@@ -1,0 +1,12 @@
+{
+    "name": "aifhub-extension",
+    "version": "0.1.0",
+    "description": "Analyze-first workflow and enhanced roadmap for AI Factory",
+    "skills": [
+        "skills/aif-analyze",
+        "skills/aif-roadmap-plus"
+    ],
+    "replaces": {
+        "skills/aif-roadmap-plus": "aif-roadmap"
+    }
+}
