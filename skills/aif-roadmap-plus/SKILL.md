@@ -10,8 +10,10 @@ Create or update `.ai-factory/ROADMAP.md` with a slice-based maturity assessment
 ## Workflow
 
 1. Load context first.
-   - Read project language memory first: an existing language note in `AGENTS.md`, then `CLAUDE.md`, then `.ai-factory/RULES.md`.
-   - If no language is recorded, ask one question and persist the answer in the project before writing the roadmap.
+   - Read project language memory first from `AGENTS.md`, then `CLAUDE.md`, then `.ai-factory/RULES.md`.
+   - Treat only explicit localization markers as saved memory. In `AGENTS.md` or `CLAUDE.md`, use a dedicated `## Interaction Preferences` section with `Default reply language:` and optional `Default artifact language:` lines.
+   - Never treat tech-stack fields such as `Language: TypeScript`, the current conversation language, or OS locale as a saved project language.
+   - If the explicit localization markers are missing, asking is mandatory before analysis or roadmap generation.
    - Use the same language for replies and artifacts by default unless the user explicitly wants a split.
    - Read `.ai-factory/DESCRIPTION.md` and `.ai-factory/ARCHITECTURE.md` when present.
    - Read the current `.ai-factory/ROADMAP.md` before editing it.

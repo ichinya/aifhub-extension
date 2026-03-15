@@ -48,7 +48,15 @@ It then stores that project preference in the project itself:
 - Otherwise prefer an existing `CLAUDE.md`
 - Otherwise fall back to `.ai-factory/RULES.md`
 
-That saved project language is reused in later sessions for both replies and generated artifacts by default. If the user explicitly wants different languages for communication and artifacts, the skill may store that split as a project-specific override.
+In `AGENTS.md` or `CLAUDE.md`, the saved preference should live in a dedicated section:
+
+```md
+## Interaction Preferences
+- Default reply language: Thai
+- Default artifact language: Thai
+```
+
+Only these explicit markers count as saved localization memory. Tech-stack lines such as `Language: TypeScript` must not be treated as reply language. If the markers are absent, the skill must ask before analysis. The saved project language is reused in later sessions for both replies and generated artifacts by default. If the user explicitly wants different languages for communication and artifacts, the skill may store that split as a project-specific override.
 
 ```bash
 /aif-analyze russian
