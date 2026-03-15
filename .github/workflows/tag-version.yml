@@ -1,0 +1,52 @@
+name: Tag Version from extension.json
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'extension.json'
+
+permissions:
+  contents: write
+
+jobs:
+  tag-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version from extension.json
+        id: get-version
+        run: |
+          VERSION=$(jq -r '.version' extension.json)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Check if tag exists
+        id: check-tag
+        run: |
+          TAG=${{ steps.get-version.outputs.tag }}
+          if git tag -l | grep -q "^${TAG}$"; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create and push tag
+        if: steps.check-tag.outputs.exists == 'false'
+        run: |
+          TAG=${{ steps.get-version.outputs.tag }}
+          VERSION=${{ steps.get-version.outputs.version }}
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $VERSION"
+          git push origin "$TAG"
+
+      - name: Tag info
+        if: steps.check-tag.outputs.exists == 'true'
+        run: |
+          echo "::notice::Tag ${{ steps.get-version.outputs.tag }} already exists, skipping creation"
