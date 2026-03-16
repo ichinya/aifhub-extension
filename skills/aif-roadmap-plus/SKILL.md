@@ -26,15 +26,34 @@ Create or update `.ai-factory/ROADMAP.md` with a slice-based maturity assessment
    - Use default mode for new roadmap generation or general roadmap updates.
    - Use check mode when the user asks to verify, re-audit, or compare the roadmap against the current repository.
 
-3. Analyze the repository.
-   - Use [references/slice-checklist.md](references/slice-checklist.md) to inspect all required slices.
-   - Treat git history as supporting context only, never as sole proof of completion.
+3. Analyze the repository across these 11 slices.
+   - Launch / Runtime
+   - Architecture / Structure
+   - Core Business Logic
+   - API / Contracts
+   - Data / Database / Migrations
+   - Security / Auth / Secrets
+   - Integrations / External Services
+   - Quality / Tests / Validation
+   - CI/CD / Delivery
+   - Observability / Logs / Metrics
+   - Documentation / DX
+   - Use [references/slice-checklist.md](references/slice-checklist.md) for the detailed checklist behind each slice.
+   - Status definitions are strict:
+   - `done` means comprehensive evidence exists in the repository for that slice.
+   - `partial` means some meaningful evidence exists, but important pieces are missing or incomplete.
+   - `missing` means there is no meaningful implementation evidence, or only aspirational notes without working artifacts.
+   - Evidence priority is strict:
+   - Primary evidence is source code, config files, schemas, tests, pipelines, and automation definitions.
+   - Secondary evidence is project documentation when it matches the repository state.
+   - Git history is supporting context only and must never be the sole reason to mark a slice `done`.
    - Preserve manual notes when they still match the codebase.
 
 4. Write `.ai-factory/ROADMAP.md`.
    - Follow [references/roadmap-template.md](references/roadmap-template.md).
    - Mark a slice `done` only with concrete proof.
    - Prefer `partial` over optimistic grading.
+   - Treat the roadmap as an audit artifact, not as a generic task list.
 
 5. Report the outcome.
    - Summarize the strongest areas, critical gaps, and any status changes.
