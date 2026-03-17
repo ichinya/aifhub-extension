@@ -1,0 +1,65 @@
+# Verification Findings Schema
+
+plan_id: {{plan_id}}
+verified_at: {{timestamp}}
+verdict: pass | pass-with-notes | fail
+
+# Counts
+counts:
+  blocking: 0
+  important: 0
+  optional: 0
+  total: 0
+
+# Findings by severity
+findings:
+  blocking: []
+    # - id: B001
+    #   check: task-completeness | rules-compliance | constraints | code-quality | architecture | documentation
+    #   file: path/to/file
+    #   line: 42
+    #   description: "What's wrong"
+    #   rule: "Reference to rule in rules.md or constraints file"
+    #   fix_suggestion: "How to fix it"
+
+  important: []
+    # - id: I001
+    #   ...
+
+  optional: []
+    # - id: O001
+    #   ...
+
+# Check results summary
+checks:
+  task_completeness:
+    status: pass | fail | skip
+    details: "Brief summary"
+
+  rules_compliance:
+    status: pass | fail | skip
+    details: "Brief summary"
+
+  constraints:
+    status: pass | fail | skip
+    details: "Brief summary"
+
+  code_quality:
+    build: pass | fail | skip
+    tests: pass | fail | skip
+    lint: pass | fail | skip
+    details: "Brief summary"
+
+  architecture:
+    status: pass | fail | skip
+    details: "Brief summary"
+
+  documentation:
+    status: pass | fail | skip
+    details: "Brief summary"
+
+# Next action
+next_action:
+  skill: aif-fix | aif-done
+  reason: "Why this action is recommended"
+  argument: "Argument to pass to the skill (e.g., finding ids)"

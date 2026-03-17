@@ -1,12 +1,13 @@
 # Plan Status Schema
-# This file tracks the current state of the plan workflow
+# Tracks the current state of the plan workflow
 
 plan_id: {{plan_id}}
 title: {{task_title}}
 created: {{created_date}}
 updated: {{updated_date}}
 
-# Workflow state: draft, exploring, planning, implementing, verifying, fixing, done
+# Workflow state
+# draft → exploring → planning → implementing → verifying → fixing → done
 status: draft
 
 # Progress tracking
@@ -23,14 +24,34 @@ history:
     from: null
     to: draft
 
-# Verification results
+# Verification results (updated by aif-verify+)
 verification:
   last_run: null
-  verdict: null
+  verdict: null  # pass | pass-with-notes | fail
   findings:
     blocking: 0
     important: 0
     optional: 0
+  checks:
+    task_completeness: null
+    rules_compliance: null
+    constraints: null
+    code_quality:
+      build: null
+      tests: null
+      lint: null
+    architecture: null
+    documentation: null
+
+# Fix tracking (updated by aif-fix)
+fixes:
+  total_applied: 0
+  iterations: 0
+  last_fix: null
+  applied: []
+    # - finding_id: B001
+    #   fixed_at: timestamp
+    #   description: "What was fixed"
 
 # Links
 links:
