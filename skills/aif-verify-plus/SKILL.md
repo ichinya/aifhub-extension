@@ -107,6 +107,8 @@ For each `constraints-*.md` file:
 
 ## Findings Structure
 
+Use [findings-template.yaml](references/findings-template.yaml) as the canonical schema for findings output.
+
 ```yaml
 findings:
   blocking:      # Must fix before done

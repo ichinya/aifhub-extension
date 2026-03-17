@@ -101,6 +101,7 @@ All templates are in `references/`:
 | [rules-template.md](references/rules-template.md) | Rules and constraints template |
 | [verify-template.md](references/verify-template.md) | Verification checklist |
 | [explore-template.md](references/explore-template.md) | Exploration notes structure |
+| [research-template.md](references/research-template.md) | RESEARCH.md format (from aif-explore) |
 | [status-schema.yaml](references/status-schema.yaml) | Status tracking schema |
 
 ## Importing from aif-explore

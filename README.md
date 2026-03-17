@@ -1,11 +1,26 @@
 # AIFHub Extension
 
-> Extension for [ai-factory 2.x](https://github.com/lee-to/ai-factory) CLI providing analyze-first workflow and enhanced roadmap skill.
+> Extension for [ai-factory 2.x](https://github.com/lee-to/ai-factory) CLI providing spec-driven workflow for AI agents.
 
 ## What This Extension Does
 
-- **Adds `/aif-analyze`** — Analysis-first workflow skill for primary project analysis
-- **Replaces `/aif-roadmap`** — Enhanced roadmap with evidence-based maturity assessment across 11 project slices
+Full spec-driven development workflow:
+
+| Skill | Replaces | Purpose |
+|-------|----------|---------|
+| `/aif-analyze` | — | Analyze project, create config.yaml + DESCRIPTION.md |
+| `/aif-new` | — | Create plan folder with structured artifacts |
+| `/aif-verify+` | `/aif-verify` | Enhanced verification with structured findings |
+| `/aif-fix` | — | Fix issues found by verify+ |
+| `/aif-done` | — | Finalize plan, archive to specs/ |
+| `/aif-roadmap` | `/aif-roadmap` | Enhanced roadmap with maturity assessment |
+
+## Workflow
+
+```
+aif-analyze → aif-explore → aif-new → aif-implement → aif-verify+ → aif-fix → aif-done
+                                                            ↑______________|
+```
 
 ## Installation
 
@@ -18,11 +33,8 @@ ai-factory extension add https://github.com/ichinya/aifhub-extension.git
 ### Local Installation
 
 ```bash
-# Clone repository
 git clone https://github.com/ichinya/aifhub-extension.git
 cd aifhub-extension
-
-# Add to ai-factory
 ai-factory extension add .
 ```
 
@@ -34,120 +46,104 @@ ai-factory extension add .
 /aif-analyze
 ```
 
-Scans your project and creates `.ai-factory/DESCRIPTION.md` with:
-- Project overview and type
-- Detected tech stack
-- Main modules and integrations
-- Security-sensitive areas
-- Current maturity snapshot
+Scans your project and creates:
+- `.ai-factory/config.yaml` — localization and workflow settings
+- `.ai-factory/DESCRIPTION.md` — project specification
 
-On first use in a project, the skill asks two questions:
+On first use asks for language preference and translation scope.
 
-1. What language to use in this project
-2. What to translate: `communication only`, `communication and artifacts`, or `artifacts only`
-
-The language list must always include:
-- `original (English)`
-- `russian`
-- a context-derived option when there is strong evidence for it
-
-It then stores that project preference in the project itself:
-- Prefer an existing `AGENTS.md`
-- Otherwise prefer an existing `CLAUDE.md`
-- Otherwise fall back to `.ai-factory/RULES.md`
-
-In `AGENTS.md` or `CLAUDE.md`, the saved preference should live in a dedicated section:
-
-```md
-## Interaction Preferences
-- Preferred language: Thai
-- Translation scope: communication only
-```
-
-Only these explicit markers count as saved localization memory. Tech-stack lines such as `Language: TypeScript` must not be treated as reply language. If the markers are absent, the skill must ask before analysis. If the saved scope excludes artifacts, generated files stay in the original project language. If the scope includes artifacts, generated files use the preferred language.
+### 2. Create Plan
 
 ```bash
-/aif-analyze russian
+/aif-new "add OAuth authentication"
 ```
 
-### 2. Generate Roadmap
+Creates a plan folder with structured artifacts:
 
-```bash
-/aif-roadmap
+```
+.ai-factory/plans/add-oauth/
+├── task.md        # What is being done
+├── context.md     # Local codebase context
+├── rules.md       # Implementation constraints
+├── verify.md      # Verification checklist
+├── status.yaml    # Workflow status tracking
+└── explore.md     # Exploration notes (optional)
 ```
 
-Creates `.ai-factory/ROADMAP.md` with maturity assessment across 11 slices:
+If `.ai-factory/RESEARCH.md` exists (from `/aif-explore`), it imports findings into the plan.
 
-1. **Launch / Runtime** — Entry points, environment, dependencies
-2. **Architecture / Structure** — Module organization, patterns
-3. **Core Business Logic** — Domain models, business rules
-4. **API / Contracts** — Endpoints, schemas, documentation
-5. **Data / Database** — Schema, migrations, queries
-6. **Security / Auth** — Authentication, authorization, secrets
-7. **Integrations** — External services, webhooks
-8. **Quality / Tests** — Unit, integration, E2E tests
-9. **CI/CD** — Pipelines, builds, deployment
-10. **Observability** — Logs, metrics, tracing
-11. **Documentation** — README, API docs, DX
-
-**Check mode** — Verify roadmap against current code:
+### 3. Implement
 
 ```bash
-/aif-roadmap check
-```
-
-The roadmap skill reuses the same saved project language.
-
-## Recommended Workflow
-
-```bash
-# Step 1: Analyze project
-/aif-analyze
-
-# Step 2: Define architecture
-/aif-architecture
-
-# Step 3: Generate roadmap
-/aif-roadmap
-
-# Step 4: Plan implementation
-/aif-plan "your feature"
-
-# Step 5: Implement
 /aif-implement
-
-# Step 6: Verify
-/aif-verify
 ```
+
+Implement the plan using built-in `/aif-implement` skill.
+
+### 4. Verify
+
+```bash
+/aif-verify+
+```
+
+Enhanced verification against task, rules, and constraints:
+- Produces structured findings (blocking / important / optional)
+- Routes to `/aif-fix` on fail or `/aif-done` on pass
+
+Strict mode for pre-merge checks:
+
+```bash
+/aif-verify+ --strict
+```
+
+### 5. Fix Issues
+
+```bash
+/aif-fix              # Fix blocking + important
+/aif-fix B001 I001    # Fix specific findings
+/aif-fix --all        # Fix everything including optional
+```
+
+### 6. Finalize
+
+```bash
+/aif-done
+```
+
+Archives plan artifacts to `.ai-factory/specs/<plan-id>/` with summary.
+
+### 7. Generate Roadmap
+
+```bash
+/aif-roadmap
+```
+
+Creates `.ai-factory/ROADMAP.md` with maturity assessment across 11 slices.
 
 ## Project Structure
 
 ```
 aifhub-extension/
-├── extension.json           # Extension manifest
-├── README.md                # This file
+├── extension.json                # Extension manifest (v0.4.0)
+├── README.md                     # This file
 └── skills/
-    ├── aif-analyze/
-    │   └── SKILL.md         # Analysis workflow skill
-    └── aif-roadmap-plus/
-        └── SKILL.md         # Enhanced roadmap skill
-```
-
-## Extension Manifest
-
-```json
-{
-  "name": "aifhub-extension",
-  "version": "0.1.0",
-  "description": "Analyze-first workflow and enhanced roadmap for AI Factory",
-  "skills": [
-    "skills/aif-analyze",
-    "skills/aif-roadmap-plus"
-  ],
-  "replaces": {
-    "skills/aif-roadmap-plus": "aif-roadmap"
-  }
-}
+    ├── aif-analyze/              # Project analysis
+    │   ├── SKILL.md
+    │   └── references/
+    ├── aif-new/                  # Plan creation
+    │   ├── SKILL.md
+    │   └── references/
+    ├── aif-verify-plus/          # Enhanced verification
+    │   ├── SKILL.md
+    │   └── references/
+    ├── aif-fix/                  # Fix verification issues
+    │   └── SKILL.md
+    ├── aif-done/                 # Plan finalization
+    │   ├── SKILL.md
+    │   └── references/
+    └── aif-roadmap-plus/         # Enhanced roadmap
+        ├── SKILL.md
+        └── references/
 ```
 
 ## Requirements

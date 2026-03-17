@@ -28,7 +28,8 @@ Finalize a plan by marking it complete, archiving artifacts to `.ai-factory/spec
 
 4. **Archive to specs**
    - Copy plan artifacts to `.ai-factory/specs/<plan-id>/`
-   - Create `spec.md` summary document
+   - Create `spec.md` summary using [spec-template.md](references/spec-template.md)
+   - Update `specs/index.yaml` following [index-schema.yaml](references/index-schema.yaml)
    - Preserve original timestamps
 
 5. **Update project context** (if applicable)
