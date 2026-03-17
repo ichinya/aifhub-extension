@@ -1,192 +1,337 @@
 ---
 name: aif-fix
-description: Fix issues found by aif-verify+. Reads verification findings and implements fixes for blocking and important issues. Use when verification fails or user says "fix the issues".
+description: Fix issues found by aif-verify+. Reads verification findings, implements fixes for blocking and important issues, then suggests re-verification. Use when verification fails or user says "fix the issues".
 argument-hint: "[plan-id] [finding-ids...] [--all]"
 ---
 
-# AIF Fix
+# AIF Fix — Fix Verification Findings
 
-Fix issues identified by `aif-verify+`. Reads verification findings and implements corrections for blocking and important issues.
+Fix issues identified by `aif-verify+`. Reads structured findings, implements corrections, and drives the fix → verify loop.
 
-## Workflow
-
-1. **Load plan and findings**
-   - Find plan folder (by argument or current branch)
-   - Read `status.yaml` → `verification.findings`
-   - If no verification run, suggest running `aif-verify+` first
-   - Read plan artifacts: `task.md`, `rules.md`, `constraints-*.md`
-
-2. **Identify issues to fix**
-   - With `[finding-ids...]`: fix only specified findings (B001, I001, etc.)
-   - With `--all`: fix all findings including optional
-   - Default: fix blocking + important findings
-
-3. **Prioritize fixes**
-   - Blocking issues first (B001, B002, ...)
-   - Important issues second (I001, I002, ...)
-   - Optional issues last (only with --all)
-
-4. **Implement fixes**
-   - For each finding:
-     - Read affected file(s)
-     - Implement fix following `rules.md` constraints
-     - Verify fix addresses the finding
-   - Run tests after each fix if applicable
-
-5. **Update status**
-   - Mark fixed findings in status.yaml
-   - Update verification section
-
-6. **Re-verify**
-   - Suggest running `aif-verify+` to confirm fixes
-   - Or show manual verification steps
-
-## Fix Implementation Rules
-
-### For Task Completeness Issues
-
-```
-Finding: Missing implementation for task item
-Fix:
-1. Read task.md → Scope → In Scope for requirement details
-2. Implement the missing functionality
-3. Add/update tests
-4. Update documentation if required
-```
-
-### For Rules Compliance Issues
-
-```
-Finding: Violation of rule in rules.md
-Fix:
-1. Read the specific rule from rules.md
-2. Understand what the rule requires
-3. Modify code to comply with rule
-4. Verify no other code violates same rule
-```
-
-### For Code Quality Issues
-
-```
-Finding: Build/test/lint failure
-Fix:
-1. Read error output
-2. Identify root cause
-3. Fix the issue
-4. Re-run the failing check
-```
-
-### For Documentation Issues
-
-```
-Finding: Missing or outdated documentation
-Fix:
-1. Identify what needs documentation
-2. Update relevant doc files
-3. Ensure consistency with code
-```
-
-## Fix Report Format
-
-After fixing, report what was done:
-
-```
-## Fix Report: {{plan-id}}
-
-### Issues Fixed
-
-| ID | Severity | Issue | Fix Applied |
-|----|----------|-------|-------------|
-| B001 | blocking | Missing rate limiting | Added rate-limit middleware to login |
-| I001 | important | TODO in code | Removed TODO, implemented proper error handling |
-
-### Files Modified
-
-- `src/auth/login.ts` — Added rate limiting, removed TODO
-- `src/middleware/rate-limit.ts` — New file
-
-### Tests
-
-- Added: `tests/auth/login.rate-limit.test.ts`
-- Result: ✅ All tests pass
-
-### Remaining Issues
-
-| ID | Severity | Issue | Reason |
-|----|----------|-------|--------|
-| O001 | optional | Missing API docs | Deferred (not blocking) |
+**This skill modifies source code.** It reads verification findings and applies targeted fixes following plan rules.
 
 ---
 
-## Next Steps
+## Artifact Ownership
 
-✅ Run `/aif-verify+` to confirm all fixes
+- **Primary ownership:** Source code files that need fixing (guided by findings).
+- **Writes:** `plans/<plan-id>/status.yaml` (fixes section).
+- **Read-only:** `plans/<plan-id>/task.md`, `rules.md`, `constraints-*.md`, `verify.md`, all project context files.
+- **No writes to:** Plan artifact content (task.md, rules.md, etc.), specs/, other plans.
+
+---
+
+## Step 0: Load Context
+
+### 0.1 Load Skill-Context Overrides
+
+**Read `.ai-factory/skill-context/aif-fix/SKILL.md`** — MANDATORY if the file exists.
+
+Treat skill-context rules as project-level overrides:
+- When a skill-context rule conflicts with this SKILL.md, **the skill-context rule wins**.
+- **CRITICAL:** If a skill-context rule says "fixes MUST include X" — you MUST comply.
+
+**Enforcement:** After each fix, verify it against all skill-context rules.
+
+### 0.2 Load Project Context
+
+Read these files if present:
+- `.ai-factory/config.yaml` — localization
+- `.ai-factory/DESCRIPTION.md` — tech stack, conventions
+- `.ai-factory/ARCHITECTURE.md` — dependency rules, file placement
+- `.ai-factory/RULES.md` — project conventions
+- `AGENTS.md` — project structure
+
+### 0.3 Find Plan and Findings
+
+```
+1. If $ARGUMENTS contains plan-id → use .ai-factory/plans/<plan-id>/
+2. Else get current branch → look for matching plan
+3. Else list available plans → ask user
 ```
 
-## Status Update
+Read `status.yaml → verification`:
+- If `verification.last_run` is null:
+  ```
+  No verification results found. Run /aif-verify+ first to identify issues.
+  ```
+  → STOP.
+- If `verification.verdict` is `pass`:
+  ```
+  Last verification passed. Nothing to fix.
+  Suggest: /aif-done to finalize the plan.
+  ```
+  → STOP.
 
-Update `status.yaml` after fixes:
+Read plan artifacts: `task.md`, `rules.md`, `constraints-*.md`, `verify.md`.
+
+### 0.4 Parse Finding IDs from Arguments
+
+- If `$ARGUMENTS` contains finding IDs (B001, I001, etc.) → fix only those
+- If `$ARGUMENTS` contains `--all` → fix all findings including optional
+- Default (no IDs, no flags) → fix blocking + important
+
+---
+
+## Step 1: Identify and Prioritize
+
+### 1.1 Load Findings
+
+Read findings from `verify.md → Findings` table or from the verification output.
+
+### 1.2 Build Fix Queue
+
+```
+Fix Queue (ordered by priority):
+1. 🔴 B001: Login endpoint missing rate limiting [src/auth/login.ts:45]
+2. 🔴 B002: Build fails — type error [src/models/user.ts:12]
+3. 🟡 I001: TODO left in code [src/auth/login.ts:12]
+4. 🟡 I002: Missing unit test for validation [—]
+```
+
+Show the queue and confirm:
+
+```
+AskUserQuestion: Fix queue ready. Proceed?
+
+Blocking: 2 issues
+Important: 2 issues
+
+Options:
+1. Fix all (recommended) — Address all blocking + important
+2. Fix blocking only — Address only blocking issues
+3. Select specific — Choose which findings to fix
+4. Cancel — I'll handle this manually
+```
+
+---
+
+## Step 2: Implement Fixes
+
+For each finding in the queue:
+
+### 2.1 Announce Current Fix
+
+```
+## Fixing B001: Login endpoint missing rate limiting
+File: src/auth/login.ts:45
+Rule: rules.md → Implementation Rules → #3
+```
+
+### 2.2 Read and Understand Context
+
+- Read the affected file(s)
+- Read surrounding code for patterns and conventions
+- Understand the root cause (not just the symptom)
+- Check `rules.md` for constraints that apply to the fix
+
+### 2.3 Apply the Fix
+
+Follow the same conventions as the existing code:
+- Match code style, naming patterns, error handling approach
+- Follow ARCHITECTURE.md dependency rules
+- Follow RULES.md conventions
+- Add logging where appropriate (use project's logging pattern)
+
+### 2.4 Verify the Fix Locally
+
+After applying:
+- Check code compiles (if applicable)
+- Run relevant tests (if applicable)
+- Verify the fix actually addresses the finding
+
+### 2.5 Mark Finding as Fixed
+
+Record in `status.yaml`:
+```yaml
+fixes:
+  applied:
+    - finding_id: B001
+      fixed_at: <timestamp>
+      description: "Added rate-limit middleware to login endpoint"
+      files_modified:
+        - src/auth/login.ts
+        - src/middleware/rate-limit.ts
+```
+
+### 2.6 Move to Next Finding
+
+Repeat for each finding in the queue.
+
+---
+
+## Step 3: Fix Strategies by Category
+
+### Task Completeness Issues (missing implementation)
+
+```
+1. Read task.md → Scope → find the missing item
+2. Read context.md → identify where to implement
+3. Implement the missing functionality
+4. Add tests if rules.md requires them
+5. Update documentation if rules.md requires it
+```
+
+### Rules Compliance Issues (rule violation)
+
+```
+1. Read the specific rule from rules.md
+2. Understand what the rule requires
+3. Modify code to comply
+4. Grep for same pattern elsewhere — fix all occurrences
+```
+
+### Code Quality Issues (build/test/lint failure)
+
+```
+1. Read the error output carefully
+2. Identify root cause (not just silence the error)
+3. Fix the underlying issue
+4. Re-run the failing check to confirm
+```
+
+### Documentation Issues (missing/outdated docs)
+
+```
+1. Identify what needs documentation
+2. Update the relevant files (README, API docs, inline comments)
+3. Ensure consistency with actual code behavior
+```
+
+### Architecture Issues (wrong file location, dependency violation)
+
+```
+1. Read ARCHITECTURE.md rules
+2. Move files or fix imports to comply
+3. Update any references to moved files
+4. Verify no broken imports
+```
+
+---
+
+## Step 4: Fix Report
+
+After all fixes applied:
+
+```
+## Fix Report: <plan-id>
+
+### Issues Fixed: N/M
+
+| ID | Severity | Issue | Fix Applied | Files |
+|----|----------|-------|-------------|-------|
+| B001 | 🔴 blocking | Missing rate limiting | Added middleware | login.ts, rate-limit.ts |
+| B002 | 🔴 blocking | Type error | Fixed type annotation | user.ts |
+| I001 | 🟡 important | TODO in code | Implemented proper logic | login.ts |
+| I002 | 🟡 important | Missing test | Added unit test | login.test.ts |
+
+### Files Modified
+- `src/auth/login.ts` — Added rate limiting, resolved TODO
+- `src/middleware/rate-limit.ts` — New file
+- `src/models/user.ts` — Fixed type annotation
+- `tests/auth/login.test.ts` — New test file
+
+### Remaining Issues
+| ID | Severity | Issue | Reason |
+|----|----------|-------|--------|
+| O001 | ⚪ optional | Missing API docs | Not in fix scope |
+
+### Build/Test Status After Fixes
+- Build: ✅ / ❌
+- Tests: ✅ N passed / ❌ N failed
+```
+
+---
+
+## Step 5: Route to Re-Verification
+
+```
+AskUserQuestion: Fixes applied. What next?
+
+Options:
+1. Re-verify — Run /aif-verify+ to confirm fixes (recommended)
+2. Commit fixes — Run /aif-commit
+3. Continue fixing — Address remaining optional issues
+4. Done for now — I'll verify later
+```
+
+---
+
+## Step 6: Update Status
+
+Update `plans/<plan-id>/status.yaml`:
 
 ```yaml
-status: fixing  # or ready-for-verify
+status: fixing
 
-verification:
-  last_run: 2024-01-15T10:30:00Z
-  verdict: fail  # Previous verdict
-  findings:
-    blocking: 0    # Updated after fixes
-    important: 0
-    optional: 1
-
-fixes_applied:
-  - finding_id: B001
-    fixed_at: 2024-01-15T10:45:00Z
-    description: "Added rate limiting middleware"
-  - finding_id: I001
-    fixed_at: 2024-01-15T10:50:00Z
-    description: "Removed TODO comment"
+fixes:
+  total_applied: <count>
+  iterations: <N>  # Increment each fix cycle
+  last_fix: <current ISO timestamp>
+  applied:
+    - finding_id: B001
+      fixed_at: <timestamp>
+      description: "..."
+    # ... all fixed findings
 ```
+
+### Context Cleanup
+
+```
+AskUserQuestion: Free up context before continuing?
+
+Options:
+1. /clear — Full reset (recommended after fixing)
+2. /compact — Compress history
+3. Continue as is
+```
+
+---
 
 ## Fix Loop
 
 ```
-aif-verify+ (FAIL) → aif-fix → aif-verify+ (PASS) → aif-done
-         ↑__________________|
+aif-verify+ (FAIL) → aif-fix → aif-verify+ → PASS → aif-done
+         ↑__________________________|
               (if still FAIL)
 ```
 
-Maximum fix iterations: 3
-After 3 failed attempts, escalate to user for manual intervention.
+**Maximum iterations: 3**
 
-## Integration
+After 3 failed fix → verify cycles:
+```
+⚠️ Fix loop limit reached (3 iterations).
 
-| Skill | Relationship |
-|-------|--------------|
-| `aif-verify+` | Predecessor — provides findings to fix |
-| `aif-verify+` | Successor — confirms fixes |
-| `aif-done` | Final successor — after verification passes |
+The following issues persist after 3 fix attempts:
+- B001: ...
+- I002: ...
+
+Options:
+1. Escalate — I need to review these manually
+2. Accept — Proceed to /aif-done with accepted findings
+3. One more try — Reset counter and try again
+```
+
+---
 
 ## Rules
 
-- Always read findings from status.yaml or verification output
-- Follow rules.md constraints when implementing fixes
-- Run tests after fixes when applicable
-- Update status.yaml with fix results
-- Suggest re-verification after fixes complete
-- Do not mark findings as fixed without implementing the fix
+- **Always read findings first** — never fix without knowing what's broken
+- **Follow rules.md constraints** when implementing fixes
+- **Follow project conventions** — match existing code style
+- **One fix at a time** — complete, verify, move to next
+- **Run tests after fixes** when applicable
+- **Update status.yaml** with fix results
+- **Suggest re-verification** after fixes complete
+- **Do not mark findings as fixed** without actually implementing the fix
+- **Do not scope-creep** — fix only what was reported, don't refactor
+- **Read skill-context overrides** — project-specific fix rules take priority
 
-## Example Usage
+## Anti-patterns
 
-```
-# Fix all blocking and important issues from last verification
-/aif-fix
-
-# Fix specific findings
-/aif-fix B001 I001
-
-# Fix everything including optional
-/aif-fix --all
-
-# Fix issues in specific plan
-/aif-fix add-oauth B001 B002
-```
+- ❌ Fixing without reading the finding details
+- ❌ Silencing errors instead of fixing root cause
+- ❌ Refactoring unrelated code while fixing
+- ❌ Skipping re-verification after fixes
+- ❌ Exceeding 3 fix iterations without user input
+- ❌ Modifying plan artifacts (task.md, rules.md) during fix

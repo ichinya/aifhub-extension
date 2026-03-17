@@ -1,194 +1,292 @@
 ---
 name: aif-new
 description: Create a new plan folder with structured artifacts (task, context, rules, verify, status). Use when starting a new feature, change, or improvement that requires structured planning.
+argument-hint: "[task description]"
 ---
 
-# AIF New
+# AIF New — Create Plan Folder
 
-Create a new plan folder under `.ai-factory/plans/<plan-id>/` with all required artifacts.
+Create a new plan folder under `.ai-factory/plans/<plan-id>/` with all required artifacts for spec-driven workflow.
+
+**This skill creates the plan structure only.** It does NOT implement anything. After plan creation, hand off to `aif-implement`.
+
+---
+
+## Artifact Ownership
+
+- **Primary ownership:** `.ai-factory/plans/<plan-id>/` — all files inside the new plan folder.
+- **Read-only:** `.ai-factory/config.yaml`, `.ai-factory/DESCRIPTION.md`, `.ai-factory/ARCHITECTURE.md`, `AGENTS.md`, `.ai-factory/RESEARCH.md`.
+- **No writes to:** project source code, other plans, specs/, ROADMAP.md, RULES.md.
+
+---
+
+## Step 0: Load Context
+
+### 0.1 Load Skill-Context Overrides
+
+**Read `.ai-factory/skill-context/aif-new/SKILL.md`** — MANDATORY if the file exists.
+
+This file contains project-specific rules accumulated by `/aif-evolve`. Treat them as project-level overrides:
+- When a skill-context rule conflicts with a rule in this SKILL.md, **the skill-context rule wins**.
+- When there is no conflict, apply both.
+- **CRITICAL:** skill-context rules apply to ALL outputs — including plan artifact content. Generating artifacts that violate skill-context rules is a bug.
+
+**Enforcement:** After generating any plan artifact, verify it against all skill-context rules. Fix violations before presenting to the user.
+
+### 0.2 Load Project Context
+
+Read these files if present (do NOT fail if missing):
+
+- `.ai-factory/config.yaml` — localization, workflow settings, plan_id_format
+- `.ai-factory/DESCRIPTION.md` — tech stack, modules, integrations
+- `AGENTS.md` — project structure map
+- `.ai-factory/ARCHITECTURE.md` — architecture patterns, dependency rules
+- `.ai-factory/RULES.md` — project conventions (if any)
+- `.ai-factory/RESEARCH.md` — persisted exploration notes
+
+If `.ai-factory/config.yaml` does not exist:
+```
+AskUserQuestion: Project config not found. Create it?
+
+Options:
+1. Yes — Run /aif-analyze first to initialize config (recommended)
+2. Continue without config — Use defaults (english, slug format)
+```
+
+### 0.3 Resolve Localization
+
+- If `config.yaml` exists → use `language_mode` and `artifact_language`
+- If no config → fall back to `AGENTS.md` / `CLAUDE.md` / `.ai-factory/RULES.md` Interaction Preferences
+- If no localization found anywhere → ask before generating artifacts
+- **Keep file names, identifiers, and YAML keys in English always**
+
+---
+
+## Step 1: Gather Plan Input
+
+### 1.1 Parse Arguments
+
+If `$ARGUMENTS` contains a task description → use it as the starting point.
+
+If `$ARGUMENTS` is empty:
+```
+AskUserQuestion: What would you like to plan?
+
+Provide a brief description of the feature, change, or improvement.
+Examples:
+- "Add OAuth authentication with Google and GitHub"
+- "Refactor database layer to support PostgreSQL"
+- "Fix performance issues in search endpoint"
+```
+
+### 1.2 Check for Exploration Output
+
+Read `.ai-factory/RESEARCH.md` if it exists:
+
+- Parse `<!-- aif:active-summary:start -->` ... `<!-- aif:active-summary:end -->` block
+- If topic matches the task description (or is clearly related):
+  ```
+  AskUserQuestion: Found exploration notes in RESEARCH.md that may be relevant.
+
+  Topic: {{research_topic}}
+  Goal: {{research_goal}}
+
+  Import exploration into the plan?
+
+  Options:
+  1. Yes — Import findings into plan artifacts (recommended)
+  2. No — Start fresh, ignore exploration
+  3. View — Show me the summary first
+  ```
+- If imported, distribute content:
+  - Topic + Goal → `task.md`
+  - Constraints + Decisions → `rules.md`
+  - Open questions → `task.md → Out of Scope` or `context.md → Known Constraints`
+  - Success signals → `verify.md`
+
+### 1.3 Clarify Scope
+
+If the task description is vague or broad, ask targeted questions:
+
+```
+AskUserQuestion: Let me clarify the scope for this plan.
+
+1. What specific outcome do you expect? (not just "add feature X" but "users can do Y")
+2. Are there parts we should explicitly NOT touch?
+3. Any hard constraints? (deadlines, dependencies, backwards compatibility)
+4. Related issue or PR number?
+```
+
+Do NOT ask all questions if the task is already clear. Skip what's obvious.
+
+### 1.4 Investigate Codebase (when relevant)
+
+If the task mentions specific modules, files, or features:
+- Use `Glob` and `Grep` to find relevant files
+- Read key files to understand current implementation
+- Map integration points
+- This feeds into `context.md`
+
+---
+
+## Step 2: Generate Plan ID
+
+Read format from `config.yaml → workflow.plan_id_format` (default: `slug`).
+
+| Format | Logic | Example |
+|--------|-------|---------|
+| `slug` | Lowercase, hyphens, max 40 chars, from task title | `add-oauth-authentication` |
+| `sequential` | Next number: scan existing plans, increment | `003` |
+| `timestamp` | ISO date-time compact | `2024-01-15-1030` |
+
+**Uniqueness check:**
+```bash
+ls .ai-factory/plans/
+```
+If collision → append `-2`, `-3`, etc.
+
+---
+
+## Step 3: Create Plan Folder
+
+```bash
+mkdir -p .ai-factory/plans/<plan-id>
+```
+
+Create these files using templates from `references/`:
+
+| File | Template | Required |
+|------|----------|----------|
+| `task.md` | [task-template.md](references/task-template.md) | Yes |
+| `context.md` | [context-template.md](references/context-template.md) | Yes |
+| `rules.md` | [rules-template.md](references/rules-template.md) | Yes |
+| `verify.md` | [verify-template.md](references/verify-template.md) | Yes |
+| `status.yaml` | [status-schema.yaml](references/status-schema.yaml) | Yes |
+| `explore.md` | [explore-template.md](references/explore-template.md) | Only if RESEARCH.md imported |
+| `constraints-*.md` | — | Only if specific constraints identified |
+
+### Populating Artifacts
+
+**task.md** — Fill from user input + exploration:
+- Summary: 1-2 sentence description
+- Motivation: why this matters
+- Scope In/Out: concrete checklist items
+- Acceptance Criteria: testable conditions
+- Dependencies and effort estimate
+
+**context.md** — Fill from codebase investigation:
+- Key files that will be changed (with paths)
+- Relevant patterns already in use
+- Known constraints from ARCHITECTURE.md
+- Integration points
+
+**rules.md** — Fill from exploration decisions + project rules:
+- Import project-level rules from RULES.md / ARCHITECTURE.md
+- Add plan-specific implementation rules
+- Testing requirements (what needs tests)
+- Documentation requirements
+
+**verify.md** — Generate from task scope + rules:
+- One checkbox per In Scope item
+- One checkbox per acceptance criterion
+- Standard checks: build, tests, lint, docs
+- Constraints compliance checkboxes
+
+**status.yaml** — Initialize:
+```yaml
+plan_id: <plan-id>
+title: "<task title>"
+created: <current ISO timestamp>
+updated: <current ISO timestamp>
+status: draft
+progress:
+  scope_total: <count of In Scope items>
+  scope_completed: 0
+history:
+  - timestamp: <current ISO timestamp>
+    event: created
+    to: draft
+links:
+  issue: <issue number if provided>
+```
+
+### Content Rules
+
+- Fill in everything you know — do NOT leave `{{placeholder}}` when real data is available
+- Use `{{placeholder}}` ONLY for information you genuinely don't have
+- Generate in `artifact_language` from config
+- Use evidence from codebase investigation, not assumptions
+- Cross-reference with ARCHITECTURE.md for file placement rules
+
+---
+
+## Step 4: Report and Handoff
+
+Show the created plan:
+
+```
+## Plan Created ✅
+
+📁 `.ai-factory/plans/<plan-id>/`
+
+| Artifact | Status | Description |
+|----------|--------|-------------|
+| task.md | ✅ Ready | <brief summary> |
+| context.md | ✅ Ready | <N key files mapped> |
+| rules.md | ✅ Ready | <N rules defined> |
+| verify.md | ✅ Ready | <N checkpoints> |
+| status.yaml | ✅ Draft | Plan initialized |
+| explore.md | ✅/— | Imported from RESEARCH.md / Not applicable |
+
+### Next Steps
+
+1. 📝 Review artifacts — Check task.md scope and rules.md constraints
+2. 🔍 /aif-explore <plan-id> — If more research needed
+3. 🚀 /aif-implement — When ready to start coding
+```
+
+```
+AskUserQuestion: What would you like to do next?
+
+Options:
+1. Review plan artifacts — Open task.md for review
+2. Start exploring — Run /aif-explore for deeper research
+3. Start implementing — Run /aif-implement
+4. Done for now — I'll review later
+```
+
+---
 
 ## Context + Rules + Templates Model
 
 This skill follows the [context-rules-templates-model.md](references/context-rules-templates-model.md):
 
-| Level | Context | Rules | Templates |
-|-------|---------|-------|-----------|
-| **Project** | config.yaml, DESCRIPTION.md, AGENTS.md | ARCHITECTURE.md, RULES.md | .ai-factory/templates/ |
-| **Plan** | task.md, context.md, explore.md | rules.md, verify.md, constraints-*.md | (inherits from project) |
+| Level | Context | Rules |
+|-------|---------|-------|
+| **Project** | config.yaml, DESCRIPTION.md, AGENTS.md | ARCHITECTURE.md, RULES.md |
+| **Plan** | task.md, context.md, explore.md | rules.md, verify.md, constraints-*.md |
 
-Plan artifacts **inherit** from project level and can add plan-specific rules.
+Plan artifacts **inherit** from project level. Plan rules can **add to** but not **replace** project rules.
 
-## Workflow
-
-1. **Read project context**
-   - `.ai-factory/config.yaml` — localization, workflow settings
-   - `.ai-factory/DESCRIPTION.md` — tech stack, modules
-   - `AGENTS.md` — project structure map
-   - `.ai-factory/ARCHITECTURE.md` — architecture patterns (if exists)
-
-2. **Check for exploration output**
-   - Read `.ai-factory/RESEARCH.md` if exists
-   - If RESEARCH.md contains relevant exploration:
-     - Offer to import it into the plan as `explore.md`
-     - Extract key findings into `context.md`
-     - Extract decisions into `rules.md`
-   - If no exploration exists:
-     - Ask if user wants to run `aif-explore` first
-     - Or proceed with basic plan creation
-
-3. **Gather plan input**
-   - Ask the user for the task description if not provided
-   - Clarify scope: what's in and out of this plan
-   - Identify key files/modules affected
-   - Capture any constraints or requirements
-
-4. **Generate plan id**
-   - Format from `config.yaml → workflow.plan_id_format` (default: slug)
-   - `slug`: Generate from task title (lowercase, hyphens, max 40 chars)
-   - `sequential`: Use next number (001, 002, etc.)
-   - `timestamp`: Use ISO date-time format
-   - Ensure uniqueness by checking existing plans in `.ai-factory/plans/`
-
-5. **Create plan folder structure**
-   ```
-   .ai-factory/plans/<plan-id>/
-     task.md        # What is being done (required)
-     context.md     # Local context for this plan (required)
-     rules.md       # Plan-specific rules (required)
-     verify.md      # Verification checklist (required)
-     status.yaml    # Workflow status tracking (required)
-     explore.md     # Exploration notes (optional, from aif-explore)
-     constraints-*.md # Additional constraints (optional)
-   ```
-
-6. **Populate artifacts from templates**
-   - Use templates from `references/*-template.md`
-   - Fill in available information from:
-     - User input
-     - Exploration notes (RESEARCH.md)
-     - Project context files
-   - Mark placeholders with `{{placeholder}}` for user review
-   - Set initial `status: draft` in status.yaml
-
-7. **Report and handoff**
-   - Show created plan folder path
-   - List created artifacts with brief descriptions
-   - Suggest next steps:
-     - `aif-explore` — if more research needed
-     - `aif-implement` — if plan is ready for implementation
-     - Manual review — if placeholders need filling
-
-## Artifact Descriptions
-
-| File | Type | Purpose | Required |
-|------|------|---------|----------|
-| `task.md` | Context | Clear definition of what and why | Yes |
-| `context.md` | Context | Relevant codebase context, key files | Yes |
-| `rules.md` | Rules | Implementation constraints, testing requirements | Yes |
-| `verify.md` | Rules + Template | Verification checklist for aif-verify+ | Yes |
-| `status.yaml` | Context | Workflow state tracking | Yes |
-| `explore.md` | Context | Exploration notes from aif-explore | Optional |
-| `constraints-*.md` | Rules | Additional constraint files (security, API, etc.) | Optional |
-
-## Templates
-
-All templates are in `references/`:
-
-| Template | Purpose |
-|----------|---------|
-| [task-template.md](references/task-template.md) | Task definition structure |
-| [context-template.md](references/context-template.md) | Context gathering template |
-| [rules-template.md](references/rules-template.md) | Rules and constraints template |
-| [verify-template.md](references/verify-template.md) | Verification checklist |
-| [explore-template.md](references/explore-template.md) | Exploration notes structure |
-| [research-template.md](references/research-template.md) | RESEARCH.md format (from aif-explore) |
-| [status-schema.yaml](references/status-schema.yaml) | Status tracking schema |
-
-## Importing from aif-explore
-
-When `.ai-factory/RESEARCH.md` exists and contains relevant exploration:
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  RESEARCH.md                                            │
-│  ┌─────────────────────────────────────────────────┐    │
-│  │ Active Summary                                   │    │
-│  │ - Topic: Add OAuth authentication                │    │
-│  │ - Goal: Support Google and GitHub providers      │    │
-│  │ - Decisions: Use Passport.js, store in session   │    │
-│  │ - Open questions: Token refresh strategy?        │    │
-│  └─────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────┘
-                         │
-                         ▼ aif-new
-┌─────────────────────────────────────────────────────────┐
-│  plans/oauth-auth/                                      │
-│  ├── task.md      ← Topic, Goal                        │
-│  ├── context.md   ← Relevant files, patterns           │
-│  ├── rules.md     ← Decisions, constraints             │
-│  ├── verify.md    ← Success signals                    │
-│  ├── explore.md   ← Full RESEARCH.md content           │
-│  └── status.yaml  ← draft                              │
-└─────────────────────────────────────────────────────────┘
-```
+---
 
 ## Rules
 
-- Always read `.ai-factory/config.yaml` first for project settings
-- Create plan folder only under `.ai-factory/plans/`
-- Never overwrite existing plans — generate unique plan id
-- Keep all artifact file names in English
-- Generate content in the configured `artifact_language`
-- Leave placeholders clearly marked for user review
-- Import exploration from RESEARCH.md when available
-- Do not start implementation — only create the plan structure
+- **Read `.ai-factory/config.yaml` first** for project settings
+- **Read skill-context overrides** before generating artifacts
+- **Create plan folder only under** `.ai-factory/plans/`
+- **Never overwrite existing plans** — generate unique plan id
+- **Keep file names in English** — always
+- **Generate content** in configured `artifact_language`
+- **Fill real data** where available, use `{{placeholder}}` only for unknowns
+- **Do not start implementation** — only create the plan structure
+- **Import exploration** from RESEARCH.md when available and relevant
+- **Do not auto-capture** — always ask before importing exploration
 
-## Example Usage
+## Anti-patterns
 
-```
-User: "Create a plan for adding dark mode to the UI"
-
-Agent:
-1. Reads config.yaml (language: russian)
-2. Checks RESEARCH.md (not found)
-3. Asks clarifying questions about scope
-4. Creates .ai-factory/plans/add-dark-mode/
-5. Populates all artifacts with gathered info
-```
-
-```
-User: "Мне нужен план для OAuth" (after running aif-explore)
-
-Agent:
-1. Reads config.yaml (artifact_language: russian)
-2. Reads RESEARCH.md (contains OAuth exploration)
-3. Offers to import exploration → explore.md
-4. Creates .ai-factory/plans/oauth-auth/
-5. Extracts findings into context.md, decisions into rules.md
-```
-
-## Integration with Other Skills
-
-| Skill | Relationship |
-|-------|--------------|
-| `aif-explore` | Reads RESEARCH.md, creates explore.md in plan |
-| `aif-implement` | Reads plan artifacts to guide implementation |
-| `aif-verify+` | Uses verify.md as verification checklist |
-| `aif-done` | Marks plan complete, archives to specs/ |
-
-## Status Workflow
-
-```
-draft → exploring → planning → implementing → verifying → fixing → done
-                                    ↑_______________|
-```
-
-| Status | Description |
-|--------|-------------|
-| `draft` | Initial creation, artifacts may have placeholders |
-| `exploring` | Running aif-explore for more context |
-| `planning` | Refining plan details, all placeholders filled |
-| `implementing` | Active implementation via aif-implement |
-| `verifying` | Running aif-verify+ |
-| `fixing` | Addressing verification findings |
-| `done` | Completed and archived to specs/ |
+- ❌ Creating plan with all `{{placeholder}}` — investigate first, fill what you can
+- ❌ Skipping codebase investigation — always check relevant files
+- ❌ Auto-importing RESEARCH.md without asking — user must confirm
+- ❌ Creating constraints-*.md files by default — only when specific constraints identified
+- ❌ Starting implementation — this skill only creates plan structure
