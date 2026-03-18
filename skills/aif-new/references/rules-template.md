@@ -39,7 +39,7 @@ List concrete inherited area rules when known, for example:
 - [ ] README
 - [ ] API docs
 - [ ] Inline comments
-- [ ] AGENTS.md / DESCRIPTION.md
+- [ ] DESCRIPTION.md (if stack/integrations changed)
 
 ## Breaking Changes
 

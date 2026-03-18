@@ -1,6 +1,6 @@
 ---
 name: aif-done
-description: Finalize a plan, mark it complete, and archive artifacts to specs/. Use after aif-verify+ passes or when manually marking work as done.
+description: Finalize a plan, mark it complete, and archive artifacts to specs/. Use after /aif-verify passes or when manually marking work as done.
 argument-hint: "[plan-id] [--summary] [--force]"
 ---
 
@@ -57,6 +57,8 @@ Read all artifacts from the plan folder:
 - `.ai-factory/DESCRIPTION.md` — to check for needed updates
 - `.ai-factory/ARCHITECTURE.md` — to check for architecture changes
 - `.ai-factory/ROADMAP.md` — to suggest milestone completion
+- `.ai-factory/RULES.md` — additional project conventions (if present)
+- `.ai-factory/rules/base.md` — base project rules via `config.rules.base`
 
 ---
 
@@ -75,7 +77,7 @@ AskUserQuestion: Plan status is "<current_status>" with verdict "<verdict>".
 This plan hasn't passed verification yet.
 
 Options:
-1. Run verification — Run /aif-verify+ first (recommended)
+1. Run verification — Run /aif-verify first (recommended)
 2. Force complete — Mark as done without verification (--force)
 3. Cancel
 ```

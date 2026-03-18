@@ -17,7 +17,7 @@ This document defines the artifact model for spec-driven workflow.
 | Artifact | Type | Purpose |
 |----------|------|---------|
 | `.ai-factory/config.yaml` | Context + Rules | Localization, workflow settings, paths, rules refs |
-| `AGENTS.md` | Context + Rules | Project structure map, agent rules |
+| `.ai-factory/RESEARCH.md` | Context | Persisted exploration context and active summary |
 | `.ai-factory/DESCRIPTION.md` | Context | Tech stack, modules, integrations (owned by core /aif) |
 | `.ai-factory/ARCHITECTURE.md` | Context + Rules | Architecture decisions, patterns (owned by core /aif-architecture) |
 | `.ai-factory/RULES.md` | Rules | Project conventions (optional) |
@@ -69,7 +69,7 @@ Plan Level (Derived)
 | `aif-explore` | Project + plan context | RESEARCH.md, explore.md |
 | `aif-new` | Project context + exploration + rules | Plan folder artifacts, area rules (optional) |
 | `aif-implement` | Plan context + all rules (base + area) | Code files |
-| `aif-verify+` | Plan rules + verify.md + all rules | Verification results |
+| `aif-verify` | Plan rules + verify.md + all rules | Verification results |
 | `aif-done` | Plan artifacts | specs/ folder |
 
 ## Rules Architecture (Config)
@@ -96,7 +96,7 @@ rules:
 **Ownership:**
 - `aif-analyze` creates `base.md` (required)
 - `aif-new` creates area rules (optional, plan-driven)
-- `aif-implement` and `aif-verify+` read only
+- `aif-implement` and `aif-verify` read only
 
 ## Legacy Rules Compatibility
 
@@ -130,7 +130,7 @@ skills/<name>/references/ ← Skill defaults (fallback)
 project_context:
   - .ai-factory/config.yaml     # language.ui: russian
   - .ai-factory/DESCRIPTION.md  # React + TypeScript
-  - AGENTS.md                   # Structure map
+  - .ai-factory/RESEARCH.md     # Active summary / exploration context
 
 # Skill reads exploration (if exists):
 exploration_context:

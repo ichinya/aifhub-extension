@@ -10,17 +10,18 @@ Create or update `.ai-factory/ROADMAP.md` with a slice-based maturity assessment
 ## Workflow
 
 1. Load context first.
-   - Read project language memory first from `AGENTS.md`, then `CLAUDE.md`, then `.ai-factory/RULES.md`.
-   - Treat only explicit localization markers as saved memory. In `AGENTS.md` or `CLAUDE.md`, use a dedicated `## Interaction Preferences` section with `Preferred language:` and `Translation scope:` lines.
+   - Read `.ai-factory/config.yaml` first as source of truth for localization and workflow settings.
+   - Read `.ai-factory/RULES.md` and `.ai-factory/rules/base.md` for project conventions when present.
+   - Treat only explicit localization markers from `config.yaml` as saved memory for this skill.
    - Never treat tech-stack fields such as `Language: TypeScript`, the current conversation language, or OS locale as a saved project language.
-   - If the explicit localization markers are missing or incomplete, asking is mandatory before analysis or roadmap generation.
+   - If localization markers are missing or incomplete in config, asking is mandatory before analysis or roadmap generation.
    - Ask question 1 for the language. The options must always include `original (English)` and `russian`, plus a context-derived option when strong evidence exists.
    - Ask question 2 for the translation scope with these options: `communication only`, `communication and artifacts`, `artifacts only`.
    - If the translation scope excludes artifacts, keep generated artifacts in the original project language.
    - If the translation scope includes artifacts, generate them in the preferred language.
    - Read `.ai-factory/DESCRIPTION.md` and `.ai-factory/ARCHITECTURE.md` when present.
    - Read the current `.ai-factory/ROADMAP.md` before editing it.
-   - If the user explicitly changes the project localization preference, update the same project memory file before finishing.
+   - If the user explicitly changes the project localization preference, update `.ai-factory/config.yaml` before finishing.
 
 2. Decide the mode from the user request.
    - Use default mode for new roadmap generation or general roadmap updates.

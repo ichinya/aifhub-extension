@@ -92,7 +92,8 @@ If `.ai-factory/RULES.md` exists, load it as additional project rules.
 - `.ai-factory/config.yaml` — localization for report output, rules paths
 - `.ai-factory/DESCRIPTION.md` — tech stack for build/test detection
 - `.ai-factory/ARCHITECTURE.md` — architecture rules to check
-- `AGENTS.md` — project structure
+- `.ai-factory/RULES.md` — additional project conventions (if present)
+- `.ai-factory/rules/base.md` — required base rules via `config.rules.base`
 
 ### 0.6 Gather Changed Files
 

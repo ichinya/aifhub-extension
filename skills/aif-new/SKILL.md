@@ -16,7 +16,7 @@ Create a new plan folder under `.ai-factory/plans/<plan-id>/` with all required 
 
 - **Primary ownership:** `.ai-factory/plans/<plan-id>/` — all files inside the new plan folder.
 - **Conditional ownership:** `.ai-factory/rules/<area>.md` (when user confirms area rules), `.ai-factory/config.yaml` (`rules.*` section only, when adding area rules).
-- **Read-only:** `.ai-factory/DESCRIPTION.md`, `.ai-factory/ARCHITECTURE.md`, `AGENTS.md`, `.ai-factory/RESEARCH.md`.
+- **Read-only:** `.ai-factory/DESCRIPTION.md`, `.ai-factory/ARCHITECTURE.md`, `.ai-factory/RESEARCH.md`.
 - **No writes to:** project source code, other plans, specs/, ROADMAP.md.
 
 ---
@@ -40,7 +40,6 @@ Read these files if present (do NOT fail if missing):
 
 - `.ai-factory/config.yaml` — localization, workflow settings, plan_id_format, rules paths
 - `.ai-factory/DESCRIPTION.md` — tech stack, modules, integrations
-- `AGENTS.md` — project structure map
 - `.ai-factory/ARCHITECTURE.md` — architecture patterns, dependency rules
 - `.ai-factory/RULES.md` — project conventions (use if present)
 - `.ai-factory/rules/base.md` — project rules (path from config: `config.rules.base`)
@@ -63,8 +62,8 @@ If config.yaml exists:
 - Use `config.language.technical_terms` for tech terms (default: english)
 
 **No config fallback**:
-- Fall back to `AGENTS.md` / `CLAUDE.md` / `.ai-factory/RULES.md` Interaction Preferences
-- If no localization found anywhere → ask before generating artifacts
+- Ask user before generating artifacts when localization is missing in config
+- Suggest running `/aif-analyze` to initialize localization in `config.yaml`
 
 **Always**: Keep file names, identifiers, and YAML keys in English
 
@@ -293,7 +292,7 @@ This skill follows the [context-rules-templates-model.md](references/context-rul
 
 | Level | Context | Rules |
 |-------|---------|-------|
-| **Project** | config.yaml, DESCRIPTION.md, AGENTS.md | ARCHITECTURE.md, rules/base.md, rules/*.md |
+| **Project** | config.yaml, DESCRIPTION.md, RESEARCH.md | ARCHITECTURE.md, RULES.md, rules/base.md, rules/*.md |
 | **Plan** | task.md, context.md, explore.md | rules.md, verify.md, constraints-*.md |
 
 Plan artifacts **inherit** from project level. Plan rules can **add to** but not **replace** project rules.

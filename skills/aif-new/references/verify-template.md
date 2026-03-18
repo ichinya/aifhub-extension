@@ -1,6 +1,6 @@
 # Verify Checklist: {{plan_id}}
 
-> Used by aif-verify+ to check implementation
+> Used by /aif-verify to check implementation
 
 ## Task Completeness
 
@@ -72,7 +72,7 @@
 
 ---
 
-## Findings (заполняется aif-verify+)
+## Findings (заполняется /aif-verify)
 
 | ID | Severity | Description | Status |
 |----|----------|-------------|--------|

@@ -1,12 +1,12 @@
 ---
 name: aif-fix
-description: Fix issues found by aif-verify+. Reads verification findings, implements fixes for blocking and important issues, then suggests re-verification. Use when verification fails or user says "fix the issues".
+description: Fix issues found by /aif-verify. Reads verification findings, implements fixes for blocking and important issues, then suggests re-verification. Use when verification fails or user says "fix the issues".
 argument-hint: "[plan-id] [finding-ids...] [--all]"
 ---
 
 # AIF Fix — Fix Verification Findings
 
-Fix issues identified by `aif-verify+`. Reads structured findings, implements corrections, and drives the fix → verify loop.
+Fix issues identified by `/aif-verify`. Reads structured findings, implements corrections, and drives the fix → verify loop.
 
 **This skill modifies source code.** It reads verification findings and applies targeted fixes following plan rules.
 
@@ -40,7 +40,7 @@ Read these files if present:
 - `.ai-factory/DESCRIPTION.md` — tech stack, conventions
 - `.ai-factory/ARCHITECTURE.md` — dependency rules, file placement
 - `.ai-factory/RULES.md` — project conventions
-- `AGENTS.md` — project structure
+- `.ai-factory/rules/base.md` — base project rules (path from `config.rules.base`)
 
 ### 0.3 Find Plan and Findings
 
@@ -53,7 +53,7 @@ Read these files if present:
 Read `status.yaml → verification`:
 - If `verification.last_run` is null:
   ```
-  No verification results found. Run /aif-verify+ first to identify issues.
+  No verification results found. Run /aif-verify first to identify issues.
   ```
   → STOP.
 - If `verification.verdict` is `pass`:
@@ -249,7 +249,7 @@ After all fixes applied:
 AskUserQuestion: Fixes applied. What next?
 
 Options:
-1. Re-verify — Run /aif-verify+ to confirm fixes (recommended)
+1. Re-verify — Run /aif-verify to confirm fixes (recommended)
 2. Commit fixes — Run /aif-commit
 3. Continue fixing — Address remaining optional issues
 4. Done for now — I'll verify later
@@ -291,7 +291,7 @@ Options:
 ## Fix Loop
 
 ```
-aif-verify+ (FAIL) → aif-fix → aif-verify+ → PASS → aif-done
+aif-verify (FAIL) → aif-fix → aif-verify → PASS → aif-done
          ↑__________________________|
               (if still FAIL)
 ```
