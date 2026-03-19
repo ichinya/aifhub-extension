@@ -8,7 +8,7 @@ argument-hint: "[task description]"
 
 Create a new plan folder under `.ai-factory/plans/<plan-id>/` with all required artifacts for spec-driven workflow.
 
-**This skill creates the plan structure only.** It does NOT implement anything. After plan creation, hand off to `aif-implement`.
+**This skill creates the plan structure only.** It does NOT implement anything. After plan creation, hand off to `aif-improve` first, then to `aif-implement` (Implement+ replacement in this extension).
 
 ---
 
@@ -88,6 +88,12 @@ These rules apply to plan artifacts and will be inherited by the plan's `rules.m
 ### 1.1 Parse Arguments
 
 If `$ARGUMENTS` contains a task description → use it as the starting point.
+
+If `$ARGUMENTS` points to an existing local file path:
+- Read the file as the task specification source
+- Extract goals/scope/constraints from file content
+- Use extracted content as primary input for generated artifacts
+- Keep file path as reference in `context.md`
 
 If `$ARGUMENTS` is empty:
 ```
@@ -230,12 +236,21 @@ status: draft
 progress:
   scope_total: <count of In Scope items>
   scope_completed: 0
+execution:
+  mode: local
+  subagent: null
+  mode_resolved_at: null
+  current_task: null
+  max_fix_loops: 3
+  quality_checks: []
 history:
   - timestamp: <current ISO timestamp>
     event: created
     to: draft
 links:
   issue: <issue number if provided>
+completed_at: null
+archived_to: null
 ```
 
 ### Content Rules
@@ -271,7 +286,8 @@ Show the created plan:
 
 1. 📝 Review artifacts — Check task.md scope and rules.md constraints
 2. 🔍 /aif-explore <plan-id> — If more research needed
-3. 🚀 /aif-implement — When ready to start coding
+3. 🚀 /aif-improve — Refine the plan (auto-recommended)
+4. 🚀 /aif-implement — When ready to start coding
 ```
 
 ```
@@ -280,9 +296,12 @@ AskUserQuestion: What would you like to do next?
 Options:
 1. Review plan artifacts — Open task.md for review
 2. Start exploring — Run /aif-explore for deeper research
-3. Start implementing — Run /aif-implement
-4. Done for now — I'll review later
+3. Improve plan first — Run /aif-improve (recommended)
+4. Start implementing — Run /aif-implement
+5. Done for now — I'll review later
 ```
+
+If user chooses improve (or if project policy enables auto-improve), immediately hand off to `/aif-improve` with the created plan context.
 
 ---
 

@@ -15,7 +15,7 @@ Fix issues identified by `/aif-verify`. Reads structured findings, implements co
 ## Artifact Ownership
 
 - **Primary ownership:** Source code files that need fixing (guided by findings).
-- **Writes:** `plans/<plan-id>/status.yaml` (fixes section).
+- **Writes:** `plans/<plan-id>/status.yaml` (fixes section), `plans/<plan-id>/fixes/*.md` (fix artifacts).
 - **Read-only:** `plans/<plan-id>/task.md`, `rules.md`, `constraints-*.md`, `verify.md`, all project context files.
 - **No writes to:** Plan artifact content (task.md, rules.md, etc.), specs/, other plans.
 
@@ -92,15 +92,15 @@ Fix Queue (ordered by priority):
 Show the queue and confirm:
 
 ```
-AskUserQuestion: Fix queue ready. Proceed?
+AskUserQuestion: Fix queue ready. How should I proceed?
 
 Blocking: 2 issues
 Important: 2 issues
 
 Options:
-1. Fix all (recommended) — Address all blocking + important
+1. Fix blocking + important (recommended) — Address the default fix scope
 2. Fix blocking only — Address only blocking issues
-3. Select specific — Choose which findings to fix
+3. Select findings manually — Choose specific findings
 4. Cancel — I'll handle this manually
 ```
 
@@ -149,10 +149,42 @@ fixes:
     - finding_id: B001
       fixed_at: <timestamp>
       description: "Added rate-limit middleware to login endpoint"
+      artifact: ".ai-factory/plans/<plan-id>/fixes/<timestamp>-B001.md"
       files_modified:
         - src/auth/login.ts
         - src/middleware/rate-limit.ts
 ```
+
+Also create a fix artifact in `plans/<plan-id>/fixes/`:
+
+`<timestamp>-<finding-id>.md`
+
+Template:
+
+```markdown
+# Fix <finding-id>
+
+## Problem
+<finding description>
+
+## Root Cause
+<root cause>
+
+## Changes
+- <change 1>
+- <change 2>
+
+## Files
+- <path>
+
+## Resolution
+<how validated>
+
+## Prevention
+<how to avoid recurrence>
+```
+
+Add the artifact path to `status.yaml -> fixes.files[]` and reference it from the matching `fixes.applied[]` entry when possible.
 
 ### 2.6 Move to Next Finding
 
@@ -168,7 +200,7 @@ Repeat for each finding in the queue.
 1. Read task.md → Scope → find the missing item
 2. Read context.md → identify where to implement
 3. Implement the missing functionality
-4. Add tests if rules.md requires them
+4. Add or update tests only if the finding explicitly concerns missing tests or rules.md requires them
 5. Update documentation if rules.md requires it
 ```
 
@@ -249,10 +281,10 @@ After all fixes applied:
 AskUserQuestion: Fixes applied. What next?
 
 Options:
-1. Re-verify — Run /aif-verify to confirm fixes (recommended)
-2. Commit fixes — Run /aif-commit
-3. Continue fixing — Address remaining optional issues
-4. Done for now — I'll verify later
+1. Re-verify now — Run /aif-verify to confirm fixes (recommended)
+2. Commit current fixes — Run /aif-commit
+3. Continue with optional findings — Address remaining optional issues
+4. Stop for now — Verify later
 ```
 
 ---
@@ -263,6 +295,7 @@ Update `plans/<plan-id>/status.yaml`:
 
 ```yaml
 status: fixing
+updated: <current ISO timestamp>
 
 fixes:
   total_applied: <count>
@@ -321,6 +354,7 @@ Options:
 - **Follow project conventions** — match existing code style
 - **One fix at a time** — complete, verify, move to next
 - **Run tests after fixes** when applicable
+- **Create new tests only when the finding or plan rules explicitly require them**
 - **Update status.yaml** with fix results
 - **Suggest re-verification** after fixes complete
 - **Do not mark findings as fixed** without actually implementing the fix

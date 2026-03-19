@@ -6,6 +6,7 @@
 |-------|----------|---------|
 | `/aif-analyze` | - | Analyze project context and bootstrap config/rules |
 | `/aif-new` | - | Create plan folder with structured artifacts |
+| `/aif-implement` | `/aif-implement` | Execute plan-folder tasks with status.yaml tracking and optional subagent mode |
 | `/aif-verify` | `/aif-verify` | Enhanced verification with structured findings |
 | `/aif-fix` | - | Fix issues found by verify+ |
 | `/aif-done` | - | Finalize plan and archive to specs |
@@ -14,8 +15,8 @@
 ## Workflow
 
 ```text
-aif-analyze -> aif-explore -> aif-new -> aif-implement -> aif-verify -> aif-fix -> aif-done
-                                                                ^______________|
+aif-analyze -> aif-explore -> aif-new -> aif-improve -> aif-implement -> aif-verify -> aif-fix -> aif-done
+                                                                         ^______________|
 ```
 
 ## Installation
@@ -57,13 +58,29 @@ Notes:
 
 Creates plan artifacts in `.ai-factory/plans/<plan-id>/`.
 
-### 3) Implement plan
+### 3) Improve plan (recommended)
+
+```bash
+/aif-improve
+```
+
+Refines the freshly created plan before execution.
+
+Note: `/aif-improve` is provided by core `ai-factory`, not by this extension.
+
+### 4) Implement plan
 
 ```bash
 /aif-implement
 ```
 
-### 4) Verify
+Implement+ supports:
+- `--list` to discover active plan folders
+- `@<path>` explicit plan selection
+- `--from <n>` task index resume
+- optional Claude subagent mode with local fallback
+
+### 5) Verify
 
 ```bash
 /aif-verify
@@ -75,7 +92,7 @@ Strict verification mode:
 /aif-verify --strict
 ```
 
-### 5) Fix findings (if needed)
+### 6) Fix findings (if needed)
 
 ```bash
 /aif-fix
@@ -83,7 +100,7 @@ Strict verification mode:
 /aif-fix --all
 ```
 
-### 6) Finalize
+### 7) Finalize
 
 ```bash
 /aif-done
@@ -91,7 +108,7 @@ Strict verification mode:
 
 Archives plan artifacts to `.ai-factory/specs/<plan-id>/`.
 
-### 7) Roadmap
+### 8) Roadmap
 
 ```bash
 /aif-roadmap
@@ -112,6 +129,7 @@ aifhub-extension/
 `- skills/
    |- aif-analyze/
    |- aif-new/
+   |- aif-implement-plus/
    |- aif-verify-plus/
    |- aif-fix/
    |- aif-done/

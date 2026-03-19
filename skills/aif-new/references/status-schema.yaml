@@ -7,7 +7,7 @@ created: {{created_date}}
 updated: {{updated_date}}
 
 # Workflow state
-# draft → exploring → planning → implementing → verifying → fixing → done
+# draft → implementing → verifying → fixing → done
 status: draft
 
 # Progress tracking
@@ -16,6 +16,15 @@ progress:
   scope_completed: 0
   tests_total: 0
   tests_passed: 0
+
+# Execution state (updated by aif-implement)
+execution:
+  mode: local
+  subagent: null
+  mode_resolved_at: null
+  current_task: null
+  max_fix_loops: 3
+  quality_checks: []
 
 # Workflow history
 history:
@@ -48,10 +57,12 @@ fixes:
   total_applied: 0
   iterations: 0
   last_fix: null
+  files: []
   applied: []
     # - finding_id: B001
     #   fixed_at: timestamp
     #   description: "What was fixed"
+    #   artifact: ".ai-factory/plans/<plan-id>/fixes/<timestamp>-B001.md"
 
 # Links
 links:
@@ -59,6 +70,10 @@ links:
   pr: null
   parent_plan: null
   depends_on: []
+
+# Completion metadata (updated by aif-done)
+completed_at: null
+archived_to: null
 
 # Notes
 notes: |

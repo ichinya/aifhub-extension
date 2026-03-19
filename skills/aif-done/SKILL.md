@@ -50,6 +50,7 @@ No plan folder found. Nothing to finalize.
 Read all artifacts from the plan folder:
 - `task.md`, `context.md`, `rules.md`, `verify.md`, `status.yaml`
 - `explore.md`, `constraints-*.md` (if present)
+- `fixes/*.md` (if present)
 
 ### 0.4 Load Project Context
 
@@ -70,6 +71,10 @@ Check `status.yaml`:
 - `status` should be `verifying` (verification just passed)
 - `verification.verdict` should be `pass` or `pass-with-notes`
 
+Acceptable completion state:
+- `status: verifying` with `verification.verdict: pass|pass-with-notes`
+- If status is stale but the latest verification verdict is pass/pass-with-notes, prefer the verdict and warn about status drift
+
 If NOT eligible:
 ```
 AskUserQuestion: Plan status is "<current_status>" with verdict "<verdict>".
@@ -77,8 +82,8 @@ AskUserQuestion: Plan status is "<current_status>" with verdict "<verdict>".
 This plan hasn't passed verification yet.
 
 Options:
-1. Run verification — Run /aif-verify first (recommended)
-2. Force complete — Mark as done without verification (--force)
+1. Run verification now — Run /aif-verify first (recommended)
+2. Finalize with force — Mark as done without verification (--force)
 3. Cancel
 ```
 
@@ -114,6 +119,10 @@ From `status.yaml → fixes`:
 - Fix iterations count
 - Individual fix descriptions
 
+If `plans/<plan-id>/fixes/` exists:
+- include fix artifact filenames as additional completion evidence
+- use them as input for final lessons/evolution prompts
+
 ---
 
 ## Step 3: Generate Completion Summary
@@ -141,7 +150,7 @@ Generate an extended summary including:
 AskUserQuestion: Any lessons learned from this plan?
 
 Options:
-1. Add lessons — I have notes to capture
+1. Add lessons learned — I have notes to capture
 2. Skip — No lessons this time
 ```
 
@@ -165,6 +174,7 @@ Copy all files from `plans/<plan-id>/` to `specs/<plan-id>/`:
 - `status.yaml`
 - `explore.md` (if exists)
 - `constraints-*.md` (if exist)
+- `fixes/*.md` (if exist)
 
 ### 4.3 Create spec.md
 
@@ -205,6 +215,7 @@ Update `plans/<plan-id>/status.yaml`:
 
 ```yaml
 status: done
+updated: <current ISO timestamp>
 completed_at: <current ISO timestamp>
 archived_to: .ai-factory/specs/<plan-id>/
 
@@ -258,7 +269,46 @@ Suggestion: Run /aif-roadmap check
 
 ---
 
-## Step 7: Clean Up Plan Folder
+## Step 7: Optional Docs and Evolution
+
+Before cleanup, handle two optional post-actions while the original plan folder is still available.
+
+### Documentation checkpoint
+
+Ask:
+
+```
+AskUserQuestion: Documentation checkpoint — how should we document this feature?
+
+Options:
+1. Update existing docs (/aif-docs) (recommended)
+2. Create feature page with /aif-docs
+3. Skip documentation for now
+```
+
+Record outcome in completion output as one of:
+- `Documentation: updated existing docs`
+- `Documentation: created docs/<feature-slug>.md`
+- `Documentation: skipped by user`
+- `Documentation: warn-only (Docs: no/unset)`
+
+### Evolution checkpoint
+
+If plan contains fix artifacts (`plans/<plan-id>/fixes/*.md`) or rich findings history:
+
+```
+AskUserQuestion: Run evolution from this plan context?
+
+Options:
+1. Yes — Run /aif-evolve with plan/fixes context (recommended)
+2. No — Skip evolution
+```
+
+When enabled, use the completed plan folder as the evidence base for evolution suggestions.
+
+---
+
+## Step 8: Clean Up Plan Folder
 
 ```
 AskUserQuestion: Plan archived to .ai-factory/specs/<plan-id>/
@@ -266,8 +316,8 @@ AskUserQuestion: Plan archived to .ai-factory/specs/<plan-id>/
 Clean up original plan folder?
 
 Options:
-1. Remove — Delete .ai-factory/plans/<plan-id>/ (recommended)
-2. Keep — Retain both copies
+1. Remove original plan folder (recommended) — Delete .ai-factory/plans/<plan-id>/
+2. Keep original plan folder — Retain both copies
 ```
 
 If remove:
@@ -277,7 +327,7 @@ rm -rf .ai-factory/plans/<plan-id>
 
 ---
 
-## Step 8: Completion Report
+## Step 9: Completion Report
 
 ```
 ## Plan Finalized ✅
@@ -298,6 +348,7 @@ rm -rf .ai-factory/plans/<plan-id>
 - rules.md — Rules and constraints
 - verify.md — Verification results
 - status.yaml — Full workflow history
+- fixes/*.md — Fix history artifacts (if any)
 
 ### Suggested Updates
 - /aif-analyze — Refresh project description (if stack changed)
@@ -311,7 +362,7 @@ Ready to start a new plan? Run /aif-new
 ### Context Cleanup
 
 ```
-AskUserQuestion: Free up context?
+AskUserQuestion: Free up context before continuing?
 
 Options:
 1. /clear — Full reset (recommended)
@@ -333,7 +384,8 @@ Options:
     ├── rules.md            # Rules used
     ├── verify.md           # Final verification results
     ├── status.yaml         # Full workflow history
-    └── explore.md          # Exploration notes (if any)
+    ├── explore.md          # Exploration notes (if any)
+    └── fixes/              # Fix artifacts (if any)
 ```
 
 **Concept:**
