@@ -50,9 +50,9 @@ If no plan found:
 AskUserQuestion: No plan folder found. What should I verify?
 
 Options:
-1. Verify branch diff — Compare current branch against main
-2. Verify last commit — Check the most recent commit
-3. List available plans — Show plans in .ai-factory/plans/
+1. List available plans — Choose a plan folder from .ai-factory/plans/ (recommended)
+2. Verify branch diff — Compare current branch against main
+3. Verify last commit — Check the most recent commit
 4. Cancel
 ```
 
@@ -340,13 +340,13 @@ Each finding MUST include:
 AskUserQuestion: Verification complete. What next?
 
 Options (on FAIL):
-1. Fix all — Run /aif-fix to address blocking + important issues
+1. Fix blocking + important — Run /aif-fix (recommended)
 2. Fix blocking only — Run /aif-fix B001 B002 ...
-3. Accept as-is — Mark findings as accepted, proceed to /aif-done
+3. Accept findings and finalize with force — Run /aif-done --force
 
-Options (on PASS):
-1. Finalize — Run /aif-done (recommended)
-2. Fix notes — Run /aif-fix for important/optional findings
+Options (on PASS or PASS with notes):
+1. Finalize now — Run /aif-done (recommended)
+2. Address remaining notes — Run /aif-fix for important/optional findings
 3. Security check — Run /aif-security-checklist
 4. Code review — Run /aif-review
 ```
@@ -359,6 +359,7 @@ Update `plans/<plan-id>/status.yaml`:
 
 ```yaml
 status: verifying
+updated: <current ISO timestamp>
 
 verification:
   last_run: <current ISO timestamp>

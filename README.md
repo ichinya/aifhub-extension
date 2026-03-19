@@ -18,10 +18,21 @@ Then continue with:
 
 ```bash
 /aif-new "your feature"
+/aif-improve
 /aif-implement
 /aif-verify
 /aif-done
 ```
+
+`/aif-implement` is replaced by this extension with **Implement+** behavior:
+- plan-folder execution via `.ai-factory/plans/<plan-id>/`
+- status tracking in `status.yaml`
+- optional Claude subagent mode (with local fallback)
+
+`/aif-improve` is also replaced by this extension with **Improve+** behavior:
+- plan-folder discovery via `.ai-factory/plans/<plan-id>/`
+- artifact refinement across `task.md`, `context.md`, `rules.md`, `verify.md`, and `status.yaml`
+- optional Claude `plan-polisher` mode (with local fallback)
 
 ## Documentation
 
