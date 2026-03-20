@@ -17,7 +17,7 @@ Create a new plan folder under `.ai-factory/plans/<plan-id>/` with all required 
 
 - **Primary ownership:** `.ai-factory/plans/<plan-id>/` — all files inside the new plan folder.
 - **Conditional ownership:** `.ai-factory/rules/<area>.md` (when user confirms area rules), `.ai-factory/config.yaml` (`rules.*` section only, when adding area rules).
-- **Read-only:** `.ai-factory/DESCRIPTION.md`, `.ai-factory/ARCHITECTURE.md`, `.ai-factory/RESEARCH.md`.
+- **Read-only:** `.ai-factory/DESCRIPTION.md`, `.ai-factory/ARCHITECTURE.md`, `config.paths.research` (normally `.ai-factory/RESEARCH.md`).
 - **No writes to:** project source code, other plans, specs/, ROADMAP.md.
 
 ---
@@ -44,7 +44,7 @@ Read these files if present (do NOT fail if missing):
 - `.ai-factory/ARCHITECTURE.md` — architecture patterns, dependency rules
 - `.ai-factory/RULES.md` — project conventions (use if present)
 - `.ai-factory/rules/base.md` — project rules (path from config: `config.rules.base`)
-- `.ai-factory/RESEARCH.md` — persisted exploration notes
+- `config.paths.research` — persisted exploration notes (default: `.ai-factory/RESEARCH.md`)
 
 If `.ai-factory/config.yaml` does not exist:
 ```
@@ -116,12 +116,14 @@ Examples:
 
 ### 1.2 Check for Exploration Output
 
-Read `.ai-factory/RESEARCH.md` if it exists:
+Resolve the research artifact path from `config.paths.research` when config exists, otherwise use `.ai-factory/RESEARCH.md` as the default path.
+
+Read the resolved research artifact if it exists:
 
 - Parse `<!-- aif:active-summary:start -->` ... `<!-- aif:active-summary:end -->` block
 - If topic matches the task description (or is clearly related):
   ```
-  AskUserQuestion: Found exploration notes in RESEARCH.md that may be relevant.
+  AskUserQuestion: Found exploration notes in the configured research artifact that may be relevant.
 
   Topic: {{research_topic}}
   Goal: {{research_goal}}
@@ -138,13 +140,13 @@ Read `.ai-factory/RESEARCH.md` if it exists:
   - Constraints + Decisions → `rules.md`
   - Open questions → `task.md → Out of Scope` or `context.md → Known Constraints`
   - Success signals → `verify.md`
-- Always normalize RESEARCH into a plan-local `explore.md` when RESEARCH exists:
-   - Source: `.ai-factory/RESEARCH.md`
+- Always normalize RESEARCH into a plan-local `explore.md` when the resolved research artifact exists:
+   - Source: `<resolved research path>`
    - Destination: `.ai-factory/plans/<plan-id>/explore.md`
    - Preserve the original RESEARCH body below the frontmatter; do not truncate it
    - Add YAML frontmatter for the plan-local artifact
-   - Include `source_artifact: ".ai-factory/RESEARCH.md"` only on this imported/normalized path
-   - Keep `.ai-factory/RESEARCH.md` in place and unchanged (copy + normalize, not move)
+   - Include `source_artifact: "<resolved research path>"` only on this imported/normalized path
+   - Keep the resolved research artifact in place and unchanged (copy + normalize, not move)
 
 ### 1.3 Clarify Scope
 
@@ -204,7 +206,7 @@ Create these files using templates from `references/`:
 | `rules.md` | [rules-template.md](references/rules-template.md) | Yes |
 | `verify.md` | [verify-template.md](references/verify-template.md) | Yes |
 | `status.yaml` | [status-schema.yaml](references/status-schema.yaml) | Yes |
-| `explore.md` | Normalize from `.ai-factory/RESEARCH.md` if exists, otherwise [explore-template.md](references/explore-template.md) | Yes if RESEARCH.md exists |
+| `explore.md` | Normalize from `config.paths.research` if it exists, otherwise [explore-template.md](references/explore-template.md) | Yes if the research artifact exists |
 | `constraints-*.md` | — | Only if specific constraints identified |
 
 ### Populating Artifacts
@@ -303,7 +305,7 @@ Show the created plan:
 | rules.md | ✅ Ready | <N rules defined> |
 | verify.md | ✅ Ready | <N checkpoints> |
 | status.yaml | ✅ Draft | Plan initialized |
- | explore.md | ✅/— | Copied from RESEARCH.md / Not applicable |
+ | explore.md | ✅/— | Copied from the research artifact / Not applicable |
 
 ### Next Steps
 
@@ -334,7 +336,7 @@ This skill follows the [context-rules-templates-model.md](references/context-rul
 
 | Level | Context | Rules |
 |-------|---------|-------|
-| **Project** | config.yaml, DESCRIPTION.md, RESEARCH.md | ARCHITECTURE.md, RULES.md, rules/base.md, rules/*.md |
+| **Project** | config.yaml, DESCRIPTION.md, config.paths.research | ARCHITECTURE.md, RULES.md, rules/base.md, rules/*.md |
 | **Plan** | task.md, context.md, explore.md | rules.md, verify.md, constraints-*.md |
 
 Plan artifacts **inherit** from project level. Plan rules can **add to** but not **replace** project rules.

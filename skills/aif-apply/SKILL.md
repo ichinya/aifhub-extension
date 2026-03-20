@@ -13,7 +13,7 @@ Run the full spec-driven execution cycle from an active plan folder. `aif-apply`
 This skill is orchestration-first:
 
 - manual trigger only - never auto-runs on plan creation
-- plan-folder aware - works from `.ai-factory/plans/<plan-id>/`
+- plan-folder aware - works from `config.paths.plans/<plan-id>/` (normally `.ai-factory/plans/<plan-id>/`)
 - Claude-aware - can delegate to Claude subagents when available
 - fallback-safe - preserves the same external workflow in local mode
 
@@ -51,6 +51,8 @@ Read if present:
 - `.ai-factory/RULES.md`
 - `.ai-factory/rules/base.md`
 
+Use `config.paths.plans` as the source of truth for plan discovery and list mode. If `config.yaml` is missing or does not define `paths.plans`, fall back to `.ai-factory/plans/` as the default extension path and note that `/aif-analyze` should repair the config.
+
 Read skill-context in this order:
 
 1. `.ai-factory/skill-context/aif-apply/SKILL.md`
@@ -64,8 +66,8 @@ Plan resolution priority:
 
 1. `@<path>` argument
 2. explicit `<plan-id>` argument
-3. current branch slug match against `.ai-factory/plans/<slug>/`
-4. single active plan folder where `status != done`
+3. current branch slug match against `config.paths.plans/<slug>/`
+4. single active plan folder under `config.paths.plans/` where `status != done`
 5. list active plans and ask the user to choose when more than one unfinished plan remains
 
 If no active plan exists, clearly report that there is nothing to execute and suggest `/aif-new`.
@@ -82,7 +84,7 @@ Decision priority:
 - existing `status.yaml -> execution.git.strategy` -> reuse the saved plan choice when resuming
 - otherwise ask the user once before execution starts
 
-Save the decision to `status.yaml -> execution`:
+Save the decision by updating only `status.yaml -> execution.git`:
 
 ```yaml
 execution:
@@ -92,6 +94,8 @@ execution:
     base_branch: <branch name|null>
     resolved_at: <ISO timestamp|null>
 ```
+
+Preserve any existing sibling fields under `execution` such as `mode`, `subagent`, `current_task`, `max_fix_loops`, and `quality_checks`.
 
 Safety rules:
 
@@ -115,7 +119,7 @@ Mode rules:
 - `--subagent` -> prefer delegated mode with local fallback
 - no explicit flag -> default to local unless Claude-only workers are available and the user chooses delegation
 
-Save the decision to `status.yaml -> execution`:
+Save the decision by updating only `status.yaml -> execution.mode`, `execution.subagent`, and `execution.mode_resolved_at`:
 
 ```yaml
 execution:
@@ -123,6 +127,8 @@ execution:
   subagent: plan-polisher|implementer|implementer-isolation|null
   mode_resolved_at: <ISO timestamp>
 ```
+
+Do not replace the whole `execution` object here. Preserve `execution.git`, `execution.current_task`, `execution.max_fix_loops`, and `execution.quality_checks`.
 
 When both delegated phases are used, record `plan-polisher` during readiness work and then update `execution.subagent` to the selected `implementer*` worker for task execution.
 
@@ -229,7 +235,7 @@ When invoked with `status`, show:
 
 When invoked with `--list`:
 
-1. list plan folders under `.ai-factory/plans/`
+1. list plan folders under `config.paths.plans/`
 2. keep folders containing `status.yaml`
 3. read `plan_id`, `title`, `status`, and progress counters
 4. print concise usage hints

@@ -152,7 +152,7 @@ If the user wants to preserve exploration context, offer to save it to `config.p
 Use wording aligned with the extension workflow:
 
 ```text
-Save these exploration results to .ai-factory/RESEARCH.md so /clear and /aif-new can reuse them?
+Save these exploration results to `<resolved research path>` so /clear and /aif-new can reuse them?
 
 Options:
 1. Yes — update Active Summary + append a new Session (recommended)
