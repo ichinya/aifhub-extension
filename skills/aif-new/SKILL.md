@@ -86,6 +86,7 @@ Artifact metadata contract:
 - markdown plan artifacts use YAML frontmatter first
 - required keys: `artifact_type`, `plan_id`, `title`, `artifact_status`, `owner`, `created_at`, `updated_at`
 - optional traceability keys may include `source_issue`, `source_plan`, `source_artifact`
+- string-valued frontmatter fields such as `plan_id`, `title`, `source_plan`, and `source_artifact` must be YAML-quoted when artifacts are written
 - YAML-native artifacts such as `status.yaml` keep their existing format and are not wrapped
 
 ---
@@ -142,6 +143,7 @@ Read `.ai-factory/RESEARCH.md` if it exists:
    - Destination: `.ai-factory/plans/<plan-id>/explore.md`
    - Preserve the original RESEARCH body below the frontmatter; do not truncate it
    - Add YAML frontmatter for the plan-local artifact
+   - Include `source_artifact: ".ai-factory/RESEARCH.md"` only on this imported/normalized path
    - Keep `.ai-factory/RESEARCH.md` in place and unchanged (copy + normalize, not move)
 
 ### 1.3 Clarify Scope
@@ -273,6 +275,7 @@ archived_to: null
 - Use evidence from codebase investigation, not assumptions
 - Cross-reference with ARCHITECTURE.md for file placement rules
 - For markdown plan artifacts, write YAML frontmatter first using the shared metadata contract
+- Quote string-valued frontmatter placeholders so sequential ids like `003` and titles containing `:` or `[]` remain valid YAML strings
 - `artifact_status` for newly created plan artifacts should start as `draft`
 - Keep `status.yaml` YAML-native; do not wrap it or duplicate mutable workflow state into markdown frontmatter
 - All initial templates in `references/` are in English; translate generated artifact content to configured language when `artifact_language` is not English

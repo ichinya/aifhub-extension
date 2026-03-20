@@ -1,12 +1,11 @@
 ---
 artifact_type: explore
-plan_id: {{plan_id}}
-title: {{task_title}}
+plan_id: "{{plan_id}}"
+title: "{{task_title}}"
 artifact_status: draft
 owner: aif-new
 created_at: {{created_date}}
 updated_at: {{updated_date}}
-source_artifact: .ai-factory/RESEARCH.md
 ---
 
 # Exploration Notes: {{plan_id}}

@@ -1,7 +1,7 @@
 ---
 artifact_type: rules
-plan_id: {{plan_id}}
-title: {{task_title}}
+plan_id: "{{plan_id}}"
+title: "{{task_title}}"
 artifact_status: draft
 owner: aif-new
 created_at: {{created_date}}

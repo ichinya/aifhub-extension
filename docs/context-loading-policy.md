@@ -53,6 +53,8 @@ Required frontmatter fields:
 - `created_at`
 - `updated_at`
 
+When these metadata fields carry string values, producers should serialize them as quoted YAML scalars. In practice this matters for values such as `plan_id`, `title`, `source_plan`, and `source_artifact`, so sequential ids like `003` and titles containing `:` or `[]` remain parseable.
+
 Optional fields are allowed when the artifact needs traceability, for example:
 
 - `source_issue`
