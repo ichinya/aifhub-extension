@@ -254,6 +254,11 @@ execution:
   mode: local
   subagent: null
   mode_resolved_at: null
+  git:
+    strategy: null
+    work_branch: null
+    base_branch: null
+    resolved_at: null
   current_task: null
   max_fix_loops: 3
   quality_checks: []

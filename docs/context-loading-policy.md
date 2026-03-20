@@ -19,8 +19,12 @@ Bridge files (`AGENTS.md`, `CLAUDE.md`, `QWEN.md`) are allowed only in this boot
 
 ### Consumer skills
 
+- `aif-explore`
 - `aif-new`
-- `aif-verify`
+- `aif-apply`
+- `aif-improve-plus`
+- `aif-implement-plus`
+- `aif-verify-plus`
 - `aif-fix`
 - `aif-done`
 - `aif-roadmap-plus`
@@ -38,6 +42,21 @@ Consumer skills must use:
 - `.ai-factory/rules/base.md`
 
 Optional area rules are loaded via `config.rules.*` when present.
+
+Plan-aware consumer skills additionally use:
+
+- `config.paths.plans/<plan-id>/task.md`
+- `config.paths.plans/<plan-id>/context.md`
+- `config.paths.plans/<plan-id>/rules.md`
+- `config.paths.plans/<plan-id>/verify.md`
+- `config.paths.plans/<plan-id>/status.yaml`
+- `config.paths.plans/<plan-id>/explore.md` (if present)
+
+Special ownership case:
+
+- `aif-explore` may read `config.paths.research` and is the only consumer skill allowed to write it
+- `aif-new` may read the same research artifact and normalize it into plan-local `explore.md`
+- no consumer skill may use bridge files as a substitute for these runtime paths
 
 ## Artifact Metadata Contract
 

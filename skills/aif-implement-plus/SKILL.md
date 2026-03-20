@@ -177,6 +177,8 @@ execution:
   mode_resolved_at: <ISO timestamp>
 ```
 
+Preserve any existing `execution.git.*` fields when updating mode metadata. `aif-implement-plus` must not drop the git strategy already chosen by `/aif-apply`.
+
 Fallback rule:
 - if subagent invocation fails, log warning and continue in local mode
 
@@ -292,6 +294,8 @@ Loop limit:
 execution:
   max_fix_loops: 3
 ```
+
+Update only `execution.max_fix_loops`; do not replace the whole `execution` object or remove sibling fields such as `execution.git`.
 
 On loop limit reached, ask user whether to continue or stop.
 
