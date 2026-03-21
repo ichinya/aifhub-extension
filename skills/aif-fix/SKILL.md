@@ -2,7 +2,7 @@
 name: aif-fix
 description: Fix issues found by /aif-verify. Reads verification findings, implements fixes for blocking and important issues, then suggests re-verification. Use when verification fails or user says "fix the issues".
 argument-hint: "[plan-id] [finding-ids...] [--all]"
-allowed-tools: Read Write Edit Glob Grep Bash question Questions Task
+allowed-tools: Read Write Edit Glob Grep Bash question questionnaire Task
 version: 0.7.0
 ---
 

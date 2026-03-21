@@ -2,11 +2,13 @@
 name: aif-new
 description: Create a new plan folder with structured artifacts (task, context, rules, verify, status). Use when starting a new feature, change, or improvement that requires structured planning.
 argument-hint: "[task description]"
-allowed-tools: Read Write Glob Grep Bash(mkdir *) Bash(cp *) Bash(basename *) question Questions
+allowed-tools: Read Write Glob Grep Bash(mkdir *) Bash(cp *) Bash(basename *) question questionnaire
 version: 0.7.0
 ---
 
 # AIF New — Create Plan Folder
+
+> **См. [Вопросы пользователю](../shared/QUESTION-TOOL.md)** — форматы question/questionnaire для разных агентов
 
 Create a new plan folder under `.ai-factory/plans/<plan-id>/` with all required artifacts for spec-driven workflow.
 

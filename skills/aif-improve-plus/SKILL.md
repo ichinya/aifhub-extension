@@ -2,9 +2,11 @@
 name: aif-improve-plus
 description: Refine plan-folder artifacts with deeper codebase analysis, status sync, and optional Claude plan-polisher delegation. Replaces /aif-improve.
 argument-hint: "[plan-id|@path|--list] [improvement prompt] [--local|--subagent]"
-allowed-tools: Read Glob Grep Write Edit Bash(git *) question Questions
+allowed-tools: Read Glob Grep Write Edit Bash(git *) question questionnaire
 version: 0.7.0
 ---
+
+> **См. [Question Tool Reference](../shared/QUESTION-TOOL.md)** — форматы question/questionnaire для разных агентов.
 
 # AIF Improve+ — Refine Plan Folder
 

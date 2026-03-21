@@ -2,9 +2,11 @@
 name: aif-implement-plus
 description: Execute plan-folder tasks with progress persistence, verify/fix loop, and optional Claude subagent delegation. Replaces /aif-implement.
 argument-hint: "[plan-id|@path|status|--list] [--from <n>] [--local|--subagent]"
-allowed-tools: Read Write Edit Glob Grep Bash(git *) Bash(mkdir *) Bash(cp *) Bash(basename *) question Questions Task
+allowed-tools: Read Write Edit Glob Grep Bash(git *) Bash(mkdir *) Bash(cp *) Bash(basename *) question questionnaire Task
 version: 0.7.0
 ---
+
+> **См. [Question Tool Reference](../shared/QUESTION-TOOL.md)** — форматы question/questionnaire для разных агентов.
 
 # AIF Implement+ — Execute Task Plan
 

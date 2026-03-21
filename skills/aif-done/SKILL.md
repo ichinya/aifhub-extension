@@ -2,13 +2,15 @@
 name: aif-done
 description: Finalize a plan, mark it complete, and archive artifacts to specs/. Use after /aif-verify passes or when manually marking work as done.
 argument-hint: "[plan-id] [--summary] [--force]"
-allowed-tools: Read Write Glob Grep Bash(mkdir *) Bash(cp *) Bash(rm -rf *) question Questions
+allowed-tools: Read Write Glob Grep Bash(mkdir *) Bash(cp *) Bash(rm -rf *) question questionnaire
 version: 0.7.0
 ---
 
 # AIF Done — Finalize and Archive Plan
 
 Finalize a plan by marking it complete, archiving artifacts to `.ai-factory/specs/`, and optionally updating project context.
+
+> **См. [Question Tool Reference](../shared/QUESTION-TOOL.md)** — форматы question/questionnaire для разных агентов.
 
 **This is a workflow terminus.** After `aif-done`, the plan is archived and the cycle is complete.
 

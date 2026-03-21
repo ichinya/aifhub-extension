@@ -2,7 +2,7 @@
 name: aif-verify+
 description: Enhanced verification against task, rules, and constraints. Checks implementation completeness, produces structured findings, and routes workflow to aif-fix or aif-done. Use after aif-implement completes.
 argument-hint: "[plan-id] [--strict]"
-allowed-tools: Read Glob Grep Bash(git *) Bash(npm *) Bash(python *) Bash(go *) Bash(cargo *) question Questions
+allowed-tools: Read Glob Grep Bash(git *) Bash(npm *) Bash(python *) Bash(go *) Bash(cargo *) question questionnaire
 version: 0.7.0
 ---
 
@@ -11,6 +11,8 @@ version: 0.7.0
 Verify implementation against plan artifacts (task, rules, constraints) and produce structured findings with severity levels.
 
 **This skill is read-only.** It inspects code but NEVER modifies implementation files. It updates only `status.yaml` and `verify.md` inside the plan folder.
+
+> **См. [Question Tool Reference](../shared/QUESTION-TOOL.md)** — форматы question/questionnaire для разных агентов.
 
 ---
 
