@@ -2,6 +2,7 @@
 name: aif-fix
 description: Fix issues found by /aif-verify. Reads verification findings, implements fixes for blocking and important issues, then suggests re-verification. Use when verification fails or user says "fix the issues".
 argument-hint: "[plan-id] [finding-ids...] [--all]"
+allowed-tools: Read Write Edit Glob Grep Bash question Questions Task
 version: 0.7.0
 ---
 
@@ -97,16 +98,16 @@ Fix Queue (ordered by priority):
 Show the queue and confirm:
 
 ```
-AskUserQuestion: Fix queue ready. How should I proceed?
-
-Blocking: 2 issues
-Important: 2 issues
-
-Options:
-1. Fix blocking + important (recommended) — Address the default fix scope
-2. Fix blocking only — Address only blocking issues
-3. Select findings manually — Choose specific findings
-4. Cancel — I'll handle this manually
+question(questions: [{
+  header: "Очередь",
+  question: "Очередь исправлений готова. Как proceed?\n\nBlocking: {{blocking_count}} issues\nImportant: {{important_count}} issues",
+  options: [
+    { label: "Fix blocking + important (Рекомендуется)", description: "Исправить default scope" },
+    { label: "Только blocking", description: "Исправить только blocking issues" },
+    { label: "Выбрать вручную", description: "Указать конкрет findings" },
+    { label: "Отмена", description: "Исправлю самостоятельно" }
+  ]
+}])
 ```
 
 ---
@@ -295,13 +296,16 @@ After all fixes applied:
 ## Step 5: Route to Re-Verification
 
 ```
-AskUserQuestion: Fixes applied. What next?
-
-Options:
-1. Re-verify now — Run /aif-verify to confirm fixes (recommended)
-2. Commit current fixes — Run /aif-commit
-3. Continue with optional findings — Address remaining optional issues
-4. Stop for now — Verify later
+question(questions: [{
+  header: "Далее",
+  question: "Исправления применены. Что дальше?",
+  options: [
+    { label: "Re-verify сейчас (Рекомендуется)", description: "/aif-verify для подтверждения" },
+    { label: "Закоммитить исправления", description: "/aif-commit" },
+    { label: "Продолжить с optional findings", description: "Исправить оставшиеся issues" },
+    { label: "Остановиться", description: "Проверю позже" }
+  ]
+}])
 ```
 
 ---
@@ -328,12 +332,15 @@ fixes:
 ### Context Cleanup
 
 ```
-AskUserQuestion: Free up context before continuing?
-
-Options:
-1. /clear — Full reset (recommended after fixing)
-2. /compact — Compress history
-3. Continue as is
+question(questions: [{
+  header: "Контекст",
+  question: "Освободить контекст перед продолжением?",
+  options: [
+    { label: "/clear — Полный сброс (Рекомендуется)", description: "После исправлений" },
+    { label: "/compact — Сжать историю", description: "Компактный режим" },
+    { label: "Продолжить как есть", description: "Без изменений" }
+  ]
+}])
 ```
 
 ---

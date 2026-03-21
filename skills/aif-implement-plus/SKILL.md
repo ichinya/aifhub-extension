@@ -2,6 +2,7 @@
 name: aif-implement-plus
 description: Execute plan-folder tasks with progress persistence, verify/fix loop, and optional Claude subagent delegation. Replaces /aif-implement.
 argument-hint: "[plan-id|@path|status|--list] [--from <n>] [--local|--subagent]"
+allowed-tools: Read Write Edit Glob Grep Bash(git *) Bash(mkdir *) Bash(cp *) Bash(basename *) question Questions Task
 version: 0.7.0
 ---
 
@@ -161,11 +162,14 @@ Mode rules:
 When subagents are available and mode is not forced, ask:
 
 ```
-AskUserQuestion: Claude subagents detected. How should I execute this plan?
-
-Options:
-1. Use subagent mode (recommended)
-2. Use local mode
+question(questions: [{
+  header: "Режим",
+  question: "Обнаружены Claude subagents. Как should I execute this plan?",
+  options: [
+    { label: "Subagent mode (Рекомендуется)", description: "Делегировать выполнение subagent" },
+    { label: "Local mode", description: "Выполнять в текущем контексте" }
+  ]
+}])
 ```
 
 Save mode to `status.yaml`:

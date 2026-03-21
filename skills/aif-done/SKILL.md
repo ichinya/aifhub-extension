@@ -2,6 +2,7 @@
 name: aif-done
 description: Finalize a plan, mark it complete, and archive artifacts to specs/. Use after /aif-verify passes or when manually marking work as done.
 argument-hint: "[plan-id] [--summary] [--force]"
+allowed-tools: Read Write Glob Grep Bash(mkdir *) Bash(cp *) Bash(rm -rf *) question Questions
 version: 0.7.0
 ---
 
@@ -82,14 +83,15 @@ Acceptable completion state:
 
 If NOT eligible:
 ```
-AskUserQuestion: Plan status is "<current_status>" with verdict "<verdict>".
-
-This plan hasn't passed verification yet.
-
-Options:
-1. Run verification now — Run /aif-verify first (recommended)
-2. Finalize with force — Mark as done without verification (--force)
-3. Cancel
+question(questions: [{
+  header: "Статус",
+  question: "Статус плана: \"{{current_status}}\" с вердиктом \"{{verdict}}\".\n\nПлан ещё не прошёл верификацию.",
+  options: [
+    { label: "Запустить верификацию (Рекомендуется)", description: "/aif-verify" },
+    { label: "Завершить принудительно (--force)", description: "Без верификации" },
+    { label: "Отмена", description: "Выйти" }
+  ]
+}])
 ```
 
 ### Force Mode (`--force`)
@@ -153,11 +155,14 @@ Generate an extended summary including:
 - Lessons learned (ask user):
 
 ```
-AskUserQuestion: Any lessons learned from this plan?
-
-Options:
-1. Add lessons learned — I have notes to capture
-2. Skip — No lessons this time
+question(questions: [{
+  header: "Уроки",
+  question: "Есть ли уроки, извлечённые из этого плана?",
+  options: [
+    { label: "Да — Добав уроки", description: "У меня есть заметки" },
+    { label: "Пропустить", description: "В этот раз без уроков" }
+  ]
+}])
 ```
 
 ---
@@ -284,12 +289,15 @@ Before cleanup, handle two optional post-actions while the original plan folder 
 Ask:
 
 ```
-AskUserQuestion: Documentation checkpoint — how should we document this feature?
-
-Options:
-1. Update existing docs (/aif-docs) (recommended)
-2. Create feature page with /aif-docs
-3. Skip documentation for now
+question(questions: [{
+  header: "Документация",
+  question: "Как задокументировать эту функцию?",
+  options: [
+    { label: "Обновить существующие docs (Рекомендуется)", description: "/aif-docs" },
+    { label: "Создать страницу функции", description: "/aif-docs docs/<feature>.md" },
+    { label: "Пропустить", description: "Без документации сейчас" }
+  ]
+}])
 ```
 
 Record outcome in completion output as one of:
@@ -303,11 +311,14 @@ Record outcome in completion output as one of:
 If plan contains fix artifacts (`plans/<plan-id>/fixes/*.md`) or rich findings history:
 
 ```
-AskUserQuestion: Run evolution from this plan context?
-
-Options:
-1. Yes — Run /aif-evolve with plan/fixes context (recommended)
-2. No — Skip evolution
+question(questions: [{
+  header: "Эволюция",
+  question: "Запустить эволюцию из контекста этого плана?",
+  options: [
+    { label: "Да — /aif-evolve (Рекомендуется)", description: "Использовать plan/fixes как evidence" },
+    { label: "Нет — Пропустить", description: "Без эволюции" }
+  ]
+}])
 ```
 
 When enabled, use the completed plan folder as the evidence base for evolution suggestions.
@@ -317,13 +328,14 @@ When enabled, use the completed plan folder as the evidence base for evolution s
 ## Step 8: Clean Up Plan Folder
 
 ```
-AskUserQuestion: Plan archived to .ai-factory/specs/<plan-id>/
-
-Clean up original plan folder?
-
-Options:
-1. Remove original plan folder (recommended) — Delete .ai-factory/plans/<plan-id>/
-2. Keep original plan folder — Retain both copies
+question(questions: [{
+  header: "Очистка",
+  question: "План архивирован в .ai-factory/specs/<plan-id>/\n\nУдалить оригинальную папку плана?",
+  options: [
+    { label: "Удалить .ai-factory/plans/<plan-id>/ (Рекомендуется)", description: "Оставить только архив" },
+    { label: "Оставить обе копии", description: "Сохранить план и архив" }
+  ]
+}])
 ```
 
 If remove:
@@ -368,12 +380,15 @@ Ready to start a new plan? Run /aif-new
 ### Context Cleanup
 
 ```
-AskUserQuestion: Free up context before continuing?
-
-Options:
-1. /clear — Full reset (recommended)
-2. /compact — Compress history
-3. Continue as is
+question(questions: [{
+  header: "Контекст",
+  question: "Освободить контекст перед продолжением?",
+  options: [
+    { label: "/clear — Полный сброс (Рекомендуется)", description: "После завершения плана" },
+    { label: "/compact — Сжать историю", description: "Компактный режим" },
+    { label: "Продолжить как есть", description: "Без изменений" }
+  ]
+}])
 ```
 
 ---

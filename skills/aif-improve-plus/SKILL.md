@@ -2,6 +2,7 @@
 name: aif-improve-plus
 description: Refine plan-folder artifacts with deeper codebase analysis, status sync, and optional Claude plan-polisher delegation. Replaces /aif-improve.
 argument-hint: "[plan-id|@path|--list] [improvement prompt] [--local|--subagent]"
+allowed-tools: Read Glob Grep Write Edit Bash(git *) question Questions
 version: 0.7.0
 ---
 
@@ -133,11 +134,14 @@ Mode rules:
 When `plan-polisher` is available and mode is not forced, ask:
 
 ```
-AskUserQuestion: Claude plan-polisher detected. How should I refine this plan?
-
-Options:
-1. Use subagent mode (recommended)
-2. Use local mode
+question(questions: [{
+  header: "Режим",
+  question: "Обнаружен Claude plan-polisher. Как should I refine this plan?",
+  options: [
+    { label: "Subagent mode (Рекомендуется)", description: "Делегировать улучшение plan-polisher" },
+    { label: "Local mode", description: "Улучшать в текущем контексте" }
+  ]
+}])
 ```
 
 ### Step 1: Load Plan Artifacts
@@ -339,12 +343,15 @@ Next step:
 ### Context Cleanup
 
 ```
-AskUserQuestion: Free up context before continuing?
-
-Options:
-1. /clear — Full reset (recommended)
-2. /compact — Compress history
-3. Continue as is
+question(questions: [{
+  header: "Контекст",
+  question: "Освободить контекст перед продолжением?",
+  options: [
+    { label: "/clear — Полный сброс (Рекомендуется)", description: "Очистить весь контекст" },
+    { label: "/compact — Сжать историю", description: "Компактный режим" },
+    { label: "Продолжить как есть", description: "Без изменений" }
+  ]
+}])
 ```
 
 ---

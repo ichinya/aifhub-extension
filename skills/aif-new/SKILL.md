@@ -2,6 +2,7 @@
 name: aif-new
 description: Create a new plan folder with structured artifacts (task, context, rules, verify, status). Use when starting a new feature, change, or improvement that requires structured planning.
 argument-hint: "[task description]"
+allowed-tools: Read Write Glob Grep Bash(mkdir *) Bash(cp *) Bash(basename *) question Questions
 version: 0.7.0
 ---
 
@@ -48,11 +49,14 @@ Read these files if present (do NOT fail if missing):
 
 If `.ai-factory/config.yaml` does not exist:
 ```
-AskUserQuestion: Project config not found. Create it?
-
-Options:
-1. Yes — Run /aif-analyze first to initialize config (recommended)
-2. Continue without config — Use defaults (english, slug format)
+question(questions: [{
+  header: "Конфиг",
+  question: "Конфиг проекта не найден. Создать?",
+  options: [
+    { label: "Да — запустить /aif-analyze (Рекомендуется)", description: "Инициализировать config.yaml" },
+    { label: "Продолжить без конфига", description: "Использовать defaults (english, slug)" }
+  ]
+}])
 ```
 
 ### 0.3 Resolve Localization
@@ -105,13 +109,13 @@ If `$ARGUMENTS` points to an existing local file path:
 
 If `$ARGUMENTS` is empty:
 ```
-AskUserQuestion: What would you like to plan?
-
-Provide a brief description of the feature, change, or improvement.
-Examples:
-- "Add OAuth authentication with Google and GitHub"
-- "Refactor database layer to support PostgreSQL"
-- "Fix performance issues in search endpoint"
+question(questions: [{
+  header: "Задача",
+  question: "Что вы хотите запланировать?\n\nОпишите функцию, изменение или улучшение.",
+  options: [
+    { label: "Ввести описание", description: "Напишу задачу текстом" }
+  ]
+}])
 ```
 
 ### 1.2 Check for Exploration Output
@@ -123,17 +127,15 @@ Read the resolved research artifact if it exists:
 - Parse `<!-- aif:active-summary:start -->` ... `<!-- aif:active-summary:end -->` block
 - If topic matches the task description (or is clearly related):
   ```
-  AskUserQuestion: Found exploration notes in the configured research artifact that may be relevant.
-
-  Topic: {{research_topic}}
-  Goal: {{research_goal}}
-
-  Import exploration into the plan?
-
-  Options:
-  1. Yes — Import findings into plan artifacts (recommended)
-  2. No — Start fresh, ignore exploration
-  3. View — Show me the summary first
+  question(questions: [{
+    header: "Исследование",
+    question: "Найдены заметки исследования в {{research_path}}.\n\nТема: {{research_topic}}\nЦель: {{research_goal}}\n\nИмпортировать в план?",
+    options: [
+      { label: "Да — импортировать findings (Рекомендуется)", description: "Добавить в артефакты плана" },
+      { label: "Нет — начать заново", description: "Игнорировать исследование" },
+      { label: "Показать summary", description: "Показать сначала" }
+    ]
+  }])
   ```
 - If imported, distribute content:
   - Topic + Goal → `task.md`
@@ -153,12 +155,40 @@ Read the resolved research artifact if it exists:
 If the task description is vague or broad, ask targeted questions:
 
 ```
-AskUserQuestion: Let me clarify the scope for this plan.
-
-1. What specific outcome do you expect? (not just "add feature X" but "users can do Y")
-2. Are there parts we should explicitly NOT touch?
-3. Any hard constraints? (deadlines, dependencies, backwards compatibility)
-4. Related issue or PR number?
+question(questions: [
+  {
+    header: "Результат",
+    question: "Какой конкретный результат ожидаете?",
+    options: [
+      { label: "Опишу", description: "Укажу конкретный outcome" },
+      { label: "Пропустить", description: "Оставить как есть" }
+    ]
+  },
+  {
+    header: "Границы",
+    question: "Есть части, которые НЕ нужно трогать?",
+    options: [
+      { label: "Да, есть исключения", description: "Укажу границы" },
+      { label: "Нет, всё открыто", description: "Без ограничений" }
+    ]
+  },
+  {
+    header: "Ограничения",
+    question: "Есть жёсткие ограничения? (дедлайны, зависимости, совместимость)",
+    options: [
+      { label: "Да, укажу", description: "Опишу ограничения" },
+      { label: "Нет", description: "Без ограничений" }
+    ]
+  },
+  {
+    header: "Связи",
+    question: "Связанный issue или PR?",
+    options: [
+      { label: "Да, укажу номер", description: "Привязать к issue/PR" },
+      { label: "Нет", description: "Без связей" }
+    ]
+  }
+])
 ```
 
 Do NOT ask all questions if the task is already clear. Skip what's obvious.
@@ -316,14 +346,17 @@ Show the created plan:
 ```
 
 ```
-AskUserQuestion: What would you like to do next?
-
-Options:
-1. Review plan artifacts — Open task.md for review
-2. Start exploring — Run /aif-explore for deeper research
-3. Improve plan first — Run /aif-improve (recommended)
-4. Start implementing — Run /aif-implement
-5. Done for now — I'll review later
+question(questions: [{
+  header: "Далее",
+  question: "Что хотите сделать дальше?",
+  options: [
+    { label: "Проверить артефакты плана", description: "Открыть task.md" },
+    { label: "Исследовать глубже", description: "/aif-explore <plan-id>" },
+    { label: "Улучшить план (Рекомендуется)", description: "/aif-improve" },
+    { label: "Начать реализацию", description: "/aif-implement" },
+    { label: "Позже", description: "Проверю самостоятельно" }
+  ]
+}])
 ```
 
 If user chooses improve (or if project policy enables auto-improve), immediately hand off to `/aif-improve` with the created plan context.
@@ -388,13 +421,14 @@ Based on plan scope, determine if area-specific rules would help:
 ### 5.2 Ask Before Creating
 
 ```
-AskUserQuestion: This plan touches {{area}}. Would you like to create area-specific rules?
-
-Creating `.ai-factory/rules/{{area}}.md` would help ensure consistent implementation across similar plans.
-
-Options:
-1. Yes — Create rules/{{area}}.md with project-specific conventions
-2. No — Use only base rules
+question(questions: [{
+  header: "Правила области",
+  question: "План затрагивает {{area}}. Создать специфичные правила для области?\n\nСоздание .ai-factory/rules/{{area}}.md обеспечит консистентность реализации.",
+  options: [
+    { label: "Да — создать rules/{{area}}.md (Рекомендуется)", description: "Добавить конвенции для области" },
+    { label: "Нет — только base rules", description: "Использовать только базовые правила" }
+  ]
+}])
 ```
 
 ### 5.3 Create Area Rules File

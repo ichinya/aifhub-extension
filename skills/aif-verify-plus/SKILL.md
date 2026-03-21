@@ -2,6 +2,7 @@
 name: aif-verify+
 description: Enhanced verification against task, rules, and constraints. Checks implementation completeness, produces structured findings, and routes workflow to aif-fix or aif-done. Use after aif-implement completes.
 argument-hint: "[plan-id] [--strict]"
+allowed-tools: Read Glob Grep Bash(git *) Bash(npm *) Bash(python *) Bash(go *) Bash(cargo *) question Questions
 version: 0.7.0
 ---
 
@@ -48,13 +49,16 @@ Treat skill-context rules as project-level overrides:
 
 If no plan found:
 ```
-AskUserQuestion: No plan folder found. What should I verify?
-
-Options:
-1. List available plans — Choose a plan folder from .ai-factory/plans/ (recommended)
-2. Verify branch diff — Compare current branch against main
-3. Verify last commit — Check the most recent commit
-4. Cancel
+question(questions: [{
+  header: "План",
+  question: "Папка плана не найдена. Что верифицировать?",
+  options: [
+    { label: "Выбрать план (Рекомендуется)", description: "Выбрать из .ai-factory/plans/" },
+    { label: "Branch diff", description: "Сравнить текущую ветку с main" },
+    { label: "Last commit", description: "Проверить последний коммит" },
+    { label: "Отмена", description: "Выйти" }
+  ]
+}])
 ```
 
 ### 0.3 Load Plan Artifacts
@@ -342,18 +346,21 @@ Each finding MUST include:
 ### Route Workflow
 
 ```
-AskUserQuestion: Verification complete. What next?
-
-Options (on FAIL):
-1. Fix blocking + important — Run /aif-fix (recommended)
-2. Fix blocking only — Run /aif-fix B001 B002 ...
-3. Accept findings and finalize with force — Run /aif-done --force
-
-Options (on PASS or PASS with notes):
-1. Finalize now — Run /aif-done (recommended)
-2. Address remaining notes — Run /aif-fix for important/optional findings
-3. Security check — Run /aif-security-checklist
-4. Code review — Run /aif-review
+question(questions: [{
+  header: "Далее",
+  question: "Верификация завершена. Что дальше?",
+  options: [
+    # On FAIL:
+    { label: "/aif-fix — Исправить blocking + important (Рекомендуется)", description: "Автоматическое исправление" },
+    { label: "/aif-fix B001... — Только blocking", description: "Исправить только указанные" },
+    { label: "/aif-done --force — Завершить с замечаниями", description: "Принудительное завершение" }
+    # On PASS or PASS with notes:
+    { label: "/aif-done — Завершить (Рекомендуется)", description: "Архивировать план" },
+    { label: "/aif-fix — Исправить remaining notes", description: "Адресовать important/optional findings" },
+    { label: "/aif-security-checklist", description: "Проверка безопасности" },
+    { label: "/aif-review", description: "Code review" }
+  ]
+}])
 ```
 
 ---
@@ -389,12 +396,15 @@ Update `plans/<plan-id>/verify.md` — fill in the Findings table and Verdict se
 ### Context Cleanup
 
 ```
-AskUserQuestion: Free up context before continuing?
-
-Options:
-1. /clear — Full reset (recommended after heavy verification)
-2. /compact — Compress history
-3. Continue as is
+question(questions: [{
+  header: "Контекст",
+  question: "Освободить контекст перед продолжением?",
+  options: [
+    { label: "/clear — Полный сброс (Рекомендуется)", description: "После heavy verification" },
+    { label: "/compact — Сжать историю", description: "Компактный режим" },
+    { label: "Продолжить как есть", description: "Без изменений" }
+  ]
+}])
 ```
 
 ---
