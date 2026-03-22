@@ -2,10 +2,13 @@
 name: aif-fix
 description: Fix issues found by /aif-verify. Reads verification findings, implements fixes for blocking and important issues, then suggests re-verification. Use when verification fails or user says "fix the issues".
 argument-hint: "[plan-id] [finding-ids...] [--all]"
+allowed-tools: Read Write Edit Glob Grep Bash question questionnaire Task
 version: 0.7.0
 ---
 
 # AIF Fix — Fix Verification Findings
+
+> **See [Question Tool Reference](../shared/QUESTION-TOOL.md)** — question/questionnaire formats for different agents.
 
 Fix issues identified by `/aif-verify`. Reads structured findings, implements corrections, and drives the fix → verify loop.
 
@@ -97,16 +100,16 @@ Fix Queue (ordered by priority):
 Show the queue and confirm:
 
 ```
-AskUserQuestion: Fix queue ready. How should I proceed?
-
-Blocking: 2 issues
-Important: 2 issues
-
-Options:
-1. Fix blocking + important (recommended) — Address the default fix scope
-2. Fix blocking only — Address only blocking issues
-3. Select findings manually — Choose specific findings
-4. Cancel — I'll handle this manually
+question(questions: [{
+  header: "Queue",
+  question: "Fix queue ready. How should I proceed?\n\nBlocking: {{blocking_count}} issues\nImportant: {{important_count}} issues",
+  options: [
+    { label: "Fix blocking + important (Recommended)", description: "Address default scope" },
+    { label: "Blocking only", description: "Fix blocking issues only" },
+    { label: "Select manually", description: "Choose specific findings" },
+    { label: "Cancel", description: "I'll handle this manually" }
+  ]
+}])
 ```
 
 ---
@@ -295,13 +298,16 @@ After all fixes applied:
 ## Step 5: Route to Re-Verification
 
 ```
-AskUserQuestion: Fixes applied. What next?
-
-Options:
-1. Re-verify now — Run /aif-verify to confirm fixes (recommended)
-2. Commit current fixes — Run /aif-commit
-3. Continue with optional findings — Address remaining optional issues
-4. Stop for now — Verify later
+question(questions: [{
+  header: "Next",
+  question: "Fixes applied. What next?",
+  options: [
+    { label: "Re-verify now (Recommended)", description: "/aif-verify to confirm fixes" },
+    { label: "Commit fixes", description: "/aif-commit" },
+    { label: "Continue with optional findings", description: "Address remaining issues" },
+    { label: "Stop for now", description: "Verify later" }
+  ]
+}])
 ```
 
 ---
@@ -328,12 +334,15 @@ fixes:
 ### Context Cleanup
 
 ```
-AskUserQuestion: Free up context before continuing?
-
-Options:
-1. /clear — Full reset (recommended after fixing)
-2. /compact — Compress history
-3. Continue as is
+question(questions: [{
+  header: "Context",
+  question: "Free up context before continuing?",
+  options: [
+    { label: "/clear — Full reset (Recommended)", description: "After fixes" },
+    { label: "/compact — Compress history", description: "Compact mode" },
+    { label: "Continue as is", description: "No changes" }
+  ]
+}])
 ```
 
 ---

@@ -2,12 +2,15 @@
 name: aif-done
 description: Finalize a plan, mark it complete, and archive artifacts to specs/. Use after /aif-verify passes or when manually marking work as done.
 argument-hint: "[plan-id] [--summary] [--force]"
+allowed-tools: Read Write Glob Grep Bash(mkdir *) Bash(cp *) Bash(rm -rf *) question questionnaire
 version: 0.7.0
 ---
 
 # AIF Done — Finalize and Archive Plan
 
 Finalize a plan by marking it complete, archiving artifacts to `.ai-factory/specs/`, and optionally updating project context.
+
+> **See [Question Tool Reference](../shared/QUESTION-TOOL.md)** — question/questionnaire formats for different agents.
 
 **This is a workflow terminus.** After `aif-done`, the plan is archived and the cycle is complete.
 
@@ -82,14 +85,15 @@ Acceptable completion state:
 
 If NOT eligible:
 ```
-AskUserQuestion: Plan status is "<current_status>" with verdict "<verdict>".
-
-This plan hasn't passed verification yet.
-
-Options:
-1. Run verification now — Run /aif-verify first (recommended)
-2. Finalize with force — Mark as done without verification (--force)
-3. Cancel
+question(questions: [{
+  header: "Status",
+  question: "Plan status: \"{{current_status}}\" with verdict \"{{verdict}}\".\n\nPlan has not passed verification yet.",
+  options: [
+    { label: "Run verification (Recommended)", description: "/aif-verify" },
+    { label: "Force finalize (--force)", description: "Without verification" },
+    { label: "Cancel", description: "Exit" }
+  ]
+}])
 ```
 
 ### Force Mode (`--force`)
@@ -153,11 +157,14 @@ Generate an extended summary including:
 - Lessons learned (ask user):
 
 ```
-AskUserQuestion: Any lessons learned from this plan?
-
-Options:
-1. Add lessons learned — I have notes to capture
-2. Skip — No lessons this time
+question(questions: [{
+  header: "Lessons",
+  question: "Are there any lessons learned from this plan?",
+  options: [
+    { label: "Yes — Add lessons", description: "I have notes to capture" },
+    { label: "Skip", description: "No lessons this time" }
+  ]
+}])
 ```
 
 ---
@@ -284,12 +291,15 @@ Before cleanup, handle two optional post-actions while the original plan folder 
 Ask:
 
 ```
-AskUserQuestion: Documentation checkpoint — how should we document this feature?
-
-Options:
-1. Update existing docs (/aif-docs) (recommended)
-2. Create feature page with /aif-docs
-3. Skip documentation for now
+question(questions: [{
+  header: "Documentation",
+  question: "How should we document this feature?",
+  options: [
+    { label: "Update existing docs (Recommended)", description: "/aif-docs" },
+    { label: "Create feature page", description: "/aif-docs docs/<feature>.md" },
+    { label: "Skip", description: "No documentation now" }
+  ]
+}])
 ```
 
 Record outcome in completion output as one of:
@@ -303,11 +313,14 @@ Record outcome in completion output as one of:
 If plan contains fix artifacts (`plans/<plan-id>/fixes/*.md`) or rich findings history:
 
 ```
-AskUserQuestion: Run evolution from this plan context?
-
-Options:
-1. Yes — Run /aif-evolve with plan/fixes context (recommended)
-2. No — Skip evolution
+question(questions: [{
+  header: "Evolution",
+  question: "Run evolution from this plan context?",
+  options: [
+    { label: "Yes — /aif-evolve (Recommended)", description: "Use plan/fixes as evidence" },
+    { label: "No — Skip", description: "Without evolution" }
+  ]
+}])
 ```
 
 When enabled, use the completed plan folder as the evidence base for evolution suggestions.
@@ -317,13 +330,14 @@ When enabled, use the completed plan folder as the evidence base for evolution s
 ## Step 8: Clean Up Plan Folder
 
 ```
-AskUserQuestion: Plan archived to .ai-factory/specs/<plan-id>/
-
-Clean up original plan folder?
-
-Options:
-1. Remove original plan folder (recommended) — Delete .ai-factory/plans/<plan-id>/
-2. Keep original plan folder — Retain both copies
+question(questions: [{
+  header: "Cleanup",
+  question: "Plan archived to .ai-factory/specs/<plan-id>/\n\nDelete original plan folder?",
+  options: [
+    { label: "Delete .ai-factory/plans/<plan-id>/ (Recommended)", description: "Keep archive only" },
+    { label: "Keep both copies", description: "Retain plan and archive" }
+  ]
+}])
 ```
 
 If remove:
@@ -368,12 +382,15 @@ Ready to start a new plan? Run /aif-new
 ### Context Cleanup
 
 ```
-AskUserQuestion: Free up context before continuing?
-
-Options:
-1. /clear — Full reset (recommended)
-2. /compact — Compress history
-3. Continue as is
+question(questions: [{
+  header: "Context",
+  question: "Free up context before continuing?",
+  options: [
+    { label: "/clear — Full reset (Recommended)", description: "After plan completion" },
+    { label: "/compact — Compress history", description: "Compact mode" },
+    { label: "Continue as is", description: "No changes" }
+  ]
+}])
 ```
 
 ---

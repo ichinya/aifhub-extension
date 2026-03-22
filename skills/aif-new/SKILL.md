@@ -2,10 +2,13 @@
 name: aif-new
 description: Create a new plan folder with structured artifacts (task, context, rules, verify, status). Use when starting a new feature, change, or improvement that requires structured planning.
 argument-hint: "[task description]"
+allowed-tools: Read Write Glob Grep Bash(mkdir *) Bash(cp *) Bash(basename *) question questionnaire
 version: 0.7.0
 ---
 
 # AIF New — Create Plan Folder
+
+> **Reference:** [Question Tool](../shared/QUESTION-TOOL.md) — question/questionnaire formats for different agents
 
 Create a new plan folder under `.ai-factory/plans/<plan-id>/` with all required artifacts for spec-driven workflow.
 
@@ -48,11 +51,14 @@ Read these files if present (do NOT fail if missing):
 
 If `.ai-factory/config.yaml` does not exist:
 ```
-AskUserQuestion: Project config not found. Create it?
-
-Options:
-1. Yes — Run /aif-analyze first to initialize config (recommended)
-2. Continue without config — Use defaults (english, slug format)
+question(questions: [{
+  header: "Config",
+  question: "Project config not found. Create it?",
+  options: [
+    { label: "Yes — run /aif-analyze (Recommended)", description: "Initialize config.yaml" },
+    { label: "Continue without config", description: "Use defaults (english, slug)" }
+  ]
+}])
 ```
 
 ### 0.3 Resolve Localization
@@ -105,13 +111,13 @@ If `$ARGUMENTS` points to an existing local file path:
 
 If `$ARGUMENTS` is empty:
 ```
-AskUserQuestion: What would you like to plan?
-
-Provide a brief description of the feature, change, or improvement.
-Examples:
-- "Add OAuth authentication with Google and GitHub"
-- "Refactor database layer to support PostgreSQL"
-- "Fix performance issues in search endpoint"
+question(questions: [{
+  header: "Task",
+  question: "What would you like to plan?\n\nDescribe the feature, change, or improvement.",
+  options: [
+    { label: "Enter description", description: "I'll type the task" }
+  ]
+}])
 ```
 
 ### 1.2 Check for Exploration Output
@@ -123,17 +129,15 @@ Read the resolved research artifact if it exists:
 - Parse `<!-- aif:active-summary:start -->` ... `<!-- aif:active-summary:end -->` block
 - If topic matches the task description (or is clearly related):
   ```
-  AskUserQuestion: Found exploration notes in the configured research artifact that may be relevant.
-
-  Topic: {{research_topic}}
-  Goal: {{research_goal}}
-
-  Import exploration into the plan?
-
-  Options:
-  1. Yes — Import findings into plan artifacts (recommended)
-  2. No — Start fresh, ignore exploration
-  3. View — Show me the summary first
+  question(questions: [{
+    header: "Research",
+    question: "Found research notes at {{research_path}}.\n\nTopic: {{research_topic}}\nGoal: {{research_goal}}\n\nImport into plan?",
+    options: [
+      { label: "Yes — import findings (Recommended)", description: "Add to plan artifacts" },
+      { label: "No — start fresh", description: "Ignore research" },
+      { label: "Show summary", description: "Show me first" }
+    ]
+  }])
   ```
 - If imported, distribute content:
   - Topic + Goal → `task.md`
@@ -153,12 +157,40 @@ Read the resolved research artifact if it exists:
 If the task description is vague or broad, ask targeted questions:
 
 ```
-AskUserQuestion: Let me clarify the scope for this plan.
-
-1. What specific outcome do you expect? (not just "add feature X" but "users can do Y")
-2. Are there parts we should explicitly NOT touch?
-3. Any hard constraints? (deadlines, dependencies, backwards compatibility)
-4. Related issue or PR number?
+question(questions: [
+  {
+    header: "Outcome",
+    question: "What specific outcome do you expect from this plan?",
+    options: [
+      { label: "Describe", description: "I'll specify concrete outcomes" },
+      { label: "Skip", description: "Leave as is" }
+    ]
+  },
+  {
+    header: "Boundaries",
+    question: "Are there parts we should NOT touch?",
+    options: [
+      { label: "Yes, have exclusions", description: "I'll specify boundaries" },
+      { label: "No, open", description: "No restrictions" }
+    ]
+  },
+  {
+    header: "Constraints",
+    question: "Are there hard constraints? (deadlines, dependencies, compatibility)",
+    options: [
+      { label: "Yes, will specify", description: "I'll specify constraints" },
+      { label: "No", description: "No constraints" }
+    ]
+  },
+  {
+    header: "Links",
+    question: "Related issue or PR?",
+    options: [
+      { label: "Yes, provide number", description: "Link to issue/PR" },
+      { label: "No", description: "No links" }
+    ]
+  }
+])
 ```
 
 Do NOT ask all questions if the task is already clear. Skip what's obvious.
@@ -316,14 +348,17 @@ Show the created plan:
 ```
 
 ```
-AskUserQuestion: What would you like to do next?
-
-Options:
-1. Review plan artifacts — Open task.md for review
-2. Start exploring — Run /aif-explore for deeper research
-3. Improve plan first — Run /aif-improve (recommended)
-4. Start implementing — Run /aif-implement
-5. Done for now — I'll review later
+question(questions: [{
+  header: "Next",
+  question: "What would you like to do next?",
+  options: [
+    { label: "Review plan artifacts", description: "Open task.md" },
+    { label: "Explore deeper", description: "/aif-explore <plan-id>" },
+    { label: "Improve plan (Recommended)", description: "/aif-improve" },
+    { label: "Start implementation", description: "/aif-implement" },
+    { label: "Later", description: "I'll review manually" }
+  ]
+}])
 ```
 
 If user chooses improve (or if project policy enables auto-improve), immediately hand off to `/aif-improve` with the created plan context.
@@ -388,13 +423,14 @@ Based on plan scope, determine if area-specific rules would help:
 ### 5.2 Ask Before Creating
 
 ```
-AskUserQuestion: This plan touches {{area}}. Would you like to create area-specific rules?
-
-Creating `.ai-factory/rules/{{area}}.md` would help ensure consistent implementation across similar plans.
-
-Options:
-1. Yes — Create rules/{{area}}.md with project-specific conventions
-2. No — Use only base rules
+question(questions: [{
+  header: "Area rules",
+  question: "Plan touches {{area}}. Create area-specific rules?\n\nCreating .ai-factory/rules/{{area}}.md will ensure consistency across similar plans.",
+  options: [
+    { label: "Yes — create rules/{{area}}.md (Recommended)", description: "Add conventions for this area" },
+    { label: "No — base rules only", description: "Use only base rules" }
+  ]
+}])
 ```
 
 ### 5.3 Create Area Rules File
