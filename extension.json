@@ -1,24 +1,41 @@
 {
-    "name": "aifhub-extension",
-    "version": "0.7.2",
-    "description": "Spec-driven workflow for AI Factory: analyze, plan, verify, fix, finalize, and manage artifacts",
-    "skills": [
-        "skills/aif-analyze",
-        "skills/aif-explore",
-        "skills/aif-new",
-        "skills/aif-apply",
-        "skills/aif-improve-plus",
-        "skills/aif-implement-plus",
-        "skills/aif-verify-plus",
-        "skills/aif-fix",
-        "skills/aif-done",
-        "skills/aif-roadmap-plus"
-    ],
-    "replaces": {
-        "skills/aif-explore": "aif-explore",
-        "skills/aif-improve-plus": "aif-improve",
-        "skills/aif-implement-plus": "aif-implement",
-        "skills/aif-roadmap-plus": "aif-roadmap",
-        "skills/aif-verify-plus": "aif-verify"
+  "name": "aifhub-extension",
+  "version": "0.7.2",
+  "description": "Spec-driven workflow for AI Factory: analyze, plan, verify, fix, finalize, and manage artifacts",
+  "compat": {
+    "ai-factory": ">=2.8.0 <3.0.0"
+  },
+  "sources": {
+    "ai-factory": {
+      "url": "https://github.com/lee-to/ai-factory",
+      "version": "2.8.0",
+      "lastSync": "2026-03-26",
+      "notes": "config-first context loading, status.yaml schema, plan-folder workflow"
+    },
+    "openspec": {
+      "url": "https://github.com/Fission-AI/OpenSpec",
+      "version": "v0.23.0",
+      "lastSync": "2026-03-26",
+      "notes": "init"
     }
+  },
+  "skills": [
+    "skills/aif-analyze",
+    "skills/aif-explore",
+    "skills/aif-new",
+    "skills/aif-apply",
+    "skills/aif-improve-plus",
+    "skills/aif-implement-plus",
+    "skills/aif-verify-plus",
+    "skills/aif-fix",
+    "skills/aif-done",
+    "skills/aif-roadmap-plus"
+  ],
+  "replaces": {
+    "skills/aif-explore": "aif-explore",
+    "skills/aif-improve-plus": "aif-improve",
+    "skills/aif-implement-plus": "aif-implement",
+    "skills/aif-roadmap-plus": "aif-roadmap",
+    "skills/aif-verify-plus": "aif-verify"
+  }
 }
