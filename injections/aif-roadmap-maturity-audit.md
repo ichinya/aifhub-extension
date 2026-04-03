@@ -60,7 +60,7 @@ Evidence priority is strict:
 
 When available, follow these extension-owned reference files:
 
-- `.ai-factory/extensions/aifhub-extension/skills/aif-roadmap-plus/references/slice-checklist.md`
-- `.ai-factory/extensions/aifhub-extension/skills/aif-roadmap-plus/references/roadmap-template.md`
+- `.ai-factory/extensions/aifhub-extension/injections/references/aif-roadmap/slice-checklist.md`
+- `.ai-factory/extensions/aifhub-extension/injections/references/aif-roadmap/roadmap-template.md`
 
 If the extension copy is not installed yet, continue with the rules in this injected block.
