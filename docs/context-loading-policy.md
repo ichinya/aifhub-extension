@@ -22,12 +22,12 @@ Bridge files (`AGENTS.md`, `CLAUDE.md`, `QWEN.md`) are allowed only in this boot
 - `aif-explore`
 - `aif-new`
 - `aif-apply`
-- `aif-improve-plus`
-- `aif-implement-plus`
-- `aif-verify-plus`
+- `aif-improve`
+- `aif-implement`
+- `aif-verify`
 - `aif-fix`
 - `aif-done`
-- `aif-roadmap-plus`
+- `aif-roadmap`
 
 These skills must not depend on bridge files.
 

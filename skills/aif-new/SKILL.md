@@ -12,7 +12,7 @@ version: 0.7.0
 
 Create a new plan folder under `.ai-factory/plans/<plan-id>/` with all required artifacts for spec-driven workflow.
 
-**This skill creates the plan structure only.** It does NOT implement anything. After plan creation, hand off to `aif-improve` first, then to `aif-implement` (Implement+ replacement in this extension).
+**This skill creates the plan structure only.** It does NOT implement anything. After plan creation, hand off to `aif-improve` first, then to `aif-implement`.
 
 ---
 

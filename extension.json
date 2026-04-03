@@ -1,6 +1,6 @@
 {
   "name": "aifhub-extension",
-  "version": "0.7.2",
+  "version": "0.8.0",
   "description": "Spec-driven workflow for AI Factory: analyze, plan, verify, fix, finalize, and manage artifacts",
   "compat": {
     "ai-factory": ">=2.8.0 <3.0.0"
@@ -8,9 +8,10 @@
   "sources": {
     "ai-factory": {
       "url": "https://github.com/lee-to/ai-factory",
-      "version": "2.8.0",
-      "lastSync": "2026-03-26",
-      "notes": "config-first context loading, status.yaml schema, plan-folder workflow"
+      "version": "2.9.1",
+      "baselineVersion": "2.0.0",
+      "lastSync": "2026-04-03",
+      "notes": "Reviewed against upstream 2.9.1; extension workflow now layers plan-folder behavior via injections over built-in skills"
     },
     "openspec": {
       "url": "https://github.com/Fission-AI/OpenSpec",
@@ -21,21 +22,45 @@
   },
   "skills": [
     "skills/aif-analyze",
-    "skills/aif-explore",
     "skills/aif-new",
     "skills/aif-apply",
-    "skills/aif-improve-plus",
-    "skills/aif-implement-plus",
-    "skills/aif-verify-plus",
-    "skills/aif-fix",
-    "skills/aif-done",
-    "skills/aif-roadmap-plus"
+    "skills/aif-done"
   ],
-  "replaces": {
-    "skills/aif-explore": "aif-explore",
-    "skills/aif-improve-plus": "aif-improve",
-    "skills/aif-implement-plus": "aif-implement",
-    "skills/aif-roadmap-plus": "aif-roadmap",
-    "skills/aif-verify-plus": "aif-verify"
-  }
+  "injections": [
+    {
+      "target": "aif-explore",
+      "position": "prepend",
+      "file": "./injections/aif-explore-plan-folder.md"
+    },
+    {
+      "target": "aif-roadmap",
+      "position": "prepend",
+      "file": "./injections/aif-roadmap-maturity-audit.md"
+    },
+    {
+      "target": "aif-fix",
+      "position": "prepend",
+      "file": "./injections/aif-fix-plan-folder.md"
+    },
+    {
+      "target": "aif-verify",
+      "position": "prepend",
+      "file": "./injections/aif-verify-plan-folder.md"
+    },
+    {
+      "target": "aif-improve",
+      "position": "prepend",
+      "file": "./injections/aif-improve-plan-folder.md"
+    },
+    {
+      "target": "aif-implement",
+      "position": "prepend",
+      "file": "./injections/aif-implement-plan-folder.md"
+    },
+    {
+      "target": "aif-evolve",
+      "position": "prepend",
+      "file": "./injections/aif-evolve-plan-evidence.md"
+    }
+  ]
 }

@@ -2,18 +2,18 @@
 
 ## Skills
 
-| Skill | Replaces | Purpose |
-|-------|----------|---------|
-| `/aif-analyze` | - | Analyze project context and bootstrap config/rules |
-| `/aif-explore` | `/aif-explore` | Explore ideas and active plans with config-first, RESEARCH-only persistence |
-| `/aif-new` | - | Create plan folder with structured artifacts |
-| `/aif-improve` | `/aif-improve` | Refine plan-folder artifacts with deeper analysis before implementation |
-| `/aif-apply` | - | Recommended orchestration entrypoint for improve -> implement -> verify/fix -> done |
-| `/aif-implement` | `/aif-implement` | Execute plan-folder tasks with status.yaml tracking and optional subagent mode |
-| `/aif-verify` | `/aif-verify` | Enhanced verification with structured findings |
-| `/aif-fix` | - | Fix issues found by verify+ |
-| `/aif-done` | - | Finalize plan and archive to specs |
-| `/aif-roadmap` | `/aif-roadmap` | Enhanced roadmap with maturity assessment |
+| Skill | Type | Purpose |
+|-------|------|---------|
+| `/aif-analyze` | Extension skill | Analyze project context and bootstrap config/rules |
+| `/aif-explore` | Built-in + injection | Explore ideas and active plans with plan-folder-aware persistence rules |
+| `/aif-new` | Extension skill | Create plan folder with structured artifacts |
+| `/aif-improve` | Built-in + injection | Refine plan-folder artifacts with deeper analysis before implementation |
+| `/aif-apply` | Extension skill | Recommended orchestration entrypoint for improve -> implement -> verify/fix -> done |
+| `/aif-implement` | Built-in + injection | Execute plan-folder tasks with status.yaml tracking and optional subagent mode |
+| `/aif-verify` | Built-in + injection | Enhanced verification with structured findings in plan-folder workflow |
+| `/aif-fix` | Built-in + injection | Fix issues found by verification in plan-folder workflow |
+| `/aif-done` | Extension skill | Finalize plan and archive to specs |
+| `/aif-roadmap` | Built-in + injection | Evidence-based maturity audit roadmap |
 
 ## Workflow
 
@@ -21,37 +21,31 @@
 aif-analyze -> aif-explore -> aif-new -> aif-improve -> aif-apply -> aif-done
                                                           |
                                                           v
-                                                   aif-implement
+                                                    aif-implement
                                                           |
                                                           v
                                                    quality checks
                                                           |
                                                           v
-                                                     aif-verify
+                                                      aif-verify
                                                           |
                                         PASS ____________/ \____________ FAIL
                                                           |             |
                                                           |             v
-                                                          |          aif-fix
+                                                          |           aif-fix
                                                           |             |
                                                           \_____________/
 ```
 
 ## Installation
 
-### From Git repository
-
 ```bash
 ai-factory extension add https://github.com/ichinya/aifhub-extension.git
 ```
 
-### Local installation
-
-```bash
-git clone https://github.com/ichinya/aifhub-extension.git
-cd aifhub-extension
-ai-factory extension add .
-```
+Notes:
+- `ai-factory extension list` prints `name/version/source` from `.ai-factory.json`
+- updates should be done through `ai-factory extension update` against the Git source configured in `.ai-factory.json`
 
 ## Typical Flow
 
@@ -78,7 +72,7 @@ Optional exploration before planning:
 /aif-explore @.ai-factory/plans/<plan-id>
 ```
 
-Explore replacement behavior:
+Explore injection behavior:
 - reads `.ai-factory/config.yaml` first
 - resolves plan folders instead of legacy `PLAN.md`
 - may write only `.ai-factory/RESEARCH.md`
@@ -100,7 +94,7 @@ Creates plan artifacts in `.ai-factory/plans/<plan-id>/`.
 
 Refines the freshly created plan before execution.
 
-Improve+ supports:
+Improve workflow supports:
 - `--list` to discover active plan folders
 - `@<path>` explicit plan selection
 - optional Claude `plan-polisher` mode with local fallback
@@ -129,7 +123,7 @@ Use this as the recommended execution entrypoint after `/aif-improve`.
 
 Use this when you want to run the execution steps manually instead of via `/aif-apply`.
 
-Implement+ supports:
+Implement workflow supports:
 - `--list` to discover active plan folders
 - `@<path>` explicit plan selection
 - `--from <n>` task index resume
@@ -177,19 +171,14 @@ Updates `.ai-factory/ROADMAP.md` with maturity assessment.
 aifhub-extension/
 |- extension.json
 |- README.md
+|- injections/
 |- docs/
 |  |- README.md
 |  |- usage.md
 |  `- context-loading-policy.md
 `- skills/
    |- aif-analyze/
-   |- aif-explore/
    |- aif-new/
    |- aif-apply/
-   |- aif-improve-plus/
-   |- aif-implement-plus/
-   |- aif-verify-plus/
-   |- aif-fix/
-   |- aif-done/
-   `- aif-roadmap-plus/
+   `- aif-done/
 ```

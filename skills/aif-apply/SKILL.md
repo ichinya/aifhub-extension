@@ -55,7 +55,7 @@ Use `config.paths.plans` as the source of truth for plan discovery and list mode
 Read skill-context in this order:
 
 1. `.ai-factory/skill-context/aif-apply/SKILL.md`
-2. `.ai-factory/skill-context/aif-implement-plus/SKILL.md` as compatibility guidance when apply-specific context does not exist
+2. `.ai-factory/skill-context/aif-implement/SKILL.md` as compatibility guidance when apply-specific context does not exist
 
 If a skill-context file exists, treat it as a project-level override and enforce it across all orchestration decisions.
 

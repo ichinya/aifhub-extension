@@ -317,13 +317,23 @@ question(questions: [{
   header: "Evolution",
   question: "Run evolution from this plan context?",
   options: [
-    { label: "Yes — /aif-evolve (Recommended)", description: "Use plan/fixes as evidence" },
+    { label: "Yes — /aif-evolve <plan-id> (Recommended)", description: "Use plan context, findings, and fixes as evidence" },
     { label: "No — Skip", description: "Without evolution" }
   ]
 }])
 ```
 
-When enabled, use the completed plan folder as the evidence base for evolution suggestions.
+When enabled, prefer `/aif-evolve <plan-id>` (or `/aif-evolve @.ai-factory/plans/<plan-id>` when an explicit path is needed).
+
+Use the completed plan folder as the first evidence base for evolution:
+
+- `context.md`
+- `verify.md`
+- `status.yaml`
+- `fixes/*.md`
+- `explore.md` (if present)
+
+Patches remain additional global evidence, but they must not be the only input when plan-local evidence exists.
 
 ---
 

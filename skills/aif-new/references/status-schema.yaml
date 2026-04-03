@@ -38,7 +38,7 @@ history:
     from: null
     to: draft
 
-# Verification results (updated by aif-verify+)
+# Verification results (updated by aif-verify)
 verification:
   last_run: null
   verdict: null  # pass | pass-with-notes | fail

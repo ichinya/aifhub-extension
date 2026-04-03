@@ -64,6 +64,32 @@ ai-factory {installed_version} несовместим с extension (requires {co
 
 4. Continue execution (warning only, do not block)
 
+### Step 1.6: Check Legacy Workflow Aliases
+
+If this project contains legacy skill-context directories under `.ai-factory/skill-context/`:
+
+- `aif-implement-plus`
+- `aif-improve-plus`
+- `aif-verify-plus`
+- `aif-fix-plus`
+
+then emit a non-blocking migration note:
+
+```
+ℹ️ Legacy Workflow Compatibility
+
+This project still contains legacy skill-context for `aif-*-plus`.
+Canonical commands are now:
+- /aif-implement
+- /aif-improve
+- /aif-verify
+- /aif-fix
+
+Backward-compatible fallback is still supported, but renaming the skill-context folders is recommended.
+```
+
+Do not rewrite or delete those folders automatically in this skill.
+
 ### Step 2: Inspect the Repository
 
 - Use [references/project-scan-checklist.md](references/project-scan-checklist.md) as the scan order.

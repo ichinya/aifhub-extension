@@ -57,7 +57,7 @@ workflow:
 # ============================================================================
 # RULES CONFIGURATION
 # ============================================================================
-# Rules are loaded by aif-implement and aif-verify+ as quality gates
+# Rules are loaded by aif-implement and aif-verify as quality gates
 # base.md is required; area files are optional and plan-driven
 rules:
   # Required: project-wide coding rules, conventions, constraints
