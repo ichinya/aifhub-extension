@@ -89,7 +89,7 @@ Minimum summary:
 
 ### Workflow Integration
 
-When `/aif-done` offers an evolution checkpoint for a completed plan, prefer:
+When `/aif-verify` completes finalization for a plan, prefer:
 
 - `/aif-evolve <plan-id>`
 

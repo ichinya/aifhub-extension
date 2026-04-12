@@ -73,4 +73,4 @@
 
 ---
 
-*Note: Area-specific rules (api.md, frontend.md, etc.) are created by aif-new when a plan needs them.*
+*Note: Area-specific rules (api.md, frontend.md, etc.) are added during planning when a plan needs them.*

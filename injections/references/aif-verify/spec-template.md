@@ -3,7 +3,7 @@ artifact_type: spec
 plan_id: "{{plan_id}}"
 title: "{{task_title}}"
 artifact_status: archived
-owner: aif-done
+owner: aif-verify
 created_at: {{start_date}}
 updated_at: {{archive_date}}
 source_issue: {{issue_number}}
@@ -12,11 +12,11 @@ source_plan: "{{plan_id}}"
 
 # Spec: {{plan_id}}
 
-> Finalized specification archived from plan
+> Finalized specification archived from plan verification.
 
 ## Summary
 
-<!-- Краткое описание реализованного в 1-2 предложения -->
+<!-- Brief summary of what was delivered -->
 
 ## Status
 
@@ -31,7 +31,7 @@ source_plan: "{{plan_id}}"
 
 ### Scope Delivered
 
-<!-- Из task.md → Scope → In Scope -->
+<!-- Derived from task.md -> Scope -> In Scope -->
 
 - [x] Item 1
 - [x] Item 2
@@ -45,8 +45,6 @@ source_plan: "{{plan_id}}"
 
 ### Dependencies Added
 
-<!-- Новые зависимости, если есть -->
-
 | Package | Version | Purpose |
 |---------|---------|---------|
 | - | - | - |
@@ -59,7 +57,7 @@ source_plan: "{{plan_id}}"
 |-------|--------|-------|
 | Task Completeness | ✅/❌ | - |
 | Rules Compliance | ✅/❌ | - |
-| Code Quality | ✅/❌ | build, tests, lint |
+| Code Quality | ✅/❌/⏭️ | build, tests, lint |
 | Architecture | ✅/❌ | - |
 | Documentation | ✅/❌ | - |
 
@@ -78,29 +76,28 @@ source_plan: "{{plan_id}}"
 
 ## Decisions Made
 
-<!-- Ключевые архитектурные или технические решения -->
-
 1. **Decision 1** — Rationale
 2. **Decision 2** — Rationale
 
 ## Lessons Learned
 
-<!-- Что пошло хорошо, что можно улучшить -->
-
 ### What Went Well
--
+
+- 
 
 ### What to Improve
--
+
+- 
 
 ## References
 
 | Type | Reference |
 |------|-----------|
 | Original Plan | `.ai-factory/plans/{{plan_id}}/` |
+| Plan File | `.ai-factory/plans/{{plan_id}}.md` |
 | Issue | #{{issue_number}} |
 | PR | #{{pr_number}} |
-| Branch | `feature/{{plan_id}}` |
+| Branch | `{{branch_name}}` |
 
 ---
 
