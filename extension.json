@@ -1,7 +1,7 @@
 {
   "name": "aifhub-extension",
-  "version": "0.8.0",
-  "description": "Spec-driven workflow for AI Factory: analyze, plan, verify, fix, finalize, and manage artifacts",
+  "version": "0.9.0",
+  "description": "Spec-driven workflow for AI Factory: analyze, plan, implement, verify, fix, and archive structured plan artifacts",
   "compat": {
     "ai-factory": ">=2.8.0 <3.0.0"
   },
@@ -10,8 +10,8 @@
       "url": "https://github.com/lee-to/ai-factory",
       "version": "2.9.1",
       "baselineVersion": "2.0.0",
-      "lastSync": "2026-04-03",
-      "notes": "Reviewed against upstream 2.9.1; extension workflow now layers plan-folder behavior via injections over built-in skills"
+      "lastSync": "2026-04-12",
+      "notes": "Reviewed against upstream 2.9.1; release 0.9.0 moves planning, execution orchestration, and finalization to built-in skills via injections"
     },
     "openspec": {
       "url": "https://github.com/Fission-AI/OpenSpec",
@@ -21,12 +21,20 @@
     }
   },
   "skills": [
-    "skills/aif-analyze",
-    "skills/aif-new",
-    "skills/aif-apply",
-    "skills/aif-done"
+    "skills/aif-analyze"
+  ],
+  "agentFiles": [
+    "./agent-files/codex/aifhub-plan-polisher.toml",
+    "./agent-files/codex/aifhub-implement-worker.toml",
+    "./agent-files/codex/aifhub-review-sidecar.toml",
+    "./agent-files/codex/aifhub-security-sidecar.toml"
   ],
   "injections": [
+    {
+      "target": "aif-plan",
+      "position": "prepend",
+      "file": "./injections/aif-plan-plan-folder.md"
+    },
     {
       "target": "aif-explore",
       "position": "prepend",

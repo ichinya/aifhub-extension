@@ -1,6 +1,6 @@
 # AIFHub Extension
 
-Extension for [ai-factory 2.x](https://github.com/lee-to/ai-factory) CLI with a spec-driven workflow for AI agents.
+Extension for [ai-factory 2.x](https://github.com/lee-to/ai-factory) CLI that keeps a structured plan-folder workflow while returning the public workflow to upstream commands.
 
 ## Quick Start
 
@@ -14,80 +14,61 @@ Run:
 /aif-analyze
 ```
 
-Then continue with the recommended workflow:
+Then use:
 
 ```bash
-/aif-explore "your feature"   # optional exploration
-/aif-new "your feature"
+/aif-explore "your feature"   # optional
+/aif-plan full "your feature"
 /aif-improve
-/aif-apply
+/aif-implement
+/aif-verify
 ```
 
-`/aif-explore` stays upstream AI Factory and is extended by this extension via injection:
+If verification finds issues:
 
-- reads context from `.ai-factory/config.yaml`
-- understands `.ai-factory/plans/<plan-id>/` and `@path` plan references
-- remains thinking-only and writes only `.ai-factory/RESEARCH.md`
+```bash
+/aif-fix
+/aif-verify
+```
 
-`/aif-apply` is the recommended manual orchestration step after planning:
+## What This Extension Adds
 
-- resolves the active plan folder
-- persists the chosen git strategy in `status.yaml` and applies it locally before implementation starts
-- runs `/aif-implement` as the single owner of task execution, progress sync, and the verify/fix loop
-- routes passing plans to `/aif-done` after re-reading the resulting verification state
+- `aif-analyze` remains extension-owned and bootstraps `.ai-factory/config.yaml` plus `rules/base.md`.
+- `aif-plan`, `aif-explore`, `aif-improve`, `aif-implement`, `aif-verify`, `aif-fix`, `aif-roadmap`, and `aif-evolve` remain upstream skills with extension injections.
+- Full-mode plans use a dual artifact model:
+  - `.ai-factory/plans/<plan-id>.md`
+  - `.ai-factory/plans/<plan-id>/`
+- Legacy folder-only plans are soft-migrated by generating the missing companion plan file on first improve, implement, or verify entry.
+- Codex installs receive bounded worker agents through `agentFiles`.
 
-Built-in AI Factory commands such as `/aif-verify`, `/aif-fix`, `/aif-roadmap`, and `/aif-evolve` remain
-and are extended via injections where needed.
+## Command Mapping
 
-`/aif-implement` is handled as built-in + injection for the plan-folder execution workflow:
+- `/aif-new` -> `/aif-plan full`
+- `/aif-apply` -> `/aif-implement`
+- `/aif-done` -> `/aif-verify`
 
-- plan-folder execution via `.ai-factory/plans/<plan-id>/`
-- status tracking in `status.yaml`
-- optional Claude subagent mode (with local fallback)
-
-`/aif-improve` is handled as built-in + injection for the plan-folder refinement workflow:
-
-- plan-folder discovery via `.ai-factory/plans/<plan-id>/`
-- artifact refinement across `task.md`, `context.md`, `rules.md`, `verify.md`, and `status.yaml`
-- optional Claude `plan-polisher` mode (with local fallback)
-
-`/aif-roadmap` is also extended via injection with the extension's evidence-based maturity audit rules.
-
-`/aif-verify` and `/aif-fix` are now also handled as built-in + injection for the extension's plan-folder workflow.
-
-There are no remaining explicit `*-plus` workflow commands.
+These old commands are migration references only, not the recommended path.
 
 ## Documentation
 
-Detailed documentation is organized in `docs/`:
-
-- `docs/README.md` - docs index
-- `docs/usage.md` - commands, workflow, and examples
-- `docs/context-loading-policy.md` - bootstrap vs consumer context-loading contract
+- [docs/README.md](/C:/projects/aifhub/aifhub-extension/docs/README.md)
+- [docs/usage.md](/C:/projects/aifhub/aifhub-extension/docs/usage.md)
+- [docs/context-loading-policy.md](/C:/projects/aifhub/aifhub-extension/docs/context-loading-policy.md)
 
 ## Requirements
 
-- **ai-factory CLI**: `>=2.8.0 <3.0.0` (see `extension.json` → `compat.ai-factory`)
+- `ai-factory CLI >=2.8.0 <3.0.0`
 
-This extension tracks upstream compatibility in `extension.json`:
+Compatibility tracking lives in `extension.json`:
 
-| Field                | Purpose                                   |
-|----------------------|-------------------------------------------|
-| `compat.ai-factory`  | Semver range for ai-factory compatibility |
-| `sources.ai-factory` | Last reviewed upstream release + notes    |
-
-`sources.ai-factory.version` is the upstream release last reviewed against this extension.
-`sources.ai-factory.baselineVersion` keeps the historical migration baseline for internal tracking.
+- `compat.ai-factory`: supported ai-factory range
+- `sources.ai-factory`: last reviewed upstream release and migration notes
 
 ## Update Behavior
 
-AI Factory re-applies injections automatically on update.
-
-- `ai-factory update` refreshes base skills, then re-applies extension injections
-- `ai-factory extension update` refreshes the installed extension copy from its source
-- This extension now relies on built-in skills + injections instead of `replaces`, so canonical built-in commands should survive updates cleanly
-
-`/aif-analyze` checks compatibility and warns if your ai-factory version is outside the supported range.
+- `ai-factory update` refreshes built-in skills and reapplies extension injections.
+- `ai-factory extension update` refreshes the installed extension copy from its Git source.
+- Passing `/aif-verify` now performs final archival automatically unless `--check-only` is used.
 
 ## License
 

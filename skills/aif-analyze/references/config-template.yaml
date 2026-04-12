@@ -63,7 +63,7 @@ rules:
   # Required: project-wide coding rules, conventions, constraints
   base: .ai-factory/rules/base.md
   
-  # Optional area-specific rules (created by aif-new when plan needs them)
+  # Optional area-specific rules (added during planning when a plan needs them)
   # Uncomment and add paths as needed:
   # api: .ai-factory/rules/api.md
   # frontend: .ai-factory/rules/frontend.md

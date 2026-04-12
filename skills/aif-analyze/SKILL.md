@@ -66,12 +66,7 @@ ai-factory {installed_version} несовместим с extension (requires {co
 
 ### Step 1.6: Check Legacy Workflow Aliases
 
-If this project contains legacy skill-context directories under `.ai-factory/skill-context/`:
-
-- `aif-implement-plus`
-- `aif-improve-plus`
-- `aif-verify-plus`
-- `aif-fix-plus`
+If this project contains legacy skill-context directories under `.ai-factory/skill-context/` for deprecated `*-plus` workflow names:
 
 then emit a non-blocking migration note:
 
@@ -117,7 +112,7 @@ Use [references/config-template.yaml](references/config-template.yaml) as refere
   - Testing requirements (from test files presence)
 - Use [references/rules-base-template.md](references/rules-base-template.md) as scaffold.
 - Fill placeholders with project-specific values, not generic advice.
-- Do NOT create optional area rules (api.md, frontend.md, etc.) — that's `aif-new` responsibility.
+- Do NOT create optional area rules (api.md, frontend.md, etc.) — planning owns those when the active plan needs them.
 - If `.ai-factory/RULES.md` exists, treat it as additional project-level rules (do not overwrite it).
 
 ### Step 5: Ensure Directories Exist
@@ -168,7 +163,7 @@ workflow:
 
 rules:
   base: .ai-factory/rules/base.md
-  # area rules added by aif-new when needed
+  # area rules added by planning when needed
 
 agent_profile: default
 ```
@@ -181,7 +176,7 @@ agent_profile: default
 - If DESCRIPTION is missing, suggest `/aif` first.
 - Follow workflow flags to suggest or initiate `/aif-architecture` and `/aif-roadmap`.
 - Create `rules/base.md` with project-specific rules, not generic advice.
-- Do NOT create optional area rules — that's `aif-new` responsibility.
+- Do NOT create optional area rules — planning owns those when needed.
 - Ensure all directories from config paths exist.
 - Keep the result concise and repository-specific.
 

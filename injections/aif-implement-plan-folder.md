@@ -1,10 +1,10 @@
-## AIFHub Implement Plan-Folder Override
+## AIFHub Implement Companion-Artifact Override
 
 Apply this block before the upstream `aif-implement` body. When any rule below conflicts with the base skill text, this block wins.
 
 ### Goal
 
-Use the built-in `/aif-implement` skill as the canonical execution command for the extension's plan-folder workflow.
+Use the built-in `/aif-implement` skill as the canonical execution command and orchestration owner for the extension workflow.
 
 ### Skill-Context Resolution
 
@@ -15,12 +15,24 @@ Read skill-context in this order:
 
 If both exist, `aif-implement` wins.
 
-### Workflow Rule
+### Plan Resolution
 
-- Do not redirect the user to a separate `aif-implement-plus` command.
+Resolve all of these inputs to one active plan pair before execution starts:
+
+- `.ai-factory/plans/<plan-id>.md`
+- `.ai-factory/plans/<plan-id>/`
+- `task.md`, `context.md`, `rules.md`, `verify.md`, `status.yaml`, or `explore.md` inside a plan folder
+
+If only the folder exists, create the missing companion plan file first and record the migration event in `status.yaml.history`.
+
+### Workflow Rules
+
 - `/aif-implement` is the canonical execution command for this extension workflow.
-- When no plan exists yet, route the user through `/aif-new "<task>" -> /aif-improve`.
-- After tasks complete, use `/aif-verify`, `/aif-fix`, and `/aif-done`.
+- When no plan exists yet, route the user through `/aif-plan full "<task>" -> /aif-improve`.
+- `/aif-implement` owns git strategy resolution and must persist `execution.git.*` in `status.yaml`.
+- `/aif-implement` also owns `execution.mode`, `execution.runtime`, and `execution.subagent` updates.
+- After tasks complete, route to `/aif-verify`; passing verification finalizes there unless `--check-only` is used.
+- Do not route users to deprecated workflow aliases or legacy `*-plus` command names.
 
 ### Subagent Compatibility
 
@@ -40,9 +52,11 @@ When persisting `execution.subagent`, allow:
 
 Prefer `implement-coordinator` when available.
 
-### Git Strategy Compatibility
+### Execution Metadata
 
-Preserve any existing `execution.git.*` fields chosen by `/aif-apply`. Do not drop or overwrite sibling git fields when updating execution mode metadata.
+- Preserve sibling keys when updating `execution.*`.
+- Record git-strategy decisions, runtime changes, legacy upgrades, and mode switches in `status.yaml.history`.
+- When the implementation flow needs a manual checkpoint, the next command is `/aif-verify`, not a deprecated finalize alias.
 
 ### Compatibility Note
 

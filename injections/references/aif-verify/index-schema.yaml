@@ -1,20 +1,18 @@
 # Specs Catalog
-# Index of all finalized specifications
+# Index of all finalized specifications created by aif-verify finalization.
 
-# Individual specs
 specs:
-  # Example entry (remove after first real spec)
-  # - id: add-oauth
-  #   title: Add OAuth Authentication
-  #   completed: 2024-01-15
+  # Example entry:
+  # - id: feat-example
+  #   title: Example Specification
+  #   completed: 2026-04-12
   #   verdict: pass
   #   files_changed: 12
-  #   tests_added: 15
-  #   tags: [auth, security]
-  #   issue: 42
-  #   pr: 43
+  #   tests_added: 0
+  #   tags: [workflow, example]
+  #   issue: null
+  #   pr: null
 
-# Statistics
 stats:
   total: 0
   by_verdict:
@@ -22,7 +20,6 @@ stats:
     pass-with-notes: 0
   by_tag: {}
 
-# Schema reference
 _schema:
   spec_entry:
     id: "plan-id (slug format)"
