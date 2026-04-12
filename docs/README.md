@@ -8,7 +8,7 @@ Detailed documentation for the AIFHub extension.
 
 | Guide | Description |
 |-------|-------------|
-| [Usage](usage.md) | Canonical workflow, command behavior, migration mapping, and smoke checks |
+| [Usage](usage.md) | Canonical workflow, command behavior, and smoke checks |
 | [Context Loading Policy](context-loading-policy.md) | Runtime context contract, ownership boundaries, and artifact rules |
 
 ## Recommended Reading Order
@@ -22,7 +22,6 @@ This docs set covers:
 
 - public workflow for the extension
 - companion plan-file plus plan-folder model
-- migration mapping from deprecated workflow aliases
 - runtime context and ownership boundaries
 
 Project-level AI Factory planning and archived specs remain under `.ai-factory/` and are not duplicated here.

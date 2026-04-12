@@ -125,5 +125,5 @@ If `config.yaml` is missing or incomplete for the requested operation:
 ## See Also
 
 - [Documentation Index](README.md) - docs overview and reading order
-- [Usage](usage.md) - command flow and migration mapping
+- [Usage](usage.md) - command flow and current workflow behavior
 - [Project README](../README.md) - landing page and install path

@@ -41,19 +41,22 @@ If verification finds issues:
 - Legacy folder-only plans are soft-migrated by generating the missing companion plan file on first improve, implement, or verify entry.
 - Codex installs receive bounded worker agents through `agentFiles`.
 
-## Command Mapping
+## Current Workflow
 
-- `/aif-new` -> `/aif-plan full`
-- `/aif-apply` -> `/aif-implement`
-- `/aif-done` -> `/aif-verify`
+```text
+aif-analyze -> aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify
+                                                                      \-> aif-fix -> aif-verify
+```
 
-These old commands are migration references only, not the recommended path.
+The public workflow no longer includes `aif-new`, `aif-apply`, or `aif-done`.
 
 ## Documentation
 
-- [docs/README.md](/C:/projects/aifhub/aifhub-extension/docs/README.md)
-- [docs/usage.md](/C:/projects/aifhub/aifhub-extension/docs/usage.md)
-- [docs/context-loading-policy.md](/C:/projects/aifhub/aifhub-extension/docs/context-loading-policy.md)
+| Guide | Description |
+|-------|-------------|
+| [Documentation Index](docs/README.md) | Overview and recommended reading order |
+| [Usage](docs/usage.md) | Current command flow, examples, and smoke checks |
+| [Context Loading Policy](docs/context-loading-policy.md) | Runtime context contract and ownership rules |
 
 ## Requirements
 

@@ -23,6 +23,8 @@ aif-analyze -> aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-ve
                                                                       \-> aif-fix -> aif-verify
 ```
 
+The public workflow no longer includes `aif-new`, `aif-apply`, or `aif-done`.
+
 ## Installation
 
 ```bash
@@ -123,12 +125,6 @@ After fixes, run:
 /aif-verify
 ```
 
-## Migration Mapping
-
-- `/aif-new` -> `/aif-plan full`
-- `/aif-apply` -> `/aif-implement`
-- `/aif-done` -> `/aif-verify`
-
 ## Release Smoke Checks
 
 Use this checklist when validating an install or update of the extension:
@@ -168,7 +164,7 @@ Expect the canonical upstream commands to remain available without extension-own
 /aif-verify --check-only
 ```
 
-Expect companion plan artifacts under `.ai-factory/plans/`, synchronized `status.yaml`, and no recommendation to use deprecated workflow aliases.
+Expect companion plan artifacts under `.ai-factory/plans/`, synchronized `status.yaml`, and documentation that points only to the current workflow.
 
 ## Project Layout
 
