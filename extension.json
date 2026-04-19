@@ -1,6 +1,6 @@
 {
   "name": "aifhub-extension",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Spec-driven workflow for AI Factory: analyze, plan, implement, verify, fix, and archive structured plan artifacts",
   "compat": {
     "ai-factory": ">=2.8.0 <3.0.0"
@@ -24,10 +24,26 @@
     "skills/aif-analyze"
   ],
   "agentFiles": [
-    "./agent-files/codex/aifhub-plan-polisher.toml",
-    "./agent-files/codex/aifhub-implement-worker.toml",
-    "./agent-files/codex/aifhub-review-sidecar.toml",
-    "./agent-files/codex/aifhub-security-sidecar.toml"
+    {
+      "runtime": "codex",
+      "source": "./agent-files/codex/aifhub-plan-polisher.toml",
+      "target": "aifhub-plan-polisher.toml"
+    },
+    {
+      "runtime": "codex",
+      "source": "./agent-files/codex/aifhub-implement-worker.toml",
+      "target": "aifhub-implement-worker.toml"
+    },
+    {
+      "runtime": "codex",
+      "source": "./agent-files/codex/aifhub-review-sidecar.toml",
+      "target": "aifhub-review-sidecar.toml"
+    },
+    {
+      "runtime": "codex",
+      "source": "./agent-files/codex/aifhub-security-sidecar.toml",
+      "target": "aifhub-security-sidecar.toml"
+    }
   ],
   "injections": [
     {
