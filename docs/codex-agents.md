@@ -12,10 +12,10 @@
 | `aifhub-implement-worker` | Bounded worker для выполнения одной plan task или тесно связанной группы задач | `workspace-write` | Только execution scope выбранной задачи; без commit/push |
 | `aifhub-review-sidecar` | Read-only sidecar для review changed scope с findings-first выводом | `read-only` | Не пишет файлы |
 | `aifhub-security-sidecar` | Read-only sidecar для security-аудита changed scope | `read-only` | Не пишет файлы |
-| `aifhub-verifier` | Low-write verifier для plan pair и changed scope с gate result | `workspace-write` | Только `.ai-factory/plans/<plan-id>/status.yaml` и `verify.md`; без code edits |
-| `aifhub-fixer` | Targeted fixer по выбранным verification/review findings | `workspace-write` | Только файлы, нужные для выбранных findings, плюс `status.yaml` и `fixes/*.md` |
-| `aifhub-rules-sidecar` | Read-only sidecar для проверки `.ai-factory/RULES.md`, `rules/base.md` и plan-local `rules.md` | `read-only` | Не пишет файлы |
-| `aifhub-done-finalizer` | Finalization helper для archive/spec summary после passing verification | `workspace-write` | Только `status.yaml`, `.ai-factory/specs/<plan-id>/` и `.ai-factory/specs/index.yaml` |
+| `aifhub-verifier` | Low-write verifier для plan pair и changed scope с gate result | `workspace-write` | Только `status.yaml` и `verify.md` для validated active plan pair; `slug` должен быть normalized и подтверждён существующей записью в `.ai-factory/plans/` |
+| `aifhub-fixer` | Targeted fixer по выбранным verification/review findings | `workspace-write` | Только validated changed scope выбранных findings плюс `status.yaml` и `fixes/*.md` resolved plan pair; allowlist может только сузить уже подтверждённый scope |
+| `aifhub-rules-sidecar` | Read-only sidecar для проверки `.ai-factory/RULES.md`, `.ai-factory/rules/base.md` и plan-local `rules.md` | `read-only` | Не пишет файлы |
+| `aifhub-done-finalizer` | Finalization helper для archive/spec summary после passing verification | `workspace-write` | Только `status.yaml` verified plan, его archive dir в `.ai-factory/specs/` и `.ai-factory/specs/index.yaml`; `--force` запрещён |
 
 `name` является authoritative spawn-name. Filename нужен только как удобная convention в репозитории и в manifest.
 
@@ -45,7 +45,7 @@
 
 - Попросить review sidecar: `Используй агент aifhub-review-sidecar и проверь текущий changed scope. Верни findings first.`
 - Попросить security sidecar: `Запусти aifhub-security-sidecar для security review изменённых файлов без правок.`
-- Попросить rules sidecar: `Используй aifhub-rules-sidecar и проверь текущий scope на соответствие файлам .ai-factory/RULES.md, rules/base.md и plan-local rules.`
+- Попросить rules sidecar: `Используй aifhub-rules-sidecar и проверь текущий scope на соответствие файлам .ai-factory/RULES.md, .ai-factory/rules/base.md и plan-local rules.`
 - Попросить implement worker: `Запусти aifhub-implement-worker для выполнения одной задачи из активного плана и верни changed files, verification evidence и blockers.`
 - Попросить plan polisher: `Используй aifhub-plan-polisher для точечной полировки текущего плана без редактирования source code.`
 - Попросить verifier: `Запусти aifhub-verifier для active plan pair и changed files. Обнови только verification artifacts и верни verdict с counts по findings.`
