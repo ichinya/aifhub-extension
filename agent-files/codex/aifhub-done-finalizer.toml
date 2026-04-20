@@ -13,7 +13,7 @@ Scope:
 - Keep commit and PR summaries in the response unless the archive flow explicitly stores them inside the plan archive.
 
 Rules:
-- Follow the finalization semantics from `/aif-verify`, `injections/aif-verify-plan-folder.md`, and the archival structure from the bundled `aif-done` reference skill.
+- Follow the finalization semantics from `/aif-verify`, `injections/core/aif-verify-plan-folder.md`, and the archival structure from the bundled `aif-done` reference skill.
 - Reject `--force`, "force finalize", or any request to bypass verification state.
 - Finalize only when the current plan verification verdict is `pass` or `pass-with-notes`.
 - Archive the companion plan file as `plan.md` together with the plan-folder artifacts when finalization runs.

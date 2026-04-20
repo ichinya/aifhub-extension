@@ -16,14 +16,19 @@
 | `/aif-roadmap` | Built-in + injection | Evidence-based maturity audit roadmap |
 | `/aif-evolve` | Built-in + injection | Plan-evidence-driven evolution workflow |
 
-## Workflow
+## Канонический Public Workflow
 
 ```text
-aif-analyze -> aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify
-                                                                      \-> aif-fix -> aif-verify
+aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify
+                                                            \-> aif-fix -> aif-verify
 ```
 
-The public workflow no longer includes `aif-new`, `aif-apply`, or `aif-done`.
+`/aif-analyze` — это bootstrap/setup step перед этим flow. Он подготавливает `.ai-factory/config.yaml` и `rules/base.md`, но не является первым узлом canonical public command sequence.
+
+- Для новой работы используйте `/aif-plan full`. `/aif-new` упоминается только как historical alias; в handoff vocabulary используется отдельное stage name `New`, а не slash command.
+- `Explore / New / Apply / Done` — это handoff stage names. Подробности собраны в [Handoff Naming](handoff.md).
+- `aif-apply` как delegated wrapper пока отложен по ownership/status contract из [issue #20](https://github.com/ichinya/aifhub-extension/issues/20); current public path использует `/aif-implement`.
+- `aif-done` в handoff контексте означает explicit AIFHub finalizer semantics, а не обязательную slash command.
 
 ## Совместимость
 
@@ -60,6 +65,8 @@ Creates or updates:
 - `.ai-factory/config.yaml`
 - `.ai-factory/rules/base.md`
 
+`/aif-analyze` завершает bootstrap. После него canonical public workflow начинается с `/aif-explore` или сразу с `/aif-plan full`.
+
 ### 2. Explore (optional)
 
 ```bash
@@ -86,6 +93,8 @@ Full-mode planning creates both:
 
 If active research exists, `/aif-plan` normalizes it into plan-local `explore.md`.
 
+`/aif-plan full` — current replacement для historical `/aif-new`, когда нужно открыть новую full plan pair.
+
 ### 4. Improve the plan
 
 ```bash
@@ -111,6 +120,8 @@ Implement behavior:
 - supports `--from <n>` resume and optional Claude worker mode
 - routes completion to `/aif-verify`
 
+`Apply` в handoff wording может ссылаться на этот этап, но current public command здесь — `/aif-implement`, не `/aif-apply`.
+
 ### 6. Verify and finalize
 
 ```bash
@@ -123,6 +134,8 @@ Verify behavior:
 - reads the plan pair and plan-folder artifacts
 - records findings in `verify.md` and `status.yaml`
 - archives passing plans into `.ai-factory/specs/<plan-id>/` unless `--check-only` is used
+
+`Done` в handoff wording относится к verified/finalized состоянию этого этапа, а не к обязательной slash command.
 
 ### 7. Fix findings
 
@@ -208,6 +221,7 @@ aifhub-extension/
 ## See Also
 
 - [Documentation Index](README.md) - docs overview and reading order
+- [Handoff Naming](handoff.md) - терминология стадий versus current public commands
 - [Codex Agents](codex-agents.md) - bundled `aifhub-*` agents, explicit invocation, and sandbox contract
 - [Context Loading Policy](context-loading-policy.md) - runtime context and ownership contract
 - [Project README](../README.md) - quick start and high-level workflow summary

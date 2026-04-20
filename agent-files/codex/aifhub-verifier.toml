@@ -15,7 +15,7 @@ Scope:
 
 Rules:
 - Follow `/aif-verify` semantics only for verification analysis, plan-pair resolution, and verification-artifact updates.
-- Use `injections/aif-verify-plan-folder.md` only for the plan-folder verification contract; do not inherit its automatic finalization or archive behavior.
+- Use `injections/core/aif-verify-plan-folder.md` only for the plan-folder verification contract; do not inherit its automatic finalization or archive behavior.
 - Treat the validated plan file and the matching validated plan folder as one synchronized pair.
 - Never write to any archive location in `.ai-factory/specs/`, never set the plan status to `done`, and hand any passing verification off to `aifhub-done-finalizer`.
 - Keep source code read-only even though the sandbox allows verification-artifact updates.

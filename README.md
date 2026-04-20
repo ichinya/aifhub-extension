@@ -41,6 +41,8 @@ If verification finds issues:
 /aif-verify
 ```
 
+`/aif-analyze` здесь выступает отдельным bootstrap/setup step. Canonical public workflow начинается после него.
+
 ## What This Extension Adds
 
 - `aif-analyze` remains extension-owned and bootstraps `.ai-factory/config.yaml` plus `rules/base.md`.
@@ -51,14 +53,19 @@ If verification finds issues:
 - Legacy folder-only plans are soft-migrated by generating the missing companion plan file on first improve, implement, or verify entry.
 - В установках Codex ограниченные worker agents подключаются через runtime-aware `agentFiles` на `ai-factory 2.10.0+`.
 
-## Current Workflow
+## Канонический Public Workflow
 
 ```text
-aif-analyze -> aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify
-                                                                      \-> aif-fix -> aif-verify
+aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify
+                                                            \-> aif-fix -> aif-verify
 ```
 
-The public workflow no longer includes `aif-new`, `aif-apply`, or `aif-done`.
+`/aif-analyze` подготавливает bootstrap context, но не входит в canonical public command path.
+
+- Для новой работы используйте `/aif-plan full`. `/aif-new` упоминается только как historical alias; в handoff vocabulary используется отдельное stage name `New`, а не slash command.
+- `Explore / New / Apply / Done` могут использоваться как handoff stage names, но не обязаны совпадать со slash commands.
+- `aif-apply` как delegated wrapper отложен из-за ownership/status contract из [issue #20](https://github.com/ichinya/aifhub-extension/issues/20). Текущий public execution entrypoint — `/aif-implement`.
+- `aif-done` в handoff semantics читается как explicit AIFHub finalizer, а не как active public alias.
 
 ## Documentation
 
@@ -66,6 +73,7 @@ The public workflow no longer includes `aif-new`, `aif-apply`, or `aif-done`.
 |-------|-------------|
 | [Documentation Index](docs/README.md) | Overview and recommended reading order |
 | [Usage](docs/usage.md) | Current command flow, examples, and smoke checks |
+| [Handoff Naming](docs/handoff.md) | Терминология `Explore / New / Apply / Done` без возврата legacy commands в public path |
 | [Context Loading Policy](docs/context-loading-policy.md) | Runtime context contract and ownership rules |
 
 ## Requirements

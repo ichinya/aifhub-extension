@@ -69,42 +69,42 @@
     {
       "target": "aif-plan",
       "position": "prepend",
-      "file": "./injections/aif-plan-plan-folder.md"
+      "file": "./injections/core/aif-plan-plan-folder.md"
     },
     {
       "target": "aif-explore",
       "position": "prepend",
-      "file": "./injections/aif-explore-plan-folder.md"
+      "file": "./injections/core/aif-explore-plan-folder.md"
     },
     {
       "target": "aif-roadmap",
       "position": "prepend",
-      "file": "./injections/aif-roadmap-maturity-audit.md"
+      "file": "./injections/core/aif-roadmap-maturity-audit.md"
     },
     {
       "target": "aif-fix",
       "position": "prepend",
-      "file": "./injections/aif-fix-plan-folder.md"
+      "file": "./injections/core/aif-fix-plan-folder.md"
     },
     {
       "target": "aif-verify",
       "position": "prepend",
-      "file": "./injections/aif-verify-plan-folder.md"
+      "file": "./injections/core/aif-verify-plan-folder.md"
     },
     {
       "target": "aif-improve",
       "position": "prepend",
-      "file": "./injections/aif-improve-plan-folder.md"
+      "file": "./injections/core/aif-improve-plan-folder.md"
     },
     {
       "target": "aif-implement",
       "position": "prepend",
-      "file": "./injections/aif-implement-plan-folder.md"
+      "file": "./injections/core/aif-implement-plan-folder.md"
     },
     {
       "target": "aif-evolve",
       "position": "prepend",
-      "file": "./injections/aif-evolve-plan-evidence.md"
+      "file": "./injections/core/aif-evolve-plan-evidence.md"
     }
   ]
 }

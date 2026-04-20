@@ -75,10 +75,14 @@ then emit a non-blocking migration note:
 
 This project still contains legacy skill-context for `aif-*-plus`.
 Canonical commands are now:
+- /aif-plan full
 - /aif-implement
 - /aif-improve
 - /aif-verify
 - /aif-fix
+
+Если docs или handoff notes упоминают `Explore`, `New`, `Apply` или `Done`, трактуй их только как названия стадий.
+Не подавай `/aif-new`, `/aif-apply` или `/aif-done` как текущий public workflow.
 
 Backward-compatible fallback is still supported, but renaming the skill-context folders is recommended.
 ```
@@ -136,6 +140,9 @@ Use [references/config-template.yaml](references/config-template.yaml) as refere
 - Mention created/updated files: `config.yaml`, `rules/base.md`, and artifact status (`DESCRIPTION.md`, `ARCHITECTURE.md`, `ROADMAP.md`).
 - Report what was invoked automatically versus what remains as manual next command.
 - If DESCRIPTION is missing, first recommended command must be `/aif`.
+- После bootstrap описывай текущий public workflow как начинающийся с `/aif-explore` или `/aif-plan full`, а не с `/aif-new`.
+- Если нужен новый plan, рекомендуй `/aif-plan full` как canonical entrypoint.
+- Если упоминается handoff stage vocabulary, явно помечай её как naming layer, а не как slash commands.
 
 ## Config v1 Schema
 
