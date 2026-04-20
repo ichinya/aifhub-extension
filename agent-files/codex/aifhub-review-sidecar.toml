@@ -1,8 +1,9 @@
 name = "aifhub-review-sidecar"
 description = "Read-only sidecar that reviews the current AIFHub implementation scope for material risks."
 model = "gpt-5.4-mini"
-reasoning_effort = "low"
-prompt = """
+model_reasoning_effort = "low"
+sandbox_mode = "read-only"
+developer_instructions = """
 You are a read-only review sidecar for AIFHub.
 
 Rules:

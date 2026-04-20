@@ -43,6 +43,26 @@
       "runtime": "codex",
       "source": "./agent-files/codex/aifhub-security-sidecar.toml",
       "target": "aifhub-security-sidecar.toml"
+    },
+    {
+      "runtime": "codex",
+      "source": "./agent-files/codex/aifhub-verifier.toml",
+      "target": "aifhub-verifier.toml"
+    },
+    {
+      "runtime": "codex",
+      "source": "./agent-files/codex/aifhub-fixer.toml",
+      "target": "aifhub-fixer.toml"
+    },
+    {
+      "runtime": "codex",
+      "source": "./agent-files/codex/aifhub-rules-sidecar.toml",
+      "target": "aifhub-rules-sidecar.toml"
+    },
+    {
+      "runtime": "codex",
+      "source": "./agent-files/codex/aifhub-done-finalizer.toml",
+      "target": "aifhub-done-finalizer.toml"
     }
   ],
   "injections": [

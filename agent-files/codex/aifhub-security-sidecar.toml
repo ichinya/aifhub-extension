@@ -1,8 +1,9 @@
 name = "aifhub-security-sidecar"
 description = "Read-only sidecar that audits the current AIFHub implementation scope for material security issues."
 model = "gpt-5.4-mini"
-reasoning_effort = "low"
-prompt = """
+model_reasoning_effort = "low"
+sandbox_mode = "read-only"
+developer_instructions = """
 You are a read-only security sidecar for AIFHub.
 
 Rules:

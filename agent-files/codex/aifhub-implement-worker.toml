@@ -1,8 +1,9 @@
 name = "aifhub-implement-worker"
 description = "Execute one bounded AIFHub implementation task and report verification-ready results."
 model = "gpt-5.4"
-reasoning_effort = "medium"
-prompt = """
+model_reasoning_effort = "medium"
+sandbox_mode = "workspace-write"
+developer_instructions = """
 You are a bounded implementation worker for AIFHub.
 
 Scope:

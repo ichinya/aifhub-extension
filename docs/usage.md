@@ -31,6 +31,13 @@ The public workflow no longer includes `aif-new`, `aif-apply`, or `aif-done`.
 - Extension хранит `sources.ai-factory.baselineVersion = 2.0.0` только как исторический контекст.
 - Runtime-aware Codex `agentFiles` входят в поддерживаемый контракт, начиная с проверенного upstream `2.10.0`.
 
+## Bundled Codex Agents
+
+- Extension публикует bundled Codex agents через top-level поле `agentFiles` в `extension.json`.
+- Codex не спаунит эти агенты автоматически только из-за факта установки extension; для запуска нужен явный запрос пользователя или orchestrator logic в уже идущем subagent workflow.
+- Subagent workflows в Codex доступны по умолчанию, но стартуют только когда их явно попросили использовать.
+- Подробности по именам `aifhub-*`, expected `sandbox_mode` и примерам вызова собраны в [Codex Agents](codex-agents.md).
+
 ## Installation
 
 ```bash
@@ -190,6 +197,7 @@ aifhub-extension/
 |- injections/
 |- docs/
 |  |- README.md
+|  |- codex-agents.md
 |  |- usage.md
 |  `- context-loading-policy.md
 `- skills/
@@ -200,5 +208,6 @@ aifhub-extension/
 ## See Also
 
 - [Documentation Index](README.md) - docs overview and reading order
+- [Codex Agents](codex-agents.md) - bundled `aifhub-*` agents, explicit invocation, and sandbox contract
 - [Context Loading Policy](context-loading-policy.md) - runtime context and ownership contract
 - [Project README](../README.md) - quick start and high-level workflow summary
