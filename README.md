@@ -2,6 +2,16 @@
 
 Extension for [ai-factory 2.x](https://github.com/lee-to/ai-factory) CLI that keeps a structured plan-folder workflow while returning the public workflow to upstream commands.
 
+## Сводка совместимости
+
+| Поле | Значение |
+|-------|----------|
+| Проверенный upstream | `ai-factory 2.10.0` |
+| Поддерживаемый `compat.ai-factory` | `>=2.10.0 <3.0.0` |
+| Исторический `baselineVersion` | `2.0.0` |
+
+`baselineVersion` фиксирует историческую upstream-базу этой модели extension. Актуальные ожидания по поддержке и установке всегда определяются `compat.ai-factory`.
+
 ## Quick Start
 
 ```bash
@@ -39,7 +49,7 @@ If verification finds issues:
   - `.ai-factory/plans/<plan-id>.md`
   - `.ai-factory/plans/<plan-id>/`
 - Legacy folder-only plans are soft-migrated by generating the missing companion plan file on first improve, implement, or verify entry.
-- Codex installs receive bounded worker agents through `agentFiles`.
+- В установках Codex ограниченные worker agents подключаются через runtime-aware `agentFiles` на `ai-factory 2.10.0+`.
 
 ## Current Workflow
 
@@ -60,16 +70,19 @@ The public workflow no longer includes `aif-new`, `aif-apply`, or `aif-done`.
 
 ## Requirements
 
-- `ai-factory CLI >=2.8.0 <3.0.0`
+- `ai-factory CLI >=2.10.0 <3.0.0`
 
-Compatibility tracking lives in `extension.json`:
+Отслеживание совместимости ведётся в `extension.json`:
 
-- `compat.ai-factory`: supported ai-factory range
-- `sources.ai-factory`: last reviewed upstream release and migration notes
+- `compat.ai-factory`: поддерживаемый диапазон `ai-factory`
+- `sources.ai-factory.version`: последняя проверенная upstream-версия
+- `sources.ai-factory.baselineVersion`: исторический baseline исходной модели extension
+- `sources.ai-factory.notes`: причина текущей минимально поддерживаемой версии
 
 ## Update Behavior
 
 - `ai-factory update` refreshes built-in skills and reapplies extension injections.
+- На поддерживаемых релизах `ai-factory` объявленные в manifest `agentFiles` продолжают управляться через extension contract.
 - `ai-factory extension update` refreshes the installed extension copy from its Git source.
 - Passing `/aif-verify` now performs final archival automatically unless `--check-only` is used.
 

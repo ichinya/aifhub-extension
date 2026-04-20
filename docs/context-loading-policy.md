@@ -6,6 +6,8 @@
 
 Define one explicit context-loading contract across bootstrap, planning, execution, and verification skills.
 
+Эта политика фиксирует контракт extension, проверенный против `ai-factory 2.10.0`.
+
 ## Roles
 
 ### Bootstrap skill
@@ -17,7 +19,7 @@ Responsibilities:
 - create or update `.ai-factory/rules/base.md`
 - support migration and bootstrap compatibility
 
-Bridge files (`AGENTS.md`, `CLAUDE.md`, `QWEN.md`) are allowed only in this bootstrap path.
+Bootstrap lookup order follows `aif-analyze`: `.ai-factory/config.yaml`, then `AGENTS.md`, then `CLAUDE.md`, then `.ai-factory/RULES.md`. Legacy bridge files (`AGENTS.md`, `CLAUDE.md`) могут читаться только как migration inputs, если уже существуют, но extension не создаёт новые bridge files. Каноническими bootstrap-результатами остаются `.ai-factory/config.yaml` и `.ai-factory/rules/base.md`.
 
 ### Consumer skills
 

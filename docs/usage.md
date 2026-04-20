@@ -25,6 +25,12 @@ aif-analyze -> aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-ve
 
 The public workflow no longer includes `aif-new`, `aif-apply`, or `aif-done`.
 
+## Совместимость
+
+- Это руководство рассчитано на `ai-factory >=2.10.0 <3.0.0`.
+- Extension хранит `sources.ai-factory.baselineVersion = 2.0.0` только как исторический контекст.
+- Runtime-aware Codex `agentFiles` входят в поддерживаемый контракт, начиная с проверенного upstream `2.10.0`.
+
 ## Installation
 
 ```bash
@@ -77,7 +83,7 @@ If active research exists, `/aif-plan` normalizes it into plan-local `explore.md
 
 ```bash
 /aif-improve
-/aif-improve @.ai-factory/plans/<plan-id>
+/aif-improve @.ai-factory/plans/<plan-id>/
 /aif-improve @.ai-factory/plans/<plan-id>.md
 ```
 
@@ -129,32 +135,40 @@ After fixes, run:
 
 Use this checklist when validating an install or update of the extension:
 
-1. Install:
+1. Проверить версию CLI:
+
+```bash
+ai-factory --version
+```
+
+Ожидается версия внутри `>=2.10.0 <3.0.0`.
+
+2. Установка:
 
 ```bash
 ai-factory extension add https://github.com/ichinya/aifhub-extension.git
 ```
 
-Expect `extension.json` to expose only `skills/aif-analyze`, the injected built-in workflow, and Codex `agentFiles`.
+Ожидается, что `extension.json` будет публиковать только `skills/aif-analyze`, injected built-in workflow и Codex `agentFiles`.
 
-2. Update:
+3. Обновление:
 
 ```bash
 ai-factory update
 ai-factory extension update
 ```
 
-Expect built-in skills to remain canonical and injections to reapply cleanly.
+Ожидается, что built-in skills останутся canonical, injections переустановятся чисто, а поддерживаемые runtime-managed assets останутся синхронизированы с manifest.
 
-3. Remove:
+4. Удаление:
 
 ```bash
 ai-factory extension remove aifhub-extension
 ```
 
-Expect the canonical upstream commands to remain available without extension-owned `aif-plan` workflow overrides.
+Ожидается, что canonical upstream commands останутся доступными без extension-owned override для `aif-plan`.
 
-4. End-to-end workflow:
+5. Сквозной workflow:
 
 ```bash
 /aif-analyze
@@ -164,7 +178,7 @@ Expect the canonical upstream commands to remain available without extension-own
 /aif-verify --check-only
 ```
 
-Expect companion plan artifacts under `.ai-factory/plans/`, synchronized `status.yaml`, and documentation that points only to the current workflow.
+Ожидаются companion artifacts в `.ai-factory/plans/`, синхронизированный `status.yaml` и документация, которая указывает только на текущий workflow.
 
 ## Project Layout
 
