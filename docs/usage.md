@@ -30,11 +30,50 @@ aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify
 - `aif-apply` как delegated wrapper пока отложен по ownership/status contract из [issue #20](https://github.com/ichinya/aifhub-extension/issues/20); current public path использует `/aif-implement`.
 - `aif-done` в handoff контексте означает explicit AIFHub finalizer semantics, а не обязательную slash command.
 
+## Codex App / CLI Flow
+
+Codex не имеет автоматического переключения режимов из extension prompts. Пользователь управляет режимом вручную.
+
+### Recommended Flow
+
+```text
+# 1. Switch to Plan mode (user action)
+/plan-mode
+
+# 2. Explore and plan (Plan mode — request_user_input available)
+/aif-explore "task description"
+/aif-plan full "task description"
+/aif-improve
+
+# 3. Exit Plan mode (user action)
+exit plan mode
+
+# 4. Implement and verify (Default mode — plain-text questions only)
+/aif-implement
+/aif-verify
+```
+
+### Runtime Notes
+
+- **Plan mode**: `request_user_input` доступен для 1-3 коротких вопросов. Используйте его в planning/refinement стадиях.
+- **Default mode**: формы недоступны. Задавайте вопросы как plain text в assistant message. Не используйте `question(...)` или `questionnaire(...)`.
+- **Subagent mode**: не задавайте интерактивные вопросы. Фиксируйте assumptions и возвращайте blockers/open questions родителю.
+- Подробности по форматам вопросов: [Codex Plan Mode](codex-plan-mode.md).
+- Справочник по форматам вопросов для всех runtime: `skills/shared/QUESTION-TOOL.md`.
+
 ## Совместимость
 
 - Это руководство рассчитано на `ai-factory >=2.10.0 <3.0.0`.
 - Extension хранит `sources.ai-factory.baselineVersion = 2.0.0` только как исторический контекст.
 - Runtime-aware Codex `agentFiles` входят в поддерживаемый контракт, начиная с проверенного upstream `2.10.0`.
+
+## Слои Prompt-Инъекций
+
+- `injections/core/` — active `core plan-folder overlay`; только этот слой подключается через `extension.json` и поддерживает canonical public workflow.
+- `injections/handoff/` — future stub prompt assets; здесь лежат `aif-review-handoff-gate.md`, `aif-security-checklist-handoff-gate.md`, `aif-rules-check-handoff-gate.md`, `aif-verify-handoff-gate.md`, `aif-fix-handoff-comment.md` и `aif-done-handoff-finalizer.md` как заготовки для отдельного runtime binding, но не как уже подключённый profile. Каждый stub содержит machine-consumable `<!-- gate-summary -->` блок для будущего Handoff parser.
+- `injections/references/` — shared root-level references для verify/roadmap и будущих handoff consumers без копирования файлов по слоям.
+
+Пока отдельный handoff runtime binding не реализован, ordinary CLI workflow зависит только от `core` overlays, а `injections/handoff/*` остаются future stubs и не должны трактоваться как текущий runtime contract.
 
 ## Bundled Codex Agents
 
@@ -42,6 +81,30 @@ aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify
 - Codex не спаунит эти агенты автоматически только из-за факта установки extension; для запуска нужен явный запрос пользователя или orchestrator logic в уже идущем subagent workflow.
 - Subagent workflows в Codex доступны по умолчанию, но стартуют только когда их явно попросили использовать.
 - Подробности по именам `aifhub-*`, expected `sandbox_mode` и примерам вызова собраны в [Codex Agents](codex-agents.md).
+
+## Validation
+
+Extension включает три валидатора, которые проверяют целостность manifest, agent schema и документации.
+
+### Валидаторы
+
+| Скрипт | Что проверяет |
+|--------|---------------|
+| `scripts/validate-extension.mjs` | `extension.json`: paths из `skills`, `agentFiles.source`, `injections.file` существуют; `agentFiles.target` имеют расширение `.toml`; `version` — semver; `compat.ai-factory` присутствует |
+| `scripts/validate-codex-agents.mjs` | Codex TOML файлы в `agent-files/codex/`: обязательные поля `name`, `description`, `developer_instructions`, `sandbox_mode`; отсутствие legacy полей `prompt` и `reasoning_effort` |
+| `scripts/validate-doc-links.mjs` | Markdown ссылки в `docs/`, `injections/`, `skills/`: целевые файлы существуют; нет пустых plan placeholders (`.ai-factory/plans/.md`); внешние ссылки и anchor-only игнорируются |
+
+### Запуск
+
+```bash
+# Запустить все валидаторы
+npm run validate
+
+# Запустить все тесты
+npm test
+```
+
+CI автоматически запускает валидаторы на каждом PR (`.github/workflows/validate.yml`).
 
 ## Installation
 
@@ -208,10 +271,14 @@ aifhub-extension/
 |- agent-files/
 |  `- codex/
 |- injections/
+|  |- core/
+|  |- handoff/
+|  `- references/
 |- docs/
 |  |- README.md
 |  |- codex-agents.md
 |  |- usage.md
+|  |- handoff.md
 |  `- context-loading-policy.md
 `- skills/
    |- aif-analyze/
@@ -224,4 +291,5 @@ aifhub-extension/
 - [Handoff Naming](handoff.md) - терминология стадий versus current public commands
 - [Codex Agents](codex-agents.md) - bundled `aifhub-*` agents, explicit invocation, and sandbox contract
 - [Context Loading Policy](context-loading-policy.md) - runtime context and ownership contract
+- [Codex Plan Mode](codex-plan-mode.md) - Codex app/CLI recommended flow and question format guidance
 - [Project README](../README.md) - quick start and high-level workflow summary

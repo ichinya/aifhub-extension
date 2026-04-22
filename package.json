@@ -1,0 +1,9 @@
+{
+  "name": "aifhub-extension",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test scripts/*.test.mjs",
+    "validate": "node scripts/validate-extension.mjs && node scripts/validate-codex-agents.mjs && node scripts/validate-doc-links.mjs"
+  }
+}

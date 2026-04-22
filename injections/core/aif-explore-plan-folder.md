@@ -13,3 +13,13 @@ When working in a repository that uses this extension:
 - If a legacy folder-only plan is detected, present the canonical next step using the normalized plan id and companion plan-file model.
 
 If this override conflicts with the base `aif-explore` wording, follow the extension workflow rules above.
+
+### Codex Runtime
+
+When running in Codex app/CLI:
+
+- The planning stage (`/aif-explore`, `/aif-plan full`, `/aif-improve`) is best used in Codex Plan mode, where `request_user_input` is available.
+- This skill does not attempt to switch the Codex session mode. The user controls the mode.
+- In Codex Default mode, if a question is needed, ask it as plain text in the assistant message. Do not use `question(...)` or `questionnaire(...)`.
+- In autonomous or subagent mode, do not ask interactive questions. Record assumptions and return blockers/open questions to the parent.
+- See `skills/shared/QUESTION-TOOL.md` for the full runtime question format mapping.

@@ -53,6 +53,12 @@ If verification finds issues:
 - Legacy folder-only plans are soft-migrated by generating the missing companion plan file on first improve, implement, or verify entry.
 - В установках Codex ограниченные worker agents подключаются через runtime-aware `agentFiles` на `ai-factory 2.10.0+`.
 
+## Слои Prompt Assets
+
+- `injections/core/` содержит active `core plan-folder overlay`, который единственный подключается через `extension.json` и обслуживает обычный CLI workflow.
+- `injections/handoff/` содержит future stub prompt assets для review/security/rules/verify/fix/done semantics; пока отдельный runtime binding не реализован, действующие consumers продолжают использовать inline `developer_instructions` из `agent-files/codex/*.toml`. Каждый stub включает machine-consumable `<!-- gate-summary -->` блок для будущего Handoff parser.
+- `injections/references/` остаётся shared root-level bucket для reference assets, которыми могут пользоваться оба слоя без дублирования.
+
 ## Канонический Public Workflow
 
 ```text
@@ -75,6 +81,17 @@ aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify
 | [Usage](docs/usage.md) | Current command flow, examples, and smoke checks |
 | [Handoff Naming](docs/handoff.md) | Терминология `Explore / New / Apply / Done` без возврата legacy commands в public path |
 | [Context Loading Policy](docs/context-loading-policy.md) | Runtime context contract and ownership rules |
+
+## Validation
+
+CI автоматически проверяет manifest paths, agent schema и doc links на каждом PR.
+
+Локальный запуск:
+
+```bash
+npm run validate   # все валидаторы
+npm test           # все тесты
+```
 
 ## Requirements
 

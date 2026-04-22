@@ -41,6 +41,11 @@ Bootstrap project context for AI Factory. This skill prepares configuration and 
 - If the translation scope excludes artifacts, keep generated artifacts in the original project language.
 - If the translation scope includes artifacts, generate them in the preferred language.
 - Keep file names, commands, and identifiers in English.
+- Choose the question format by runtime. See `skills/shared/QUESTION-TOOL.md` for the mapping:
+  - Claude Code / Kilo CLI / OpenCode: use `question(questions: [...])`.
+  - Codex Default mode: use plain-text questions (no form tool available).
+  - Codex Plan mode: use `request_user_input` for 1-3 short questions.
+  - Autonomous / subagent mode: do not ask interactive questions; record assumptions and return blockers to the parent.
 
 ### Step 1.5: Check Extension Compatibility
 
