@@ -19,6 +19,8 @@ Reference for the `aif-done` skill and `aifhub-done-finalizer` Codex agent.
   `- ...              # other plan-folder artifacts (excluding status.yaml execution metadata)
 ```
 
+If the archive directory already exists from an earlier `/aif-done` run or legacy `/aif-verify` auto-archive behavior, treat finalization as a refresh pass and update the archived artifacts instead of failing.
+
 ## Specs Index Format
 
 `.ai-factory/specs/index.yaml`:
@@ -36,7 +38,7 @@ specs:
 
 Conventional commit based on plan scope:
 
-```
+```text
 <type>(<scope>): <summary>
 
 <body — what was implemented, referencing plan artifacts>
@@ -60,18 +62,18 @@ Conventional commit based on plan scope:
 - [ ] <suggested verification steps based on plan scope>
 ```
 
-## Follow-up Suggestions
+## Governance and Evolution Follow-ups
 
-Only suggest when plan contains evidence:
+Apply only when the verified plan contains evidence:
 
-| Evidence | Suggested Follow-up |
-|----------|-------------------|
-| Roadmap milestone referenced and completed | `/aif-roadmap` update |
-| New architecture pattern or module introduced | `/aif-architecture` update |
-| New coding rules or conventions established | Rules update |
-| Evolution candidates identified | `/aif-evolve` pass |
+| Evidence | Finalization Action |
+|----------|--------------------|
+| Roadmap milestone referenced and completed | Update roadmap through the roadmap owner or return an exact `/aif-roadmap` handoff |
+| New architecture pattern or module introduced | Update architecture through the architecture owner or return an exact `/aif-architecture` handoff |
+| New coding rules or conventions established | Update the project rules owner path or return an exact rules handoff |
+| Evolution candidates identified | Run `/aif-evolve` when explicitly requested and supported, otherwise recommend it |
 
-All follow-ups are suggestion-only — never auto-edit governance files.
+Never invent governance changes without plan evidence. If the current runtime cannot safely perform the owning update, return the exact next command/instruction instead of silently skipping it.
 
 ## Status Update on Finalization
 
@@ -86,6 +88,11 @@ finalization:
     <draft>
   pr_summary_draft: |
     <draft>
+  governance_updates:
+    roadmap: <updated|handoff|skip>
+    rules: <updated|handoff|skip>
+    architecture: <updated|handoff|skip>
+  evolve_action: <ran|suggested|skip>
 ```
 
 ## Error Handling
@@ -96,5 +103,6 @@ finalization:
 | Verification not run / verdict missing | Stop, suggest `/aif-verify` |
 | Verification failed (`fail`) | Stop, suggest `/aif-fix` then `/aif-verify` |
 | Workspace dirty outside plan scope | Stop, ask user to confirm |
+| Archive already exists | Refresh archive/spec/index outputs; do not fail |
 | `gh` not available | Output manual PR instructions instead of failing |
 | Specs directory missing | Create `.ai-factory/specs/` and `index.yaml` |

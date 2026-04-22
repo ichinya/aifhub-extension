@@ -2,7 +2,7 @@
 gate-summary:
   id: aif-done-handoff-finalizer
   stage: Done
-  status: active
+  status: stub
   consumers:
     - aif-done
     - aifhub-done-finalizer
@@ -11,16 +11,17 @@ gate-summary:
   auto_bind: false
 -->
 
-## Handoff Finalizer для `aif-done`
+## Future Stub: finalizer для `aif-done`
 
-Этот prompt-файл определяет finalizer semantics для AIFHub/Handoff Done stage.
+Этот prompt-файл хранит заготовку finalizer semantics для AIFHub/Handoff Done stage.
+Сейчас он не подключён ни через `extension.json`, ни через bundled runtime agents: соответствующие consumers пока используют inline `developer_instructions`.
 
-### Consumer
+### Planned Consumer After Runtime Binding
 
 - `aif-done` — extension-owned skill (`skills/aif-done/SKILL.md`)
 - `aifhub-done-finalizer` — Codex agent (`agent-files/codex/aifhub-done-finalizer.toml`)
 
-### Trigger
+### Planned Trigger After Runtime Binding
 
 - Explicit `/aif-done` invocation after passing verification.
 - Plan must have `verification.verdict` of `pass` or `pass-with-notes`.
@@ -31,9 +32,15 @@ gate-summary:
 - Finalization только при успешной verification state.
 - Bounded archival scope: `status.yaml`, `.ai-factory/specs/<plan-id>/`, `.ai-factory/specs/index.yaml`.
 - Commit/PR summaries выводятся как drafts для пользовательского review.
-- Для `.ai-factory/ROADMAP.md`, `.ai-factory/RULES.md` и `.ai-factory/ARCHITECTURE.md` — только suggestion-only follow-ups.
+- Для roadmap/rules/architecture follow-ups использует только plan-backed evidence и owner-safe update path; если update нельзя безопасно завершить в текущем runtime, возвращает exact handoff.
+- `/aif-evolve` запускает по явному запросу и при наличии runtime support, иначе предлагает как следующий шаг.
 - Если workspace dirty не только из текущего плана — останавливается и просит подтверждения.
 - Если `gh` недоступен — выводит manual PR instructions вместо падения.
+
+### Dormancy Contract
+
+- Файл существует как future stub prompt asset для отдельного handoff runtime binding.
+- Пока такой binding не реализован, ordinary CLI workflow остаётся `core`-only, а этот stub не должен трактоваться как уже активный runtime contract.
 
 ### Reference
 

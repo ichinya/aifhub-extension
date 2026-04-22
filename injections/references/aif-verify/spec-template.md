@@ -3,7 +3,7 @@ artifact_type: spec
 plan_id: "{{plan_id}}"
 title: "{{task_title}}"
 artifact_status: archived
-owner: aif-verify
+owner: aif-done
 created_at: {{start_date}}
 updated_at: {{archive_date}}
 source_issue: {{issue_number}}
@@ -12,7 +12,7 @@ source_plan: "{{plan_id}}"
 
 # Spec: {{plan_id}}
 
-> Finalized specification archived from plan verification.
+> Finalized specification archived during done-stage finalization.
 
 ## Summary
 

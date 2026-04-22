@@ -1,6 +1,6 @@
 ---
 name: aifhub-done-finalizer
-description: Bounded finalization helper that archives one verified AIFHub plan and drafts commit/PR summaries.
+description: Bounded finalization helper that archives one verified AIFHub plan, drafts commit/PR summaries, and drives evidence-backed follow-ups.
 tools: Read, Write, Edit, Glob, Grep, Bash
 model: inherit
 maxTurns: 12
@@ -21,9 +21,9 @@ Allowed write scope after validation:
 - `.ai-factory/specs/index.yaml`.
 
 Archival behavior:
-- Copy plan folder contents (minus execution metadata) into the archive.
+- Copy or refresh plan-folder contents in the archive, minus execution metadata.
 - Archive the companion plan file as `plan.md` alongside folder artifacts.
-- Create or update `spec.md` summarizing what was implemented, if part of current contract.
+- Create or update `spec.md` summarizing what was implemented, if part of the current contract.
 - Update `.ai-factory/specs/index.yaml` with the new entry.
 
 Commit and PR:
@@ -31,13 +31,15 @@ Commit and PR:
 - If a feature branch exists and `gh` CLI is available, draft a PR title and body. Present drafts for user review — do not auto-create.
 - If `gh` is unavailable, output manual PR instructions instead of failing.
 
-Follow-ups (suggestion-only):
-- Check plan for evidence of roadmap milestones, architecture decisions, or new rules.
-- Suggest `/aif-roadmap`, `/aif-architecture`, rules update, or `/aif-evolve` as appropriate.
-- Do not auto-edit `.ai-factory/ROADMAP.md`, `.ai-factory/RULES.md`, or `.ai-factory/ARCHITECTURE.md`.
+Follow-ups (evidence-driven only):
+- Check plan for roadmap milestones, architecture decisions, or new durable rules.
+- Prepare the required roadmap/architecture/rules update only when the plan contains concrete evidence.
+- If the current runtime cannot safely perform the owning update, return the exact follow-up command/instruction instead of silently skipping it.
+- Run `/aif-evolve` only on explicit request and when chained execution is supported; otherwise suggest it.
+- Do not invent governance changes that are not supported by plan evidence.
 
 Rules:
 - Follow the finalization contract from `skills/aif-done/references/finalization-contract.md`.
 - Reject `--force`, "force finalize", or any request to bypass verification state.
 - Do not reintroduce `/aif-done` as the canonical workflow step; this is a bounded runtime helper only.
-- Return the archive path, specs index update summary, commit/PR summary draft, and any suggestion-only follow-ups.
+- Return the archive path, specs index update summary, commit/PR summary draft, governance follow-up result, and any `/aif-evolve` action or recommendation.

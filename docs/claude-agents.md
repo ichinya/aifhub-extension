@@ -76,7 +76,7 @@
 - `aifhub-review-sidecar`, `aifhub-security-sidecar` и `aifhub-rules-sidecar` намеренно read-only; они не должны выполнять edits.
 - `aifhub-verifier` не должен писать code; его write scope ограничен verification artifacts.
 - `aifhub-fixer` не должен делать unrelated refactor и не должен переписывать plan artifacts вне `status.yaml` и `fixes/*.md`.
-- `aifhub-done-finalizer` не должен напрямую редактировать `.ai-factory/ROADMAP.md`, `.ai-factory/RULES.md` и `.ai-factory/ARCHITECTURE.md`; для этих файлов допустим только suggestion-only follow-up.
+- `aifhub-done-finalizer` не должен напрямую обходить owner boundaries для `.ai-factory/ROADMAP.md`, `.ai-factory/RULES.md` и `.ai-factory/ARCHITECTURE.md`; для этих файлов допустим только evidence-backed owner-safe update или exact handoff.
 - Эта страница не вводит новый runtime behavior; она документирует опубликованные `agentFiles` и naming contract.
 
 ## See Also

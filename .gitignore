@@ -1,5 +1,10 @@
 /.*/
 /.*
+!/.github/
+/.github/*
+!/.github/workflows/
+/.github/workflows/*
+!/.github/workflows/validate.yml
 /*.md
 !/CHANGELOG.md
 node_modules/

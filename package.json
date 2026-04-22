@@ -4,6 +4,6 @@
   "type": "module",
   "scripts": {
     "test": "node --test scripts/*.test.mjs",
-    "validate": "node scripts/validate-extension.mjs && node scripts/validate-codex-agents.mjs && node scripts/validate-doc-links.mjs"
+    "validate": "node scripts/validate-extension.mjs && node scripts/validate-codex-agents.mjs && node scripts/validate-claude-agents.mjs && node scripts/validate-doc-links.mjs"
   }
 }

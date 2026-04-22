@@ -1,7 +1,7 @@
 {
   "name": "aifhub-extension",
-  "version": "0.10.0",
-  "description": "Upstream-first extension для AI Factory: bootstrap остаётся во владении extension; workflow skills `aif-plan`, `aif-implement`, `aif-verify` и `aif-fix` подключаются через `injections`, а Codex runtime files публикуются через top-level поле `agentFiles`",
+  "version": "0.11.0",
+  "description": "Upstream-first extension for AI Factory: bootstrap remains extension-owned; `aif-plan`, `aif-implement`, `aif-verify`, and `aif-fix` connect through `injections`; `aif-done` remains the extension-owned finalizer; Codex and Claude runtime files publish through top-level `agentFiles`.",
   "compat": {
     "ai-factory": ">=2.10.0 <3.0.0"
   },

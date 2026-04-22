@@ -32,7 +32,6 @@ Then use:
 /aif-improve
 /aif-implement
 /aif-verify
-/aif-done                     # archive, commit/PR drafts, follow-ups
 ```
 
 If verification finds issues:
@@ -40,7 +39,12 @@ If verification finds issues:
 ```bash
 /aif-fix
 /aif-verify
-/aif-done
+```
+
+Optional explicit AIFHub finalizer after passing verification:
+
+```bash
+/aif-done                     # archive, commit/PR drafts, evidence-driven follow-ups
 ```
 
 `/aif-analyze` здесь выступает отдельным bootstrap/setup step. Canonical public workflow начинается после него.
@@ -48,33 +52,33 @@ If verification finds issues:
 ## What This Extension Adds
 
 - `aif-analyze` remains extension-owned and bootstraps `.ai-factory/config.yaml` plus `rules/base.md`.
-- `aif-done` is extension-owned AIFHub/Handoff finalizer that archives verified plans, drafts commit/PR summaries, and suggests follow-ups.
+- `aif-done` is an explicit extension-owned AIFHub/Handoff finalizer that archives verified plans, drafts commit/PR summaries, and drives evidence-backed governance and evolution follow-ups.
 - `aif-plan`, `aif-explore`, `aif-improve`, `aif-implement`, `aif-verify`, `aif-fix`, `aif-roadmap`, and `aif-evolve` remain upstream skills with extension injections.
 - Full-mode plans use a dual artifact model:
   - `.ai-factory/plans/<plan-id>.md`
   - `.ai-factory/plans/<plan-id>/`
 - Legacy folder-only plans are soft-migrated by generating the missing companion plan file on first improve, implement, or verify entry.
-- В установках Codex ограниченные worker agents подключаются через runtime-aware `agentFiles` на `ai-factory 2.10.0+`.
+- На `ai-factory 2.10.0+` extension публикует namespaced runtime-aware `agentFiles` для Codex и Claude; подробности и ограничения собраны в [Codex Agents](docs/codex-agents.md) и [Claude Agents](docs/claude-agents.md).
 
 ## Слои Prompt Assets
 
 - `injections/core/` содержит active `core plan-folder overlay`, который единственный подключается через `extension.json` и обслуживает обычный CLI workflow.
-- `injections/handoff/` содержит future stub prompt assets для review/security/rules/verify/fix/done semantics; пока отдельный runtime binding не реализован, действующие consumers продолжают использовать inline `developer_instructions` из `agent-files/codex/*.toml`. Каждый stub включает machine-consumable `<!-- gate-summary -->` блок для будущего Handoff parser.
+- `injections/handoff/` содержит four-file dormant handoff profile: future stub prompt assets для review/security/rules/done semantics. Пока отдельный runtime binding не реализован, verifier/fixer остаются частью `core` workflow и используют inline `developer_instructions` из `agent-files/codex/*.toml`. Каждый stub включает machine-consumable `<!-- gate-summary -->` блок для будущего Handoff parser.
 - `injections/references/` остаётся shared root-level bucket для reference assets, которыми могут пользоваться оба слоя без дублирования.
 
 ## Канонический Public Workflow
 
 ```text
-aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify -> aif-done [optional]
-                                                            \-> aif-fix -> aif-verify -> aif-done [optional]
+aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify
+                                                            \-> aif-fix -> aif-verify
 ```
 
 `/aif-analyze` подготавливает bootstrap context, но не входит в canonical public command path.
 
-- Для новой работы используйте `/aif-plan full`. `/aif-new` упоминается только как historical alias; в handoff vocabulary используется отдельное stage name `New`, а не slash command.
-- `Explore / New / Apply / Done` могут использоваться как handoff stage names, но не обязаны совпадать со slash commands.
-- `aif-apply` как delegated wrapper отложен из-за ownership/status contract из [issue #20](https://github.com/ichinya/aifhub-extension/issues/20). Текущий public execution entrypoint — `/aif-implement`.
-- `/aif-done` — AIFHub/Handoff finalizer, архивирующий verified plan и готовящий commit/PR drafts. Работает после `/aif-verify`, не является обязательным шагом upstream workflow.
+- Для новой работы используйте `/aif-plan full`. `/aif-new` — только historical alias; stage name `New` в handoff vocabulary не является slash command и не заменяет canonical entrypoint.
+- `Explore / New / Apply / Done` могут использоваться как handoff stage names, но это naming layer, а не public CLI command list.
+- `aif-apply` как delegated wrapper отложен до закрытия ownership/status contract из [issue #20](https://github.com/ichinya/aifhub-extension/issues/20). Issue #20 остаётся открытым для реальной subagent orchestration, а current public execution entrypoint — `/aif-implement`.
+- `/aif-done` — explicit AIFHub/Handoff finalizer после `/aif-verify`, а не восстановленный legacy alias и не часть canonical public CLI workflow.
 
 ## Documentation
 
@@ -82,12 +86,14 @@ aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify -> aif-don
 |-------|-------------|
 | [Documentation Index](docs/README.md) | Overview and recommended reading order |
 | [Usage](docs/usage.md) | Current command flow, examples, and smoke checks |
+| [Codex Agents](docs/codex-agents.md) | Namespaced Codex subagents, sandbox contract, and explicit invocation examples |
+| [Claude Agents](docs/claude-agents.md) | Namespaced Claude subagents, `.claude/agents/` install target, and handoff limitations |
 | [Handoff Naming](docs/handoff.md) | Терминология `Explore / New / Apply / Done` без возврата legacy commands в public path |
 | [Context Loading Policy](docs/context-loading-policy.md) | Runtime context contract and ownership rules |
 
 ## Validation
 
-CI автоматически проверяет manifest paths, agent schema и doc links на каждом PR.
+CI автоматически проверяет manifest paths, Codex/Claude agent schema и doc links на каждом PR.
 
 Локальный запуск:
 
@@ -112,7 +118,7 @@ npm test           # все тесты
 - `ai-factory update` refreshes built-in skills and reapplies extension injections.
 - На поддерживаемых релизах `ai-factory` объявленные в manifest `agentFiles` продолжают управляться через extension contract.
 - `ai-factory extension update` refreshes the installed extension copy from its Git source.
-- Passing `/aif-verify` now performs final archival automatically unless `--check-only` is used.
+- Passing `/aif-verify` now leaves the plan in a verified state; optional archival, summaries, and final follow-up orchestration live in `/aif-done`.
 
 ## License
 

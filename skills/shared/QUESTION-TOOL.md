@@ -7,9 +7,11 @@
 Different agents use different interaction tools:
 
 - Codex Default mode: no form tool. Ask a short plain-text question in the assistant message.
-- Codex Plan mode: use `request_user_input`.
+- Codex Plan mode: use `request_user_input` only after the user has already switched the session into Plan mode, and keep it to 1-3 short questions.
 - Claude Code / Kilo CLI / OpenCode: use `question(questions: [...])`.
 - pi: use `question(...)` for one question and `questionnaire(...)` for multiple questions.
+
+For Codex planning and refinement flows, prompts may recommend Plan mode, but they cannot switch the client mode automatically.
 
 If you are writing or updating a skill, pick the format that matches the runtime instead of copying examples from another agent.
 
@@ -21,6 +23,8 @@ If you are writing or updating a skill, pick the format that matches the runtime
 
 Codex cannot render a question form in Default mode. Do not fake a `question(...)` block there.
 
+If the Codex session is still in Default mode during planning or refinement, continue with plain-text questions or record assumptions instead of emitting a form call.
+
 Use a short plain-text question in the assistant message instead.
 
 Example:
@@ -31,7 +35,7 @@ Which path should I take: continue with the default fix, or stop and review firs
 
 ### Plan Mode
 
-Codex form UI is available through `request_user_input`.
+Codex form UI is available through `request_user_input`, but only when the user has already put the session into Plan mode.
 
 ```text
 request_user_input({
@@ -192,8 +196,8 @@ Open questions (parent to resolve):
 ## Rules
 
 1. Choose the question format by runtime, not by habit.
-2. Do not use `question(...)` or `questionnaire(...)` in Codex Default mode.
-3. Use `request_user_input` in Codex only when the session is in Plan mode.
+2. Do not use `question(...)` or `questionnaire(...)` anywhere in Codex.
+3. Use `request_user_input` in Codex only when the session is already in Plan mode, and only for 1-3 short questions.
 4. For `question(questions: [...])`, keep `header` short and every option descriptive.
 5. Mark the preferred option with `(Recommended)`.
 6. Do not turn a free-text data capture step into a forced menu if the workflow still needs user text.
@@ -214,6 +218,7 @@ If a question UI does not render:
 
 2. Check the mode.
    - In Codex, `request_user_input` is unavailable outside Plan mode.
+   - If a planning skill recommends Plan mode, the user must switch modes manually.
 
 3. Check the syntax for the target runtime.
    - Codex Plan mode expects the `request_user_input` schema.

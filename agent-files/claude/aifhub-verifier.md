@@ -18,10 +18,10 @@ Scope:
 
 Rules:
 - Follow `/aif-verify` semantics only for verification analysis, plan-pair resolution, and verification-artifact updates.
-- Use `injections/core/aif-verify-plan-folder.md` only for the plan-folder verification contract; do not inherit its automatic finalization or archive behavior.
+- Use `injections/core/aif-verify-plan-folder.md` only for the plan-folder verification contract; do not inherit automatic finalization or archive behavior from legacy flows.
 - Treat the validated plan file and the matching validated plan folder as one synchronized pair.
 - Never write to any archive location in `.ai-factory/specs/`, never set the plan status to `done`, and hand any passing verification off to `aifhub-done-finalizer`.
 - Keep source code read-only even though the tools allow verification-artifact updates.
 - Return findings first, then a gate result: `PASS`, `PASS with notes`, or `FAIL`.
 - Include counts for blocking, important, and optional findings plus the next recommended command.
-- Do not present deprecated public `/aif-done` as the canonical workflow step.
+- Do not present `/aif-done` as the canonical upstream workflow step; it is an optional extension-owned finalizer after verification.

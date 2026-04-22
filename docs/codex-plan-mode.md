@@ -9,9 +9,9 @@ Codex operates in two modes that affect how the agent interacts with the user:
 - **Default mode**: no form tool. Questions must be plain text.
 - **Plan mode**: `request_user_input` is available for structured questions.
 
-The extension does not switch modes automatically. The user controls the mode.
+The extension does not switch modes automatically. The user controls the mode, and prompts can only recommend the right mode for the current stage.
 
-## Recommended Workflow
+## Recommended Codex App Flow
 
 ```text
 # 1. Enter Plan mode (user action)
@@ -44,7 +44,7 @@ Do not use `question(...)`, `questionnaire(...)`, or `request_user_input` in Def
 
 ### Plan Mode
 
-Use `request_user_input` for 1-3 short questions:
+Use `request_user_input` only after the user has already entered Plan mode, and only for 1-3 short questions:
 
 ```text
 request_user_input({
@@ -86,9 +86,9 @@ Open questions (parent to resolve):
 
 The extension prompts (`injections/core/aif-*-plan-folder.md`) include Codex runtime guidance that:
 
-- Recommends Plan mode for planning and refinement stages.
-- Does not attempt to switch the session mode.
-- Falls back to plain-text questions in Default mode.
+- Recommends Plan mode specifically for `/aif-explore`, `/aif-plan full`, and `/aif-improve` when structured planning questions are needed.
+- Does not attempt or promise to switch the session mode.
+- Falls back to plain-text questions in Default mode and does not require `question(...)` or `questionnaire(...)` in Codex.
 - Avoids interactive questions in subagent context.
 
 This means the issue of automatic mode switching is **documented + prompt-safe**, not implemented as client automation.

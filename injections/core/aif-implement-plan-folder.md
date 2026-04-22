@@ -31,7 +31,7 @@ If only the folder exists, create the missing companion plan file first and reco
 - When no plan exists yet, route the user through `/aif-plan full "<task>" -> /aif-improve`.
 - `/aif-implement` owns git strategy resolution and must persist `execution.git.*` in `status.yaml`.
 - `/aif-implement` also owns `execution.mode`, `execution.runtime`, and `execution.subagent` updates.
-- After tasks complete, route to `/aif-verify`; passing verification finalizes there unless `--check-only` is used.
+- After tasks complete, route to `/aif-verify`; a passing verification leaves the plan ready for optional `/aif-done` finalization.
 - Do not route users to deprecated workflow aliases or legacy `*-plus` command names.
 
 ### Subagent Compatibility

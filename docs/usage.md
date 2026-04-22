@@ -12,29 +12,29 @@
 | `/aif-plan` | Built-in + injection | Create the companion plan file + plan folder pair |
 | `/aif-improve` | Built-in + injection | Refine both plan layers together before execution |
 | `/aif-implement` | Built-in + injection | Execute tasks and own git plus execution metadata |
-| `/aif-verify` | Built-in + injection | Verify findings and finalize/archive passing plans unless `--check-only` is used |
+| `/aif-verify` | Built-in + injection | Verify findings and update `verify.md` plus `status.yaml`; optional archival/finalizer work lives in `/aif-done` |
 | `/aif-fix` | Built-in + injection | Apply fixes for verification findings |
 | `/aif-roadmap` | Built-in + injection | Evidence-based maturity audit roadmap |
 | `/aif-evolve` | Built-in + injection | Plan-evidence-driven evolution workflow |
-| `/aif-done` | Extension skill | Archive verified plan to specs/, draft commit/PR summaries, suggest follow-ups |
+| `/aif-done` | Extension skill | Archive verified plan to specs/, draft commit/PR summaries, and drive evidence-backed governance/evolution follow-ups |
 
 ## Канонический Public Workflow
 
 ```text
-aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify -> aif-done [optional]
-                                                            \-> aif-fix -> aif-verify -> aif-done [optional]
+aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify
+                                                            \-> aif-fix -> aif-verify
 ```
 
 `/aif-analyze` — это bootstrap/setup step перед этим flow. Он подготавливает `.ai-factory/config.yaml` и `rules/base.md`, но не является первым узлом canonical public command sequence.
 
-- Для новой работы используйте `/aif-plan full`. `/aif-new` упоминается только как historical alias; в handoff vocabulary используется отдельное stage name `New`, а не slash command.
-- `Explore / New / Apply / Done` — это handoff stage names. Подробности собраны в [Handoff Naming](handoff.md).
-- `aif-apply` как delegated wrapper пока отложен по ownership/status contract из [issue #20](https://github.com/ichinya/aifhub-extension/issues/20); current public path использует `/aif-implement`.
-- `/aif-done` — AIFHub/Handoff finalizer, работающий после passing verification. Архивирует план, готовит commit/PR drafts и предлагает follow-ups. Не дублирует `/aif-verify`.
+- Для новой работы используйте `/aif-plan full`. `/aif-new` — только historical alias; `New` в handoff vocabulary — stage name, а не slash command.
+- `Explore / New / Apply / Done` — это handoff stage names. Это naming layer, не public CLI command list. Подробности собраны в [Handoff Naming](handoff.md).
+- `aif-apply` как delegated wrapper пока отложен по ownership/status contract из [issue #20](https://github.com/ichinya/aifhub-extension/issues/20); issue остаётся открытым для реальной subagent orchestration, а current public path использует `/aif-implement`.
+- `/aif-done` — explicit AIFHub/Handoff finalizer после passing verification. Он не дублирует `/aif-verify`, не является legacy alias и не входит в canonical public CLI path.
 
-## Codex App / CLI Flow
+## Recommended Codex App Flow
 
-Codex не имеет автоматического переключения режимов из extension prompts. Пользователь управляет режимом вручную.
+Codex не имеет автоматического переключения режимов из extension prompts. Пользователь управляет режимом вручную, а prompts могут только рекомендовать нужный режим для текущей стадии.
 
 ### Recommended Flow
 
@@ -53,12 +53,17 @@ exit plan mode
 # 4. Implement and verify (Default mode — plain-text questions only)
 /aif-implement
 /aif-verify
+
+# 5. Optional explicit finalizer
+/aif-done
 ```
+
+Этот flow документирует безопасный runtime contract для Codex. Он не обещает client automation и не подразумевает auto-switch Plan mode из skill/injection prompts.
 
 ### Runtime Notes
 
-- **Plan mode**: `request_user_input` доступен для 1-3 коротких вопросов. Используйте его в planning/refinement стадиях.
-- **Default mode**: формы недоступны. Задавайте вопросы как plain text в assistant message. Не используйте `question(...)` или `questionnaire(...)`.
+- **Plan mode**: `request_user_input` доступен только после ручного входа в Plan mode и только для 1-3 коротких вопросов. Используйте его в planning/refinement стадиях.
+- **Default mode**: формы недоступны. Задавайте вопросы как plain text в assistant message. Не используйте `question(...)`, `questionnaire(...)` или `request_user_input`.
 - **Subagent mode**: не задавайте интерактивные вопросы. Фиксируйте assumptions и возвращайте blockers/open questions родителю.
 - Подробности по форматам вопросов: [Codex Plan Mode](codex-plan-mode.md).
 - Справочник по форматам вопросов для всех runtime: `skills/shared/QUESTION-TOOL.md`.
@@ -67,34 +72,35 @@ exit plan mode
 
 - Это руководство рассчитано на `ai-factory >=2.10.0 <3.0.0`.
 - Extension хранит `sources.ai-factory.baselineVersion = 2.0.0` только как исторический контекст.
-- Runtime-aware Codex `agentFiles` входят в поддерживаемый контракт, начиная с проверенного upstream `2.10.0`.
+- Runtime-aware Codex и Claude `agentFiles` входят в поддерживаемый контракт, начиная с проверенного upstream `2.10.0`.
 
 ## Слои Prompt-Инъекций
 
 - `injections/core/` — active `core plan-folder overlay`; только этот слой подключается через `extension.json` и поддерживает canonical public workflow.
-- `injections/handoff/` — future stub prompt assets; здесь лежат `aif-review-handoff-gate.md`, `aif-security-checklist-handoff-gate.md`, `aif-rules-check-handoff-gate.md`, `aif-verify-handoff-gate.md`, `aif-fix-handoff-comment.md` и `aif-done-handoff-finalizer.md` как заготовки для отдельного runtime binding, но не как уже подключённый profile. Каждый stub содержит machine-consumable `<!-- gate-summary -->` блок для будущего Handoff parser.
+- `injections/handoff/` — future stub prompt assets; здесь лежат только `aif-review-handoff-gate.md`, `aif-security-checklist-handoff-gate.md`, `aif-rules-check-handoff-gate.md` и `aif-done-handoff-finalizer.md` как dormant profile для отдельного runtime binding, но не как уже подключённый profile. `aif-verify` и `aif-fix` остаются частью `core` workflow, а соответствующие runtime consumers по-прежнему используют inline `developer_instructions`. Каждый stub содержит machine-consumable `<!-- gate-summary -->` блок для будущего Handoff parser.
 - `injections/references/` — shared root-level references для verify/roadmap и будущих handoff consumers без копирования файлов по слоям.
 
 Пока отдельный handoff runtime binding не реализован, ordinary CLI workflow зависит только от `core` overlays, а `injections/handoff/*` остаются future stubs и не должны трактоваться как текущий runtime contract.
 
-## Bundled Codex Agents
+## Bundled Runtime Agents
 
-- Extension публикует bundled Codex agents через top-level поле `agentFiles` в `extension.json`.
-- Codex не спаунит эти агенты автоматически только из-за факта установки extension; для запуска нужен явный запрос пользователя или orchestrator logic в уже идущем subagent workflow.
-- Subagent workflows в Codex доступны по умолчанию, но стартуют только когда их явно попросили использовать.
-- Подробности по именам `aifhub-*`, expected `sandbox_mode` и примерам вызова собраны в [Codex Agents](codex-agents.md).
+- Extension публикует namespaced runtime-managed agents через top-level поле `agentFiles` в `extension.json` для Codex и Claude.
+- Codex и Claude не начинают использовать эти subagents автоматически только из-за факта установки extension; для запуска нужен явный пользовательский запрос или future orchestrator mapping.
+- Для Codex подробности по именам `aifhub-*`, `sandbox_mode` и примерам вызова собраны в [Codex Agents](codex-agents.md).
+- Для Claude подробности по `.claude/agents/`, `permissionMode`, `background: true` sidecars и ручному использованию собраны в [Claude Agents](claude-agents.md).
 
 ## Validation
 
-Extension включает три валидатора, которые проверяют целостность manifest, agent schema и документации.
+Extension включает четыре валидатора, которые проверяют целостность manifest, Codex/Claude agent schema и документации.
 
 ### Валидаторы
 
 | Скрипт | Что проверяет |
 |--------|---------------|
-| `scripts/validate-extension.mjs` | `extension.json`: paths из `skills`, `agentFiles.source`, `injections.file` существуют; `agentFiles.target` имеют расширение `.toml`; `version` — semver; `compat.ai-factory` присутствует |
+| `scripts/validate-extension.mjs` | `extension.json`: paths из `skills`, `agentFiles.source`, `injections.file` существуют; `agentFiles.target` соответствуют runtime (`.toml` для Codex, `.md` для Claude); `version` — semver; `compat.ai-factory` присутствует |
 | `scripts/validate-codex-agents.mjs` | Codex TOML файлы в `agent-files/codex/`: обязательные поля `name`, `description`, `developer_instructions`, `sandbox_mode`; отсутствие legacy полей `prompt` и `reasoning_effort` |
-| `scripts/validate-doc-links.mjs` | Markdown ссылки в `docs/`, `injections/`, `skills/`: целевые файлы существуют; нет пустых plan placeholders (`.ai-factory/plans/.md`); внешние ссылки и anchor-only игнорируются |
+| `scripts/validate-claude-agents.mjs` | Claude markdown-файлы в `agent-files/claude/`: YAML frontmatter, обязательные поля `name` и `description`, namespaced `aifhub-*` naming contract |
+| `scripts/validate-doc-links.mjs` | Markdown ссылки в `docs/`, `injections/`, `skills/`: целевые файлы существуют; нет пустых plan placeholders с пропущенным `<plan-id>`; внешние ссылки и anchor-only игнорируются |
 
 ### Запуск
 
@@ -158,7 +164,7 @@ Full-mode planning creates both:
 
 If active research exists, `/aif-plan` normalizes it into plan-local `explore.md`.
 
-`/aif-plan full` — current replacement для historical `/aif-new`, когда нужно открыть новую full plan pair.
+Для открытия новой full plan pair используйте `/aif-plan full`. Historical `/aif-new` больше не является current public command.
 
 ### 4. Improve the plan
 
@@ -187,7 +193,7 @@ Implement behavior:
 
 `Apply` в handoff wording может ссылаться на этот этап, но current public command здесь — `/aif-implement`, не `/aif-apply`.
 
-### 6. Verify and finalize
+### 6. Verify
 
 ```bash
 /aif-verify
@@ -198,13 +204,15 @@ Implement behavior:
 Verify behavior:
 - reads the plan pair and plan-folder artifacts
 - records findings in `verify.md` and `status.yaml`
-- archives passing plans into `.ai-factory/specs/<plan-id>/` unless `--check-only` is used
+- returns the pass/fail state that gates `/aif-fix` or the optional `/aif-done` finalizer
 
-### 7. Done (AIFHub/Handoff finalizer)
+### 7. Done (explicit AIFHub/Handoff finalizer)
 
 ```bash
 /aif-done
 ```
+
+`/aif-done` owns post-verify archival, commit/PR drafting, and evidence-backed governance/evolution follow-ups. `/aif-verify` remains verification-only, including `--check-only` runs.
 
 ### Review Gates (optional)
 
@@ -218,16 +226,18 @@ Three independent read-only gates can be run after implementation and before fin
 
 All three gates are independent and can run in any order. If any gate returns `FAIL`, return to the implementing stage. `/aif-rules-check` is an extension-owned temporary gate — when upstream `ai-factory` adds a native version, this skill should be deprecated.
 
-`/aif-done` — extension-owned skill, работающий **после** passing verification:
+`/aif-done` — extension-owned explicit finalizer, работающий **после** passing verification:
 
 - Проверяет, что active plan прошёл verify (verdict `pass` или `pass-with-notes`).
 - Архивирует plan folder и companion plan file в `.ai-factory/specs/<plan-id>/`.
 - Готовит commit message draft.
 - Если есть feature branch и `gh` доступен — готовит PR summary draft. Без `gh` — выводит manual PR instructions.
-- Предлагает follow-ups (roadmap, architecture, rules, `/aif-evolve`) — только как suggestions, без auto-edit.
+- Применяет evidence-driven follow-ups для roadmap/architecture/rules через owning path или возвращает exact handoff, если текущий runtime не может безопасно завершить update.
 - Если workspace dirty не только из текущего плана — останавливается и просит подтверждения.
 
-`/aif-done` не дублирует `/aif-verify` — это отдельный AIFHub/Handoff finalizer для archive/summary/follow-up задачи.
+`/aif-done` не дублирует `/aif-verify` — это отдельный AIFHub/Handoff finalizer для archive/summary/follow-up задачи, а не legacy alias старого public workflow.
+
+Governance note: roadmap/architecture/rules follow-ups must be backed by verified plan evidence. If the owning update cannot run safely in the current runtime, `/aif-done` should return an exact handoff instead of silently skipping it.
 
 ### 8. Fix findings
 
@@ -261,7 +271,7 @@ ai-factory --version
 ai-factory extension add https://github.com/ichinya/aifhub-extension.git
 ```
 
-Ожидается, что `extension.json` будет публиковать только `skills/aif-analyze`, injected built-in workflow и Codex `agentFiles`.
+Ожидается, что `extension.json` будет публиковать только `skills/aif-analyze`, injected built-in workflow и namespaced runtime-managed `agentFiles` для Codex и Claude.
 
 3. Обновление:
 
@@ -298,6 +308,7 @@ ai-factory extension remove aifhub-extension
 aifhub-extension/
 |- extension.json
 |- agent-files/
+|  |- claude/
 |  `- codex/
 |- injections/
 |  |- core/
@@ -305,6 +316,7 @@ aifhub-extension/
 |  `- references/
 |- docs/
 |  |- README.md
+|  |- claude-agents.md
 |  |- codex-agents.md
 |  |- usage.md
 |  |- handoff.md
@@ -320,6 +332,7 @@ aifhub-extension/
 
 - [Documentation Index](README.md) - docs overview and reading order
 - [Handoff Naming](handoff.md) - терминология стадий versus current public commands
+- [Claude Agents](claude-agents.md) - bundled `aifhub-*` Claude agents, `.claude/agents/` install behavior, and manual invocation contract
 - [Codex Agents](codex-agents.md) - bundled `aifhub-*` agents, explicit invocation, and sandbox contract
 - [Context Loading Policy](context-loading-policy.md) - runtime context and ownership contract
 - [Codex Plan Mode](codex-plan-mode.md) - Codex app/CLI recommended flow and question format guidance

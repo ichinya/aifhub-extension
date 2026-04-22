@@ -1,0 +1,36 @@
+name: Validate Extension
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Run validators
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Validate extension manifest
+        run: node scripts/validate-extension.mjs
+
+      - name: Validate Codex agent files
+        run: node scripts/validate-codex-agents.mjs
+
+      - name: Validate Claude agent files
+        run: node scripts/validate-claude-agents.mjs
+
+      - name: Validate doc links
+        run: node scripts/validate-doc-links.mjs
+
+      - name: Run tests
+        run: npm test

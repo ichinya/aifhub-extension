@@ -38,6 +38,16 @@ Bootstrap lookup order follows `aif-analyze`: `.ai-factory/config.yaml`, then `A
 
 These skills must not depend on bridge files.
 
+`aif-rules-check` must use:
+
+- `.ai-factory/config.yaml`
+- `.ai-factory/RULES.md` if present
+- `.ai-factory/rules/base.md`
+- active plan-local `rules.md` if present
+- current changed scope from `git diff` / changed files
+
+When plan-local `rules.md` exists, it overrides project-level and base rules for the scoped gate result.
+
 ## Required Consumer Context Set
 
 Consumer skills must use:

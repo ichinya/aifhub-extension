@@ -43,9 +43,10 @@ Bootstrap project context for AI Factory. This skill prepares configuration and 
 - Keep file names, commands, and identifiers in English.
 - Choose the question format by runtime. See `skills/shared/QUESTION-TOOL.md` for the mapping:
   - Claude Code / Kilo CLI / OpenCode: use `question(questions: [...])`.
-  - Codex Default mode: use plain-text questions (no form tool available).
-  - Codex Plan mode: use `request_user_input` for 1-3 short questions.
-  - Autonomous / subagent mode: do not ask interactive questions; record assumptions and return blockers to the parent.
+  - Codex Default mode: use plain-text questions only (no form tool available).
+  - Codex Plan mode: use `request_user_input` only when the user already switched the session into Plan mode, and only for 1-3 short questions.
+  - If Codex planning guidance needs Plan mode, recommend manual `/plan-mode` as a user action; do not imply this skill can switch modes itself.
+  - Autonomous / subagent mode: do not ask interactive questions; record assumptions and blockers/open questions and return them to the parent.
 
 ### Step 1.5: Check Extension Compatibility
 
@@ -80,14 +81,16 @@ then emit a non-blocking migration note:
 
 This project still contains legacy skill-context for `aif-*-plus`.
 Canonical commands are now:
+- /aif-explore
 - /aif-plan full
-- /aif-implement
 - /aif-improve
+- /aif-implement
 - /aif-verify
 - /aif-fix
 
 Если docs или handoff notes упоминают `Explore`, `New`, `Apply` или `Done`, трактуй их только как названия стадий.
-Не подавай `/aif-new`, `/aif-apply` или `/aif-done` как текущий public workflow.
+Не подавай `/aif-new` или `/aif-apply` как текущие public commands.
+`/aif-done` упоминай только как explicit post-verify AIFHub finalizer, а не как legacy alias или часть canonical public workflow.
 
 Backward-compatible fallback is still supported, but renaming the skill-context folders is recommended.
 ```
@@ -148,6 +151,7 @@ Use [references/config-template.yaml](references/config-template.yaml) as refere
 - После bootstrap описывай текущий public workflow как начинающийся с `/aif-explore` или `/aif-plan full`, а не с `/aif-new`.
 - Если нужен новый plan, рекомендуй `/aif-plan full` как canonical entrypoint.
 - Если упоминается handoff stage vocabulary, явно помечай её как naming layer, а не как slash commands.
+- Если упоминается `/aif-done`, явно описывай его как explicit post-verify finalizer, а не как legacy workflow alias.
 
 ## Config v1 Schema
 

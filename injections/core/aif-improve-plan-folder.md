@@ -45,8 +45,9 @@ If historical docs or plan notes still mention `aif-improve-plus`, interpret tha
 
 When running in Codex app/CLI:
 
-- The refinement stage (`/aif-improve`) is best used in Codex Plan mode, where `request_user_input` is available for short clarifying questions.
-- This skill does not attempt to switch the Codex session mode. The user controls the mode.
-- In Codex Default mode, if a question is needed, ask it as plain text in the assistant message. Do not use `question(...)` or `questionnaire(...)`.
+- The refinement stage (`/aif-improve`) should run in Codex Plan mode when structured clarifying questions are needed.
+- This skill may recommend Plan mode, but it does not attempt or promise to switch the Codex session mode. The user controls the mode.
+- In Codex Plan mode, use `request_user_input` only for 1-3 short questions.
+- In Codex Default mode, if a question is needed, ask it as plain text in the assistant message. Do not use `question(...)`, `questionnaire(...)`, or `request_user_input`.
 - In autonomous or subagent mode, do not ask interactive questions. Record assumptions and return blockers/open questions to the parent.
 - See `skills/shared/QUESTION-TOOL.md` for the full runtime question format mapping.
