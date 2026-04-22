@@ -65,6 +65,46 @@
       "runtime": "codex",
       "source": "./agent-files/codex/aifhub-done-finalizer.toml",
       "target": "aifhub-done-finalizer.toml"
+    },
+    {
+      "runtime": "claude",
+      "source": "./agent-files/claude/aifhub-plan-polisher.md",
+      "target": "aifhub-plan-polisher.md"
+    },
+    {
+      "runtime": "claude",
+      "source": "./agent-files/claude/aifhub-implement-worker.md",
+      "target": "aifhub-implement-worker.md"
+    },
+    {
+      "runtime": "claude",
+      "source": "./agent-files/claude/aifhub-verifier.md",
+      "target": "aifhub-verifier.md"
+    },
+    {
+      "runtime": "claude",
+      "source": "./agent-files/claude/aifhub-fixer.md",
+      "target": "aifhub-fixer.md"
+    },
+    {
+      "runtime": "claude",
+      "source": "./agent-files/claude/aifhub-review-sidecar.md",
+      "target": "aifhub-review-sidecar.md"
+    },
+    {
+      "runtime": "claude",
+      "source": "./agent-files/claude/aifhub-security-sidecar.md",
+      "target": "aifhub-security-sidecar.md"
+    },
+    {
+      "runtime": "claude",
+      "source": "./agent-files/claude/aifhub-rules-sidecar.md",
+      "target": "aifhub-rules-sidecar.md"
+    },
+    {
+      "runtime": "claude",
+      "source": "./agent-files/claude/aifhub-done-finalizer.md",
+      "target": "aifhub-done-finalizer.md"
     }
   ],
   "injections": [

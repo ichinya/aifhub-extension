@@ -122,11 +122,58 @@ describe('validate-extension.mjs', () => {
     assert.equal(code, 1);
   });
 
-  it('fails with non-.toml agentFile target', async () => {
+  it('fails with non-.toml agentFile target for codex runtime', async () => {
     const manifest = validManifest();
     const parsed = JSON.parse(manifest);
     parsed.agentFiles[0].target = 'test.yaml';
     await writeFixture(tmpDir, 'extension.json', JSON.stringify(parsed));
+    await writeFixture(tmpDir, 'skills/aif-analyze/SKILL.md', '# test');
+    await writeFixture(tmpDir, 'agent-files/codex/test.toml', 'name = "test"');
+    await writeFixture(tmpDir, 'injections/core/test.md', '# test');
+
+    const code = await runValidatorExitCode(tmpDir);
+    assert.equal(code, 1);
+  });
+
+  it('passes with valid manifest including claude runtime agentFiles', async () => {
+    const manifest = validManifest({
+      agentFiles: [
+        { runtime: 'codex', source: './agent-files/codex/test.toml', target: 'test.toml' },
+        { runtime: 'claude', source: './agent-files/claude/test.md', target: 'test.md' }
+      ]
+    });
+    await writeFixture(tmpDir, 'extension.json', manifest);
+    await writeFixture(tmpDir, 'skills/aif-analyze/SKILL.md', '# test');
+    await writeFixture(tmpDir, 'agent-files/codex/test.toml', 'name = "test"');
+    await writeFixture(tmpDir, 'agent-files/claude/test.md', '---\nname: test\ndescription: test\ntools: Read\nmodel: inherit\nmaxTurns: 6\n---\n# test');
+    await writeFixture(tmpDir, 'injections/core/test.md', '# test');
+
+    const code = await runValidatorExitCode(tmpDir);
+    assert.equal(code, 0);
+  });
+
+  it('fails with non-.md agentFile target for claude runtime', async () => {
+    const manifest = validManifest({
+      agentFiles: [
+        { runtime: 'claude', source: './agent-files/claude/test.toml', target: 'test.toml' }
+      ]
+    });
+    await writeFixture(tmpDir, 'extension.json', manifest);
+    await writeFixture(tmpDir, 'skills/aif-analyze/SKILL.md', '# test');
+    await writeFixture(tmpDir, 'agent-files/claude/test.toml', 'name = "test"');
+    await writeFixture(tmpDir, 'injections/core/test.md', '# test');
+
+    const code = await runValidatorExitCode(tmpDir);
+    assert.equal(code, 1);
+  });
+
+  it('fails with unknown agentFile runtime', async () => {
+    const manifest = validManifest({
+      agentFiles: [
+        { runtime: 'unknown', source: './agent-files/codex/test.toml', target: 'test.toml' }
+      ]
+    });
+    await writeFixture(tmpDir, 'extension.json', manifest);
     await writeFixture(tmpDir, 'skills/aif-analyze/SKILL.md', '# test');
     await writeFixture(tmpDir, 'agent-files/codex/test.toml', 'name = "test"');
     await writeFixture(tmpDir, 'injections/core/test.md', '# test');

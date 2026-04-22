@@ -116,8 +116,15 @@ async function validateExtension() {
     }
 
     const target = af.target || '';
-    if (!target.endsWith('.toml')) {
-      log('ERROR', `agentFile target must have .toml extension`, { target });
+    const runtime = af.runtime || '';
+    if (runtime === 'codex' && !target.endsWith('.toml')) {
+      log('ERROR', `Codex agentFile target must have .toml extension`, { target });
+      hasErrors = true;
+    } else if (runtime === 'claude' && !target.endsWith('.md')) {
+      log('ERROR', `Claude agentFile target must have .md extension`, { target });
+      hasErrors = true;
+    } else if (runtime !== 'codex' && runtime !== 'claude') {
+      log('ERROR', `Unknown agentFile runtime`, { runtime });
       hasErrors = true;
     }
   }
