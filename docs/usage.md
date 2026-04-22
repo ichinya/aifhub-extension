@@ -15,12 +15,13 @@
 | `/aif-fix` | Built-in + injection | Apply fixes for verification findings |
 | `/aif-roadmap` | Built-in + injection | Evidence-based maturity audit roadmap |
 | `/aif-evolve` | Built-in + injection | Plan-evidence-driven evolution workflow |
+| `/aif-done` | Extension skill | Archive verified plan to specs/, draft commit/PR summaries, suggest follow-ups |
 
 ## Канонический Public Workflow
 
 ```text
-aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify
-                                                            \-> aif-fix -> aif-verify
+aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify -> aif-done [optional]
+                                                            \-> aif-fix -> aif-verify -> aif-done [optional]
 ```
 
 `/aif-analyze` — это bootstrap/setup step перед этим flow. Он подготавливает `.ai-factory/config.yaml` и `rules/base.md`, но не является первым узлом canonical public command sequence.
@@ -28,7 +29,7 @@ aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify
 - Для новой работы используйте `/aif-plan full`. `/aif-new` упоминается только как historical alias; в handoff vocabulary используется отдельное stage name `New`, а не slash command.
 - `Explore / New / Apply / Done` — это handoff stage names. Подробности собраны в [Handoff Naming](handoff.md).
 - `aif-apply` как delegated wrapper пока отложен по ownership/status contract из [issue #20](https://github.com/ichinya/aifhub-extension/issues/20); current public path использует `/aif-implement`.
-- `aif-done` в handoff контексте означает explicit AIFHub finalizer semantics, а не обязательную slash command.
+- `/aif-done` — AIFHub/Handoff finalizer, работающий после passing verification. Архивирует план, готовит commit/PR drafts и предлагает follow-ups. Не дублирует `/aif-verify`.
 
 ## Codex App / CLI Flow
 
@@ -198,9 +199,24 @@ Verify behavior:
 - records findings in `verify.md` and `status.yaml`
 - archives passing plans into `.ai-factory/specs/<plan-id>/` unless `--check-only` is used
 
-`Done` в handoff wording относится к verified/finalized состоянию этого этапа, а не к обязательной slash command.
+### 7. Done (AIFHub/Handoff finalizer)
 
-### 7. Fix findings
+```bash
+/aif-done
+```
+
+`/aif-done` — extension-owned skill, работающий **после** passing verification:
+
+- Проверяет, что active plan прошёл verify (verdict `pass` или `pass-with-notes`).
+- Архивирует plan folder и companion plan file в `.ai-factory/specs/<plan-id>/`.
+- Готовит commit message draft.
+- Если есть feature branch и `gh` доступен — готовит PR summary draft. Без `gh` — выводит manual PR instructions.
+- Предлагает follow-ups (roadmap, architecture, rules, `/aif-evolve`) — только как suggestions, без auto-edit.
+- Если workspace dirty не только из текущего плана — останавливается и просит подтверждения.
+
+`/aif-done` не дублирует `/aif-verify` — это отдельный AIFHub/Handoff finalizer для archive/summary/follow-up задачи.
+
+### 8. Fix findings
 
 ```bash
 /aif-fix
@@ -282,6 +298,7 @@ aifhub-extension/
 |  `- context-loading-policy.md
 `- skills/
    |- aif-analyze/
+   |- aif-done/
    `- shared/
 ```
 

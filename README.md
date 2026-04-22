@@ -32,6 +32,7 @@ Then use:
 /aif-improve
 /aif-implement
 /aif-verify
+/aif-done                     # archive, commit/PR drafts, follow-ups
 ```
 
 If verification finds issues:
@@ -39,6 +40,7 @@ If verification finds issues:
 ```bash
 /aif-fix
 /aif-verify
+/aif-done
 ```
 
 `/aif-analyze` здесь выступает отдельным bootstrap/setup step. Canonical public workflow начинается после него.
@@ -46,6 +48,7 @@ If verification finds issues:
 ## What This Extension Adds
 
 - `aif-analyze` remains extension-owned and bootstraps `.ai-factory/config.yaml` plus `rules/base.md`.
+- `aif-done` is extension-owned AIFHub/Handoff finalizer that archives verified plans, drafts commit/PR summaries, and suggests follow-ups.
 - `aif-plan`, `aif-explore`, `aif-improve`, `aif-implement`, `aif-verify`, `aif-fix`, `aif-roadmap`, and `aif-evolve` remain upstream skills with extension injections.
 - Full-mode plans use a dual artifact model:
   - `.ai-factory/plans/<plan-id>.md`
@@ -62,8 +65,8 @@ If verification finds issues:
 ## Канонический Public Workflow
 
 ```text
-aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify
-                                                            \-> aif-fix -> aif-verify
+aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify -> aif-done [optional]
+                                                            \-> aif-fix -> aif-verify -> aif-done [optional]
 ```
 
 `/aif-analyze` подготавливает bootstrap context, но не входит в canonical public command path.
@@ -71,7 +74,7 @@ aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify
 - Для новой работы используйте `/aif-plan full`. `/aif-new` упоминается только как historical alias; в handoff vocabulary используется отдельное stage name `New`, а не slash command.
 - `Explore / New / Apply / Done` могут использоваться как handoff stage names, но не обязаны совпадать со slash commands.
 - `aif-apply` как delegated wrapper отложен из-за ownership/status contract из [issue #20](https://github.com/ichinya/aifhub-extension/issues/20). Текущий public execution entrypoint — `/aif-implement`.
-- `aif-done` в handoff semantics читается как explicit AIFHub finalizer, а не как active public alias.
+- `/aif-done` — AIFHub/Handoff finalizer, архивирующий verified plan и готовящий commit/PR drafts. Работает после `/aif-verify`, не является обязательным шагом upstream workflow.
 
 ## Documentation
 

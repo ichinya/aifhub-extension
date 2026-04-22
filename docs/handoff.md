@@ -25,7 +25,7 @@
 | `injections/handoff/aif-rules-check-handoff-gate.md` | Review | `aifhub-rules-sidecar` | Как заготовка для отдельной проверки rule compliance |
 | `injections/handoff/aif-verify-handoff-gate.md` | Implementing | `aifhub-verifier` | Как заготовка для verification gate в handoff context |
 | `injections/handoff/aif-fix-handoff-comment.md` | Implementing | `aifhub-fixer` | Как заготовка для fix loop с aggregated findings от review gates |
-| `injections/handoff/aif-done-handoff-finalizer.md` | Done | `aifhub-done-finalizer` | Как заготовка для finalizer semantics после passing verification |
+| `injections/handoff/aif-done-handoff-finalizer.md` | Done | `aif-done`, `aifhub-done-finalizer` | Active finalizer для archive/summary/follow-up после passing verification |
 
 До появления отдельного runtime binding `injections/core/` остаётся единственным active overlay-layer для canonical public workflow, а `injections/references/` — shared reference bucket для core overlays и будущих handoff stubs.
 
@@ -45,7 +45,7 @@ aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify
 | `Explore` | Исследование и уточнение задачи перед планированием | `/aif-explore` при необходимости | Что stage name автоматически означает обязательную команду |
 | `New` | Создание новой full plan pair и старт нового scope | `/aif-plan full` | Что нужно вызывать `/aif-new` |
 | `Apply` | Применение утверждённого plan к execution workflow | `/aif-implement` | Что существует активный public wrapper `/aif-apply` |
-| `Done` | Verified/finalized end state после execution и проверки | `/aif-verify`, а при findings — `/aif-fix` -> `/aif-verify` | Что пользователь обязан вызывать `/aif-done` |
+| `Done` | Verified/finalized end state: archive, commit/PR, follow-ups | `/aif-verify` -> `/aif-done` | Что `/aif-done` — обязательный шаг upstream workflow (он optional post-verify finalizer) |
 
 ## `aif-apply`
 
@@ -61,20 +61,30 @@ aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify
 
 ## `aif-done`
 
-В handoff vocabulary `aif-done` трактуется как explicit AIFHub finalizer semantics. Это допустимое внутреннее или историческое имя стадии, но не current public alias.
-
-Для пользователя путь завершения остаётся таким:
+`/aif-done` — extension-owned skill и AIFHub/Handoff finalizer. Работает **после** passing verification:
 
 ```text
-/aif-implement -> /aif-verify
-fail -> /aif-fix -> /aif-verify
+/aif-implement -> /aif-verify -> /aif-done
+fail -> /aif-fix -> /aif-verify -> /aif-done
 ```
+
+Что делает `/aif-done`:
+- Проверяет, что plan прошёл verify (verdict `pass` или `pass-with-notes`).
+- Архивирует plan folder и companion plan file в `.ai-factory/specs/<plan-id>/`.
+- Готовит commit message и PR summary drafts.
+- Предлагает follow-ups (roadmap, architecture, rules, `/aif-evolve`) — только как suggestions.
+
+Что **не** делает:
+- Не дублирует `/aif-verify` verification logic.
+- Не auto-создаёт PR — только drafts для review.
+- Не auto-редактирует governance files (ROADMAP, RULES, ARCHITECTURE).
+- Не является обязательным шагом canonical upstream workflow.
 
 ## Правила интерпретации
 
 - Если handoff говорит `New`, для новой работы используйте `/aif-plan full`.
 - Если handoff говорит `Apply`, ориентируйтесь на `/aif-implement`.
-- Если handoff говорит `Done`, доведите plan до verified/finalized state через `/aif-verify`, а не через legacy alias.
+- Если handoff говорит `Done`, доведите plan до verified state через `/aif-verify`, затем запустите `/aif-done` для архивации и подготовки commit/PR summaries.
 - Если handoff говорит `Explore / New / Apply / Done`, считайте это naming layer, а не списком обязательных slash commands.
 
 ## Stage Mapping (Future Handoff Orchestration)
@@ -87,7 +97,7 @@ fail -> /aif-fix -> /aif-verify
 | **Plan Ready** | no worker; gate/status only | — | Stage status tracking API |
 | **Implementing** | `/aif-implement`, `/aif-verify --check-only`; if fail: `/aif-fix` -> `/aif-verify --check-only` | `aif-verify-handoff-gate.md`, `aif-fix-handoff-comment.md` | Auto-transition на verification pass/fail |
 | **Review** | `/aif-review`, `/aif-security-checklist`, `/aif-rules-check`; if any gate fails: return to Implementing | `aif-review-handoff-gate.md`, `aif-security-checklist-handoff-gate.md`, `aif-rules-check-handoff-gate.md` | Multi-gate aggregation и conditional return |
-| **Done** | `/aif-verify` (finalization), optional `/aif-done` semantics | `aif-done-handoff-finalizer.md` | Explicit finalizer stage binding |
+| **Done** | `/aif-verify` (verification), `/aif-done` (archival, commit/PR drafts, follow-ups) | `aif-done-handoff-finalizer.md` | Explicit finalizer stage binding |
 
 ### Что работает сейчас вручную
 
@@ -95,7 +105,7 @@ fail -> /aif-fix -> /aif-verify
 /aif-plan full -> /aif-improve -> /aif-implement -> /aif-verify --check-only
                                                          fail -> /aif-fix -> /aif-verify --check-only
                                       /aif-review + /aif-security-checklist (по желанию)
-/aif-verify (finalization без --check-only)
+/aif-verify -> /aif-done (archive, commit/PR drafts, follow-ups)
 ```
 
 Все перечисленные команды работают в текущем CLI workflow через `injections/core/` overlays.

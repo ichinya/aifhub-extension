@@ -21,7 +21,8 @@
     }
   },
   "skills": [
-    "skills/aif-analyze"
+    "skills/aif-analyze",
+    "skills/aif-done"
   ],
   "agentFiles": [
     {
