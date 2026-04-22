@@ -22,7 +22,8 @@
   },
   "skills": [
     "skills/aif-analyze",
-    "skills/aif-done"
+    "skills/aif-done",
+    "skills/aif-rules-check"
   ],
   "agentFiles": [
     {

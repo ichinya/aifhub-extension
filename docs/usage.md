@@ -7,6 +7,7 @@
 | Skill | Type | Purpose |
 |-------|------|---------|
 | `/aif-analyze` | Extension skill | Bootstrap `.ai-factory/config.yaml` and `rules/base.md` |
+| `/aif-rules-check` | Extension skill (temporary gate) | Read-only rule compliance check against rules hierarchy |
 | `/aif-explore` | Built-in + injection | Explore ideas and persist only `.ai-factory/RESEARCH.md` |
 | `/aif-plan` | Built-in + injection | Create the companion plan file + plan folder pair |
 | `/aif-improve` | Built-in + injection | Refine both plan layers together before execution |
@@ -205,6 +206,18 @@ Verify behavior:
 /aif-done
 ```
 
+### Review Gates (optional)
+
+Three independent read-only gates can be run after implementation and before final verification:
+
+```text
+/aif-review             — code review gate
+/aif-security-checklist — security gate
+/aif-rules-check        — rules compliance gate (extension-owned, temporary)
+```
+
+All three gates are independent and can run in any order. If any gate returns `FAIL`, return to the implementing stage. `/aif-rules-check` is an extension-owned temporary gate — when upstream `ai-factory` adds a native version, this skill should be deprecated.
+
 `/aif-done` — extension-owned skill, работающий **после** passing verification:
 
 - Проверяет, что active plan прошёл verify (verdict `pass` или `pass-with-notes`).
@@ -299,6 +312,7 @@ aifhub-extension/
 `- skills/
    |- aif-analyze/
    |- aif-done/
+   |- aif-rules-check/
    `- shared/
 ```
 

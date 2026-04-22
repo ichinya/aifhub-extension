@@ -32,6 +32,10 @@ Bootstrap lookup order follows `aif-analyze`: `.ai-factory/config.yaml`, then `A
 - `aif-roadmap`
 - `aif-evolve`
 
+### Gate skills (read-only)
+
+- `aif-rules-check` — extension-owned temporary gate for rule compliance checks
+
 These skills must not depend on bridge files.
 
 ## Required Consumer Context Set
@@ -120,6 +124,7 @@ If `config.yaml` is missing or incomplete for the requested operation:
 - `ROADMAP.md` owner: core `/aif-roadmap`
 - `RULES.md` owner: `/aif-rules`
 - `rules/base.md` owner: extension `aif-analyze`
+- `aif-rules-check` owner: extension; reads rules but never writes
 - `.ai-factory/plans/<plan-id>.md` owner: built-in `/aif-plan` with extension injection rules
 - `.ai-factory/plans/<plan-id>/status.yaml` owner: `/aif-implement`, `/aif-verify`, `/aif-fix`
 - `rules/*.md` owner: `/aif-plan` when the active plan explicitly adds area-specific rules
