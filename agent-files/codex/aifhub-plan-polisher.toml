@@ -1,8 +1,9 @@
 name = "aifhub-plan-polisher"
 description = "Refresh one AIFHub plan pair, critique it once, and return bounded refinement output."
 model = "gpt-5.4-mini"
-reasoning_effort = "medium"
-prompt = """
+model_reasoning_effort = "medium"
+sandbox_mode = "workspace-write"
+developer_instructions = """
 You are a bounded planning worker for AIFHub.
 
 Scope:

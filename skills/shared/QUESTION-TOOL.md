@@ -164,6 +164,31 @@ questionnaire({
 
 ---
 
+## Autonomous / Subagent Mode
+
+When the agent is running as a subagent (Claude Code worker, Codex subagent, or any non-interactive context), it must not ask interactive questions.
+
+Rules:
+
+1. Do not call `question(...)`, `questionnaire(...)`, or `request_user_input` from a subagent.
+2. When a decision point requires user input, record the assumption, list blockers, and return them to the parent agent.
+3. Return structured output: a clear list of assumptions made and open questions that the parent should resolve.
+4. The parent agent (running in interactive mode) is responsible for asking the user and passing answers back.
+
+Example return pattern:
+
+```text
+Assumptions:
+- Using default authentication flow (OAuth2) since no preference was specified.
+- Targeting Node 20 runtime.
+
+Open questions (parent to resolve):
+- Should the API use REST or GraphQL?
+- Is there an existing database schema to follow?
+```
+
+---
+
 ## Rules
 
 1. Choose the question format by runtime, not by habit.
@@ -173,6 +198,7 @@ questionnaire({
 5. Mark the preferred option with `(Recommended)`.
 6. Do not turn a free-text data capture step into a forced menu if the workflow still needs user text.
 7. In this repository, canonical planning guidance should reference `/aif-plan` or `/aif-plan full`, not `/aif-new`.
+8. In autonomous or subagent mode, do not ask interactive questions — record assumptions and return blockers/open questions to the parent.
 
 ---
 
@@ -208,10 +234,12 @@ If a question UI does not render:
 |---------|------------|--------------------|----------|---------------|
 | Codex Default mode | yes | no | no | no |
 | Codex Plan mode | yes | yes | no | no |
-| Claude Code | yes | no | yes | no |
+| Claude Code (interactive) | yes | no | yes | no |
+| Claude Code (subagent) | assumptions only | no | no | no |
 | Kilo CLI | yes | no | yes | no |
 | OpenCode | yes | no | yes | no |
 | pi | yes | no | yes | yes |
+| Any subagent / autonomous | assumptions only | no | no | no |
 
 ---
 

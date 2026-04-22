@@ -4,6 +4,16 @@
 
 Detailed documentation for the AIFHub extension.
 
+## Сводка совместимости
+
+| Поле | Значение |
+|-------|----------|
+| Проверенный upstream | `ai-factory 2.10.0` |
+| Поддерживаемый диапазон | `>=2.10.0 <3.0.0` |
+| Исторический `baselineVersion` | `2.0.0` |
+
+Для решений о поддержке ориентируйтесь на `compat.ai-factory`. `baselineVersion` нужен только как исторический контекст.
+
 ## Guides
 
 | Guide | Description |
@@ -22,7 +32,7 @@ This docs set covers:
 
 - public workflow for the extension
 - companion plan-file plus plan-folder model
-- runtime context and ownership boundaries
+- runtime-контекст, границы владения и проверенный контракт совместимости
 
 Project-level AI Factory planning and archived specs remain under `.ai-factory/` and are not duplicated here.
 

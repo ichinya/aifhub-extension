@@ -41,6 +41,11 @@ Bootstrap project context for AI Factory. This skill prepares configuration and 
 - If the translation scope excludes artifacts, keep generated artifacts in the original project language.
 - If the translation scope includes artifacts, generate them in the preferred language.
 - Keep file names, commands, and identifiers in English.
+- Choose the question format by runtime. See `skills/shared/QUESTION-TOOL.md` for the mapping:
+  - Claude Code / Kilo CLI / OpenCode: use `question(questions: [...])`.
+  - Codex Default mode: use plain-text questions (no form tool available).
+  - Codex Plan mode: use `request_user_input` for 1-3 short questions.
+  - Autonomous / subagent mode: do not ask interactive questions; record assumptions and return blockers to the parent.
 
 ### Step 1.5: Check Extension Compatibility
 
@@ -75,10 +80,14 @@ then emit a non-blocking migration note:
 
 This project still contains legacy skill-context for `aif-*-plus`.
 Canonical commands are now:
+- /aif-plan full
 - /aif-implement
 - /aif-improve
 - /aif-verify
 - /aif-fix
+
+Если docs или handoff notes упоминают `Explore`, `New`, `Apply` или `Done`, трактуй их только как названия стадий.
+Не подавай `/aif-new`, `/aif-apply` или `/aif-done` как текущий public workflow.
 
 Backward-compatible fallback is still supported, but renaming the skill-context folders is recommended.
 ```
@@ -136,6 +145,9 @@ Use [references/config-template.yaml](references/config-template.yaml) as refere
 - Mention created/updated files: `config.yaml`, `rules/base.md`, and artifact status (`DESCRIPTION.md`, `ARCHITECTURE.md`, `ROADMAP.md`).
 - Report what was invoked automatically versus what remains as manual next command.
 - If DESCRIPTION is missing, first recommended command must be `/aif`.
+- После bootstrap описывай текущий public workflow как начинающийся с `/aif-explore` или `/aif-plan full`, а не с `/aif-new`.
+- Если нужен новый plan, рекомендуй `/aif-plan full` как canonical entrypoint.
+- Если упоминается handoff stage vocabulary, явно помечай её как naming layer, а не как slash commands.
 
 ## Config v1 Schema
 

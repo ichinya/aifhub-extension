@@ -6,6 +6,8 @@
 
 Define one explicit context-loading contract across bootstrap, planning, execution, and verification skills.
 
+Эта политика фиксирует контракт extension, проверенный против `ai-factory 2.10.0`.
+
 ## Roles
 
 ### Bootstrap skill
@@ -17,7 +19,7 @@ Responsibilities:
 - create or update `.ai-factory/rules/base.md`
 - support migration and bootstrap compatibility
 
-Bridge files (`AGENTS.md`, `CLAUDE.md`, `QWEN.md`) are allowed only in this bootstrap path.
+Bootstrap lookup order follows `aif-analyze`: `.ai-factory/config.yaml`, then `AGENTS.md`, then `CLAUDE.md`, then `.ai-factory/RULES.md`. Legacy bridge files (`AGENTS.md`, `CLAUDE.md`) могут читаться только как migration inputs, если уже существуют, но extension не создаёт новые bridge files. Каноническими bootstrap-результатами остаются `.ai-factory/config.yaml` и `.ai-factory/rules/base.md`.
 
 ### Consumer skills
 
@@ -29,6 +31,10 @@ Bridge files (`AGENTS.md`, `CLAUDE.md`, `QWEN.md`) are allowed only in this boot
 - `aif-fix`
 - `aif-roadmap`
 - `aif-evolve`
+
+### Gate skills (read-only)
+
+- `aif-rules-check` — extension-owned temporary gate for rule compliance checks
 
 These skills must not depend on bridge files.
 
@@ -118,6 +124,7 @@ If `config.yaml` is missing or incomplete for the requested operation:
 - `ROADMAP.md` owner: core `/aif-roadmap`
 - `RULES.md` owner: `/aif-rules`
 - `rules/base.md` owner: extension `aif-analyze`
+- `aif-rules-check` owner: extension; reads rules but never writes
 - `.ai-factory/plans/<plan-id>.md` owner: built-in `/aif-plan` with extension injection rules
 - `.ai-factory/plans/<plan-id>/status.yaml` owner: `/aif-implement`, `/aif-verify`, `/aif-fix`
 - `rules/*.md` owner: `/aif-plan` when the active plan explicitly adds area-specific rules

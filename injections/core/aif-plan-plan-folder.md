@@ -42,3 +42,13 @@ The companion plan file may remain plain upstream markdown; the shared YAML fron
 
 - After planning, route the next step to `/aif-improve`.
 - Do not mention deprecated orchestration or finalize aliases as active workflow steps.
+
+### Codex Runtime
+
+When running in Codex app/CLI:
+
+- The planning stage (`/aif-plan full`, `/aif-improve`) is best used in Codex Plan mode, where `request_user_input` is available for short clarifying questions.
+- This skill does not attempt to switch the Codex session mode. The user controls the mode.
+- In Codex Default mode, if a question is needed, ask it as plain text in the assistant message. Do not use `question(...)` or `questionnaire(...)`.
+- In autonomous or subagent mode, do not ask interactive questions. Record assumptions and return blockers/open questions to the parent.
+- See `skills/shared/QUESTION-TOOL.md` for the full runtime question format mapping.
