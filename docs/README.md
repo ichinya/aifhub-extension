@@ -26,6 +26,7 @@ OpenSpec compatibility is tracked as optional adapter metadata, not as a hard ex
 | [Handoff Naming](handoff.md) | Stage vocabulary versus current public commands and future mapping constraints |
 | [Context Loading Policy](context-loading-policy.md) | Runtime context contract, ownership boundaries, and artifact rules |
 | [OpenSpec Compatibility](openspec-compatibility.md) | Optional OpenSpec CLI adapter policy, degraded mode, and future capability flags |
+| [Active Change Resolver](active-change-resolver.md) | Shared active OpenSpec change selection, runtime paths, pointer behavior, and ambiguity diagnostics |
 | [ADR 0001: OpenSpec-native artifact protocol](adr/0001-openspec-native-artifact-protocol.md) | v1 source-of-truth contract for OpenSpec canonical artifacts and AI Factory runtime state |
 
 ## Recommended Reading Order
@@ -35,7 +36,8 @@ OpenSpec compatibility is tracked as optional adapter metadata, not as a hard ex
 3. Read [Handoff Naming](handoff.md) for current manual stages versus future mapping.
 4. Read [Context Loading Policy](context-loading-policy.md) for ownership and runtime path rules.
 5. Read [OpenSpec Compatibility](openspec-compatibility.md) for optional OpenSpec CLI adapter policy and degraded-mode behavior.
-6. Read [ADR 0001](adr/0001-openspec-native-artifact-protocol.md) for the v1 artifact ownership contract.
+6. Read [Active Change Resolver](active-change-resolver.md) for shared change selection and runtime state paths.
+7. Read [ADR 0001](adr/0001-openspec-native-artifact-protocol.md) for the v1 artifact ownership contract.
 
 ## Scope
 
@@ -56,5 +58,6 @@ Project-level AI Factory planning and archived specs remain under `.ai-factory/`
 - [Handoff Naming](handoff.md) - current manual stages and future stage-agent mapping constraints
 - [Context Loading Policy](context-loading-policy.md) - context-loading and ownership rules
 - [OpenSpec Compatibility](openspec-compatibility.md) - optional CLI adapter policy and future capability flags
+- [Active Change Resolver](active-change-resolver.md) - active change selection and runtime state layout
 - [ADR 0001: OpenSpec-native artifact protocol](adr/0001-openspec-native-artifact-protocol.md) - canonical OpenSpec artifacts and runtime AI Factory state
 - [Project README](../README.md) - landing page and quick start
