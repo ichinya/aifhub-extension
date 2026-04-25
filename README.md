@@ -12,25 +12,6 @@ Extension for [ai-factory 2.x](https://github.com/lee-to/ai-factory) CLI that ke
 
 `baselineVersion` фиксирует историческую upstream-базу этой модели extension. Актуальные ожидания по поддержке и установке всегда определяются `compat.ai-factory`.
 
-### OpenSpec compatibility
-
-OpenSpec is an optional CLI adapter for the v1 OpenSpec-native artifact protocol.
-
-| Capability | Requirement |
-|---|---|
-| AI Factory-only extension install/use | `ai-factory >=2.10.0 <3.0.0` |
-| OpenSpec-native validation/archive | OpenSpec CLI `>=1.3.1 <2.0.0` |
-| OpenSpec CLI runtime | Node `>=20.19.0` |
-| OpenSpec skills/commands | Not installed by this extension |
-
-When the OpenSpec CLI is unavailable, the extension remains usable in degraded AI Factory-only mode. OpenSpec validation/archive capabilities are disabled until a compatible `openspec` CLI is available.
-
-AI Factory-only mode follows the Node/runtime support of AI Factory and upstream. OpenSpec-native validation/archive requires Node `>=20.19.0` because that is the OpenSpec CLI runtime requirement.
-
-OpenSpec can be initialized without tool integrations using `openspec init --tools none`, but this extension does not require running that during install.
-
-See [OpenSpec Compatibility](docs/openspec-compatibility.md) for install/upgrade notes and the capability flags planned for runtime detection.
-
 ## Quick Start
 
 ```bash
@@ -109,7 +90,6 @@ aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify
 | [Claude Agents](docs/claude-agents.md) | Namespaced Claude subagents, `.claude/agents/` install target, and handoff limitations |
 | [Handoff Naming](docs/handoff.md) | Терминология `Explore / New / Apply / Done` без возврата legacy commands в public path |
 | [Context Loading Policy](docs/context-loading-policy.md) | Runtime context contract and ownership rules |
-| [OpenSpec Compatibility](docs/openspec-compatibility.md) | Optional OpenSpec CLI adapter policy, degraded mode, and future capability flags |
 
 ## Validation
 
@@ -125,9 +105,6 @@ npm test           # все тесты
 ## Requirements
 
 - `ai-factory CLI >=2.10.0 <3.0.0`
-- Optional OpenSpec-native validation/archive: `openspec CLI >=1.3.1 <2.0.0` on Node `>=20.19.0`
-- OpenSpec skills/commands are not installed by this extension.
-- Missing OpenSpec CLI is degraded AI Factory-only mode, not an extension install failure.
 
 Отслеживание совместимости ведётся в `extension.json`:
 
@@ -135,7 +112,6 @@ npm test           # все тесты
 - `sources.ai-factory.version`: последняя проверенная upstream-версия
 - `sources.ai-factory.baselineVersion`: исторический baseline исходной модели extension
 - `sources.ai-factory.notes`: причина текущей минимально поддерживаемой версии
-- `sources.openspec`: optional OpenSpec CLI adapter baseline, supported range, Node requirement, and degraded-mode policy
 
 ## Update Behavior
 
