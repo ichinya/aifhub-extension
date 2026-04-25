@@ -2,7 +2,7 @@
 
 # OpenSpec Compatibility
 
-OpenSpec is an optional CLI adapter for the v1 OpenSpec-native artifact protocol. This page records the supported baseline, bootstrap/config behavior, runtime detection surface, and expected degraded behavior; it does not implement later OpenSpec-native `/aif-plan`, verification, archive, migration, or OpenSpec skill/command installation.
+OpenSpec is an optional CLI adapter for the v1 OpenSpec-native artifact protocol. This page records the supported baseline, bootstrap/config behavior, `/aif-plan full` OpenSpec-native planning behavior, runtime detection surface, and expected degraded behavior.
 
 ## Supported Versions
 
@@ -56,6 +56,24 @@ OpenSpec-native bootstrap verifies or creates `openspec/config.yaml`, `openspec/
 
 OpenSpec skills and slash commands are not installed by this extension.
 
+## OpenSpec-Native Planning
+
+`/aif-plan full` remains the public planning entrypoint. When `.ai-factory/config.yaml` has `aifhub.artifactProtocol: openspec`, planning creates canonical OpenSpec change artifacts instead of legacy AI Factory plan folders:
+
+```text
+openspec/changes/<change-id>/
+  proposal.md
+  design.md
+  tasks.md
+  specs/<capability>/spec.md
+```
+
+Behavior-changing plans should include at least one delta spec under `specs/**/spec.md`. Docs/tooling-only plans may omit a delta spec only when they explicitly explain why no product or workflow behavior changes.
+
+Planning validates through `scripts/openspec-runner.mjs` with `validateOpenSpecChange(changeId)` when a compatible OpenSpec CLI is available. Missing or unsupported OpenSpec CLI is degraded validation, not planning failure.
+
+Legacy `.ai-factory/plans/<plan-id>.md` plus `.ai-factory/plans/<plan-id>/` output remains available only in AI Factory-only mode.
+
 ## Install And Upgrade Notes
 
 This change only updates extension policy, metadata, and documentation. OpenSpec remains an optional external CLI adapter and is not added to `dependencies` or `devDependencies`.
@@ -66,13 +84,13 @@ When a compatible OpenSpec CLI is missing:
 - AI Factory bootstrap/config workflows may still run in AI Factory-only mode
 - OpenSpec-native validation is unavailable
 - OpenSpec-native archive is unavailable
-- future OpenSpec-aware commands should report capability flags instead of failing extension install
+- OpenSpec-aware commands should report capability flags instead of failing extension install
 
 OpenSpec skills and slash commands are not installed by this extension in v1.
 
 ## Runtime Capability Flags
 
-Issue #38 adds the shared runner in `scripts/openspec-runner.mjs` for OpenSpec CLI detection and normalized command execution. Future OpenSpec-aware commands should consume capability metadata equivalent to:
+Issue #38 adds the shared runner in `scripts/openspec-runner.mjs` for OpenSpec CLI detection and normalized command execution. OpenSpec-aware commands consume capability metadata equivalent to:
 
 ```yaml
 openspec:
@@ -86,4 +104,4 @@ openspec:
   versionSupported: boolean
 ```
 
-The runner reports missing or incompatible OpenSpec environments as structured degraded-mode data. OpenSpec-native bootstrap consumes this capability shape; planning, verification, archive integration, migration, generated rules, and broader prompt rewrites remain separate follow-up work.
+The runner reports missing or incompatible OpenSpec environments as structured degraded-mode data. OpenSpec-native bootstrap and planning consume this capability shape; verification, archive integration, migration, generated rules, and broader prompt rewrites remain separate follow-up work.

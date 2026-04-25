@@ -23,13 +23,15 @@ OpenSpec is an optional CLI adapter for the v1 OpenSpec-native artifact protocol
 | OpenSpec CLI runtime | Node `>=20.19.0` |
 | OpenSpec skills/commands | Not installed by this extension |
 
-When the OpenSpec CLI is unavailable, the extension remains usable in degraded AI Factory-only mode. OpenSpec validation/archive capabilities are disabled until a compatible `openspec` CLI is available.
+When the OpenSpec CLI is unavailable, the extension remains usable. OpenSpec validation/archive capabilities are disabled until a compatible `openspec` CLI is available, but OpenSpec-native planning can still generate structurally correct artifacts with degraded validation.
 
 AI Factory-only mode follows the Node/runtime support of AI Factory and upstream. OpenSpec-native validation/archive requires Node `>=20.19.0` because that is the OpenSpec CLI runtime requirement.
 
 OpenSpec can be initialized without tool integrations using `openspec init --tools none`, but this extension does not require running that during install.
 
 `/aif-analyze` supports an explicit OpenSpec-native bootstrap mode. Use it only when a project requests OpenSpec-native artifacts or already has `aifhub.artifactProtocol: openspec`; otherwise the legacy AI Factory-only config remains the default. In OpenSpec-native mode, canonical plan/change artifacts map to `openspec/changes`, specs map to `openspec/specs`, and runtime AI Factory output stays under `.ai-factory/state`, `.ai-factory/qa`, and `.ai-factory/rules/generated`.
+
+`/aif-plan full` remains the public planning entrypoint. In OpenSpec-native mode it creates `openspec/changes/<change-id>/proposal.md`, `design.md`, `tasks.md`, and behavior delta specs under `specs/**/spec.md`; legacy `.ai-factory/plans` output is AI Factory-only mode.
 
 See [OpenSpec Compatibility](docs/openspec-compatibility.md) for install/upgrade notes and the capability flags planned for runtime detection.
 
@@ -75,9 +77,9 @@ Optional explicit AIFHub finalizer after passing verification:
 - `aif-analyze` remains extension-owned and bootstraps `.ai-factory/config.yaml` plus `rules/base.md`; it can also prepare explicit OpenSpec-native config without installing OpenSpec skills.
 - `aif-done` is an explicit extension-owned AIFHub/Handoff finalizer that archives verified plans, drafts commit/PR summaries, and drives evidence-backed governance and evolution follow-ups.
 - `aif-plan`, `aif-explore`, `aif-improve`, `aif-implement`, `aif-verify`, `aif-fix`, `aif-roadmap`, and `aif-evolve` remain upstream skills with extension injections.
-- Full-mode plans use a dual artifact model:
-  - `.ai-factory/plans/<plan-id>.md`
-  - `.ai-factory/plans/<plan-id>/`
+- Full-mode planning is mode-gated:
+  - OpenSpec-native mode creates `openspec/changes/<change-id>/proposal.md`, `design.md`, `tasks.md`, and behavior delta specs.
+  - AI Factory-only legacy mode creates `.ai-factory/plans/<plan-id>.md` plus `.ai-factory/plans/<plan-id>/`.
 - Legacy folder-only plans are soft-migrated by generating the missing companion plan file on first improve, implement, or verify entry.
 - На `ai-factory 2.10.0+` extension публикует namespaced runtime-aware `agentFiles` для Codex и Claude; подробности и ограничения собраны в [Codex Agents](docs/codex-agents.md) и [Claude Agents](docs/claude-agents.md).
 
@@ -111,7 +113,7 @@ aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify
 | [Claude Agents](docs/claude-agents.md) | Namespaced Claude subagents, `.claude/agents/` install target, and handoff limitations |
 | [Handoff Naming](docs/handoff.md) | Терминология `Explore / New / Apply / Done` без возврата legacy commands в public path |
 | [Context Loading Policy](docs/context-loading-policy.md) | Runtime context contract and ownership rules |
-| [OpenSpec Compatibility](docs/openspec-compatibility.md) | Optional OpenSpec CLI adapter policy, degraded mode, and future capability flags |
+| [OpenSpec Compatibility](docs/openspec-compatibility.md) | Optional OpenSpec CLI adapter policy, OpenSpec-native planning, degraded mode, and capability flags |
 
 ## Validation
 

@@ -65,6 +65,8 @@ Runtime state is outside canonical OpenSpec changes:
 
 The helper never creates `.ai-factory/plans/<change-id>` and never writes under `openspec/changes/<change-id>/`.
 
+`/aif-plan full` uses the same change-id vocabulary in OpenSpec-native mode. It should create canonical OpenSpec change artifacts under `openspec/changes/<change-id>/` and keep planning runtime evidence, when needed, under `.ai-factory/state/<change-id>/`.
+
 ## Current Pointer
 
 The pointer file is `.ai-factory/state/current.yaml` by default. The resolver reads these YAML keys:

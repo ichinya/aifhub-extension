@@ -9,7 +9,7 @@
 | `/aif-analyze` | Extension skill | Bootstrap `.ai-factory/config.yaml` and `rules/base.md`; explicit OpenSpec-native config is supported |
 | `/aif-rules-check` | Extension skill (temporary gate) | Read-only rule compliance check against rules hierarchy |
 | `/aif-explore` | Built-in + injection | Explore ideas and persist only `.ai-factory/RESEARCH.md` |
-| `/aif-plan` | Built-in + injection | Create the companion plan file + plan folder pair |
+| `/aif-plan` | Built-in + injection | Create mode-gated full plans: OpenSpec changes in OpenSpec-native mode, companion plan folders in legacy AI Factory mode |
 | `/aif-improve` | Built-in + injection | Refine both plan layers together before execution |
 | `/aif-implement` | Built-in + injection | Execute tasks and own git plus execution metadata |
 | `/aif-verify` | Built-in + injection | Verify findings and update `verify.md` plus `status.yaml`; optional archival/finalizer work lives in `/aif-done` |
@@ -168,11 +168,23 @@ Explore behavior:
 /aif-plan full "add OAuth authentication"
 ```
 
-Full-mode planning creates both:
+Full-mode planning is mode-gated.
+
+In OpenSpec-native mode (`aifhub.artifactProtocol: openspec`), `/aif-plan full` creates canonical OpenSpec change artifacts:
+
+- `openspec/changes/<change-id>/proposal.md`
+- `openspec/changes/<change-id>/design.md`
+- `openspec/changes/<change-id>/tasks.md`
+- `openspec/changes/<change-id>/specs/**/spec.md` when behavior changes
+
+OpenSpec validation runs through `scripts/openspec-runner.mjs` when a compatible CLI is available. Missing or unsupported OpenSpec CLI is degraded validation, not planning failure.
+
+In legacy AI Factory-only mode, full-mode planning creates both:
+
 - `.ai-factory/plans/<plan-id>.md`
 - `.ai-factory/plans/<plan-id>/`
 
-If active research exists, `/aif-plan` normalizes it into plan-local `explore.md`.
+If active research exists, `/aif-plan` normalizes it into plan-local `explore.md` only in legacy AI Factory mode. OpenSpec-native runtime notes belong under `.ai-factory/state/<change-id>/`, not inside `openspec/changes/<change-id>/`.
 
 Для открытия новой full plan pair используйте `/aif-plan full`. Historical `/aif-new` больше не является current public command.
 
