@@ -15,6 +15,24 @@ language:
   technical_terms: english
 
 # ============================================================================
+# AIFHUB ARTIFACT PROTOCOL
+# ============================================================================
+# Legacy default is AI Factory-only. Use artifactProtocol: openspec only when
+# the user explicitly requests OpenSpec-native mode or existing config already
+# uses aifhub.artifactProtocol: openspec.
+aifhub:
+  # ai-factory | openspec
+  artifactProtocol: ai-factory
+  # OpenSpec-native settings. Keep installSkills false; this extension never
+  # installs OpenSpec skills or slash commands.
+  openspec:
+    root: openspec
+    installSkills: false
+    validateOnPlan: true
+    validateOnVerify: true
+    archiveOnDone: true
+
+# ============================================================================
 # PATH CONFIGURATION
 # ============================================================================
 # All paths are relative to project root
@@ -28,6 +46,15 @@ paths:
   # Workflow directories
   plans: .ai-factory/plans
   specs: .ai-factory/specs
+
+  # Runtime/generated directories used by OpenSpec-native mode
+  state: .ai-factory/state
+  qa: .ai-factory/qa
+  generated_rules: .ai-factory/rules/generated
+
+  # OpenSpec-native path profile when aifhub.artifactProtocol: openspec:
+  # plans: openspec/changes
+  # specs: openspec/specs
   
   # Rules directory (base.md required, area files optional)
   rules: .ai-factory/rules

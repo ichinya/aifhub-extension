@@ -18,6 +18,9 @@ Responsibilities:
 - create or update `.ai-factory/config.yaml`
 - create or update `.ai-factory/rules/base.md`
 - support migration and bootstrap compatibility
+- support explicit OpenSpec-native bootstrap when requested or when config already has `aifhub.artifactProtocol: openspec`
+
+In OpenSpec-native bootstrap mode, `aif-analyze` may set `paths.plans` to `openspec/changes`, `paths.specs` to `openspec/specs`, and runtime/generated paths to `.ai-factory/state`, `.ai-factory/qa`, and `.ai-factory/rules/generated`. This changes where consumers resolve canonical plan/change and spec artifacts, but it does not install OpenSpec skills or make later OpenSpec-native workflow stages complete.
 
 Bootstrap lookup order follows `aif-analyze`: `.ai-factory/config.yaml`, then `AGENTS.md`, then `CLAUDE.md`, then `.ai-factory/RULES.md`. Legacy bridge files (`AGENTS.md`, `CLAUDE.md`) могут читаться только как migration inputs, если уже существуют, но extension не создаёт новые bridge files. Каноническими bootstrap-результатами остаются `.ai-factory/config.yaml` и `.ai-factory/rules/base.md`.
 

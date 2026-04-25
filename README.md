@@ -29,6 +29,8 @@ AI Factory-only mode follows the Node/runtime support of AI Factory and upstream
 
 OpenSpec can be initialized without tool integrations using `openspec init --tools none`, but this extension does not require running that during install.
 
+`/aif-analyze` supports an explicit OpenSpec-native bootstrap mode. Use it only when a project requests OpenSpec-native artifacts or already has `aifhub.artifactProtocol: openspec`; otherwise the legacy AI Factory-only config remains the default. In OpenSpec-native mode, canonical plan/change artifacts map to `openspec/changes`, specs map to `openspec/specs`, and runtime AI Factory output stays under `.ai-factory/state`, `.ai-factory/qa`, and `.ai-factory/rules/generated`.
+
 See [OpenSpec Compatibility](docs/openspec-compatibility.md) for install/upgrade notes and the capability flags planned for runtime detection.
 
 ## Quick Start
@@ -70,7 +72,7 @@ Optional explicit AIFHub finalizer after passing verification:
 
 ## What This Extension Adds
 
-- `aif-analyze` remains extension-owned and bootstraps `.ai-factory/config.yaml` plus `rules/base.md`.
+- `aif-analyze` remains extension-owned and bootstraps `.ai-factory/config.yaml` plus `rules/base.md`; it can also prepare explicit OpenSpec-native config without installing OpenSpec skills.
 - `aif-done` is an explicit extension-owned AIFHub/Handoff finalizer that archives verified plans, drafts commit/PR summaries, and drives evidence-backed governance and evolution follow-ups.
 - `aif-plan`, `aif-explore`, `aif-improve`, `aif-implement`, `aif-verify`, `aif-fix`, `aif-roadmap`, and `aif-evolve` remain upstream skills with extension injections.
 - Full-mode plans use a dual artifact model:
