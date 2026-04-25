@@ -402,11 +402,11 @@ function extractOpenSpecVersion(output) {
     return null;
   }
 
-  return `${parsed.major}.${parsed.minor}.${parsed.patch}`;
+  return formatSemver(parsed);
 }
 
 function parseSemver(version) {
-  const match = String(version).match(/(?:^|[^\d])(\d+)\.(\d+)\.(\d+)(?:[-+][0-9A-Za-z.-]+)?/);
+  const match = String(version).match(/(?:^|[^\d])(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?/);
 
   if (!match) {
     return null;
@@ -415,8 +415,24 @@ function parseSemver(version) {
   return {
     major: Number.parseInt(match[1], 10),
     minor: Number.parseInt(match[2], 10),
-    patch: Number.parseInt(match[3], 10)
+    patch: Number.parseInt(match[3], 10),
+    prerelease: match[4] ?? null,
+    build: match[5] ?? null
   };
+}
+
+function formatSemver(version) {
+  let result = `${version.major}.${version.minor}.${version.patch}`;
+
+  if (version.prerelease !== null) {
+    result += `-${version.prerelease}`;
+  }
+
+  if (version.build !== null) {
+    result += `+${version.build}`;
+  }
+
+  return result;
 }
 
 function compareSemver(a, b) {
@@ -437,20 +453,95 @@ function compareSemver(a, b) {
     }
   }
 
+  const prereleaseComparison = comparePrerelease(left.prerelease, right.prerelease);
+
+  if (prereleaseComparison !== 0) {
+    return prereleaseComparison;
+  }
+
   return 0;
 }
 
+function comparePrerelease(left, right) {
+  if (left === null && right === null) {
+    return 0;
+  }
+
+  if (left === null) {
+    return 1;
+  }
+
+  if (right === null) {
+    return -1;
+  }
+
+  const leftParts = left.split('.');
+  const rightParts = right.split('.');
+  const maxLength = Math.max(leftParts.length, rightParts.length);
+
+  for (let i = 0; i < maxLength; i += 1) {
+    const leftPart = leftParts[i];
+    const rightPart = rightParts[i];
+
+    if (leftPart === undefined) {
+      return -1;
+    }
+
+    if (rightPart === undefined) {
+      return 1;
+    }
+
+    const partComparison = comparePrereleasePart(leftPart, rightPart);
+
+    if (partComparison !== 0) {
+      return partComparison;
+    }
+  }
+
+  return 0;
+}
+
+function comparePrereleasePart(left, right) {
+  const leftNumeric = isNumericIdentifier(left);
+  const rightNumeric = isNumericIdentifier(right);
+
+  if (leftNumeric && rightNumeric) {
+    return Number(left) - Number(right);
+  }
+
+  if (leftNumeric) {
+    return -1;
+  }
+
+  if (rightNumeric) {
+    return 1;
+  }
+
+  return left.localeCompare(right);
+}
+
+function isNumericIdentifier(value) {
+  return /^(0|[1-9]\d*)$/.test(value);
+}
+
 function satisfiesGteLt(version, min, max) {
+  const parsed = parseSemver(version);
   const minComparison = compareSemver(version, min);
   const maxComparison = compareSemver(version, max);
 
-  return minComparison !== null
+  return parsed !== null
+    && parsed.prerelease === null
+    && minComparison !== null
     && maxComparison !== null
     && minComparison >= 0
     && maxComparison < 0;
 }
 
 function satisfiesGte(version, min) {
+  const parsed = parseSemver(version);
   const comparison = compareSemver(version, min);
-  return comparison !== null && comparison >= 0;
+  return parsed !== null
+    && parsed.prerelease === null
+    && comparison !== null
+    && comparison >= 0;
 }

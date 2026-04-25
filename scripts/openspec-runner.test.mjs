@@ -103,6 +103,22 @@ describe('detectOpenSpec', () => {
     assert.equal(result.errors[0].code, 'unsupported-version');
   });
 
+  it('returns unsupported-version for prerelease 1.3.1-beta.1', async () => {
+    const result = await detectOpenSpec({
+      executor: async () => ({ exitCode: 0, stdout: 'openspec 1.3.1-beta.1', stderr: '' }),
+      nodeVersion: '20.19.0'
+    });
+
+    assert.equal(result.available, true);
+    assert.equal(result.canValidate, false);
+    assert.equal(result.canArchive, false);
+    assert.equal(result.version, '1.3.1-beta.1');
+    assert.equal(result.versionSupported, false);
+    assert.equal(result.nodeSupported, true);
+    assert.equal(result.reason, 'unsupported-version');
+    assert.equal(result.errors[0].code, 'unsupported-version');
+  });
+
   it('returns unsupported-node when injected Node version is below 20.19.0', async () => {
     const result = await detectOpenSpec({
       executor: async () => ({ exitCode: 0, stdout: '@fission-ai/openspec 1.3.1', stderr: '' }),
