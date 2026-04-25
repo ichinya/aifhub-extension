@@ -2,7 +2,7 @@
 
 # OpenSpec Compatibility
 
-OpenSpec is an optional CLI adapter for the v1 OpenSpec-native artifact protocol. This page records the supported baseline, runtime detection surface, and expected degraded behavior; it does not implement OpenSpec-native artifacts or OpenSpec skill/command installation.
+OpenSpec is an optional CLI adapter for the v1 OpenSpec-native artifact protocol. This page records the supported baseline, bootstrap/config behavior, runtime detection surface, and expected degraded behavior; it does not implement later OpenSpec-native `/aif-plan`, verification, archive, migration, or OpenSpec skill/command installation.
 
 ## Supported Versions
 
@@ -22,6 +22,39 @@ openspec init --tools none
 ```
 
 The AIFHub extension does not require this command during install.
+
+## OpenSpec-Native Bootstrap Mode
+
+`/aif-analyze` supports an explicit OpenSpec-native bootstrap/config mode. The mode is selected only when the user asks for `openspec-native` or when existing config already has:
+
+```yaml
+aifhub:
+  artifactProtocol: openspec
+```
+
+In that mode, `.ai-factory/config.yaml` can include:
+
+```yaml
+aifhub:
+  artifactProtocol: openspec
+  openspec:
+    root: openspec
+    installSkills: false
+    validateOnPlan: true
+    validateOnVerify: true
+    archiveOnDone: true
+
+paths:
+  plans: openspec/changes
+  specs: openspec/specs
+  state: .ai-factory/state
+  qa: .ai-factory/qa
+  generated_rules: .ai-factory/rules/generated
+```
+
+OpenSpec-native bootstrap verifies or creates `openspec/config.yaml`, `openspec/specs/`, `openspec/changes/`, `.ai-factory/state/`, `.ai-factory/qa/`, and `.ai-factory/rules/generated/`. If a compatible OpenSpec CLI is present, the skill may use or recommend `openspec init --tools none`; if the CLI is missing or unsupported, bootstrap continues with manual skeleton behavior and degraded capability flags.
+
+OpenSpec skills and slash commands are not installed by this extension.
 
 ## Install And Upgrade Notes
 
@@ -53,4 +86,4 @@ openspec:
   versionSupported: boolean
 ```
 
-The runner reports missing or incompatible OpenSpec environments as structured degraded-mode data. OpenSpec-native bootstrap, planning, verification, archive integration, migration, generated rules, and prompt rewrites remain separate follow-up work.
+The runner reports missing or incompatible OpenSpec environments as structured degraded-mode data. OpenSpec-native bootstrap consumes this capability shape; planning, verification, archive integration, migration, generated rules, and broader prompt rewrites remain separate follow-up work.

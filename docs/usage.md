@@ -6,7 +6,7 @@
 
 | Skill | Type | Purpose |
 |-------|------|---------|
-| `/aif-analyze` | Extension skill | Bootstrap `.ai-factory/config.yaml` and `rules/base.md` |
+| `/aif-analyze` | Extension skill | Bootstrap `.ai-factory/config.yaml` and `rules/base.md`; explicit OpenSpec-native config is supported |
 | `/aif-rules-check` | Extension skill (temporary gate) | Read-only rule compliance check against rules hierarchy |
 | `/aif-explore` | Built-in + injection | Explore ideas and persist only `.ai-factory/RESEARCH.md` |
 | `/aif-plan` | Built-in + injection | Create the companion plan file + plan folder pair |
@@ -135,6 +135,16 @@ Notes:
 Creates or updates:
 - `.ai-factory/config.yaml`
 - `.ai-factory/rules/base.md`
+
+For OpenSpec-native bootstrap, explicitly request `openspec-native` or start from a config that already contains `aifhub.artifactProtocol: openspec`. The skill then completes the OpenSpec-native config shape, maps canonical changes to `openspec/changes`, maps specs to `openspec/specs`, prepares `.ai-factory/state`, `.ai-factory/qa`, and `.ai-factory/rules/generated`, and reports OpenSpec CLI capabilities through `scripts/openspec-runner.mjs` when available. Missing OpenSpec CLI remains degraded mode, not bootstrap failure.
+
+Compatible OpenSpec CLI environments may use or receive this recommendation:
+
+```bash
+openspec init --tools none
+```
+
+The extension does not install OpenSpec skills or slash commands.
 
 `/aif-analyze` завершает bootstrap. После него canonical public workflow начинается с `/aif-explore` или сразу с `/aif-plan full`.
 
