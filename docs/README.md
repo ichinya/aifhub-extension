@@ -14,6 +14,8 @@ Detailed documentation for the AIFHub extension.
 
 Для решений о поддержке ориентируйтесь на `compat.ai-factory`. `baselineVersion` нужен только как исторический контекст.
 
+OpenSpec compatibility is tracked as optional adapter metadata, not as a hard extension requirement. See [OpenSpec Compatibility](openspec-compatibility.md) for the supported CLI range, Node policy, degraded mode, and future capability flags.
+
 ## Guides
 
 | Guide | Description |
@@ -23,6 +25,7 @@ Detailed documentation for the AIFHub extension.
 | [Claude Agents](claude-agents.md) | Namespaced Claude subagents, `.claude/agents/` install target, and handoff limitations |
 | [Handoff Naming](handoff.md) | Stage vocabulary versus current public commands and future mapping constraints |
 | [Context Loading Policy](context-loading-policy.md) | Runtime context contract, ownership boundaries, and artifact rules |
+| [OpenSpec Compatibility](openspec-compatibility.md) | Optional OpenSpec CLI adapter policy, degraded mode, and future capability flags |
 
 ## Recommended Reading Order
 
@@ -30,6 +33,7 @@ Detailed documentation for the AIFHub extension.
 2. Read [Codex Agents](codex-agents.md) or [Claude Agents](claude-agents.md) for the runtime-specific subagent contract you need.
 3. Read [Handoff Naming](handoff.md) for current manual stages versus future mapping.
 4. Read [Context Loading Policy](context-loading-policy.md) for ownership and runtime path rules.
+5. Read [OpenSpec Compatibility](openspec-compatibility.md) for optional OpenSpec CLI adapter policy and degraded-mode behavior.
 
 ## Scope
 
@@ -38,6 +42,7 @@ This docs set covers:
 - public workflow for the extension
 - companion plan-file plus plan-folder model
 - runtime-контекст, границы владения и проверенный контракт совместимости
+- optional OpenSpec CLI adapter baseline and degraded-mode policy
 
 Project-level AI Factory planning and archived specs remain under `.ai-factory/` and are not duplicated here.
 
@@ -48,4 +53,5 @@ Project-level AI Factory planning and archived specs remain under `.ai-factory/`
 - [Claude Agents](claude-agents.md) - runtime-managed Claude agent files and `.claude/agents/` behavior
 - [Handoff Naming](handoff.md) - current manual stages and future stage-agent mapping constraints
 - [Context Loading Policy](context-loading-policy.md) - context-loading and ownership rules
+- [OpenSpec Compatibility](openspec-compatibility.md) - optional CLI adapter policy and future capability flags
 - [Project README](../README.md) - landing page and quick start

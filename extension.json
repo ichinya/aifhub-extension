@@ -15,9 +15,13 @@
     },
     "openspec": {
       "url": "https://github.com/Fission-AI/OpenSpec",
-      "version": "v0.23.0",
-      "lastSync": "2026-03-26",
-      "notes": "init"
+      "version": "1.3.1",
+      "supportedRange": ">=1.3.1 <2.0.0",
+      "lastSync": "2026-04-25",
+      "optional": true,
+      "requiresNode": ">=20.19.0",
+      "mode": "optional-cli-adapter",
+      "notes": "OpenSpec is used as an optional artifact protocol and CLI validation/archive adapter for v1. OpenSpec skills are not installed by this extension. AI Factory-only mode remains supported without the OpenSpec CLI."
     }
   },
   "skills": [
