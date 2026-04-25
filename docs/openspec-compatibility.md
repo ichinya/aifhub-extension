@@ -2,7 +2,7 @@
 
 # OpenSpec Compatibility
 
-OpenSpec is an optional CLI adapter for the v1 OpenSpec-native artifact protocol. This policy update records the supported baseline and expected degraded behavior only; it does not implement OpenSpec CLI detection, a CLI runner, OpenSpec-native artifacts, or OpenSpec skill/command installation.
+OpenSpec is an optional CLI adapter for the v1 OpenSpec-native artifact protocol. This page records the supported baseline, runtime detection surface, and expected degraded behavior; it does not implement OpenSpec-native artifacts or OpenSpec skill/command installation.
 
 ## Supported Versions
 
@@ -37,9 +37,9 @@ When a compatible OpenSpec CLI is missing:
 
 OpenSpec skills and slash commands are not installed by this extension in v1.
 
-## Planned Capability Flags
+## Runtime Capability Flags
 
-Issue #38 will own runtime detection and command integration. Future commands should expose capability metadata equivalent to:
+Issue #38 adds the shared runner in `scripts/openspec-runner.mjs` for OpenSpec CLI detection and normalized command execution. Future OpenSpec-aware commands should consume capability metadata equivalent to:
 
 ```yaml
 openspec:
@@ -49,6 +49,8 @@ openspec:
   version: string | null
   supportedRange: ">=1.3.1 <2.0.0"
   requiresNode: ">=20.19.0"
+  nodeSupported: boolean
+  versionSupported: boolean
 ```
 
-These flags are documented here for compatibility policy only. Runtime detection and CLI execution are intentionally out of scope for this issue.
+The runner reports missing or incompatible OpenSpec environments as structured degraded-mode data. OpenSpec-native bootstrap, planning, verification, archive integration, migration, generated rules, and prompt rewrites remain separate follow-up work.
