@@ -60,7 +60,7 @@ async function listActiveOpenSpecChangesWithDiagnostics(context) {
     const fallbackChangeIds = [];
 
     for (const entry of entries) {
-      if (!entry.isDirectory() || entry.name === 'archive' || entry.name.startsWith('.')) {
+      if (!entry.isDirectory() || !isSelectableChangeId(entry.name)) {
         continue;
       }
 
@@ -107,6 +107,10 @@ export async function ensureRuntimeLayout(changeId, options = {}) {
 
   for (const dirPath of [statePath, qaPath]) {
     if (await pathExists(dirPath)) {
+      if (!await isDirectory(dirPath)) {
+        throw new Error(`Runtime layout path exists but is not a directory: ${dirPath}`);
+      }
+
       preserved.push(path.relative(context.rootDir, dirPath));
       continue;
     }
@@ -206,7 +210,7 @@ async function resolveExplicitChange(input, context) {
   const changeId = normalized.changeId;
   const changePath = path.join(context.changesDir, changeId);
 
-  if (!await isDirectory(changePath)) {
+  if (!isSelectableChangeId(changeId) || !await isDirectory(changePath)) {
     const listed = await listActiveOpenSpecChangesWithDiagnostics(context);
 
     return createFailureResult({
@@ -523,6 +527,12 @@ function invalidChangeId(input) {
       message: `Invalid OpenSpec change id: ${JSON.stringify(input)}.`
     }
   };
+}
+
+function isSelectableChangeId(changeId) {
+  return normalizeChangeId(changeId).ok
+    && changeId !== 'archive'
+    && !changeId.startsWith('.');
 }
 
 async function hasActiveChangeMarker(changePath) {

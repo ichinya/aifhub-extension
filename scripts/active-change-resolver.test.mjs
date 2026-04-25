@@ -165,6 +165,20 @@ describe('change id normalization and active listing', () => {
     assert.deepEqual(result, ['alpha-change', 'beta-change']);
   });
 
+  it('excludes unsafe marker-bearing and fallback-only change directory names', async () => {
+    const rootDir = await createTempRoot();
+    await createChange(rootDir, 'valid-change', ['proposal.md']);
+    await createChange(rootDir, 'bad name', ['proposal.md']);
+
+    assert.deepEqual(await listActiveOpenSpecChanges({ rootDir }), ['valid-change']);
+
+    const fallbackOnlyRoot = await createTempRoot();
+    await createChange(fallbackOnlyRoot, 'safe-draft', []);
+    await createChange(fallbackOnlyRoot, 'bad name', []);
+
+    assert.deepEqual(await listActiveOpenSpecChanges({ rootDir: fallbackOnlyRoot }), ['safe-draft']);
+  });
+
   it('reports filesystem diagnostics through resolution when active listing fails', async () => {
     const rootDir = await createTempRoot();
 
@@ -209,6 +223,21 @@ describe('explicit and cwd resolution', () => {
     assert.equal(result.ok, false);
     assert.equal(result.source, 'explicit');
     assert.deepEqual(result.candidates, ['fallback-change']);
+    assert.equal(result.errors[0].code, 'explicit-change-not-found');
+  });
+
+  it('rejects the reserved archive directory as an explicit active change', async () => {
+    const rootDir = await createTempRoot();
+    await createChange(rootDir, 'archive', ['proposal.md']);
+
+    const result = await resolveActiveChange({
+      rootDir,
+      changeId: 'archive'
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.source, 'explicit');
+    assert.equal(result.changeId, null);
     assert.equal(result.errors[0].code, 'explicit-change-not-found');
   });
 
@@ -463,6 +492,28 @@ describe('runtime state and QA layout', () => {
 
     assert.equal(await pathExists(path.join(rootDir, '.ai-factory', 'state')), false);
     assert.equal(await pathExists(path.join(rootDir, '.ai-factory', 'qa')), false);
+  });
+
+  it('rejects existing runtime layout paths that are files', async () => {
+    const rootDir = await createTempRoot();
+    const stateFile = path.join(rootDir, '.ai-factory', 'state', 'file-collision');
+    await mkdir(path.dirname(stateFile), { recursive: true });
+    await writeFile(stateFile, 'not a directory\n', 'utf8');
+
+    await assert.rejects(
+      () => ensureRuntimeLayout('file-collision', { rootDir }),
+      /Runtime layout path exists but is not a directory/
+    );
+
+    const qaRoot = await createTempRoot();
+    const qaFile = path.join(qaRoot, '.ai-factory', 'qa', 'file-collision');
+    await mkdir(path.dirname(qaFile), { recursive: true });
+    await writeFile(qaFile, 'not a directory\n', 'utf8');
+
+    await assert.rejects(
+      () => ensureRuntimeLayout('file-collision', { rootDir: qaRoot }),
+      /Runtime layout path exists but is not a directory/
+    );
   });
 
   it('does not create plan folders or write under OpenSpec change artifacts', async () => {
