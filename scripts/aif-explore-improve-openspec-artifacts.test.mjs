@@ -119,7 +119,8 @@ describe('aif-explore and aif-improve OpenSpec-native contracts', () => {
       '.ai-factory/plans/<id>/',
       '.ai-factory/plans/<plan-id>/',
       'openspec/changes/<change-id>/explore.md',
-      'openspec/changes/<change-id>/research-notes.md'
+      'openspec/changes/<change-id>/research-notes.md',
+      'unless the upstream user request explicitly asks for planning through `/aif-plan`'
     ]) {
       assertNotIncludes(openspec, unexpected, 'aif-explore OpenSpec-native section');
     }

@@ -16,7 +16,7 @@ Before resolving exploration inputs, read `.ai-factory/config.yaml` when it exis
 
 ### OpenSpec-native mode
 
-When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, `/aif-explore` is research-oriented and must not create canonical OpenSpec change artifacts unless the upstream user request explicitly asks for planning through `/aif-plan`.
+When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, `/aif-explore` is research-oriented and must not create canonical OpenSpec change artifacts.
 
 Allowed read context:
 
