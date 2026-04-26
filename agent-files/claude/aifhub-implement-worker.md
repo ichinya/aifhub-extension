@@ -16,6 +16,7 @@ Read `.ai-factory/config.yaml` before resolving scope. Do not create commits.
 Use this mode when config declares `aifhub.artifactProtocol: openspec`.
 
 - Execute exactly one task or tightly coupled task group for one active OpenSpec change.
+- Use `scripts/openspec-execution-context.mjs` `buildImplementationContext(options)` when available before editing, and `writeExecutionTrace(changeId, trace, options)` for implementation traces.
 - Read canonical artifacts: `openspec/specs/**` plus `openspec/changes/<change-id>/proposal.md`, `design.md`, `tasks.md`, and `specs/**/spec.md`.
 - Read generated rules from `.ai-factory/rules/generated/` when present.
 - Use `.ai-factory/state/<change-id>/` for runtime state and implementation traces.

@@ -65,6 +65,10 @@ Runtime state is outside canonical OpenSpec changes:
 
 The helper never creates `.ai-factory/plans/<change-id>` and never writes under `openspec/changes/<change-id>/`.
 
+`scripts/openspec-execution-context.mjs` builds on this resolver for `/aif-implement` and `/aif-fix`. In OpenSpec-native mode it reads canonical OpenSpec artifacts, generated rules, optional OpenSpec `instructions apply` output, and QA evidence for fixes; trace writers then write only under `.ai-factory/state/<change-id>/implementation/` or `.ai-factory/state/<change-id>/fixes/`.
+
+OpenSpec-native implement/fix context does not require legacy `.ai-factory/plans/<id>/task.md`. Generated rules remain derived guidance, and missing OpenSpec CLI instructions degrade to warnings instead of blocking filesystem-based context loading.
+
 `/aif-plan full` uses the same change-id vocabulary in OpenSpec-native mode. It should create canonical OpenSpec change artifacts under `openspec/changes/<change-id>/` and keep planning runtime evidence, when needed, under `.ai-factory/state/<change-id>/`.
 
 `/aif-improve` also uses this vocabulary in OpenSpec-native mode. It refines only canonical OpenSpec artifacts, keeps runtime evidence under `.ai-factory/state/<change-id>/`, and treats archived targets under `openspec/changes/archive/**` as immutable by default. If further work is needed for an archived change, create a new active change instead of editing the archive silently.

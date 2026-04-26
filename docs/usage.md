@@ -221,7 +221,10 @@ Improve behavior:
 
 Implement behavior:
 - in OpenSpec-native mode, reads `proposal.md`, `design.md`, `tasks.md`, `specs/**/spec.md`, accepted specs, and generated rules
-- in OpenSpec-native mode, writes execution progress and git strategy under `.ai-factory/state/<change-id>/`; it does not write canonical OpenSpec artifacts unless the user explicitly expands scope
+- in OpenSpec-native mode, uses `scripts/openspec-execution-context.mjs` when available to prepare implementation context and optional OpenSpec `instructions apply` guidance
+- in OpenSpec-native mode, writes implementation traces only under `.ai-factory/state/<change-id>/implementation/`; it does not write canonical OpenSpec artifacts unless the user explicitly expands scope
+- in OpenSpec-native mode, does not require legacy `.ai-factory/plans/<id>/task.md`
+- generated rules are derived guidance; missing or stale generated rules warn without replacing canonical OpenSpec artifacts
 - in legacy AI Factory-only mode, owns `status.yaml` execution metadata and git-strategy persistence
 - supports `--from <n>` resume and optional Claude worker mode
 - routes completion to `/aif-verify`
@@ -283,6 +286,15 @@ Governance note: roadmap/architecture/rules follow-ups must be backed by verifie
 /aif-fix B001 I001
 /aif-fix --all
 ```
+
+Fix behavior:
+- in OpenSpec-native mode, reads the same canonical OpenSpec artifacts as `/aif-implement`
+- in OpenSpec-native mode, reads QA evidence from `.ai-factory/qa/<change-id>/`
+- in OpenSpec-native mode, uses `scripts/openspec-execution-context.mjs` when available to prepare fix context and optional OpenSpec `instructions apply` guidance
+- in OpenSpec-native mode, writes fix traces only under `.ai-factory/state/<change-id>/fixes/`
+- in OpenSpec-native mode, does not write runtime traces into `openspec/changes/<change-id>/`
+- in OpenSpec-native mode, does not require legacy `.ai-factory/plans/<id>/task.md`
+- generated rules are derived guidance; missing or stale generated rules warn without replacing canonical OpenSpec artifacts
 
 After fixes, run:
 
