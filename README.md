@@ -33,6 +33,10 @@ OpenSpec can be initialized without tool integrations using `openspec init --too
 
 `/aif-plan full` remains the public planning entrypoint. In OpenSpec-native mode it creates `openspec/changes/<change-id>/proposal.md`, `design.md`, `tasks.md`, and behavior delta specs under `specs/**/spec.md`; legacy `.ai-factory/plans` output is AI Factory-only mode.
 
+`/aif-explore` remains research-oriented in OpenSpec-native mode. It may read OpenSpec specs and changes, but writes research/runtime notes only to `.ai-factory/RESEARCH.md` or `.ai-factory/state/<change-id>/` and does not create non-OpenSpec files inside `openspec/changes/<change-id>/`.
+
+`/aif-improve` refines existing OpenSpec-native artifacts in place: `proposal.md`, `design.md`, `tasks.md`, and `specs/**/spec.md`. It preserves user edits with patch-style changes, returns changed/preserved summary sections, warns or refuses archived changes, and keeps legacy plan-folder refinement as AI Factory-only behavior.
+
 See [OpenSpec Compatibility](docs/openspec-compatibility.md) for install/upgrade notes and the capability flags planned for runtime detection.
 
 ## Quick Start
@@ -80,6 +84,7 @@ Optional explicit AIFHub finalizer after passing verification:
 - Full-mode planning is mode-gated:
   - OpenSpec-native mode creates `openspec/changes/<change-id>/proposal.md`, `design.md`, `tasks.md`, and behavior delta specs.
   - AI Factory-only legacy mode creates `.ai-factory/plans/<plan-id>.md` plus `.ai-factory/plans/<plan-id>/`.
+- OpenSpec-native explore/improve behavior is mode-gated: explore writes only research/runtime notes outside change folders, while improve edits only canonical OpenSpec change artifacts and preserves user edits.
 - Legacy folder-only plans are soft-migrated by generating the missing companion plan file on first improve, implement, or verify entry.
 - На `ai-factory 2.10.0+` extension публикует namespaced runtime-aware `agentFiles` для Codex и Claude; подробности и ограничения собраны в [Codex Agents](docs/codex-agents.md) и [Claude Agents](docs/claude-agents.md).
 
