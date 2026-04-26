@@ -77,8 +77,8 @@ These paths are reserved names only in v1. Their detailed behavior is out of sco
 | `/aif-plan` | `openspec/specs`, project context | `openspec/changes/<id>/*` | optional `.ai-factory/state/<id>/*` | Creates OpenSpec-native change in v1 |
 | `/aif-explore` | project context, optional `openspec/specs` | none by default | `.ai-factory/state/<id>/explore.md` or equivalent | Research is not canonical unless promoted into OpenSpec artifacts |
 | `/aif-improve` | `openspec/changes/<id>/*`, `openspec/specs` | `openspec/changes/<id>/*` | patch summary if needed | Must preserve user edits |
-| `/aif-implement` | `openspec/specs`, `openspec/changes/<id>/*`, generated rules | none | `.ai-factory/state/<id>/*` | Execution state is runtime-only |
-| `/aif-fix` | same as implement plus QA reports | none | `.ai-factory/state/<id>/*` | Fixes implementation, not specs unless explicitly requested |
+| `/aif-implement` | `openspec/specs`, `openspec/changes/<id>/*`, generated rules, optional OpenSpec `instructions apply` | none | `.ai-factory/state/<id>/implementation/*` | Execution traces are runtime-only and do not require legacy `.ai-factory/plans/<id>/task.md` |
+| `/aif-fix` | same as implement plus QA reports from `.ai-factory/qa/<id>/*` | none | `.ai-factory/state/<id>/fixes/*` | Fixes implementation, not specs unless explicitly requested; does not require legacy `.ai-factory/plans/<id>/task.md` |
 | `/aif-verify` | `openspec/*`, generated rules | none | `.ai-factory/qa/<id>/*` | Must not archive |
 | `/aif-rules-check` | `openspec/specs`, `openspec/changes/<id>/specs` | none | none | Reads generated rules as derived guidance; never regenerates them |
 | `/aif-done` | `openspec/changes/<id>/*`, QA state | none until #33 archive integration; future `openspec/specs/*` via OpenSpec archive | final summary/state | Only finalizer may drive archive policy |
@@ -105,6 +105,8 @@ The compiler writes exactly these derived files:
 ```
 
 OpenSpec-native consumer and gate skills should read these files as execution guidance when present. Read-only gates such as `aif-rules-check` report missing or stale generated rules and ask the caller to regenerate them through the compiler-owning workflow; they do not write generated files themselves.
+
+Runtime consumers such as `/aif-implement` and `/aif-fix` treat generated rules as derived guidance only. When generated rules are missing or stale, they warn and continue from canonical OpenSpec artifacts rather than silently regenerating or treating generated files as source of truth.
 
 ## OpenSpec CLI policy
 

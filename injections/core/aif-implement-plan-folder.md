@@ -25,7 +25,9 @@ Before resolving an implementation target, read `.ai-factory/config.yaml` when i
 
 ### OpenSpec-native mode
 
-When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, `/aif-implement` executes implementation tasks for the active OpenSpec change. This prompt guidance does not implement the runtime behavior rewrite tracked by issue #31.
+When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, `/aif-implement` executes implementation tasks for the active OpenSpec change.
+
+Use `buildImplementationContext(options)` from `scripts/openspec-execution-context.mjs` when available before editing implementation files. Treat the returned resolver diagnostics, canonical artifacts, generated rules, OpenSpec apply instructions, runtime paths, warnings, and errors as the machine-readable implementation context. If the helper is unavailable, fall back to the explicit filesystem reads and runtime boundaries in this section.
 
 Use shared vocabulary consistently: `OpenSpec-native mode`, `canonical OpenSpec change`, `active change`, `change-id`, `base specs`, `delta specs`, `generated rules`, `runtime state`, `QA evidence`, and `legacy AI Factory-only mode`.
 
@@ -51,6 +53,7 @@ Read generated rules as derived implementation guidance when present:
 
 Execution trace and runtime state boundaries:
 
+- Prefer `writeExecutionTrace(changeId, trace, options)` from `scripts/openspec-execution-context.mjs` for implementation traces.
 - Write implementation progress, task execution traces, degraded capability notes, and runner metadata only under `.ai-factory/state/<change-id>/`.
 - Do not write runtime-only files, summaries, validation output, or execution traces under `openspec/changes/<change-id>/`.
 - Do not create legacy plan-folder execution artifacts in OpenSpec-native mode.

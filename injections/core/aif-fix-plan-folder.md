@@ -27,6 +27,8 @@ Before resolving fix findings, read `.ai-factory/config.yaml` when it exists.
 
 When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, `/aif-fix` applies selected QA findings for the active OpenSpec change.
 
+Use `buildFixContext(options)` from `scripts/openspec-execution-context.mjs` when available before editing implementation files. Treat the returned resolver diagnostics, canonical artifacts, QA evidence, generated rules, OpenSpec apply instructions, runtime paths, warnings, and errors as the machine-readable fix context. If the helper is unavailable, fall back to the explicit filesystem reads and runtime boundaries in this section.
+
 Use shared vocabulary consistently: `OpenSpec-native mode`, `canonical OpenSpec change`, `active change`, `change-id`, `base specs`, `delta specs`, `generated rules`, `runtime state`, `QA evidence`, and `legacy AI Factory-only mode`.
 
 Resolve the active change using `scripts/active-change-resolver.mjs` when available:
@@ -52,6 +54,7 @@ Read generated rules as derived fix guidance when present:
 
 Write fix traces only to runtime state:
 
+- Prefer `writeFixTrace(changeId, trace, options)` from `scripts/openspec-execution-context.mjs` for fix traces.
 - `.ai-factory/state/<change-id>/`
 - `.ai-factory/state/<change-id>/fixes/`
 
