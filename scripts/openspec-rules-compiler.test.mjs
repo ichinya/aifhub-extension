@@ -442,6 +442,33 @@ The system MUST remove old behavior.
       'THEN it becomes a requirement'
     ]);
   });
+
+  it('preserves structured given when then scenario fields from CLI JSON', async () => {
+    const { extractRequirementsFromShowJson } = await loadCompiler();
+
+    const extracted = extractRequirementsFromShowJson({
+      requirements: [
+        {
+          title: 'Structured Scenario',
+          description: 'The system MUST preserve structured scenario steps.',
+          scenarios: [
+            {
+              title: 'structured flow',
+              given: 'GIVEN an OpenSpec CLI scenario',
+              when: 'WHEN generated rules are compiled',
+              then: 'THEN every structured step is preserved'
+            }
+          ]
+        }
+      ]
+    });
+
+    assert.deepEqual(extracted.requirements[0].scenarios[0].steps, [
+      'GIVEN an OpenSpec CLI scenario',
+      'WHEN generated rules are compiled',
+      'THEN every structured step is preserved'
+    ]);
+  });
 });
 
 describe('aif-rules-check OpenSpec-native prompt contract', () => {

@@ -833,21 +833,26 @@ function normalizeJsonScenarios(input) {
     }
 
     const title = String(scenario.title ?? scenario.name ?? `Scenario ${index + 1}`).trim();
-    const steps = normalizeBody(
-      scenario.steps
-      ?? scenario.given
-      ?? scenario.when
-      ?? scenario.then
-      ?? scenario.description
-      ?? scenario.body
-      ?? ''
-    );
+    const steps = normalizeJsonScenarioSteps(scenario);
 
     return {
       title,
       steps
     };
   });
+}
+
+function normalizeJsonScenarioSteps(scenario) {
+  const fields = [
+    scenario.steps,
+    scenario.given,
+    scenario.when,
+    scenario.then,
+    scenario.description,
+    scenario.body
+  ];
+
+  return fields.flatMap((field) => normalizeBody(field));
 }
 
 function normalizeBody(input) {
