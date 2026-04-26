@@ -2,7 +2,7 @@
 
 # OpenSpec Compatibility
 
-OpenSpec is an optional CLI adapter for the v1 OpenSpec-native artifact protocol. This page records the supported baseline, bootstrap/config behavior, `/aif-plan full` OpenSpec-native planning behavior, runtime detection surface, and expected degraded behavior.
+OpenSpec is an optional CLI adapter for the v1 OpenSpec-native artifact protocol. This page records the supported baseline, bootstrap/config behavior, mode-gated prompt assets, `/aif-plan full` OpenSpec-native planning behavior, runtime detection surface, and expected degraded behavior.
 
 ## Supported Versions
 
@@ -104,4 +104,4 @@ openspec:
   versionSupported: boolean
 ```
 
-The runner reports missing or incompatible OpenSpec environments as structured degraded-mode data. OpenSpec-native bootstrap and planning consume this capability shape; verification, archive integration, migration, generated rules, and broader prompt rewrites remain separate follow-up work.
+The runner reports missing or incompatible OpenSpec environments as structured degraded-mode data. OpenSpec-native bootstrap, planning, generated-rules guidance, and prompt assets for implement, fix, verify, done, rules-check, and runtime agents consume this capability shape. Runtime integrations remain scoped: #31 covers implementation/fix/verification state alignment, #32 covers migration behavior, and #33 covers archive/finalizer integration.

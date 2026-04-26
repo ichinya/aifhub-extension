@@ -25,6 +25,42 @@ This is an **extension-owned temporary gate**. When upstream `ai-factory` adds a
   - changed files and current diff via `git diff`
 - **Returns**: `PASS | WARN | FAIL` with structured findings.
 
+## OpenSpec-native mode
+
+Use OpenSpec-native mode when `.ai-factory/config.yaml` contains `aifhub.artifactProtocol: openspec` or the explicit scope is under `openspec/changes/<change-id>/`.
+
+Read canonical OpenSpec artifacts only as context:
+
+- `openspec/specs/**`
+- `openspec/changes/<change-id>/proposal.md`
+- `openspec/changes/<change-id>/design.md`
+- `openspec/changes/<change-id>/tasks.md`
+- `openspec/changes/<change-id>/specs/**/spec.md`
+
+Load rules in this exact priority order:
+
+1. `.ai-factory/rules/generated/openspec-merged-<change-id>.md`
+2. `.ai-factory/rules/generated/openspec-change-<change-id>.md`
+3. `.ai-factory/rules/generated/openspec-base.md`
+4. `.ai-factory/RULES.md`, if present
+5. `.ai-factory/rules/base.md`, if present
+
+OpenSpec-native mode does not require plan-local `rules.md`. Plan-local `rules.md` is ignored unless the run is explicitly in Legacy AI Factory-only mode.
+
+If generated rules are missing or stale, return `WARN`, report whether each generated rules file was present, missing, or stale, and ask the caller to regenerate rules through the compiler-owning workflow. This read-only gate must not regenerate or edit generated rules.
+
+Do not write runtime state or QA evidence. If a normal response needs to identify related evidence locations for the caller, name `.ai-factory/state/<change-id>/` and `.ai-factory/qa/<change-id>/` only as external runtime state and QA evidence paths.
+
+## Legacy AI Factory-only mode
+
+When OpenSpec-native mode is not enabled, preserve the legacy AI Factory-only rules hierarchy:
+
+1. plan-local `rules.md` from `.ai-factory/plans/<plan-id>/rules.md`, if an active plan exists
+2. `.ai-factory/RULES.md`, if present
+3. `.ai-factory/rules/base.md`, if present
+
+Legacy AI Factory-only mode may cross-reference the active plan pair and plan-local `rules.md`. It remains read-only and must not edit rules, source files, `status.yaml`, or plan artifacts.
+
 ## Workflow
 
 ### Step 1: Load Rules Hierarchy
@@ -33,20 +69,8 @@ This is an **extension-owned temporary gate**. When upstream `ai-factory` adds a
 2. Detect rules mode:
    - OpenSpec-native mode when config contains `aifhub.artifactProtocol: openspec` or the active scope is clearly under `openspec/changes/<change-id>/`.
    - Legacy AI Factory-only mode otherwise.
-3. In OpenSpec-native mode, load rules in priority order:
-   - `.ai-factory/rules/generated/openspec-merged-<change-id>.md`
-   - `.ai-factory/rules/generated/openspec-change-<change-id>.md`
-   - `.ai-factory/rules/generated/openspec-base.md`
-   - `.ai-factory/RULES.md` (project-level overrides, if present)
-   - `.ai-factory/rules/base.md` (base rules from `aif-analyze`, if present)
-4. OpenSpec-native mode does not require plan-local `rules.md`. Plan-local `rules.md` is ignored unless the run is explicitly legacy AI Factory-only.
-5. If OpenSpec-native generated rules are missing or stale generated rules are detected:
-   - Return `WARN` with message: "OpenSpec generated rules are missing or stale; regenerate rules before relying on this gate."
-   - Suggest that the owner workflow regenerate rules; this read-only gate must not regenerate or edit generated rules.
-6. In legacy AI Factory-only mode, load rules in priority order:
-   - plan-local `rules.md` (plan-specific, highest priority, if active plan exists)
-   - `.ai-factory/RULES.md` (project-level overrides, if present)
-   - `.ai-factory/rules/base.md` (base rules from `aif-analyze`)
+3. In OpenSpec-native mode, follow the `OpenSpec-native mode` hierarchy above.
+4. In Legacy AI Factory-only mode, follow the `Legacy AI Factory-only mode` hierarchy above.
 7. If no rules files exist:
    - Return `WARN` with message: "No rules files found. Run `/aif-analyze` to create base rules."
    - Stop.
@@ -63,7 +87,7 @@ This is an **extension-owned temporary gate**. When upstream `ai-factory` adds a
 
 For each changed file:
 
-1. Check against applicable rules in priority order (plan-local, project, base).
+1. Check against applicable rules in priority order for the detected mode.
 2. Flag **material rule violations** only - not stylistic preferences.
 3. Categorize findings:
    - **Blocking**: rule violation that will cause verification failure.
@@ -99,7 +123,7 @@ Verdict rules:
 - If rules are outdated: suggest `/aif-rules`.
 - If OpenSpec generated rules are missing or stale generated rules are detected: suggest `regenerate rules` through the compiler-owning workflow before relying on this gate.
 - If blocking findings exist: suggest `/aif-fix`.
-- If plan-local rules are missing in legacy AI Factory-only mode: suggest adding `rules.md` to the plan folder.
+- If plan-local rules are missing in Legacy AI Factory-only mode: suggest adding `rules.md` to the plan folder.
 - **Never** suggest editing rules from this skill - that is the responsibility of `/aif-rules`.
 
 ## Ownership Boundary
@@ -119,7 +143,7 @@ Verdict rules:
 - Never write or update rules - that is the responsibility of `/aif-rules` or `aif-analyze`.
 - Never regenerate or edit generated rules - if `.ai-factory/rules/generated/*.md` is missing or stale, return `WARN` and ask the caller to regenerate rules through the compiler-owning workflow.
 - Only flag material rule violations, not general style preferences.
-- Use bounded scope: active plan pair or explicitly passed changed scope.
+- Use bounded scope: active OpenSpec change, Legacy AI Factory-only active plan pair, or explicitly passed changed scope.
 - If rules are missing or outdated, suggest `/aif-analyze` or `/aif-rules` but do not edit them.
 
 ## Example Requests

@@ -66,10 +66,10 @@ describe('aif-plan OpenSpec-native planning contract', () => {
   it('defines mode-gated OpenSpec-native and legacy sections', async () => {
     const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
     const openspec = extractSection(injection, 'OpenSpec-native mode');
-    const legacy = extractSection(injection, 'Legacy AI Factory mode');
+    const legacy = extractSection(injection, 'Legacy AI Factory-only mode');
 
     assertIncludes(openspec, 'aifhub.artifactProtocol: openspec', 'OpenSpec-native section');
-    assertIncludes(openspec, 'overrides legacy plan-folder behavior', 'OpenSpec-native section');
+    assertIncludes(openspec, 'OpenSpec-native instructions override legacy plan-folder instructions', 'OpenSpec-native section');
     assertIncludes(legacy, 'When OpenSpec-native mode is not enabled', 'Legacy section');
     assertIncludes(legacy, '.ai-factory/plans/<plan-id>.md', 'Legacy section');
     assertIncludes(legacy, '.ai-factory/plans/<plan-id>/task.md', 'Legacy section');

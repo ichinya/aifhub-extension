@@ -37,6 +37,8 @@ OpenSpec can be initialized without tool integrations using `openspec init --too
 
 `/aif-improve` refines existing OpenSpec-native artifacts in place: `proposal.md`, `design.md`, `tasks.md`, and `specs/**/spec.md`. It preserves user edits with patch-style changes, returns changed/preserved summary sections, warns or refuses archived changes, and keeps legacy plan-folder refinement as AI Factory-only behavior.
 
+Prompt assets for `/aif-implement`, `/aif-fix`, `/aif-verify`, `/aif-done`, `/aif-rules-check`, and bundled runtime agents are mode-gated. In OpenSpec-native mode they read canonical OpenSpec artifacts and write runtime/QA/finalizer state outside `openspec/changes`; in legacy AI Factory-only mode they keep using `.ai-factory/plans` plan-folder artifacts.
+
 See [OpenSpec Compatibility](docs/openspec-compatibility.md) for install/upgrade notes and the capability flags planned for runtime detection.
 
 ## Quick Start
@@ -79,12 +81,12 @@ Optional explicit AIFHub finalizer after passing verification:
 ## What This Extension Adds
 
 - `aif-analyze` remains extension-owned and bootstraps `.ai-factory/config.yaml` plus `rules/base.md`; it can also prepare explicit OpenSpec-native config without installing OpenSpec skills.
-- `aif-done` is an explicit extension-owned AIFHub/Handoff finalizer that archives verified plans, drafts commit/PR summaries, and drives evidence-backed governance and evolution follow-ups.
+- `aif-done` is an explicit extension-owned AIFHub/Handoff finalizer that archives verified legacy plans or follows OpenSpec-native archive policy, drafts commit/PR summaries, and drives evidence-backed governance and evolution follow-ups.
 - `aif-plan`, `aif-explore`, `aif-improve`, `aif-implement`, `aif-verify`, `aif-fix`, `aif-roadmap`, and `aif-evolve` remain upstream skills with extension injections.
 - Full-mode planning is mode-gated:
   - OpenSpec-native mode creates `openspec/changes/<change-id>/proposal.md`, `design.md`, `tasks.md`, and behavior delta specs.
   - AI Factory-only legacy mode creates `.ai-factory/plans/<plan-id>.md` plus `.ai-factory/plans/<plan-id>/`.
-- OpenSpec-native explore/improve behavior is mode-gated: explore writes only research/runtime notes outside change folders, while improve edits only canonical OpenSpec change artifacts and preserves user edits.
+- OpenSpec-native prompt assets are mode-gated: explore writes only research/runtime notes outside change folders, improve edits only canonical OpenSpec change artifacts, and implement/fix/verify/done/rules-check/runtime agents keep OpenSpec changes canonical while writing runtime output under `.ai-factory/state`, `.ai-factory/qa`, or finalizer state.
 - Legacy folder-only plans are soft-migrated by generating the missing companion plan file on first improve, implement, or verify entry.
 - На `ai-factory 2.10.0+` extension публикует namespaced runtime-aware `agentFiles` для Codex и Claude; подробности и ограничения собраны в [Codex Agents](docs/codex-agents.md) и [Claude Agents](docs/claude-agents.md).
 

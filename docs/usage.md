@@ -11,12 +11,12 @@
 | `/aif-explore` | Built-in + injection | Explore ideas; in OpenSpec-native mode, keep research/runtime notes outside canonical change folders |
 | `/aif-plan` | Built-in + injection | Create mode-gated full plans: OpenSpec changes in OpenSpec-native mode, companion plan folders in legacy AI Factory mode |
 | `/aif-improve` | Built-in + injection | Refine OpenSpec-native artifacts with preservation, or both legacy plan layers together before execution |
-| `/aif-implement` | Built-in + injection | Execute tasks and own git plus execution metadata |
-| `/aif-verify` | Built-in + injection | Verify findings and update `verify.md` plus `status.yaml`; optional archival/finalizer work lives in `/aif-done` |
-| `/aif-fix` | Built-in + injection | Apply fixes for verification findings |
+| `/aif-implement` | Built-in + injection | Execute tasks with mode-gated OpenSpec runtime state or legacy plan-folder metadata |
+| `/aif-verify` | Built-in + injection | Verify changed scope with mode-gated QA output; optional archival/finalizer work lives in `/aif-done` |
+| `/aif-fix` | Built-in + injection | Apply fixes for verification findings without rewriting canonical artifacts unless requested |
 | `/aif-roadmap` | Built-in + injection | Evidence-based maturity audit roadmap |
 | `/aif-evolve` | Built-in + injection | Plan-evidence-driven evolution workflow |
-| `/aif-done` | Extension skill | Archive verified plan to specs/, draft commit/PR summaries, and drive evidence-backed governance/evolution follow-ups |
+| `/aif-done` | Extension skill | Finalize verified work with OpenSpec-native archive policy or legacy plan archive, commit/PR drafts, and evidence-backed follow-ups |
 
 ## Канонический Public Workflow
 
@@ -76,7 +76,7 @@ exit plan mode
 
 ## Слои Prompt-Инъекций
 
-- `injections/core/` — active `core plan-folder overlay`; только этот слой подключается через `extension.json` и поддерживает canonical public workflow.
+- `injections/core/` — active mode-gated workflow prompt assets; только этот слой подключается через `extension.json` и поддерживает canonical public workflow. OpenSpec-native sections keep canonical artifacts under `openspec/`, while legacy AI Factory-only sections keep the plan-folder overlay.
 - `injections/handoff/` — future stub prompt assets; здесь лежат только `aif-review-handoff-gate.md`, `aif-security-checklist-handoff-gate.md`, `aif-rules-check-handoff-gate.md` и `aif-done-handoff-finalizer.md` как dormant profile для отдельного runtime binding, но не как уже подключённый profile. `aif-verify` и `aif-fix` остаются частью `core` workflow, а соответствующие runtime consumers по-прежнему используют inline `developer_instructions`. Каждый stub содержит machine-consumable `<!-- gate-summary -->` блок для будущего Handoff parser.
 - `injections/references/` — shared root-level references для verify/roadmap и будущих handoff consumers без копирования файлов по слоям.
 
@@ -214,11 +214,15 @@ Improve behavior:
 
 ```bash
 /aif-implement
+/aif-implement <change-id>
+/aif-implement @openspec/changes/<change-id>/
 /aif-implement @.ai-factory/plans/<plan-id>/status.yaml
 ```
 
 Implement behavior:
-- owns `status.yaml` execution metadata and git-strategy persistence
+- in OpenSpec-native mode, reads `proposal.md`, `design.md`, `tasks.md`, `specs/**/spec.md`, accepted specs, and generated rules
+- in OpenSpec-native mode, writes execution progress and git strategy under `.ai-factory/state/<change-id>/`; it does not write canonical OpenSpec artifacts unless the user explicitly expands scope
+- in legacy AI Factory-only mode, owns `status.yaml` execution metadata and git-strategy persistence
 - supports `--from <n>` resume and optional Claude worker mode
 - routes completion to `/aif-verify`
 
@@ -233,8 +237,9 @@ Implement behavior:
 ```
 
 Verify behavior:
-- reads the plan pair and plan-folder artifacts
-- records findings in `verify.md` and `status.yaml`
+- in OpenSpec-native mode, reads canonical OpenSpec artifacts, generated rules, runtime state, and changed files
+- in OpenSpec-native mode, records QA evidence and findings under `.ai-factory/qa/<change-id>/` and does not archive
+- in legacy AI Factory-only mode, reads the plan pair and plan-folder artifacts and records findings in `verify.md` and `status.yaml`
 - returns the pass/fail state that gates `/aif-fix` or the optional `/aif-done` finalizer
 
 ### 7. Done (explicit AIFHub/Handoff finalizer)
@@ -243,7 +248,7 @@ Verify behavior:
 /aif-done
 ```
 
-`/aif-done` owns post-verify archival, commit/PR drafting, and evidence-backed governance/evolution follow-ups. `/aif-verify` remains verification-only, including `--check-only` runs.
+`/aif-done` owns post-verify finalization, commit/PR drafting, and evidence-backed governance/evolution follow-ups. In OpenSpec-native mode it follows OpenSpec archive policy and writes finalizer state outside canonical change artifacts; concrete archive integration remains tracked by #33. In legacy AI Factory-only mode it archives the verified plan pair to `.ai-factory/specs/<plan-id>/`. `/aif-verify` remains verification-only, including `--check-only` runs.
 
 ### Review Gates (optional)
 
@@ -259,8 +264,9 @@ All three gates are independent and can run in any order. If any gate returns `F
 
 `/aif-done` — extension-owned explicit finalizer, работающий **после** passing verification:
 
-- Проверяет, что active plan прошёл verify (verdict `pass` или `pass-with-notes`).
-- Архивирует plan folder и companion plan file в `.ai-factory/specs/<plan-id>/`.
+- Проверяет, что active work прошёл verify (verdict `pass` или `pass-with-notes`).
+- В OpenSpec-native mode follows OpenSpec archive policy and writes only finalizer/runtime state until #33 completes concrete archive integration.
+- В legacy AI Factory-only mode архивирует plan folder и companion plan file в `.ai-factory/specs/<plan-id>/`.
 - Готовит commit message draft.
 - Если есть feature branch и `gh` доступен — готовит PR summary draft. Без `gh` — выводит manual PR instructions.
 - Применяет evidence-driven follow-ups для roadmap/architecture/rules через owning path или возвращает exact handoff, если текущий runtime не может безопасно завершить update.
@@ -331,7 +337,7 @@ ai-factory extension remove aifhub-extension
 /aif-verify --check-only
 ```
 
-Ожидаются companion artifacts в `.ai-factory/plans/`, синхронизированный `status.yaml` и документация, которая указывает только на текущий workflow.
+Ожидаются companion artifacts в `.ai-factory/plans/`, синхронизированный `status.yaml` и документация, которая указывает только на текущий workflow. For an explicit OpenSpec-native smoke, expect `openspec/changes/<change-id>/` plus runtime/QA output under `.ai-factory/state/<change-id>/` and `.ai-factory/qa/<change-id>/`.
 
 ## Project Layout
 

@@ -15,6 +15,29 @@ Treat `/aif-roadmap` as an evidence-based maturity audit for this extension work
 5. Treat only explicit localization markers from `config.yaml` as saved memory for this skill.
 6. If localization markers are missing or incomplete in config, ask before roadmap generation.
 
+### OpenSpec-native evidence
+
+When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, roadmap audit may read OpenSpec-native evidence:
+
+- `openspec/specs/**`
+- `openspec/changes/<change-id>/proposal.md`
+- `openspec/changes/<change-id>/design.md`
+- `openspec/changes/<change-id>/tasks.md`
+- `openspec/changes/<change-id>/specs/**/spec.md`
+- `.ai-factory/rules/generated/openspec-merged-<change-id>.md`
+- `.ai-factory/rules/generated/openspec-change-<change-id>.md`
+- `.ai-factory/rules/generated/openspec-base.md`
+- `.ai-factory/state/<change-id>/`
+- `.ai-factory/qa/<change-id>/`
+
+Use these as evidence only. `/aif-roadmap` must not write runtime state, QA evidence, generated rules, or canonical OpenSpec change artifacts.
+
+When OpenSpec-native evidence is used, summarize the artifact source set in the normal response.
+
+### Legacy AI Factory-only evidence
+
+When OpenSpec-native mode is not enabled, legacy `.ai-factory/plans/<plan-id>/` and `.ai-factory/specs/<plan-id>/` records may be used as historical roadmap evidence.
+
 ### Modes
 
 - Default mode: create or refresh the roadmap audit.

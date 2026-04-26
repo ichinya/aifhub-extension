@@ -30,6 +30,8 @@ aifhub:
     installSkills: false
     validateOnPlan: true
     validateOnVerify: true
+    # Capability flag for a future finalizer/runtime integration; do not
+    # install OpenSpec skills or silently archive through legacy specs.
     archiveOnDone: true
 
 # ============================================================================
