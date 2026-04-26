@@ -274,7 +274,10 @@ describe('OpenSpec execution context API', () => {
   });
 
   it('builds fix context with QA evidence and warns or fails when QA evidence is missing', async () => {
-    const { buildFixContext } = await loadExecutionContext();
+    const {
+      buildFixContext,
+      collectQaEvidence
+    } = await loadExecutionContext();
     const rootDir = await createTempRoot();
     await createOpenSpecChange(rootDir, 'add-oauth');
     await writeFixture(rootDir, '.ai-factory/qa/add-oauth/verify.md', '# Verify\n');
@@ -288,6 +291,16 @@ describe('OpenSpec execution context API', () => {
     assert.equal(withQa.ok, true);
     assert.deepEqual(withQa.qaEvidence.map((item) => item.path), [
       '.ai-factory/qa/add-oauth/verify.md'
+    ]);
+
+    await writeFixture(rootDir, 'custom-qa/add-oauth/verify.md', '# Custom Verify\n');
+    const relativeQa = await collectQaEvidence('add-oauth', {
+      rootDir,
+      qaDir: 'custom-qa/add-oauth'
+    });
+
+    assert.deepEqual(relativeQa.qaEvidence.map((item) => item.path), [
+      'custom-qa/add-oauth/verify.md'
     ]);
 
     const missingRoot = await createTempRoot();
@@ -353,13 +366,26 @@ describe('OpenSpec execution context API', () => {
     assert.equal(await pathExists(path.join(rootDir, 'openspec', 'changes', 'add-oauth', '.ai-factory')), false);
     assert.equal(await pathExists(path.join(rootDir, '.ai-factory', 'plans', 'add-oauth')), false);
 
+    const customState = await writeExecutionTrace('add-oauth', {
+      summary: 'Custom runtime state',
+      canonicalArtifactsRead: ['openspec/changes/add-oauth/tasks.md'],
+      generatedRulesRead: [],
+      changedFiles: []
+    }, {
+      rootDir,
+      stateDir: '.ai-factory/custom-state',
+      runId: 'custom-001'
+    });
+
+    assert.equal(customState.relativePath, '.ai-factory/custom-state/add-oauth/implementation/custom-001.md');
+
     await assert.rejects(
       () => writeExecutionTrace('add-oauth', { summary: 'bad state' }, {
         rootDir,
         stateDir: 'openspec/changes',
         runId: 'escape'
       }),
-      /canonical runtime state directory/
+      /outside canonical OpenSpec changes/
     );
     assert.equal(
       await pathExists(path.join(rootDir, 'openspec', 'changes', 'add-oauth', 'implementation', 'escape.md')),

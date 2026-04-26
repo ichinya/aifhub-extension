@@ -1,6 +1,6 @@
 // openspec-execution-context.mjs - OpenSpec implement/fix runtime context helpers
 import { createHash } from 'node:crypto';
-import { access, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -16,7 +16,6 @@ import {
 
 const MODE = 'openspec-native';
 const GENERATED_DIR = path.join('.ai-factory', 'rules', 'generated');
-const TRACE_STATE_DIR = path.join('.ai-factory', 'state');
 const INSTRUCTIONS_ARTIFACT = 'apply';
 const REQUIRED_CHANGE_ARTIFACTS = ['proposal.md', 'design.md', 'tasks.md'];
 
@@ -257,7 +256,7 @@ export async function collectQaEvidence(changeId, options = {}) {
   }
 
   const qaDir = options.qaDir !== undefined
-    ? path.resolve(options.qaDir)
+    ? resolveFromRoot(rootDir, options.qaDir)
     : path.join(rootDir, '.ai-factory', 'qa', normalized.changeId);
   const qaEvidence = await collectTextFiles(rootDir, qaDir, () => true);
 
@@ -356,13 +355,18 @@ async function writeTrace({ changeId, trace, options, type, directoryName }) {
 
   const runId = normalizeRunId(options.runId ?? createDefaultRunId(options));
   const rootDir = resolveRootDir(options);
-  assertCanonicalTraceStateDir(rootDir, options.stateDir);
+  const layout = await ensureRuntimeLayout(normalized.changeId, {
+    rootDir,
+    cwd: options.cwd,
+    stateDir: options.stateDir,
+    qaDir: options.qaDir
+  });
+  assertSafeTraceStatePath(rootDir, layout.statePath);
 
-  const statePath = path.join(rootDir, TRACE_STATE_DIR, normalized.changeId);
-  const outputDir = path.join(statePath, directoryName);
+  const outputDir = path.join(layout.statePath, directoryName);
   const targetPath = path.resolve(outputDir, `${runId}.md`);
 
-  if (!isWithinDirectory(targetPath, outputDir) || !isWithinDirectory(targetPath, statePath)) {
+  if (!isWithinDirectory(targetPath, outputDir) || !isWithinDirectory(targetPath, layout.statePath)) {
     throw new Error(`Trace output path escapes runtime state: ${targetPath}`);
   }
 
@@ -384,16 +388,21 @@ async function writeTrace({ changeId, trace, options, type, directoryName }) {
   };
 }
 
-function assertCanonicalTraceStateDir(rootDir, stateDir) {
-  if (stateDir === undefined || stateDir === null) {
-    return;
+function assertSafeTraceStatePath(rootDir, statePath) {
+  const resolvedRoot = path.resolve(rootDir);
+  const resolvedStatePath = path.resolve(statePath);
+
+  if (!isWithinDirectory(resolvedStatePath, resolvedRoot)) {
+    throw new Error(`Trace state path escapes repository root: ${resolvedStatePath}`);
   }
 
-  const canonicalStateDir = path.join(rootDir, TRACE_STATE_DIR);
-  const requestedStateDir = path.resolve(rootDir, stateDir);
-
-  if (!samePath(requestedStateDir, canonicalStateDir)) {
-    throw new Error(`Trace stateDir must resolve to canonical runtime state directory: ${toPosix(TRACE_STATE_DIR)}.`);
+  for (const forbiddenDir of [
+    path.join(resolvedRoot, 'openspec', 'changes'),
+    path.join(resolvedRoot, '.ai-factory', 'plans')
+  ]) {
+    if (isWithinDirectory(resolvedStatePath, forbiddenDir)) {
+      throw new Error('Trace state path must stay outside canonical OpenSpec changes and legacy plan folders.');
+    }
   }
 }
 
@@ -672,17 +681,12 @@ function isWithinDirectory(targetPath, directoryPath) {
   return relative.length === 0 || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
-function samePath(left, right) {
-  const resolvedLeft = path.resolve(left);
-  const resolvedRight = path.resolve(right);
-
-  return process.platform === 'win32'
-    ? resolvedLeft.toLowerCase() === resolvedRight.toLowerCase()
-    : resolvedLeft === resolvedRight;
-}
-
 function resolveRootDir(options = {}) {
   return path.resolve(options.rootDir ?? process.cwd());
+}
+
+function resolveFromRoot(rootDir, value) {
+  return path.resolve(rootDir, value);
 }
 
 function toPosix(value) {
