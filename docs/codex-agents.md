@@ -8,14 +8,14 @@
 
 | `name` | Назначение | `sandbox_mode` | Write boundary |
 |-------|------------|----------------|----------------|
-| `aifhub-plan-polisher` | Bounded worker для полировки одного активного плана и companion artifacts | `workspace-write` | Только active plan pair; без правок source code |
-| `aifhub-implement-worker` | Bounded worker для выполнения одной plan task или тесно связанной группы задач | `workspace-write` | Только execution scope выбранной задачи; без commit/push |
+| `aifhub-plan-polisher` | Bounded worker для полировки одного активного плана или OpenSpec change artifacts | `workspace-write` | Только active OpenSpec change artifacts in OpenSpec-native mode or active plan pair in legacy mode; без правок source code |
+| `aifhub-implement-worker` | Bounded worker для выполнения одной plan task или тесно связанной группы задач | `workspace-write` | Только execution scope выбранной задачи and OpenSpec runtime state or legacy task metadata; без commit/push |
 | `aifhub-review-sidecar` | Read-only sidecar для review changed scope с findings-first выводом | `read-only` | Не пишет файлы |
 | `aifhub-security-sidecar` | Read-only sidecar для security-аудита changed scope | `read-only` | Не пишет файлы |
-| `aifhub-verifier` | Low-write verifier для plan pair и changed scope с gate result | `workspace-write` | Только `status.yaml` и `verify.md` для validated active plan pair; `slug` должен быть normalized и подтверждён существующей записью в `.ai-factory/plans/` |
-| `aifhub-fixer` | Targeted fixer по выбранным verification/review findings | `workspace-write` | Только validated changed scope выбранных findings плюс `status.yaml` и `fixes/*.md` resolved plan pair; allowlist может только сузить уже подтверждённый scope |
-| `aifhub-rules-sidecar` | Read-only sidecar для проверки `.ai-factory/RULES.md`, `.ai-factory/rules/base.md` и plan-local `rules.md` | `read-only` | Не пишет файлы |
-| `aifhub-done-finalizer` | Finalization helper для archive/spec summary после passing verification | `workspace-write` | Только `status.yaml` verified plan, его archive dir в `.ai-factory/specs/` и `.ai-factory/specs/index.yaml`; `--force` запрещён |
+| `aifhub-verifier` | Low-write verifier для OpenSpec change or legacy plan pair и changed scope с gate result | `workspace-write` | Только `.ai-factory/qa/<change-id>/` in OpenSpec-native mode or `status.yaml`/`verify.md` for validated legacy plan pair |
+| `aifhub-fixer` | Targeted fixer по выбранным verification/review findings | `workspace-write` | Только validated changed scope выбранных findings plus `.ai-factory/state/<change-id>/` in OpenSpec-native mode or `status.yaml`/`fixes/*.md` for legacy plan pair; allowlist может только сузить уже подтверждённый scope |
+| `aifhub-rules-sidecar` | Read-only sidecar для проверки generated OpenSpec rules or `.ai-factory/RULES.md`, `.ai-factory/rules/base.md` и plan-local `rules.md` | `read-only` | Не пишет файлы |
+| `aifhub-done-finalizer` | Finalization helper для OpenSpec deferred archive status или legacy archive/spec summary после passing verification | `workspace-write` | OpenSpec-native finalizer state outside `openspec/changes` or legacy `status.yaml`, archive dir в `.ai-factory/specs/` и `.ai-factory/specs/index.yaml`; `--force` запрещён |
 
 `name` является authoritative spawn-name. Filename нужен только как удобная convention в репозитории и в manifest.
 
@@ -45,20 +45,20 @@
 
 - Попросить review sidecar: `Используй агент aifhub-review-sidecar и проверь текущий changed scope. Верни findings first.`
 - Попросить security sidecar: `Запусти aifhub-security-sidecar для security review изменённых файлов без правок.`
-- Попросить rules sidecar: `Используй aifhub-rules-sidecar и проверь текущий scope на соответствие файлам .ai-factory/RULES.md, .ai-factory/rules/base.md и plan-local rules.`
-- Попросить implement worker: `Запусти aifhub-implement-worker для выполнения одной задачи из активного плана и верни changed files, verification evidence и blockers.`
-- Попросить plan polisher: `Используй aifhub-plan-polisher для точечной полировки текущего плана без редактирования source code.`
-- Попросить verifier: `Запусти aifhub-verifier для active plan pair и changed files. Обнови только verification artifacts и верни verdict с counts по findings.`
+- Попросить rules sidecar: `Используй aifhub-rules-sidecar и проверь текущий scope на соответствие generated OpenSpec rules или файлам .ai-factory/RULES.md, .ai-factory/rules/base.md и plan-local rules.`
+- Попросить implement worker: `Запусти aifhub-implement-worker для выполнения одной задачи из активного OpenSpec change или legacy плана и верни changed files, verification evidence и blockers.`
+- Попросить plan polisher: `Используй aifhub-plan-polisher для точечной полировки текущего OpenSpec change или legacy плана без редактирования source code.`
+- Попросить verifier: `Запусти aifhub-verifier для active OpenSpec change or legacy plan pair и changed files. Обнови только verification artifacts и верни verdict с counts по findings.`
 - Попросить fixer: `Используй aifhub-fixer и исправь только findings B001 и I002, затем верни files modified и re-verify recommendation.`
-- Попросить done finalizer: `Запусти aifhub-done-finalizer для passing plan, архивируй artifacts в specs и подготовь commit/PR summary draft.`
+- Попросить done finalizer: `Запусти aifhub-done-finalizer для passing OpenSpec change или legacy plan. Для OpenSpec-native scope отчитай deferred archive status и finalizer state; для legacy scope используй `.ai-factory/specs/<plan-id>/` archive path. Подготовь commit/PR summary draft.`
 
 Во всех случаях полезно явно задавать scope: какой plan, какие файлы или какой changed range должен анализироваться.
 
 ## Что важно помнить
 
 - `aifhub-review-sidecar`, `aifhub-security-sidecar` и `aifhub-rules-sidecar` намеренно read-only; они не должны выполнять edits.
-- `aifhub-verifier` не должен писать code; даже при `sandbox_mode = "workspace-write"` его write scope ограничен verification artifacts.
-- `aifhub-fixer` не должен делать unrelated refactor и не должен переписывать plan artifacts вне `status.yaml` и `fixes/*.md`, если finding не указывает иначе.
+- `aifhub-verifier` не должен писать code; даже при `sandbox_mode = "workspace-write"` его write scope ограничен QA/verification artifacts.
+- `aifhub-fixer` не должен делать unrelated refactor и не должен переписывать canonical OpenSpec artifacts or legacy plan artifacts вне выбранного finding scope.
 - `aifhub-done-finalizer` не должен напрямую обходить owner boundaries для `.ai-factory/ROADMAP.md`, `.ai-factory/RULES.md` и `.ai-factory/ARCHITECTURE.md`; для этих файлов допустим только evidence-backed owner-safe update или exact handoff.
 - `aifhub-plan-polisher` и `aifhub-implement-worker` write-capable, но их write scope всё равно ограничен инструкциями конкретного агента.
 - Эта страница не вводит новый runtime behavior; она документирует уже опубликованные `agentFiles`, naming contract и expected sandbox policy.

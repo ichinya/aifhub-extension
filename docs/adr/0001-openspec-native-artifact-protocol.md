@@ -81,7 +81,7 @@ These paths are reserved names only in v1. Their detailed behavior is out of sco
 | `/aif-fix` | same as implement plus QA reports | none | `.ai-factory/state/<id>/*` | Fixes implementation, not specs unless explicitly requested |
 | `/aif-verify` | `openspec/*`, generated rules | none | `.ai-factory/qa/<id>/*` | Must not archive |
 | `/aif-rules-check` | `openspec/specs`, `openspec/changes/<id>/specs` | none | none | Reads generated rules as derived guidance; never regenerates them |
-| `/aif-done` | `openspec/changes/<id>/*`, QA state | `openspec/specs/*` via OpenSpec archive | final summary/state | Only finalizer may archive |
+| `/aif-done` | `openspec/changes/<id>/*`, QA state | none until #33 archive integration; future `openspec/specs/*` via OpenSpec archive | final summary/state | Only finalizer may drive archive policy |
 
 ## Generated rules policy
 
@@ -127,13 +127,13 @@ This ADR defines policy only; it does not implement migration.
 - OpenSpec CLI runner implementation
 - OpenSpec-native `/aif-plan`
 - migration implementation
-- full implement/fix/verify integration with generated rules
+- full runtime implementation for #31 implement/fix/verify state alignment
 - TOON/context/KB
 - AIFHub registry/evals
 - OpenSpec capability detection
 - bootstrap changes
 - active-change resolver
-- prompt, skill, or injection rewrites
+- concrete archive integration for #33 and migration behavior for #32 beyond prompt assets
 
 ## Consequences
 

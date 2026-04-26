@@ -14,7 +14,9 @@ Use the built-in `/aif-plan` skill as the canonical planning entrypoint for this
 
 ### OpenSpec-native mode
 
-When `.ai-factory/config.yaml` has `aifhub.artifactProtocol: openspec`, this block overrides legacy plan-folder behavior.
+When `.ai-factory/config.yaml` has `aifhub.artifactProtocol: openspec`, OpenSpec-native instructions override legacy plan-folder instructions.
+
+Use shared vocabulary consistently: `OpenSpec-native mode`, `canonical OpenSpec change`, `active change`, `change-id`, `base specs`, `delta specs`, `generated rules`, `runtime state`, `QA evidence`, and `legacy AI Factory-only mode`.
 
 Use canonical OpenSpec artifacts under `openspec/changes/<change-id>/`:
 
@@ -152,7 +154,7 @@ openspec validate <change-id> --type change --strict --json --no-interactive --n
 
 Report generated OpenSpec artifact paths and validation status in the normal planning response. Persist validation evidence only under `.ai-factory/state/<change-id>/` when a runtime file is needed.
 
-### Legacy AI Factory mode
+### Legacy AI Factory-only mode
 
 When OpenSpec-native mode is not enabled, preserve the existing legacy companion plan-folder contract.
 
@@ -171,15 +173,15 @@ The companion plan file may remain plain upstream markdown; the shared YAML fron
 ### Research Normalization
 
 - In OpenSpec-native mode, do not import research into `openspec/changes/<change-id>/` as runtime-only notes.
-- In legacy AI Factory mode, if `.ai-factory/RESEARCH.md` exists, normalize the active summary into plan-local `explore.md`.
+- In legacy AI Factory-only mode, if `.ai-factory/RESEARCH.md` exists, normalize the active summary into plan-local `explore.md`.
 - Keep `.ai-factory/RESEARCH.md` read-only.
-- In legacy AI Factory mode, record the imported source and timestamp in `status.yaml.history`.
+- In legacy AI Factory-only mode, record the imported source and timestamp in `status.yaml.history`.
 
 ### Plan Resolution and Migration
 
 - In OpenSpec-native mode, use OpenSpec change IDs and the shared active-change vocabulary.
-- In legacy AI Factory mode, when the active branch slug matches an existing plan folder without a companion `.md` plan file, generate the missing plan file before continuing.
-- In legacy AI Factory mode, record legacy upgrades in `status.yaml.history` with the source folder path and the generated companion plan file path.
+- In legacy AI Factory-only mode, when the active branch slug matches an existing plan folder without a companion `.md` plan file, generate the missing plan file before continuing.
+- In legacy AI Factory-only mode, record legacy upgrades in `status.yaml.history` with the source folder path and the generated companion plan file path.
 - User-facing guidance must present the mode-appropriate canonical artifacts, not a mixed OpenSpec/legacy shape.
 
 ### Handoff Rules

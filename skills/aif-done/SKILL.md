@@ -1,24 +1,83 @@
 ---
 name: aif-done
-description: Finalize a verified plan, archive artifacts to specs/, prepare commit/PR summaries, and drive evidence-backed follow-ups. Works after /aif-verify passes or when manually marking work as done.
-version: 1.1.0
+description: Finalize a verified OpenSpec-native change or legacy AI Factory-only plan, prepare commit/PR summaries, and drive evidence-backed follow-ups.
+version: 1.2.0
 author: ichi
 ---
 
 # AIF Done
 
-AIFHub/Handoff finalization skill. Archives a verified plan, drafts commit and PR summaries, drives evidence-backed governance follow-ups, and can run or recommend evolution follow-ups.
+AIFHub/Handoff finalization skill. Finalizes a verified OpenSpec-native change or a legacy AI Factory-only plan, drafts commit and PR summaries, drives evidence-backed governance follow-ups, and can run or recommend evolution follow-ups.
 
 This skill does not duplicate `/aif-verify` — it runs **after** a passing verification (PASS or PASS-with-notes).
 
-## Precondition
+Resolve mode from `.ai-factory/config.yaml`:
+
+- Use OpenSpec-native mode when `aifhub.artifactProtocol: openspec`.
+- Use Legacy AI Factory-only mode otherwise.
+
+## OpenSpec-native mode
+
+OpenSpec-native mode finalizes the verified change state without implementing archive integration from issue #33.
+
+### Preconditions
+
+- Resolve exactly one active change or explicit `<change-id>`.
+- Read QA evidence from `.ai-factory/qa/<change-id>/`.
+- Treat verification as passing only when QA evidence records `pass` or `pass-with-notes`.
+- If verification has not run or verdict is `fail`, stop and suggest `/aif-verify` or `/aif-fix`.
+
+### Canonical Context
+
+Read canonical OpenSpec artifacts:
+
+- `openspec/specs/**`
+- `openspec/changes/<change-id>/proposal.md`
+- `openspec/changes/<change-id>/design.md`
+- `openspec/changes/<change-id>/tasks.md`
+- `openspec/changes/<change-id>/specs/**/spec.md`
+
+Read generated rules as derived guidance when present:
+
+- `.ai-factory/rules/generated/openspec-merged-<change-id>.md`
+- `.ai-factory/rules/generated/openspec-change-<change-id>.md`
+- `.ai-factory/rules/generated/openspec-base.md`
+
+Runtime state and QA evidence live outside canonical changes:
+
+- `.ai-factory/state/<change-id>/`
+- `.ai-factory/qa/<change-id>/`
+
+### Archive Policy
+
+- Do not silently archive OpenSpec changes through legacy `.ai-factory/specs`.
+- Do not run `openspec archive <change-id> --yes` in this issue. Full archive integration belongs to issue #33 or later runtime integration.
+- If the user requests archive/finalization before #33 exists, report that archive integration is deferred and prepare commit/PR/governance outputs from verified evidence only.
+- Do not write runtime-only output into `openspec/changes/<change-id>/`.
+
+### OpenSpec-Native Output
+
+Normal output must report:
+
+- selected `change-id`;
+- precondition state and QA verdict;
+- canonical artifacts inspected;
+- generated rules state when relevant;
+- runtime state and QA evidence paths;
+- archive integration status: deferred to #33 unless a later runtime integration explicitly owns it.
+
+## Legacy AI Factory-only mode
+
+Legacy AI Factory-only mode preserves the verified plan finalization contract based on `.ai-factory/plans/<plan-id>/` and `.ai-factory/specs/<plan-id>/`.
+
+### Precondition
 
 - Active plan must have a passing verification state (`pass` or `pass-with-notes`).
 - If verification has not run or verdict is `fail`, this skill stops and suggests running `/aif-verify` first.
 
-## Workflow
+### Workflow
 
-### Step 1: Validate Precondition
+#### Step 1: Validate Precondition
 
 1. Resolve the active plan (same resolution logic as `/aif-implement`).
 2. Read `status.yaml` and check `verification.verdict`.
@@ -29,7 +88,7 @@ This skill does not duplicate `/aif-verify` — it runs **after** a passing veri
      - Stop and ask the user to confirm or clean up.
      - Only plan-related changes (files touched by the plan's implementation) are acceptable without confirmation.
 
-### Step 2: Archive Plan
+#### Step 2: Archive Plan
 
 1. Resolve archive path: `.ai-factory/specs/<plan-id>/`.
 2. **Idempotency check:** If `.ai-factory/specs/<plan-id>/` already exists:
@@ -43,13 +102,13 @@ This skill does not duplicate `/aif-verify` — it runs **after** a passing veri
 4. Create or update `spec.md` summarizing what was implemented, if part of the current contract.
 5. Update `.ai-factory/specs/index.yaml` with the new entry.
 
-### Step 3: Prepare Commit Message
+#### Step 3: Prepare Commit Message
 
 1. Analyze all changes made under this plan.
 2. Draft a conventional commit message summarizing the implementation.
 3. Present the draft to the user for review.
 
-### Step 4: Prepare PR Summary (if applicable)
+#### Step 4: Prepare PR Summary (if applicable)
 
 1. Check if a feature branch exists (branch != main/master).
 2. If `gh` CLI is available:
@@ -58,7 +117,7 @@ This skill does not duplicate `/aif-verify` — it runs **after** a passing veri
 3. If `gh` is not available:
    - Output manual PR instructions with the drafted title and body.
 
-### Step 5: Apply Evidence-Driven Follow-ups
+#### Step 5: Apply Evidence-Driven Follow-ups
 
 1. Check plan for evidence of:
    - roadmap milestone completion or maturity movement;
@@ -73,7 +132,7 @@ This skill does not duplicate `/aif-verify` — it runs **after** a passing veri
 4. Run `/aif-evolve` when the user explicitly asked for integrated finalization and the runtime can chain the action; otherwise propose it as the next step.
 5. Never invent governance changes that are not supported by plan evidence.
 
-### Step 6: Mark Plan Done
+#### Step 6: Mark Plan Done
 
 1. Update `status.yaml`:
    - Set `status: done`.
@@ -89,6 +148,9 @@ This skill does not duplicate `/aif-verify` — it runs **after** a passing veri
 
 | Artifact | Owner | This Skill |
 |----------|-------|------------|
+| `openspec/changes/<change-id>/` | OpenSpec-native workflow | Reads only until #33 archive integration exists |
+| `.ai-factory/qa/<change-id>/` | `/aif-verify` | Reads precondition and QA evidence |
+| `.ai-factory/state/<change-id>/` | OpenSpec-native runtime | Reads finalization context when present |
 | `.ai-factory/specs/<plan-id>/` | **aif-done** | Creates or refreshes on finalization |
 | `.ai-factory/specs/index.yaml` | **aif-done** | Updates |
 | `.ai-factory/plans/<plan-id>/status.yaml` | **aif-done** | Updates `status: done` |
@@ -100,6 +162,7 @@ This skill does not duplicate `/aif-verify` — it runs **after** a passing veri
 ## Rules
 
 - Never finalize a plan that has not passed verification.
+- In OpenSpec-native mode, never silently archive through legacy `.ai-factory/specs`; report archive integration as deferred to #33.
 - Never invent governance changes without evidence from the verified plan.
 - When governance updates belong to another owner, use the owning path or return an exact handoff instead of silently skipping the change.
 - Never auto-create a PR — always present drafts for user approval.

@@ -2,21 +2,48 @@
 
 ## Required Inputs
 
-- `.ai-factory/config.yaml` to resolve the active plan and rules paths
-- `.ai-factory/RULES.md` if present
-- `.ai-factory/rules/base.md`
-- active plan-local `rules.md` if present
+- `.ai-factory/config.yaml` to resolve the artifact protocol, active change or active plan, and rules paths
 - current diff and changed files
+- OpenSpec-native generated rules when `aifhub.artifactProtocol: openspec`
+- `.ai-factory/RULES.md` if present
+- `.ai-factory/rules/base.md` if present
+- active plan-local `rules.md` only in Legacy AI Factory-only mode
 
-## Rules Hierarchy
+## OpenSpec-native mode
 
-The rules gate checks compliance against a three-level hierarchy:
+OpenSpec-native mode reads canonical OpenSpec artifacts as context:
+
+- `openspec/specs/**`
+- `openspec/changes/<change-id>/proposal.md`
+- `openspec/changes/<change-id>/design.md`
+- `openspec/changes/<change-id>/tasks.md`
+- `openspec/changes/<change-id>/specs/**/spec.md`
+
+Rules are loaded in this exact priority order:
 
 ```text
-1. .ai-factory/plans/<id>/rules.md - plan-local rules (highest priority when active)
-2. .ai-factory/RULES.md            - project-level rules
-3. .ai-factory/rules/base.md       - base rules from aif-analyze
+1. .ai-factory/rules/generated/openspec-merged-<change-id>.md
+2. .ai-factory/rules/generated/openspec-change-<change-id>.md
+3. .ai-factory/rules/generated/openspec-base.md
+4. .ai-factory/RULES.md
+5. .ai-factory/rules/base.md
 ```
+
+OpenSpec-native mode does not require plan-local `rules.md`. If generated rules are missing or stale, return `WARN`, report whether generated rules were present, missing, or stale, and ask the caller to regenerate through the compiler-owning workflow. This gate must not regenerate or edit generated rules.
+
+Do not write runtime state or QA evidence. If output needs to name related evidence locations, use `.ai-factory/state/<change-id>/` and `.ai-factory/qa/<change-id>/` only as external runtime state and QA evidence paths.
+
+## Legacy AI Factory-only mode
+
+The legacy gate checks compliance against a three-level hierarchy:
+
+```text
+1. .ai-factory/plans/<plan-id>/rules.md - plan-local rules (highest priority when active)
+2. .ai-factory/RULES.md                 - project-level rules
+3. .ai-factory/rules/base.md            - base rules from aif-analyze
+```
+
+Legacy AI Factory-only mode may read the active plan pair and plan-local `rules.md`. It remains read-only.
 
 ## Finding Categories
 
@@ -71,7 +98,7 @@ The gate operates on:
 
 - changed files detected via `git diff` (staged + unstaged)
 - current diff content needed to confirm rule compliance
-- active plan scope (if a plan is in progress)
+- active OpenSpec change scope, Legacy AI Factory-only active plan scope, or both when explicitly provided
 - explicitly passed file paths (if provided by user)
 
 The gate does not scan the entire codebase - only the changed scope.

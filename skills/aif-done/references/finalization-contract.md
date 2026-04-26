@@ -1,6 +1,49 @@
 # Finalization Contract
 
-Reference for the `aif-done` skill and `aifhub-done-finalizer` Codex agent.
+Reference for the `aif-done` skill and `aifhub-done-finalizer` agents.
+
+## OpenSpec-native mode
+
+### Entry Conditions
+
+- `.ai-factory/config.yaml` has `aifhub.artifactProtocol: openspec`.
+- Exactly one active change or explicit `<change-id>` is selected.
+- QA evidence exists under `.ai-factory/qa/<change-id>/`.
+- Verification verdict in QA evidence is `pass` or `pass-with-notes`.
+- No uncommitted changes outside the selected change scope unless the user confirms.
+
+### Canonical Context
+
+Read:
+
+```text
+openspec/specs/**
+openspec/changes/<change-id>/proposal.md
+openspec/changes/<change-id>/design.md
+openspec/changes/<change-id>/tasks.md
+openspec/changes/<change-id>/specs/**/spec.md
+.ai-factory/rules/generated/openspec-merged-<change-id>.md
+.ai-factory/rules/generated/openspec-change-<change-id>.md
+.ai-factory/rules/generated/openspec-base.md
+.ai-factory/state/<change-id>/
+.ai-factory/qa/<change-id>/
+```
+
+### Archive Policy
+
+Do not archive OpenSpec changes through legacy `.ai-factory/specs`. Full archival through:
+
+```bash
+openspec archive <change-id> --yes
+```
+
+is deferred to issue #33 or later runtime integration. Until then, finalization prepares commit/PR/governance outputs from verified QA evidence and reports archive integration as deferred.
+
+### Output
+
+Report selected `change-id`, precondition state, QA evidence path, canonical artifacts inspected, generated rules state, runtime state path, and archive integration status.
+
+## Legacy AI Factory-only mode
 
 ## Entry Conditions
 

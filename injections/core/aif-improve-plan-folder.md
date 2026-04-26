@@ -27,6 +27,8 @@ Before resolving a target, read `.ai-factory/config.yaml` when it exists.
 
 When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, `/aif-improve` refines an existing OpenSpec-native change.
 
+Use shared vocabulary consistently: `OpenSpec-native mode`, `canonical OpenSpec change`, `active change`, `change-id`, `base specs`, `delta specs`, `generated rules`, `runtime state`, `QA evidence`, and `legacy AI Factory-only mode`.
+
 Resolve the active change using the shared vocabulary from `scripts/active-change-resolver.mjs`:
 
 - Prefer an explicit `<change-id>` or `@openspec/changes/<change-id>` input when provided.
@@ -34,7 +36,7 @@ Resolve the active change using the shared vocabulary from `scripts/active-chang
 - Treat the selected change ID, selected source, candidate list, warnings, and errors as user-visible refinement context.
 - If the resolved path is under `openspec/changes/archive/**`, do not edit silently. Archived changes are immutable by default; report the archived target clearly and suggest creating a new change for further work.
 
-Refine only these canonical OpenSpec artifacts:
+Refine only these canonical OpenSpec artifacts for the active change:
 
 - `openspec/changes/<change-id>/proposal.md`
 - `openspec/changes/<change-id>/design.md`
@@ -54,11 +56,13 @@ Preservation rules:
 
 Validation and runtime state:
 
+- Read base specs from `openspec/specs/**` and generated rules from `.ai-factory/rules/generated/` when they are needed to preserve canonical requirement intent.
 - Run or recommend OpenSpec validation through `validateOpenSpecChange(changeId)` from `scripts/openspec-runner.mjs`, or equivalent shared-runner behavior.
 - Validation should correspond to `openspec validate <change-id> --type change --strict --json --no-interactive --no-color`.
 - Missing or unsupported OpenSpec CLI is degraded validation, not a refinement failure.
 - Summarize validation success, failure, or degraded status in the normal response.
-- Runtime notes may be written only under `.ai-factory/state/<change-id>/`.
+- Runtime state notes may be written only under `.ai-factory/state/<change-id>/`.
+- QA evidence belongs under `.ai-factory/qa/<change-id>/` and should not be written into canonical OpenSpec change artifacts.
 - Prefer `ensureRuntimeLayout(changeId)` when runtime directories are needed.
 - Valid persisted runtime evidence includes `.ai-factory/state/<change-id>/improve-summary.md` and `.ai-factory/state/<change-id>/last-validation.json`.
 - Do not write runtime-only files or validation evidence under `openspec/changes/<change-id>/`.

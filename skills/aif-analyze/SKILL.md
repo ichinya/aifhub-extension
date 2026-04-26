@@ -242,6 +242,7 @@ openspec init --tools none
 - Report whether config values were created or preserved.
 - Report the active path set.
 - In `openspec-native` mode, include the OpenSpec capability object, degraded reason when present, created/preserved skeleton directories, and the statement that OpenSpec skill installation was skipped by design.
+- In `openspec-native` mode, explicitly report whether `.ai-factory/state`, `.ai-factory/qa`, and `.ai-factory/rules/generated` were created or preserved.
 - Report what was invoked automatically versus what remains as manual next command.
 - If DESCRIPTION is missing, first recommended command must be `/aif`.
 - После bootstrap описывай текущий public workflow как начинающийся с `/aif-explore` или `/aif-plan full`, а не с `/aif-new`.
@@ -304,6 +305,7 @@ agent_profile: default
 - In OpenSpec-native mode, use `detectOpenSpec()` from `scripts/openspec-runner.mjs` when available and treat missing or unsupported CLI as degraded capability, not failure.
 - In OpenSpec-native mode, use or recommend `openspec init --tools none` only for compatible CLI environments.
 - Never install OpenSpec skills, slash commands, dependencies, or manifest entries.
+- Never treat missing OpenSpec validate/archive capability as bootstrap failure; report it as degraded OpenSpec capability and continue with the configured runtime/generated path layout.
 - Never generate DESCRIPTION directly in this skill.
 - If DESCRIPTION is missing, suggest `/aif` first.
 - Follow workflow flags to suggest or initiate `/aif-architecture` and `/aif-roadmap`.

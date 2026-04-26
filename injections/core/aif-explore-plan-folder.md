@@ -18,6 +18,8 @@ Before resolving exploration inputs, read `.ai-factory/config.yaml` when it exis
 
 When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, `/aif-explore` is research-oriented and must not create canonical OpenSpec change artifacts.
 
+Use shared vocabulary consistently: `OpenSpec-native mode`, `canonical OpenSpec change`, `active change`, `change-id`, `base specs`, `delta specs`, `generated rules`, `runtime state`, `QA evidence`, and `legacy AI Factory-only mode`.
+
 Allowed read context:
 
 - `.ai-factory/config.yaml`
@@ -47,6 +49,8 @@ Response and next-step guidance:
 
 - Report where research was written in the normal response.
 - Distinguish research output from canonical OpenSpec artifacts.
+- Report the selected active change and runtime state path when change-scoped research was used.
+- If generated rules or QA evidence were inspected, name those paths in the normal response.
 - Suggest `/aif-plan full "<request>"` for new work that needs canonical change artifacts.
 - Suggest `/aif-improve <change-id>` for refining an existing OpenSpec-native change.
 - Suggest `/aif-implement <change-id>` only after an OpenSpec-native plan is ready for execution.
