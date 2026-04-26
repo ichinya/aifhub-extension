@@ -44,12 +44,16 @@ These skills must not depend on bridge files.
 `aif-rules-check` must use:
 
 - `.ai-factory/config.yaml`
+- in OpenSpec-native mode, generated rules in priority order:
+  - `.ai-factory/rules/generated/openspec-merged-<change-id>.md`
+  - `.ai-factory/rules/generated/openspec-change-<change-id>.md`
+  - `.ai-factory/rules/generated/openspec-base.md`
 - `.ai-factory/RULES.md` if present
 - `.ai-factory/rules/base.md`
-- active plan-local `rules.md` if present
+- active plan-local `rules.md` only in legacy AI Factory-only mode
 - current changed scope from `git diff` / changed files
 
-When plan-local `rules.md` exists, it overrides project-level and base rules for the scoped gate result.
+OpenSpec-native `aif-rules-check` does not require plan-local `rules.md`. If generated rules are missing or stale, the gate reports `WARN` and asks the caller to regenerate rules; it does not edit or regenerate files. In legacy AI Factory-only mode, plan-local `rules.md` overrides project-level and base rules for the scoped gate result.
 
 ## Required Consumer Context Set
 
@@ -71,6 +75,9 @@ In OpenSpec-native mode:
 - `openspec/changes/<change-id>/design.md`
 - `openspec/changes/<change-id>/tasks.md`
 - `openspec/changes/<change-id>/specs/**/spec.md`
+- `.ai-factory/rules/generated/openspec-base.md`
+- `.ai-factory/rules/generated/openspec-change-<change-id>.md`
+- `.ai-factory/rules/generated/openspec-merged-<change-id>.md`
 - `.ai-factory/state/<change-id>/` for runtime state
 - `.ai-factory/qa/<change-id>/` for QA output
 
@@ -153,6 +160,7 @@ If `config.yaml` is missing or incomplete for the requested operation:
 - `RULES.md` owner: `/aif-rules`
 - `rules/base.md` owner: extension `aif-analyze`
 - `aif-rules-check` owner: extension; reads rules but never writes
+- `.ai-factory/rules/generated/*.md` owner: OpenSpec generated rules compiler; derived from `openspec/specs/**/spec.md` and `openspec/changes/<change-id>/specs/**/spec.md`, safe to delete and regenerate
 - `openspec/changes/<change-id>/proposal.md`, `design.md`, `tasks.md`, and `specs/**/spec.md` owner in OpenSpec-native mode: built-in `/aif-plan` with extension injection rules
 - OpenSpec-native refinement owner: built-in `/aif-improve` with extension injection rules; it preserves user edits and updates only canonical OpenSpec artifacts
 - `.ai-factory/plans/<plan-id>.md` owner in legacy AI Factory-only mode: built-in `/aif-plan` with extension injection rules
