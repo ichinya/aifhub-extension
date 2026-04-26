@@ -20,7 +20,7 @@ Responsibilities:
 - support migration and bootstrap compatibility
 - support explicit OpenSpec-native bootstrap when requested or when config already has `aifhub.artifactProtocol: openspec`
 
-In OpenSpec-native bootstrap mode, `aif-analyze` may set `paths.plans` to `openspec/changes`, `paths.specs` to `openspec/specs`, and runtime/generated paths to `.ai-factory/state`, `.ai-factory/qa`, and `.ai-factory/rules/generated`. This changes where consumers resolve canonical plan/change and spec artifacts, but it does not install OpenSpec skills or make later OpenSpec-native workflow stages complete.
+In OpenSpec-native bootstrap mode, `aif-analyze` may set `paths.plans` to `openspec/changes`, `paths.specs` to `openspec/specs`, and runtime/generated paths to `.ai-factory/state`, `.ai-factory/qa`, and `.ai-factory/rules/generated`. This changes where consumers resolve canonical plan/change and spec artifacts, but it does not install OpenSpec skills.
 
 Bootstrap lookup order follows `aif-analyze`: `.ai-factory/config.yaml`, then `AGENTS.md`, then `CLAUDE.md`, then `.ai-factory/RULES.md`. Legacy bridge files (`AGENTS.md`, `CLAUDE.md`) могут читаться только как migration inputs, если уже существуют, но extension не создаёт новые bridge files. Каноническими bootstrap-результатами остаются `.ai-factory/config.yaml` и `.ai-factory/rules/base.md`.
 
@@ -65,6 +65,17 @@ Optional area rules are loaded via `config.rules.*` when present.
 
 Plan-aware consumer skills additionally use:
 
+In OpenSpec-native mode:
+
+- `openspec/changes/<change-id>/proposal.md`
+- `openspec/changes/<change-id>/design.md`
+- `openspec/changes/<change-id>/tasks.md`
+- `openspec/changes/<change-id>/specs/**/spec.md`
+- `.ai-factory/state/<change-id>/` for runtime state
+- `.ai-factory/qa/<change-id>/` for QA output
+
+In legacy AI Factory-only mode:
+
 - `config.paths.plans/<plan-id>.md`
 - `config.paths.plans/<plan-id>/task.md`
 - `config.paths.plans/<plan-id>/context.md`
@@ -76,7 +87,8 @@ Plan-aware consumer skills additionally use:
 Special ownership case:
 
 - `aif-explore` may read `config.paths.research` and is the only consumer skill allowed to write it
-- `aif-plan` may read the same research artifact and normalize it into plan-local `explore.md`
+- `aif-plan` may read the same research artifact and normalize it into plan-local `explore.md` in legacy AI Factory-only mode
+- OpenSpec-native planning must keep runtime-only notes under `.ai-factory/state/<change-id>/`, not under `openspec/changes/<change-id>/`
 - no consumer skill may use bridge files as a substitute for these runtime paths
 
 ## Artifact Metadata Contract
@@ -138,8 +150,9 @@ If `config.yaml` is missing or incomplete for the requested operation:
 - `RULES.md` owner: `/aif-rules`
 - `rules/base.md` owner: extension `aif-analyze`
 - `aif-rules-check` owner: extension; reads rules but never writes
-- `.ai-factory/plans/<plan-id>.md` owner: built-in `/aif-plan` with extension injection rules
-- `.ai-factory/plans/<plan-id>/status.yaml` owner: `/aif-implement`, `/aif-verify`, `/aif-fix`
+- `openspec/changes/<change-id>/proposal.md`, `design.md`, `tasks.md`, and `specs/**/spec.md` owner in OpenSpec-native mode: built-in `/aif-plan` with extension injection rules
+- `.ai-factory/plans/<plan-id>.md` owner in legacy AI Factory-only mode: built-in `/aif-plan` with extension injection rules
+- `.ai-factory/plans/<plan-id>/status.yaml` owner in legacy AI Factory-only mode: `/aif-implement`, `/aif-verify`, `/aif-fix`
 - `rules/*.md` owner: `/aif-plan` when the active plan explicitly adds area-specific rules
 
 ## See Also
