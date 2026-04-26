@@ -50,6 +50,9 @@ Generated AI Factory artifacts:
 
 ```text
 .ai-factory/rules/generated/
+  openspec-base.md
+  openspec-change-<change-id>.md
+  openspec-merged-<change-id>.md
 ```
 
 Generated rules are derived from OpenSpec specs and change specs. They are not canonical requirements and must be recoverable from canonical OpenSpec artifacts.
@@ -77,7 +80,7 @@ These paths are reserved names only in v1. Their detailed behavior is out of sco
 | `/aif-implement` | `openspec/specs`, `openspec/changes/<id>/*`, generated rules | none | `.ai-factory/state/<id>/*` | Execution state is runtime-only |
 | `/aif-fix` | same as implement plus QA reports | none | `.ai-factory/state/<id>/*` | Fixes implementation, not specs unless explicitly requested |
 | `/aif-verify` | `openspec/*`, generated rules | none | `.ai-factory/qa/<id>/*` | Must not archive |
-| `/aif-rules-check` | `openspec/specs`, `openspec/changes/<id>/specs` | none | reports and/or `.ai-factory/rules/generated/*` | Generated rules are derived |
+| `/aif-rules-check` | `openspec/specs`, `openspec/changes/<id>/specs` | none | none | Reads generated rules as derived guidance; never regenerates them |
 | `/aif-done` | `openspec/changes/<id>/*`, QA state | `openspec/specs/*` via OpenSpec archive | final summary/state | Only finalizer may archive |
 
 ## Generated rules policy
@@ -92,6 +95,16 @@ openspec/changes/<change-id>/specs/
 ```
 
 Generated rule output may guide implementation and review, but conflict resolution must defer to canonical OpenSpec artifacts.
+
+The compiler writes exactly these derived files:
+
+```text
+.ai-factory/rules/generated/openspec-base.md
+.ai-factory/rules/generated/openspec-change-<change-id>.md
+.ai-factory/rules/generated/openspec-merged-<change-id>.md
+```
+
+OpenSpec-native consumer and gate skills should read these files as execution guidance when present. Read-only gates such as `aif-rules-check` report missing or stale generated rules and ask the caller to regenerate them through the compiler-owning workflow; they do not write generated files themselves.
 
 ## OpenSpec CLI policy
 
@@ -114,7 +127,7 @@ This ADR defines policy only; it does not implement migration.
 - OpenSpec CLI runner implementation
 - OpenSpec-native `/aif-plan`
 - migration implementation
-- generated rules compiler implementation
+- full implement/fix/verify integration with generated rules
 - TOON/context/KB
 - AIFHub registry/evals
 - OpenSpec capability detection
@@ -136,5 +149,5 @@ Tradeoffs:
 
 - Commands must distinguish canonical writes from runtime writes.
 - Legacy `.ai-factory/plans` consumers need migration or compatibility logic later.
-- Generated rules need a compiler in a later issue before they can be relied on operationally.
+- Generated rules are operational only when the derived files are present and fresh; consumer migrations still need to preserve canonical OpenSpec precedence.
 - OpenSpec validate/archive remains unavailable until a compatible external CLI is present.
