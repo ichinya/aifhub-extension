@@ -267,6 +267,36 @@ The system MUST add beta behavior.
     assert.equal(await pathExists(path.join(rootDir, '.ai-factory', 'rules', 'generated')), false);
   });
 
+  it('rejects duplicate generated output filenames before writing files', async () => {
+    const { writeGeneratedRules } = await loadCompiler();
+    const rootDir = await createTempRoot();
+
+    const result = await writeGeneratedRules('duplicate-files', {
+      files: [
+        {
+          kind: 'base',
+          fileName: 'openspec-base.md',
+          content: 'base one\n'
+        },
+        {
+          kind: 'base',
+          fileName: 'openspec-base.md',
+          content: 'base two\n'
+        },
+        {
+          kind: 'change',
+          fileName: 'openspec-change-duplicate-files.md',
+          content: 'change\n'
+        }
+      ]
+    }, { rootDir });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.files.length, 0);
+    assert.equal(result.errors[0].code, 'invalid-rendered-files');
+    assert.equal(await pathExists(path.join(rootDir, '.ai-factory', 'rules', 'generated')), false);
+  });
+
   it('resolves the active change when no change id is provided', async () => {
     const { compileOpenSpecRules } = await loadCompiler();
     const rootDir = await createTempRoot();

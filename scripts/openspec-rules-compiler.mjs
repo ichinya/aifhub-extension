@@ -221,9 +221,15 @@ export async function writeGeneratedRules(changeId, rendered, options = {}) {
     `openspec-change-${normalized.changeId}.md`,
     `openspec-merged-${normalized.changeId}.md`
   ]);
+  const renderedNames = renderedFiles.map((file) => file.fileName);
+  const renderedNameSet = new Set(renderedNames);
   const files = [];
 
-  if (renderedFiles.length !== 3 || renderedFiles.some((file) => !expectedNames.has(file.fileName))) {
+  if (
+    renderedFiles.length !== expectedNames.size
+    || renderedNameSet.size !== expectedNames.size
+    || renderedNames.some((fileName) => !expectedNames.has(fileName))
+  ) {
     return createWriteResult({
       ok: false,
       errors: [
