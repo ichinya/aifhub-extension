@@ -8,9 +8,9 @@
 |-------|------|---------|
 | `/aif-analyze` | Extension skill | Bootstrap `.ai-factory/config.yaml` and `rules/base.md`; explicit OpenSpec-native config is supported |
 | `/aif-rules-check` | Extension skill (temporary gate) | Read-only rule compliance check against rules hierarchy |
-| `/aif-explore` | Built-in + injection | Explore ideas and persist only `.ai-factory/RESEARCH.md` |
+| `/aif-explore` | Built-in + injection | Explore ideas; in OpenSpec-native mode, keep research/runtime notes outside canonical change folders |
 | `/aif-plan` | Built-in + injection | Create mode-gated full plans: OpenSpec changes in OpenSpec-native mode, companion plan folders in legacy AI Factory mode |
-| `/aif-improve` | Built-in + injection | Refine both plan layers together before execution |
+| `/aif-improve` | Built-in + injection | Refine OpenSpec-native artifacts with preservation, or both legacy plan layers together before execution |
 | `/aif-implement` | Built-in + injection | Execute tasks and own git plus execution metadata |
 | `/aif-verify` | Built-in + injection | Verify findings and update `verify.md` plus `status.yaml`; optional archival/finalizer work lives in `/aif-done` |
 | `/aif-fix` | Built-in + injection | Apply fixes for verification findings |
@@ -152,15 +152,18 @@ The extension does not install OpenSpec skills or slash commands.
 
 ```bash
 /aif-explore "add OAuth authentication"
+/aif-explore <change-id>
 /aif-explore <plan-id>
 /aif-explore @.ai-factory/plans/<plan-id>.md
 ```
 
 Explore behavior:
 - reads `.ai-factory/config.yaml` first
-- resolves either the companion plan file or the plan folder to one active pair
-- writes only `.ai-factory/RESEARCH.md`
-- routes new work to `/aif-plan full`
+- in OpenSpec-native mode, stays research-oriented and may read `openspec/specs/**` plus `openspec/changes/<change-id>/**`
+- in OpenSpec-native mode, writes research/runtime output only to `.ai-factory/RESEARCH.md` or `.ai-factory/state/<change-id>/`
+- does not create non-OpenSpec files inside `openspec/changes/<change-id>/`
+- in legacy AI Factory-only mode, resolves either the companion plan file or the plan folder to one active pair and writes only `.ai-factory/RESEARCH.md`
+- routes new work to `/aif-plan full`; route existing OpenSpec-native changes to `/aif-improve <change-id>`
 
 ### 3. Create a full plan
 
@@ -192,14 +195,20 @@ If active research exists, `/aif-plan` normalizes it into plan-local `explore.md
 
 ```bash
 /aif-improve
+/aif-improve <change-id>
+/aif-improve @openspec/changes/<change-id>/
 /aif-improve @.ai-factory/plans/<plan-id>/
 /aif-improve @.ai-factory/plans/<plan-id>.md
 ```
 
 Improve behavior:
-- resolves the plan file, the plan folder, or any plan-local artifact path
-- updates the plan summary plus plan-folder artifacts together
-- auto-generates a missing companion plan file for legacy folder-only plans
+- in OpenSpec-native mode, resolves the active change with `scripts/active-change-resolver.mjs`
+- refines only `proposal.md`, `design.md`, `tasks.md`, and `specs/**/spec.md`
+- preserves user edits, prefers patch-style changes, and returns `Changed:` / `Preserved:` summary sections
+- warns or refuses archived targets under `openspec/changes/archive/**` because archived changes are immutable by default
+- validates through `scripts/openspec-runner.mjs` when a compatible CLI is available; missing or unsupported CLI is degraded validation
+- in legacy AI Factory-only mode, resolves the plan file, the plan folder, or any plan-local artifact path
+- updates the legacy plan summary plus plan-folder artifacts together and auto-generates a missing companion plan file for legacy folder-only plans
 
 ### 5. Implement
 

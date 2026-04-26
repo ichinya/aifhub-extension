@@ -88,7 +88,10 @@ Special ownership case:
 
 - `aif-explore` may read `config.paths.research` and is the only consumer skill allowed to write it
 - `aif-plan` may read the same research artifact and normalize it into plan-local `explore.md` in legacy AI Factory-only mode
+- In OpenSpec-native mode, `aif-explore` may write research and runtime notes outside canonical change folders only: `.ai-factory/RESEARCH.md`, `.ai-factory/state/<change-id>/explore.md`, and `.ai-factory/state/<change-id>/research-notes.md`
+- In OpenSpec-native mode, `aif-improve` edits only valid OpenSpec change artifacts: `proposal.md`, `design.md`, `tasks.md`, and `specs/**/spec.md`
 - OpenSpec-native planning must keep runtime-only notes under `.ai-factory/state/<change-id>/`, not under `openspec/changes/<change-id>/`
+- Legacy `task.md`, `context.md`, `rules.md`, `verify.md`, `status.yaml`, and `explore.md` apply only to legacy AI Factory-only plan folders, not OpenSpec-native changes
 - no consumer skill may use bridge files as a substitute for these runtime paths
 
 ## Artifact Metadata Contract
@@ -151,6 +154,7 @@ If `config.yaml` is missing or incomplete for the requested operation:
 - `rules/base.md` owner: extension `aif-analyze`
 - `aif-rules-check` owner: extension; reads rules but never writes
 - `openspec/changes/<change-id>/proposal.md`, `design.md`, `tasks.md`, and `specs/**/spec.md` owner in OpenSpec-native mode: built-in `/aif-plan` with extension injection rules
+- OpenSpec-native refinement owner: built-in `/aif-improve` with extension injection rules; it preserves user edits and updates only canonical OpenSpec artifacts
 - `.ai-factory/plans/<plan-id>.md` owner in legacy AI Factory-only mode: built-in `/aif-plan` with extension injection rules
 - `.ai-factory/plans/<plan-id>/status.yaml` owner in legacy AI Factory-only mode: `/aif-implement`, `/aif-verify`, `/aif-fix`
 - `rules/*.md` owner: `/aif-plan` when the active plan explicitly adds area-specific rules
