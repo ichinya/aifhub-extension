@@ -186,7 +186,8 @@ export async function buildDoneContext(options = {}) {
   });
   const verification = await assertVerificationPassed(resolverResult.changeId, {
     ...options,
-    rootDir
+    rootDir,
+    qaPath: layout.qaPath
   });
   const runtimeTraces = await collectRuntimeTraces(rootDir, layout.statePath);
   const openspec = await detectOpenSpecCapability(options, rootDir);

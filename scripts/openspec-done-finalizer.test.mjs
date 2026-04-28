@@ -211,6 +211,43 @@ describe('OpenSpec done finalizer API', () => {
     ]);
   });
 
+  it('builds context using the configured QA evidence path', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'paths:',
+      '  qa: custom-qa',
+      '  state: custom-state',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'custom-qa/add-oauth/openspec-validation.json', JSON.stringify({
+      changeId: 'add-oauth',
+      ok: true,
+      skipped: false,
+      error: null
+    }, null, 2));
+    await writeFixture(rootDir, 'custom-qa/add-oauth/verify.md', [
+      '# Verify: add-oauth',
+      '',
+      '## AIF Verify Gate',
+      '',
+      'Verdict: PASS',
+      'Code verification: PASS',
+      ''
+    ].join('\n'));
+
+    const context = await buildDoneContext({
+      rootDir,
+      changeId: 'add-oauth',
+      detectOpenSpec: async () => availableCliDetection()
+    });
+
+    assert.equal(context.ok, true);
+    assert.equal(context.verification.passed, true);
+    assert.match(context.paths.qa, /custom-qa[\\/]add-oauth$/);
+    assert.equal(context.verification.verify.path, 'custom-qa/add-oauth/verify.md');
+  });
+
   it('refuses missing, failed, and pending verification evidence', async () => {
     const missing = await assertVerificationPassed('add-oauth', {
       readLatestVerificationEvidence: async () => ({
