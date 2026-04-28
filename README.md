@@ -23,7 +23,7 @@ OpenSpec is an optional CLI adapter for the v1 OpenSpec-native artifact protocol
 | OpenSpec CLI runtime | Node `>=20.19.0` |
 | OpenSpec skills/commands | Not installed by this extension |
 
-When the OpenSpec CLI is unavailable, the extension remains usable. OpenSpec validation/archive capabilities are disabled until a compatible `openspec` CLI is available, but OpenSpec-native planning can still generate structurally correct artifacts with degraded validation.
+When the OpenSpec CLI is unavailable, the extension remains usable. OpenSpec validation/archive capabilities are disabled until a compatible `openspec` CLI is available, but OpenSpec-native planning can still generate structurally correct artifacts with degraded validation. `/aif-done` fails archive-required OpenSpec-native finalization when the CLI is missing.
 
 AI Factory-only mode follows the Node/runtime support of AI Factory and upstream. OpenSpec-native validation/archive requires Node `>=20.19.0` because that is the OpenSpec CLI runtime requirement.
 
@@ -37,7 +37,7 @@ OpenSpec can be initialized without tool integrations using `openspec init --too
 
 `/aif-improve` refines existing OpenSpec-native artifacts in place: `proposal.md`, `design.md`, `tasks.md`, and `specs/**/spec.md`. It preserves user edits with patch-style changes, returns changed/preserved summary sections, warns or refuses archived changes, and keeps legacy plan-folder refinement as AI Factory-only behavior.
 
-Prompt assets for `/aif-implement`, `/aif-fix`, `/aif-verify`, `/aif-done`, `/aif-rules-check`, and bundled runtime agents are mode-gated. In OpenSpec-native mode they read canonical OpenSpec artifacts and write runtime/QA/finalizer state outside `openspec/changes`; in legacy AI Factory-only mode they keep using `.ai-factory/plans` plan-folder artifacts.
+Prompt assets for `/aif-implement`, `/aif-fix`, `/aif-verify`, `/aif-done`, `/aif-rules-check`, and bundled runtime agents are mode-gated. In OpenSpec-native mode they read canonical OpenSpec artifacts and write runtime/QA/finalizer state outside `openspec/changes`; in legacy AI Factory-only mode they keep using `.ai-factory/plans` plan-folder artifacts. `/aif-done` is the OpenSpec-native finalizer: it requires passing `/aif-verify` evidence, archives through `openspec archive <change-id> --yes` via the shared OpenSpec runner, supports `--skip-specs`, writes final evidence under `.ai-factory/qa/<change-id>/`, and writes final summaries under `.ai-factory/state/<change-id>/`.
 
 See [OpenSpec Compatibility](docs/openspec-compatibility.md) for install/upgrade notes and the capability flags planned for runtime detection.
 
@@ -73,7 +73,7 @@ If verification finds issues:
 Optional explicit AIFHub finalizer after passing verification:
 
 ```bash
-/aif-done                     # archive, commit/PR drafts, evidence-driven follow-ups
+/aif-done                     # OpenSpec CLI archive, commit/PR drafts, evidence-driven follow-ups
 ```
 
 `/aif-analyze` здесь выступает отдельным bootstrap/setup step. Canonical public workflow начинается после него.
@@ -81,7 +81,7 @@ Optional explicit AIFHub finalizer after passing verification:
 ## What This Extension Adds
 
 - `aif-analyze` remains extension-owned and bootstraps `.ai-factory/config.yaml` plus `rules/base.md`; it can also prepare explicit OpenSpec-native config without installing OpenSpec skills.
-- `aif-done` is an explicit extension-owned AIFHub/Handoff finalizer that archives verified legacy plans or follows OpenSpec-native archive policy, drafts commit/PR summaries, and drives evidence-backed governance and evolution follow-ups.
+- `aif-done` is an explicit extension-owned AIFHub/Handoff finalizer that archives verified OpenSpec-native changes through OpenSpec CLI or archives verified legacy plans in AI Factory-only mode, drafts commit/PR summaries, and drives evidence-backed governance and evolution follow-ups.
 - `aif-plan`, `aif-explore`, `aif-improve`, `aif-implement`, `aif-verify`, `aif-fix`, `aif-roadmap`, and `aif-evolve` remain upstream skills with extension injections.
 - Full-mode planning is mode-gated:
   - OpenSpec-native mode creates `openspec/changes/<change-id>/proposal.md`, `design.md`, `tasks.md`, and behavior delta specs.

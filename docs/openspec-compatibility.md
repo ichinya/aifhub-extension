@@ -83,7 +83,7 @@ When a compatible OpenSpec CLI is missing:
 - extension install remains valid
 - AI Factory bootstrap/config workflows may still run in AI Factory-only mode
 - OpenSpec-native validation is unavailable and `/aif-verify` continues in degraded mode unless `aifhub.openspec.requireCliForVerify: true`
-- OpenSpec-native archive is unavailable
+- OpenSpec-native archive-required `/aif-done` fails with an explicit CLI requirement
 - OpenSpec-aware commands should report capability flags instead of failing extension install
 
 OpenSpec skills and slash commands are not installed by this extension in v1.
@@ -106,4 +106,6 @@ openspec:
 
 `/aif-verify` uses `scripts/openspec-verification-context.mjs` with `scripts/openspec-runner.mjs` to validate the active OpenSpec change before normal code checks. Invalid OpenSpec artifacts hard-fail before lint, tests, or review. Validation/status evidence is written under `.ai-factory/qa/<change-id>/`; `/aif-verify` does not archive.
 
-The runner reports missing or incompatible OpenSpec environments as structured degraded-mode data. OpenSpec-native bootstrap, planning, generated-rules guidance, and prompt assets for implement, fix, verify, done, rules-check, and runtime agents consume this capability shape. Runtime integrations remain scoped: #31 covers implementation/fix runtime state alignment, #32 covers verify validate/status runtime behavior, and #33 covers archive/finalizer integration.
+`/aif-done` is the OpenSpec-native finalizer. It refuses archive unless `/aif-verify` passed for the same change, guards dirty working tree state, archives through `openspec archive <change-id> --yes` via `scripts/openspec-runner.mjs`, supports `--skip-specs` for docs/tooling-only changes, writes final evidence under `.ai-factory/qa/<change-id>/`, and writes final summaries under `.ai-factory/state/<change-id>/`. It does not use custom archive logic or legacy `.ai-factory/specs` archives in OpenSpec-native mode.
+
+The runner reports missing or incompatible OpenSpec environments as structured degraded-mode data. OpenSpec-native bootstrap, planning, generated-rules guidance, and prompt assets for implement, fix, verify, done, rules-check, and runtime agents consume this capability shape. Runtime integrations remain scoped: #31 covers implementation/fix runtime state alignment, #32 covers verify validate/status runtime behavior, and done finalization covers archive/finalizer integration.

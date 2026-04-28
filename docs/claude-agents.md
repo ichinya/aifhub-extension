@@ -15,7 +15,7 @@
 | `aifhub-verifier` | Low-write verifier для OpenSpec change or legacy plan pair и changed scope с gate result | Read, Write, Edit, Glob, Grep, Bash | `acceptEdits` | Только `.ai-factory/qa/<change-id>/` in OpenSpec-native mode or `status.yaml`/`verify.md` for validated legacy plan pair |
 | `aifhub-fixer` | Targeted fixer по выбранным verification/review findings | Read, Write, Edit, Glob, Grep, Bash | `acceptEdits` | Только validated changed scope выбранных findings plus `.ai-factory/state/<change-id>/` in OpenSpec-native mode or `status.yaml`/`fixes/*.md` |
 | `aifhub-rules-sidecar` | Read-only sidecar для проверки generated OpenSpec rules or `.ai-factory/RULES.md`, `.ai-factory/rules/base.md` и plan-local `rules.md` | Read, Glob, Grep | `dontAsk` | Не пишет файлы |
-| `aifhub-done-finalizer` | Finalization helper для OpenSpec deferred archive status или legacy archive/spec summary после passing verification | Read, Write, Edit, Glob, Grep, Bash | `acceptEdits` | OpenSpec-native finalizer state outside `openspec/changes` or legacy `status.yaml`, archive dir в `.ai-factory/specs/` и `.ai-factory/specs/index.yaml`; `--force` запрещён |
+| `aifhub-done-finalizer` | Finalization helper для OpenSpec CLI archive/final summary или legacy archive/spec summary после passing verification | Read, Write, Edit, Glob, Grep, Bash | `acceptEdits` | OpenSpec-native `.ai-factory/qa/<change-id>/` final evidence and `.ai-factory/state/<change-id>/` summary, with archive only through OpenSpec CLI; legacy `status.yaml`, archive dir в `.ai-factory/specs/` и `.ai-factory/specs/index.yaml`; `--force` запрещён |
 
 `name` является authoritative spawn-name. Filename нужен только как удобная convention в репозитории и в manifest.
 
@@ -24,7 +24,7 @@
 - `read-only sidecar`: `aifhub-review-sidecar`, `aifhub-security-sidecar`, `aifhub-rules-sidecar`. Эти агенты только читают scope и возвращают findings-first output без auto-fix. Запускаются в фоне (`background: true`).
 - `low-write verifier`: `aifhub-verifier`. Агент может обновлять только verification artifacts, но не implementation files.
 - `bounded worker`: `aifhub-plan-polisher`, `aifhub-implement-worker`, `aifhub-fixer`. Они write-capable, но у каждого есть жёстко ограниченный рабочий scope.
-- `finalization helper`: `aifhub-done-finalizer`. Он завершает verification-passing plan и готовит summary/archive work.
+- `finalization helper`: `aifhub-done-finalizer`. Он завершает verification-passing OpenSpec change through `openspec archive <change-id> --yes` or legacy plan archive work, supports `--skip-specs`, and prepares summary/archive evidence.
 
 ## Как это работает
 
@@ -55,7 +55,7 @@
 - Попросить plan polisher: `Используй aifhub-plan-polisher для точечной полировки текущего OpenSpec change или legacy плана без редактирования source code.`
 - Попросить verifier: `Запусти aifhub-verifier для active OpenSpec change or legacy plan pair и changed files. Обнови только verification artifacts и верни verdict с counts по findings.`
 - Попросить fixer: `Используй aifhub-fixer и исправь только findings B001 и I002, затем верни files modified и re-verify recommendation.`
-- Попросить done finalizer: `Запусти aifhub-done-finalizer для passing OpenSpec change или legacy plan. Для OpenSpec-native scope отчитай deferred archive status и finalizer state; для legacy scope используй `.ai-factory/specs/<plan-id>/` archive path. Подготовь commit/PR summary draft.`
+- Попросить done finalizer: `Запусти aifhub-done-finalizer для passing OpenSpec change или legacy plan. Для OpenSpec-native scope проверь /aif-verify evidence, archive through openspec archive <change-id> --yes, use --skip-specs for docs/tooling-only work, and report .ai-factory/qa/<change-id>/ plus .ai-factory/state/<change-id>/ outputs. Для legacy scope используй `.ai-factory/specs/<plan-id>/` archive path. Подготовь commit/PR summary draft.`
 
 Во всех случаях полезно явно задавать scope: какой plan, какие файлы или какой changed range должен анализироваться.
 
@@ -76,7 +76,7 @@
 - `aifhub-review-sidecar`, `aifhub-security-sidecar` и `aifhub-rules-sidecar` намеренно read-only; они не должны выполнять edits.
 - `aifhub-verifier` не должен писать code; его write scope ограничен QA/verification artifacts.
 - `aifhub-fixer` не должен делать unrelated refactor и не должен переписывать canonical OpenSpec artifacts or legacy plan artifacts вне выбранного finding scope.
-- `aifhub-done-finalizer` не должен напрямую обходить owner boundaries для `.ai-factory/ROADMAP.md`, `.ai-factory/RULES.md` и `.ai-factory/ARCHITECTURE.md`; для этих файлов допустим только evidence-backed owner-safe update или exact handoff.
+- `aifhub-done-finalizer` не должен custom-mutating `openspec/specs`, manually moving OpenSpec change folders, archiving unverified changes, or using legacy `.ai-factory/specs` archive in OpenSpec-native mode; он также не должен напрямую обходить owner boundaries для `.ai-factory/ROADMAP.md`, `.ai-factory/RULES.md` и `.ai-factory/ARCHITECTURE.md`.
 - Эта страница не вводит новый runtime behavior; она документирует опубликованные `agentFiles` и naming contract.
 
 ## See Also

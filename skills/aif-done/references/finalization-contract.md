@@ -9,8 +9,10 @@ Reference for the `aif-done` skill and `aifhub-done-finalizer` agents.
 - `.ai-factory/config.yaml` has `aifhub.artifactProtocol: openspec`.
 - Exactly one active change or explicit `<change-id>` is selected.
 - QA evidence exists under `.ai-factory/qa/<change-id>/`.
-- Verification verdict in QA evidence is `pass` or `pass-with-notes`.
-- No uncommitted changes outside the selected change scope unless the user confirms.
+- Verification evidence clearly records final PASS or PASS-with-notes for this change.
+- OpenSpec-native `/aif-done` refuses unverified changes.
+- `Code verification: PENDING` is ambiguous and must refuse finalization.
+- Dirty working tree state is empty, or explicit dirty-state recording is enabled.
 
 ### Canonical Context
 
@@ -31,17 +33,41 @@ openspec/changes/<change-id>/specs/**/spec.md
 
 ### Archive Policy
 
-Do not archive OpenSpec changes through legacy `.ai-factory/specs`. Full archival through:
+OpenSpec-native `/aif-done` uses `scripts/openspec-done-finalizer.mjs`. Archive lifecycle mutation must happen through `archiveOpenSpecChange(changeId, options)` and never through custom folder movement or direct `openspec/specs` edits. Normal archive is `openspec archive <change-id> --yes`.
+
+Normal archival corresponds to:
 
 ```bash
 openspec archive <change-id> --yes
 ```
 
-is deferred to issue #33 or later runtime integration. Until then, finalization prepares commit/PR/governance outputs from verified QA evidence and reports archive integration as deferred.
+Docs/tooling-only archival uses `--skip-specs`:
+
+```bash
+openspec archive <change-id> --yes --skip-specs --no-color
+```
+
+`--skip-specs` still writes final QA evidence and final summaries. Missing or unsupported OpenSpec CLI fails when archive is required. `/aif-verify` does not archive.
+
+OpenSpec-native mode does not use legacy `.ai-factory/specs` archive.
+
+### Final Evidence
+
+Write:
+
+```text
+.ai-factory/qa/<change-id>/done.md
+.ai-factory/qa/<change-id>/openspec-archive.json
+.ai-factory/qa/<change-id>/raw/openspec-archive.stdout
+.ai-factory/qa/<change-id>/raw/openspec-archive.stderr
+.ai-factory/state/<change-id>/final-summary.md
+```
+
+Do not write runtime-only files into `openspec/changes/<change-id>/`.
 
 ### Output
 
-Report selected `change-id`, precondition state, QA evidence path, canonical artifacts inspected, generated rules state, runtime state path, and archive integration status.
+Report selected `change-id`, verification status, dirty working tree state, QA evidence path, `.ai-factory/qa/<change-id>/` final evidence path, `.ai-factory/state/<change-id>/` final summary path, canonical artifacts inspected, generated rules state, archive result, `--skip-specs` state, commit draft, and PR draft.
 
 ## Legacy AI Factory-only mode
 

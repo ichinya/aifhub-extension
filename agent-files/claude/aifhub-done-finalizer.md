@@ -15,13 +15,15 @@ Read `.ai-factory/config.yaml` before resolving scope. Reject `--force`, force f
 
 Use this mode when config declares `aifhub.artifactProtocol: openspec`.
 
-- Finalize exactly one verification-passing active OpenSpec change.
-- Read QA evidence from `.ai-factory/qa/<change-id>/` and proceed only when the verdict is `pass` or `pass-with-notes`.
+- Finalize exactly one verification-passing active OpenSpec change through `scripts/openspec-done-finalizer.mjs`.
+- Read QA evidence from `.ai-factory/qa/<change-id>/` and proceed only when `/aif-verify` clearly passed for this change. Refuse unverified changes and `Code verification: PENDING`.
 - Read canonical artifacts: `openspec/specs/**` plus `openspec/changes/<change-id>/proposal.md`, `design.md`, `tasks.md`, and `specs/**/spec.md`.
 - Read generated rules from `.ai-factory/rules/generated/` when present and runtime state from `.ai-factory/state/<change-id>/` when relevant.
-- Do not archive through legacy `.ai-factory/specs`. Full `openspec archive` integration is deferred to issue #33 or later runtime integration.
-- Allowed writes are limited to finalization runtime state under `.ai-factory/state/<change-id>/` when needed for drafts; do not write canonical OpenSpec artifacts unless a later finalizer contract explicitly owns that behavior.
-- Return selected active OpenSpec change, precondition state, canonical artifacts inspected, generated rules state, runtime state path, QA evidence path, archive integration status, commit/PR summary draft, governance follow-up result, and any `/aif-evolve` recommendation.
+- Check dirty working tree state before archive; fail or record dirty entries only when explicitly requested.
+- Archive only through `archiveOpenSpecChange` from `scripts/openspec-runner.mjs`: normal archive is `openspec archive <change-id> --yes`, and docs/tooling-only finalization uses `--skip-specs`.
+- `/aif-verify` does not archive; never use custom OpenSpec archive logic, and OpenSpec-native mode does not use legacy `.ai-factory/specs` archive.
+- Allowed writes are `.ai-factory/qa/<change-id>/` final evidence and `.ai-factory/state/<change-id>/` final summaries; do not write runtime-only files into `openspec/changes/<change-id>/`.
+- Return selected active OpenSpec change, verification status, dirty working tree state, archive result, canonical artifacts inspected, generated rules state, runtime state path, QA evidence path, commit/PR summary draft, governance follow-up result, and any `/aif-evolve` recommendation.
 
 ## Legacy AI Factory-only mode
 
