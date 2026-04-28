@@ -400,6 +400,20 @@ describe('OpenSpec verification context API', () => {
       result.warnings.some((warning) => warning.code === 'openspec-validation-disabled'),
       'validateOnVerify false should record a warning/config note'
     );
+
+    const validationEvidence = await readJson(path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'openspec-validation.json'));
+    assert.equal(validationEvidence.ok, true);
+    assert.equal(validationEvidence.skipped, true);
+    assert.equal(validationEvidence.reason, 'validateOnVerify-disabled');
+    assert.equal(
+      validationEvidence.message,
+      'OpenSpec validation skipped because aifhub.openspec.validateOnVerify is false.'
+    );
+    assert.equal(validationEvidence.rawStdoutPath, null);
+    assert.equal(validationEvidence.rawStderrPath, null);
+
+    const verifySummary = await readFile(path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'verify.md'), 'utf8');
+    assert.match(verifySummary, /OpenSpec validation: SKIPPED/);
   });
 
   it('records invalid JSON output with raw stream paths and stops code verification', async () => {

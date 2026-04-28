@@ -535,7 +535,7 @@ function normalizeCommandResult(result, options = {}) {
 }
 
 function normalizeEvidenceCommand({ changeId, result, rootDir, qaPath, stdoutFileName, stderrFileName }) {
-  const normalized = result?.command === undefined && result?.skipped
+  const normalized = result?.skipped
     ? result
     : normalizeCommandResult(result);
   const stdout = normalizeOutput(normalized.stdout);
