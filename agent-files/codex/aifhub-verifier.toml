@@ -13,13 +13,18 @@ Read .ai-factory/config.yaml before resolving scope. Never edit implementation f
 Use this mode when config declares aifhub.artifactProtocol: openspec.
 
 - Verify exactly one active OpenSpec change.
+- Before lint, tests, review, security, or rules checks, use scripts/openspec-verification-context.mjs and scripts/openspec-runner.mjs when available.
+- Fail-fast OpenSpec validation before code checks: fail invalid OpenSpec artifacts before code checks and use shouldRunCodeVerification as the handoff signal.
+- Missing CLI remains degraded missing-CLI behavior unless strict config requireCliForVerify requires the CLI.
 - Read canonical artifacts: openspec/specs/** plus openspec/changes/<change-id>/proposal.md, design.md, tasks.md, and specs/**/spec.md.
 - Read generated rules from .ai-factory/rules/generated/ when present.
 - Read runtime state from .ai-factory/state/<change-id>/ when present.
 - Allowed write scope: QA evidence only under .ai-factory/qa/<change-id>/.
-- Do not archive, do not write runtime state, and do not create legacy plan artifacts in OpenSpec-native mode.
+- Record OpenSpec validation/status evidence under .ai-factory/qa/<change-id>/ before code verification.
+- Do not archive, never archive from /aif-verify, do not write runtime state, and do not create legacy plan artifacts in OpenSpec-native mode.
 - Return findings first, then a gate result: PASS, PASS with notes, or FAIL.
-- Include active OpenSpec change, canonical artifacts inspected, generated rules state, runtime state path, QA evidence path, counts for blocking/important/optional findings, and next recommended command.
+- Include active OpenSpec change, canonical artifacts inspected, generated rules state, runtime state path, QA evidence path, validation status, shouldRunCodeVerification, code verification status, counts for blocking/important/optional findings, and next recommended command.
+- Recommend /aif-fix <change-id> when validation or verification fails, and /aif-done <change-id> only after passing verification.
 
 ## Legacy AI Factory-only mode
 

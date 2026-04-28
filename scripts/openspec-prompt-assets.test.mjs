@@ -22,6 +22,12 @@ const MODE_GATED_PROMPTS = [
   'injections/core/aif-verify-plan-folder.md'
 ];
 
+const VERIFY_PROMPT_ASSETS = [
+  'injections/core/aif-verify-plan-folder.md',
+  'agent-files/codex/aifhub-verifier.toml',
+  'agent-files/claude/aifhub-verifier.md'
+];
+
 const CANONICAL_CHANGE_FILES = [
   'openspec/changes/<change-id>/proposal.md',
   'openspec/changes/<change-id>/design.md',
@@ -265,6 +271,44 @@ describe('OpenSpec-native prompt asset contract', () => {
     for (const relativePath of await activePromptAssets()) {
       const asset = stripFencedBlocks(await readRepoFile(relativePath));
       assertNoInstallGuidance(asset, relativePath);
+    }
+  });
+
+  it('requires verifier prompts to use fail-fast OpenSpec verification context', async () => {
+    for (const relativePath of VERIFY_PROMPT_ASSETS) {
+      const asset = stripFencedBlocks(await readRepoFile(relativePath));
+
+      for (const expected of [
+        'scripts/openspec-verification-context.mjs',
+        'scripts/openspec-runner.mjs',
+        'shouldRunCodeVerification',
+        '.ai-factory/qa/<change-id>/',
+        '/aif-fix <change-id>',
+        '/aif-done <change-id>'
+      ]) {
+        assertIncludes(asset, expected, relativePath);
+      }
+
+      assert.match(
+        asset,
+        /fail(?:s)? invalid OpenSpec artifacts before code checks|fail-fast OpenSpec validation before code checks/i,
+        `${relativePath} should require fail-fast OpenSpec validation before code checks`
+      );
+      assert.match(
+        asset,
+        /missing CLI.*degraded|degraded missing-CLI/i,
+        `${relativePath} should describe degraded missing-CLI behavior`
+      );
+      assert.match(
+        asset,
+        /strict config|requireCliForVerify/i,
+        `${relativePath} should describe strict config behavior`
+      );
+      assert.match(
+        asset,
+        /never archive|does not archive|no archive/i,
+        `${relativePath} should forbid archive from /aif-verify`
+      );
     }
   });
 

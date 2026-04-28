@@ -79,7 +79,7 @@ These paths are reserved names only in v1. Their detailed behavior is out of sco
 | `/aif-improve` | `openspec/changes/<id>/*`, `openspec/specs` | `openspec/changes/<id>/*` | patch summary if needed | Must preserve user edits |
 | `/aif-implement` | `openspec/specs`, `openspec/changes/<id>/*`, generated rules, optional OpenSpec `instructions apply` | none | `.ai-factory/state/<id>/implementation/*` | Execution traces are runtime-only and do not require legacy `.ai-factory/plans/<id>/task.md` |
 | `/aif-fix` | same as implement plus QA reports from `.ai-factory/qa/<id>/*` | none | `.ai-factory/state/<id>/fixes/*` | Fixes implementation, not specs unless explicitly requested; does not require legacy `.ai-factory/plans/<id>/task.md` |
-| `/aif-verify` | `openspec/*`, generated rules | none | `.ai-factory/qa/<id>/*` | Must not archive |
+| `/aif-verify` | `openspec/*`, generated rules | none | `.ai-factory/qa/<id>/*` | Validates OpenSpec before code checks; must not archive |
 | `/aif-rules-check` | `openspec/specs`, `openspec/changes/<id>/specs` | none | none | Reads generated rules as derived guidance; never regenerates them |
 | `/aif-done` | `openspec/changes/<id>/*`, QA state | none until #33 archive integration; future `openspec/specs/*` via OpenSpec archive | final summary/state | Only finalizer may drive archive policy |
 
@@ -116,6 +116,8 @@ The OpenSpec CLI is required for OpenSpec validate and archive capabilities. The
 
 AIFHub Extension must not install OpenSpec skills or commands. If a compatible OpenSpec CLI is missing, OpenSpec-aware commands must degrade gracefully by reporting unavailable validate/archive capabilities instead of failing extension install.
 
+For `/aif-verify`, invalid OpenSpec validation is a hard fail before lint, tests, or review. Missing or unsupported CLI remains degraded mode unless `aifhub.openspec.requireCliForVerify: true` requires strict CLI availability. Verification evidence belongs under `.ai-factory/qa/<change-id>/`, and `/aif-verify` does not archive.
+
 ## Legacy artifact policy
 
 Legacy `.ai-factory/plans` artifacts are pre-migration planning and execution records. Before migration is implemented, commands may read them as compatibility inputs and migration sources.
@@ -135,7 +137,7 @@ This ADR defines policy only; it does not implement migration.
 - OpenSpec capability detection
 - bootstrap changes
 - active-change resolver
-- concrete archive integration for #33 and migration behavior for #32 beyond prompt assets
+- concrete archive integration for #33 and migration behavior outside #32 verify validate/status runtime behavior
 
 ## Consequences
 
