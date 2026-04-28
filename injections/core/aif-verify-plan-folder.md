@@ -25,7 +25,9 @@ Before resolving verification scope, read `.ai-factory/config.yaml` when it exis
 
 ### OpenSpec-native mode
 
-When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, `/aif-verify` verifies implementation against the active OpenSpec change. This prompt guidance does not implement OpenSpec validate/status integration from issue #32.
+When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, `/aif-verify` verifies implementation against the active OpenSpec change.
+
+Before running lint, tests, code review, security review, or rules review, resolve the active change, ensure runtime layout, and use `scripts/openspec-verification-context.mjs` with `scripts/openspec-runner.mjs` when available. Fail invalid OpenSpec artifacts before code checks. Treat missing CLI as degraded missing-CLI behavior unless strict config (`aifhub.openspec.requireCliForVerify`) requires the CLI. Use `shouldRunCodeVerification` as the handoff signal: `false` blocks code checks and routes to `/aif-fix <change-id>`; `true` allows normal code verification to continue.
 
 Use shared vocabulary consistently: `OpenSpec-native mode`, `canonical OpenSpec change`, `active change`, `change-id`, `base specs`, `delta specs`, `generated rules`, `runtime state`, `QA evidence`, and `legacy AI Factory-only mode`.
 
@@ -53,8 +55,9 @@ Runtime state and QA evidence boundaries:
 
 - Read implementation runtime state from `.ai-factory/state/<change-id>/` when present.
 - Write verification findings, verdicts, command results, and review evidence only under `.ai-factory/qa/<change-id>/`.
+- Record OpenSpec validation/status evidence under `.ai-factory/qa/<change-id>/` before code verification.
 - Do not write QA evidence or runtime-only files into `openspec/changes/<change-id>/`.
-- Do not archive. `/aif-done` remains the post-verify finalizer, with full archive integration deferred to issue #33.
+- Do not archive. `/aif-verify` does not archive; `/aif-done <change-id>` remains the post-verify finalizer, with full archive integration deferred to issue #33.
 - Do not create legacy plan-folder verification artifacts in OpenSpec-native mode.
 
 Normal verification responses should report:
@@ -62,6 +65,7 @@ Normal verification responses should report:
 - selected `change-id` and resolver source;
 - canonical artifacts inspected;
 - generated rules freshness or missing/stale `WARN`;
+- OpenSpec validation status and `shouldRunCodeVerification`;
 - QA evidence path under `.ai-factory/qa/<change-id>/`;
 - verdict and finding counts;
 - fix guidance `/aif-fix <change-id>` when verification fails;

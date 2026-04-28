@@ -69,6 +69,8 @@ The helper never creates `.ai-factory/plans/<change-id>` and never writes under 
 
 OpenSpec-native implement/fix context does not require legacy `.ai-factory/plans/<id>/task.md`. Generated rules remain derived guidance, and missing OpenSpec CLI instructions degrade to warnings instead of blocking filesystem-based context loading.
 
+`scripts/openspec-verification-context.mjs` also builds on this resolver for `/aif-verify`. It validates the active OpenSpec change before code checks when validation is enabled, writes validation/status evidence only under `.ai-factory/qa/<change-id>/`, treats missing CLI as degraded mode unless strict config requires CLI, and blocks code verification when OpenSpec validation is invalid.
+
 `/aif-plan full` uses the same change-id vocabulary in OpenSpec-native mode. It should create canonical OpenSpec change artifacts under `openspec/changes/<change-id>/` and keep planning runtime evidence, when needed, under `.ai-factory/state/<change-id>/`.
 
 `/aif-improve` also uses this vocabulary in OpenSpec-native mode. It refines only canonical OpenSpec artifacts, keeps runtime evidence under `.ai-factory/state/<change-id>/`, and treats archived targets under `openspec/changes/archive/**` as immutable by default. If further work is needed for an archived change, create a new active change instead of editing the archive silently.

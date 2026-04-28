@@ -82,7 +82,7 @@ When a compatible OpenSpec CLI is missing:
 
 - extension install remains valid
 - AI Factory bootstrap/config workflows may still run in AI Factory-only mode
-- OpenSpec-native validation is unavailable
+- OpenSpec-native validation is unavailable and `/aif-verify` continues in degraded mode unless `aifhub.openspec.requireCliForVerify: true`
 - OpenSpec-native archive is unavailable
 - OpenSpec-aware commands should report capability flags instead of failing extension install
 
@@ -104,4 +104,6 @@ openspec:
   versionSupported: boolean
 ```
 
-The runner reports missing or incompatible OpenSpec environments as structured degraded-mode data. OpenSpec-native bootstrap, planning, generated-rules guidance, and prompt assets for implement, fix, verify, done, rules-check, and runtime agents consume this capability shape. Runtime integrations remain scoped: #31 covers implementation/fix/verification state alignment, #32 covers migration behavior, and #33 covers archive/finalizer integration.
+`/aif-verify` uses `scripts/openspec-verification-context.mjs` with `scripts/openspec-runner.mjs` to validate the active OpenSpec change before normal code checks. Invalid OpenSpec artifacts hard-fail before lint, tests, or review. Validation/status evidence is written under `.ai-factory/qa/<change-id>/`; `/aif-verify` does not archive.
+
+The runner reports missing or incompatible OpenSpec environments as structured degraded-mode data. OpenSpec-native bootstrap, planning, generated-rules guidance, and prompt assets for implement, fix, verify, done, rules-check, and runtime agents consume this capability shape. Runtime integrations remain scoped: #31 covers implementation/fix runtime state alignment, #32 covers verify validate/status runtime behavior, and #33 covers archive/finalizer integration.

@@ -241,7 +241,10 @@ Implement behavior:
 
 Verify behavior:
 - in OpenSpec-native mode, reads canonical OpenSpec artifacts, generated rules, runtime state, and changed files
-- in OpenSpec-native mode, records QA evidence and findings under `.ai-factory/qa/<change-id>/` and does not archive
+- in OpenSpec-native mode, validates the active OpenSpec change before lint/tests/review checks when validation is enabled
+- in OpenSpec-native mode, records OpenSpec validation/status evidence, QA evidence, and findings under `.ai-factory/qa/<change-id>/` and does not archive
+- in OpenSpec-native mode, treats missing OpenSpec CLI as degraded mode unless strict config requires CLI
+- in OpenSpec-native mode, hard-fails invalid OpenSpec artifacts before code checks
 - in legacy AI Factory-only mode, reads the plan pair and plan-folder artifacts and records findings in `verify.md` and `status.yaml`
 - returns the pass/fail state that gates `/aif-fix` or the optional `/aif-done` finalizer
 
