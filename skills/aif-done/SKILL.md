@@ -18,14 +18,16 @@ Resolve mode from `.ai-factory/config.yaml`:
 
 ## OpenSpec-native mode
 
-OpenSpec-native mode finalizes the verified change state without implementing archive integration from issue #33.
+OpenSpec-native mode finalizes the verified change state through `scripts/openspec-done-finalizer.mjs`. It is the only OpenSpec-native archive/finalization step after `/aif-verify` passes.
 
 ### Preconditions
 
 - Resolve exactly one active change or explicit `<change-id>`.
 - Read QA evidence from `.ai-factory/qa/<change-id>/`.
-- Treat verification as passing only when QA evidence records `pass` or `pass-with-notes`.
+- Treat verification as passing only when QA evidence clearly records a final PASS or PASS-with-notes for this change.
 - If verification has not run or verdict is `fail`, stop and suggest `/aif-verify` or `/aif-fix`.
+- Refuse unverified changes; do not accept `Code verification: PENDING` as final verification.
+- Check dirty working tree state before archive and either fail or record it only when explicit dirty-state recording is requested.
 
 ### Canonical Context
 
@@ -50,21 +52,32 @@ Runtime state and QA evidence live outside canonical changes:
 
 ### Archive Policy
 
+- Archive through `archiveOpenSpecChange(changeId, options)` from `scripts/openspec-runner.mjs`; this corresponds to `openspec archive <change-id> --yes`.
+- Use `archiveOpenSpecChange(changeId)` for normal finalization.
+- Use `archiveOpenSpecChange(changeId, { skipSpecs: true })` for docs/tooling-only finalization; this corresponds to `openspec archive <change-id> --yes --skip-specs --no-color`.
+- Support the user-facing `--skip-specs` path while still writing final QA evidence and final summaries.
+- If OpenSpec CLI is missing or unsupported and archive is required, fail with an explicit OpenSpec CLI requirement.
+- Do not archive in `/aif-verify`; `/aif-verify` does not archive and only records verification evidence.
+- Do not use legacy `.ai-factory/specs` archive in OpenSpec-native mode.
+- OpenSpec-native mode does not use legacy `.ai-factory/specs` archive.
 - Do not silently archive OpenSpec changes through legacy `.ai-factory/specs`.
-- Do not run `openspec archive <change-id> --yes` in this issue. Full archive integration belongs to issue #33 or later runtime integration.
-- If the user requests archive/finalization before #33 exists, report that archive integration is deferred and prepare commit/PR/governance outputs from verified evidence only.
 - Do not write runtime-only output into `openspec/changes/<change-id>/`.
+- Do not directly mutate `openspec/specs/**` or manually move OpenSpec change folders.
 
 ### OpenSpec-Native Output
 
 Normal output must report:
 
 - selected `change-id`;
-- precondition state and QA verdict;
+- verification status and refusal reason when unverified;
+- dirty working tree state;
+- archive result;
 - canonical artifacts inspected;
 - generated rules state when relevant;
 - runtime state and QA evidence paths;
-- archive integration status: deferred to #33 unless a later runtime integration explicitly owns it.
+- final evidence under `.ai-factory/qa/<change-id>/`;
+- final summaries under `.ai-factory/state/<change-id>/`;
+- commit/PR summary draft.
 
 ## Legacy AI Factory-only mode
 
@@ -148,10 +161,10 @@ Legacy AI Factory-only mode preserves the verified plan finalization contract ba
 
 | Artifact | Owner | This Skill |
 |----------|-------|------------|
-| `openspec/changes/<change-id>/` | OpenSpec-native workflow | Reads only until #33 archive integration exists |
-| `.ai-factory/qa/<change-id>/` | `/aif-verify` | Reads precondition and QA evidence |
-| `.ai-factory/state/<change-id>/` | OpenSpec-native runtime | Reads finalization context when present |
-| `.ai-factory/specs/<plan-id>/` | **aif-done** | Creates or refreshes on finalization |
+| `openspec/changes/<change-id>/` | OpenSpec-native workflow | Reads before archive; OpenSpec CLI owns lifecycle mutation |
+| `.ai-factory/qa/<change-id>/` | `/aif-verify` and **aif-done** | Reads verification evidence; writes `done.md`, `openspec-archive.json`, and raw archive output |
+| `.ai-factory/state/<change-id>/` | OpenSpec-native runtime and **aif-done** | Reads traces; writes `final-summary.md` |
+| `.ai-factory/specs/<plan-id>/` | **aif-done** legacy mode only | Creates or refreshes on legacy finalization |
 | `.ai-factory/specs/index.yaml` | **aif-done** | Updates |
 | `.ai-factory/plans/<plan-id>/status.yaml` | **aif-done** | Updates `status: done` |
 | Commit/PR drafts | **aif-done** | Outputs to user |
@@ -162,7 +175,9 @@ Legacy AI Factory-only mode preserves the verified plan finalization contract ba
 ## Rules
 
 - Never finalize a plan that has not passed verification.
-- In OpenSpec-native mode, never silently archive through legacy `.ai-factory/specs`; report archive integration as deferred to #33.
+- In OpenSpec-native mode, never finalize an unverified change.
+- In OpenSpec-native mode, archive only through `archiveOpenSpecChange`; never use custom OpenSpec archive logic.
+- In OpenSpec-native mode, never silently archive through legacy `.ai-factory/specs`.
 - Never invent governance changes without evidence from the verified plan.
 - When governance updates belong to another owner, use the owning path or return an exact handoff instead of silently skipping the change.
 - Never auto-create a PR — always present drafts for user approval.

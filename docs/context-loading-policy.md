@@ -102,7 +102,7 @@ Special ownership case:
 - In OpenSpec-native mode, `aif-fix` consumes the same canonical OpenSpec artifacts plus QA evidence under `.ai-factory/qa/<change-id>/`. It writes fix traces only under `.ai-factory/state/<change-id>/fixes/` and does not require legacy `.ai-factory/plans/<id>/task.md`
 - In OpenSpec-native mode, `aif-implement` and `aif-fix` may change implementation source files within the selected task/finding scope; they do not rewrite canonical OpenSpec artifacts unless explicitly requested
 - In OpenSpec-native mode, `aif-verify` reads canonical OpenSpec artifacts, validates the active change before code checks when validation is enabled, writes OpenSpec validation/status evidence plus QA findings under `.ai-factory/qa/<change-id>/`, treats missing CLI as degraded mode unless strict config requires CLI, hard-fails invalid OpenSpec before lint/tests/review, and must not archive
-- In OpenSpec-native mode, `aif-done` follows OpenSpec archive policy and writes finalizer/runtime state outside `openspec/changes/<change-id>/`; concrete archive integration is tracked separately by #33
+- In OpenSpec-native mode, `aif-done` requires passing `/aif-verify` evidence, archives through `openspec archive <change-id> --yes` via the OpenSpec CLI runner, supports `--skip-specs`, writes final evidence under `.ai-factory/qa/<change-id>/`, writes final summaries under `.ai-factory/state/<change-id>/`, and does not use custom archive logic or legacy `.ai-factory/specs` finalization
 - Legacy `task.md`, `context.md`, `rules.md`, `verify.md`, `status.yaml`, and `explore.md` apply only to legacy AI Factory-only plan folders, not OpenSpec-native changes
 - no consumer skill may use bridge files as a substitute for these runtime paths
 
@@ -172,7 +172,7 @@ If `config.yaml` is missing or incomplete for the requested operation:
 - `.ai-factory/state/<change-id>/fixes/*` owner in OpenSpec-native mode: `/aif-fix` fix traces
 - `.ai-factory/state/<change-id>/*` owner in OpenSpec-native mode: runtime state for execution progress, fix notes, and git strategy; `/aif-explore` may own research-only state files
 - `.ai-factory/qa/<change-id>/*` owner in OpenSpec-native mode: `/aif-verify`
-- OpenSpec-native finalizer state owner: `/aif-done`; canonical archive writes remain governed by OpenSpec archive policy and #33
+- OpenSpec-native finalizer state owner: `/aif-done`; it owns `.ai-factory/qa/<change-id>/done.md`, `.ai-factory/qa/<change-id>/openspec-archive.json`, raw archive output, and `.ai-factory/state/<change-id>/final-summary.md`; canonical archive mutation must flow through OpenSpec CLI, not custom file movement
 - `.ai-factory/plans/<plan-id>.md` owner in legacy AI Factory-only mode: built-in `/aif-plan` with extension injection rules
 - `.ai-factory/plans/<plan-id>/status.yaml` owner in legacy AI Factory-only mode: `/aif-implement`, `/aif-verify`, `/aif-fix`
 - `rules/*.md` owner: `/aif-plan` when the active plan explicitly adds area-specific rules

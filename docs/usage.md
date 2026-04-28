@@ -254,7 +254,7 @@ Verify behavior:
 /aif-done
 ```
 
-`/aif-done` owns post-verify finalization, commit/PR drafting, and evidence-backed governance/evolution follow-ups. In OpenSpec-native mode it follows OpenSpec archive policy and writes finalizer state outside canonical change artifacts; concrete archive integration remains tracked by #33. In legacy AI Factory-only mode it archives the verified plan pair to `.ai-factory/specs/<plan-id>/`. `/aif-verify` remains verification-only, including `--check-only` runs.
+`/aif-done` owns post-verify finalization, commit/PR drafting, and evidence-backed governance/evolution follow-ups. In OpenSpec-native mode it requires passing `/aif-verify` evidence, guards dirty working tree state, archives through `openspec archive <change-id> --yes` via the shared OpenSpec runner, supports `--skip-specs` for docs/tooling-only changes, writes final evidence under `.ai-factory/qa/<change-id>/`, and writes final summaries under `.ai-factory/state/<change-id>/`. Missing OpenSpec CLI fails archive-required finalization. In legacy AI Factory-only mode it archives the verified plan pair to `.ai-factory/specs/<plan-id>/`. `/aif-verify` remains verification-only, including `--check-only` runs.
 
 ### Review Gates (optional)
 
@@ -271,7 +271,7 @@ All three gates are independent and can run in any order. If any gate returns `F
 `/aif-done` — extension-owned explicit finalizer, работающий **после** passing verification:
 
 - Проверяет, что active work прошёл verify (verdict `pass` или `pass-with-notes`).
-- В OpenSpec-native mode follows OpenSpec archive policy and writes only finalizer/runtime state until #33 completes concrete archive integration.
+- В OpenSpec-native mode archives through OpenSpec CLI with `openspec archive <change-id> --yes`, supports `--skip-specs`, writes final QA evidence to `.ai-factory/qa/<change-id>/`, writes final summaries to `.ai-factory/state/<change-id>/`, and does not use custom archive logic.
 - В legacy AI Factory-only mode архивирует plan folder и companion plan file в `.ai-factory/specs/<plan-id>/`.
 - Готовит commit message draft.
 - Если есть feature branch и `gh` доступен — готовит PR summary draft. Без `gh` — выводит manual PR instructions.

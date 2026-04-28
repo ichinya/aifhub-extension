@@ -28,6 +28,13 @@ const VERIFY_PROMPT_ASSETS = [
   'agent-files/claude/aifhub-verifier.md'
 ];
 
+const DONE_PROMPT_ASSETS = [
+  'skills/aif-done/SKILL.md',
+  'skills/aif-done/references/finalization-contract.md',
+  'agent-files/codex/aifhub-done-finalizer.toml',
+  'agent-files/claude/aifhub-done-finalizer.md'
+];
+
 const CANONICAL_CHANGE_FILES = [
   'openspec/changes/<change-id>/proposal.md',
   'openspec/changes/<change-id>/design.md',
@@ -312,20 +319,65 @@ describe('OpenSpec-native prompt asset contract', () => {
     }
   });
 
-  it('documents prompt-asset migration as current scope without claiming runtime integrations', async () => {
+  it('requires done prompts to archive verified OpenSpec changes through the done finalizer', async () => {
+    for (const relativePath of DONE_PROMPT_ASSETS) {
+      const asset = stripFencedBlocks(await readRepoFile(relativePath));
+
+      for (const expected of [
+        'scripts/openspec-done-finalizer.mjs',
+        'archiveOpenSpecChange',
+        '--skip-specs',
+        '.ai-factory/qa/<change-id>/',
+        '.ai-factory/state/<change-id>/',
+        'dirty',
+        'openspec archive <change-id> --yes'
+      ]) {
+        assertIncludes(asset, expected, relativePath);
+      }
+
+      assert.match(
+        asset,
+        /refus(?:e|es).*unverified|refus(?:e|es).*\/aif-verify.*passed|verification.*passed/i,
+        `${relativePath} should refuse unverified changes`
+      );
+      assert.match(
+        asset,
+        /does not archive in `?\/aif-verify`?|\/aif-verify`? does not archive|never archive from `?\/aif-verify`?/i,
+        `${relativePath} should keep archive out of /aif-verify`
+      );
+      assert.match(
+        asset,
+        /does not use legacy `?\.ai-factory\/specs`?.*OpenSpec-native|OpenSpec-native.*does not use legacy `?\.ai-factory\/specs`?/i,
+        `${relativePath} should forbid legacy specs archive in OpenSpec-native mode`
+      );
+      assert.doesNotMatch(
+        asset,
+        /archive integration (?:is )?deferred to issue #33|deferred archive status/i,
+        `${relativePath} should no longer describe OpenSpec archive integration as deferred`
+      );
+    }
+  });
+
+  it('documents scoped OpenSpec runtime integrations without deferred done archive wording', async () => {
     const compatibility = await readRepoFile('docs/openspec-compatibility.md');
 
     assertIncludes(compatibility, 'prompt assets', 'docs/openspec-compatibility.md');
+    assertIncludes(compatibility, 'openspec archive <change-id> --yes', 'docs/openspec-compatibility.md');
+    assertIncludes(compatibility, 'done finalization covers archive/finalizer integration', 'docs/openspec-compatibility.md');
     assertNotIncludes(
       compatibility,
       'broader prompt rewrites remain separate follow-up work',
       'docs/openspec-compatibility.md'
     );
+    assert.doesNotMatch(
+      compatibility,
+      /archive integration (?:is )?deferred to issue #33/i,
+      'docs/openspec-compatibility.md should not describe done archive as deferred'
+    );
 
     for (const expected of [
       '#31',
-      '#32',
-      '#33'
+      '#32'
     ]) {
       assertIncludes(compatibility, expected, 'docs/openspec-compatibility.md');
     }
