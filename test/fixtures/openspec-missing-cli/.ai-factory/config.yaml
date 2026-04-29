@@ -1,0 +1,15 @@
+language:
+  ui: en
+  artifacts: en
+
+aifhub:
+  artifactProtocol: legacy
+  openspec:
+    missingCliFixture: true
+
+paths:
+  plans: .ai-factory/plans
+  specs: .ai-factory/specs
+  state: .ai-factory/state
+  qa: .ai-factory/qa
+  rules_generated: .ai-factory/rules/generated

@@ -1,0 +1,16 @@
+language:
+  ui: en
+  artifacts: en
+
+aifhub:
+  artifactProtocol: openspec
+  openspec:
+    validateOnVerify: true
+    requireCliForVerify: false
+
+paths:
+  plans: openspec/changes
+  specs: openspec/specs
+  state: .ai-factory/state
+  qa: .ai-factory/qa
+  rules_generated: .ai-factory/rules/generated
