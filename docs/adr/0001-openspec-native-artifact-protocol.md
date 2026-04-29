@@ -1,4 +1,4 @@
-[Back to Documentation](../README.md)
+[Previous Page](../active-change-resolver.md) | [Back to Documentation](../README.md)
 
 # ADR 0001: OpenSpec-native artifact protocol
 
@@ -12,7 +12,7 @@ AIFHub Extension v1 keeps the AI Factory user experience and command vocabulary 
 
 Issue #25 and PR #40 established that OpenSpec is an optional CLI adapter, not a required extension dependency. The supported OpenSpec range is `>=1.3.1 <2.0.0`; OpenSpec validation and archive require Node `>=20.19.0`; AIFHub Extension does not install OpenSpec skills or commands; and a missing OpenSpec CLI means degraded AI Factory-only mode, not install failure.
 
-Before runtime code is added, the project needs a stable ownership contract that separates canonical requirements and change intent from runtime execution state.
+The project needs a stable ownership contract that separates canonical requirements and change intent from runtime execution state.
 
 ## Decision
 
@@ -122,24 +122,19 @@ For `/aif-done`, OpenSpec-native archive is the finalizer step after passing `/a
 
 ## Legacy artifact policy
 
-Legacy `.ai-factory/plans` artifacts are pre-migration planning and execution records. Before migration is implemented, commands may read them as compatibility inputs and migration sources.
+Legacy `.ai-factory/plans` artifacts are pre-migration planning and execution records. Commands may read them as compatibility inputs and migration sources.
 
 Legacy plan artifacts are not the v1 canonical source of truth once OpenSpec-native artifacts exist for the same change. Any future migration must preserve user edits and avoid silently overwriting canonical OpenSpec artifacts.
 
-This ADR defines policy only; it does not implement migration.
+The implemented migration path preserves source artifacts, writes migrated canonical artifacts under `openspec/changes/<change-id>/`, and preserves runtime/QA material under `.ai-factory/state/<change-id>/` and `.ai-factory/qa/<change-id>/`.
 
 ## Out of scope
 
-- OpenSpec CLI runner implementation
-- OpenSpec-native `/aif-plan`
-- migration implementation
-- full runtime implementation for #31 implement/fix/verify state alignment
 - TOON/context/KB
 - AIFHub registry/evals
-- OpenSpec capability detection
-- bootstrap changes
-- active-change resolver
-- migration behavior outside verify validate/status runtime behavior
+- custom OpenSpec schema work
+- OpenSpec skill or slash-command installation
+- future AIFHub registry/runtime artifacts under `.aifhub/`
 
 ## Consequences
 

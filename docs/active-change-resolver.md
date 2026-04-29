@@ -1,4 +1,4 @@
-[Back to Documentation](README.md)
+[Previous Page](legacy-plan-migration.md) | [Back to Documentation](README.md) | [Next Page](adr/0001-openspec-native-artifact-protocol.md)
 
 # Active Change Resolver
 
@@ -118,7 +118,28 @@ paths:
 
 `paths.plans` maps to the OpenSpec changes directory only when it points at `openspec/changes`. Legacy `.ai-factory/plans` values are ignored for active OpenSpec change resolution.
 
+## Troubleshooting
+
+When resolution returns `ambiguous-active-change`, pass an explicit `<change-id>` to the command:
+
+```text
+/aif-improve <change-id>
+/aif-implement <change-id>
+/aif-verify <change-id>
+```
+
+When resolution returns `current-pointer-not-found`, update or remove `.ai-factory/state/current.yaml`. A stale pointer blocks fallback so broken runtime state is visible.
+
+When a legacy plan exists but no OpenSpec change exists, run explicit migration instead of expecting automatic fallback:
+
+```bash
+node scripts/migrate-legacy-plans.mjs <change-id> --dry-run
+node scripts/migrate-legacy-plans.mjs <change-id>
+```
+
 ## See Also
 
+- [Usage](usage.md)
+- [Legacy Plan Migration](legacy-plan-migration.md)
 - [ADR 0001: OpenSpec-native artifact protocol](adr/0001-openspec-native-artifact-protocol.md)
 - [OpenSpec Compatibility](openspec-compatibility.md)

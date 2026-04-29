@@ -1,87 +1,109 @@
-[← Previous Page](active-change-resolver.md) · [Back to README](README.md)
+[Previous Page](openspec-compatibility.md) | [Back to Documentation](README.md) | [Next Page](active-change-resolver.md)
 
 # Legacy Plan Migration
 
-Use this migration when a project has legacy AI Factory plan artifacts but the active workflow expects OpenSpec-native changes.
+Use legacy migration when a project has `.ai-factory/plans` artifacts and the active workflow expects OpenSpec-native changes.
 
-Legacy sources are read from `.ai-factory/plans/<id>.md` and `.ai-factory/plans/<id>/`. The migration creates canonical OpenSpec change artifacts under `openspec/changes/<change-id>/` and preserves runtime-only material under `.ai-factory/state/<change-id>/` or `.ai-factory/qa/<change-id>/`.
+Migration is explicit. It does not run automatically from `/aif-improve`, `/aif-implement`, or `/aif-verify`.
 
 ## Commands
 
-List legacy plans:
+List discovered legacy plans:
 
 ```bash
 node scripts/migrate-legacy-plans.mjs --list
 ```
 
-Preview one migration without writing files:
+Dry-run one migration:
 
 ```bash
-node scripts/migrate-legacy-plans.mjs add-oauth --dry-run
+node scripts/migrate-legacy-plans.mjs <change-id> --dry-run
 ```
 
 Migrate one plan:
 
 ```bash
-node scripts/migrate-legacy-plans.mjs add-oauth
+node scripts/migrate-legacy-plans.mjs <change-id>
 ```
 
-Preview or migrate all discovered plans:
+Dry-run all discovered plans:
 
 ```bash
 node scripts/migrate-legacy-plans.mjs --all --dry-run
+```
+
+Migrate all discovered plans:
+
+```bash
 node scripts/migrate-legacy-plans.mjs --all
 ```
 
-The package script is an optional convenience:
+Use the package wrapper when preferred:
 
 ```bash
-npm run migrate:legacy-plans -- add-oauth --dry-run
+npm run migrate:legacy-plans -- <change-id> --dry-run
 ```
 
-Use `--json` when automation needs structured output.
+Use JSON output for automation:
+
+```bash
+node scripts/migrate-legacy-plans.mjs <change-id> --json
+```
 
 ## Collision Behavior
 
-Default collision behavior is `fail`: if `openspec/changes/<id>` already exists, migration stops without overwriting it.
+The default collision mode is `fail`: if `openspec/changes/<change-id>/` already exists, migration stops without overwriting it.
 
-Supported modes:
-
-| Mode | Behavior |
-|------|----------|
-| `fail` | Stop when the target OpenSpec change exists |
-| `suffix` | Create a distinct target such as `<id>-migrated` |
-| `merge-safe` | Create only missing files and report skipped existing files |
-| `overwrite` | Overwrite generated targets only when explicitly requested |
-
-Example:
+Supported collision modes:
 
 ```bash
-node scripts/migrate-legacy-plans.mjs add-oauth --on-collision suffix
+node scripts/migrate-legacy-plans.mjs <change-id> --on-collision fail
+node scripts/migrate-legacy-plans.mjs <change-id> --on-collision merge-safe
+node scripts/migrate-legacy-plans.mjs <change-id> --on-collision suffix
+node scripts/migrate-legacy-plans.mjs <change-id> --on-collision overwrite
 ```
+
+| Mode | Behavior |
+|---|---|
+| `fail` | Stop when the target OpenSpec change exists. |
+| `merge-safe` | Write only missing files and report skipped existing files. |
+| `suffix` | Create a distinct target such as `<change-id>-migrated`. |
+| `overwrite` | Overwrite generated migration targets only when explicitly requested. |
 
 ## Artifact Mapping
 
-Canonical OpenSpec artifacts:
+Canonical and preservation mapping:
 
-| Legacy source | OpenSpec target |
-|---------------|-----------------|
+| Legacy source | Target |
+|---|---|
 | `.ai-factory/plans/<id>.md` | `openspec/changes/<id>/proposal.md` |
 | `.ai-factory/plans/<id>/task.md` | `openspec/changes/<id>/tasks.md` |
-| Design-like `context.md` | `openspec/changes/<id>/design.md` |
-| Clear behavioral requirements | `openspec/changes/<id>/specs/migrated/spec.md` |
+| `.ai-factory/plans/<id>/context.md` | `openspec/changes/<id>/design.md` and/or `.ai-factory/state/<id>/legacy-context.md` |
+| `.ai-factory/plans/<id>/rules.md` | `.ai-factory/state/<id>/legacy-rules.md` |
+| `.ai-factory/plans/<id>/verify.md` | `.ai-factory/qa/<id>/legacy-verify.md` |
+| `.ai-factory/plans/<id>/status.yaml` | `.ai-factory/state/<id>/legacy-status.yaml` |
+| `.ai-factory/plans/<id>/explore.md` | `.ai-factory/state/<id>/legacy-explore.md` |
 
-Runtime and QA preservation:
+When clear behavioral requirements are extractable, migration may create:
 
-| Legacy source | Runtime target |
-|---------------|----------------|
-| `context.md` | `.ai-factory/state/<id>/legacy-context.md` |
-| `rules.md` | `.ai-factory/state/<id>/legacy-rules.md` |
-| `status.yaml` | `.ai-factory/state/<id>/legacy-status.yaml` |
-| `explore.md` | `.ai-factory/state/<id>/legacy-explore.md` |
-| `verify.md` | `.ai-factory/qa/<id>/legacy-verify.md` |
+```text
+openspec/changes/<id>/specs/migrated/spec.md
+```
 
-`verify.md` and `status.yaml` are never copied into `openspec/changes/<id>/`. The migration never mutates `openspec/specs/**`.
+Review migrated delta specs before treating them as product requirements.
+
+## Safety Behavior
+
+Migration never silently deletes legacy source files.
+
+Migration must not write migrated output under:
+
+- `.ai-factory/plans/`
+- `openspec/specs/`
+- another change's `.ai-factory/state/<change-id>/`
+- another change's `.ai-factory/qa/<change-id>/`
+
+If a safety check fails, the script stops and reports diagnostics.
 
 ## Validation and Reports
 
@@ -91,18 +113,32 @@ After a non-dry-run migration, the script writes:
 .ai-factory/state/<id>/migration-report.md
 ```
 
-The report lists source artifacts, generated OpenSpec artifacts, runtime artifacts, validation status, diagnostics, and manual follow-ups.
+The report records source artifacts, generated OpenSpec artifacts, runtime artifacts, validation status, diagnostics, and manual follow-ups.
 
-When a compatible OpenSpec CLI is available, migration runs change validation through the shared runner. Missing or unsupported OpenSpec CLI records `SKIPPED` and does not block migration.
+When a compatible OpenSpec CLI is available, migration validates the migrated change through the shared runner.
 
-If validation fails, generated files remain in place and the report records `FAIL`; the script does not rollback by deleting migrated or legacy artifacts.
+When the CLI is missing or unsupported, validation is recorded as `SKIPPED`; this is degraded behavior, not silent success.
+
+When validation fails, generated files remain in place and the report records `FAIL`. The script does not roll back by deleting migrated or legacy artifacts.
 
 ## After Migration
 
-Legacy artifacts are not deleted. Review the generated OpenSpec change and refine it before implementation:
+Refine the migrated OpenSpec-native change before implementation:
 
-```bash
+```text
 /aif-improve <change-id>
 ```
 
-Generated delta specs are conservative. Review them before relying on them as product requirements.
+Then run the normal v1 flow:
+
+```text
+/aif-implement <change-id>
+/aif-verify <change-id>
+/aif-done <change-id>
+```
+
+## See Also
+
+- [Usage](usage.md)
+- [Context Loading Policy](context-loading-policy.md)
+- [Active Change Resolver](active-change-resolver.md)
