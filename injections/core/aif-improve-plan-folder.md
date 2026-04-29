@@ -35,6 +35,15 @@ Resolve the active change using the shared vocabulary from `scripts/active-chang
 - Otherwise use `resolveActiveChange` behavior: current working directory, current branch mapping, current pointer, then single active change.
 - Treat the selected change ID, selected source, candidate list, warnings, and errors as user-visible refinement context.
 - If the resolved path is under `openspec/changes/archive/**`, do not edit silently. Archived changes are immutable by default; report the archived target clearly and suggest creating a new change for further work.
+- If an explicit or inferred `<change-id>` cannot be resolved as an OpenSpec change, check for matching legacy AI Factory plan artifacts through `detectMigrationNeed(options)` from `scripts/legacy-plan-migration.mjs` or equivalent read-only detection. If migration is suggested, do not auto-migrate. Show exactly:
+
+```text
+Found legacy AI Factory plan artifacts for `<change-id>` but no OpenSpec change at `openspec/changes/<change-id>`.
+Run the legacy migration script with:
+
+node scripts/migrate-legacy-plans.mjs <change-id> --dry-run
+node scripts/migrate-legacy-plans.mjs <change-id>
+```
 
 Refine only these canonical OpenSpec artifacts for the active change:
 

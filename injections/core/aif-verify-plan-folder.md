@@ -36,6 +36,15 @@ Resolve the active change using `scripts/active-change-resolver.mjs` when availa
 - Prefer an explicit `<change-id>` or `@openspec/changes/<change-id>` input when provided.
 - Otherwise use `resolveActiveChange` behavior: current working directory, current branch mapping, current pointer, then single active change.
 - Treat selected source, candidate list, warnings, and errors as user-visible verification context.
+- If an explicit or inferred `<change-id>` cannot be resolved as an OpenSpec change, check for matching legacy AI Factory plan artifacts through `detectMigrationNeed(options)` from `scripts/legacy-plan-migration.mjs` or equivalent read-only detection. If migration is suggested, do not auto-migrate. Show exactly:
+
+```text
+Found legacy AI Factory plan artifacts for `<change-id>` but no OpenSpec change at `openspec/changes/<change-id>`.
+Run the legacy migration script with:
+
+node scripts/migrate-legacy-plans.mjs <change-id> --dry-run
+node scripts/migrate-legacy-plans.mjs <change-id>
+```
 
 Validate and review against canonical OpenSpec artifacts:
 

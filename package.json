@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "migrate:legacy-plans": "node scripts/migrate-legacy-plans.mjs",
     "test": "node --test scripts/*.test.mjs",
     "validate": "node scripts/validate-extension.mjs && node scripts/validate-codex-agents.mjs && node scripts/validate-claude-agents.mjs && node scripts/validate-doc-links.mjs"
   }

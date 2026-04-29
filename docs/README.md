@@ -27,6 +27,7 @@ OpenSpec compatibility is tracked as optional adapter metadata, not as a hard ex
 | [Context Loading Policy](context-loading-policy.md) | Runtime context contract, ownership boundaries, and artifact rules |
 | [OpenSpec Compatibility](openspec-compatibility.md) | Optional OpenSpec CLI adapter policy, degraded mode, and future capability flags |
 | [Active Change Resolver](active-change-resolver.md) | Shared active OpenSpec change selection, runtime paths, pointer behavior, and ambiguity diagnostics |
+| [Legacy Plan Migration](legacy-plan-migration.md) | Explicit migration from legacy `.ai-factory/plans` artifacts to OpenSpec-native changes |
 | [ADR 0001: OpenSpec-native artifact protocol](adr/0001-openspec-native-artifact-protocol.md) | v1 source-of-truth contract for OpenSpec canonical artifacts and AI Factory runtime state |
 
 ## Recommended Reading Order
@@ -37,7 +38,8 @@ OpenSpec compatibility is tracked as optional adapter metadata, not as a hard ex
 4. Read [Context Loading Policy](context-loading-policy.md) for ownership and runtime path rules.
 5. Read [OpenSpec Compatibility](openspec-compatibility.md) for optional OpenSpec CLI adapter policy and degraded-mode behavior.
 6. Read [Active Change Resolver](active-change-resolver.md) for shared change selection and runtime state paths.
-7. Read [ADR 0001](adr/0001-openspec-native-artifact-protocol.md) for the v1 artifact ownership contract.
+7. Read [Legacy Plan Migration](legacy-plan-migration.md) if you still have `.ai-factory/plans` artifacts to migrate.
+8. Read [ADR 0001](adr/0001-openspec-native-artifact-protocol.md) for the v1 artifact ownership contract.
 
 ## Scope
 
@@ -59,5 +61,6 @@ Project-level AI Factory planning and archived specs remain under `.ai-factory/`
 - [Context Loading Policy](context-loading-policy.md) - context-loading and ownership rules
 - [OpenSpec Compatibility](openspec-compatibility.md) - optional CLI adapter policy and future capability flags
 - [Active Change Resolver](active-change-resolver.md) - active change selection and runtime state layout
+- [Legacy Plan Migration](legacy-plan-migration.md) - explicit migration commands and artifact mapping
 - [ADR 0001: OpenSpec-native artifact protocol](adr/0001-openspec-native-artifact-protocol.md) - canonical OpenSpec artifacts and runtime AI Factory state
 - [Project README](../README.md) - landing page and quick start
