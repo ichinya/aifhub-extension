@@ -271,6 +271,23 @@ describe('mapLegacyPlanToOpenSpecArtifacts', () => {
     assert.match(tasks, /## Migrated legacy tasks/);
     assert.match(tasks, /Implement the migration in one careful pass\./);
   });
+
+  it('honors custom canonical, state, and QA directories during mapping', async () => {
+    const rootDir = await createTempRoot();
+    await copyLegacyFixture(rootDir);
+    const [legacyPlan] = (await discoverLegacyPlans({ rootDir, includeContent: true })).plans;
+
+    const mapped = mapLegacyPlanToOpenSpecArtifacts(legacyPlan, {
+      changesDir: 'custom/changes',
+      stateDir: 'custom/state',
+      qaDir: 'custom/qa'
+    });
+
+    assert.equal(mapped.ok, true);
+    assert.ok(mapped.canonicalArtifacts.every((artifact) => artifact.target.startsWith('custom/changes/add-oauth/')));
+    assert.ok(mapped.runtimeArtifacts.every((artifact) => artifact.target.startsWith('custom/state/add-oauth/')));
+    assert.ok(mapped.qaArtifacts.every((artifact) => artifact.target.startsWith('custom/qa/add-oauth/')));
+  });
 });
 
 describe('migrateLegacyPlan', () => {
@@ -352,6 +369,45 @@ describe('migrateLegacyPlan', () => {
     assert.match(report, /OpenSpec validation: SKIPPED/);
     assert.match(report, /\.ai-factory\/plans\/add-oauth\/verify\.md/);
     assert.match(report, /\.ai-factory\/qa\/add-oauth\/legacy-verify\.md/);
+  });
+
+  it('honors custom changesDir, stateDir, and qaDir when writing migration artifacts', async () => {
+    const rootDir = await createTempRoot();
+    await copyLegacyFixture(rootDir);
+    let layoutCall = null;
+
+    const result = await migrateLegacyPlan('add-oauth', {
+      rootDir,
+      changesDir: 'custom/changes',
+      stateDir: 'custom/state',
+      qaDir: 'custom/qa',
+      detectOpenSpec: async () => missingCliDetection(),
+      ensureRuntimeLayout: async (changeId, layoutOptions) => {
+        layoutCall = {
+          changeId,
+          stateDir: layoutOptions.stateDir,
+          qaDir: layoutOptions.qaDir
+        };
+      }
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.targetChangePath, 'custom/changes/add-oauth');
+    assert.equal(result.reportPath, 'custom/state/add-oauth/migration-report.md');
+    assert.deepEqual(layoutCall, {
+      changeId: 'add-oauth',
+      stateDir: 'custom/state',
+      qaDir: 'custom/qa'
+    });
+    assert.equal(await pathExists(rootDir, 'custom/changes/add-oauth/proposal.md'), true);
+    assert.equal(await pathExists(rootDir, 'custom/changes/add-oauth/tasks.md'), true);
+    assert.equal(await pathExists(rootDir, 'custom/changes/add-oauth/specs/migrated/spec.md'), true);
+    assert.equal(await pathExists(rootDir, 'custom/state/add-oauth/legacy-status.yaml'), true);
+    assert.equal(await pathExists(rootDir, 'custom/state/add-oauth/migration-report.md'), true);
+    assert.equal(await pathExists(rootDir, 'custom/qa/add-oauth/legacy-verify.md'), true);
+    assert.equal(await pathExists(rootDir, 'openspec/changes/add-oauth/proposal.md'), false);
+    assert.equal(await pathExists(rootDir, '.ai-factory/state/add-oauth/migration-report.md'), false);
+    assert.equal(await pathExists(rootDir, '.ai-factory/qa/add-oauth/legacy-verify.md'), false);
   });
 
   it('fails by default on target collision and supports suffix and merge-safe modes', async () => {

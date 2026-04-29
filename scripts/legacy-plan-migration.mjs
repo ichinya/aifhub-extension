@@ -170,6 +170,7 @@ export function mapLegacyPlanToOpenSpecArtifacts(legacyPlan, options = {}) {
 
   const changeId = options.changeId ?? normalized.planId;
   const normalizedChange = normalizeChangeId(changeId);
+  const paths = getMigrationPathConfig(options);
   if (!normalizedChange.ok) {
     return {
       ok: false,
@@ -191,13 +192,13 @@ export function mapLegacyPlanToOpenSpecArtifacts(legacyPlan, options = {}) {
   const canonicalArtifacts = [
     {
       kind: 'proposal',
-      target: toPosix(path.join(DEFAULT_CHANGES_DIR, normalizedChange.changeId, 'proposal.md')),
+      target: toPosix(path.join(paths.changesDir, normalizedChange.changeId, 'proposal.md')),
       source: legacyPlan.planFile ?? sourceArtifacts[0] ?? null,
       content: renderProposal({ title, legacyPlan, contents, sourceArtifacts })
     },
     {
       kind: 'tasks',
-      target: toPosix(path.join(DEFAULT_CHANGES_DIR, normalizedChange.changeId, 'tasks.md')),
+      target: toPosix(path.join(paths.changesDir, normalizedChange.changeId, 'tasks.md')),
       source: legacyPlan.files?.task ?? null,
       content: renderTasks(contents.task)
     }
@@ -213,7 +214,7 @@ export function mapLegacyPlanToOpenSpecArtifacts(legacyPlan, options = {}) {
   if (isDesignLike(contents.context)) {
     canonicalArtifacts.push({
       kind: 'design',
-      target: toPosix(path.join(DEFAULT_CHANGES_DIR, normalizedChange.changeId, 'design.md')),
+      target: toPosix(path.join(paths.changesDir, normalizedChange.changeId, 'design.md')),
       source: legacyPlan.files?.context ?? null,
       content: renderDesign({ title, legacyPlan, contents })
     });
@@ -222,7 +223,7 @@ export function mapLegacyPlanToOpenSpecArtifacts(legacyPlan, options = {}) {
   if (hasText(contents.context)) {
     runtimeArtifacts.push({
       kind: 'legacy-context',
-      target: toPosix(path.join(DEFAULT_STATE_DIR, normalizedChange.changeId, 'legacy-context.md')),
+      target: toPosix(path.join(paths.stateDir, normalizedChange.changeId, 'legacy-context.md')),
       source: legacyPlan.files?.context ?? null,
       content: renderPreservedMarkdown('Legacy Context', legacyPlan.files?.context, contents.context)
     });
@@ -231,7 +232,7 @@ export function mapLegacyPlanToOpenSpecArtifacts(legacyPlan, options = {}) {
   if (hasText(contents.rules)) {
     runtimeArtifacts.push({
       kind: 'legacy-rules',
-      target: toPosix(path.join(DEFAULT_STATE_DIR, normalizedChange.changeId, 'legacy-rules.md')),
+      target: toPosix(path.join(paths.stateDir, normalizedChange.changeId, 'legacy-rules.md')),
       source: legacyPlan.files?.rules ?? null,
       content: renderPreservedMarkdown('Legacy Rules', legacyPlan.files?.rules, contents.rules)
     });
@@ -244,7 +245,7 @@ export function mapLegacyPlanToOpenSpecArtifacts(legacyPlan, options = {}) {
   if (hasText(contents.status)) {
     runtimeArtifacts.push({
       kind: 'legacy-status',
-      target: toPosix(path.join(DEFAULT_STATE_DIR, normalizedChange.changeId, 'legacy-status.yaml')),
+      target: toPosix(path.join(paths.stateDir, normalizedChange.changeId, 'legacy-status.yaml')),
       source: legacyPlan.files?.status ?? null,
       content: contents.status
     });
@@ -253,7 +254,7 @@ export function mapLegacyPlanToOpenSpecArtifacts(legacyPlan, options = {}) {
   if (hasText(contents.explore)) {
     runtimeArtifacts.push({
       kind: 'legacy-explore',
-      target: toPosix(path.join(DEFAULT_STATE_DIR, normalizedChange.changeId, 'legacy-explore.md')),
+      target: toPosix(path.join(paths.stateDir, normalizedChange.changeId, 'legacy-explore.md')),
       source: legacyPlan.files?.explore ?? null,
       content: renderPreservedMarkdown('Legacy Exploration Notes', legacyPlan.files?.explore, contents.explore)
     });
@@ -262,7 +263,7 @@ export function mapLegacyPlanToOpenSpecArtifacts(legacyPlan, options = {}) {
   if (hasText(contents.verify)) {
     qaArtifacts.push({
       kind: 'legacy-verify',
-      target: toPosix(path.join(DEFAULT_QA_DIR, normalizedChange.changeId, 'legacy-verify.md')),
+      target: toPosix(path.join(paths.qaDir, normalizedChange.changeId, 'legacy-verify.md')),
       source: legacyPlan.files?.verify ?? null,
       content: contents.verify
     });
@@ -277,7 +278,7 @@ export function mapLegacyPlanToOpenSpecArtifacts(legacyPlan, options = {}) {
   if (requirements.length > 0) {
     canonicalArtifacts.push({
       kind: 'delta-spec',
-      target: toPosix(path.join(DEFAULT_CHANGES_DIR, normalizedChange.changeId, 'specs', 'migrated', 'spec.md')),
+      target: toPosix(path.join(paths.changesDir, normalizedChange.changeId, 'specs', 'migrated', 'spec.md')),
       source: sourceArtifacts[0] ?? null,
       content: renderDeltaSpec(requirements)
     });
@@ -308,6 +309,7 @@ export async function migrateLegacyPlan(planId, options = {}) {
   const normalized = normalizeLegacyPlanId(planId);
   const dryRun = Boolean(options.dryRun);
   const onCollision = options.onCollision ?? 'fail';
+  const paths = getMigrationPathConfig(options);
 
   if (!normalized.ok) {
     return createMigrationFailure({
@@ -364,12 +366,15 @@ export async function migrateLegacyPlan(planId, options = {}) {
       dryRun,
       planId: normalized.planId,
       changeId: normalized.planId,
-      targetChangePath: toPosix(path.join(DEFAULT_CHANGES_DIR, normalized.planId)),
+      targetChangePath: toPosix(path.join(paths.changesDir, normalized.planId)),
       errors: collision.errors
     });
   }
 
-  const mapped = mapLegacyPlanToOpenSpecArtifacts(legacyPlan, { changeId: collision.changeId });
+  const mapped = mapLegacyPlanToOpenSpecArtifacts(legacyPlan, {
+    ...paths,
+    changeId: collision.changeId
+  });
   if (!mapped.ok) {
     return createMigrationFailure({
       dryRun,
@@ -389,7 +394,7 @@ export async function migrateLegacyPlan(planId, options = {}) {
 
   for (const artifact of plannedArtifacts) {
     try {
-      assertSafeArtifactTarget(rootDir, collision.changeId, artifact);
+      assertSafeArtifactTarget(rootDir, collision.changeId, artifact, paths);
     } catch (err) {
       errors.push({
         code: 'unsafe-target',
@@ -417,6 +422,7 @@ export async function migrateLegacyPlan(planId, options = {}) {
   }
 
   const reportPath = await resolveMigrationReportPath(rootDir, collision.changeId, {
+    ...paths,
     onCollision
   });
   operations.push({
@@ -429,7 +435,7 @@ export async function migrateLegacyPlan(planId, options = {}) {
     assertSafeArtifactTarget(rootDir, collision.changeId, {
       target: reportPath,
       bucket: 'state'
-    });
+    }, paths);
   } catch (err) {
     errors.push({
       code: 'unsafe-target',
@@ -443,7 +449,7 @@ export async function migrateLegacyPlan(planId, options = {}) {
       dryRun,
       planId: normalized.planId,
       changeId: collision.changeId,
-      targetChangePath: toPosix(path.join(DEFAULT_CHANGES_DIR, collision.changeId)),
+      targetChangePath: toPosix(path.join(paths.changesDir, collision.changeId)),
       operations,
       warnings: mapped.warnings,
       errors
@@ -455,7 +461,7 @@ export async function migrateLegacyPlan(planId, options = {}) {
     dryRun,
     planId: normalized.planId,
     changeId: collision.changeId,
-    targetChangePath: toPosix(path.join(DEFAULT_CHANGES_DIR, collision.changeId)),
+    targetChangePath: toPosix(path.join(paths.changesDir, collision.changeId)),
     operations,
     validation: createValidationSummary('SKIPPED', false, null),
     reportPath,
@@ -564,6 +570,7 @@ export async function writeMigrationReport(planId, report, options = {}) {
   const rootDir = resolveRootDir(options);
   const changeId = options.changeId ?? report?.changeId ?? planId;
   const normalized = normalizeChangeId(changeId);
+  const paths = getMigrationPathConfig(options);
 
   if (!normalized.ok) {
     throw new Error(normalized.error.message);
@@ -571,7 +578,7 @@ export async function writeMigrationReport(planId, report, options = {}) {
 
   const reportPath = options.reportPath
     ? toPosix(options.reportPath)
-    : toPosix(path.join(DEFAULT_STATE_DIR, normalized.changeId, 'migration-report.md'));
+    : toPosix(path.join(paths.stateDir, normalized.changeId, 'migration-report.md'));
   const artifact = {
     bucket: 'state',
     target: reportPath,
@@ -581,7 +588,7 @@ export async function writeMigrationReport(planId, report, options = {}) {
       ...report
     })
   };
-  assertSafeArtifactTarget(rootDir, normalized.changeId, artifact);
+  assertSafeArtifactTarget(rootDir, normalized.changeId, artifact, paths);
 
   if (options.dryRun) {
     return {
@@ -642,7 +649,8 @@ export async function detectMigrationNeed(options = {}) {
 
 async function resolveCollisionTarget(planId, options) {
   const rootDir = resolveRootDir(options);
-  const changesDir = options.changesDir ?? DEFAULT_CHANGES_DIR;
+  const paths = getMigrationPathConfig(options);
+  const changesDir = paths.changesDir;
   const onCollision = options.onCollision ?? 'fail';
   const target = resolveFromRoot(rootDir, path.join(changesDir, planId));
   const exists = await pathExists(target);
@@ -663,7 +671,7 @@ async function resolveCollisionTarget(planId, options) {
         {
           code: 'target-exists',
           message: `OpenSpec change target already exists: ${toPosix(path.join(changesDir, planId))}.`,
-          source: toPosix(path.join(DEFAULT_PLANS_DIR, `${planId}.md`)),
+          source: toPosix(path.join(paths.plansDir, `${planId}.md`)),
           target: toPosix(path.join(changesDir, planId))
         }
       ]
@@ -700,7 +708,8 @@ async function resolveCollisionTarget(planId, options) {
 }
 
 async function resolveMigrationReportPath(rootDir, changeId, options = {}) {
-  const defaultReportPath = toPosix(path.join(DEFAULT_STATE_DIR, changeId, 'migration-report.md'));
+  const paths = getMigrationPathConfig(options);
+  const defaultReportPath = toPosix(path.join(paths.stateDir, changeId, 'migration-report.md'));
 
   if (options.onCollision === 'overwrite' || !await pathExists(resolveFromRoot(rootDir, defaultReportPath))) {
     return defaultReportPath;
@@ -708,7 +717,7 @@ async function resolveMigrationReportPath(rootDir, changeId, options = {}) {
 
   for (let index = 0; index < 100; index += 1) {
     const suffix = index === 0 ? '-migrated' : `-migrated-${index + 1}`;
-    const candidate = toPosix(path.join(DEFAULT_STATE_DIR, changeId, `migration-report${suffix}.md`));
+    const candidate = toPosix(path.join(paths.stateDir, changeId, `migration-report${suffix}.md`));
     if (!await pathExists(resolveFromRoot(rootDir, candidate))) {
       return candidate;
     }
@@ -786,6 +795,15 @@ function ensureDiscoveredPlan(plansById, id, rootDir, changesRoot) {
   }
 
   return plansById.get(id);
+}
+
+function getMigrationPathConfig(options = {}) {
+  return {
+    plansDir: options.plansDir ?? DEFAULT_PLANS_DIR,
+    changesDir: options.changesDir ?? DEFAULT_CHANGES_DIR,
+    stateDir: options.stateDir ?? DEFAULT_STATE_DIR,
+    qaDir: options.qaDir ?? DEFAULT_QA_DIR
+  };
 }
 
 async function readLegacyPlanContents(rootDir, plan) {
@@ -1119,24 +1137,25 @@ async function writeArtifact(rootDir, artifact) {
   await writeFile(targetPath, artifact.content, 'utf8');
 }
 
-function assertSafeArtifactTarget(rootDir, changeId, artifact) {
+function assertSafeArtifactTarget(rootDir, changeId, artifact, options = {}) {
+  const paths = getMigrationPathConfig(options);
   const targetPath = resolveFromRoot(rootDir, artifact.target);
   assertWithinRoot(rootDir, targetPath);
-  assertNotLegacyPlanPath(rootDir, targetPath);
+  assertNotLegacyPlanPath(rootDir, targetPath, paths);
   assertNotBaseSpecPath(rootDir, targetPath);
 
   if (artifact.bucket === 'canonical') {
-    assertWithinDirectory(targetPath, resolveFromRoot(rootDir, path.join(DEFAULT_CHANGES_DIR, changeId)), 'Canonical migration target must stay inside the OpenSpec change folder.');
+    assertWithinDirectory(targetPath, resolveFromRoot(rootDir, path.join(paths.changesDir, changeId)), 'Canonical migration target must stay inside the OpenSpec change folder.');
     return;
   }
 
   if (artifact.bucket === 'state') {
-    assertWithinDirectory(targetPath, resolveFromRoot(rootDir, path.join(DEFAULT_STATE_DIR, changeId)), 'Runtime state migration target must stay inside the change state folder.');
+    assertWithinDirectory(targetPath, resolveFromRoot(rootDir, path.join(paths.stateDir, changeId)), 'Runtime state migration target must stay inside the change state folder.');
     return;
   }
 
   if (artifact.bucket === 'qa') {
-    assertWithinDirectory(targetPath, resolveFromRoot(rootDir, path.join(DEFAULT_QA_DIR, changeId)), 'QA migration target must stay inside the change QA folder.');
+    assertWithinDirectory(targetPath, resolveFromRoot(rootDir, path.join(paths.qaDir, changeId)), 'QA migration target must stay inside the change QA folder.');
     return;
   }
 
@@ -1147,8 +1166,9 @@ function assertWithinRoot(rootDir, targetPath) {
   assertWithinDirectory(targetPath, path.resolve(rootDir), 'Migration target escapes repository root.');
 }
 
-function assertNotLegacyPlanPath(rootDir, targetPath) {
-  const legacyPlansPath = resolveFromRoot(rootDir, DEFAULT_PLANS_DIR);
+function assertNotLegacyPlanPath(rootDir, targetPath, options = {}) {
+  const paths = getMigrationPathConfig(options);
+  const legacyPlansPath = resolveFromRoot(rootDir, paths.plansDir);
   if (isWithinDirectory(targetPath, legacyPlansPath)) {
     throw new Error('Migration target must not write under legacy plan folders.');
   }
