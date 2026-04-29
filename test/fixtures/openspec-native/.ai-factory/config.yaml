@@ -13,4 +13,4 @@ paths:
   specs: openspec/specs
   state: .ai-factory/state
   qa: .ai-factory/qa
-  rules_generated: .ai-factory/rules/generated
+  generated_rules: .ai-factory/rules/generated

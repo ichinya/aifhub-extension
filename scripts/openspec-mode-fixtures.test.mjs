@@ -124,7 +124,7 @@ describe('OpenSpec mode fixtures', () => {
     assert.match(config, /specs:\s*openspec\/specs/);
     assert.match(config, /state:\s*\.ai-factory\/state/);
     assert.match(config, /qa:\s*\.ai-factory\/qa/);
-    assert.match(config, /rules_generated:\s*\.ai-factory\/rules\/generated/);
+    assert.match(config, /generated_rules:\s*\.ai-factory\/rules\/generated/);
     assert.doesNotMatch(config, /openspec[-_\s]*skills/i);
     assert.equal(await isDirectory(path.join(FIXTURE_ROOT, 'openspec-native', '.codex', 'skills', 'openspec')), false);
   });
