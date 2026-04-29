@@ -254,6 +254,39 @@ describe('OpenSpec execution context API', () => {
     assert.equal(result.openspecInstructions.available, true);
   });
 
+  it('skips OpenSpec apply instructions when useInstructionsApply is false', async () => {
+    const { buildImplementationContext } = await loadExecutionContext();
+    const rootDir = await createTempRoot();
+    let instructionCalls = 0;
+    await createOpenSpecChange(rootDir, 'add-oauth');
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  openspec:',
+      '    useInstructionsApply: false'
+    ].join('\n'));
+
+    const result = await buildImplementationContext({
+      rootDir,
+      changeId: 'add-oauth',
+      detectOpenSpec: async () => availableCliDetection(),
+      getOpenSpecInstructions: async () => {
+        instructionCalls += 1;
+        return {
+          ok: true,
+          json: { steps: ['apply change'] },
+          stdout: '{"steps":["apply change"]}',
+          stderr: ''
+        };
+      }
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(instructionCalls, 0);
+    assert.equal(result.openspecInstructions.available, false);
+    assert.equal(result.openspecInstructions.detail, 'useInstructionsApply-disabled');
+    assert.ok(result.warnings.some((warning) => warning.code === 'openspec-instructions-disabled'));
+  });
+
   it('does not fail context creation when OpenSpec CLI is missing', async () => {
     const { buildImplementationContext } = await loadExecutionContext();
     const rootDir = await createTempRoot();

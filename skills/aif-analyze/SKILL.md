@@ -134,8 +134,15 @@ aifhub:
     root: openspec
     installSkills: false
     validateOnPlan: true
+    validateOnImprove: true
     validateOnVerify: true
+    statusOnVerify: true
     archiveOnDone: true
+    useInstructionsApply: true
+    compileRulesOnSync: true
+    validateOnSync: true
+    requireCliForVerify: false
+    requireCliForDone: true
 ```
 
   - Ensure canonical artifact paths are set or completed:
@@ -264,8 +271,15 @@ aifhub:
     root: openspec
     installSkills: false
     validateOnPlan: true
+    validateOnImprove: true
     validateOnVerify: true
+    statusOnVerify: true
     archiveOnDone: true
+    useInstructionsApply: true
+    compileRulesOnSync: true
+    validateOnSync: true
+    requireCliForVerify: false
+    requireCliForDone: true
 
 paths:
   description: .ai-factory/DESCRIPTION.md
@@ -303,6 +317,7 @@ agent_profile: default
 - Create/update `config.yaml` and `rules/base.md` first.
 - Use OpenSpec-native mode only when explicitly requested or when existing config has `aifhub.artifactProtocol: openspec`.
 - In OpenSpec-native mode, use `detectOpenSpec()` from `scripts/openspec-runner.mjs` when available and treat missing or unsupported CLI as degraded capability, not failure.
+- In OpenSpec-native mode, AIFHub skills may request OpenSpec validation, status, instructions, and archive through `scripts/openspec-runner.mjs`; never install or depend on OpenSpec slash commands.
 - In OpenSpec-native mode, use or recommend `openspec init --tools none` only for compatible CLI environments.
 - Never install OpenSpec skills, slash commands, dependencies, or manifest entries.
 - Never treat missing OpenSpec validate/archive capability as bootstrap failure; report it as degraded OpenSpec capability and continue with the configured runtime/generated path layout.

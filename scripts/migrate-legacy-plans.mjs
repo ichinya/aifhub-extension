@@ -170,7 +170,8 @@ function renderMigration(result) {
     '',
     ...renderDiagnostics('Warnings', result.warnings),
     '',
-    ...renderDiagnostics('Errors', result.errors)
+    ...renderDiagnostics('Errors', result.errors),
+    ...renderTargetExistsHint(result, result.planId ?? '<change-id>')
   ].join('\n');
 }
 
@@ -183,7 +184,8 @@ function renderAll(result) {
     '',
     ...renderDiagnostics('Warnings', result.warnings),
     '',
-    ...renderDiagnostics('Errors', result.errors)
+    ...renderDiagnostics('Errors', result.errors),
+    ...renderTargetExistsHint(result, '--all')
   ].join('\n');
 }
 
@@ -196,6 +198,24 @@ function renderDiagnostics(label, diagnostics) {
   return [
     `${label}:`,
     ...items.map((item) => `- ${item.code ?? 'diagnostic'}: ${item.message ?? JSON.stringify(item)}`)
+  ];
+}
+
+function renderTargetExistsHint(result, subjectArgs) {
+  const errors = Array.isArray(result.errors) ? result.errors : [];
+  if (!errors.some((error) => error.code === 'target-exists')) {
+    return [];
+  }
+
+  const command = `node scripts/migrate-legacy-plans.mjs ${subjectArgs}`;
+
+  return [
+    '',
+    'Hint:',
+    '- Existing OpenSpec targets were found. The default collision mode is fail.',
+    `- Preview a safe merge: ${command} --on-collision merge-safe --dry-run`,
+    `- Apply a safe merge: ${command} --on-collision merge-safe`,
+    `- Create separate migrated targets: ${command} --on-collision suffix`
   ];
 }
 

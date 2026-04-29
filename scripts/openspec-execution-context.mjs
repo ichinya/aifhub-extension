@@ -44,7 +44,10 @@ export async function buildImplementationContext(options = {}) {
   });
   const canonical = await collectCanonicalChangeArtifacts(resolverResult.changeId, { ...options, rootDir });
   const generatedRules = await collectGeneratedRules(resolverResult.changeId, { ...options, rootDir });
-  const instructions = await collectOpenSpecInstructions(resolverResult.changeId, { ...options, rootDir });
+  const config = await readExecutionConfig(rootDir);
+  const instructions = config.useInstructionsApply
+    ? await collectOpenSpecInstructions(resolverResult.changeId, { ...options, rootDir })
+    : createDisabledInstructionsResult();
   const warnings = dedupeDiagnostics([
     ...resolverResult.warnings,
     ...canonical.warnings,
@@ -346,6 +349,74 @@ async function collectOpenSpecInstructions(changeId, options) {
   };
 }
 
+async function readExecutionConfig(rootDir) {
+  const defaults = {
+    useInstructionsApply: true
+  };
+
+  try {
+    const raw = await readFile(path.join(rootDir, '.ai-factory', 'config.yaml'), 'utf8');
+    return {
+      ...defaults,
+      ...parseOpenSpecExecutionConfig(raw)
+    };
+  } catch {
+    return defaults;
+  }
+}
+
+function parseOpenSpecExecutionConfig(raw) {
+  const values = {};
+  const lines = String(raw ?? '').split(/\r?\n/);
+  let aifhubIndent = null;
+  let openspecIndent = null;
+
+  for (const rawLine of lines) {
+    if (/^\s*(?:#.*)?$/.test(rawLine)) {
+      continue;
+    }
+
+    const match = rawLine.match(/^(\s*)([A-Za-z0-9_-]+):(?:\s*(.*?))?\s*$/);
+    if (!match) {
+      continue;
+    }
+
+    const indent = match[1].length;
+    const key = match[2];
+    const rawValue = match[3] ?? '';
+
+    if (aifhubIndent !== null && indent <= aifhubIndent && key !== 'aifhub') {
+      aifhubIndent = null;
+      openspecIndent = null;
+    }
+
+    if (openspecIndent !== null && indent <= openspecIndent && key !== 'openspec') {
+      openspecIndent = null;
+    }
+
+    if (key === 'aifhub') {
+      aifhubIndent = indent;
+      openspecIndent = null;
+      continue;
+    }
+
+    if (aifhubIndent !== null && key === 'openspec' && indent > aifhubIndent) {
+      openspecIndent = indent;
+      continue;
+    }
+
+    if (aifhubIndent !== null && openspecIndent !== null && indent > openspecIndent && key === 'useInstructionsApply') {
+      const parsed = parseBooleanScalar(rawValue);
+
+      if (parsed !== null) {
+        values.useInstructionsApply = parsed;
+      }
+    }
+  }
+
+  return values;
+}
+
 async function writeTrace({ changeId, trace, options, type, directoryName }) {
   const normalized = normalizeChangeId(changeId);
 
@@ -640,6 +711,52 @@ function createUnavailableInstructions(detail) {
     raw: null,
     detail
   };
+}
+
+function createDisabledInstructionsResult() {
+  return {
+    openspecInstructions: createUnavailableInstructions('useInstructionsApply-disabled'),
+    warnings: [
+      {
+        code: 'openspec-instructions-disabled',
+        message: 'OpenSpec apply instructions skipped because aifhub.openspec.useInstructionsApply is false.'
+      }
+    ],
+    errors: []
+  };
+}
+
+function parseBooleanScalar(rawValue) {
+  const value = stripInlineComment(rawValue).trim().replace(/^["']|["']$/g, '').toLowerCase();
+
+  if (value === 'true') {
+    return true;
+  }
+
+  if (value === 'false') {
+    return false;
+  }
+
+  return null;
+}
+
+function stripInlineComment(value) {
+  let quote = null;
+
+  for (let index = 0; index < String(value).length; index += 1) {
+    const char = String(value)[index];
+
+    if ((char === '"' || char === "'") && (index === 0 || String(value)[index - 1] !== '\\')) {
+      quote = quote === char ? null : quote ?? char;
+      continue;
+    }
+
+    if (char === '#' && quote === null) {
+      return String(value).slice(0, index);
+    }
+  }
+
+  return String(value);
 }
 
 function missingQaEvidenceDiagnostic() {

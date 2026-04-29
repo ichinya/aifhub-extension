@@ -10,10 +10,12 @@ AI Factory UX + OpenSpec artifact protocol
 
 OpenSpec-native artifacts under `openspec/` are canonical. AI Factory artifacts under `.ai-factory/` hold runtime state, QA evidence, generated rules, and legacy migration input.
 
+OpenSpec CLI features are reached through AIFHub wrappers and `scripts/openspec-runner.mjs`; OpenSpec skills or slash commands are not installed by the extension.
+
 ## Reading Order
 
 1. [Project README](../README.md) for the landing page, quick start, artifact layout, compatibility summary, migration summary, and troubleshooting summary.
-2. [Usage](usage.md) for the full command flow, command read/write boundaries, OAuth example, troubleshooting, and smoke checks.
+2. [Usage](usage.md) for the full command flow, `/aif-mode` switching and sync, command read/write boundaries, OAuth example, troubleshooting, and smoke checks.
 3. [Context Loading Policy](context-loading-policy.md) for consumer context, ownership boundaries, generated rules, and legacy path rules.
 4. [OpenSpec Compatibility](openspec-compatibility.md) for optional CLI adapter support, Node requirements, capability flags, and degraded mode.
 5. [Legacy Plan Migration](legacy-plan-migration.md) if existing `.ai-factory/plans` artifacts need to move into OpenSpec-native changes.
@@ -47,6 +49,7 @@ The remaining runtime-specific guides are supporting references:
 This docs set covers:
 
 - OpenSpec-native v1 workflow
+- artifact mode switching and sync through `/aif-mode`
 - command reads, writes, and forbidden writes
 - canonical OpenSpec artifact ownership
 - AI Factory runtime state, QA evidence, and generated rules

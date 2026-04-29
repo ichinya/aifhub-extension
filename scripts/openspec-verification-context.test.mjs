@@ -416,6 +416,38 @@ describe('OpenSpec verification context API', () => {
     assert.match(verifySummary, /OpenSpec validation: SKIPPED/);
   });
 
+  it('skips status evidence when statusOnVerify is false', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+    let statusCalls = 0;
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  openspec:',
+      '    validateOnVerify: true',
+      '    statusOnVerify: false'
+    ].join('\n'));
+
+    const result = await buildVerificationContext({
+      rootDir,
+      changeId: 'add-oauth',
+      detectOpenSpec: async () => availableCliDetection(),
+      validateOpenSpecChange: async () => validationResult(),
+      getOpenSpecStatus: async () => {
+        statusCalls += 1;
+        return statusResult();
+      }
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.config.statusOnVerify, false);
+    assert.equal(statusCalls, 0);
+    assert.equal(result.openspec.status, null);
+    assert.equal(await pathExists(path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'openspec-status.json')), false);
+
+    const verifySummary = await readFile(path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'verify.md'), 'utf8');
+    assert.match(verifySummary, /OpenSpec status: SKIPPED/);
+  });
+
   it('records invalid JSON output with raw stream paths and stops code verification', async () => {
     const rootDir = await createTempRoot();
     await createOpenSpecChange(rootDir);

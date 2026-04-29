@@ -6,6 +6,15 @@ OpenSpec is an optional CLI adapter for the v1 OpenSpec-native artifact protocol
 
 AIFHub Extension can create and consume OpenSpec-native filesystem artifacts without a local OpenSpec CLI. Validation and archive operations require a compatible CLI.
 
+OpenSpec-native mode uses this layering:
+
+```text
+OpenSpec artifacts = canonical truth
+OpenSpec CLI = validator / status / instructions / archive adapter
+AIFHub skills = UX and orchestration
+AI Factory = execution runtime
+```
+
 ## Supported Versions
 
 | Capability | Requirement |
@@ -40,8 +49,15 @@ aifhub:
     root: openspec
     installSkills: false
     validateOnPlan: true
+    validateOnImprove: true
     validateOnVerify: true
+    statusOnVerify: true
     archiveOnDone: true
+    useInstructionsApply: true
+    compileRulesOnSync: true
+    validateOnSync: true
+    requireCliForVerify: false
+    requireCliForDone: true
 
 paths:
   plans: openspec/changes
@@ -51,7 +67,50 @@ paths:
   generated_rules: .ai-factory/rules/generated
 ```
 
-`installSkills: false` is intentional. AIFHub Extension uses OpenSpec artifacts and the optional CLI adapter, not OpenSpec-installed skills.
+`installSkills: false` is intentional. AIFHub Extension uses OpenSpec artifacts and `scripts/openspec-runner.mjs` as the optional CLI adapter, not OpenSpec-installed skills or slash commands.
+
+## AIFHub Wrapper Behavior
+
+| AIFHub command | OpenSpec CLI feature |
+|---|---|
+| `/aif-analyze` | optional `openspec init --tools none` guidance or filesystem skeleton |
+| `/aif-plan full` | `openspec validate <change>` when `validateOnPlan` is enabled and CLI is available |
+| `/aif-improve` | `openspec validate <change>` when `validateOnImprove` is enabled and CLI is available |
+| `/aif-implement` | `openspec instructions apply --change <id>` when `useInstructionsApply` is enabled and CLI is available |
+| `/aif-verify` | `openspec validate` and optional `openspec status` evidence |
+| `/aif-rules-check` | OpenSpec specs/deltas through runner or filesystem fallback for generated rules |
+| `/aif-done` | `openspec archive <change> --yes` when archive is required |
+| `/aif-mode sync` | generated-rule compile plus validate/status according to sync flags |
+| `/aif-mode doctor` | CLI, Node, active change, generated rules, and archive readiness diagnostics |
+
+Do not route users to OpenSpec slash commands such as `/opsx:propose`, `/opsx:apply`, or `/opsx:archive`.
+
+## Mode Controller
+
+`/aif-mode` is the extension-owned controller for artifact protocol changes:
+
+```text
+/aif-mode status
+/aif-mode openspec
+/aif-mode ai-factory
+/aif-mode sync
+/aif-mode doctor
+```
+
+`/aif-mode openspec` ensures:
+
+```text
+openspec/config.yaml
+openspec/specs/
+openspec/changes/
+.ai-factory/state/
+.ai-factory/qa/
+.ai-factory/rules/generated/
+```
+
+It does not install OpenSpec skills or commands. If legacy plans exist, it reports migration commands and only runs migration when explicitly approved.
+
+`/aif-mode ai-factory` switches the config marker and legacy paths back to `.ai-factory/plans`, `.ai-factory/specs`, and `.ai-factory/rules`. It does not delete `openspec/`.
 
 ## OpenSpec-Native Planning
 

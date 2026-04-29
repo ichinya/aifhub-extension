@@ -606,4 +606,28 @@ describe('migrate-legacy-plans CLI', () => {
       }
     );
   });
+
+  it('prints collision recovery hints when all migration targets already exist', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/plans/alpha.md', '# Alpha\n');
+    await writeFixture(rootDir, '.ai-factory/plans/beta.md', '# Beta\n');
+    await writeFixture(rootDir, 'openspec/changes/alpha/proposal.md', '# Existing Alpha\n');
+    await writeFixture(rootDir, 'openspec/changes/beta/proposal.md', '# Existing Beta\n');
+
+    await assert.rejects(
+      () => execFileAsync(process.execPath, [CLI_PATH, '--all'], {
+        cwd: rootDir,
+        windowsHide: true
+      }),
+      (err) => {
+        assert.equal(err.code, 1);
+        assert.match(err.stdout, /Status: FAILED/);
+        assert.match(err.stdout, /target-exists/);
+        assert.match(err.stdout, /Preview a safe merge: node scripts\/migrate-legacy-plans\.mjs --all --on-collision merge-safe --dry-run/);
+        assert.match(err.stdout, /Apply a safe merge: node scripts\/migrate-legacy-plans\.mjs --all --on-collision merge-safe/);
+        assert.match(err.stdout, /Create separate migrated targets: node scripts\/migrate-legacy-plans\.mjs --all --on-collision suffix/);
+        return true;
+      }
+    );
+  });
 });

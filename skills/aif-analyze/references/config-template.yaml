@@ -29,10 +29,17 @@ aifhub:
     root: openspec
     installSkills: false
     validateOnPlan: true
+    validateOnImprove: true
     validateOnVerify: true
-    # Capability flag for a future finalizer/runtime integration; do not
-    # install OpenSpec skills or silently archive through legacy specs.
+    statusOnVerify: true
     archiveOnDone: true
+    useInstructionsApply: true
+    compileRulesOnSync: true
+    validateOnSync: true
+    requireCliForVerify: false
+    # /aif-done archive-required finalization needs a compatible CLI.
+    # Do not install OpenSpec skills or silently archive through legacy specs.
+    requireCliForDone: true
 
 # ============================================================================
 # PATH CONFIGURATION

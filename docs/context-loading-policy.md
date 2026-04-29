@@ -6,6 +6,8 @@ This policy defines which artifacts AIFHub Extension commands load and which art
 
 OpenSpec-native v1 has one core rule: canonical requirements and change intent live under `openspec/`; runtime state, QA evidence, and generated rules live under `.ai-factory/`.
 
+OpenSpec CLI integration is a runner-backed adapter. Commands may request validation, status, instructions, and archive through `scripts/openspec-runner.mjs`, but they must not install or invoke OpenSpec slash-command skills.
+
 ## Modes
 
 ### OpenSpec-Native Mode
@@ -19,6 +21,8 @@ aifhub:
 
 In this mode, plan-aware commands resolve active work from `openspec/changes/<change-id>/`, not from `.ai-factory/plans/`.
 
+`/aif-mode openspec` is the mode-switching entrypoint. It may update config and ensure skeleton directories, but it does not create feature-specific canonical change content by itself.
+
 ### Legacy AI Factory-Only Mode
 
 Legacy AI Factory-only mode uses the older companion plan model:
@@ -29,6 +33,8 @@ Legacy AI Factory-only mode uses the older companion plan model:
 ```
 
 These paths remain supported only for legacy compatibility and explicit migration input.
+
+`/aif-mode ai-factory` switches the config path profile back to this model. It preserves `openspec/` and treats OpenSpec-to-legacy output as compatibility export only.
 
 ## Base Context
 
@@ -63,10 +69,13 @@ They may also load derived/runtime artifacts:
 
 Generated rules are derived guidance only. If generated rules conflict with canonical OpenSpec artifacts, canonical OpenSpec artifacts win.
 
+Runner output from OpenSpec CLI commands is runtime guidance or evidence. It does not replace the canonical filesystem artifacts under `openspec/`.
+
 ## Command Ownership
 
 | Command | May write canonical OpenSpec artifacts | May write runtime or QA artifacts |
 |---|---|---|
+| `/aif-mode` | skeleton only; never manual `openspec/specs/**` mutations | mode reports, generated rules, optional migration/export outputs |
 | `/aif-analyze` | Optional `openspec/` skeleton only when configured | capability/config setup |
 | `/aif-plan full` | `openspec/changes/<change-id>/proposal.md`, `design.md`, `tasks.md`, `specs/**/spec.md` | optional `.ai-factory/state/<change-id>/` |
 | `/aif-explore` | no | `.ai-factory/RESEARCH.md`, `.ai-factory/state/<change-id>/` |
@@ -104,6 +113,17 @@ Migration never silently deletes legacy source artifacts and never writes migrat
 
 See [Legacy Plan Migration](legacy-plan-migration.md).
 
+## Compatibility Export
+
+OpenSpec-to-legacy compatibility export is optional and lossy. It may write:
+
+- `.ai-factory/plans/<id>.md`
+- `.ai-factory/plans/<id>/task.md`
+- `.ai-factory/plans/<id>/context.md`
+- `.ai-factory/plans/<id>/rules.md`
+
+The export does not make OpenSpec artifacts obsolete and does not delete or archive them. Existing legacy files are not overwritten unless the caller explicitly approves overwrite behavior.
+
 ## Generated Rules
 
 `.ai-factory/rules/generated/` is owned by the OpenSpec generated-rules compiler. Files in that directory are safe to delete and regenerate from:
@@ -114,6 +134,8 @@ openspec/changes/<change-id>/specs/**/spec.md
 ```
 
 Read-only gates report missing or stale generated rules as warnings and do not regenerate them automatically.
+
+`/aif-mode sync` owns regeneration of generated OpenSpec rules for mode maintenance. Consumer commands should still treat generated rules as derived guidance rather than source of truth.
 
 ## Fallback Behavior
 

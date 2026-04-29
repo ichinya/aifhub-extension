@@ -10,9 +10,10 @@ AI Factory UX + OpenSpec artifact protocol
 
 ## What This Extension Does
 
-- Keeps `/aif-analyze`, `/aif-plan`, `/aif-explore`, `/aif-improve`, `/aif-implement`, `/aif-verify`, `/aif-fix`, and `/aif-done` as the public command vocabulary.
+- Keeps `/aif-analyze`, `/aif-plan`, `/aif-explore`, `/aif-improve`, `/aif-implement`, `/aif-verify`, `/aif-fix`, `/aif-done`, and `/aif-mode` as the public command vocabulary.
 - In OpenSpec-native mode, writes canonical change artifacts under `openspec/changes/<change-id>/` and accepted specs under `openspec/specs/`.
 - Keeps AI Factory runtime state, verification evidence, finalization evidence, and generated rules outside canonical OpenSpec changes.
+- Requests OpenSpec validation, status, instructions, and archive through the AIFHub wrapper and `scripts/openspec-runner.mjs` when a compatible CLI is available.
 - Preserves legacy AI Factory-only plan folders as compatibility and migration input only.
 - Publishes namespaced Codex and Claude agent files through the extension manifest for explicit user or orchestrator invocation.
 - Does not install OpenSpec skills or slash commands.
@@ -29,6 +30,14 @@ Bootstrap project context:
 
 ```text
 /aif-analyze
+```
+
+Inspect or switch artifact mode:
+
+```text
+/aif-mode status
+/aif-mode openspec
+/aif-mode sync
 ```
 
 Confirm or request OpenSpec-native mode when bootstrapping a v1 OpenSpec workflow. The expected config marker is:
@@ -117,6 +126,8 @@ OpenSpec is optional for extension install and AI Factory-only workflows.
 
 When the OpenSpec CLI is missing or unsupported, OpenSpec-aware commands report degraded validate/archive capabilities. Planning and filesystem-based context loading can continue, but archive-required `/aif-done` fails until a compatible CLI is available.
 
+OpenSpec CLI integration is adapter-only: users keep calling `/aif-plan`, `/aif-improve`, `/aif-implement`, `/aif-verify`, `/aif-done`, and `/aif-mode`; the extension never installs OpenSpec command skills.
+
 OpenSpec can be initialized without tool integrations:
 
 ```bash
@@ -140,6 +151,22 @@ node scripts/migrate-legacy-plans.mjs <change-id>
 The migration writes canonical artifacts under `openspec/changes/<change-id>/`, preserves runtime material under `.ai-factory/state/<change-id>/`, preserves QA material under `.ai-factory/qa/<change-id>/`, and never silently deletes legacy source files.
 
 See [Legacy Plan Migration](docs/legacy-plan-migration.md) for collision modes, validation behavior, and the full artifact map.
+
+## Mode Switching
+
+`/aif-mode` is the extension-owned mode controller:
+
+```text
+/aif-mode status
+/aif-mode openspec
+/aif-mode ai-factory
+/aif-mode sync
+/aif-mode doctor
+```
+
+Switching to OpenSpec-native mode updates `.ai-factory/config.yaml`, ensures `openspec/config.yaml`, `openspec/specs/`, `openspec/changes/`, `.ai-factory/state/`, `.ai-factory/qa/`, and `.ai-factory/rules/generated/`, detects legacy plans, compiles generated rules, validates changes when a compatible CLI is available, and writes a report under `.ai-factory/state/mode-switches/`.
+
+Switching to AI Factory-only mode updates the legacy path profile and preserves `openspec/`. Use `--export-openspec` only when compatibility legacy artifacts are needed from OpenSpec changes.
 
 ## Troubleshooting
 

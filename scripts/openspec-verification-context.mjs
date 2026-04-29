@@ -361,6 +361,22 @@ async function runValidationPipeline(changeId, options) {
     };
   }
 
+  if (!options.config.statusOnVerify) {
+    return {
+      openspec,
+      validation,
+      status: null,
+      shouldRunCodeVerification: true,
+      warnings: [
+        {
+          code: 'openspec-status-disabled',
+          message: 'OpenSpec status skipped because aifhub.openspec.statusOnVerify is false.'
+        }
+      ],
+      errors: []
+    };
+  }
+
   const rawStatus = await getOpenSpecStatus(changeId, createRunOptions(options));
   const status = normalizeCommandResult(rawStatus);
   const statusWarnings = status.ok ? [] : [
@@ -384,6 +400,7 @@ async function readVerificationConfig(rootDir) {
   const configPath = path.join(rootDir, '.ai-factory', 'config.yaml');
   const defaults = {
     validateOnVerify: true,
+    statusOnVerify: true,
     requireCliForVerify: false
   };
 
@@ -439,7 +456,7 @@ function parseOpenSpecVerifyConfig(raw) {
     }
 
     if (aifhubIndent !== null && openspecIndent !== null && indent > openspecIndent) {
-      if (key === 'validateOnVerify' || key === 'requireCliForVerify') {
+      if (key === 'validateOnVerify' || key === 'statusOnVerify' || key === 'requireCliForVerify') {
         const parsed = parseBooleanScalar(rawValue);
 
         if (parsed !== null) {
@@ -726,6 +743,7 @@ function createFailureContext({ resolverResult, warnings = [], errors = [] }) {
     paths: {},
     config: {
       validateOnVerify: true,
+      statusOnVerify: true,
       requireCliForVerify: false
     },
     canonicalArtifacts: {},

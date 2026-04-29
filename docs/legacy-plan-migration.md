@@ -70,6 +70,20 @@ node scripts/migrate-legacy-plans.mjs <change-id> --on-collision overwrite
 | `suffix` | Create a distinct target such as `<change-id>-migrated`. |
 | `overwrite` | Overwrite generated migration targets only when explicitly requested. |
 
+If `--all` reports `target-exists` for every discovered plan, the project already has canonical OpenSpec change directories. Preview the non-destructive merge path first:
+
+```bash
+node scripts/migrate-legacy-plans.mjs --all --on-collision merge-safe --dry-run
+```
+
+Then apply it only when the dry-run output is acceptable:
+
+```bash
+node scripts/migrate-legacy-plans.mjs --all --on-collision merge-safe
+```
+
+Use `--on-collision suffix` instead when existing OpenSpec changes must remain completely untouched.
+
 ## Artifact Mapping
 
 Canonical and preservation mapping:
@@ -136,6 +150,26 @@ Then run the normal v1 flow:
 /aif-verify <change-id>
 /aif-done <change-id>
 ```
+
+## Compatibility Export
+
+OpenSpec-to-legacy export is available through `/aif-mode` for projects that intentionally switch back to legacy AI Factory-only mode:
+
+```text
+/aif-mode ai-factory --export-openspec --change <change-id> --yes
+/aif-mode sync --export-openspec --change <change-id> --yes
+```
+
+This is a compatibility export, not migration. It flattens OpenSpec artifacts into legacy plan files and can lose delta-spec structure:
+
+| OpenSpec source | Legacy compatibility target |
+|---|---|
+| `openspec/changes/<id>/proposal.md` | `.ai-factory/plans/<id>.md` |
+| `openspec/changes/<id>/tasks.md` | `.ai-factory/plans/<id>/task.md` |
+| proposal, design, and specs summary | `.ai-factory/plans/<id>/context.md` |
+| `.ai-factory/rules/generated/openspec-merged-<id>.md` | `.ai-factory/plans/<id>/rules.md` |
+
+Compatibility export preserves `openspec/` and does not overwrite existing legacy files unless `--yes` is passed.
 
 ## See Also
 

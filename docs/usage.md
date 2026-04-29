@@ -5,6 +5,7 @@
 This guide documents the v1 OpenSpec-native workflow for AIFHub Extension.
 
 ```text
+/aif-mode status
 /aif-analyze
   -> /aif-plan full "<request>"
   -> optional /aif-explore "<topic>"
@@ -16,6 +17,8 @@ This guide documents the v1 OpenSpec-native workflow for AIFHub Extension.
 ```
 
 OpenSpec-native mode uses OpenSpec artifacts as canonical planning/spec artifacts and AI Factory paths for runtime state, QA evidence, and generated rules.
+
+AIFHub commands request OpenSpec validation, status, instructions, and archive through `scripts/openspec-runner.mjs` when the CLI is available. Users should keep using `/aif-*` commands; this extension does not install or rely on OpenSpec slash commands.
 
 ## Artifact Ownership
 
@@ -32,6 +35,32 @@ OpenSpec-native mode uses OpenSpec artifacts as canonical planning/spec artifact
 | `.ai-factory/plans/` | Legacy AI Factory-only compatibility and migration input |
 
 ## Command Boundaries
+
+### `/aif-mode`
+
+Reads:
+
+- `.ai-factory/config.yaml`
+- `openspec/changes/**`
+- `openspec/specs/**`
+- `.ai-factory/plans/**`
+- `.ai-factory/rules/generated/**`
+
+Writes by subcommand:
+
+- `openspec`: `.ai-factory/config.yaml`, OpenSpec skeleton paths, runtime directories, generated rules, optional legacy migration outputs when `--yes` is passed, and `.ai-factory/state/mode-switches/*.md`
+- `ai-factory`: `.ai-factory/config.yaml`, legacy skeleton paths, optional compatibility export outputs when `--export-openspec` is passed, and `.ai-factory/state/mode-switches/*.md`
+- `sync`: derived generated rules or compatibility export outputs for the current mode, plus a sync report
+- `status` and `doctor`: no writes
+
+Does not write:
+
+- OpenSpec skills or slash commands
+- manual changes to `openspec/specs/**`
+- archive output or `/aif-done` finalization
+- runtime files under `openspec/changes/<change-id>/`
+
+Use `--dry-run` for planned switching or sync writes. Use `--all` or `--change <id>` to control change selection. Use `--export-openspec` only for compatibility legacy exports from OpenSpec changes. In OpenSpec mode, sync respects `aifhub.openspec.compileRulesOnSync` and `aifhub.openspec.validateOnSync`.
 
 ### `/aif-analyze`
 
@@ -85,6 +114,8 @@ Does not write in OpenSpec-native mode:
 
 Docs/tooling-only changes may omit delta specs only when the proposal explains why no product or workflow behavior changes.
 
+When `aifhub.openspec.validateOnPlan` is enabled, planning requests `openspec validate` through the AIFHub OpenSpec runner if a compatible CLI is available. Missing CLI is a degraded warning, not a planning failure.
+
 ### `/aif-explore`
 
 Reads:
@@ -131,6 +162,8 @@ Does not write:
 - legacy `.ai-factory/plans` artifacts in OpenSpec-native mode
 - archived changes under `openspec/changes/archive/**` unless the user explicitly chooses a supported recovery path
 
+When `aifhub.openspec.validateOnImprove` is enabled, refinement requests OpenSpec validation through the runner after canonical artifact edits.
+
 ### `/aif-implement`
 
 Reads:
@@ -141,7 +174,7 @@ Reads:
 - `openspec/changes/<change-id>/specs/**/spec.md`
 - `openspec/specs/**/spec.md`
 - `.ai-factory/rules/generated/*.md` when present
-- optional OpenSpec `instructions apply` output when a compatible CLI is available
+- optional OpenSpec `instructions apply` output when `aifhub.openspec.useInstructionsApply` is enabled and a compatible CLI is available
 
 Writes:
 
@@ -178,7 +211,7 @@ Does not write:
 - final archive output
 - legacy `.ai-factory/specs` archives in OpenSpec-native mode
 
-Invalid OpenSpec validation is a hard stop before code checks. Missing or unsupported CLI is degraded mode unless config requires strict CLI availability.
+Invalid OpenSpec validation is a hard stop before code checks. Missing or unsupported CLI is degraded mode unless `aifhub.openspec.requireCliForVerify` is true. `openspec-status.json` is written when `aifhub.openspec.statusOnVerify` is enabled.
 
 ### `/aif-fix`
 
@@ -227,7 +260,7 @@ Does not write:
 - manual file moves from `openspec/changes` to archives
 - legacy `.ai-factory/specs` archives in OpenSpec-native mode
 
-Use `--skip-specs` for docs/tooling-only changes where no accepted spec update is expected.
+Use `--skip-specs` for docs/tooling-only changes where no accepted spec update is expected. Archive-required finalization needs a compatible OpenSpec CLI when `aifhub.openspec.requireCliForDone` is true.
 
 ## OAuth Example
 
@@ -298,6 +331,47 @@ After migration, run:
 ```
 
 See [Legacy Plan Migration](legacy-plan-migration.md).
+
+## Mode Switching and Sync
+
+Use `/aif-mode status` before changing modes:
+
+```text
+/aif-mode status
+```
+
+Switch to OpenSpec-native mode:
+
+```text
+/aif-mode openspec --dry-run
+/aif-mode openspec
+```
+
+If legacy plans exist, review migration first:
+
+```bash
+node scripts/migrate-legacy-plans.mjs --all --dry-run
+node scripts/migrate-legacy-plans.mjs --all
+```
+
+Switch to legacy AI Factory-only mode without deleting OpenSpec artifacts:
+
+```text
+/aif-mode ai-factory
+```
+
+Export compatibility legacy files only when requested:
+
+```text
+/aif-mode ai-factory --export-openspec --change <change-id> --yes
+```
+
+Refresh derived artifacts without changing mode:
+
+```text
+/aif-mode sync --change <change-id>
+/aif-mode doctor
+```
 
 ## Recommended Codex App Flow
 
