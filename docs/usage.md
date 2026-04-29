@@ -1,418 +1,388 @@
-[← Previous Page](README.md) · [Back to README](../README.md) · [Next Page →](context-loading-policy.md)
+[Back to Documentation](README.md) | [Back to README](../README.md) | [Next Page](context-loading-policy.md)
 
 # Usage
 
-## Skills
-
-| Skill | Type | Purpose |
-|-------|------|---------|
-| `/aif-analyze` | Extension skill | Bootstrap `.ai-factory/config.yaml` and `rules/base.md`; explicit OpenSpec-native config is supported |
-| `/aif-rules-check` | Extension skill (temporary gate) | Read-only rule compliance check against rules hierarchy |
-| `/aif-explore` | Built-in + injection | Explore ideas; in OpenSpec-native mode, keep research/runtime notes outside canonical change folders |
-| `/aif-plan` | Built-in + injection | Create mode-gated full plans: OpenSpec changes in OpenSpec-native mode, companion plan folders in legacy AI Factory mode |
-| `/aif-improve` | Built-in + injection | Refine OpenSpec-native artifacts with preservation, or both legacy plan layers together before execution |
-| `/aif-implement` | Built-in + injection | Execute tasks with mode-gated OpenSpec runtime state or legacy plan-folder metadata |
-| `/aif-verify` | Built-in + injection | Verify changed scope with mode-gated QA output; optional archival/finalizer work lives in `/aif-done` |
-| `/aif-fix` | Built-in + injection | Apply fixes for verification findings without rewriting canonical artifacts unless requested |
-| `/aif-roadmap` | Built-in + injection | Evidence-based maturity audit roadmap |
-| `/aif-evolve` | Built-in + injection | Plan-evidence-driven evolution workflow |
-| `/aif-done` | Extension skill | Finalize verified work with OpenSpec-native archive policy or legacy plan archive, commit/PR drafts, and evidence-backed follow-ups |
-
-## Канонический Public Workflow
+This guide documents the v1 OpenSpec-native workflow for AIFHub Extension.
 
 ```text
-aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify
-                                                            \-> aif-fix -> aif-verify
-```
-
-`/aif-analyze` — это bootstrap/setup step перед этим flow. Он подготавливает `.ai-factory/config.yaml` и `rules/base.md`, но не является первым узлом canonical public command sequence.
-
-- Для новой работы используйте `/aif-plan full`. `/aif-new` — только historical alias; `New` в handoff vocabulary — stage name, а не slash command.
-- `Explore / New / Apply / Done` — это handoff stage names. Это naming layer, не public CLI command list. Подробности собраны в [Handoff Naming](handoff.md).
-- `aif-apply` как delegated wrapper пока отложен по ownership/status contract из [issue #20](https://github.com/ichinya/aifhub-extension/issues/20); issue остаётся открытым для реальной subagent orchestration, а current public path использует `/aif-implement`.
-- `/aif-done` — explicit AIFHub/Handoff finalizer после passing verification. Он не дублирует `/aif-verify`, не является legacy alias и не входит в canonical public CLI path.
-
-## Recommended Codex App Flow
-
-Codex не имеет автоматического переключения режимов из extension prompts. Пользователь управляет режимом вручную, а prompts могут только рекомендовать нужный режим для текущей стадии.
-
-### Recommended Flow
-
-```text
-# 1. Switch to Plan mode (user action)
-/plan-mode
-
-# 2. Explore and plan (Plan mode — request_user_input available)
-/aif-explore "task description"
-/aif-plan full "task description"
-/aif-improve
-
-# 3. Exit Plan mode (user action)
-exit plan mode
-
-# 4. Implement and verify (Default mode — plain-text questions only)
-/aif-implement
-/aif-verify
-
-# 5. Optional explicit finalizer
-/aif-done
-```
-
-Этот flow документирует безопасный runtime contract для Codex. Он не обещает client automation и не подразумевает auto-switch Plan mode из skill/injection prompts.
-
-### Runtime Notes
-
-- **Plan mode**: `request_user_input` доступен только после ручного входа в Plan mode и только для 1-3 коротких вопросов. Используйте его в planning/refinement стадиях.
-- **Default mode**: формы недоступны. Задавайте вопросы как plain text в assistant message. Не используйте `question(...)`, `questionnaire(...)` или `request_user_input`.
-- **Subagent mode**: не задавайте интерактивные вопросы. Фиксируйте assumptions и возвращайте blockers/open questions родителю.
-- Подробности по форматам вопросов: [Codex Plan Mode](codex-plan-mode.md).
-- Справочник по форматам вопросов для всех runtime: `skills/shared/QUESTION-TOOL.md`.
-
-## Совместимость
-
-- Это руководство рассчитано на `ai-factory >=2.10.0 <3.0.0`.
-- Extension хранит `sources.ai-factory.baselineVersion = 2.0.0` только как исторический контекст.
-- Runtime-aware Codex и Claude `agentFiles` входят в поддерживаемый контракт, начиная с проверенного upstream `2.10.0`.
-
-## Слои Prompt-Инъекций
-
-- `injections/core/` — active mode-gated workflow prompt assets; только этот слой подключается через `extension.json` и поддерживает canonical public workflow. OpenSpec-native sections keep canonical artifacts under `openspec/`, while legacy AI Factory-only sections keep the plan-folder overlay.
-- `injections/handoff/` — future stub prompt assets; здесь лежат только `aif-review-handoff-gate.md`, `aif-security-checklist-handoff-gate.md`, `aif-rules-check-handoff-gate.md` и `aif-done-handoff-finalizer.md` как dormant profile для отдельного runtime binding, но не как уже подключённый profile. `aif-verify` и `aif-fix` остаются частью `core` workflow, а соответствующие runtime consumers по-прежнему используют inline `developer_instructions`. Каждый stub содержит machine-consumable `<!-- gate-summary -->` блок для будущего Handoff parser.
-- `injections/references/` — shared root-level references для verify/roadmap и будущих handoff consumers без копирования файлов по слоям.
-
-Пока отдельный handoff runtime binding не реализован, ordinary CLI workflow зависит только от `core` overlays, а `injections/handoff/*` остаются future stubs и не должны трактоваться как текущий runtime contract.
-
-## Bundled Runtime Agents
-
-- Extension публикует namespaced runtime-managed agents через top-level поле `agentFiles` в `extension.json` для Codex и Claude.
-- Codex и Claude не начинают использовать эти subagents автоматически только из-за факта установки extension; для запуска нужен явный пользовательский запрос или future orchestrator mapping.
-- Для Codex подробности по именам `aifhub-*`, `sandbox_mode` и примерам вызова собраны в [Codex Agents](codex-agents.md).
-- Для Claude подробности по `.claude/agents/`, `permissionMode`, `background: true` sidecars и ручному использованию собраны в [Claude Agents](claude-agents.md).
-
-## Validation
-
-Extension включает четыре валидатора, которые проверяют целостность manifest, Codex/Claude agent schema и документации.
-
-### Валидаторы
-
-| Скрипт | Что проверяет |
-|--------|---------------|
-| `scripts/validate-extension.mjs` | `extension.json`: paths из `skills`, `agentFiles.source`, `injections.file` существуют; `agentFiles.target` соответствуют runtime (`.toml` для Codex, `.md` для Claude); `version` — semver; `compat.ai-factory` присутствует |
-| `scripts/validate-codex-agents.mjs` | Codex TOML файлы в `agent-files/codex/`: обязательные поля `name`, `description`, `developer_instructions`, `sandbox_mode`; отсутствие legacy полей `prompt` и `reasoning_effort` |
-| `scripts/validate-claude-agents.mjs` | Claude markdown-файлы в `agent-files/claude/`: YAML frontmatter, обязательные поля `name` и `description`, namespaced `aifhub-*` naming contract |
-| `scripts/validate-doc-links.mjs` | Markdown ссылки в `docs/`, `injections/`, `skills/`: целевые файлы существуют; нет пустых plan placeholders с пропущенным `<plan-id>`; внешние ссылки и anchor-only игнорируются |
-
-### Запуск
-
-```bash
-# Запустить все валидаторы
-npm run validate
-
-# Запустить все тесты
-npm test
-```
-
-CI автоматически запускает валидаторы на каждом PR (`.github/workflows/validate.yml`).
-
-## Legacy Plan Migration
-
-If OpenSpec-native commands cannot resolve `openspec/changes/<change-id>` but matching legacy AI Factory plan artifacts still exist, run an explicit migration. Migration never runs automatically from improve, implement, or verify.
-
-Preview:
-
-```bash
-node scripts/migrate-legacy-plans.mjs <change-id> --dry-run
-```
-
-Migrate:
-
-```bash
-node scripts/migrate-legacy-plans.mjs <change-id>
-```
-
-Migrate all discovered legacy plans:
-
-```bash
-node scripts/migrate-legacy-plans.mjs --all --dry-run
-node scripts/migrate-legacy-plans.mjs --all
-```
-
-The migration maps `proposal.md`, `tasks.md`, `design.md`, and optional delta specs into `openspec/changes/<change-id>/`. Runtime-only legacy files are preserved under `.ai-factory/state/<change-id>/` and `.ai-factory/qa/<change-id>/`; legacy sources are not deleted. Review generated specs and run `/aif-improve <change-id>` after migration.
-
-See [Legacy Plan Migration](legacy-plan-migration.md) for collision modes and the full artifact map.
-
-## Installation
-
-```bash
-ai-factory extension add https://github.com/ichinya/aifhub-extension.git
-```
-
-Notes:
-- `ai-factory extension list` prints `name/version/source` from `.ai-factory.json`
-- update through `ai-factory extension update` against the Git source configured in `.ai-factory.json`
-
-## Typical Flow
-
-### 1. Analyze project
-
-```bash
 /aif-analyze
+  -> /aif-plan full "<request>"
+  -> optional /aif-explore "<topic>"
+  -> optional /aif-improve <change-id>
+  -> /aif-implement <change-id>
+  -> /aif-verify <change-id>
+      fail -> /aif-fix <change-id> -> /aif-verify <change-id>
+  -> /aif-done <change-id>
 ```
 
-Creates or updates:
+OpenSpec-native mode uses OpenSpec artifacts as canonical planning/spec artifacts and AI Factory paths for runtime state, QA evidence, and generated rules.
+
+## Artifact Ownership
+
+| Path | Role |
+|---|---|
+| `openspec/specs/**/spec.md` | Canonical current behavior |
+| `openspec/changes/<change-id>/proposal.md` | Canonical change intent |
+| `openspec/changes/<change-id>/design.md` | Canonical design notes |
+| `openspec/changes/<change-id>/tasks.md` | Canonical implementation checklist |
+| `openspec/changes/<change-id>/specs/**/spec.md` | Canonical proposed behavior deltas |
+| `.ai-factory/state/<change-id>/` | Runtime execution state and summaries |
+| `.ai-factory/qa/<change-id>/` | Verification and finalization evidence |
+| `.ai-factory/rules/generated/` | Derived rules, safe to regenerate |
+| `.ai-factory/plans/` | Legacy AI Factory-only compatibility and migration input |
+
+## Command Boundaries
+
+### `/aif-analyze`
+
+Reads:
+
+- project files and repository metadata
+- existing `.ai-factory/config.yaml` when present
+- existing rules/context artifacts when present
+
+Writes:
+
 - `.ai-factory/config.yaml`
 - `.ai-factory/rules/base.md`
+- optional OpenSpec-native skeleton paths such as `openspec/specs/`, `openspec/changes/`, `.ai-factory/state/`, `.ai-factory/qa/`, and `.ai-factory/rules/generated/`
 
-For OpenSpec-native bootstrap, explicitly request `openspec-native` or start from a config that already contains `aifhub.artifactProtocol: openspec`. The skill then completes the OpenSpec-native config shape, maps canonical changes to `openspec/changes`, maps specs to `openspec/specs`, prepares `.ai-factory/state`, `.ai-factory/qa`, and `.ai-factory/rules/generated`, and reports OpenSpec CLI capabilities through `scripts/openspec-runner.mjs` when available. Missing OpenSpec CLI remains degraded mode, not bootstrap failure.
+Does not write:
 
-Compatible OpenSpec CLI environments may use or receive this recommendation:
+- OpenSpec skills or slash commands
+- canonical change artifacts for a feature request
+- `.ai-factory/plans` in OpenSpec-native mode
 
-```bash
-openspec init --tools none
+Select OpenSpec-native mode explicitly by asking for it or by starting from config with:
+
+```yaml
+aifhub:
+  artifactProtocol: openspec
 ```
 
-The extension does not install OpenSpec skills or slash commands.
+### `/aif-plan full`
 
-`/aif-analyze` завершает bootstrap. После него canonical public workflow начинается с `/aif-explore` или сразу с `/aif-plan full`.
+Reads:
 
-### 2. Explore (optional)
+- `.ai-factory/config.yaml`
+- project context and rules
+- `openspec/specs/**/spec.md`
+- optional `.ai-factory/RESEARCH.md`
 
-```bash
-/aif-explore "add OAuth authentication"
-/aif-explore <change-id>
-/aif-explore <plan-id>
-/aif-explore @.ai-factory/plans/<plan-id>.md
-```
-
-Explore behavior:
-- reads `.ai-factory/config.yaml` first
-- in OpenSpec-native mode, stays research-oriented and may read `openspec/specs/**` plus `openspec/changes/<change-id>/**`
-- in OpenSpec-native mode, writes research/runtime output only to `.ai-factory/RESEARCH.md` or `.ai-factory/state/<change-id>/`
-- does not create non-OpenSpec files inside `openspec/changes/<change-id>/`
-- in legacy AI Factory-only mode, resolves either the companion plan file or the plan folder to one active pair and writes only `.ai-factory/RESEARCH.md`
-- routes new work to `/aif-plan full`; route existing OpenSpec-native changes to `/aif-improve <change-id>`
-
-### 3. Create a full plan
-
-```bash
-/aif-plan full "add OAuth authentication"
-```
-
-Full-mode planning is mode-gated.
-
-In OpenSpec-native mode (`aifhub.artifactProtocol: openspec`), `/aif-plan full` creates canonical OpenSpec change artifacts:
+Writes in OpenSpec-native mode:
 
 - `openspec/changes/<change-id>/proposal.md`
 - `openspec/changes/<change-id>/design.md`
 - `openspec/changes/<change-id>/tasks.md`
 - `openspec/changes/<change-id>/specs/**/spec.md` when behavior changes
+- optional runtime notes under `.ai-factory/state/<change-id>/`
 
-OpenSpec validation runs through `scripts/openspec-runner.mjs` when a compatible CLI is available. Missing or unsupported OpenSpec CLI is degraded validation, not planning failure.
+Does not write in OpenSpec-native mode:
 
-In legacy AI Factory-only mode, full-mode planning creates both:
+- `.ai-factory/plans/<id>.md`
+- `.ai-factory/plans/<id>/task.md`
+- non-OpenSpec helper files under `openspec/changes/<change-id>/`
 
-- `.ai-factory/plans/<plan-id>.md`
-- `.ai-factory/plans/<plan-id>/`
+Docs/tooling-only changes may omit delta specs only when the proposal explains why no product or workflow behavior changes.
 
-If active research exists, `/aif-plan` normalizes it into plan-local `explore.md` only in legacy AI Factory mode. OpenSpec-native runtime notes belong under `.ai-factory/state/<change-id>/`, not inside `openspec/changes/<change-id>/`.
+### `/aif-explore`
 
-Для открытия новой full plan pair используйте `/aif-plan full`. Historical `/aif-new` больше не является current public command.
+Reads:
 
-### 4. Improve the plan
+- `.ai-factory/config.yaml`
+- project context and rules
+- `openspec/specs/**/spec.md`
+- `openspec/changes/<change-id>/**` when exploring an existing change
 
-```bash
-/aif-improve
-/aif-improve <change-id>
-/aif-improve @openspec/changes/<change-id>/
-/aif-improve @.ai-factory/plans/<plan-id>/
-/aif-improve @.ai-factory/plans/<plan-id>.md
-```
+Writes:
 
-Improve behavior:
-- in OpenSpec-native mode, resolves the active change with `scripts/active-change-resolver.mjs`
-- refines only `proposal.md`, `design.md`, `tasks.md`, and `specs/**/spec.md`
-- preserves user edits, prefers patch-style changes, and returns `Changed:` / `Preserved:` summary sections
-- warns or refuses archived targets under `openspec/changes/archive/**` because archived changes are immutable by default
-- validates through `scripts/openspec-runner.mjs` when a compatible CLI is available; missing or unsupported CLI is degraded validation
-- in legacy AI Factory-only mode, resolves the plan file, the plan folder, or any plan-local artifact path
-- updates the legacy plan summary plus plan-folder artifacts together and auto-generates a missing companion plan file for legacy folder-only plans
+- `.ai-factory/RESEARCH.md`
+- `.ai-factory/state/<change-id>/explore.md` or equivalent runtime notes
 
-### 5. Implement
+Does not write:
 
-```bash
-/aif-implement
-/aif-implement <change-id>
-/aif-implement @openspec/changes/<change-id>/
-/aif-implement @.ai-factory/plans/<plan-id>/status.yaml
-```
+- `openspec/changes/<change-id>/proposal.md`
+- `openspec/changes/<change-id>/design.md`
+- `openspec/changes/<change-id>/tasks.md`
+- `openspec/changes/<change-id>/specs/**/spec.md`
+- legacy `.ai-factory/plans` artifacts in OpenSpec-native mode
 
-Implement behavior:
-- in OpenSpec-native mode, reads `proposal.md`, `design.md`, `tasks.md`, `specs/**/spec.md`, accepted specs, and generated rules
-- in OpenSpec-native mode, uses `scripts/openspec-execution-context.mjs` when available to prepare implementation context and optional OpenSpec `instructions apply` guidance
-- in OpenSpec-native mode, writes implementation traces only under `.ai-factory/state/<change-id>/implementation/`; it does not write canonical OpenSpec artifacts unless the user explicitly expands scope
-- in OpenSpec-native mode, does not require legacy `.ai-factory/plans/<id>/task.md`
-- generated rules are derived guidance; missing or stale generated rules warn without replacing canonical OpenSpec artifacts
-- in legacy AI Factory-only mode, owns `status.yaml` execution metadata and git-strategy persistence
-- supports `--from <n>` resume and optional Claude worker mode
-- routes completion to `/aif-verify`
+Exploration is research-only until promoted into canonical OpenSpec artifacts by planning or refinement.
 
-`Apply` в handoff wording может ссылаться на этот этап, но current public command здесь — `/aif-implement`, не `/aif-apply`.
+### `/aif-improve`
 
-### 6. Verify
+Reads:
 
-```bash
-/aif-verify
-/aif-verify --check-only
-/aif-verify --strict
-```
+- `openspec/changes/<change-id>/proposal.md`
+- `openspec/changes/<change-id>/design.md`
+- `openspec/changes/<change-id>/tasks.md`
+- `openspec/changes/<change-id>/specs/**/spec.md`
+- `openspec/specs/**/spec.md`
+- project context and generated rules when relevant
 
-Verify behavior:
-- in OpenSpec-native mode, reads canonical OpenSpec artifacts, generated rules, runtime state, and changed files
-- in OpenSpec-native mode, validates the active OpenSpec change before lint/tests/review checks when validation is enabled
-- in OpenSpec-native mode, records OpenSpec validation/status evidence, QA evidence, and findings under `.ai-factory/qa/<change-id>/` and does not archive
-- in OpenSpec-native mode, treats missing OpenSpec CLI as degraded mode unless strict config requires CLI
-- in OpenSpec-native mode, hard-fails invalid OpenSpec artifacts before code checks
-- in legacy AI Factory-only mode, reads the plan pair and plan-folder artifacts and records findings in `verify.md` and `status.yaml`
-- returns the pass/fail state that gates `/aif-fix` or the optional `/aif-done` finalizer
+Writes:
 
-### 7. Done (explicit AIFHub/Handoff finalizer)
+- patch-style edits to `proposal.md`, `design.md`, `tasks.md`, and `specs/**/spec.md`
+- optional runtime evidence under `.ai-factory/state/<change-id>/`
 
-```bash
-/aif-done
-```
+Does not write:
 
-`/aif-done` owns post-verify finalization, commit/PR drafting, and evidence-backed governance/evolution follow-ups. In OpenSpec-native mode it requires passing `/aif-verify` evidence, guards dirty working tree state, archives through `openspec archive <change-id> --yes` via the shared OpenSpec runner, supports `--skip-specs` for docs/tooling-only changes, writes final evidence under `.ai-factory/qa/<change-id>/`, and writes final summaries under `.ai-factory/state/<change-id>/`. Missing OpenSpec CLI fails archive-required finalization. In legacy AI Factory-only mode it archives the verified plan pair to `.ai-factory/specs/<plan-id>/`. `/aif-verify` remains verification-only, including `--check-only` runs.
+- `task.md`, `context.md`, `rules.md`, `verify.md`, or `status.yaml` under OpenSpec changes
+- legacy `.ai-factory/plans` artifacts in OpenSpec-native mode
+- archived changes under `openspec/changes/archive/**` unless the user explicitly chooses a supported recovery path
 
-### Review Gates (optional)
+### `/aif-implement`
 
-Three independent read-only gates can be run after implementation and before final verification:
+Reads:
+
+- `openspec/changes/<change-id>/proposal.md`
+- `openspec/changes/<change-id>/design.md`
+- `openspec/changes/<change-id>/tasks.md`
+- `openspec/changes/<change-id>/specs/**/spec.md`
+- `openspec/specs/**/spec.md`
+- `.ai-factory/rules/generated/*.md` when present
+- optional OpenSpec `instructions apply` output when a compatible CLI is available
+
+Writes:
+
+- implementation source files in the selected task scope
+- `.ai-factory/state/<change-id>/implementation/`
+- task progress in `openspec/changes/<change-id>/tasks.md`
+
+Does not write:
+
+- runtime traces under `openspec/changes/<change-id>/`
+- legacy `.ai-factory/plans/<id>/task.md`
+- canonical OpenSpec artifacts outside the selected implementation scope unless the user explicitly expands scope
+
+### `/aif-verify`
+
+Reads:
+
+- canonical OpenSpec specs and change artifacts
+- generated rules when present
+- runtime state under `.ai-factory/state/<change-id>/`
+- changed files and verification commands for the repository
+
+Writes:
+
+- `.ai-factory/qa/<change-id>/verify.md`
+- `.ai-factory/qa/<change-id>/openspec-validation.json`
+- `.ai-factory/qa/<change-id>/openspec-status.json`
+- `.ai-factory/qa/<change-id>/raw/`
+
+Does not write:
+
+- `openspec/specs/**`
+- `openspec/changes/archive/**`
+- final archive output
+- legacy `.ai-factory/specs` archives in OpenSpec-native mode
+
+Invalid OpenSpec validation is a hard stop before code checks. Missing or unsupported CLI is degraded mode unless config requires strict CLI availability.
+
+### `/aif-fix`
+
+Reads:
+
+- the same canonical OpenSpec artifacts as `/aif-implement`
+- QA evidence under `.ai-factory/qa/<change-id>/`
+- generated rules when present
+
+Writes:
+
+- implementation fixes in the selected finding scope
+- `.ai-factory/state/<change-id>/fixes/`
+
+Does not write:
+
+- runtime traces under `openspec/changes/<change-id>/`
+- legacy `.ai-factory/plans/<id>/task.md`
+- canonical specs unless the user explicitly asks to fix the spec itself
+
+After fixes, rerun:
 
 ```text
-/aif-review             — code review gate
-/aif-security-checklist — security gate
-/aif-rules-check        — rules compliance gate (extension-owned, temporary)
+/aif-verify <change-id>
 ```
 
-All three gates are independent and can run in any order. If any gate returns `FAIL`, return to the implementing stage. `/aif-rules-check` is an extension-owned temporary gate — when upstream `ai-factory` adds a native version, this skill should be deprecated.
+### `/aif-done`
 
-`/aif-done` — extension-owned explicit finalizer, работающий **после** passing verification:
+Reads:
 
-- Проверяет, что active work прошёл verify (verdict `pass` или `pass-with-notes`).
-- В OpenSpec-native mode archives through OpenSpec CLI with `openspec archive <change-id> --yes`, supports `--skip-specs`, writes final QA evidence to `.ai-factory/qa/<change-id>/`, writes final summaries to `.ai-factory/state/<change-id>/`, and does not use custom archive logic.
-- В legacy AI Factory-only mode архивирует plan folder и companion plan file в `.ai-factory/specs/<plan-id>/`.
-- Готовит commit message draft.
-- Если есть feature branch и `gh` доступен — готовит PR summary draft. Без `gh` — выводит manual PR instructions.
-- Применяет evidence-driven follow-ups для roadmap/architecture/rules через owning path или возвращает exact handoff, если текущий runtime не может безопасно завершить update.
-- Если workspace dirty не только из текущего плана — останавливается и просит подтверждения.
+- `openspec/changes/<change-id>/**`
+- passing verification evidence from `.ai-factory/qa/<change-id>/`
+- git working tree state
 
-`/aif-done` не дублирует `/aif-verify` — это отдельный AIFHub/Handoff finalizer для archive/summary/follow-up задачи, а не legacy alias старого public workflow.
+Writes:
 
-Governance note: roadmap/architecture/rules follow-ups must be backed by verified plan evidence. If the owning update cannot run safely in the current runtime, `/aif-done` should return an exact handoff instead of silently skipping it.
+- `.ai-factory/qa/<change-id>/done.md`
+- `.ai-factory/qa/<change-id>/openspec-archive.json`
+- `.ai-factory/qa/<change-id>/raw/`
+- `.ai-factory/state/<change-id>/final-summary.md`
+- `openspec/specs/**` only through `openspec archive <change-id> --yes`
 
-### 8. Fix findings
+Does not write:
+
+- custom manual mutations to `openspec/specs/**`
+- manual file moves from `openspec/changes` to archives
+- legacy `.ai-factory/specs` archives in OpenSpec-native mode
+
+Use `--skip-specs` for docs/tooling-only changes where no accepted spec update is expected.
+
+## OAuth Example
+
+Create the change:
+
+```text
+/aif-plan full "add OAuth login"
+```
+
+Expected canonical artifacts:
+
+```text
+openspec/changes/add-oauth-login/
+  proposal.md
+  design.md
+  tasks.md
+  specs/
+    auth/
+      spec.md
+```
+
+Refine, implement, verify, and finalize:
+
+```text
+/aif-improve add-oauth-login
+/aif-implement add-oauth-login
+/aif-verify add-oauth-login
+/aif-done add-oauth-login
+```
+
+Expected runtime and QA output:
+
+```text
+.ai-factory/state/add-oauth-login/
+.ai-factory/qa/add-oauth-login/
+```
+
+Implementation and verification traces stay out of `openspec/changes/add-oauth-login/`.
+
+## Legacy AI Factory-Only Mode
+
+Legacy AI Factory-only mode is still supported for compatibility. It is not the normal OpenSpec-native v1 creation path.
+
+Legacy planning writes:
+
+```text
+.ai-factory/plans/<plan-id>.md
+.ai-factory/plans/<plan-id>/
+  task.md
+  context.md
+  rules.md
+  verify.md
+  status.yaml
+  explore.md
+```
+
+Use the explicit migration command when existing legacy artifacts need to enter the OpenSpec-native workflow:
 
 ```bash
-/aif-fix
-/aif-fix B001 I001
-/aif-fix --all
+node scripts/migrate-legacy-plans.mjs <change-id> --dry-run
+node scripts/migrate-legacy-plans.mjs <change-id>
 ```
 
-Fix behavior:
-- in OpenSpec-native mode, reads the same canonical OpenSpec artifacts as `/aif-implement`
-- in OpenSpec-native mode, reads QA evidence from `.ai-factory/qa/<change-id>/`
-- in OpenSpec-native mode, uses `scripts/openspec-execution-context.mjs` when available to prepare fix context and optional OpenSpec `instructions apply` guidance
-- in OpenSpec-native mode, writes fix traces only under `.ai-factory/state/<change-id>/fixes/`
-- in OpenSpec-native mode, does not write runtime traces into `openspec/changes/<change-id>/`
-- in OpenSpec-native mode, does not require legacy `.ai-factory/plans/<id>/task.md`
-- generated rules are derived guidance; missing or stale generated rules warn without replacing canonical OpenSpec artifacts
+After migration, run:
 
-After fixes, run:
-
-```bash
-/aif-verify
+```text
+/aif-improve <change-id>
 ```
+
+See [Legacy Plan Migration](legacy-plan-migration.md).
+
+## Recommended Codex App Flow
+
+Codex cannot switch modes from extension prompts. The user controls the mode manually.
+
+```text
+# Plan mode, user action
+/aif-explore "task description"
+/aif-plan full "task description"
+/aif-improve <change-id>
+
+# Default mode, user action
+/aif-implement <change-id>
+/aif-verify <change-id>
+/aif-done <change-id>
+```
+
+In Codex Default mode, prompts must ask plain-text questions rather than using `request_user_input`.
+
+See [Codex Plan Mode](codex-plan-mode.md) for question-format guidance.
+
+## Troubleshooting
+
+| Problem | Meaning | Action |
+|---|---|---|
+| OpenSpec CLI missing | `openspec` is not available on `PATH`. | Continue degraded planning or install a compatible CLI before validation/archive-required finalization. |
+| Node too old | OpenSpec validate/archive requires Node `>=20.19.0`. | Use Node `>=20.19.0` for OpenSpec commands. |
+| Invalid delta spec | OpenSpec validation failed for `specs/**/spec.md`. | Fix the delta spec and rerun `/aif-verify <change-id>`. |
+| Ambiguous active change | More than one active change can be selected. | Pass `<change-id>` explicitly or update `.ai-factory/state/current.yaml`. |
+| Missing generated rules | Derived rules are absent. | Regenerate `.ai-factory/rules/generated/*.md` from OpenSpec specs before relying on rules guidance. |
+| Stale generated rules | Generated rules do not match canonical OpenSpec artifacts. | Regenerate them; do not edit generated rules as source of truth. |
+| Dirty working tree before `/aif-done` | Finalization cannot prove archive/summary scope safely. | Commit, stash, or use an explicit supported dirty-state override when available. |
 
 ## Release Smoke Checks
 
-Use this checklist when validating an install or update of the extension:
-
-1. Проверить версию CLI:
+1. Check the AI Factory version:
 
 ```bash
 ai-factory --version
 ```
 
-Ожидается версия внутри `>=2.10.0 <3.0.0`.
+Expected range:
 
-2. Установка:
+```text
+>=2.10.0 <3.0.0
+```
+
+2. Install the extension:
 
 ```bash
 ai-factory extension add https://github.com/ichinya/aifhub-extension.git
 ```
 
-Ожидается, что `extension.json` будет публиковать только `skills/aif-analyze`, injected built-in workflow и namespaced runtime-managed `agentFiles` для Codex и Claude.
-
-3. Обновление:
-
-```bash
-ai-factory update
-ai-factory extension update
-```
-
-Ожидается, что built-in skills останутся canonical, injections переустановятся чисто, а поддерживаемые runtime-managed assets останутся синхронизированы с manifest.
-
-4. Удаление:
-
-```bash
-ai-factory extension remove aifhub-extension
-```
-
-Ожидается, что canonical upstream commands останутся доступными без extension-owned override для `aif-plan`.
-
-5. Сквозной workflow:
-
-```bash
-/aif-analyze
-/aif-plan full "smoke-check feature"
-/aif-improve
-/aif-implement
-/aif-verify --check-only
-```
-
-Ожидаются companion artifacts в `.ai-factory/plans/`, синхронизированный `status.yaml` и документация, которая указывает только на текущий workflow. For an explicit OpenSpec-native smoke, expect `openspec/changes/<change-id>/` plus runtime/QA output under `.ai-factory/state/<change-id>/` and `.ai-factory/qa/<change-id>/`.
-
-## Project Layout
+3. Run an OpenSpec-native smoke:
 
 ```text
-aifhub-extension/
-|- extension.json
-|- agent-files/
-|  |- claude/
-|  `- codex/
-|- injections/
-|  |- core/
-|  |- handoff/
-|  `- references/
-|- docs/
-|  |- README.md
-|  |- claude-agents.md
-|  |- codex-agents.md
-|  |- usage.md
-|  |- handoff.md
-|  `- context-loading-policy.md
-`- skills/
-   |- aif-analyze/
-   |- aif-done/
-   |- aif-rules-check/
-   `- shared/
+/aif-analyze
+/aif-plan full "smoke check feature"
+/aif-improve <change-id>
+/aif-implement <change-id>
+/aif-verify <change-id>
+```
+
+Expected OpenSpec-native artifacts:
+
+```text
+openspec/changes/<change-id>/
+.ai-factory/state/<change-id>/
+.ai-factory/qa/<change-id>/
+```
+
+Legacy `.ai-factory/plans/` artifacts are expected only when the project is intentionally in legacy AI Factory-only mode.
+
+4. Run local repository checks:
+
+```bash
+npm run validate
+npm test
 ```
 
 ## See Also
 
-- [Documentation Index](README.md) - docs overview and reading order
-- [Handoff Naming](handoff.md) - терминология стадий versus current public commands
-- [Claude Agents](claude-agents.md) - bundled `aifhub-*` Claude agents, `.claude/agents/` install behavior, and manual invocation contract
-- [Codex Agents](codex-agents.md) - bundled `aifhub-*` agents, explicit invocation, and sandbox contract
-- [Context Loading Policy](context-loading-policy.md) - runtime context and ownership contract
-- [Codex Plan Mode](codex-plan-mode.md) - Codex app/CLI recommended flow and question format guidance
-- [Project README](../README.md) - quick start and high-level workflow summary
+- [Documentation Index](README.md)
+- [Context Loading Policy](context-loading-policy.md)
+- [OpenSpec Compatibility](openspec-compatibility.md)
+- [Legacy Plan Migration](legacy-plan-migration.md)
+- [Active Change Resolver](active-change-resolver.md)
+- [ADR 0001](adr/0001-openspec-native-artifact-protocol.md)
