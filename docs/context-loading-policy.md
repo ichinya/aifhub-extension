@@ -103,6 +103,7 @@ Special ownership case:
 - In OpenSpec-native mode, `aif-implement` and `aif-fix` may change implementation source files within the selected task/finding scope; they do not rewrite canonical OpenSpec artifacts unless explicitly requested
 - In OpenSpec-native mode, `aif-verify` reads canonical OpenSpec artifacts, validates the active change before code checks when validation is enabled, writes OpenSpec validation/status evidence plus QA findings under `.ai-factory/qa/<change-id>/`, treats missing CLI as degraded mode unless strict config requires CLI, hard-fails invalid OpenSpec before lint/tests/review, and must not archive
 - In OpenSpec-native mode, `aif-done` requires passing `/aif-verify` evidence, archives through `openspec archive <change-id> --yes` via the OpenSpec CLI runner, supports `--skip-specs`, writes final evidence under `.ai-factory/qa/<change-id>/`, writes final summaries under `.ai-factory/state/<change-id>/`, and does not use custom archive logic or legacy `.ai-factory/specs` finalization
+- Legacy plan migration is explicit and is not part of normal improve, implement, or verify execution. The migration reads legacy `.ai-factory/plans` artifacts, writes canonical migrated planning artifacts only under `openspec/changes/<change-id>/`, preserves runtime notes under `.ai-factory/state/<change-id>/`, preserves legacy verification evidence under `.ai-factory/qa/<change-id>/`, and never deletes the legacy source artifacts.
 - Legacy `task.md`, `context.md`, `rules.md`, `verify.md`, `status.yaml`, and `explore.md` apply only to legacy AI Factory-only plan folders, not OpenSpec-native changes
 - no consumer skill may use bridge files as a substitute for these runtime paths
 
@@ -181,4 +182,5 @@ If `config.yaml` is missing or incomplete for the requested operation:
 
 - [Documentation Index](README.md) - docs overview and reading order
 - [Usage](usage.md) - command flow and current workflow behavior
+- [Legacy Plan Migration](legacy-plan-migration.md) - explicit migration commands and artifact mapping
 - [Project README](../README.md) - landing page and install path

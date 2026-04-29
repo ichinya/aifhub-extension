@@ -319,6 +319,28 @@ describe('OpenSpec-native prompt asset contract', () => {
     }
   });
 
+  it('suggests explicit legacy migration without auto-migrating in improve, implement, and verify prompts', async () => {
+    for (const relativePath of [
+      'injections/core/aif-improve-plan-folder.md',
+      'injections/core/aif-implement-plan-folder.md',
+      'injections/core/aif-verify-plan-folder.md'
+    ]) {
+      const asset = await readRepoFile(relativePath);
+      const openspec = extractMarkdownSection(asset, 'OpenSpec-native mode');
+
+      for (const expected of [
+        'detectMigrationNeed(options)',
+        'scripts/legacy-plan-migration.mjs',
+        'do not auto-migrate',
+        'Found legacy AI Factory plan artifacts for `<change-id>` but no OpenSpec change at `openspec/changes/<change-id>`.',
+        'node scripts/migrate-legacy-plans.mjs <change-id> --dry-run',
+        'node scripts/migrate-legacy-plans.mjs <change-id>'
+      ]) {
+        assertIncludes(openspec, expected, `${relativePath} OpenSpec-native mode`);
+      }
+    }
+  });
+
   it('requires done prompts to archive verified OpenSpec changes through the done finalizer', async () => {
     for (const relativePath of DONE_PROMPT_ASSETS) {
       const asset = stripFencedBlocks(await readRepoFile(relativePath));

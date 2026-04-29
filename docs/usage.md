@@ -114,6 +114,33 @@ npm test
 
 CI автоматически запускает валидаторы на каждом PR (`.github/workflows/validate.yml`).
 
+## Legacy Plan Migration
+
+If OpenSpec-native commands cannot resolve `openspec/changes/<change-id>` but matching legacy AI Factory plan artifacts still exist, run an explicit migration. Migration never runs automatically from improve, implement, or verify.
+
+Preview:
+
+```bash
+node scripts/migrate-legacy-plans.mjs <change-id> --dry-run
+```
+
+Migrate:
+
+```bash
+node scripts/migrate-legacy-plans.mjs <change-id>
+```
+
+Migrate all discovered legacy plans:
+
+```bash
+node scripts/migrate-legacy-plans.mjs --all --dry-run
+node scripts/migrate-legacy-plans.mjs --all
+```
+
+The migration maps `proposal.md`, `tasks.md`, `design.md`, and optional delta specs into `openspec/changes/<change-id>/`. Runtime-only legacy files are preserved under `.ai-factory/state/<change-id>/` and `.ai-factory/qa/<change-id>/`; legacy sources are not deleted. Review generated specs and run `/aif-improve <change-id>` after migration.
+
+See [Legacy Plan Migration](legacy-plan-migration.md) for collision modes and the full artifact map.
+
 ## Installation
 
 ```bash
