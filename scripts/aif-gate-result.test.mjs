@@ -251,15 +251,17 @@ describe('aif-gate-result helper', () => {
   });
 });
 
-describe('aif-rules-check skill gate contract', () => {
-  it('documents the final rules gate result fenced block', async () => {
-    const skill = await readFile(path.join(REPO_ROOT, 'skills', 'aif-rules-check', 'SKILL.md'), 'utf8');
+describe('aif-rules-check gate contract', () => {
+  it('preserves the final rules gate result fenced block contract in fallback and overlay', async () => {
+    const assets = [
+      await readFile(path.join(REPO_ROOT, 'skills', 'aif-rules-check', 'SKILL.md'), 'utf8'),
+      await readFile(path.join(REPO_ROOT, 'injections', 'core', 'aif-rules-check-openspec-generated-rules.md'), 'utf8')
+    ];
 
-    assert.match(skill, /final fenced JSON block/i);
-    assert.match(skill, /```aif-gate-result/);
-    assert.match(skill, /"gate": "rules"/);
-    assert.match(skill, /Use lowercase JSON `status`: `pass`, `warn`, or `fail`/);
-    assert.match(skill, /"status": "warn"/);
-    assert.match(skill, /"suggested_next": null/);
+    for (const asset of assets) {
+      assert.match(asset, /final machine-readable `aif-gate-result` fenced JSON block/i);
+      assert.match(asset, /"gate": "rules"/);
+      assert.match(asset, /lowercase JSON `status`: `pass`, `warn`, or `fail`/);
+    }
   });
 });

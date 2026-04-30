@@ -1,33 +1,56 @@
 ---
 name: aif-rules-check
-description: Read-only gate that checks changed files against project rules hierarchy. Returns PASS, WARN, or FAIL plus a final aif-gate-result JSON block without editing rules or source code.
-version: 1.2.0
-author: ichi
+description: Compatibility fallback for the upstream read-only rules compliance gate. Use when ai-factory 2.10.0 installs do not yet include bundled aif-rules-check.
+argument-hint: "[git ref | empty]"
+allowed-tools: Read Glob Grep Bash(git *) AskUserQuestion
+disable-model-invocation: false
+metadata:
+  author: AIFHub Extension
+  version: "1.3"
+  category: quality
 ---
 
-# AIF Rules Check
+# Rules Compliance Gate Compatibility Fallback
 
-Read-only gate for rule compliance verification. Checks changed files against the project rules hierarchy and returns a structured verdict without modifying any files.
+Run a standalone read-only rules gate for project rules. This fallback exists only while `aifhub-extension.json -> compat.ai-factory` includes `2.10.0` installs that may predate upstream AI Factory PR #90. When the compatibility minimum moves to an upstream semver release that bundles `/aif-rules-check`, remove this fallback and keep only the AIFHub injection.
 
-This is an **extension-owned temporary gate**. When upstream `ai-factory` adds a native `/aif-rules-check`, this skill should be deprecated in favor of the upstream version.
+This command checks rule compliance only; it does not replace `/aif-review` or `/aif-verify`.
 
-## Behavior
+## Step 0: Load Contract
 
-- **Read-only**: never edits rules, source code, or plan artifacts.
-- **Reads**:
-  - `.ai-factory/config.yaml` - project configuration, mode detection, plan resolution, and rules paths
-  - `.ai-factory/rules/generated/openspec-merged-<change-id>.md` - OpenSpec-native merged generated rules, highest priority when present
-  - `.ai-factory/rules/generated/openspec-change-<change-id>.md` - OpenSpec-native change generated rules
-  - `.ai-factory/rules/generated/openspec-base.md` - OpenSpec-native base generated rules
-  - `.ai-factory/RULES.md` - project-level rules (if present)
-  - `.ai-factory/rules/base.md` - base rules created by `aif-analyze`
-  - plan-local `rules.md` - legacy AI Factory-only plan rules when explicitly in legacy mode
-  - changed files and current diff via `git diff`
-- **Returns**: `PASS | WARN | FAIL` with structured findings and a final fenced JSON block using language `aif-gate-result`.
+- Read `references/RULES-CHECK-CONTRACT.md` first.
+- Treat it as the canonical source for verdict semantics and report structure.
+- If examples in this file drift from the reference, follow the reference.
+
+## Step 1: Load Config
+
+Read `.ai-factory/config.yaml` if it exists to resolve:
+
+- `paths.rules_file`
+- `paths.rules`
+- `paths.plan`
+- `paths.plans`
+- `language.ui`
+- `git.enabled`
+- `git.base_branch`
+- `rules.base`
+- named `rules.<area>` entries
+
+If config is missing or partial, use defaults:
+
+- `paths.rules_file`: `.ai-factory/RULES.md`
+- `paths.rules`: `.ai-factory/rules/`
+- `paths.plan`: `.ai-factory/PLAN.md`
+- `paths.plans`: `.ai-factory/plans/`
+- `git.enabled`: `true`
+- `git.base_branch`: detect the repo default branch from git metadata; fall back to `main` only when detection is unavailable
+- `rules.base`: `.ai-factory/rules/base.md`
+
+If `paths.rules_file` is missing from config, default to `.ai-factory/RULES.md`. If `git.base_branch` is missing, resolve the repository default branch from git metadata when possible and use `main` only as the final fallback.
 
 ## OpenSpec-native mode
 
-Use OpenSpec-native mode when `.ai-factory/config.yaml` contains `aifhub.artifactProtocol: openspec` or the explicit scope is under `openspec/changes/<change-id>/`.
+When `.ai-factory/config.yaml` contains `aifhub.artifactProtocol: openspec` or the explicit scope is under `openspec/changes/<change-id>/`, use OpenSpec-native mode.
 
 Read canonical OpenSpec artifacts only as context:
 
@@ -37,101 +60,85 @@ Read canonical OpenSpec artifacts only as context:
 - `openspec/changes/<change-id>/tasks.md`
 - `openspec/changes/<change-id>/specs/**/spec.md`
 
-Load rules in this exact priority order:
+Load rules in this priority order:
 
 1. `.ai-factory/rules/generated/openspec-merged-<change-id>.md`
 2. `.ai-factory/rules/generated/openspec-change-<change-id>.md`
 3. `.ai-factory/rules/generated/openspec-base.md`
-4. `.ai-factory/RULES.md`, if present
-5. `.ai-factory/rules/base.md`, if present
+4. The resolved `paths.rules_file`, default `.ai-factory/RULES.md`
+5. The resolved `rules.base`, default `.ai-factory/rules/base.md`
+6. Relevant named `rules.<area>` files from config, only when they clearly match the checked scope
 
-OpenSpec-native mode does not require plan-local `rules.md`. Plan-local `rules.md` is ignored unless the run is explicitly in Legacy AI Factory-only mode.
+OpenSpec-native mode does not require plan-local `rules.md`. Ignore plan-local `rules.md` unless the run is explicitly in Legacy AI Factory-only mode.
 
-If generated rules are missing or stale, return `WARN`, report whether each generated rules file was present, missing, or stale, and ask the caller to regenerate rules through the compiler-owning workflow. This read-only gate must not regenerate or edit generated rules.
+If generated rules are missing or stale, return `WARN`, report which generated rules are present, missing, or stale, and ask the caller to regenerate rules through the compiler-owning workflow such as `/aif-mode sync`. This gate must not regenerate or edit generated rules.
 
-Do not write runtime state or QA evidence. If a normal response needs to identify related evidence locations for the caller, name `.ai-factory/state/<change-id>/` and `.ai-factory/qa/<change-id>/` only as external runtime state and QA evidence paths.
+Do not write runtime state, QA evidence, generated rules, rule artifacts, source files, or canonical OpenSpec artifacts. Runtime state `.ai-factory/state/<change-id>/` and QA evidence `.ai-factory/qa/<change-id>/` are external context only.
 
 ## Legacy AI Factory-only mode
 
-When OpenSpec-native mode is not enabled, preserve the legacy AI Factory-only rules hierarchy:
+When OpenSpec-native mode is not active, load rule sources in this order:
 
-1. plan-local `rules.md` from `.ai-factory/plans/<plan-id>/rules.md`, if an active plan exists
-2. `.ai-factory/RULES.md`, if present
-3. `.ai-factory/rules/base.md`, if present
+1. The resolved `paths.rules_file` artifact
+2. The resolved `rules.base` file
+3. Any named `rules.<area>` files from config that clearly match the changed scope
 
-Legacy AI Factory-only mode may cross-reference the active plan pair and plan-local `rules.md`. It remains read-only and must not edit rules, source files, `status.yaml`, or plan artifacts.
+Area rules are optional and scoped. Use changed file paths, folder names, and optional plan context to judge relevance. If relevance is ambiguous, mention the rule source as uncertain and keep the outcome at `WARN`, not `FAIL`.
 
-## Workflow
+Optional plan context may be used only when it helps interpret scope or area relevance. Absence of a plan is never a failure.
 
-### Step 1: Load Rules Hierarchy
+## Changed Scope
 
-1. Read `.ai-factory/config.yaml` for path configuration and active plan resolution.
-2. Detect rules mode:
-   - OpenSpec-native mode when config contains `aifhub.artifactProtocol: openspec` or the active scope is clearly under `openspec/changes/<change-id>/`.
-   - Legacy AI Factory-only mode otherwise.
-3. In OpenSpec-native mode, follow the `OpenSpec-native mode` hierarchy above.
-4. In Legacy AI Factory-only mode, follow the `Legacy AI Factory-only mode` hierarchy above.
-5. If no rules files exist:
-   - Return `WARN` with message: "No rules files found. Run `/aif-analyze` to create base rules."
-   - Stop.
+If the user provided a git ref:
 
-### Step 2: Determine Changed Scope
+1. Validate it with `git rev-parse --verify <argument>`.
+2. If valid, inspect `git diff --name-only <argument>...HEAD` and `git diff <argument>...HEAD`.
+3. If invalid, ask whether to check staged or working-tree changes instead.
 
-1. Detect changed files and current diff via `git diff` (staged + unstaged).
-2. If no changes are detected:
-   - Return `PASS` with message: "No changed files to check."
-   - Stop.
-3. If an active plan exists, cross-reference changed files against plan scope.
+Without arguments:
 
-### Step 3: Check Rule Compliance
+1. Prefer staged work with `git diff --cached --name-only` and `git diff --cached`.
+2. If nothing is staged, fall back to `git diff --name-only` and `git diff`.
+3. If there is still no local diff and `git.enabled = true`, fall back to `<resolved-base-branch>...HEAD`.
 
-For each changed file:
+If there are still no changed files, return `WARN` rather than a hard failure.
 
-1. Check against applicable rules in priority order for the detected mode.
-2. Flag **material rule violations** only - not stylistic preferences.
-3. Categorize findings:
-   - **Blocking**: rule violation that will cause verification failure.
-   - **Warning**: rule deviation that should be addressed but is not blocking.
+## Evaluate Rules
 
-### Step 4: Produce Verdict
+- `PASS`: at least one applicable rule was checked and no clear violations were found.
+- `WARN`: no applicable rules were resolved, evidence is ambiguous, generated rules are missing or stale, or there are no changed files to evaluate.
+- `FAIL`: an explicit hard rule is clearly violated by the inspected diff or changed files.
 
-Return structured output:
+Tie every blocking violation to specific rule text and at least one concrete file/path or diff hunk. If a rule is vague or cannot be verified confidently from the diff, do not escalate it past `WARN`.
 
-```md
-## Rules Check Result: PASS | WARN | FAIL
+## Read-Only Boundary
 
-### Summary
-- Files checked: N
-- Blocking: N
-- Warnings: N
+Never edit rule artifacts, generated rules, plan files, source files, runtime state, or QA evidence. If rules are missing, stale, or need refinement, suggest `/aif-rules`; if OpenSpec generated rules are missing or stale, suggest `/aif-mode sync`.
 
-### Findings
-[...per-file findings...]
+## Output
 
-### Recommendations
-[...actionable suggestions...]
-```
+Use the exact verdict semantics and section order from `references/RULES-CHECK-CONTRACT.md`.
 
-Verdict rules:
-- `PASS`: no findings.
-- `WARN`: warnings but no blocking findings.
-- `FAIL`: one or more blocking findings.
+Required content:
 
-Machine-readable verdict:
+- overall verdict
+- files checked
+- gate results
+- blocking violations
+- suggested fixes
+- suggested rule updates
+- final machine-readable `aif-gate-result` fenced JSON block
 
-- The final output must end with exactly one final fenced JSON block whose language is `aif-gate-result`.
-- Use `gate: "rules"`.
+Machine-readable gate result:
+
+- Append one final fenced `aif-gate-result` JSON block after the human-readable rules report.
+- Use `"gate": "rules"`.
 - Use lowercase JSON `status`: `pass`, `warn`, or `fail`.
-- Set `blocking` to `true` only when `status` is `fail`; otherwise set it to `false`.
-- Set `affected_files` to the changed files with material findings, or `[]` when none are affected.
-- Set `blockers` to material findings that caused `WARN` or `FAIL`. Use `[]` for `PASS`.
-- Use `severity: "error"` for blocking findings and `severity: "warning"` for warning-only findings.
-- Set `suggested_next` to one of:
-  - `{ "command": "/aif-fix", "reason": "Blocking rule violations remain." }` for `FAIL`.
-  - `{ "command": "/aif-rules", "reason": "Rules guidance is missing or stale." }` when `WARN` is caused by missing or outdated user-owned rules.
-  - `null` for `PASS` or when the correct next step is not `/aif-rules` or `/aif-fix`.
-
-Schema shape:
+- Map the human rules verdict exactly: `PASS` -> `pass`, `WARN` -> `warn`, and `FAIL` -> `fail`.
+- Use `"blocking": true|false`; set it to `true` only for explicit hard-rule violations that produce a human `FAIL`.
+- Include only hard-rule violations in `"blockers": []`.
+- Include changed or inspected paths in `"affected_files": []`.
+- Set `"suggested_next"` to `/aif-rules` when rules should be added or clarified, `/aif-fix` when code must change, or `null` when no allowed next command fits.
 
 ```aif-gate-result
 {
@@ -139,51 +146,11 @@ Schema shape:
   "gate": "rules",
   "status": "warn",
   "blocking": false,
-  "blockers": [
-    {
-      "id": "rules-1",
-      "severity": "warning",
-      "file": "src/example.ts",
-      "summary": "Short finding summary."
-    }
-  ],
-  "affected_files": ["src/example.ts"],
-  "suggested_next": null
+  "blockers": [],
+  "affected_files": [],
+  "suggested_next": {
+    "command": "/aif-rules",
+    "reason": "Rules are missing or ambiguous for the changed scope."
+  }
 }
 ```
-
-### Step 5: Suggest Follow-ups
-
-- If rules are missing: suggest `/aif-analyze` in prose; use `/aif-rules` in `suggested_next` only when project-owned rule authoring or updates are the next action.
-- If rules are outdated: suggest `/aif-rules` in prose and in `suggested_next`.
-- If OpenSpec generated rules are missing or stale generated rules are detected: suggest `regenerate rules` through the compiler-owning workflow before relying on this gate.
-- If blocking findings exist: suggest `/aif-fix`.
-- If plan-local rules are missing in Legacy AI Factory-only mode: suggest adding `rules.md` to the plan folder.
-- **Never** suggest editing rules from this skill - that is the responsibility of `/aif-rules`.
-
-## Ownership Boundary
-
-| Artifact | Owner | This Skill |
-|----------|-------|------------|
-| `.ai-factory/rules/generated/*.md` | OpenSpec generated rules compiler | Reads only |
-| `.ai-factory/RULES.md` | `/aif-rules` | Reads only |
-| `.ai-factory/rules/base.md` | `aif-analyze` | Reads only |
-| plan-local `rules.md` | `/aif-plan` | Reads only in legacy AI Factory-only mode |
-| source code files | project | Reads only |
-
-## Rules
-
-- Never modify any files - this is a read-only gate.
-- Never apply fixes - that is the responsibility of `/aif-fix`.
-- Never write or update rules - that is the responsibility of `/aif-rules` or `aif-analyze`.
-- Never regenerate or edit generated rules - if `.ai-factory/rules/generated/*.md` is missing or stale, return `WARN` and ask the caller to regenerate rules through the compiler-owning workflow.
-- Only flag material rule violations, not general style preferences.
-- Use bounded scope: active OpenSpec change, Legacy AI Factory-only active plan pair, or explicitly passed changed scope.
-- If rules are missing or outdated, suggest `/aif-analyze` or `/aif-rules` but do not edit them.
-- Always emit the final `aif-gate-result` fenced JSON block after all human-readable output, with no prose after it.
-
-## Example Requests
-
-- "Check rules compliance."
-- "/aif-rules-check"
-- "Run the rules gate on current changes."

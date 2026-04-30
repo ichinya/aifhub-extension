@@ -11,12 +11,13 @@ const REPO_ROOT = resolve(__dirname, '..');
 const EXPLICIT_REFERENCE_ASSETS = [
   'skills/aif-analyze/references/config-template.yaml',
   'skills/aif-done/references/finalization-contract.md',
-  'skills/aif-rules-check/references/rules-gate.md'
+  'skills/aif-rules-check/references/RULES-CHECK-CONTRACT.md'
 ];
 
 const MODE_GATED_PROMPTS = [
   'skills/aif-done/SKILL.md',
   'skills/aif-rules-check/SKILL.md',
+  'injections/core/aif-rules-check-openspec-generated-rules.md',
   'injections/core/aif-implement-plan-folder.md',
   'injections/core/aif-fix-plan-folder.md',
   'injections/core/aif-verify-plan-folder.md'
@@ -178,6 +179,8 @@ describe('OpenSpec-native prompt asset contract', () => {
       'skills/aif-analyze/SKILL.md',
       'skills/aif-done/SKILL.md',
       'skills/aif-rules-check/SKILL.md',
+      'skills/aif-rules-check/references/RULES-CHECK-CONTRACT.md',
+      'injections/core/aif-rules-check-openspec-generated-rules.md',
       'injections/core/aif-implement-plan-folder.md',
       'agent-files/codex/aifhub-verifier.toml',
       'agent-files/claude/aifhub-verifier.md'
@@ -250,7 +253,7 @@ describe('OpenSpec-native prompt asset contract', () => {
   it('keeps rules-check generated-rules hierarchy in the prompt-assets contract', async () => {
     for (const relativePath of [
       'skills/aif-rules-check/SKILL.md',
-      'skills/aif-rules-check/references/rules-gate.md'
+      'injections/core/aif-rules-check-openspec-generated-rules.md'
     ]) {
       const asset = await readRepoFile(relativePath);
       const openspec = extractMarkdownSection(asset, 'OpenSpec-native mode');

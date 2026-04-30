@@ -78,7 +78,7 @@ paths:
 | `/aif-improve` | `openspec validate <change>` when `validateOnImprove` is enabled and CLI is available |
 | `/aif-implement` | `openspec instructions apply --change <id>` when `useInstructionsApply` is enabled and CLI is available |
 | `/aif-verify` | `openspec validate` and optional `openspec status` evidence |
-| `/aif-rules-check` | OpenSpec specs/deltas through runner or filesystem fallback for generated rules |
+| `/aif-rules-check` | Upstream rules gate or compatibility fallback plus AIFHub generated-rules overlay for OpenSpec specs/deltas |
 | `/aif-done` | `openspec archive <change> --yes` when archive is required |
 | `/aif-mode sync` | generated-rule compile plus validate/status according to sync flags |
 | `/aif-mode doctor` | CLI, Node, active change, generated rules, and archive readiness diagnostics |

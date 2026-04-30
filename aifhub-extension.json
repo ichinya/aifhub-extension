@@ -9,7 +9,7 @@
       "version": "2.10.0",
       "baselineVersion": "2.0.0",
       "lastSync": "2026-04-20",
-      "notes": "Validated against upstream 2.10.0; runtime-aware agentFiles are documented and validated there, so compat.ai-factory starts at 2.10.0."
+      "notes": "Validated against upstream 2.10.0 plus merged PR #90 on the 2.x branch. Because published 2.10.0 installs may predate PR #90, aif-rules-check remains a compatibility fallback while AIFHub also adds the OpenSpec generated-rules injection."
     },
     "openspec": {
       "url": "https://github.com/Fission-AI/OpenSpec",
