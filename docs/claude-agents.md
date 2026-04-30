@@ -22,6 +22,7 @@
 ## Ролевые семейства
 
 - `read-only sidecar`: `aifhub-review-sidecar`, `aifhub-security-sidecar`, `aifhub-rules-sidecar`. Эти агенты только читают scope и возвращают findings-first output без auto-fix. Запускаются в фоне (`background: true`).
+- `aifhub-rules-sidecar` keeps the upstream `rules-sidecar` contract instead of replacing it: it uses `aif-rules-check`, reads `.ai-factory/rules/generated/*` in OpenSpec-native mode, and ends with a final `aif-gate-result` block with `"gate": "rules"`.
 - `low-write verifier`: `aifhub-verifier`. Агент может обновлять только verification artifacts, но не implementation files.
 - `bounded worker`: `aifhub-plan-polisher`, `aifhub-implement-worker`, `aifhub-fixer`. Они write-capable, но у каждого есть жёстко ограниченный рабочий scope.
 - `finalization helper`: `aifhub-done-finalizer`. Он завершает verification-passing OpenSpec change through `openspec archive <change-id> --yes` or legacy plan archive work, supports `--skip-specs`, and prepares summary/archive evidence.
@@ -41,7 +42,7 @@
 ## Почему имена namespaced как `aifhub-*`
 
 - Namespace предотвращает collision с bundled Claude agents из parent `ai-factory` (такие как `plan-coordinator`, `implement-coordinator`, `review-sidecar`, `security-sidecar`).
-- Имена `plan-coordinator`, `implement-coordinator`, `review-sidecar`, `security-sidecar` зарезервированы для bundled agents и не должны использоваться extension agent files без namespace.
+- Имена `plan-coordinator`, `implement-coordinator`, `review-sidecar`, `security-sidecar`, `rules-sidecar` зарезервированы для bundled agents и не должны использоваться extension agent files без namespace.
 - Prefix `aifhub-` сразу показывает, что агент относится к extension contract AIFHub.
 
 ## Примеры явного вызова

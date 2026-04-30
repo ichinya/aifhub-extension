@@ -264,4 +264,29 @@ describe('aif-rules-check gate contract', () => {
       assert.match(asset, /lowercase JSON `status`: `pass`, `warn`, or `fail`/);
     }
   });
+
+  it('keeps AIFHub rules sidecars aligned with upstream rules gate output and read-only boundaries', async () => {
+    const codexAsset = await readFile(
+      path.join(REPO_ROOT, 'agent-files', 'codex', 'aifhub-rules-sidecar.toml'),
+      'utf8'
+    );
+    const claudeAsset = await readFile(
+      path.join(REPO_ROOT, 'agent-files', 'claude', 'aifhub-rules-sidecar.md'),
+      'utf8'
+    );
+
+    assert.match(codexAsset, /sandbox_mode = "read-only"/);
+    assert.match(claudeAsset, /tools: Read, Glob, Grep/);
+    assert.doesNotMatch(claudeAsset, /^tools:.*(?:Write|Edit|Bash)/m);
+
+    for (const asset of [codexAsset, claudeAsset]) {
+      assert.match(asset, /aif-rules-check/);
+      assert.match(asset, /aif-gate-result/);
+      assert.match(asset, /"gate": "rules"/);
+      assert.match(asset, /Verdict: PASS/);
+      assert.match(asset, /\.ai-factory\/rules\/generated\/\*/);
+      assert.match(asset, /upstream .*rules-sidecar/i);
+      assert.match(asset, /Do not edit files/);
+    }
+  });
 });

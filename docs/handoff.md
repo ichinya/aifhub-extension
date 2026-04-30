@@ -26,6 +26,8 @@ Legacy slash aliases и handoff stage names — разные смысловые 
 | `injections/handoff/aif-rules-check-handoff-gate.md` | Review | `aifhub-rules-sidecar` | Как заготовка для отдельной проверки rule compliance |
 | `injections/handoff/aif-done-handoff-finalizer.md` | Done | `aif-done`, `aifhub-done-finalizer` | Как заготовка для отдельного done/finalizer stage после runtime binding |
 
+`aifhub-rules-sidecar` remains AIFHub-specific and namespaced. It should not duplicate upstream `rules-sidecar` beyond the OpenSpec-native generated rules layer: it reads `.ai-factory/rules/generated/*`, follows the `aif-rules-check` verdict semantics, and returns a final `aif-gate-result` block with `"gate": "rules"`.
+
 `aif-verify` и `aif-fix` в этом split не оформляются как handoff prompt assets: они остаются частью `core` workflow, а `aifhub-verifier` и `aifhub-fixer` пока используют inline `developer_instructions`.
 
 До появления отдельного runtime binding `injections/core/` остаётся единственным active overlay-layer для canonical public workflow, а `injections/references/` — shared reference bucket для core overlays и будущих handoff stubs.
