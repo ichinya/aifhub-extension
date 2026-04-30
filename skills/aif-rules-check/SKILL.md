@@ -1,7 +1,7 @@
 ---
 name: aif-rules-check
-description: Read-only gate that checks changed files against project rules hierarchy. Returns PASS, WARN, or FAIL without editing rules or source code.
-version: 1.1.0
+description: Read-only gate that checks changed files against project rules hierarchy. Returns PASS, WARN, or FAIL plus a final aif-gate-result JSON block without editing rules or source code.
+version: 1.2.0
 author: ichi
 ---
 
@@ -23,7 +23,7 @@ This is an **extension-owned temporary gate**. When upstream `ai-factory` adds a
   - `.ai-factory/rules/base.md` - base rules created by `aif-analyze`
   - plan-local `rules.md` - legacy AI Factory-only plan rules when explicitly in legacy mode
   - changed files and current diff via `git diff`
-- **Returns**: `PASS | WARN | FAIL` with structured findings.
+- **Returns**: `PASS | WARN | FAIL` with structured findings and a final fenced JSON block using language `aif-gate-result`.
 
 ## OpenSpec-native mode
 
@@ -71,7 +71,7 @@ Legacy AI Factory-only mode may cross-reference the active plan pair and plan-lo
    - Legacy AI Factory-only mode otherwise.
 3. In OpenSpec-native mode, follow the `OpenSpec-native mode` hierarchy above.
 4. In Legacy AI Factory-only mode, follow the `Legacy AI Factory-only mode` hierarchy above.
-7. If no rules files exist:
+5. If no rules files exist:
    - Return `WARN` with message: "No rules files found. Run `/aif-analyze` to create base rules."
    - Stop.
 
@@ -117,10 +117,45 @@ Verdict rules:
 - `WARN`: warnings but no blocking findings.
 - `FAIL`: one or more blocking findings.
 
+Machine-readable verdict:
+
+- The final output must end with exactly one final fenced JSON block whose language is `aif-gate-result`.
+- Use `gate: "rules"`.
+- Use lowercase JSON `status`: `pass`, `warn`, or `fail`.
+- Set `blocking` to `true` only when `status` is `fail`; otherwise set it to `false`.
+- Set `affected_files` to the changed files with material findings, or `[]` when none are affected.
+- Set `blockers` to material findings that caused `WARN` or `FAIL`. Use `[]` for `PASS`.
+- Use `severity: "error"` for blocking findings and `severity: "warning"` for warning-only findings.
+- Set `suggested_next` to one of:
+  - `{ "command": "/aif-fix", "reason": "Blocking rule violations remain." }` for `FAIL`.
+  - `{ "command": "/aif-rules", "reason": "Rules guidance is missing or stale." }` when `WARN` is caused by missing or outdated user-owned rules.
+  - `null` for `PASS` or when the correct next step is not `/aif-rules` or `/aif-fix`.
+
+Schema shape:
+
+```aif-gate-result
+{
+  "schema_version": 1,
+  "gate": "rules",
+  "status": "warn",
+  "blocking": false,
+  "blockers": [
+    {
+      "id": "rules-1",
+      "severity": "warning",
+      "file": "src/example.ts",
+      "summary": "Short finding summary."
+    }
+  ],
+  "affected_files": ["src/example.ts"],
+  "suggested_next": null
+}
+```
+
 ### Step 5: Suggest Follow-ups
 
-- If rules are missing: suggest `/aif-analyze`.
-- If rules are outdated: suggest `/aif-rules`.
+- If rules are missing: suggest `/aif-analyze` in prose; use `/aif-rules` in `suggested_next` only when project-owned rule authoring or updates are the next action.
+- If rules are outdated: suggest `/aif-rules` in prose and in `suggested_next`.
 - If OpenSpec generated rules are missing or stale generated rules are detected: suggest `regenerate rules` through the compiler-owning workflow before relying on this gate.
 - If blocking findings exist: suggest `/aif-fix`.
 - If plan-local rules are missing in Legacy AI Factory-only mode: suggest adding `rules.md` to the plan folder.
@@ -145,6 +180,7 @@ Verdict rules:
 - Only flag material rule violations, not general style preferences.
 - Use bounded scope: active OpenSpec change, Legacy AI Factory-only active plan pair, or explicitly passed changed scope.
 - If rules are missing or outdated, suggest `/aif-analyze` or `/aif-rules` but do not edit them.
+- Always emit the final `aif-gate-result` fenced JSON block after all human-readable output, with no prose after it.
 
 ## Example Requests
 
