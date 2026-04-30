@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// validate-extension.mjs — validates extension.json manifest paths and schema
+// validate-extension.mjs - validates upstream extension.json plus AIFHub metadata
 // Exit 0 = pass, 1 = fail
 
 import { readFile, stat } from 'node:fs/promises';
@@ -8,6 +8,37 @@ import { join, resolve, sep } from 'node:path';
 const LOG_LEVEL = process.env.LOG_LEVEL || 'INFO';
 const LEVELS = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 };
 
+const UPSTREAM_SCHEMA_URL = 'https://raw.githubusercontent.com/lee-to/ai-factory/2.x/schemas/extension.schema.json';
+const AIFHUB_METADATA_FILE = 'aifhub-extension.json';
+const AIFHUB_METADATA_SCHEMA = './schemas/aifhub-extension.schema.json';
+
+const EXTENSION_TOP_LEVEL_KEYS = new Set([
+  '$schema',
+  'name',
+  'version',
+  'description',
+  'commands',
+  'agents',
+  'agentFiles',
+  'injections',
+  'skills',
+  'replaces',
+  'mcpServers'
+]);
+
+const AIFHUB_TOP_LEVEL_KEYS = new Set(['$schema', 'compat', 'sources']);
+const SOURCE_METADATA_KEYS = new Set([
+  'url',
+  'version',
+  'baselineVersion',
+  'supportedRange',
+  'lastSync',
+  'optional',
+  'requiresNode',
+  'mode',
+  'notes'
+]);
+
 function log(level, message, details = {}) {
   if (LEVELS[level] < LEVELS[LOG_LEVEL]) return;
   const detailStr = Object.keys(details).length ? ` ${JSON.stringify(details)}` : '';
@@ -15,10 +46,12 @@ function log(level, message, details = {}) {
 }
 
 function resolvePath(baseDir, relPath) {
+  if (typeof relPath !== 'string' || !relPath) {
+    throw new Error(`Expected non-empty relative path, got ${JSON.stringify(relPath)}`);
+  }
   const p = relPath.replace(/^\.\//, '');
   const resolved = resolve(baseDir, p);
-  // Prevent path traversal: resolved path must stay within baseDir
-  // Append path.sep to ensure exact prefix match (e.g. /foo/project vs /foo/project-evil)
+  // Prevent path traversal: resolved path must stay within baseDir.
   const normalizedBase = baseDir.endsWith(sep) ? baseDir : baseDir + sep;
   if (!resolved.startsWith(normalizedBase)) {
     throw new Error(`Path traversal detected: "${relPath}" resolves outside base directory`);
@@ -35,23 +68,187 @@ async function fileExists(absPath) {
   }
 }
 
-async function validateExtension() {
-  const repoRoot = process.cwd();
-  const manifestPath = join(repoRoot, 'extension.json');
-  let hasErrors = false;
-
-  // Load extension.json
-  log('DEBUG', 'Reading extension.json', { path: manifestPath });
-  let manifest;
+async function readJsonFile(filePath, label) {
+  log('DEBUG', `Reading ${label}`, { path: filePath });
   try {
-    const raw = await readFile(manifestPath, 'utf-8');
-    manifest = JSON.parse(raw);
+    const raw = await readFile(filePath, 'utf-8');
+    return { ok: true, value: JSON.parse(raw) };
   } catch (err) {
-    log('ERROR', `Failed to read or parse extension.json: ${err.message}`);
-    return 1;
+    log('ERROR', `Failed to read or parse ${label}: ${err.message}`);
+    return { ok: false, value: null };
+  }
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function validateUnknownKeys(value, allowedKeys, label) {
+  let hasErrors = false;
+  if (!isPlainObject(value)) {
+    log('ERROR', `${label} must be an object`);
+    return true;
   }
 
-  // Check version (semver)
+  for (const key of Object.keys(value)) {
+    if (!allowedKeys.has(key)) {
+      log('ERROR', `Unknown field in ${label}`, { field: key });
+      hasErrors = true;
+    }
+  }
+  return hasErrors;
+}
+
+function resolveSchemaRef(rootSchema, ref) {
+  if (typeof ref !== 'string' || !ref.startsWith('#/')) {
+    throw new Error(`Unsupported schema reference: ${ref}`);
+  }
+
+  const parts = ref
+    .slice(2)
+    .split('/')
+    .map((part) => part.replace(/~1/g, '/').replace(/~0/g, '~'));
+
+  let current = rootSchema;
+  for (const part of parts) {
+    if (!isPlainObject(current) || !(part in current)) {
+      throw new Error(`Unresolved schema reference: ${ref}`);
+    }
+    current = current[part];
+  }
+  return current;
+}
+
+function getJsonType(value) {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'array';
+  return typeof value === 'object' ? 'object' : typeof value;
+}
+
+function matchesSchemaType(value, expectedType) {
+  if (expectedType === 'object') return isPlainObject(value);
+  if (expectedType === 'array') return Array.isArray(value);
+  return getJsonType(value) === expectedType;
+}
+
+function validateJsonAgainstSchema(value, schema, options = {}) {
+  const rootSchema = options.rootSchema ?? schema;
+  const path = options.path ?? '$';
+  const errors = [];
+
+  if (!isPlainObject(schema)) {
+    errors.push({ path, message: 'schema node must be an object' });
+    return errors;
+  }
+
+  if (schema.$ref) {
+    let resolved;
+    try {
+      resolved = resolveSchemaRef(rootSchema, schema.$ref);
+    } catch (err) {
+      errors.push({ path, message: err.message });
+      return errors;
+    }
+    return validateJsonAgainstSchema(value, resolved, { rootSchema, path });
+  }
+
+  if (schema.type) {
+    const expectedTypes = Array.isArray(schema.type) ? schema.type : [schema.type];
+    if (!expectedTypes.some((type) => matchesSchemaType(value, type))) {
+      errors.push({
+        path,
+        message: `expected type ${expectedTypes.join('|')}, got ${getJsonType(value)}`
+      });
+      return errors;
+    }
+  }
+
+  if (schema.enum && !schema.enum.includes(value)) {
+    errors.push({ path, message: `expected one of ${schema.enum.map((item) => JSON.stringify(item)).join(', ')}` });
+  }
+
+  if (typeof value === 'string') {
+    if (schema.pattern) {
+      const pattern = new RegExp(schema.pattern);
+      if (!pattern.test(value)) {
+        errors.push({ path, message: `does not match pattern ${schema.pattern}` });
+      }
+    }
+
+    if (schema.format === 'uri') {
+      try {
+        const parsed = new URL(value);
+        if (!parsed.protocol) {
+          errors.push({ path, message: 'must be a valid URI' });
+        }
+      } catch {
+        errors.push({ path, message: 'must be a valid URI' });
+      }
+    }
+  }
+
+  const shouldValidateObject =
+    isPlainObject(value) && (schema.properties || schema.required || schema.additionalProperties !== undefined);
+
+  if (shouldValidateObject) {
+    const properties = schema.properties ?? {};
+    const required = schema.required ?? [];
+
+    for (const key of required) {
+      if (!Object.prototype.hasOwnProperty.call(value, key)) {
+        errors.push({ path, message: `missing required property ${key}` });
+      }
+    }
+
+    for (const [key, propertySchema] of Object.entries(properties)) {
+      if (Object.prototype.hasOwnProperty.call(value, key)) {
+        errors.push(
+          ...validateJsonAgainstSchema(value[key], propertySchema, {
+            rootSchema,
+            path: `${path}.${key}`
+          })
+        );
+      }
+    }
+
+    const knownProperties = new Set(Object.keys(properties));
+    for (const [key, propertyValue] of Object.entries(value)) {
+      if (knownProperties.has(key)) continue;
+
+      if (schema.additionalProperties === false) {
+        errors.push({ path: `${path}.${key}`, message: 'additional property is not allowed' });
+      } else if (isPlainObject(schema.additionalProperties)) {
+        errors.push(
+          ...validateJsonAgainstSchema(propertyValue, schema.additionalProperties, {
+            rootSchema,
+            path: `${path}.${key}`
+          })
+        );
+      }
+    }
+  }
+
+  return errors;
+}
+
+function validateExtensionManifest(manifest) {
+  let hasErrors = validateUnknownKeys(manifest, EXTENSION_TOP_LEVEL_KEYS, 'extension.json');
+
+  if (manifest.$schema !== UPSTREAM_SCHEMA_URL) {
+    log('ERROR', 'extension.json must point at the upstream AI Factory manifest schema', {
+      expected: UPSTREAM_SCHEMA_URL,
+      actual: manifest.$schema
+    });
+    hasErrors = true;
+  } else {
+    log('INFO', 'extension.json schema OK', { schema: manifest.$schema });
+  }
+
+  if (!manifest.name || typeof manifest.name !== 'string') {
+    log('ERROR', 'Missing or invalid required field: name');
+    hasErrors = true;
+  }
+
   log('DEBUG', 'Checking version field', { version: manifest.version });
   if (!manifest.version) {
     log('ERROR', 'Missing required field: version');
@@ -66,16 +263,110 @@ async function validateExtension() {
     }
   }
 
-  // Check compat.ai-factory
-  log('DEBUG', 'Checking compat field', { compat: manifest.compat });
-  if (!manifest.compat || !manifest.compat['ai-factory']) {
-    log('ERROR', 'Missing required field: compat.ai-factory');
+  return hasErrors;
+}
+
+async function validateAifhubMetadata(metadata, repoRoot) {
+  let hasErrors = validateUnknownKeys(metadata, AIFHUB_TOP_LEVEL_KEYS, AIFHUB_METADATA_FILE);
+
+  if (metadata.$schema !== AIFHUB_METADATA_SCHEMA) {
+    log('ERROR', `${AIFHUB_METADATA_FILE} must point at the local AIFHub metadata schema`, {
+      expected: AIFHUB_METADATA_SCHEMA,
+      actual: metadata.$schema
+    });
     hasErrors = true;
   } else {
-    log('INFO', 'compat.ai-factory OK', { compat: manifest.compat['ai-factory'] });
+    try {
+      const schemaPath = resolvePath(repoRoot, metadata.$schema);
+      if (!(await fileExists(schemaPath))) {
+        log('ERROR', 'AIFHub metadata schema file not found', { path: metadata.$schema, resolved: schemaPath });
+        hasErrors = true;
+      } else {
+        const schemaResult = await readJsonFile(schemaPath, AIFHUB_METADATA_SCHEMA);
+        if (!schemaResult.ok) {
+          hasErrors = true;
+        } else {
+          log('INFO', 'AIFHub metadata schema file OK', { schema: metadata.$schema });
+          const schemaErrors = validateJsonAgainstSchema(metadata, schemaResult.value);
+          if (schemaErrors.length > 0) {
+            for (const error of schemaErrors) {
+              log('ERROR', 'AIFHub metadata schema violation', error);
+            }
+            hasErrors = true;
+          } else {
+            log('INFO', 'AIFHub metadata matches schema', { schema: metadata.$schema });
+          }
+        }
+      }
+    } catch (err) {
+      log('ERROR', `AIFHub metadata schema path invalid: ${err.message}`);
+      hasErrors = true;
+    }
   }
 
-  // Check skills[].path exist
+  const compat = metadata.compat;
+  log('DEBUG', 'Checking AIFHub compat field', { compat });
+  if (!isPlainObject(compat) || typeof compat['ai-factory'] !== 'string' || !compat['ai-factory']) {
+    log('ERROR', `Missing required field: ${AIFHUB_METADATA_FILE}.compat.ai-factory`);
+    hasErrors = true;
+  } else {
+    log('INFO', 'compat.ai-factory OK', { compat: compat['ai-factory'] });
+  }
+
+  const sources = metadata.sources;
+  if (!isPlainObject(sources)) {
+    log('ERROR', `Missing required field: ${AIFHUB_METADATA_FILE}.sources`);
+    return true;
+  }
+
+  if (!isPlainObject(sources['ai-factory'])) {
+    log('ERROR', `Missing required field: ${AIFHUB_METADATA_FILE}.sources.ai-factory`);
+    hasErrors = true;
+  }
+
+  for (const [sourceName, source] of Object.entries(sources)) {
+    if (!isPlainObject(source)) {
+      log('ERROR', 'Source metadata must be an object', { source: sourceName });
+      hasErrors = true;
+      continue;
+    }
+
+    for (const key of Object.keys(source)) {
+      if (!SOURCE_METADATA_KEYS.has(key)) {
+        log('ERROR', 'Unknown source metadata field', { source: sourceName, field: key });
+        hasErrors = true;
+      }
+    }
+
+    for (const requiredKey of ['url', 'version', 'lastSync']) {
+      if (typeof source[requiredKey] !== 'string' || !source[requiredKey]) {
+        log('ERROR', 'Missing required source metadata field', { source: sourceName, field: requiredKey });
+        hasErrors = true;
+      }
+    }
+
+    if (typeof source.url === 'string' && !/^https?:\/\//.test(source.url)) {
+      log('ERROR', 'Source metadata URL must be http(s)', { source: sourceName, url: source.url });
+      hasErrors = true;
+    }
+
+    if (typeof source.lastSync === 'string' && !/^\d{4}-\d{2}-\d{2}$/.test(source.lastSync)) {
+      log('ERROR', 'Source metadata lastSync must use YYYY-MM-DD', { source: sourceName, lastSync: source.lastSync });
+      hasErrors = true;
+    }
+
+    if ('optional' in source && typeof source.optional !== 'boolean') {
+      log('ERROR', 'Source metadata optional must be boolean', { source: sourceName });
+      hasErrors = true;
+    }
+  }
+
+  return hasErrors;
+}
+
+async function validateManifestPaths(manifest, repoRoot) {
+  let hasErrors = false;
+
   const skills = manifest.skills || [];
   log('DEBUG', `Checking ${skills.length} skill(s)`);
   for (const skillPath of skills) {
@@ -90,13 +381,12 @@ async function validateExtension() {
     log('DEBUG', 'Checking skill path', { path: skillPath, resolved: abs });
     const exists = await fileExists(abs);
     if (!exists) {
-      log('ERROR', `Skill path not found`, { path: skillPath, resolved: abs });
+      log('ERROR', 'Skill path not found', { path: skillPath, resolved: abs });
       hasErrors = true;
     }
   }
-  log('INFO', `Skills check complete`, { total: skills.length });
+  log('INFO', 'Skills check complete', { total: skills.length });
 
-  // Check agentFiles[].source exist and agentFiles[].target extension (.toml)
   const agentFiles = manifest.agentFiles || [];
   log('DEBUG', `Checking ${agentFiles.length} agentFile(s)`);
   for (const af of agentFiles) {
@@ -111,26 +401,25 @@ async function validateExtension() {
     log('DEBUG', 'Checking agentFile source', { source: af.source, resolved: srcAbs });
     const srcExists = await fileExists(srcAbs);
     if (!srcExists) {
-      log('ERROR', `agentFile source not found`, { source: af.source, resolved: srcAbs });
+      log('ERROR', 'agentFile source not found', { source: af.source, resolved: srcAbs });
       hasErrors = true;
     }
 
     const target = af.target || '';
     const runtime = af.runtime || '';
     if (runtime === 'codex' && !target.endsWith('.toml')) {
-      log('ERROR', `Codex agentFile target must have .toml extension`, { target });
+      log('ERROR', 'Codex agentFile target must have .toml extension', { target });
       hasErrors = true;
     } else if (runtime === 'claude' && !target.endsWith('.md')) {
-      log('ERROR', `Claude agentFile target must have .md extension`, { target });
+      log('ERROR', 'Claude agentFile target must have .md extension', { target });
       hasErrors = true;
     } else if (runtime !== 'codex' && runtime !== 'claude') {
-      log('ERROR', `Unknown agentFile runtime`, { runtime });
+      log('ERROR', 'Unknown agentFile runtime', { runtime });
       hasErrors = true;
     }
   }
-  log('INFO', `AgentFiles check complete`, { total: agentFiles.length });
+  log('INFO', 'AgentFiles check complete', { total: agentFiles.length });
 
-  // Check injections[].file exist
   const injections = manifest.injections || [];
   log('DEBUG', `Checking ${injections.length} injection(s)`);
   for (const inj of injections) {
@@ -145,11 +434,29 @@ async function validateExtension() {
     log('DEBUG', 'Checking injection file', { file: inj.file, resolved: abs });
     const exists = await fileExists(abs);
     if (!exists) {
-      log('ERROR', `Injection file not found`, { file: inj.file, resolved: abs });
+      log('ERROR', 'Injection file not found', { file: inj.file, resolved: abs });
       hasErrors = true;
     }
   }
-  log('INFO', `Injections check complete`, { total: injections.length });
+  log('INFO', 'Injections check complete', { total: injections.length });
+
+  return hasErrors;
+}
+
+async function validateExtension() {
+  const repoRoot = process.cwd();
+  const manifestPath = join(repoRoot, 'extension.json');
+  const metadataPath = join(repoRoot, AIFHUB_METADATA_FILE);
+  let hasErrors = false;
+
+  const manifestResult = await readJsonFile(manifestPath, 'extension.json');
+  if (!manifestResult.ok) return 1;
+  const metadataResult = await readJsonFile(metadataPath, AIFHUB_METADATA_FILE);
+  if (!metadataResult.ok) return 1;
+
+  hasErrors = validateExtensionManifest(manifestResult.value) || hasErrors;
+  hasErrors = await validateAifhubMetadata(metadataResult.value, repoRoot) || hasErrors;
+  hasErrors = await validateManifestPaths(manifestResult.value, repoRoot) || hasErrors;
 
   if (hasErrors) {
     log('ERROR', 'Validation FAILED');

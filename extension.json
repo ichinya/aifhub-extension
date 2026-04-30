@@ -1,29 +1,8 @@
 {
+  "$schema": "https://raw.githubusercontent.com/lee-to/ai-factory/2.x/schemas/extension.schema.json",
   "name": "aifhub-extension",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Upstream-first extension for AI Factory: bootstrap remains extension-owned; `aif-plan`, `aif-implement`, `aif-verify`, and `aif-fix` connect through `injections`; `aif-done` remains the extension-owned finalizer; Codex and Claude runtime files publish through top-level `agentFiles`.",
-  "compat": {
-    "ai-factory": ">=2.10.0 <3.0.0"
-  },
-  "sources": {
-    "ai-factory": {
-      "url": "https://github.com/lee-to/ai-factory",
-      "version": "2.10.0",
-      "baselineVersion": "2.0.0",
-      "lastSync": "2026-04-20",
-      "notes": "Проверено против upstream 2.10.0; именно там документированы и провалидированы runtime-aware agentFiles и extension-defined runtime metadata, поэтому compat.ai-factory теперь начинается с 2.10.0"
-    },
-    "openspec": {
-      "url": "https://github.com/Fission-AI/OpenSpec",
-      "version": "1.3.1",
-      "supportedRange": ">=1.3.1 <2.0.0",
-      "lastSync": "2026-04-25",
-      "optional": true,
-      "requiresNode": ">=20.19.0",
-      "mode": "optional-cli-adapter",
-      "notes": "OpenSpec is used as an optional artifact protocol and CLI validation/archive adapter for v1. OpenSpec skills are not installed by this extension. AI Factory-only mode remains supported without the OpenSpec CLI."
-    }
-  },
   "skills": [
     "skills/aif-analyze",
     "skills/aif-done",

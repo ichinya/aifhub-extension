@@ -34,6 +34,16 @@ AIFHub commands request OpenSpec validation, status, instructions, and archive t
 | `.ai-factory/rules/generated/` | Derived rules, safe to regenerate |
 | `.ai-factory/plans/` | Legacy AI Factory-only compatibility and migration input |
 
+## Manifest Metadata
+
+`extension.json` follows the upstream AI Factory extension manifest schema and should not contain AIFHub-private fields. Its `$schema` value points at:
+
+```text
+https://raw.githubusercontent.com/lee-to/ai-factory/2.x/schemas/extension.schema.json
+```
+
+The private AIFHub metadata contract lives in `aifhub-extension.json` and is described by `schemas/aifhub-extension.schema.json`. `compat.ai-factory` and `sources.*` belong there, not in `extension.json`.
+
 ## Command Boundaries
 
 ### `/aif-mode`
@@ -419,6 +429,8 @@ Expected range:
 >=2.10.0 <3.0.0
 ```
 
+The supported range is tracked in `aifhub-extension.json -> compat.ai-factory`.
+
 2. Install the extension:
 
 ```bash
@@ -451,6 +463,8 @@ Legacy `.ai-factory/plans/` artifacts are expected only when the project is inte
 npm run validate
 npm test
 ```
+
+`npm run validate` checks the split manifest contract: upstream `extension.json`, private `aifhub-extension.json`, bundled agent files, and docs links.
 
 ## See Also
 

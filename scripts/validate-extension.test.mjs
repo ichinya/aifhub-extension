@@ -1,7 +1,7 @@
-// validate-extension.test.mjs — tests for extension manifest validator
+// validate-extension.test.mjs - tests for extension manifest and AIFHub metadata validator
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, mkdir, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, mkdir, rm, readFile } from 'node:fs/promises';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
@@ -11,6 +11,9 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
+
+const UPSTREAM_SCHEMA_URL = 'https://raw.githubusercontent.com/lee-to/ai-factory/2.x/schemas/extension.schema.json';
+const AIFHUB_SCHEMA_PATH = './schemas/aifhub-extension.schema.json';
 
 let tmpDir;
 
@@ -46,10 +49,10 @@ async function writeFixture(dir, relPath, content) {
 
 function validManifest(extra = {}) {
   return JSON.stringify({
+    $schema: UPSTREAM_SCHEMA_URL,
     name: 'test-ext',
     version: '1.0.0',
     description: 'test',
-    compat: { 'ai-factory': '>=2.10.0 <3.0.0' },
     skills: ['skills/aif-analyze'],
     agentFiles: [
       { runtime: 'codex', source: './agent-files/codex/test.toml', target: 'test.toml' }
@@ -61,75 +64,144 @@ function validManifest(extra = {}) {
   });
 }
 
+function validAifhubMetadata(extra = {}) {
+  return JSON.stringify({
+    $schema: AIFHUB_SCHEMA_PATH,
+    compat: { 'ai-factory': '>=2.10.0 <3.0.0' },
+    sources: {
+      'ai-factory': {
+        url: 'https://github.com/lee-to/ai-factory',
+        version: '2.10.0',
+        baselineVersion: '2.0.0',
+        lastSync: '2026-04-20',
+        notes: 'Validated against upstream 2.10.0.'
+      },
+      openspec: {
+        url: 'https://github.com/Fission-AI/OpenSpec',
+        version: '1.3.1',
+        supportedRange: '>=1.3.1 <2.0.0',
+        lastSync: '2026-04-25',
+        optional: true,
+        requiresNode: '>=20.19.0',
+        mode: 'optional-cli-adapter',
+        notes: 'OpenSpec is used as an optional artifact protocol.'
+      }
+    },
+    ...extra
+  });
+}
+
+async function writeValidProject({
+  manifest = validManifest(),
+  metadata = validAifhubMetadata(),
+  includeMetadataSchema = true
+} = {}) {
+  await writeFixture(tmpDir, 'extension.json', manifest);
+  if (metadata !== null) {
+    await writeFixture(tmpDir, 'aifhub-extension.json', metadata);
+  }
+  if (includeMetadataSchema) {
+    const schema = await readFile(join(REPO_ROOT, 'schemas/aifhub-extension.schema.json'), 'utf-8');
+    await writeFixture(tmpDir, 'schemas/aifhub-extension.schema.json', schema);
+  }
+  await writeFixture(tmpDir, 'skills/aif-analyze/SKILL.md', '# test');
+  await writeFixture(tmpDir, 'agent-files/codex/test.toml', 'name = "test"');
+  await writeFixture(tmpDir, 'injections/core/test.md', '# test');
+}
+
 describe('validate-extension.mjs', () => {
-  it('passes with valid manifest and all files present', async () => {
-    await writeFixture(tmpDir, 'extension.json', validManifest());
-    await writeFixture(tmpDir, 'skills/aif-analyze/SKILL.md', '# test');
-    await writeFixture(tmpDir, 'agent-files/codex/test.toml', 'name = "test"');
-    await writeFixture(tmpDir, 'injections/core/test.md', '# test');
+  it('passes with upstream extension manifest, AIFHub metadata, and all files present', async () => {
+    await writeValidProject();
 
     const code = await runValidatorExitCode(tmpDir);
     assert.equal(code, 0);
   });
 
+  it('fails when extension.json contains private AIFHub metadata', async () => {
+    const metadata = JSON.parse(validAifhubMetadata());
+    const manifest = JSON.stringify({
+      ...JSON.parse(validManifest()),
+      compat: metadata.compat,
+      sources: metadata.sources
+    });
+    await writeValidProject({ manifest });
+
+    const code = await runValidatorExitCode(tmpDir);
+    assert.equal(code, 1);
+  });
+
+  it('fails with missing aifhub-extension.json', async () => {
+    await writeValidProject({ metadata: null });
+
+    const code = await runValidatorExitCode(tmpDir);
+    assert.equal(code, 1);
+  });
+
+  it('fails with missing AIFHub metadata schema file', async () => {
+    await writeValidProject({ includeMetadataSchema: false });
+
+    const code = await runValidatorExitCode(tmpDir);
+    assert.equal(code, 1);
+  });
+
   it('fails with missing skill path', async () => {
-    const manifest = validManifest();
-    const parsed = JSON.parse(manifest);
+    const parsed = JSON.parse(validManifest());
     parsed.skills = ['skills/nonexistent'];
-    await writeFixture(tmpDir, 'extension.json', JSON.stringify(parsed));
-    await writeFixture(tmpDir, 'agent-files/codex/test.toml', 'name = "test"');
-    await writeFixture(tmpDir, 'injections/core/test.md', '# test');
+    await writeValidProject({ manifest: JSON.stringify(parsed) });
 
     const code = await runValidatorExitCode(tmpDir);
     assert.equal(code, 1);
   });
 
   it('fails with missing injection file', async () => {
-    const manifest = validManifest();
-    const parsed = JSON.parse(manifest);
+    const parsed = JSON.parse(validManifest());
     parsed.injections = [{ target: 'aif-plan', position: 'prepend', file: './injections/core/missing.md' }];
-    await writeFixture(tmpDir, 'extension.json', JSON.stringify(parsed));
-    await writeFixture(tmpDir, 'skills/aif-analyze/SKILL.md', '# test');
-    await writeFixture(tmpDir, 'agent-files/codex/test.toml', 'name = "test"');
+    await writeValidProject({ manifest: JSON.stringify(parsed) });
 
     const code = await runValidatorExitCode(tmpDir);
     assert.equal(code, 1);
   });
 
   it('fails with invalid semver version', async () => {
-    const manifest = validManifest();
-    const parsed = JSON.parse(manifest);
+    const parsed = JSON.parse(validManifest());
     parsed.version = 'not-semver';
-    await writeFixture(tmpDir, 'extension.json', JSON.stringify(parsed));
-    await writeFixture(tmpDir, 'skills/aif-analyze/SKILL.md', '# test');
-    await writeFixture(tmpDir, 'agent-files/codex/test.toml', 'name = "test"');
-    await writeFixture(tmpDir, 'injections/core/test.md', '# test');
+    await writeValidProject({ manifest: JSON.stringify(parsed) });
 
     const code = await runValidatorExitCode(tmpDir);
     assert.equal(code, 1);
   });
 
-  it('fails with missing compat field', async () => {
-    const manifest = validManifest();
-    const parsed = JSON.parse(manifest);
+  it('fails with missing compat field in AIFHub metadata', async () => {
+    const parsed = JSON.parse(validAifhubMetadata());
     delete parsed.compat;
-    await writeFixture(tmpDir, 'extension.json', JSON.stringify(parsed));
-    await writeFixture(tmpDir, 'skills/aif-analyze/SKILL.md', '# test');
-    await writeFixture(tmpDir, 'agent-files/codex/test.toml', 'name = "test"');
-    await writeFixture(tmpDir, 'injections/core/test.md', '# test');
+    await writeValidProject({ metadata: JSON.stringify(parsed) });
+
+    const code = await runValidatorExitCode(tmpDir);
+    assert.equal(code, 1);
+  });
+
+  it('fails with missing sources field in AIFHub metadata', async () => {
+    const parsed = JSON.parse(validAifhubMetadata());
+    delete parsed.sources;
+    await writeValidProject({ metadata: JSON.stringify(parsed) });
+
+    const code = await runValidatorExitCode(tmpDir);
+    assert.equal(code, 1);
+  });
+
+  it('fails when AIFHub metadata violates the local schema', async () => {
+    const parsed = JSON.parse(validAifhubMetadata());
+    parsed.sources['ai-factory'].notes = 42;
+    await writeValidProject({ metadata: JSON.stringify(parsed) });
 
     const code = await runValidatorExitCode(tmpDir);
     assert.equal(code, 1);
   });
 
   it('fails with non-.toml agentFile target for codex runtime', async () => {
-    const manifest = validManifest();
-    const parsed = JSON.parse(manifest);
+    const parsed = JSON.parse(validManifest());
     parsed.agentFiles[0].target = 'test.yaml';
-    await writeFixture(tmpDir, 'extension.json', JSON.stringify(parsed));
-    await writeFixture(tmpDir, 'skills/aif-analyze/SKILL.md', '# test');
-    await writeFixture(tmpDir, 'agent-files/codex/test.toml', 'name = "test"');
-    await writeFixture(tmpDir, 'injections/core/test.md', '# test');
+    await writeValidProject({ manifest: JSON.stringify(parsed) });
 
     const code = await runValidatorExitCode(tmpDir);
     assert.equal(code, 1);
@@ -142,11 +214,8 @@ describe('validate-extension.mjs', () => {
         { runtime: 'claude', source: './agent-files/claude/test.md', target: 'test.md' }
       ]
     });
-    await writeFixture(tmpDir, 'extension.json', manifest);
-    await writeFixture(tmpDir, 'skills/aif-analyze/SKILL.md', '# test');
-    await writeFixture(tmpDir, 'agent-files/codex/test.toml', 'name = "test"');
+    await writeValidProject({ manifest });
     await writeFixture(tmpDir, 'agent-files/claude/test.md', '---\nname: test\ndescription: test\ntools: Read\nmodel: inherit\nmaxTurns: 6\n---\n# test');
-    await writeFixture(tmpDir, 'injections/core/test.md', '# test');
 
     const code = await runValidatorExitCode(tmpDir);
     assert.equal(code, 0);
@@ -158,10 +227,8 @@ describe('validate-extension.mjs', () => {
         { runtime: 'claude', source: './agent-files/claude/test.toml', target: 'test.toml' }
       ]
     });
-    await writeFixture(tmpDir, 'extension.json', manifest);
-    await writeFixture(tmpDir, 'skills/aif-analyze/SKILL.md', '# test');
+    await writeValidProject({ manifest });
     await writeFixture(tmpDir, 'agent-files/claude/test.toml', 'name = "test"');
-    await writeFixture(tmpDir, 'injections/core/test.md', '# test');
 
     const code = await runValidatorExitCode(tmpDir);
     assert.equal(code, 1);
@@ -173,22 +240,16 @@ describe('validate-extension.mjs', () => {
         { runtime: 'unknown', source: './agent-files/codex/test.toml', target: 'test.toml' }
       ]
     });
-    await writeFixture(tmpDir, 'extension.json', manifest);
-    await writeFixture(tmpDir, 'skills/aif-analyze/SKILL.md', '# test');
-    await writeFixture(tmpDir, 'agent-files/codex/test.toml', 'name = "test"');
-    await writeFixture(tmpDir, 'injections/core/test.md', '# test');
+    await writeValidProject({ manifest });
 
     const code = await runValidatorExitCode(tmpDir);
     assert.equal(code, 1);
   });
 
   it('fails with path traversal in skill path', async () => {
-    const manifest = validManifest();
-    const parsed = JSON.parse(manifest);
+    const parsed = JSON.parse(validManifest());
     parsed.skills = ['../../etc/passwd'];
-    await writeFixture(tmpDir, 'extension.json', JSON.stringify(parsed));
-    await writeFixture(tmpDir, 'agent-files/codex/test.toml', 'name = "test"');
-    await writeFixture(tmpDir, 'injections/core/test.md', '# test');
+    await writeValidProject({ manifest: JSON.stringify(parsed) });
 
     const code = await runValidatorExitCode(tmpDir);
     assert.equal(code, 1);

@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/ichinya/aifhub-extension/main/schemas/aifhub-extension.schema.json",
+  "title": "AIFHub Extension Metadata",
+  "description": "Private AIFHub extension metadata kept outside the upstream AI Factory extension manifest.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["compat", "sources"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Optional JSON Schema reference for editor and tooling support."
+    },
+    "compat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ai-factory"],
+      "properties": {
+        "ai-factory": {
+          "type": "string",
+          "description": "Supported ai-factory CLI semver range."
+        }
+      }
+    },
+    "sources": {
+      "type": "object",
+      "required": ["ai-factory"],
+      "additionalProperties": {
+        "$ref": "#/$defs/SourceMetadata"
+      },
+      "properties": {
+        "ai-factory": {
+          "$ref": "#/$defs/SourceMetadata"
+        },
+        "openspec": {
+          "$ref": "#/$defs/SourceMetadata"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "SourceMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "version", "lastSync"],
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "version": {
+          "type": "string"
+        },
+        "baselineVersion": {
+          "type": "string"
+        },
+        "supportedRange": {
+          "type": "string"
+        },
+        "lastSync": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "optional": {
+          "type": "boolean"
+        },
+        "requiresNode": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

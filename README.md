@@ -113,13 +113,23 @@ openspec/
 | `.ai-factory/rules/generated` | Derived rules, safe to regenerate |
 | `.ai-factory/plans` | Legacy compatibility and migration input only |
 
+## Manifest And Metadata
+
+`extension.json` is the strict upstream AI Factory extension manifest. It declares:
+
+```json
+"$schema": "https://raw.githubusercontent.com/lee-to/ai-factory/2.x/schemas/extension.schema.json"
+```
+
+AIFHub-owned metadata lives in `aifhub-extension.json` and is validated by `schemas/aifhub-extension.schema.json`. This keeps private fields such as `compat` and `sources` out of the upstream manifest while preserving local compatibility and provenance checks.
+
 ## OpenSpec Compatibility
 
 OpenSpec is optional for extension install and AI Factory-only workflows.
 
 | Capability | Requirement |
 |---|---|
-| AI Factory extension install/use | `ai-factory >=2.10.0 <3.0.0` |
+| AI Factory extension install/use | `ai-factory >=2.10.0 <3.0.0` from `aifhub-extension.json -> compat.ai-factory` |
 | OpenSpec-native validation/archive | OpenSpec CLI `>=1.3.1 <2.0.0` |
 | OpenSpec CLI runtime | Node `>=20.19.0` |
 | OpenSpec skills/commands | Not installed by this extension |
@@ -202,7 +212,7 @@ npm run validate
 npm test
 ```
 
-`npm run validate` checks manifest paths, Codex/Claude agent schemas, and markdown links under `docs/`, `injections/`, and `skills/`. Root `README.md` links should be checked manually when edited.
+`npm run validate` checks the upstream `extension.json` manifest, AIFHub metadata in `aifhub-extension.json`, Codex/Claude agent schemas, and markdown links under `docs/`, `injections/`, and `skills/`. Root `README.md` links should be checked manually when edited.
 
 ## Update Behavior
 

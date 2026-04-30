@@ -6,7 +6,10 @@
 
 ## [В разработке]
 
-Пока невыпущенных изменений нет.
+### Изменено
+- `extension.json` теперь указывает на upstream JSON Schema `https://raw.githubusercontent.com/lee-to/ai-factory/2.x/schemas/extension.schema.json` и больше не содержит private AIFHub поля.
+- AIFHub metadata `compat` и `sources` вынесены в `aifhub-extension.json` с локальной схемой `schemas/aifhub-extension.schema.json`.
+- `npm run validate` теперь проверяет split contract: upstream manifest, AIFHub metadata, bundled agent files и docs links.
 
 ## [0.10.0] - 2026-04-20
 

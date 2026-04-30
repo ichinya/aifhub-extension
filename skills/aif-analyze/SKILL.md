@@ -53,7 +53,7 @@ Bootstrap project context for AI Factory. This skill prepares configuration and 
 If this project is an ai-factory extension (has `extension.json`):
 
 1. Read `.ai-factory.json` to get installed ai-factory version
-2. Read `extension.json` to get `compat.ai-factory` semver range
+2. Read `aifhub-extension.json` to get `compat.ai-factory` semver range
 3. If both exist, compare:
    - If version satisfies range → continue normally
    - If version does NOT satisfy range → output warning:
@@ -65,7 +65,7 @@ ai-factory {installed_version} несовместим с extension (requires {co
 
 Рекомендации:
 - Обновите ai-factory до совместимой версии
-- Или обновите compat range в extension.json
+- Или обновите compat range в aifhub-extension.json
 ```
 
 4. Continue execution (warning only, do not block)
