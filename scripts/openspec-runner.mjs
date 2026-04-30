@@ -1,5 +1,7 @@
 // openspec-runner.mjs - shared OpenSpec CLI runner and capability detection
 import { execFile } from 'node:child_process';
+import { accessSync, constants } from 'node:fs';
+import path from 'node:path';
 import { promisify } from 'node:util';
 
 export const OPENSPEC_SUPPORTED_RANGE = '>=1.3.1 <2.0.0';
@@ -10,6 +12,7 @@ const OPENSPEC_MIN_VERSION = '1.3.1';
 const OPENSPEC_MAX_VERSION = '2.0.0';
 const NODE_MIN_VERSION = '20.19.0';
 const DEFAULT_MAX_BUFFER = 10 * 1024 * 1024;
+const WINDOWS_SCRIPT_EXTENSIONS = ['.cmd', '.bat'];
 
 const ERRORS = {
   invalidJson: {
@@ -300,13 +303,15 @@ export async function archiveOpenSpecChange(changeId, options = {}) {
 }
 
 async function defaultExecutor({ command, args, cwd, env }) {
+  const execOptions = {
+    cwd,
+    env,
+    maxBuffer: DEFAULT_MAX_BUFFER,
+    windowsHide: true
+  };
+
   try {
-    const { stdout, stderr } = await execFileAsync(command, args, {
-      cwd,
-      env,
-      maxBuffer: DEFAULT_MAX_BUFFER,
-      windowsHide: true
-    });
+    const { stdout, stderr } = await execFileAsync(command, args, execOptions);
 
     return {
       exitCode: 0,
@@ -315,6 +320,11 @@ async function defaultExecutor({ command, args, cwd, env }) {
     };
   } catch (err) {
     if (err.code === 'ENOENT') {
+      const windowsShim = findWindowsCommandScript(command, env);
+      if (windowsShim !== null) {
+        return executeWindowsCommandScript(windowsShim, args, execOptions, err);
+      }
+
       throw err;
     }
 
@@ -330,6 +340,121 @@ async function defaultExecutor({ command, args, cwd, env }) {
 
     throw err;
   }
+}
+
+async function executeWindowsCommandScript(commandPath, args, execOptions, originalError) {
+  try {
+    const { stdout, stderr } = await execFileAsync(
+      process.env.ComSpec ?? 'cmd.exe',
+      ['/d', '/s', '/c', quoteCmdCommand(commandPath, args)],
+      {
+        ...execOptions,
+        windowsVerbatimArguments: true
+      }
+    );
+
+    return {
+      exitCode: 0,
+      stdout,
+      stderr
+    };
+  } catch (err) {
+    const exitCode = getExitCode(err);
+
+    if (exitCode !== null) {
+      return {
+        exitCode,
+        stdout: err.stdout,
+        stderr: err.stderr
+      };
+    }
+
+    throw originalError;
+  }
+}
+
+function findWindowsCommandScript(command, env) {
+  if (process.platform !== 'win32') {
+    return null;
+  }
+
+  const commandText = String(command ?? '');
+  if (commandText.length === 0) {
+    return null;
+  }
+
+  if (hasPathSeparator(commandText)) {
+    return resolveWindowsScriptCandidate(commandText);
+  }
+
+  for (const directory of getWindowsPathEntries(env)) {
+    const resolved = resolveWindowsScriptCandidate(path.join(directory, commandText));
+    if (resolved !== null) {
+      return resolved;
+    }
+  }
+
+  return null;
+}
+
+function resolveWindowsScriptCandidate(candidateBase) {
+  const extension = path.extname(candidateBase).toLowerCase();
+  const candidates = WINDOWS_SCRIPT_EXTENSIONS.includes(extension)
+    ? [candidateBase]
+    : WINDOWS_SCRIPT_EXTENSIONS.map((suffix) => `${candidateBase}${suffix}`);
+
+  return candidates.find(isAccessibleFile) ?? null;
+}
+
+function getWindowsPathEntries(env) {
+  const pathValue = getEnvValue(env, 'PATH');
+  if (pathValue === null) {
+    return [];
+  }
+
+  return pathValue
+    .split(path.delimiter)
+    .filter((item) => item.trim().length > 0);
+}
+
+function getEnvValue(env, key) {
+  const source = env ?? process.env;
+  const exact = source[key];
+  if (exact !== undefined) {
+    return String(exact);
+  }
+
+  const lowerKey = key.toLowerCase();
+  const matchingKey = Object.keys(source).find((item) => item.toLowerCase() === lowerKey);
+  return matchingKey === undefined ? null : String(source[matchingKey]);
+}
+
+function hasPathSeparator(value) {
+  return value.includes('/') || value.includes('\\');
+}
+
+function isAccessibleFile(filePath) {
+  try {
+    accessSync(filePath, constants.X_OK);
+    return true;
+  } catch {
+    try {
+      accessSync(filePath, constants.F_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+function quoteCmdCommand(commandPath, args) {
+  return `"${[commandPath, ...Array.from(args ?? [])]
+    .map(quoteCmdArg)
+    .join(' ')}"`;
+}
+
+function quoteCmdArg(value) {
+  return `"${String(value).replaceAll('"', '""')}"`;
 }
 
 function createDetectionResult(overrides = {}) {

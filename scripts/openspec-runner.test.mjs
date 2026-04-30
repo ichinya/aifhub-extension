@@ -1,6 +1,9 @@
 // openspec-runner.test.mjs - tests for OpenSpec CLI runner and capability detection
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
 import {
   archiveOpenSpecChange,
@@ -143,6 +146,35 @@ describe('detectOpenSpec', () => {
 
     assert.equal(result.version, '1.3.1');
     assert.equal(result.reason, null);
+  });
+
+  it('detects a Windows npm .cmd shim from PATH', { skip: process.platform !== 'win32' }, async () => {
+    const tempDir = await mkdtemp(path.join(tmpdir(), 'openspec-shim-'));
+
+    try {
+      await writeFile(
+        path.join(tempDir, 'openspec.cmd'),
+        '@echo off\r\necho 1.3.1\r\n',
+        'utf8'
+      );
+
+      const result = await detectOpenSpec({
+        cwd: tempDir,
+        env: {
+          ...process.env,
+          PATH: `${tempDir}${path.delimiter}${process.env.PATH ?? ''}`
+        },
+        nodeVersion: '20.19.0'
+      });
+
+      assert.equal(result.available, true);
+      assert.equal(result.canValidate, true);
+      assert.equal(result.canArchive, true);
+      assert.equal(result.version, '1.3.1');
+      assert.equal(result.reason, null);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
   });
 });
 
