@@ -24,6 +24,7 @@ OpenSpec CLI features are reached through AIFHub wrappers and `scripts/openspec-
 
 The remaining runtime-specific guides are supporting references:
 
+- [AIFHub MCP](aifhub-mcp.md)
 - [Codex Agents](codex-agents.md)
 - [Claude Agents](claude-agents.md)
 - [Codex Plan Mode](codex-plan-mode.md)
@@ -39,6 +40,7 @@ The remaining runtime-specific guides are supporting references:
 | [Legacy Plan Migration](legacy-plan-migration.md) | Explicit migration commands and artifact mapping |
 | [Active Change Resolver](active-change-resolver.md) | Active change selection and runtime paths |
 | [ADR 0001](adr/0001-openspec-native-artifact-protocol.md) | Canonical OpenSpec and AI Factory runtime state contract |
+| [AIFHub MCP](aifhub-mcp.md) | Optional MCP server tools and runtime-specific config shapes |
 | [Codex Agents](codex-agents.md) | Namespaced Codex subagents and invocation contract |
 | [Claude Agents](claude-agents.md) | Namespaced Claude subagents and install target |
 | [Codex Plan Mode](codex-plan-mode.md) | Codex mode and question-format guidance |
@@ -55,6 +57,7 @@ This docs set covers:
 - AI Factory runtime state, QA evidence, and generated rules
 - legacy AI Factory-only compatibility and migration
 - runtime-managed Codex and Claude agent files
+- optional AIFHub MCP server registration and runtime-specific settings shapes
 
 It does not document `.ai-factory/plans` as the normal v1 artifact model. Those paths are legacy compatibility and migration input only.
 
@@ -78,3 +81,4 @@ npm test
 - [Legacy Plan Migration](legacy-plan-migration.md)
 - [Active Change Resolver](active-change-resolver.md)
 - [ADR 0001](adr/0001-openspec-native-artifact-protocol.md)
+- [AIFHub MCP](aifhub-mcp.md)

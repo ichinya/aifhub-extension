@@ -1,13 +1,32 @@
 {
   "$schema": "https://raw.githubusercontent.com/lee-to/ai-factory/2.x/schemas/extension.schema.json",
   "name": "aifhub-extension",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Upstream-first extension for AI Factory: bootstrap remains extension-owned; `aif-plan`, `aif-implement`, `aif-verify`, `aif-fix`, and `aif-rules-check` connect through `injections`; `aif-rules-check` also keeps a compatibility fallback while compat includes ai-factory 2.10.0; `aif-done` remains the extension-owned finalizer; Codex and Claude runtime files publish through top-level `agentFiles`.",
+  "commands": [
+    {
+      "name": "aifhub-mcp",
+      "description": "Run the AIFHub MCP server over stdio.",
+      "module": "./commands/aifhub-mcp.mjs"
+    }
+  ],
   "skills": [
     "skills/aif-analyze",
     "skills/aif-done",
     "skills/aif-rules-check",
     "skills/aif-mode"
+  ],
+  "mcpServers": [
+    {
+      "key": "aifhub",
+      "template": {
+        "command": "ai-factory",
+        "args": [
+          "aifhub-mcp"
+        ]
+      },
+      "instruction": "AIFHub MCP: exposes skill search, install, test, and improvement proposal tools. AI Factory renders this template into runtime-specific MCP settings: standard clients use mcpServers, OpenCode uses mcp with type: local, and GitHub Copilot uses servers with type: stdio."
+    }
   ],
   "agentFiles": [
     {

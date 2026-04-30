@@ -38,6 +38,7 @@ const SOURCE_METADATA_KEYS = new Set([
   'mode',
   'notes'
 ]);
+const MCP_TEMPLATE_KEYS = new Set(['command', 'args', 'env']);
 
 function log(level, message, details = {}) {
   if (LEVELS[level] < LEVELS[LOG_LEVEL]) return;
@@ -367,6 +368,26 @@ async function validateAifhubMetadata(metadata, repoRoot) {
 async function validateManifestPaths(manifest, repoRoot) {
   let hasErrors = false;
 
+  const commands = manifest.commands || [];
+  log('DEBUG', `Checking ${commands.length} command(s)`);
+  for (const command of commands) {
+    let abs;
+    try {
+      abs = resolvePath(repoRoot, command.module);
+    } catch (err) {
+      log('ERROR', `Command module path traversal: ${err.message}`, { module: command.module });
+      hasErrors = true;
+      continue;
+    }
+    log('DEBUG', 'Checking command module', { module: command.module, resolved: abs });
+    const exists = await fileExists(abs);
+    if (!exists) {
+      log('ERROR', 'Command module not found', { module: command.module, resolved: abs });
+      hasErrors = true;
+    }
+  }
+  log('INFO', 'Commands check complete', { total: commands.length });
+
   const skills = manifest.skills || [];
   log('DEBUG', `Checking ${skills.length} skill(s)`);
   for (const skillPath of skills) {
@@ -439,6 +460,97 @@ async function validateManifestPaths(manifest, repoRoot) {
     }
   }
   log('INFO', 'Injections check complete', { total: injections.length });
+
+  const mcpServers = manifest.mcpServers || [];
+  log('DEBUG', `Checking ${mcpServers.length} MCP server(s)`);
+  for (const server of mcpServers) {
+    if (!isPlainObject(server)) {
+      log('ERROR', 'MCP server entry must be an object');
+      hasErrors = true;
+      continue;
+    }
+
+    const key = server.key;
+    if (typeof key !== 'string' || !key) {
+      log('ERROR', 'MCP server key must be a non-empty string', { key });
+      hasErrors = true;
+    }
+
+    if ('instruction' in server && typeof server.instruction !== 'string') {
+      log('ERROR', 'MCP server instruction must be a string when present', { key });
+      hasErrors = true;
+    }
+
+    const template = server.template;
+    if (typeof template === 'string') {
+      let templateAbs;
+      try {
+        templateAbs = resolvePath(repoRoot, template);
+      } catch (err) {
+        log('ERROR', `MCP template path traversal: ${err.message}`, { key, template });
+        hasErrors = true;
+        continue;
+      }
+
+      const exists = await fileExists(templateAbs);
+      if (!exists) {
+        log('ERROR', 'MCP template file not found', { key, template, resolved: templateAbs });
+        hasErrors = true;
+        continue;
+      }
+
+      const templateResult = await readJsonFile(templateAbs, `MCP template ${key}`);
+      if (!templateResult.ok) {
+        hasErrors = true;
+        continue;
+      }
+      hasErrors = validateMcpTemplate(templateResult.value, key) || hasErrors;
+      continue;
+    }
+
+    hasErrors = validateMcpTemplate(template, key) || hasErrors;
+  }
+  log('INFO', 'MCP servers check complete', { total: mcpServers.length });
+
+  return hasErrors;
+}
+
+function validateMcpTemplate(template, key) {
+  let hasErrors = false;
+  if (!isPlainObject(template)) {
+    log('ERROR', 'MCP server template must be an object or relative JSON template path', { key });
+    return true;
+  }
+
+  for (const templateKey of Object.keys(template)) {
+    if (!MCP_TEMPLATE_KEYS.has(templateKey)) {
+      log('ERROR', 'Unknown MCP server template field', {
+        key,
+        field: templateKey,
+        allowed: [...MCP_TEMPLATE_KEYS]
+      });
+      hasErrors = true;
+    }
+  }
+
+  if (typeof template.command !== 'string' || !template.command) {
+    log('ERROR', 'MCP server template.command must be a non-empty string', { key });
+    hasErrors = true;
+  }
+
+  if ('args' in template && (!Array.isArray(template.args) || template.args.some((arg) => typeof arg !== 'string'))) {
+    log('ERROR', 'MCP server template.args must be an array of strings', { key });
+    hasErrors = true;
+  }
+
+  const env = template.env;
+  if (
+    'env' in template &&
+    (!isPlainObject(env) || Object.values(env).some((value) => typeof value !== 'string'))
+  ) {
+    log('ERROR', 'MCP server template.env must be an object with string values', { key });
+    hasErrors = true;
+  }
 
   return hasErrors;
 }

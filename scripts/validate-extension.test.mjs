@@ -162,6 +162,54 @@ describe('validate-extension.mjs', () => {
     assert.equal(code, 1);
   });
 
+  it('fails with missing command module file', async () => {
+    const parsed = JSON.parse(validManifest());
+    parsed.commands = [{ name: 'aifhub-mcp', description: 'AIFHub MCP server', module: './commands/missing.mjs' }];
+    await writeValidProject({ manifest: JSON.stringify(parsed) });
+
+    const code = await runValidatorExitCode(tmpDir);
+    assert.equal(code, 1);
+  });
+
+  it('fails when an MCP server template contains runtime-specific fields', async () => {
+    const parsed = JSON.parse(validManifest());
+    parsed.mcpServers = [
+      {
+        key: 'aifhub',
+        template: {
+          type: 'local',
+          command: ['ai-factory', 'aifhub-mcp']
+        }
+      }
+    ];
+    await writeValidProject({ manifest: JSON.stringify(parsed) });
+
+    const code = await runValidatorExitCode(tmpDir);
+    assert.equal(code, 1);
+  });
+
+  it('passes with a valid extension MCP server template', async () => {
+    const parsed = JSON.parse(validManifest());
+    parsed.commands = [
+      { name: 'aifhub-mcp', description: 'AIFHub MCP server', module: './commands/aifhub-mcp.mjs' }
+    ];
+    parsed.mcpServers = [
+      {
+        key: 'aifhub',
+        template: {
+          command: 'ai-factory',
+          args: ['aifhub-mcp']
+        },
+        instruction: 'Runtime-specific configuration is rendered by AI Factory.'
+      }
+    ];
+    await writeValidProject({ manifest: JSON.stringify(parsed) });
+    await writeFixture(tmpDir, 'commands/aifhub-mcp.mjs', 'export function register() {}');
+
+    const code = await runValidatorExitCode(tmpDir);
+    assert.equal(code, 0);
+  });
+
   it('fails with invalid semver version', async () => {
     const parsed = JSON.parse(validManifest());
     parsed.version = 'not-semver';
