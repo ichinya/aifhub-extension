@@ -10,13 +10,14 @@
 - `extension.json` теперь указывает на upstream JSON Schema `https://raw.githubusercontent.com/lee-to/ai-factory/2.x/schemas/extension.schema.json` и больше не содержит private AIFHub поля.
 - AIFHub metadata `compat` и `sources` вынесены в `aifhub-extension.json` с локальной схемой `schemas/aifhub-extension.schema.json`.
 - `npm run validate` теперь проверяет split contract: upstream manifest, AIFHub metadata, bundled agent files и docs links.
-- `skills/aif-rules-check` remains a compatibility fallback while `compat.ai-factory` includes `2.10.0`; AIFHub also adds `injections/core/aif-rules-check-openspec-generated-rules.md` for upstream/fallback command augmentation after upstream AI Factory PR #90.
+- `compat.ai-factory` now requires `>=2.11.0 <3.0.0`; AI Factory 2.11.0 provides native `aif-rules-check`, so AIFHub keeps only `injections/core/aif-rules-check-openspec-generated-rules.md` for OpenSpec generated-rules augmentation.
+- `scripts/validate-extension.mjs` validates `extension.json` against the local synced copy of the upstream AI Factory extension schema.
 
 ## [0.10.0] - 2026-04-20
 
 ### Изменено
-- Manifest extension перепроверен против upstream `ai-factory 2.10.0`, а `compat.ai-factory` поднят до `>=2.10.0 <3.0.0`
-- Обновлены метаданные `sources.ai-factory`, чтобы явно различать проверенный upstream `2.10.0` и исторический `baselineVersion`
+- Manifest extension перепроверен против upstream `ai-factory 2.11.0`, а `compat.ai-factory` поднят до `>=2.11.0 <3.0.0`
+- Обновлены метаданные `sources.ai-factory`, чтобы явно зафиксировать проверенный upstream `2.11.0`
 - `README.md`, `docs/README.md` и `docs/usage.md` сведены к одной сводке совместимости без смешения поддержки и baseline-семантики
 
 ### Исправлено

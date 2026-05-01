@@ -16,7 +16,7 @@ Read `.ai-factory/config.yaml` before resolving scope. Reject `--force`, force f
 Use this mode when config declares `aifhub.artifactProtocol: openspec`.
 
 - Finalize exactly one verification-passing active OpenSpec change through `scripts/openspec-done-finalizer.mjs`.
-- Read QA evidence from `.ai-factory/qa/<change-id>/` and proceed only when `/aif-verify` clearly passed for this change. Refuse unverified changes and `Code verification: PENDING`.
+- Read QA evidence from `.ai-factory/qa/<change-id>/` and proceed only when `/aif-verify` clearly passed for this change and the latest final `aif-gate-result` block has `"gate": "verify"` with `status` `pass` or `warn`. Refuse unverified changes, missing/invalid/failed verify gates, and `Code verification: PENDING`.
 - Read canonical artifacts: `openspec/specs/**` plus `openspec/changes/<change-id>/proposal.md`, `design.md`, `tasks.md`, and `specs/**/spec.md`.
 - Read generated rules from `.ai-factory/rules/generated/` when present and runtime state from `.ai-factory/state/<change-id>/` when relevant.
 - Check dirty working tree state before archive; fail or record dirty entries only when explicitly requested.

@@ -130,7 +130,7 @@ OpenSpec is optional for extension install and AI Factory-only workflows.
 
 | Capability | Requirement |
 |---|---|
-| AI Factory extension install/use | `ai-factory >=2.10.0 <3.0.0` from `aifhub-extension.json -> compat.ai-factory` |
+| AI Factory extension install/use | `ai-factory >=2.11.0 <3.0.0` from `aifhub-extension.json -> compat.ai-factory` |
 | OpenSpec-native validation/archive | OpenSpec CLI `>=1.3.1 <2.0.0` |
 | OpenSpec CLI runtime | Node `>=20.19.0` |
 | OpenSpec skills/commands | Not installed by this extension |

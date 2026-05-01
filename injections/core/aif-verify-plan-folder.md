@@ -80,6 +80,8 @@ Normal verification responses should report:
 - fix guidance `/aif-fix <change-id>` when verification fails;
 - optional finalization guidance `/aif-done <change-id>` when verification passes.
 
+End verification output and `.ai-factory/qa/<change-id>/verify.md` with exactly one final fenced `aif-gate-result` JSON block using `"gate": "verify"` and lowercase JSON `status`: `pass`, `warn`, or `fail`. Use `fail` for blocking OpenSpec validation, test, lint, build, review, security, or rules failures; use `warn` only for non-blocking notes after verification completes.
+
 Do not install OpenSpec skills or slash commands.
 Do not redirect the user to legacy finalize aliases.
 

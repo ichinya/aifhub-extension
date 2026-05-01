@@ -252,9 +252,8 @@ describe('aif-gate-result helper', () => {
 });
 
 describe('aif-rules-check gate contract', () => {
-  it('preserves the final rules gate result fenced block contract in fallback and overlay', async () => {
+  it('preserves the final rules gate result fenced block contract in the AIFHub overlay', async () => {
     const assets = [
-      await readFile(path.join(REPO_ROOT, 'skills', 'aif-rules-check', 'SKILL.md'), 'utf8'),
       await readFile(path.join(REPO_ROOT, 'injections', 'core', 'aif-rules-check-openspec-generated-rules.md'), 'utf8')
     ];
 

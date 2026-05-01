@@ -13,6 +13,10 @@ import {
   switchToOpenSpecMode,
   syncOpenSpecArtifacts
 } from './aif-artifact-sync.mjs';
+import {
+  createGateResult,
+  renderGateResultBlock
+} from './aif-gate-result.mjs';
 
 const tempRoots = [];
 
@@ -389,6 +393,106 @@ describe('doctor', () => {
     assert.equal(result.ok, false);
     assert.ok(result.diagnostics.some((item) => item.code === 'ambiguous-active-change'));
     assert.ok(result.diagnostics.some((item) => item.code === 'aif-done-archive-unavailable'));
+  });
+
+  it('validates only the resolved active change', async () => {
+    const rootDir = await createTempRoot();
+    const validated = [];
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      '  openspec:',
+      '    archiveOnDone: true',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/config.yaml', 'project: test\n');
+    await writeFixture(rootDir, 'openspec/changes/alpha/proposal.md', '# Alpha\n');
+    await writeFixture(rootDir, 'openspec/changes/beta/proposal.md', '# Beta\n');
+    await writeFixture(rootDir, '.ai-factory/state/current.yaml', 'change_id: beta\n');
+    await mkdir(path.join(rootDir, 'openspec/specs'), { recursive: true });
+    await mkdir(path.join(rootDir, '.ai-factory/qa'), { recursive: true });
+    await mkdir(path.join(rootDir, '.ai-factory/rules/generated'), { recursive: true });
+
+    const result = await doctorAifMode({
+      rootDir,
+      detectOpenSpec: async () => availableCliDetection(),
+      getCurrentBranch: async () => 'feat/unmatched',
+      validateOpenSpecChange: async (changeId) => {
+        validated.push(changeId);
+        return { ok: true, stdout: '{"valid":true}', stderr: '', json: { valid: true } };
+      },
+      getOpenSpecStatus: async () => ({
+        ok: true,
+        stdout: '{"ok":true}',
+        stderr: '',
+        json: { ok: true }
+      })
+    });
+
+    assert.deepEqual(validated, ['beta']);
+    assert.equal(result.ok, true);
+    assert.ok(result.diagnostics.some((item) => item.code === 'active-change'));
+    assert.ok(result.diagnostics.some((item) => item.code === 'openspec-validation'));
+  });
+
+  it('reports the latest verify gate result for the resolved active change', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      '  openspec:',
+      '    archiveOnDone: true',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/config.yaml', 'project: test\n');
+    await writeFixture(rootDir, 'openspec/changes/beta/proposal.md', '# Beta\n');
+    await writeFixture(rootDir, '.ai-factory/state/current.yaml', 'change_id: beta\n');
+    await writeFixture(rootDir, '.ai-factory/qa/beta/verify.md', [
+      '# Verify: beta',
+      '',
+      'Verdict: FAIL',
+      'Code verification: FAIL',
+      '',
+      renderGateResultBlock(createGateResult({
+        gate: 'verify',
+        status: 'fail',
+        blockers: [{
+          id: 'tests-failed',
+          severity: 'error',
+          file: 'src/auth.ts',
+          summary: 'Tests failed.'
+        }],
+        affectedFiles: ['src/auth.ts'],
+        suggestedNext: {
+          command: '/aif-fix',
+          reason: 'Verification failed.'
+        }
+      })),
+      ''
+    ].join('\n'));
+    await mkdir(path.join(rootDir, 'openspec/specs'), { recursive: true });
+    await mkdir(path.join(rootDir, '.ai-factory/rules/generated'), { recursive: true });
+
+    const result = await doctorAifMode({
+      rootDir,
+      detectOpenSpec: async () => missingCliDetection(),
+      getCurrentBranch: async () => 'feat/unmatched'
+    });
+
+    assert.equal(result.ok, false);
+    assert.ok(result.diagnostics.some((item) => item.code === 'verify-gate-failed'));
   });
 
   it('reports unsupported Node for OpenSpec CLI capability', async () => {

@@ -149,4 +149,9 @@ describe('extension manifest', () => {
     const manifest = JSON.parse(await readFile(path.join(REPO_ROOT, 'extension.json'), 'utf8'));
     assert.ok(manifest.skills.includes('skills/aif-mode'));
   });
+
+  it('does not install the retired aif-rules-check fallback skill', async () => {
+    const manifest = JSON.parse(await readFile(path.join(REPO_ROOT, 'extension.json'), 'utf8'));
+    assert.equal(manifest.skills.includes('skills/aif-rules-check'), false);
+  });
 });

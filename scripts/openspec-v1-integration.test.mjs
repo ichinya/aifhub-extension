@@ -19,6 +19,10 @@ import {
 import { finalizeOpenSpecChange } from './openspec-done-finalizer.mjs';
 import { compileOpenSpecRules } from './openspec-rules-compiler.mjs';
 import { migrateLegacyPlan } from './legacy-plan-migration.mjs';
+import {
+  createGateResult,
+  renderGateResultBlock
+} from './aif-gate-result.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -437,7 +441,22 @@ describe('Full OpenSpec v1 mocked paths', () => {
     });
     await writeFile(
       path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'verify.md'),
-      '# Verify: add-oauth\n\nVerdict: PASS\nOpenSpec validation: PASS\nCode verification: PASS\n',
+      [
+        '# Verify: add-oauth',
+        '',
+        'Verdict: PASS',
+        'OpenSpec validation: PASS',
+        'Code verification: PASS',
+        '',
+        renderGateResultBlock(createGateResult({
+          gate: 'verify',
+          status: 'pass',
+          blockers: [],
+          affectedFiles: [],
+          suggestedNext: null
+        })),
+        ''
+      ].join('\n'),
       'utf8'
     );
     const finalized = await finalizeOpenSpecChange({
@@ -488,7 +507,22 @@ describe('Full OpenSpec v1 mocked paths', () => {
     });
     await writeFile(
       path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'verify.md'),
-      '# Verify: add-oauth\n\nVerdict: PASS-with-notes\nOpenSpec validation: SKIPPED\nCode verification: PASS\n',
+      [
+        '# Verify: add-oauth',
+        '',
+        'Verdict: PASS-with-notes',
+        'OpenSpec validation: SKIPPED',
+        'Code verification: PASS',
+        '',
+        renderGateResultBlock(createGateResult({
+          gate: 'verify',
+          status: 'warn',
+          blockers: [],
+          affectedFiles: [],
+          suggestedNext: null
+        })),
+        ''
+      ].join('\n'),
       'utf8'
     );
     const finalized = await finalizeOpenSpecChange({

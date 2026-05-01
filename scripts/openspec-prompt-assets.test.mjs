@@ -10,13 +10,11 @@ const REPO_ROOT = resolve(__dirname, '..');
 
 const EXPLICIT_REFERENCE_ASSETS = [
   'skills/aif-analyze/references/config-template.yaml',
-  'skills/aif-done/references/finalization-contract.md',
-  'skills/aif-rules-check/references/RULES-CHECK-CONTRACT.md'
+  'skills/aif-done/references/finalization-contract.md'
 ];
 
 const MODE_GATED_PROMPTS = [
   'skills/aif-done/SKILL.md',
-  'skills/aif-rules-check/SKILL.md',
   'injections/core/aif-rules-check-openspec-generated-rules.md',
   'injections/core/aif-implement-plan-folder.md',
   'injections/core/aif-fix-plan-folder.md',
@@ -178,8 +176,6 @@ describe('OpenSpec-native prompt asset contract', () => {
     for (const expected of [
       'skills/aif-analyze/SKILL.md',
       'skills/aif-done/SKILL.md',
-      'skills/aif-rules-check/SKILL.md',
-      'skills/aif-rules-check/references/RULES-CHECK-CONTRACT.md',
       'injections/core/aif-rules-check-openspec-generated-rules.md',
       'injections/core/aif-implement-plan-folder.md',
       'agent-files/codex/aifhub-verifier.toml',
@@ -191,6 +187,7 @@ describe('OpenSpec-native prompt asset contract', () => {
     for (const asset of assets) {
       assert.ok(!asset.startsWith('injections/handoff/'), `active discovery should exclude dormant handoff stub ${asset}`);
       assert.ok(!asset.startsWith('.ai-factory/extensions/'), `active discovery should exclude installed snapshot ${asset}`);
+      assert.ok(!asset.startsWith('skills/aif-rules-check/'), `active discovery should exclude retired fallback ${asset}`);
     }
   });
 
@@ -252,7 +249,6 @@ describe('OpenSpec-native prompt asset contract', () => {
 
   it('keeps rules-check generated-rules hierarchy in the prompt-assets contract', async () => {
     for (const relativePath of [
-      'skills/aif-rules-check/SKILL.md',
       'injections/core/aif-rules-check-openspec-generated-rules.md'
     ]) {
       const asset = await readRepoFile(relativePath);

@@ -22,6 +22,9 @@ import {
   discoverLegacyPlans,
   migrateAllLegacyPlans
 } from './legacy-plan-migration.mjs';
+import {
+  getLatestGateResult
+} from './aif-gate-result.mjs';
 
 export const MODES = {
   openspec: 'openspec',
@@ -402,17 +405,21 @@ export async function doctorAifMode(options = {}) {
     ));
   }
 
-  if (status.mode === MODES.openspec && status.openspecCli.canValidate) {
+  if (status.mode === MODES.openspec && status.activeChange.state === 'resolved') {
+    diagnostics.push(await inspectVerifyGateDiagnostic(rootDir, status));
+  }
+
+  if (status.mode === MODES.openspec && status.openspecCli.canValidate && status.activeChange.state === 'resolved') {
     const validation = await validateOpenSpecChanges({
       ...options,
       rootDir,
-      changeIds: status.openSpecChanges.map((change) => change.id)
+      changeIds: [status.activeChange.changeId]
     });
 
     if (validation.ok) {
-      diagnostics.push(pass('openspec-validation', 'OpenSpec changes validate with the available CLI.'));
+      diagnostics.push(pass('openspec-validation', 'Active OpenSpec change validates with the available CLI.'));
     } else {
-      diagnostics.push(fail('openspec-validation-failed', 'One or more OpenSpec changes failed validation.'));
+      diagnostics.push(fail('openspec-validation-failed', 'Active OpenSpec change failed validation.'));
     }
   }
 
@@ -1198,6 +1205,37 @@ async function inspectConfiguredPaths(options = {}) {
   }
 
   return diagnostics;
+}
+
+async function inspectVerifyGateDiagnostic(rootDir, status) {
+  const qaRoot = status.config.paths.qa ?? DEFAULT_OPEN_SPEC_PATHS.qa;
+  const changeId = status.activeChange.changeId;
+  const verifyPath = path.join(rootDir, qaRoot, changeId, 'verify.md');
+  const content = await readOptional(verifyPath);
+
+  if (!content) {
+    return warn('verify-gate-missing', `Verify gate result is missing for active change ${changeId}.`);
+  }
+
+  const gate = getLatestGateResult(content, { gate: 'verify' });
+
+  if (gate === null) {
+    return warn('verify-gate-missing', `Verify gate result is missing for active change ${changeId}.`);
+  }
+
+  if (!gate.ok) {
+    return fail('verify-gate-invalid', `Verify gate result is invalid for active change ${changeId}.`);
+  }
+
+  if (gate.result.status === 'fail') {
+    return fail('verify-gate-failed', `Verify gate result failed for active change ${changeId}.`);
+  }
+
+  if (gate.result.status === 'warn') {
+    return warn('verify-gate-warn', `Verify gate result has warnings for active change ${changeId}.`);
+  }
+
+  return pass('verify-gate-passed', `Verify gate result passed for active change ${changeId}.`);
 }
 
 async function writeModeReport(kind, options = {}) {

@@ -67,14 +67,14 @@ function validManifest(extra = {}) {
 function validAifhubMetadata(extra = {}) {
   return JSON.stringify({
     $schema: AIFHUB_SCHEMA_PATH,
-    compat: { 'ai-factory': '>=2.10.0 <3.0.0' },
+    compat: { 'ai-factory': '>=2.11.0 <3.0.0' },
     sources: {
       'ai-factory': {
         url: 'https://github.com/lee-to/ai-factory',
-        version: '2.10.0',
-        baselineVersion: '2.0.0',
-        lastSync: '2026-04-20',
-        notes: 'Validated against upstream 2.10.0.'
+        version: '2.11.0',
+        baselineVersion: '2.11.0',
+        lastSync: '2026-05-01',
+        notes: 'Validated against upstream 2.11.0.'
       },
       openspec: {
         url: 'https://github.com/Fission-AI/OpenSpec',
@@ -94,11 +94,16 @@ function validAifhubMetadata(extra = {}) {
 async function writeValidProject({
   manifest = validManifest(),
   metadata = validAifhubMetadata(),
-  includeMetadataSchema = true
+  includeMetadataSchema = true,
+  includeExtensionSchema = true
 } = {}) {
   await writeFixture(tmpDir, 'extension.json', manifest);
   if (metadata !== null) {
     await writeFixture(tmpDir, 'aifhub-extension.json', metadata);
+  }
+  if (includeExtensionSchema) {
+    const schema = await readFile(join(REPO_ROOT, 'schemas/extension.schema.json'), 'utf-8');
+    await writeFixture(tmpDir, 'schemas/extension.schema.json', schema);
   }
   if (includeMetadataSchema) {
     const schema = await readFile(join(REPO_ROOT, 'schemas/aifhub-extension.schema.json'), 'utf-8');
@@ -139,6 +144,15 @@ describe('validate-extension.mjs', () => {
 
   it('fails with missing AIFHub metadata schema file', async () => {
     await writeValidProject({ includeMetadataSchema: false });
+
+    const code = await runValidatorExitCode(tmpDir);
+    assert.equal(code, 1);
+  });
+
+  it('fails when extension.json violates the upstream schema', async () => {
+    const parsed = JSON.parse(validManifest());
+    parsed.injections = [{ target: 'aif-plan', position: 'middle', file: './injections/core/test.md' }];
+    await writeValidProject({ manifest: JSON.stringify(parsed) });
 
     const code = await runValidatorExitCode(tmpDir);
     assert.equal(code, 1);

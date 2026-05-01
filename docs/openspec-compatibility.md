@@ -19,7 +19,7 @@ AI Factory = execution runtime
 
 | Capability | Requirement |
 |---|---|
-| AI Factory extension install/use | `ai-factory >=2.10.0 <3.0.0` |
+| AI Factory extension install/use | `ai-factory >=2.11.0 <3.0.0` |
 | OpenSpec-native validation/archive | OpenSpec CLI `>=1.3.1 <2.0.0` |
 | OpenSpec CLI runtime | Node `>=20.19.0` |
 | OpenSpec skills/commands | Not installed by this extension |
@@ -77,11 +77,11 @@ paths:
 | `/aif-plan full` | `openspec validate <change>` when `validateOnPlan` is enabled and CLI is available |
 | `/aif-improve` | `openspec validate <change>` when `validateOnImprove` is enabled and CLI is available |
 | `/aif-implement` | `openspec instructions apply --change <id>` when `useInstructionsApply` is enabled and CLI is available |
-| `/aif-verify` | `openspec validate` and optional `openspec status` evidence |
-| `/aif-rules-check` | Upstream rules gate or compatibility fallback plus AIFHub generated-rules overlay for OpenSpec specs/deltas |
+| `/aif-verify` | `openspec validate`, optional `openspec status` evidence, and final `aif-gate-result` with `"gate": "verify"` |
+| `/aif-rules-check` | Upstream rules gate plus AIFHub generated-rules overlay for OpenSpec specs/deltas |
 | `/aif-done` | `openspec archive <change> --yes` when archive is required |
 | `/aif-mode sync` | generated-rule compile plus validate/status according to sync flags |
-| `/aif-mode doctor` | CLI, Node, active change, generated rules, and archive readiness diagnostics |
+| `/aif-mode doctor` | CLI, Node, active change, generated rules, latest verify gate, and archive readiness diagnostics |
 
 Do not route users to OpenSpec slash commands such as `/opsx:propose`, `/opsx:apply`, or `/opsx:archive`.
 
