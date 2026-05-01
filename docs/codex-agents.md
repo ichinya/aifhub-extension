@@ -21,8 +21,9 @@
 
 ## Ролевые семейства
 
-- `read-only sidecar`: `aifhub-review-sidecar`, `aifhub-security-sidecar`, `aifhub-rules-sidecar`. Эти агенты только читают scope и возвращают findings-first output без auto-fix.
-- `aifhub-rules-sidecar` keeps the upstream `rules-sidecar` contract instead of replacing it: it is namespaced for AIFHub, reads `.ai-factory/rules/generated/*` in OpenSpec-native mode, and ends with a final `aif-gate-result` block with `"gate": "rules"`.
+- `read-only sidecar`: `aifhub-review-sidecar`, `aifhub-security-sidecar`, `aifhub-rules-sidecar`. Эти агенты только читают scope, возвращают findings-first output без auto-fix, and end with one final machine-readable `aif-gate-result` block.
+- `aifhub-review-sidecar`, `aifhub-security-sidecar`, and `aifhub-rules-sidecar` use gate values `"review"`, `"security"`, and `"rules"` respectively, with lowercase `status` values `pass`, `warn`, or `fail`.
+- `aifhub-rules-sidecar` keeps the upstream `rules-sidecar` contract instead of replacing it: it is namespaced for AIFHub and reads `.ai-factory/rules/generated/*` in OpenSpec-native mode.
 - `low-write verifier`: `aifhub-verifier`. Агент может обновлять только verification artifacts, но не implementation files.
 - `bounded worker`: `aifhub-plan-polisher`, `aifhub-implement-worker`, `aifhub-fixer`. Они write-capable, но у каждого есть жёстко ограниченный рабочий scope.
 - `finalization helper`: `aifhub-done-finalizer`. Он завершает verification-passing OpenSpec change through `openspec archive <change-id> --yes` or legacy plan archive work, supports `--skip-specs`, prepares summary/archive evidence, and does not bypass owner boundaries для `.ai-factory/ROADMAP.md`, `.ai-factory/RULES.md` и `.ai-factory/ARCHITECTURE.md`.
