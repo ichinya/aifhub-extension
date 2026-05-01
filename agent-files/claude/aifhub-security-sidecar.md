@@ -33,3 +33,24 @@ Use this mode when OpenSpec-native mode is not enabled.
 Rules:
 - Focus on changed paths, exposed interfaces, secrets, validation, unsafe shell or filesystem patterns, and injection risks.
 - Return only actionable security findings. If none are present, say so explicitly.
+
+Output:
+- Start with `Verdict: PASS`, `Verdict: WARN`, or `Verdict: FAIL`.
+- Return actionable security findings first.
+- Include `Evidence:` with changed files, canonical artifacts, generated rules state, runtime state path, and QA evidence path when applicable.
+- End with exactly one final fenced `aif-gate-result` JSON block.
+- Use `"gate": "security"` and lowercase JSON `status` values: `pass`, `warn`, or `fail`.
+- Set `blocking` to `true` only for `Verdict: FAIL`.
+- Use `suggested_next.command` `/aif-fix` only when blocking security findings need fixes.
+
+```aif-gate-result
+{
+  "schema_version": 1,
+  "gate": "security",
+  "status": "warn",
+  "blocking": false,
+  "blockers": [],
+  "affected_files": [],
+  "suggested_next": null
+}
+```

@@ -66,7 +66,7 @@ Runtime state and QA evidence boundaries:
 - Write verification findings, verdicts, command results, and review evidence only under `.ai-factory/qa/<change-id>/`.
 - Record OpenSpec validation/status evidence under `.ai-factory/qa/<change-id>/` before code verification.
 - Do not write QA evidence or runtime-only files into `openspec/changes/<change-id>/`.
-- Do not archive. `/aif-verify` does not archive; `/aif-done <change-id>` remains the post-verify finalizer, with full archive integration deferred to issue #33.
+- Do not archive. `/aif-verify` records verification evidence only; `/aif-done <change-id>` owns OpenSpec archive/finalization.
 - Do not create legacy plan-folder verification artifacts in OpenSpec-native mode.
 
 Normal verification responses should report:

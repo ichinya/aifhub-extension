@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/lee-to/ai-factory/2.x/schemas/extension.schema.json",
   "name": "aifhub-extension",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Upstream-first extension for AI Factory 2.11+: bootstrap remains extension-owned; `aif-plan`, `aif-implement`, `aif-verify`, and `aif-fix` connect through injections; upstream `aif-rules-check` is augmented by the AIFHub OpenSpec generated-rules injection; `aif-done` and `aif-mode` remain extension-owned finalizers/orchestrators; Codex and Claude runtime files publish through top-level `agentFiles`.",
   "commands": [
     {

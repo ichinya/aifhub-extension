@@ -289,3 +289,53 @@ describe('aif-rules-check gate contract', () => {
     }
   });
 });
+
+describe('review and security sidecar gate contracts', () => {
+  async function readSidecarAssets(kind) {
+    return {
+      codex: await readFile(
+        path.join(REPO_ROOT, 'agent-files', 'codex', `aifhub-${kind}-sidecar.toml`),
+        'utf8'
+      ),
+      claude: await readFile(
+        path.join(REPO_ROOT, 'agent-files', 'claude', `aifhub-${kind}-sidecar.md`),
+        'utf8'
+      )
+    };
+  }
+
+  function assertReadOnlySidecarBoundaries(codexAsset, claudeAsset) {
+    assert.match(codexAsset, /sandbox_mode = "read-only"/);
+    assert.match(claudeAsset, /tools: Read, Glob, Grep/);
+    assert.doesNotMatch(claudeAsset, /^tools:.*(?:Write|Edit|Bash)/m);
+
+    for (const asset of [codexAsset, claudeAsset]) {
+      assert.match(asset, /Do not edit files/);
+      assert.doesNotMatch(asset, /\.ai-factory\/qa\/<change-id>\/verify\.md/);
+    }
+  }
+
+  function assertGateContract(asset, gate) {
+    assert.match(asset, /End with exactly one final fenced `?aif-gate-result`? JSON block/);
+    assert.match(asset, new RegExp(`"gate": "${gate}"`));
+    assert.match(asset, /pass`, `warn`, or `fail`|pass, warn, or fail/);
+    assert.match(asset, /blocking.*true.*fail|fail.*blocking.*true/i);
+    assert.match(asset, /suggested_next\.command.*\/aif-fix|suggested_next.*\/aif-fix/i);
+  }
+
+  it('keeps review sidecars read-only and aligned with review gate output', async () => {
+    const { codex, claude } = await readSidecarAssets('review');
+
+    assertReadOnlySidecarBoundaries(codex, claude);
+    assertGateContract(codex, 'review');
+    assertGateContract(claude, 'review');
+  });
+
+  it('keeps security sidecars read-only and aligned with security gate output', async () => {
+    const { codex, claude } = await readSidecarAssets('security');
+
+    assertReadOnlySidecarBoundaries(codex, claude);
+    assertGateContract(codex, 'security');
+    assertGateContract(claude, 'security');
+  });
+});
