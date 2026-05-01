@@ -10,7 +10,9 @@ Reference for the `aif-done` skill and `aifhub-done-finalizer` agents.
 - Exactly one active change or explicit `<change-id>` is selected.
 - QA evidence exists under `.ai-factory/qa/<change-id>/`.
 - Verification evidence clearly records final PASS or PASS-with-notes for this change.
+- The latest final fenced `aif-gate-result` block in `verify.md` is valid JSON with `"gate": "verify"` and `status` of `pass` or `warn`.
 - OpenSpec-native `/aif-done` refuses unverified changes.
+- Missing, invalid, or failed verify gate results refuse finalization and require `/aif-verify` or `/aif-fix`.
 - `Code verification: PENDING` is ambiguous and must refuse finalization.
 - Dirty working tree state is empty, or explicit dirty-state recording is enabled.
 

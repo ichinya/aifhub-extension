@@ -17,6 +17,11 @@ import {
   collectCanonicalChangeArtifacts,
   collectGeneratedRules
 } from './openspec-execution-context.mjs';
+import {
+  createGateResult,
+  getLatestGateResult,
+  renderGateResultBlock
+} from './aif-gate-result.mjs';
 
 const MODE = 'openspec-native';
 const DEFAULT_QA_DIR = path.join('.ai-factory', 'qa');
@@ -194,7 +199,8 @@ export async function writeVerificationEvidence(changeId, evidence, options = {}
     warnings: evidence.warnings ?? [],
     errors: evidence.errors ?? []
   });
-  await writeFile(path.join(qaPath, VERIFY_FILE), `${summary}\n`, 'utf8');
+  const gateResult = evidence.gateResult ?? createVerifyGateResult(normalized.changeId, evidence);
+  await writeFile(path.join(qaPath, VERIFY_FILE), `${summary}\n\n${renderGateResultBlock(gateResult)}\n`, 'utf8');
   files.push(toPosix(path.relative(rootDir, path.join(qaPath, VERIFY_FILE))));
 
   return {
@@ -206,6 +212,7 @@ export async function writeVerificationEvidence(changeId, evidence, options = {}
     },
     validation,
     status,
+    gateResult,
     warnings: [],
     errors: []
   };
@@ -238,6 +245,9 @@ export async function readLatestVerificationEvidence(changeId, options = {}) {
   const status = await readOptionalJson(path.join(qaPath, STATUS_FILE));
   const verifyPath = path.join(qaPath, VERIFY_FILE);
   const verifyContent = await readOptionalText(verifyPath);
+  const gateResult = verifyContent.exists
+    ? getLatestGateResult(verifyContent.value, { gate: 'verify' })
+    : null;
 
   return {
     ok: validation.exists,
@@ -249,6 +259,7 @@ export async function readLatestVerificationEvidence(changeId, options = {}) {
       path: toPosix(path.relative(rootDir, verifyPath)),
       content: verifyContent.value
     },
+    gateResult,
     warnings: validation.exists ? [] : [
       {
         code: 'verification-evidence-missing',
@@ -257,6 +268,32 @@ export async function readLatestVerificationEvidence(changeId, options = {}) {
     ],
     errors: []
   };
+}
+
+function createVerifyGateResult(changeId, evidence) {
+  const errors = Array.isArray(evidence.errors) ? evidence.errors : [];
+  const warnings = Array.isArray(evidence.warnings) ? evidence.warnings : [];
+  const shouldRunCodeVerification = evidence.shouldRunCodeVerification !== false;
+  const failed = errors.length > 0 || !shouldRunCodeVerification;
+  const diagnostics = failed ? errors : warnings;
+
+  return createGateResult({
+    gate: 'verify',
+    status: failed ? 'fail' : 'warn',
+    blockers: diagnostics.map((item, index) => ({
+      id: item.code ?? `verify-${index + 1}`,
+      severity: failed ? 'error' : 'warning',
+      file: item.path,
+      summary: item.message ?? String(item)
+    })),
+    affectedFiles: diagnostics.map((item) => item.path).filter(Boolean),
+    suggestedNext: failed
+      ? {
+        command: '/aif-fix',
+        reason: `Verification is blocked for ${changeId}.`
+      }
+      : null
+  });
 }
 
 export function summarizeOpenSpecValidation(result, options = {}) {

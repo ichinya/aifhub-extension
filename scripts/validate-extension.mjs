@@ -9,6 +9,7 @@ const LOG_LEVEL = process.env.LOG_LEVEL || 'INFO';
 const LEVELS = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 };
 
 const UPSTREAM_SCHEMA_URL = 'https://raw.githubusercontent.com/lee-to/ai-factory/2.x/schemas/extension.schema.json';
+const UPSTREAM_SCHEMA_FILE = './schemas/extension.schema.json';
 const AIFHUB_METADATA_FILE = 'aifhub-extension.json';
 const AIFHUB_METADATA_SCHEMA = './schemas/aifhub-extension.schema.json';
 
@@ -153,6 +154,15 @@ function validateJsonAgainstSchema(value, schema, options = {}) {
     return validateJsonAgainstSchema(value, resolved, { rootSchema, path });
   }
 
+  if (Array.isArray(schema.oneOf)) {
+    const results = schema.oneOf.map((candidate) => validateJsonAgainstSchema(value, candidate, { rootSchema, path }));
+    const matches = results.filter((candidateErrors) => candidateErrors.length === 0);
+
+    if (matches.length !== 1) {
+      errors.push({ path, message: `expected exactly one oneOf schema to match, got ${matches.length}` });
+    }
+  }
+
   if (schema.type) {
     const expectedTypes = Array.isArray(schema.type) ? schema.type : [schema.type];
     if (!expectedTypes.some((type) => matchesSchemaType(value, type))) {
@@ -188,6 +198,17 @@ function validateJsonAgainstSchema(value, schema, options = {}) {
     }
   }
 
+  if (Array.isArray(value) && schema.items) {
+    for (const [index, item] of value.entries()) {
+      errors.push(
+        ...validateJsonAgainstSchema(item, schema.items, {
+          rootSchema,
+          path: `${path}[${index}]`
+        })
+      );
+    }
+  }
+
   const shouldValidateObject =
     isPlainObject(value) && (schema.properties || schema.required || schema.additionalProperties !== undefined);
 
@@ -198,6 +219,18 @@ function validateJsonAgainstSchema(value, schema, options = {}) {
     for (const key of required) {
       if (!Object.prototype.hasOwnProperty.call(value, key)) {
         errors.push({ path, message: `missing required property ${key}` });
+      }
+    }
+
+    if (isPlainObject(schema.dependentRequired)) {
+      for (const [key, dependentKeys] of Object.entries(schema.dependentRequired)) {
+        if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+
+        for (const dependentKey of dependentKeys) {
+          if (!Object.prototype.hasOwnProperty.call(value, dependentKey)) {
+            errors.push({ path, message: `property ${dependentKey} is required when ${key} is present` });
+          }
+        }
       }
     }
 
@@ -232,7 +265,7 @@ function validateJsonAgainstSchema(value, schema, options = {}) {
   return errors;
 }
 
-function validateExtensionManifest(manifest) {
+async function validateExtensionManifest(manifest, repoRoot) {
   let hasErrors = validateUnknownKeys(manifest, EXTENSION_TOP_LEVEL_KEYS, 'extension.json');
 
   if (manifest.$schema !== UPSTREAM_SCHEMA_URL) {
@@ -262,6 +295,33 @@ function validateExtensionManifest(manifest) {
     } else {
       log('INFO', 'Version OK', { version: manifest.version });
     }
+  }
+
+  try {
+    const schemaPath = resolvePath(repoRoot, UPSTREAM_SCHEMA_FILE);
+    if (!(await fileExists(schemaPath))) {
+      log('ERROR', 'Upstream extension schema file not found', { path: UPSTREAM_SCHEMA_FILE, resolved: schemaPath });
+      hasErrors = true;
+    } else {
+      const schemaResult = await readJsonFile(schemaPath, UPSTREAM_SCHEMA_FILE);
+      if (!schemaResult.ok) {
+        hasErrors = true;
+      } else {
+        log('INFO', 'Upstream extension schema file OK', { schema: UPSTREAM_SCHEMA_FILE });
+        const schemaErrors = validateJsonAgainstSchema(manifest, schemaResult.value);
+        if (schemaErrors.length > 0) {
+          for (const error of schemaErrors) {
+            log('ERROR', 'extension.json upstream schema violation', error);
+          }
+          hasErrors = true;
+        } else {
+          log('INFO', 'extension.json matches upstream schema', { schema: UPSTREAM_SCHEMA_FILE });
+        }
+      }
+    }
+  } catch (err) {
+    log('ERROR', `Upstream extension schema path invalid: ${err.message}`);
+    hasErrors = true;
   }
 
   return hasErrors;
@@ -566,7 +626,7 @@ async function validateExtension() {
   const metadataResult = await readJsonFile(metadataPath, AIFHUB_METADATA_FILE);
   if (!metadataResult.ok) return 1;
 
-  hasErrors = validateExtensionManifest(manifestResult.value) || hasErrors;
+  hasErrors = await validateExtensionManifest(manifestResult.value, repoRoot) || hasErrors;
   hasErrors = await validateAifhubMetadata(metadataResult.value, repoRoot) || hasErrors;
   hasErrors = await validateManifestPaths(manifestResult.value, repoRoot) || hasErrors;
 

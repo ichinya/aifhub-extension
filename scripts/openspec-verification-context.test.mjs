@@ -12,6 +12,9 @@ import {
   summarizeOpenSpecValidation,
   writeVerificationEvidence
 } from './openspec-verification-context.mjs';
+import {
+  getLatestGateResult
+} from './aif-gate-result.mjs';
 
 const tempRoots = [];
 
@@ -505,6 +508,38 @@ describe('OpenSpec verification context API', () => {
     assert.equal(latest.validation.changeId, 'add-oauth');
     assert.equal(latest.status, null, 'missing optional status output should not throw');
     assert.equal(latest.verify.exists, true);
+  });
+
+  it('writes and reloads the final verify gate result block', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+    await writeVerificationEvidence('add-oauth', {
+      validation: validationResult(),
+      status: null,
+      generatedRules: [],
+      shouldRunCodeVerification: false,
+      warnings: [],
+      errors: [
+        {
+          code: 'code-checks-failed',
+          message: 'Code verification failed.',
+          path: 'src/auth.ts'
+        }
+      ]
+    }, {
+      rootDir
+    });
+
+    const latest = await readLatestVerificationEvidence('add-oauth', { rootDir });
+    const verifyGate = getLatestGateResult(latest.verify.content, { gate: 'verify' });
+
+    assert.equal(verifyGate.ok, true);
+    assert.equal(verifyGate.result.gate, 'verify');
+    assert.equal(verifyGate.result.status, 'fail');
+    assert.equal(verifyGate.result.blocking, true);
+    assert.deepEqual(verifyGate.result.affected_files, ['src/auth.ts']);
+    assert.equal(latest.gateResult.ok, true);
+    assert.equal(latest.gateResult.result.status, 'fail');
   });
 
   it('rejects QA evidence writes outside QA runtime paths', async () => {

@@ -214,6 +214,8 @@ Writes:
 - `.ai-factory/qa/<change-id>/openspec-status.json`
 - `.ai-factory/qa/<change-id>/raw/`
 
+`verify.md` ends with a final fenced `aif-gate-result` JSON block using `"gate": "verify"` and `status` of `pass`, `warn`, or `fail`.
+
 Does not write:
 
 - `openspec/specs/**`
@@ -254,6 +256,7 @@ Reads:
 
 - `openspec/changes/<change-id>/**`
 - passing verification evidence from `.ai-factory/qa/<change-id>/`
+- the latest valid verify `aif-gate-result` block from `.ai-factory/qa/<change-id>/verify.md`
 - git working tree state
 
 Writes:
@@ -426,7 +429,7 @@ ai-factory --version
 Expected range:
 
 ```text
->=2.10.0 <3.0.0
+>=2.11.0 <3.0.0
 ```
 
 The supported range is tracked in `aifhub-extension.json -> compat.ai-factory`.

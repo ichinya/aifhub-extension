@@ -25,7 +25,9 @@ OpenSpec-native mode finalizes the verified change state through `scripts/opensp
 - Resolve exactly one active change or explicit `<change-id>`.
 - Read QA evidence from `.ai-factory/qa/<change-id>/`.
 - Treat verification as passing only when QA evidence clearly records a final PASS or PASS-with-notes for this change.
+- Require the latest final fenced `aif-gate-result` block in `verify.md` to be valid JSON with `"gate": "verify"` and `status` of `pass` or `warn`.
 - If verification has not run or verdict is `fail`, stop and suggest `/aif-verify` or `/aif-fix`.
+- If the verify gate result is missing, invalid, or `fail`, stop and suggest rerunning `/aif-verify <change-id>` or `/aif-fix <change-id>`.
 - Refuse unverified changes; do not accept `Code verification: PENDING` as final verification.
 - Check dirty working tree state before archive and either fail or record it only when explicit dirty-state recording is requested.
 

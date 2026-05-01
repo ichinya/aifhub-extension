@@ -22,6 +22,9 @@ import {
   collectCanonicalChangeArtifacts,
   collectGeneratedRules
 } from './openspec-execution-context.mjs';
+import {
+  getLatestGateResult
+} from './aif-gate-result.mjs';
 
 const execFileAsync = promisify(execFile);
 const MODE = 'openspec-native';
@@ -293,6 +296,34 @@ export async function assertVerificationPassed(changeId, options = {}) {
   }
 
   const verifyContent = evidence.verify.content ?? '';
+  const gate = getVerificationGate(evidence, verifyContent);
+  if (gate.missing) {
+    return createVerificationFailure({
+      changeId: normalized.changeId,
+      code: 'verification-gate-missing',
+      message: 'Verification evidence is missing the final aif-gate-result block for the verify gate.',
+      evidence
+    });
+  }
+
+  if (!gate.ok) {
+    return createVerificationFailure({
+      changeId: normalized.changeId,
+      code: 'verification-gate-invalid',
+      message: 'Verification evidence contains an invalid final aif-gate-result block for the verify gate.',
+      evidence
+    });
+  }
+
+  if (gate.result.status === 'fail') {
+    return createVerificationFailure({
+      changeId: normalized.changeId,
+      code: 'verification-gate-failed',
+      message: 'Refusing to archive because the latest verify gate result failed.',
+      evidence
+    });
+  }
+
   if (/\b(Code verification:\s*PENDING|Code verification:\s*BLOCKED)\b/i.test(verifyContent)) {
     return createVerificationFailure({
       changeId: normalized.changeId,
@@ -775,6 +806,7 @@ function normalizeVerificationSummary(evidence, passed) {
     passed,
     validation: evidence?.validation ?? null,
     status: evidence?.status ?? null,
+    gateResult: getVerificationGate(evidence, evidence?.verify?.content ?? ''),
     verify: {
       exists: Boolean(evidence?.verify?.exists),
       path: evidence?.verify?.path ?? null,
@@ -782,6 +814,35 @@ function normalizeVerificationSummary(evidence, passed) {
     },
     warnings: evidence?.warnings ?? [],
     errors: evidence?.errors ?? []
+  };
+}
+
+function getVerificationGate(evidence, verifyContent) {
+  const gate = evidence?.gateResult ?? getLatestGateResult(verifyContent, { gate: 'verify' });
+
+  if (gate === null || gate === undefined) {
+    return {
+      missing: true,
+      ok: false,
+      result: null,
+      errors: []
+    };
+  }
+
+  if (!gate.ok) {
+    return {
+      missing: false,
+      ok: false,
+      result: null,
+      errors: gate.errors ?? []
+    };
+  }
+
+  return {
+    missing: false,
+    ok: true,
+    result: gate.result,
+    errors: []
   };
 }
 

@@ -1,8 +1,8 @@
 {
   "$schema": "https://raw.githubusercontent.com/lee-to/ai-factory/2.x/schemas/extension.schema.json",
   "name": "aifhub-extension",
-  "version": "1.0.6",
-  "description": "Upstream-first extension for AI Factory: bootstrap remains extension-owned; `aif-plan`, `aif-implement`, `aif-verify`, `aif-fix`, and `aif-rules-check` connect through `injections`; `aif-rules-check` also keeps a compatibility fallback while compat includes ai-factory 2.10.0; `aif-done` remains the extension-owned finalizer; Codex and Claude runtime files publish through top-level `agentFiles`.",
+  "version": "1.0.7",
+  "description": "Upstream-first extension for AI Factory 2.11+: bootstrap remains extension-owned; `aif-plan`, `aif-implement`, `aif-verify`, and `aif-fix` connect through injections; upstream `aif-rules-check` is augmented by the AIFHub OpenSpec generated-rules injection; `aif-done` and `aif-mode` remain extension-owned finalizers/orchestrators; Codex and Claude runtime files publish through top-level `agentFiles`.",
   "commands": [
     {
       "name": "aifhub-mcp",
@@ -13,7 +13,6 @@
   "skills": [
     "skills/aif-analyze",
     "skills/aif-done",
-    "skills/aif-rules-check",
     "skills/aif-mode"
   ],
   "mcpServers": [

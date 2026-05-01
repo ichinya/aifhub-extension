@@ -14,6 +14,10 @@ import {
   summarizeDoneResult,
   writeDoneSummary
 } from './openspec-done-finalizer.mjs';
+import {
+  createGateResult,
+  renderGateResultBlock
+} from './aif-gate-result.mjs';
 
 const tempRoots = [];
 
@@ -127,6 +131,25 @@ function verificationEvidence(overrides = {}) {
     '',
     'Verdict: PASS',
     `Code verification: ${codeState}`,
+    '',
+    renderGateResultBlock(createGateResult({
+      gate: 'verify',
+      status: overrides.gateStatus ?? 'pass',
+      blockers: overrides.gateStatus === 'fail'
+        ? [{
+          id: 'verify-failed',
+          severity: 'error',
+          summary: 'Verification failed.'
+        }]
+        : [],
+      affectedFiles: [],
+      suggestedNext: overrides.gateStatus === 'fail'
+        ? {
+          command: '/aif-fix',
+          reason: 'Verification failed.'
+        }
+        : null
+    })),
     ''
   ].join('\n');
 
@@ -151,6 +174,7 @@ function verificationEvidence(overrides = {}) {
       path: '.ai-factory/qa/add-oauth/verify.md',
       content: verifyExists ? content : ''
     },
+    gateResult: overrides.gateResult,
     warnings: overrides.warnings ?? [],
     errors: overrides.errors ?? []
   };
@@ -233,6 +257,14 @@ describe('OpenSpec done finalizer API', () => {
       '',
       'Verdict: PASS',
       'Code verification: PASS',
+      '',
+      renderGateResultBlock(createGateResult({
+        gate: 'verify',
+        status: 'pass',
+        blockers: [],
+        affectedFiles: [],
+        suggestedNext: null
+      })),
       ''
     ].join('\n'));
 
@@ -266,7 +298,29 @@ describe('OpenSpec done finalizer API', () => {
     const failed = await assertVerificationPassed('add-oauth', {
       readLatestVerificationEvidence: async () => verificationEvidence({
         validationOk: false,
-        content: '# Verify\n\nOpenSpec validation: FAIL\nCode verification: BLOCKED\n'
+        gateStatus: 'fail',
+        content: [
+          '# Verify',
+          '',
+          'OpenSpec validation: FAIL',
+          'Code verification: BLOCKED',
+          '',
+          renderGateResultBlock(createGateResult({
+            gate: 'verify',
+            status: 'fail',
+            blockers: [{
+              id: 'openspec-validation-failed',
+              severity: 'error',
+              summary: 'OpenSpec validation failed.'
+            }],
+            affectedFiles: [],
+            suggestedNext: {
+              command: '/aif-fix',
+              reason: 'OpenSpec validation failed.'
+            }
+          })),
+          ''
+        ].join('\n')
       })
     });
     assert.equal(failed.ok, false);
@@ -275,7 +329,21 @@ describe('OpenSpec done finalizer API', () => {
     const pending = await assertVerificationPassed('add-oauth', {
       readLatestVerificationEvidence: async () => verificationEvidence({
         codeState: 'PENDING',
-        content: '# Verify\n\nOpenSpec validation: PASS\nCode verification: PENDING\n'
+        content: [
+          '# Verify',
+          '',
+          'OpenSpec validation: PASS',
+          'Code verification: PENDING',
+          '',
+          renderGateResultBlock(createGateResult({
+            gate: 'verify',
+            status: 'warn',
+            blockers: [],
+            affectedFiles: [],
+            suggestedNext: null
+          })),
+          ''
+        ].join('\n')
       })
     });
     assert.equal(pending.ok, false);
@@ -286,6 +354,42 @@ describe('OpenSpec done finalizer API', () => {
     });
     assert.equal(passed.ok, true);
     assert.equal(passed.passed, true);
+  });
+
+  it('requires a valid latest verify gate result before finalization', async () => {
+    const missingGate = await assertVerificationPassed('add-oauth', {
+      readLatestVerificationEvidence: async () => verificationEvidence({
+        content: '# Verify\n\nVerdict: PASS\nCode verification: PASS\n'
+      })
+    });
+    assert.equal(missingGate.ok, false);
+    assert.equal(missingGate.errors[0].code, 'verification-gate-missing');
+
+    const invalidGate = await assertVerificationPassed('add-oauth', {
+      readLatestVerificationEvidence: async () => verificationEvidence({
+        content: [
+          '# Verify',
+          '',
+          'Verdict: PASS',
+          'Code verification: PASS',
+          '',
+          '```aif-gate-result',
+          '{"schema_version":1,"gate":"verify"',
+          '```',
+          ''
+        ].join('\n')
+      })
+    });
+    assert.equal(invalidGate.ok, false);
+    assert.equal(invalidGate.errors[0].code, 'verification-gate-invalid');
+
+    const failedGate = await assertVerificationPassed('add-oauth', {
+      readLatestVerificationEvidence: async () => verificationEvidence({
+        gateStatus: 'fail'
+      })
+    });
+    assert.equal(failedGate.ok, false);
+    assert.equal(failedGate.errors[0].code, 'verification-gate-failed');
   });
 
   it('detects dirty working tree state and records it only when explicit', async () => {
