@@ -7,11 +7,17 @@
 ## [В разработке]
 
 ### Изменено
+- Документация OpenSpec-native workflow теперь описывает полный tail: sync/rules/review/security gates, verify/fix loop, doctor, done, post-archive sync, commit и optional evolve.
+- Prompt assets для done/implement/verifier теперь явно передают финализацию в `/aif-mode sync`, `/aif-commit` и optional `/aif-evolve`, не представляя `/aif-done` заменой commit gate.
 - `extension.json` теперь указывает на upstream JSON Schema `https://raw.githubusercontent.com/lee-to/ai-factory/2.x/schemas/extension.schema.json` и больше не содержит private AIFHub поля.
 - AIFHub metadata `compat` и `sources` вынесены в `aifhub-extension.json` с локальной схемой `schemas/aifhub-extension.schema.json`.
 - `npm run validate` теперь проверяет split contract: upstream manifest, AIFHub metadata, bundled agent files и docs links.
 - `compat.ai-factory` now requires `>=2.11.0 <3.0.0`; AI Factory 2.11.0 provides native `aif-rules-check`, so AIFHub keeps only `injections/core/aif-rules-check-openspec-generated-rules.md` for OpenSpec generated-rules augmentation.
 - `scripts/validate-extension.mjs` validates `extension.json` against the local synced copy of the upstream AI Factory extension schema.
+
+### Исправлено
+- `/aif-mode sync` в OpenSpec-native mode теперь обновляет `.ai-factory/rules/generated/openspec-base.md` даже после archive, когда активных changes больше нет, и пропускает change-specific rules/validation без ошибки.
+- `/aif-mode sync --all` больше не падает только из-за активных migrated/docs-only changes без delta specs; такие changes помечаются `no-delta-specs`, а changes с delta specs продолжают проходить sync validation.
 
 ## [0.10.0] - 2026-04-20
 

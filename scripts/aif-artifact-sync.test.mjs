@@ -244,8 +244,232 @@ describe('artifact sync and export', () => {
     });
 
     assert.equal(result.ok, true);
+    assert.match(await readFixture(rootDir, '.ai-factory/rules/generated/openspec-base.md'), /No base OpenSpec requirements found/);
     assert.match(await readFixture(rootDir, '.ai-factory/rules/generated/openspec-change-add-mfa.md'), /Requirement: Require MFA/);
+    assert.match(await readFixture(rootDir, '.ai-factory/rules/generated/openspec-merged-add-mfa.md'), /Requirement: Require MFA/);
+    assert.equal(result.validation.skipped, true);
+    assert.equal(result.validation.reason, 'missing-cli');
     assert.equal(await pathExists(rootDir, '.ai-factory/state/mode-switches/2026-04-29T00-00-00-000Z-sync-openspec.md'), true);
+  });
+
+  it('syncs generated rules for all active OpenSpec changes', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/config.yaml', 'project: test\n');
+    await writeFixture(rootDir, 'openspec/specs/auth/spec.md', [
+      '# Auth',
+      '',
+      '## Requirements',
+      '',
+      '### Requirement: Base Auth',
+      '',
+      'The system MUST preserve accepted authentication behavior.',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/changes/add-mfa/proposal.md', '# Proposal\n');
+    await writeFixture(rootDir, 'openspec/changes/add-mfa/specs/auth/spec.md', [
+      '# Auth',
+      '',
+      '## ADDED Requirements',
+      '',
+      '### Requirement: Require MFA',
+      '',
+      'The system MUST require MFA for administrators.',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/changes/add-passkeys/proposal.md', '# Proposal\n');
+    await writeFixture(rootDir, 'openspec/changes/add-passkeys/specs/auth/spec.md', [
+      '# Auth',
+      '',
+      '## ADDED Requirements',
+      '',
+      '### Requirement: Support Passkeys',
+      '',
+      'The system MUST support passkey sign-in.',
+      ''
+    ].join('\n'));
+
+    const result = await syncOpenSpecArtifacts({
+      rootDir,
+      all: true,
+      detectOpenSpec: async () => missingCliDetection(),
+      timestamp: '2026-04-29T01-00-00-000Z'
+    });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.changes.changeIds, ['add-mfa', 'add-passkeys']);
+    assert.match(await readFixture(rootDir, '.ai-factory/rules/generated/openspec-base.md'), /Requirement: Base Auth/);
+    assert.match(await readFixture(rootDir, '.ai-factory/rules/generated/openspec-change-add-mfa.md'), /Requirement: Require MFA/);
+    assert.match(await readFixture(rootDir, '.ai-factory/rules/generated/openspec-merged-add-passkeys.md'), /Requirement: Support Passkeys/);
+  });
+
+  it('skips sync validation for active changes without delta specs', async () => {
+    const rootDir = await createTempRoot();
+    const validated = [];
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/config.yaml', 'project: test\n');
+    await writeFixture(rootDir, 'openspec/changes/docs-only/proposal.md', '# Proposal\n');
+    await writeFixture(rootDir, 'openspec/changes/add-mfa/proposal.md', '# Proposal\n');
+    await writeFixture(rootDir, 'openspec/changes/add-mfa/specs/auth/spec.md', [
+      '# Auth',
+      '',
+      '## ADDED Requirements',
+      '',
+      '### Requirement: Require MFA',
+      '',
+      'The system MUST require MFA for administrators.',
+      '',
+      '#### Scenario: administrator signs in',
+      '',
+      '- GIVEN an administrator account',
+      '- WHEN the administrator signs in',
+      '- THEN an MFA challenge is required',
+      ''
+    ].join('\n'));
+
+    const result = await syncOpenSpecArtifacts({
+      rootDir,
+      all: true,
+      detectOpenSpec: async () => availableCliDetection(),
+      validateOpenSpecChange: async (changeId) => {
+        validated.push(changeId);
+        return { ok: true, stdout: '{"valid":true}', stderr: '', json: { valid: true } };
+      },
+      getOpenSpecStatus: async (changeId) => ({
+        ok: true,
+        stdout: JSON.stringify({ changeId }),
+        stderr: '',
+        json: { changeId }
+      }),
+      timestamp: '2026-04-29T01-30-00-000Z'
+    });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(validated, ['add-mfa']);
+    assert.equal(result.validation.results.length, 1);
+    assert.equal(result.validation.skippedChanges.length, 1);
+    assert.equal(result.validation.skippedChanges[0].changeId, 'docs-only');
+    assert.ok(result.validation.warnings.some((warning) => warning.code === 'no-delta-specs'));
+  });
+
+  it('does not skip no-delta validation for targeted sync', async () => {
+    const rootDir = await createTempRoot();
+    const validated = [];
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/config.yaml', 'project: test\n');
+    await writeFixture(rootDir, 'openspec/changes/docs-only/proposal.md', '# Proposal\n');
+
+    const result = await syncOpenSpecArtifacts({
+      rootDir,
+      changeId: 'docs-only',
+      detectOpenSpec: async () => availableCliDetection(),
+      validateOpenSpecChange: async (changeId) => {
+        validated.push(changeId);
+        return {
+          ok: false,
+          stdout: '',
+          stderr: 'Change must have at least one delta.',
+          json: null,
+          errors: [
+            {
+              code: 'openspec-validation-failed',
+              message: 'Change must have at least one delta.'
+            }
+          ]
+        };
+      },
+      getOpenSpecStatus: async (changeId) => ({
+        ok: true,
+        stdout: JSON.stringify({ changeId }),
+        stderr: '',
+        json: { changeId }
+      }),
+      timestamp: '2026-04-29T01-45-00-000Z'
+    });
+
+    assert.equal(result.ok, false);
+    assert.deepEqual(validated, ['docs-only']);
+    assert.equal(result.validation.skipped, false);
+    assert.deepEqual(result.validation.skippedChanges, []);
+    assert.equal(result.validation.results.length, 1);
+    assert.equal(result.validation.results[0].changeId, 'docs-only');
+    assert.ok(result.validation.errors.some((error) => error.code === 'openspec-validation-failed'));
+    assert.ok(!result.validation.warnings.some((warning) => warning.code === 'no-delta-specs'));
+  });
+
+  it('refreshes base generated rules after archive when no active changes exist', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/config.yaml', 'project: test\n');
+    await writeFixture(rootDir, 'openspec/specs/auth/spec.md', [
+      '# Auth',
+      '',
+      '## Requirements',
+      '',
+      '### Requirement: Accepted Auth',
+      '',
+      'The system MUST support accepted authentication.',
+      ''
+    ].join('\n'));
+
+    const result = await syncOpenSpecArtifacts({
+      rootDir,
+      detectOpenSpec: async () => missingCliDetection(),
+      getCurrentBranch: async () => 'main',
+      timestamp: '2026-04-29T02-00-00-000Z'
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.changes.source, 'none');
+    assert.deepEqual(result.changes.changeIds, []);
+    assert.equal(result.generatedRules.baseOnly, true);
+    assert.equal(result.generatedRules.changeSpecificSkipped, true);
+    assert.equal(result.validation.skipped, true);
+    assert.equal(result.validation.reason, 'no-selected-changes');
+    assert.match(await readFixture(rootDir, '.ai-factory/rules/generated/openspec-base.md'), /Requirement: Accepted Auth/);
+    assert.equal(await pathExists(rootDir, '.ai-factory/rules/generated/openspec-change-accepted-auth.md'), false);
+    assert.equal(await pathExists(rootDir, 'openspec/changes/.ai-factory'), false);
+    assert.equal(await pathExists(rootDir, '.ai-factory/state/mode-switches/2026-04-29T02-00-00-000Z-sync-openspec.md'), true);
   });
 
   it('respects compileRulesOnSync and validateOnSync config toggles', async () => {

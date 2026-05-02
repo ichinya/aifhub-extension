@@ -151,6 +151,89 @@ export async function collectOpenSpecRuleSources(changeId, options = {}) {
   });
 }
 
+export async function compileOpenSpecBaseRules(options = {}) {
+  const rootDir = path.resolve(options.rootDir ?? process.cwd());
+  const collected = await collectOpenSpecBaseRuleSources({
+    ...options,
+    rootDir
+  });
+
+  if (!collected.ok) {
+    return createCompilerResult({
+      ok: false,
+      changeId: null,
+      mode: collected.mode,
+      warnings: collected.warnings,
+      errors: collected.errors,
+      sources: collected.sources
+    });
+  }
+
+  const rendered = renderDocument({
+    kind: 'base',
+    title: 'Base OpenSpec Rules',
+    changeId: null,
+    sources: sortSources(collected.sources),
+    emptyMessage: 'No base OpenSpec requirements found.'
+  });
+  const written = await writeGeneratedBaseRules(rendered, {
+    ...options,
+    rootDir
+  });
+
+  if (!written.ok) {
+    return createCompilerResult({
+      ok: false,
+      changeId: null,
+      mode: collected.mode,
+      warnings: [...collected.warnings, ...written.warnings],
+      errors: written.errors,
+      sources: collected.sources,
+      files: written.files
+    });
+  }
+
+  return createCompilerResult({
+    ok: true,
+    changeId: null,
+    mode: collected.mode,
+    warnings: [...collected.warnings, ...written.warnings],
+    errors: [],
+    sources: collected.sources,
+    files: written.files
+  });
+}
+
+async function collectOpenSpecBaseRuleSources(options = {}) {
+  const rootDir = path.resolve(options.rootDir ?? process.cwd());
+  const warnings = [];
+  const cli = await detectOpenSpecCapability(rootDir, options);
+  warnings.push(...cli.warnings);
+
+  const baseSpecsDir = path.join(rootDir, 'openspec', 'specs');
+  const baseFiles = await collectSpecFiles(baseSpecsDir);
+  const sources = [];
+
+  for (const filePath of baseFiles) {
+    const source = await readRuleSource(filePath, {
+      rootDir,
+      kind: 'base',
+      specsDir: baseSpecsDir,
+      changeId: null,
+      cli
+    });
+    warnings.push(...source.warnings);
+    sources.push(source.item);
+  }
+
+  return createSourceResult({
+    ok: true,
+    mode: chooseMode(sources, cli),
+    warnings: dedupeDiagnostics(warnings),
+    sources: sortSources(sources)
+  });
+}
+
 export function renderGeneratedRules(sources, options = {}) {
   const normalized = normalizeChangeId(options.changeId);
   const changeId = normalized.ok ? normalized.changeId : options.changeId;
@@ -271,6 +354,53 @@ export async function writeGeneratedRules(changeId, rendered, options = {}) {
   return createWriteResult({
     ok: true,
     files
+  });
+}
+
+async function writeGeneratedBaseRules(content, options = {}) {
+  const rootDir = path.resolve(options.rootDir ?? process.cwd());
+  const generatedDir = path.resolve(rootDir, GENERATED_DIR);
+  const targetPath = path.resolve(generatedDir, BASE_FILE);
+  const relativePath = toPosix(path.relative(rootDir, targetPath));
+
+  if (!isWithinDirectory(targetPath, generatedDir)) {
+    return createWriteResult({
+      errors: [
+        {
+          code: 'unsafe-generated-path',
+          message: `Generated output path escapes '${GENERATED_DIR}': ${BASE_FILE}`
+        }
+      ]
+    });
+  }
+
+  if (options.dryRun) {
+    return createWriteResult({
+      ok: true,
+      files: [
+        {
+          kind: 'base',
+          path: targetPath,
+          relativePath,
+          written: false
+        }
+      ]
+    });
+  }
+
+  await mkdir(generatedDir, { recursive: true });
+  await writeFile(targetPath, content, 'utf8');
+
+  return createWriteResult({
+    ok: true,
+    files: [
+      {
+        kind: 'base',
+        path: targetPath,
+        relativePath,
+        written: true
+      }
+    ]
   });
 }
 

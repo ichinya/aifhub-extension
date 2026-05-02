@@ -69,7 +69,16 @@ Do not write runtime-only files into `openspec/changes/<change-id>/`.
 
 ### Output
 
-Report selected `change-id`, verification status, dirty working tree state, QA evidence path, `.ai-factory/qa/<change-id>/` final evidence path, `.ai-factory/state/<change-id>/` final summary path, canonical artifacts inspected, generated rules state, archive result, `--skip-specs` state, commit draft, and PR draft.
+Report selected `change-id`, verification status, dirty working tree state, QA evidence path, `.ai-factory/qa/<change-id>/` final evidence path, `.ai-factory/state/<change-id>/` final summary path, canonical artifacts inspected, generated rules state, archive result, `--skip-specs` state, commit draft, PR draft, and next steps: `/aif-mode sync`, `/aif-commit`, and optional `/aif-evolve`.
+
+After successful finalization:
+
+1. Recommend `/aif-mode sync` to refresh derived artifacts after archive.
+2. Recommend `/aif-commit` as the next AI Factory command.
+3. Optionally recommend `/aif-evolve` when durable learning evidence exists.
+4. Do not create commits automatically.
+5. Do not create PRs automatically.
+6. `/aif-done` does not replace `/aif-commit`.
 
 ## Legacy AI Factory-only mode
 
@@ -145,6 +154,8 @@ Apply only when the verified plan contains evidence:
 | Evolution candidates identified | Run `/aif-evolve` when explicitly requested and supported, otherwise recommend it |
 
 Never invent governance changes without plan evidence. If the current runtime cannot safely perform the owning update, return the exact next command/instruction instead of silently skipping it.
+
+OpenSpec-native `/aif-done` prepares commit and PR drafts only. It does not create commits, does not create PRs, and does not replace `/aif-commit`.
 
 ## Status Update on Finalization
 

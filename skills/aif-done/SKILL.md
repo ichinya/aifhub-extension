@@ -79,7 +79,19 @@ Normal output must report:
 - runtime state and QA evidence paths;
 - final evidence under `.ai-factory/qa/<change-id>/`;
 - final summaries under `.ai-factory/state/<change-id>/`;
-- commit/PR summary draft.
+- commit/PR summary draft;
+- next steps: `/aif-mode sync`, `/aif-commit`, and optional `/aif-evolve`.
+
+### Post-Finalization Handoff
+
+After successful finalization:
+
+1. Recommend `/aif-mode sync` to refresh derived artifacts after archive.
+2. Recommend `/aif-commit` as the next AI Factory command.
+3. Optionally recommend `/aif-evolve` when durable learning evidence exists.
+4. Do not create commits automatically.
+5. Do not create PRs automatically.
+6. `/aif-done` does not replace `/aif-commit`.
 
 ## Legacy AI Factory-only mode
 
@@ -183,9 +195,10 @@ Legacy AI Factory-only mode preserves the verified plan finalization contract ba
 - Never invent governance changes without evidence from the verified plan.
 - When governance updates belong to another owner, use the owning path or return an exact handoff instead of silently skipping the change.
 - Never auto-create a PR — always present drafts for user approval.
+- Never create commits from `/aif-done`; hand commit creation to `/aif-commit` or the user's normal git workflow.
 - If `gh` is unavailable, provide manual instructions instead of failing.
 - Keep direct archival writes bounded to the plan status, specs directory, and specs index.
-- Do not reintroduce `/aif-done` as the canonical upstream workflow step — this is an AIFHub/Handoff finalizer only.
+- Do not reintroduce `/aif-done` as the canonical upstream workflow step, and do not present `/aif-done` as replacing `/aif-commit`.
 
 ## Example Requests
 

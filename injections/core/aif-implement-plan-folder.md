@@ -77,6 +77,14 @@ Normal implementation responses should report:
 - task progress from the OpenSpec `tasks.md`;
 - next step `/aif-verify <change-id>` when implementation is ready.
 
+After implementation, optional read-only gates are:
+
+- `/aif-rules-check`
+- `/aif-review`
+- `/aif-security-checklist`
+
+The authoritative final verification remains `/aif-verify <change-id>`.
+
 Do not install OpenSpec skills or slash commands.
 Do not route users to deprecated workflow aliases or legacy `*-plus` command names.
 

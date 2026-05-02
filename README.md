@@ -10,7 +10,7 @@ AI Factory UX + OpenSpec artifact protocol
 
 ## What This Extension Does
 
-- Keeps `/aif-analyze`, `/aif-plan`, `/aif-explore`, `/aif-improve`, `/aif-implement`, `/aif-verify`, `/aif-fix`, `/aif-done`, and `/aif-mode` as the public command vocabulary.
+- Keeps `/aif-analyze`, `/aif-plan`, `/aif-explore`, `/aif-improve`, `/aif-implement`, `/aif-rules-check`, `/aif-review`, `/aif-security-checklist`, `/aif-verify`, `/aif-fix`, `/aif-done`, `/aif-commit`, `/aif-evolve`, and `/aif-mode` as the public command vocabulary.
 - In OpenSpec-native mode, writes canonical change artifacts under `openspec/changes/<change-id>/` and accepted specs under `openspec/specs/`.
 - Keeps AI Factory runtime state, verification evidence, finalization evidence, and generated rules outside canonical OpenSpec changes.
 - Requests OpenSpec validation, status, instructions, and archive through the AIFHub wrapper and `scripts/openspec-runner.mjs` when a compatible CLI is available.
@@ -25,6 +25,8 @@ Install the extension:
 
 ```bash
 ai-factory extension add https://github.com/ichinya/aifhub-extension.git
+ai-factory update
+ai-factory extension update aifhub-extension
 ```
 
 Bootstrap project context:
@@ -53,19 +55,38 @@ Create and refine a change:
 ```text
 /aif-plan full "add OAuth login"
 /aif-improve add-oauth-login
+/aif-mode sync --change add-oauth-login
 ```
 
-Implement, verify, fix if needed, and finalize:
+Implement, check optional gates, verify, fix if needed, finalize, sync, commit, and optionally evolve:
 
 ```text
 /aif-implement add-oauth-login
+/aif-mode sync --change add-oauth-login
+/aif-rules-check
+/aif-review
+/aif-security-checklist
 /aif-verify add-oauth-login
 /aif-fix add-oauth-login
 /aif-verify add-oauth-login
+/aif-mode doctor --change add-oauth-login
 /aif-done add-oauth-login
+/aif-mode sync
+/aif-commit
+/aif-evolve
 ```
 
-`/aif-done` is an explicit finalizer after passing verification. It archives through the OpenSpec CLI when archive is required, writes final evidence under `.ai-factory/qa/<change-id>/`, and writes final summaries under `.ai-factory/state/<change-id>/`.
+`/aif-done` finalizes the OpenSpec lifecycle. It archives the accepted OpenSpec change through the OpenSpec CLI when archive is required and writes final evidence under `.ai-factory/qa/<change-id>/` plus final summaries under `.ai-factory/state/<change-id>/`.
+
+It does not replace `/aif-commit`. After `/aif-done`, run `/aif-commit` or your normal git workflow to commit implementation changes, OpenSpec archive/spec changes, QA evidence, and final summaries.
+
+Optional gates:
+
+- `/aif-rules-check` - read-only rules compliance.
+- `/aif-review` - read-only code review.
+- `/aif-security-checklist` - read-only security gate.
+- `/aif-mode doctor` - mode/config/artifact readiness.
+- `/aif-mode sync` - derived artifact refresh and OpenSpec validation/status when available.
 
 ## Artifact Layout
 

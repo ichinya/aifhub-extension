@@ -39,7 +39,7 @@ Load rules in this priority order:
 
 OpenSpec-native mode does not require plan-local `rules.md`. Ignore plan-local `rules.md` unless the run is explicitly in Legacy AI Factory-only mode.
 
-If generated rules are missing or stale, return `WARN`, report which generated rules are present, missing, or stale, and ask the caller to regenerate rules through the compiler-owning workflow such as `/aif-mode sync`. This gate must not regenerate or edit generated rules.
+If generated rules are missing or stale, return `WARN`, report which generated rules are present, missing, or stale, and ask the caller to regenerate rules through the compiler-owning workflow: `/aif-mode sync --change <change-id>`, then rerun `/aif-rules-check`. This gate must not regenerate or edit generated rules.
 
 Runtime state and QA evidence are external context only:
 

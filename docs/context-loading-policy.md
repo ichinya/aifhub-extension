@@ -84,7 +84,29 @@ Runner output from OpenSpec CLI commands is runtime guidance or evidence. It doe
 | `/aif-fix` | no, unless explicitly requested for selected finding scope | `.ai-factory/state/<change-id>/fixes/` |
 | `/aif-verify` | no | `.ai-factory/qa/<change-id>/` |
 | `/aif-rules-check` | no | no |
+| `/aif-review` | no | no |
+| `/aif-security-checklist` | no | no |
 | `/aif-done` | `openspec/specs/**` only through OpenSpec CLI archive | `.ai-factory/qa/<change-id>/`, `.ai-factory/state/<change-id>/final-summary.md` |
+| `/aif-commit` | no | git commit only |
+| `/aif-evolve` | no | skill-context or evolution artifacts only |
+
+## Quality Gates and Finalization Tail
+
+OpenSpec-native quality gates:
+
+| Command | Reads | Writes |
+|---|---|---|
+| `/aif-rules-check` | generated rules, project rules, changed files, optional OpenSpec context | none |
+| `/aif-review` | changed files, OpenSpec context, generated rules | none |
+| `/aif-security-checklist` | changed files, OpenSpec context, generated rules | none |
+| `/aif-verify` | canonical OpenSpec artifacts, generated rules, runtime state, gate outputs when available | `.ai-factory/qa/<change-id>/` |
+| `/aif-done` | passing verify evidence, verify gate result, OpenSpec change | final QA/state evidence and OpenSpec archive via CLI |
+| `/aif-commit` | staged changes, done evidence, final summary, OpenSpec archive/spec changes | git commit |
+| `/aif-evolve` | patches, evidence, skill-context inputs | skill-context/evolution artifacts |
+
+`/aif-done` owns OpenSpec lifecycle finalization. `/aif-commit` owns git commit creation. `/aif-evolve` owns learning/evolution.
+
+After `/aif-done`, `/aif-commit` may read finalization evidence and OpenSpec archive/spec mutations, but must not mutate OpenSpec lifecycle artifacts manually.
 
 ## Legacy Artifact Boundaries
 
