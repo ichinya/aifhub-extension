@@ -372,6 +372,61 @@ describe('artifact sync and export', () => {
     assert.ok(result.validation.warnings.some((warning) => warning.code === 'no-delta-specs'));
   });
 
+  it('does not skip no-delta validation for targeted sync', async () => {
+    const rootDir = await createTempRoot();
+    const validated = [];
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/config.yaml', 'project: test\n');
+    await writeFixture(rootDir, 'openspec/changes/docs-only/proposal.md', '# Proposal\n');
+
+    const result = await syncOpenSpecArtifacts({
+      rootDir,
+      changeId: 'docs-only',
+      detectOpenSpec: async () => availableCliDetection(),
+      validateOpenSpecChange: async (changeId) => {
+        validated.push(changeId);
+        return {
+          ok: false,
+          stdout: '',
+          stderr: 'Change must have at least one delta.',
+          json: null,
+          errors: [
+            {
+              code: 'openspec-validation-failed',
+              message: 'Change must have at least one delta.'
+            }
+          ]
+        };
+      },
+      getOpenSpecStatus: async (changeId) => ({
+        ok: true,
+        stdout: JSON.stringify({ changeId }),
+        stderr: '',
+        json: { changeId }
+      }),
+      timestamp: '2026-04-29T01-45-00-000Z'
+    });
+
+    assert.equal(result.ok, false);
+    assert.deepEqual(validated, ['docs-only']);
+    assert.equal(result.validation.skipped, false);
+    assert.deepEqual(result.validation.skippedChanges, []);
+    assert.equal(result.validation.results.length, 1);
+    assert.equal(result.validation.results[0].changeId, 'docs-only');
+    assert.ok(result.validation.errors.some((error) => error.code === 'openspec-validation-failed'));
+    assert.ok(!result.validation.warnings.some((warning) => warning.code === 'no-delta-specs'));
+  });
+
   it('refreshes base generated rules after archive when no active changes exist', async () => {
     const rootDir = await createTempRoot();
     await writeFixture(rootDir, '.ai-factory/config.yaml', [

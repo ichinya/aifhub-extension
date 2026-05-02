@@ -259,7 +259,7 @@ export async function syncOpenSpecArtifacts(options = {}) {
       ...options,
       rootDir,
       changeIds: changes.changeIds,
-      skipNoDeltaChanges: true
+      skipNoDeltaChanges: Boolean(options.all)
     })
     : createSkippedValidationSync('validateOnSync-disabled');
   const legacy = await discoverLegacyPlans({ rootDir });
