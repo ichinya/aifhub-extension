@@ -23,7 +23,8 @@ Use this mode when config declares `aifhub.artifactProtocol: openspec`.
 - Archive only through `archiveOpenSpecChange` from `scripts/openspec-runner.mjs`: normal archive is `openspec archive <change-id> --yes`, and docs/tooling-only finalization uses `--skip-specs`.
 - `/aif-verify` does not archive; never use custom OpenSpec archive logic, and OpenSpec-native mode does not use legacy `.ai-factory/specs` archive.
 - Allowed writes are `.ai-factory/qa/<change-id>/` final evidence and `.ai-factory/state/<change-id>/` final summaries; do not write runtime-only files into `openspec/changes/<change-id>/`.
-- Return selected active OpenSpec change, verification status, dirty working tree state, archive result, canonical artifacts inspected, generated rules state, runtime state path, QA evidence path, commit/PR summary draft, governance follow-up result, and any `/aif-evolve` recommendation.
+- Return selected active OpenSpec change, verification status, dirty working tree state, archive result, canonical artifacts inspected, generated rules state, runtime state path, QA evidence path, commit/PR summary draft, governance follow-up result, next-step recommendation for `/aif-mode sync`, next-step recommendation for `/aif-commit`, and any `/aif-evolve` recommendation.
+- After successful finalization, recommend `/aif-mode sync` to refresh derived artifacts after archive, recommend `/aif-commit` as the next AI Factory command, and optionally recommend `/aif-evolve` when durable learning evidence exists.
 
 ## Legacy AI Factory-only mode
 
@@ -38,5 +39,6 @@ Use this mode when OpenSpec-native mode is not enabled.
 Rules:
 - Follow the finalization contract from `skills/aif-done/references/finalization-contract.md`.
 - Draft a conventional commit message and PR body for user review; do not auto-create PRs.
+- Do not create commits automatically, do not create PRs automatically, and do not present `/aif-done` as replacing `/aif-commit`.
 - Do not invent governance changes that are not supported by verified evidence.
-- Do not reintroduce `/aif-done` as the canonical workflow step; this is a bounded runtime helper only.
+- Do not reintroduce `/aif-done` as the canonical workflow step; this is a bounded runtime helper only and does not replace `/aif-commit`.

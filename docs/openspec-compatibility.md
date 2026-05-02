@@ -85,6 +85,31 @@ paths:
 
 Do not route users to OpenSpec slash commands such as `/opsx:propose`, `/opsx:apply`, or `/opsx:archive`.
 
+## Artifact Sync Points
+
+Recommended sync points:
+
+- after `/aif-plan full` or `/aif-improve`: `/aif-mode sync --change <change-id>`
+- after spec/task edits during implementation or fix: `/aif-mode sync --change <change-id>`
+- after `/aif-done` archive: `/aif-mode sync`
+
+`/aif-mode sync` compiles generated rules and requests OpenSpec validation/status when configured and available. Missing OpenSpec CLI is degraded mode for sync validation, not an install failure.
+
+When no active changes exist after archive, `/aif-mode sync` still refreshes `.ai-factory/rules/generated/openspec-base.md` from `openspec/specs/**`, skips change-specific generated rules, skips change validation, writes a sync report, and returns OK.
+
+For `/aif-mode sync --all`, selected active changes without `openspec/changes/<change-id>/specs/**/spec.md` delta specs are reported as `no-delta-specs` warnings and skipped for sync validation. Changes with delta specs are still validated/statused when the CLI is available.
+
+## Rules Gate
+
+`/aif-rules-check` is read-only. It uses AIFHub generated rules in OpenSpec-native mode and returns a machine-readable `aif-gate-result` with `gate: "rules"`.
+
+If generated rules are missing or stale, run:
+
+```text
+/aif-mode sync --change <change-id>
+/aif-rules-check
+```
+
 ## Mode Controller
 
 `/aif-mode` is the extension-owned controller for artifact protocol changes:

@@ -91,6 +91,7 @@ When `--export-openspec` is passed, export compatibility artifacts from OpenSpec
 Refresh derived or compatibility artifacts without changing mode.
 
 - In OpenSpec-native mode: ensure skeleton paths, compile generated rules when `compileRulesOnSync` is enabled, validate selected changes when `validateOnSync` is enabled and a compatible CLI is available, detect legacy plans, optionally update `.ai-factory/state/current.yaml` with `--current`, and write a sync report.
+- During `sync --all`, skip sync validation for selected changes that do not contain `openspec/changes/<id>/specs/**/spec.md` delta specs; report `no-delta-specs` warnings while still compiling generated rules and validating selected changes that do contain delta specs.
 - In AI Factory-only mode: ensure legacy paths, optionally export OpenSpec changes with `--export-openspec`, preserve OpenSpec artifacts, and write a sync report.
 
 ### `doctor`

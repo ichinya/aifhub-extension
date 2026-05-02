@@ -11,6 +11,10 @@ OpenSpec sync performs these actions without changing mode:
 5. Detect legacy plans that may need migration.
 6. Write a sync report under `.ai-factory/state/mode-switches/`.
 
+When no active changes are selected, sync still refreshes `.ai-factory/rules/generated/openspec-base.md`, skips change-specific generated rules, skips change validation with `no-selected-changes`, writes a report, and returns OK.
+
+When `--all` selects active changes that have no `openspec/changes/<change-id>/specs/**/spec.md` delta specs, sync reports `no-delta-specs` warnings and skips validation/status for those changes. This keeps maintenance sync usable for old migrated or docs-only active changes while preserving stricter per-change verification in `/aif-verify <change-id>`.
+
 Generated rules are derived artifacts:
 
 ```text

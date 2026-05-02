@@ -23,6 +23,7 @@ Use this mode when config declares `aifhub.artifactProtocol: openspec`.
 - Treat `.ai-factory/qa/<change-id>/` as QA evidence owned by verification; name it in reports but do not write verifier findings.
 - Do not create legacy plan artifacts in OpenSpec-native mode.
 - Report changed files, active OpenSpec change, canonical artifacts inspected, generated rules state, runtime state path, QA evidence path, blockers, and next recommended command.
+- After implementation, optional read-only gates are `/aif-rules-check`, `/aif-review`, and `/aif-security-checklist`. The authoritative final verification remains `/aif-verify <change-id>`.
 
 ## Legacy AI Factory-only mode
 

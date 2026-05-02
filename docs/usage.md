@@ -5,15 +5,42 @@
 This guide documents the v1 OpenSpec-native workflow for AIFHub Extension.
 
 ```text
-/aif-mode status
-/aif-analyze
-  -> /aif-plan full "<request>"
-  -> optional /aif-explore "<topic>"
-  -> optional /aif-improve <change-id>
-  -> /aif-implement <change-id>
-  -> /aif-verify <change-id>
-      fail -> /aif-fix <change-id> -> /aif-verify <change-id>
-  -> /aif-done <change-id>
+setup and mode:
+  /aif-mode status                                  # recommended
+  /aif-analyze                                      # required once per project
+  /aif-mode openspec                                # required when switching modes
+  /aif-mode doctor                                  # optional readiness check
+
+optional discovery:
+  /aif-explore "<topic>"                            # optional
+  /aif-grounded "<question>"                        # optional upstream certainty gate
+
+planning:
+  /aif-plan full "<request>"                        # required
+  /aif-improve <change-id>                          # optional, repeatable
+  /aif-mode sync --change <change-id>               # recommended
+
+implementation:
+  /aif-implement <change-id>                        # required
+
+optional gates:
+  /aif-mode sync --change <change-id>               # optional if specs/rules changed
+  /aif-rules-check                                  # optional/recommended rules gate
+  /aif-review                                       # optional read-only review gate
+  /aif-security-checklist                           # optional for security-sensitive changes
+
+verification:
+  /aif-verify <change-id>                           # required
+    fail -> /aif-fix <change-id>                    # required only after failed verify
+         -> optional /aif-rules-check
+         -> /aif-verify <change-id>
+
+finalization:
+  /aif-mode doctor --change <change-id>             # recommended before archive
+  /aif-done <change-id>                             # required after passing verify
+  /aif-mode sync                                    # recommended after archive
+  /aif-commit                                       # recommended AI Factory commit gate
+  /aif-evolve                                       # optional learning step
 ```
 
 OpenSpec-native mode uses OpenSpec artifacts as canonical planning/spec artifacts and AI Factory paths for runtime state, QA evidence, and generated rules.
@@ -71,6 +98,12 @@ Does not write:
 - runtime files under `openspec/changes/<change-id>/`
 
 Use `--dry-run` for planned switching or sync writes. Use `--all` or `--change <id>` to control change selection. Use `--export-openspec` only for compatibility legacy exports from OpenSpec changes. In OpenSpec mode, sync respects `aifhub.openspec.compileRulesOnSync` and `aifhub.openspec.validateOnSync`.
+
+`/aif-mode sync --change <change-id>` is recommended after `/aif-plan full` or `/aif-improve` and whenever canonical specs or tasks changed during implementation or fixes. It ensures OpenSpec skeleton paths, compiles `.ai-factory/rules/generated/openspec-base.md`, `.ai-factory/rules/generated/openspec-change-<change-id>.md`, and `.ai-factory/rules/generated/openspec-merged-<change-id>.md`, requests OpenSpec validation/status when the CLI is available and `validateOnSync` is enabled, detects legacy plans in OpenSpec mode, and writes a sync report under `.ai-factory/state/mode-switches/`.
+
+`/aif-mode sync` without `--change` is recommended after `/aif-done`. After archive, there may be no active change. Sync still refreshes `.ai-factory/rules/generated/openspec-base.md` from `openspec/specs/**`, skips change-specific generated rules and change validation when no active changes exist, and writes a sync report. OpenSpec skills are not installed.
+
+`/aif-mode sync --all` is a maintenance sweep. It refreshes generated rules for active changes, validates only selected changes that contain `openspec/changes/<change-id>/specs/**/spec.md` delta specs, and reports selected no-delta changes as `no-delta-specs` warnings instead of failing solely because old or docs-only active changes have no delta specs. `/aif-verify <change-id>` remains the stricter verification gate for a specific change.
 
 ### `/aif-analyze`
 
@@ -198,6 +231,67 @@ Does not write:
 - legacy `.ai-factory/plans/<id>/task.md`
 - canonical OpenSpec artifacts outside the selected implementation scope unless the user explicitly expands scope
 
+After implementation, optional read-only gates are available before final verification:
+
+```text
+/aif-rules-check
+/aif-review
+/aif-security-checklist
+```
+
+The authoritative final verification remains `/aif-verify <change-id>`.
+
+### `/aif-rules-check`
+
+Reads:
+
+- `.ai-factory/rules/generated/openspec-merged-<change-id>.md`
+- `.ai-factory/rules/generated/openspec-change-<change-id>.md`
+- `.ai-factory/rules/generated/openspec-base.md`
+- `.ai-factory/RULES.md`
+- `.ai-factory/rules/base.md`
+- optional canonical OpenSpec context under `openspec/specs/**` and `openspec/changes/<change-id>/**`
+
+Writes:
+
+- none
+
+`/aif-rules-check` is optional after implementation or fixes and useful for strict/high-risk changes. In OpenSpec-native mode it uses generated rules first, returns a final `aif-gate-result` with `gate: "rules"`, and does not regenerate generated rules.
+
+If generated rules are missing or stale:
+
+```text
+/aif-rules-check
+/aif-mode sync --change <change-id>
+/aif-rules-check
+```
+
+### `/aif-review`
+
+Reads:
+
+- changed files
+- OpenSpec context and generated rules when available
+
+Writes:
+
+- none
+
+`/aif-review` is an optional read-only code review gate. It returns a final `aif-gate-result` with `gate: "review"`, is useful before `/aif-verify` or for high-risk changes, and does not write OpenSpec, runtime, or QA artifacts.
+
+### `/aif-security-checklist`
+
+Reads:
+
+- changed files
+- OpenSpec context and generated rules when available
+
+Writes:
+
+- none
+
+`/aif-security-checklist` is an optional security gate. It is recommended for auth, secrets, permissions, filesystem, shell, external service, API boundary, or data-handling changes. It returns a final `aif-gate-result` with `gate: "security"` and does not write artifacts.
+
 ### `/aif-verify`
 
 Reads:
@@ -275,6 +369,40 @@ Does not write:
 
 Use `--skip-specs` for docs/tooling-only changes where no accepted spec update is expected. Archive-required finalization needs a compatible OpenSpec CLI when `aifhub.openspec.requireCliForDone` is true.
 
+Next steps after `/aif-done`:
+
+1. Run `/aif-mode sync` to refresh derived artifacts after OpenSpec archive.
+2. Run `/aif-commit` to commit implementation, OpenSpec archive/spec changes, QA evidence, and final summaries.
+3. Optionally run `/aif-evolve` when the change produced durable workflow or skill learnings.
+
+`/aif-done` finalizes the OpenSpec lifecycle. It does not replace `/aif-commit`.
+
+### `/aif-commit`
+
+Reads:
+
+- staged changes and current diff
+- `.ai-factory/qa/<change-id>/done.md` when present
+- `.ai-factory/qa/<change-id>/openspec-archive.json` when present
+- `.ai-factory/state/<change-id>/final-summary.md` when present
+- OpenSpec archive/spec changes produced by `/aif-done`
+
+Writes:
+
+- git commit through the upstream AI Factory commit workflow
+
+Does not write:
+
+- OpenSpec lifecycle artifacts manually
+- `.ai-factory/qa/<change-id>/`
+- `.ai-factory/state/<change-id>/`
+
+In OpenSpec-native mode, `/aif-commit` normally runs after `/aif-done`.
+
+### `/aif-evolve`
+
+`/aif-evolve` is optional after commit/finalization. Use it when the implementation, fix, or finalization evidence contains durable lessons that should improve future skills or skill-context. It should not mutate OpenSpec canonical artifacts.
+
 ## OAuth Example
 
 Create the change:
@@ -295,13 +423,19 @@ openspec/changes/add-oauth-login/
       spec.md
 ```
 
-Refine, implement, verify, and finalize:
+Refine, sync, implement, gate, verify, finalize, sync, commit, and optionally evolve:
 
 ```text
 /aif-improve add-oauth-login
+/aif-mode sync --change add-oauth-login
 /aif-implement add-oauth-login
+/aif-rules-check
 /aif-verify add-oauth-login
+/aif-mode doctor --change add-oauth-login
 /aif-done add-oauth-login
+/aif-mode sync
+/aif-commit
+/aif-evolve
 ```
 
 Expected runtime and QA output:
@@ -383,8 +517,11 @@ Refresh derived artifacts without changing mode:
 
 ```text
 /aif-mode sync --change <change-id>
+/aif-mode sync
 /aif-mode doctor
 ```
+
+Use `/aif-mode sync --change <change-id>` before implementation and after refinement. Use `/aif-mode sync` after `/aif-done` to refresh base generated rules from accepted specs after archive.
 
 ## Recommended Codex App Flow
 
@@ -395,11 +532,15 @@ Codex cannot switch modes from extension prompts. The user controls the mode man
 /aif-explore "task description"
 /aif-plan full "task description"
 /aif-improve <change-id>
+/aif-mode sync --change <change-id>
 
 # Default mode, user action
 /aif-implement <change-id>
+/aif-rules-check
 /aif-verify <change-id>
 /aif-done <change-id>
+/aif-mode sync
+/aif-commit
 ```
 
 In Codex Default mode, prompts must ask plain-text questions rather than using `request_user_input`.

@@ -9,6 +9,7 @@ import {
   writeCurrentChangePointer
 } from './active-change-resolver.mjs';
 import {
+  compileOpenSpecBaseRules,
   collectOpenSpecRuleSources,
   compileOpenSpecRules,
   renderGeneratedRules
@@ -257,7 +258,8 @@ export async function syncOpenSpecArtifacts(options = {}) {
     ? await validateOpenSpecChanges({
       ...options,
       rootDir,
-      changeIds: changes.changeIds
+      changeIds: changes.changeIds,
+      skipNoDeltaChanges: true
     })
     : createSkippedValidationSync('validateOnSync-disabled');
   const legacy = await discoverLegacyPlans({ rootDir });
@@ -721,6 +723,27 @@ async function syncGeneratedRules(options = {}) {
   const changeIds = Array.from(options.changeIds ?? []);
   const results = [];
 
+  if (changeIds.length === 0) {
+    const result = await compileOpenSpecBaseRules({ ...options, rootDir, dryRun });
+
+    return {
+      ok: result.ok,
+      dryRun,
+      baseOnly: true,
+      changeSpecificSkipped: true,
+      results: [result],
+      files: result.files ?? [],
+      warnings: dedupeDiagnostics([
+        ...(result.warnings ?? []),
+        {
+          code: 'no-active-change-specific-rules',
+          message: 'No active OpenSpec changes were selected; refreshed base generated rules only.'
+        }
+      ]),
+      errors: result.errors ?? []
+    };
+  }
+
   for (const changeId of changeIds) {
     if (dryRun) {
       const collected = await collectOpenSpecRuleSources(changeId, { ...options, rootDir });
@@ -767,6 +790,46 @@ async function syncGeneratedRules(options = {}) {
 async function validateOpenSpecChanges(options = {}) {
   const rootDir = resolveRootDir(options);
   const changeIds = Array.from(options.changeIds ?? []);
+
+  if (changeIds.length === 0) {
+    return {
+      ok: true,
+      skipped: true,
+      reason: 'no-selected-changes',
+      detection: null,
+      results: [],
+      skippedChanges: [],
+      warnings: [
+        {
+          code: 'no-selected-changes',
+          message: 'OpenSpec validation skipped because no active changes were selected.'
+        }
+      ],
+      errors: []
+    };
+  }
+
+  const selected = options.skipNoDeltaChanges
+    ? await selectValidatableChanges(rootDir, changeIds)
+    : {
+      changeIds,
+      skippedChanges: [],
+      warnings: []
+    };
+
+  if (selected.changeIds.length === 0) {
+    return {
+      ok: true,
+      skipped: true,
+      reason: 'no-validatable-changes',
+      detection: null,
+      results: [],
+      skippedChanges: selected.skippedChanges,
+      warnings: selected.warnings,
+      errors: []
+    };
+  }
+
   const detection = await detectOpenSpecCapability(rootDir, options);
 
   if (!detection.canValidate) {
@@ -776,7 +839,11 @@ async function validateOpenSpecChanges(options = {}) {
       reason: detection.reason ?? 'openspec-cli-unavailable',
       detection: summarizeOpenSpecDetection(detection),
       results: [],
-      warnings: normalizeDetectionWarnings(detection),
+      skippedChanges: selected.skippedChanges,
+      warnings: dedupeDiagnostics([
+        ...selected.warnings,
+        ...normalizeDetectionWarnings(detection)
+      ]),
       errors: []
     };
   }
@@ -785,7 +852,7 @@ async function validateOpenSpecChanges(options = {}) {
   const getOpenSpecStatus = options.getOpenSpecStatus ?? defaultGetOpenSpecStatus;
   const results = [];
 
-  for (const changeId of changeIds) {
+  for (const changeId of selected.changeIds) {
     const validation = await validateOpenSpecChange(changeId, createRunOptions(rootDir, options));
     const status = validation.ok
       ? await getOpenSpecStatus(changeId, createRunOptions(rootDir, options))
@@ -804,13 +871,43 @@ async function validateOpenSpecChanges(options = {}) {
     skipped: false,
     detection: summarizeOpenSpecDetection(detection),
     results,
-    warnings: [],
+    skippedChanges: selected.skippedChanges,
+    warnings: selected.warnings,
     errors: results
       .filter((result) => !result.ok)
       .map((result) => ({
         code: 'openspec-validation-failed',
         message: `OpenSpec validation/status failed for '${result.changeId}'.`
       }))
+  };
+}
+
+async function selectValidatableChanges(rootDir, changeIds) {
+  const validatable = [];
+  const skippedChanges = [];
+
+  for (const changeId of changeIds) {
+    const specRoot = path.join(rootDir, 'openspec', 'changes', changeId, 'specs');
+    const specFiles = await listSpecFiles(specRoot, rootDir);
+
+    if (specFiles.length === 0) {
+      skippedChanges.push({
+        changeId,
+        reason: 'no-delta-specs'
+      });
+      continue;
+    }
+
+    validatable.push(changeId);
+  }
+
+  return {
+    changeIds: validatable,
+    skippedChanges,
+    warnings: skippedChanges.map((item) => ({
+      code: 'no-delta-specs',
+      message: `OpenSpec validation skipped for '${item.changeId}' because the change has no delta spec files.`
+    }))
   };
 }
 
@@ -1674,6 +1771,8 @@ function renderGeneratedRulesSection(generatedRules) {
     '## Generated Rules',
     '',
     `Files: ${generatedRules.files.length}`,
+    `Base-only sync: ${generatedRules.baseOnly ? 'yes' : 'no'}`,
+    `Change-specific rules skipped: ${generatedRules.changeSpecificSkipped ? 'yes' : 'no'}`,
     ...renderDiagnostics('Warnings', generatedRules.warnings),
     ...renderDiagnostics('Errors', generatedRules.errors)
   ].join('\n');
@@ -1685,6 +1784,7 @@ function renderValidationSection(validation) {
     '',
     `Skipped: ${validation.skipped ? 'yes' : 'no'}`,
     `Results: ${validation.results.length}`,
+    `Skipped changes: ${validation.skippedChanges?.length ?? 0}`,
     ...renderDiagnostics('Warnings', validation.warnings),
     ...renderDiagnostics('Errors', validation.errors)
   ].join('\n');

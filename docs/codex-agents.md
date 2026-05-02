@@ -41,6 +41,58 @@
 - Имена остаются стабильными между manifest, файлами в `agent-files/codex/` и явным spawn-запросом.
 - Prefix сразу показывает, что агент относится к extension contract AIFHub, а не к встроенному generic поведению Codex.
 
+## Agent-assisted OpenSpec workflow
+
+Manual commands remain the source of truth. Agents are bounded helpers.
+
+### Planning
+
+- `/aif-plan full <request>`
+- optional `aifhub-plan-polisher`
+- optional `/aif-improve <change-id>`
+- recommended `/aif-mode sync --change <change-id>`
+
+`aifhub-plan-polisher` may edit canonical OpenSpec change artifacts and must validate touched artifacts through the OpenSpec runner when available.
+
+### Implementation
+
+- `aifhub-implement-worker`
+- writes implementation traces only under `.ai-factory/state/<change-id>/implementation/`
+
+After implementation, optional read-only gates are `/aif-rules-check`, `/aif-review`, and `/aif-security-checklist`. The authoritative final verification remains `/aif-verify <change-id>`.
+
+### Read-only sidecars
+
+Run after code changes and before or during verification:
+
+- `aifhub-rules-sidecar` -> `gate: "rules"`
+- `aifhub-review-sidecar` -> `gate: "review"`
+- `aifhub-security-sidecar` -> `gate: "security"`
+
+All sidecars are read-only and end with final `aif-gate-result`.
+
+### Verification and fix loop
+
+- `aifhub-verifier`
+- if fail: `aifhub-fixer`
+- rerun `aifhub-verifier`
+
+Verifier writes QA evidence under `.ai-factory/qa/<change-id>/`.
+
+### Finalization
+
+- `aifhub-done-finalizer`
+- requires passing verify gate
+- archives only through OpenSpec CLI
+- writes final evidence/summaries
+- recommends `/aif-mode sync`
+- recommends `/aif-commit`
+- does not create commits or PRs automatically
+
+### Optional learning
+
+- `/aif-evolve` after commit/finalization when durable learnings exist.
+
 ## Примеры явного вызова
 
 Используйте те же имена, что записаны в поле `name`:
