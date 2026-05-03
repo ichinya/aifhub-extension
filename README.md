@@ -217,7 +217,7 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 |---|---|
 | [Documentation Index](docs/README.md) | Reading order and docs map |
 | [Usage](docs/usage.md) | Full command flow, read/write boundaries, examples, and troubleshooting |
-| [Context Loading Policy](docs/context-loading-policy.md) | Consumer context, ownership, and legacy boundaries |
+| [Context Loading Policy](docs/context-loading-policy.md) | Consumer context, GitHub-aware roadmap evidence, ownership, and legacy boundaries |
 | [OpenSpec Compatibility](docs/openspec-compatibility.md) | Optional CLI adapter policy and capability flags |
 | [Legacy Plan Migration](docs/legacy-plan-migration.md) | Explicit migration from legacy plans to OpenSpec-native changes |
 | [Active Change Resolver](docs/active-change-resolver.md) | Active change selection and runtime paths |

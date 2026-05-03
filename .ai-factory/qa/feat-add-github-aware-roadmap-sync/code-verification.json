@@ -1,0 +1,75 @@
+{
+  "changeId": "feat-add-github-aware-roadmap-sync",
+  "mode": "OpenSpec-native mode",
+  "verifyMode": "strict",
+  "verdict": "PASS-with-notes",
+  "blockingFindings": 0,
+  "warnings": [
+    {
+      "id": "roadmap-context-drift",
+      "severity": "warning",
+      "file": ".ai-factory/ROADMAP.md",
+      "summary": "Existing roadmap context is stale relative to current verification evidence; owner command is /aif-roadmap check."
+    },
+    {
+      "id": "line-ending-normalization-note",
+      "severity": "note",
+      "file": "injections/core/aif-roadmap-maturity-audit.md",
+      "summary": "git diff --check reported no whitespace errors, only a CRLF-to-LF normalization warning from Git."
+    }
+  ],
+  "commands": [
+    {
+      "command": "buildVerificationContext({ changeId })",
+      "status": "pass",
+      "summary": "OpenSpec validation/status evidence written; shouldRunCodeVerification=true."
+    },
+    {
+      "command": "node --test scripts/openspec-prompt-assets.test.mjs",
+      "status": "pass",
+      "summary": "18 tests passed."
+    },
+    {
+      "command": "npm run validate",
+      "status": "pass",
+      "summary": "Manifest, agent files, and docs link validation passed."
+    },
+    {
+      "command": "npm test",
+      "status": "pass",
+      "summary": "244 tests passed."
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "summary": "No whitespace errors; non-blocking CRLF/LF warning for roadmap injection."
+    },
+    {
+      "command": "rg unfinished markers/env refs in changed files",
+      "status": "pass",
+      "summary": "No TODO/FIXME/HACK/PLACEHOLDER/debug/env-var matches in changed files."
+    }
+  ],
+  "taskCompletion": {
+    "complete": 11,
+    "total": 11,
+    "note": "Commit Plan checkboxes were intentionally not marked; commit creation is outside /aif-verify ownership."
+  },
+  "contextGates": [
+    {
+      "gate": "Architecture",
+      "status": "PASS",
+      "summary": "Changes stay in prompt assets, references, docs, tests, and QA evidence; no runtime writes under canonical OpenSpec paths."
+    },
+    {
+      "gate": "Rules",
+      "status": "PASS",
+      "summary": "Project rules and ownership boundaries are respected; no bridge files or unrelated context writes were introduced."
+    },
+    {
+      "gate": "Roadmap",
+      "status": "WARN",
+      "summary": "Existing roadmap artifact is stale and has no direct milestone linkage for this feat; no contradiction with roadmap direction was found."
+    }
+  ]
+}

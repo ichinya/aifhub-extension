@@ -10,7 +10,9 @@ const REPO_ROOT = resolve(__dirname, '..');
 
 const EXPLICIT_REFERENCE_ASSETS = [
   'skills/aif-analyze/references/config-template.yaml',
-  'skills/aif-done/references/finalization-contract.md'
+  'skills/aif-done/references/finalization-contract.md',
+  'injections/references/aif-roadmap/roadmap-template.md',
+  'injections/references/aif-roadmap/slice-checklist.md'
 ];
 
 const MODE_GATED_PROMPTS = [
@@ -52,6 +54,13 @@ const SIDECAR_PROMPT_ASSETS = [
   ['agent-files/claude/aifhub-review-sidecar.md', 'review'],
   ['agent-files/codex/aifhub-security-sidecar.toml', 'security'],
   ['agent-files/claude/aifhub-security-sidecar.md', 'security']
+];
+
+const ROADMAP_PROMPT_ASSET = 'injections/core/aif-roadmap-maturity-audit.md';
+
+const ROADMAP_REFERENCE_ASSETS = [
+  'injections/references/aif-roadmap/roadmap-template.md',
+  'injections/references/aif-roadmap/slice-checklist.md'
 ];
 
 const CANONICAL_CHANGE_FILES = [
@@ -197,6 +206,8 @@ describe('OpenSpec-native prompt asset contract', () => {
       'skills/aif-analyze/SKILL.md',
       'skills/aif-done/SKILL.md',
       'injections/core/aif-rules-check-openspec-generated-rules.md',
+      ROADMAP_PROMPT_ASSET,
+      ...ROADMAP_REFERENCE_ASSETS,
       'injections/core/aif-implement-plan-folder.md',
       'agent-files/codex/aifhub-verifier.toml',
       'agent-files/claude/aifhub-verifier.md'
@@ -506,6 +517,56 @@ describe('OpenSpec-native prompt asset contract', () => {
     for (const [relativePath, gate] of SIDECAR_PROMPT_ASSETS) {
       const asset = await readRepoFile(relativePath);
       assertIncludes(asset, `"gate": "${gate}"`, relativePath);
+    }
+  });
+
+  it('defines GitHub-aware roadmap evidence as supporting and non-blocking', async () => {
+    const asset = stripFencedBlocks(await readRepoFile(ROADMAP_PROMPT_ASSET));
+
+    for (const expected of [
+      'GitHub-aware evidence',
+      'milestones',
+      'open and closed issues',
+      'open, merged, and closed PRs',
+      'labels',
+      'linked branches',
+      'current git tree',
+      'supporting evidence only',
+      'must never be the sole reason to mark a slice or roadmap item `done`',
+      'GitHub evidence was used, unavailable, or partially available'
+    ]) {
+      assertIncludes(asset, expected, ROADMAP_PROMPT_ASSET);
+    }
+  });
+
+  it('keeps GitHub-aware roadmap output owner-bounded and credential-safe', async () => {
+    const asset = stripFencedBlocks(await readRepoFile(ROADMAP_PROMPT_ASSET));
+
+    for (const expected of [
+      'must not mutate GitHub issues, milestones, PRs, labels, or linked branches',
+      'must not write tokens',
+      'authorization headers',
+      'raw credential helper output',
+      'private authentication diagnostics',
+      'GitHub says done, but local evidence is missing',
+      'local implementation exists, but GitHub is stale',
+      'OpenSpec change exists, but no linked roadmap/milestone/issue is visible'
+    ]) {
+      assertIncludes(asset, expected, ROADMAP_PROMPT_ASSET);
+    }
+  });
+
+  it('keeps roadmap references ready for optional GitHub links without requiring them everywhere', async () => {
+    for (const relativePath of ROADMAP_REFERENCE_ASSETS) {
+      const asset = stripFencedBlocks(await readRepoFile(relativePath));
+
+      for (const expected of [
+        'GitHub evidence',
+        'GitHub links are optional',
+        'local artifact evidence remains required'
+      ]) {
+        assertIncludes(asset, expected, relativePath);
+      }
     }
   });
 

@@ -71,12 +71,26 @@ Generated rules are derived guidance only. If generated rules conflict with cano
 
 Runner output from OpenSpec CLI commands is runtime guidance or evidence. It does not replace the canonical filesystem artifacts under `openspec/`.
 
+## GitHub-Aware Roadmap Context
+
+`/aif-roadmap` may additionally read GitHub and git-tracker context when available:
+
+- GitHub milestones, issues, PRs, labels, and linked branches
+- current git tree, changed files, tags, and recent commits
+
+This context is supporting evidence only. Closed GitHub issues, completed milestones, and merged PRs do not by themselves make roadmap items `done`; local evidence from OpenSpec artifacts, source files, tests, CI, runtime state, QA evidence, or generated rules remains required.
+
+GitHub access is non-blocking. If `gh`, connector data, network access, authentication, or rate limits prevent complete GitHub evidence loading, `/aif-roadmap` should continue from local evidence and summarize whether GitHub evidence was unavailable or partial.
+
+`/aif-roadmap` may update only the configured roadmap artifact. It must not mutate GitHub issues, milestones, PRs, labels, linked branches, canonical OpenSpec artifacts, runtime state, QA evidence, generated rules, or implementation files. It must not write tokens, authorization headers, raw credential helper output, or private authentication diagnostics into roadmap output.
+
 ## Command Ownership
 
 | Command | May write canonical OpenSpec artifacts | May write runtime or QA artifacts |
 |---|---|---|
 | `/aif-mode` | skeleton only; never manual `openspec/specs/**` mutations | mode reports, generated rules, optional migration/export outputs |
 | `/aif-analyze` | Optional `openspec/` skeleton only when configured | capability/config setup |
+| `/aif-roadmap` | no | no |
 | `/aif-plan full` | `openspec/changes/<change-id>/proposal.md`, `design.md`, `tasks.md`, `specs/**/spec.md` | optional `.ai-factory/state/<change-id>/` |
 | `/aif-explore` | no | `.ai-factory/RESEARCH.md`, `.ai-factory/state/<change-id>/` |
 | `/aif-improve` | `proposal.md`, `design.md`, `tasks.md`, `specs/**/spec.md` | optional `.ai-factory/state/<change-id>/` |
@@ -89,6 +103,8 @@ Runner output from OpenSpec CLI commands is runtime guidance or evidence. It doe
 | `/aif-done` | `openspec/specs/**` only through OpenSpec CLI archive | `.ai-factory/qa/<change-id>/`, `.ai-factory/state/<change-id>/final-summary.md` |
 | `/aif-commit` | no | git commit only |
 | `/aif-evolve` | no | skill-context or evolution artifacts only |
+
+`/aif-roadmap` writes only the configured roadmap artifact, `.ai-factory/ROADMAP.md` by default.
 
 ## Quality Gates and Finalization Tail
 
