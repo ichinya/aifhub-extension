@@ -16,7 +16,7 @@ OpenSpec CLI features are reached through AIFHub wrappers and `scripts/openspec-
 
 1. [Project README](../README.md) for the landing page, quick start, artifact layout, compatibility summary, migration summary, and troubleshooting summary.
 2. [Usage](usage.md) for the full command flow, `/aif-mode` switching and sync, rules/review/security gates, verification/fix/finalization tail, commit/evolve handoff, OAuth example, troubleshooting, and smoke checks.
-3. [Context Loading Policy](context-loading-policy.md) for consumer context, ownership boundaries, generated rules, quality gates, commit handoff, and legacy path rules.
+3. [Context Loading Policy](context-loading-policy.md) for consumer context, GitHub-aware roadmap evidence, ownership boundaries, generated rules, quality gates, commit handoff, and legacy path rules.
 4. [OpenSpec Compatibility](openspec-compatibility.md) for optional CLI adapter support, artifact sync points, rules gate behavior, Node requirements, capability flags, and degraded mode.
 5. [Legacy Plan Migration](legacy-plan-migration.md) if existing `.ai-factory/plans` artifacts need to move into OpenSpec-native changes.
 6. [Active Change Resolver](active-change-resolver.md) for active change selection, runtime paths, current pointer behavior, and ambiguity diagnostics.
@@ -35,7 +35,7 @@ The remaining runtime-specific guides are supporting references:
 | Guide | Purpose |
 |---|---|
 | [Usage](usage.md) | Full OpenSpec-native command flow, gates, finalization tail, commit, and examples |
-| [Context Loading Policy](context-loading-policy.md) | Runtime context, ownership, gates, commit handoff, and legacy boundaries |
+| [Context Loading Policy](context-loading-policy.md) | Runtime context, GitHub-aware roadmap evidence, ownership, gates, commit handoff, and legacy boundaries |
 | [OpenSpec Compatibility](openspec-compatibility.md) | CLI adapter policy, sync points, rules gate, version support, and degraded mode |
 | [Legacy Plan Migration](legacy-plan-migration.md) | Explicit migration commands and artifact mapping |
 | [Active Change Resolver](active-change-resolver.md) | Active change selection and runtime paths |

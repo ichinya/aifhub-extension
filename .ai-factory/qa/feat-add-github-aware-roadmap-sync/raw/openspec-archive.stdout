@@ -1,0 +1,13 @@
+
+Proposal warnings in proposal.md (non-blocking):
+  ⚠ Change must have a Why section. Missing required sections. Expected headers: "## Why" and "## What Changes". Ensure deltas are documented in specs/ using delta headers.
+Task status: 11/14 tasks
+Warning: 3 incomplete task(s) found. Continuing due to --yes flag.
+
+Specs to update:
+  roadmap-github-sync: create
+Applying changes to openspec/specs/roadmap-github-sync/spec.md:
+  + 6 added
+Totals: + 6, ~ 0, - 0, → 0
+Specs updated successfully.
+Change 'feat-add-github-aware-roadmap-sync' archived as '2026-05-03-feat-add-github-aware-roadmap-sync'.

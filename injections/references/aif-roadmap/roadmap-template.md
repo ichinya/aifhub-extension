@@ -18,6 +18,8 @@ Create `.ai-factory/ROADMAP.md` with this structure:
 **Evidence:**
 - [File or pattern found]
 
+**GitHub evidence:** [optional milestone/issue/PR links or "not available"]
+
 **Commentary:**
 - [Assessment]
 
@@ -59,3 +61,7 @@ Create `.ai-factory/ROADMAP.md` with this structure:
 - Preserve valid manual notes when updating an existing roadmap.
 - In check mode, mention slices whose status changed and explain why.
 - Make next steps concrete enough to become implementation tasks later.
+- GitHub evidence may include milestones, issues, PRs, labels, linked branches, and current git tree state when available.
+- GitHub links are optional; do not require them for every roadmap entry.
+- local artifact evidence remains required for `done` status decisions.
+- Do not include tokens, authorization headers, raw credential helper output, or private authentication diagnostics.

@@ -34,6 +34,32 @@ Use these as evidence only. `/aif-roadmap` must not write runtime state, QA evid
 
 When OpenSpec-native evidence is used, summarize the artifact source set in the normal response.
 
+### GitHub-aware evidence
+
+When GitHub context is available, `/aif-roadmap` may read GitHub-aware evidence as supporting evidence only:
+
+- milestones
+- open and closed issues
+- open, merged, and closed PRs
+- labels
+- linked branches
+- current git tree, changed files, tags, and recent commits
+
+GitHub context may come from `gh`, a GitHub connector, explicit issue/PR URLs, or caller-provided metadata. GitHub access is optional and non-blocking. If GitHub data is missing, unauthenticated, rate-limited, offline, or only partially available, continue from local repository evidence and summarize whether GitHub evidence was used, unavailable, or partially available.
+
+GitHub state must never replace local proof. A closed issue, completed milestone, or merged PR must never be the sole reason to mark a slice or roadmap item `done`; require local evidence from OpenSpec artifacts, source files, tests, CI, runtime state, QA evidence, generated rules, or other repository artifacts.
+
+Detect and report drift when material:
+
+- GitHub says done, but local evidence is missing
+- local implementation exists, but GitHub is stale
+- OpenSpec change exists, but no linked roadmap/milestone/issue is visible
+- merged PR exists, but current git tree does not contain the expected local evidence
+
+GitHub-aware roadmap output must be credential-safe. It may include public or user-provided identifiers such as issue numbers, PR numbers, milestone names, titles, states, and URLs. It must not write tokens, authorization headers, raw credential helper output, or private authentication diagnostics into `.ai-factory/ROADMAP.md` or normal responses.
+
+`/aif-roadmap` is read-only with respect to GitHub: it must not mutate GitHub issues, milestones, PRs, labels, or linked branches. It must also not write runtime state, QA evidence, generated rules, canonical OpenSpec artifacts, or implementation files.
+
 ### Legacy AI Factory-only evidence
 
 When OpenSpec-native mode is not enabled, legacy `.ai-factory/plans/<plan-id>/` and `.ai-factory/specs/<plan-id>/` records may be used as historical roadmap evidence.
@@ -69,7 +95,7 @@ Evidence priority is strict:
 
 - Primary evidence: source code, config files, schemas, tests, pipelines, automation definitions.
 - Secondary evidence: project documentation only when it matches the repository state.
-- Git history is supporting context only and must never be the sole reason to mark a slice `done`.
+- Git history and GitHub state are supporting context only and must never be the sole reason to mark a slice `done`.
 
 ### Output Rules
 
@@ -77,6 +103,7 @@ Evidence priority is strict:
 - Preserve manual notes that still match the codebase.
 - Treat the roadmap as an audit artifact, not as a generic task list.
 - In check mode, call out regressions explicitly.
+- Link to GitHub milestones, issues, or PRs where useful, but keep local artifact evidence as the basis for status decisions.
 - Summarize strongest areas, critical gaps, and any status changes.
 
 ### Reference Assets

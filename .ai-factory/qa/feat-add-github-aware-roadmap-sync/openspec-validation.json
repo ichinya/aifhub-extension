@@ -1,0 +1,51 @@
+{
+  "changeId": "feat-add-github-aware-roadmap-sync",
+  "command": "openspec",
+  "args": [
+    "validate",
+    "feat-add-github-aware-roadmap-sync",
+    "--type",
+    "change",
+    "--strict",
+    "--json",
+    "--no-interactive",
+    "--no-color"
+  ],
+  "exitCode": 0,
+  "ok": true,
+  "skipped": false,
+  "reason": null,
+  "message": null,
+  "parsedJson": {
+    "items": [
+      {
+        "id": "feat-add-github-aware-roadmap-sync",
+        "type": "change",
+        "valid": true,
+        "issues": [],
+        "durationMs": 2
+      }
+    ],
+    "summary": {
+      "totals": {
+        "items": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      "byType": {
+        "change": {
+          "items": 1,
+          "passed": 1,
+          "failed": 0
+        }
+      }
+    },
+    "version": "1.0"
+  },
+  "jsonParseError": null,
+  "rawStdoutPath": ".ai-factory/qa/feat-add-github-aware-roadmap-sync/raw/openspec-validate.stdout",
+  "rawStderrPath": ".ai-factory/qa/feat-add-github-aware-roadmap-sync/raw/openspec-validate.stderr",
+  "stdout": "{\n  \"items\": [\n    {\n      \"id\": \"feat-add-github-aware-roadmap-sync\",\n      \"type\": \"change\",\n      \"valid\": true,\n      \"issues\": [],\n      \"durationMs\": 2\n    }\n  ],\n  \"summary\": {\n    \"totals\": {\n      \"items\": 1,\n      \"passed\": 1,\n      \"failed\": 0\n    },\n    \"byType\": {\n      \"change\": {\n        \"items\": 1,\n        \"passed\": 1,\n        \"failed\": 0\n      }\n    }\n  },\n  \"version\": \"1.0\"\n}\n",
+  "stderr": "",
+  "error": null
+}

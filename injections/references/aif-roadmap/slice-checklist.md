@@ -75,5 +75,11 @@ Mark a slice `done` only when the repository shows comprehensive evidence. When 
 ## Evidence Notes
 
 - Use git history only as supporting context.
+- Use GitHub evidence only as supporting context. GitHub evidence may include milestones, issues, PRs, labels, linked branches, and current git tree state when available.
+- GitHub links are optional; do not require them for every slice or roadmap entry.
 - Prefer direct file paths, configs, tests, and automation definitions as evidence.
+- local artifact evidence remains required before marking a slice or roadmap item `done`.
+- If GitHub says work is complete but local evidence is missing, report drift instead of marking `done`.
+- If local implementation exists but GitHub or roadmap linkage is stale, report drift instead of discarding local evidence.
+- Do not include tokens, authorization headers, raw credential helper output, or private authentication diagnostics.
 - If a slice is unclear, explain what is missing instead of guessing.

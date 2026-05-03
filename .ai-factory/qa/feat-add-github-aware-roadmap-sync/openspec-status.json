@@ -1,0 +1,52 @@
+{
+  "changeId": "feat-add-github-aware-roadmap-sync",
+  "command": "openspec",
+  "args": [
+    "status",
+    "--change",
+    "feat-add-github-aware-roadmap-sync",
+    "--json",
+    "--no-color"
+  ],
+  "exitCode": 0,
+  "ok": true,
+  "skipped": false,
+  "reason": null,
+  "message": null,
+  "parsedJson": {
+    "changeName": "feat-add-github-aware-roadmap-sync",
+    "schemaName": "spec-driven",
+    "isComplete": true,
+    "applyRequires": [
+      "tasks"
+    ],
+    "artifacts": [
+      {
+        "id": "proposal",
+        "outputPath": "proposal.md",
+        "status": "done"
+      },
+      {
+        "id": "design",
+        "outputPath": "design.md",
+        "status": "done"
+      },
+      {
+        "id": "specs",
+        "outputPath": "specs/**/*.md",
+        "status": "done"
+      },
+      {
+        "id": "tasks",
+        "outputPath": "tasks.md",
+        "status": "done"
+      }
+    ]
+  },
+  "jsonParseError": null,
+  "rawStdoutPath": ".ai-factory/qa/feat-add-github-aware-roadmap-sync/raw/openspec-status.stdout",
+  "rawStderrPath": ".ai-factory/qa/feat-add-github-aware-roadmap-sync/raw/openspec-status.stderr",
+  "stdout": "{\n  \"changeName\": \"feat-add-github-aware-roadmap-sync\",\n  \"schemaName\": \"spec-driven\",\n  \"isComplete\": true,\n  \"applyRequires\": [\n    \"tasks\"\n  ],\n  \"artifacts\": [\n    {\n      \"id\": \"proposal\",\n      \"outputPath\": \"proposal.md\",\n      \"status\": \"done\"\n    },\n    {\n      \"id\": \"design\",\n      \"outputPath\": \"design.md\",\n      \"status\": \"done\"\n    },\n    {\n      \"id\": \"specs\",\n      \"outputPath\": \"specs/**/*.md\",\n      \"status\": \"done\"\n    },\n    {\n      \"id\": \"tasks\",\n      \"outputPath\": \"tasks.md\",\n      \"status\": \"done\"\n    }\n  ]\n}\n",
+  "stderr": "",
+  "error": null
+}

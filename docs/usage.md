@@ -183,6 +183,34 @@ Does not write:
 
 Exploration is research-only until promoted into canonical OpenSpec artifacts by planning or refinement.
 
+### `/aif-roadmap`
+
+Reads:
+
+- `.ai-factory/config.yaml`
+- project context and rules
+- current `.ai-factory/ROADMAP.md`
+- OpenSpec-native evidence under `openspec/specs/**` and `openspec/changes/**`
+- local source, tests, CI, runtime state, QA evidence, and generated rules when relevant
+- optional GitHub milestones, issues, PRs, labels, and linked branches when available
+- current git tree, changed files, tags, and recent commits when available
+
+Writes:
+
+- configured roadmap artifact, `.ai-factory/ROADMAP.md` by default
+
+Does not write:
+
+- GitHub issues, milestones, PRs, labels, or linked branches
+- `openspec/changes/**`
+- `openspec/specs/**`
+- `.ai-factory/state/<change-id>/`
+- `.ai-factory/qa/<change-id>/`
+- `.ai-factory/rules/generated/**`
+- implementation source files
+
+GitHub state is supporting evidence only. Closed issues, completed milestones, and merged PRs are useful signals, but local artifact evidence remains required before marking roadmap items `done`. If GitHub evidence is unavailable, unauthenticated, rate-limited, offline, or partial, `/aif-roadmap` continues from local evidence and summarizes the limitation without writing credentials or private authentication diagnostics.
+
 ### `/aif-improve`
 
 Reads:
