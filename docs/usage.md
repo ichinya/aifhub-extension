@@ -105,6 +105,8 @@ Use `--dry-run` for planned switching or sync writes. Use `--all` or `--change <
 
 `/aif-mode sync --all` is a maintenance sweep. It refreshes generated rules for active changes, validates only selected changes that contain `openspec/changes/<change-id>/specs/**/spec.md` delta specs, and reports selected no-delta changes as `no-delta-specs` warnings instead of failing solely because old or docs-only active changes have no delta specs. `/aif-verify <change-id>` remains the stricter verification gate for a specific change.
 
+For CLI or IDE runtimes, planning commands may recommend an available planning mode for structured questions, but they must not fabricate unavailable tools or client actions. Codex mode switching remains a user action; see [Codex Plan Mode](codex-plan-mode.md).
+
 ### `/aif-analyze`
 
 Reads:
@@ -246,6 +248,14 @@ Reads:
 - `openspec/specs/**/spec.md`
 - `.ai-factory/rules/generated/*.md` when present
 - optional OpenSpec `instructions apply` output when `aifhub.openspec.useInstructionsApply` is enabled and a compatible CLI is available
+
+Runtime todo behavior:
+
+- `openspec/changes/<change-id>/tasks.md` is the canonical implementation checklist.
+- When the runtime exposes a todo or plan tool, `/aif-implement` mirrors checkbox tasks into runtime todo state before editing.
+- In Codex this uses `update_plan` when available.
+- If no todo tool is available, `/aif-implement` reports a task snapshot as a capability fallback and continues from `tasks.md`.
+- Runtime todo hydration does not authorize broad task expansion; execution remains one task or one tightly coupled task group.
 
 Writes:
 
@@ -572,6 +582,8 @@ Codex cannot switch modes from extension prompts. The user controls the mode man
 ```
 
 In Codex Default mode, prompts must ask plain-text questions rather than using `request_user_input`.
+
+When implementation starts, Codex should hydrate runtime todo state from the selected OpenSpec `tasks.md` checklist with `update_plan` when available. If no todo tool is available, it should show a task snapshot and continue from canonical `tasks.md`.
 
 See [Codex Plan Mode](codex-plan-mode.md) for question-format guidance.
 

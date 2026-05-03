@@ -30,6 +30,8 @@ exit plan mode
 /aif-verify
 ```
 
+During `/aif-implement`, the OpenSpec `tasks.md` checklist remains canonical. Codex should mirror that checklist into runtime todo state with `update_plan` when available; otherwise it should show a task snapshot and continue from `tasks.md`.
+
 ## Question Format by Mode
 
 ### Default Mode
@@ -90,6 +92,7 @@ The extension prompts (`injections/core/aif-*-plan-folder.md`) include Codex run
 - Does not attempt or promise to switch the session mode.
 - Falls back to plain-text questions in Default mode and does not require `question(...)` or `questionnaire(...)` in Codex.
 - Avoids interactive questions in subagent context.
+- Hydrates `/aif-implement` runtime todo state from OpenSpec `tasks.md` when a todo or plan tool is available, or reports a task snapshot capability fallback.
 
 This means the issue of automatic mode switching is **documented + prompt-safe**, not implemented as client automation.
 

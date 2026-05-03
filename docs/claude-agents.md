@@ -9,7 +9,7 @@
 | `name` | Назначение | `tools` | `permissionMode` | Write boundary |
 |-------|------------|---------|-------------------|----------------|
 | `aifhub-plan-polisher` | Bounded worker для полировки одного активного плана или OpenSpec change artifacts | Read, Write, Edit, Glob, Grep, Bash | `acceptEdits` | Только active OpenSpec change artifacts in OpenSpec-native mode or active plan pair in legacy mode; без правок source code |
-| `aifhub-implement-worker` | Bounded worker для выполнения одной plan task или тесно связанной группы задач | Read, Write, Edit, Glob, Grep, Bash | `acceptEdits` | Только execution scope выбранной задачи and OpenSpec runtime state or legacy task metadata; без commit/push |
+| `aifhub-implement-worker` | Bounded worker для выполнения одной plan task или тесно связанной группы задач; mirrors OpenSpec `tasks.md` into runtime todo state when available | Read, Write, Edit, Glob, Grep, Bash | `acceptEdits` | Только execution scope выбранной задачи and OpenSpec runtime state or legacy task metadata; без commit/push |
 | `aifhub-review-sidecar` | Read-only sidecar для review changed scope с findings-first выводом | Read, Glob, Grep | `dontAsk` | Не пишет файлы |
 | `aifhub-security-sidecar` | Read-only sidecar для security-аудита changed scope | Read, Glob, Grep | `dontAsk` | Не пишет файлы |
 | `aifhub-verifier` | Low-write verifier для OpenSpec change or legacy plan pair и changed scope с gate result | Read, Write, Edit, Glob, Grep, Bash | `acceptEdits` | Только `.ai-factory/qa/<change-id>/` in OpenSpec-native mode or `status.yaml`/`verify.md` for validated legacy plan pair |
@@ -62,6 +62,8 @@ Manual commands remain the source of truth. Agents are bounded helpers.
 ### Implementation
 
 - `aifhub-implement-worker`
+- reads canonical `tasks.md` and hydrates runtime todo state with the available runtime task or todo mechanism; in Codex this corresponds to `update_plan`
+- reports a task snapshot as a capability fallback when direct todo access is unavailable
 - writes implementation traces only under `.ai-factory/state/<change-id>/implementation/`
 
 After implementation, optional read-only gates are `/aif-rules-check`, `/aif-review`, and `/aif-security-checklist`. The authoritative final verification remains `/aif-verify <change-id>`.

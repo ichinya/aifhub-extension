@@ -79,5 +79,6 @@ When running in Codex app/CLI:
 - This skill may recommend Plan mode, but it does not attempt or promise to switch the Codex session mode. The user controls the mode.
 - In Codex Plan mode, use `request_user_input` only for 1-3 short questions.
 - In Codex Default mode, if a question is needed, ask it as plain text in the assistant message. Do not use `question(...)`, `questionnaire(...)`, or `request_user_input`.
+- If another CLI or IDE runtime exposes a planning mode, use that available planning-mode mechanism for structured planning questions; do not fabricate unavailable tools or client actions.
 - In autonomous or subagent mode, do not ask interactive questions. Record assumptions and return blockers/open questions to the parent.
 - See `skills/shared/QUESTION-TOOL.md` for the full runtime question format mapping.

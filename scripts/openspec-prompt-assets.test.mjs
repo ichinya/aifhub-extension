@@ -35,6 +35,12 @@ const IMPLEMENT_PROMPT_ASSETS = [
   'agent-files/claude/aifhub-implement-worker.md'
 ];
 
+const PLANNING_RUNTIME_PROMPT_ASSETS = [
+  'injections/core/aif-explore-plan-folder.md',
+  'injections/core/aif-plan-plan-folder.md',
+  'injections/core/aif-improve-plan-folder.md'
+];
+
 const PLAN_POLISHER_PROMPT_ASSETS = [
   'agent-files/codex/aifhub-plan-polisher.toml',
   'agent-files/claude/aifhub-plan-polisher.md'
@@ -510,6 +516,52 @@ describe('OpenSpec-native prompt asset contract', () => {
         /authoritative final verification remains `?\/aif-verify <change-id>`?|\/aif-verify <change-id>.*authoritative final verification/i,
         `${relativePath} should keep /aif-verify as authoritative final verification`
       );
+    }
+  });
+
+  it('keeps planning-mode guidance capability-gated across active planning prompts', async () => {
+    for (const relativePath of PLANNING_RUNTIME_PROMPT_ASSETS) {
+      const asset = stripFencedBlocks(await readRepoFile(relativePath));
+
+      for (const expected of [
+        'skills/shared/QUESTION-TOOL.md',
+        'CLI or IDE runtime exposes a planning mode',
+        'do not fabricate unavailable tools or client actions',
+        'user controls the mode'
+      ]) {
+        assertIncludes(asset, expected, relativePath);
+      }
+    }
+  });
+
+  it('requires implement prompts to hydrate runtime todo state from OpenSpec tasks', async () => {
+    for (const relativePath of IMPLEMENT_PROMPT_ASSETS) {
+      const asset = stripFencedBlocks(await readRepoFile(relativePath));
+
+      for (const expected of [
+        'openspec/changes/<change-id>/tasks.md',
+        'runtime todo',
+        'update_plan',
+        'task snapshot',
+        'capability fallback',
+        'does not authorize broad task expansion'
+      ]) {
+        assertIncludes(asset, expected, relativePath);
+      }
+    }
+  });
+
+  it('documents Codex and Claude implement-worker todo hydration behavior', async () => {
+    for (const relativePath of [
+      'docs/codex-plan-mode.md',
+      'docs/usage.md',
+      'docs/codex-agents.md',
+      'docs/claude-agents.md'
+    ]) {
+      const asset = stripFencedBlocks(await readRepoFile(relativePath));
+
+      assertIncludes(asset, 'tasks.md', relativePath);
+      assertIncludes(asset, 'runtime todo', relativePath);
     }
   });
 

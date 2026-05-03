@@ -219,4 +219,22 @@ describe('aif-explore and aif-improve OpenSpec-native contracts', () => {
       assertNoInstallGuidance(openspec, `${relativePath} OpenSpec-native section`);
     }
   });
+
+  it('keeps Codex and IDE planning-mode guidance capability-gated', async () => {
+    for (const relativePath of [
+      'injections/core/aif-explore-plan-folder.md',
+      'injections/core/aif-improve-plan-folder.md'
+    ]) {
+      const injection = await readRepoFile(relativePath);
+
+      for (const expected of [
+        'skills/shared/QUESTION-TOOL.md',
+        'CLI or IDE runtime exposes a planning mode',
+        'do not fabricate unavailable tools or client actions',
+        'user controls the mode'
+      ]) {
+        assertIncludes(injection, expected, relativePath);
+      }
+    }
+  });
 });

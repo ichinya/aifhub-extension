@@ -54,6 +54,15 @@ Read canonical OpenSpec artifacts before editing implementation files:
 - `openspec/changes/<change-id>/tasks.md`
 - `openspec/changes/<change-id>/specs/**/spec.md`
 
+Hydrate runtime todo state from canonical OpenSpec tasks before editing implementation files:
+
+- Treat `openspec/changes/<change-id>/tasks.md` as the source checklist.
+- If the current runtime exposes a todo or plan tool, use it before editing. In Codex, use `update_plan` when available.
+- Map checked tasks to `completed`, mark the selected unfinished task or tightly coupled task group as `in_progress`, and leave other unfinished tasks as `pending`.
+- If no todo or plan tool is available, report a concise task snapshot in the normal response and continue from canonical `tasks.md`.
+- Report missing todo-tool support as a capability fallback, not as an implementation failure.
+- Hydrating runtime todo state does not authorize broad task expansion; `/aif-implement` still executes one task or one tightly coupled task group.
+
 Read generated rules as derived implementation guidance when present:
 
 - `.ai-factory/rules/generated/openspec-merged-<change-id>.md`
@@ -75,6 +84,7 @@ Normal implementation responses should report:
 - generated rules freshness or missing/stale `WARN`;
 - runtime state path under `.ai-factory/state/<change-id>/`;
 - task progress from the OpenSpec `tasks.md`;
+- runtime todo hydration summary or task snapshot capability fallback;
 - next step `/aif-verify <change-id>` when implementation is ready.
 
 After implementation, optional read-only gates are:

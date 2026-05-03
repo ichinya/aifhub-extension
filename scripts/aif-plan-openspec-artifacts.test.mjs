@@ -142,6 +142,19 @@ describe('aif-plan OpenSpec-native planning contract', () => {
     }
   });
 
+  it('keeps Codex and IDE planning-mode guidance capability-gated', async () => {
+    const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
+
+    for (const expected of [
+      'skills/shared/QUESTION-TOOL.md',
+      'CLI or IDE runtime exposes a planning mode',
+      'do not fabricate unavailable tools or client actions',
+      'user controls the mode'
+    ]) {
+      assertIncludes(injection, expected, 'aif-plan injection');
+    }
+  });
+
   it('keeps compatibility docs aligned with OpenSpec-native planning support', async () => {
     const compatibility = await readRepoFile('docs/openspec-compatibility.md');
 

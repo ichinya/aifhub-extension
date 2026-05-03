@@ -6,7 +6,7 @@ Generated files are derived guidance and are safe to delete, overwrite, and rege
 
 ## Source Fingerprints
 - sha256:6a509c016b59f5c1b54a24042dfd1fd472ea4881e3ac8616a2a5ea28fbcceb19 openspec/specs/openspec-cli-runner/spec.md
-- sha256:5fcee1859c0ff8e16b41f8d472f693c2ffc23cee8b82e1e8d71e106f28840d43 openspec/specs/roadmap-github-sync/spec.md
+- sha256:1cc7f234241c4ea99a560d7e24bda5cfbcaddfe8a90a2d09f4e56f608d005f64 openspec/specs/roadmap-github-sync/spec.md
 
 ## Requirements
 
@@ -38,7 +38,7 @@ Source:
 - Capability: roadmap-github-sync
 - Change: none
 - Section: Requirements
-- Fingerprint: sha256:5fcee1859c0ff8e16b41f8d472f693c2ffc23cee8b82e1e8d71e106f28840d43
+- Fingerprint: sha256:1cc7f234241c4ea99a560d7e24bda5cfbcaddfe8a90a2d09f4e56f608d005f64
 
 `/aif-roadmap` MUST treat GitHub issue and PR state as supporting evidence only. A closed issue, completed milestone, or merged PR MUST NOT be the sole reason to mark a roadmap slice or roadmap item `done`.
 
@@ -64,7 +64,7 @@ Source:
 - Capability: roadmap-github-sync
 - Change: none
 - Section: Requirements
-- Fingerprint: sha256:5fcee1859c0ff8e16b41f8d472f693c2ffc23cee8b82e1e8d71e106f28840d43
+- Fingerprint: sha256:1cc7f234241c4ea99a560d7e24bda5cfbcaddfe8a90a2d09f4e56f608d005f64
 
 `/aif-roadmap` MUST call out material drift between GitHub tracker state and local canonical evidence.
 
@@ -95,7 +95,7 @@ Source:
 - Capability: roadmap-github-sync
 - Change: none
 - Section: Requirements
-- Fingerprint: sha256:5fcee1859c0ff8e16b41f8d472f693c2ffc23cee8b82e1e8d71e106f28840d43
+- Fingerprint: sha256:1cc7f234241c4ea99a560d7e24bda5cfbcaddfe8a90a2d09f4e56f608d005f64
 
 `/aif-roadmap` MUST keep GitHub evidence collection non-blocking and MUST NOT write tokens, authorization headers, raw credential helper output, or private authentication diagnostics into `.ai-factory/ROADMAP.md`.
 
@@ -119,7 +119,7 @@ Source:
 - Capability: roadmap-github-sync
 - Change: none
 - Section: Requirements
-- Fingerprint: sha256:5fcee1859c0ff8e16b41f8d472f693c2ffc23cee8b82e1e8d71e106f28840d43
+- Fingerprint: sha256:1cc7f234241c4ea99a560d7e24bda5cfbcaddfe8a90a2d09f4e56f608d005f64
 
 `/aif-roadmap` MUST be able to include GitHub milestones, issues, PRs, labels, linked branches, and local git tree state in the roadmap audit evidence set when that context is available.
 
@@ -150,7 +150,7 @@ Source:
 - Capability: roadmap-github-sync
 - Change: none
 - Section: Requirements
-- Fingerprint: sha256:5fcee1859c0ff8e16b41f8d472f693c2ffc23cee8b82e1e8d71e106f28840d43
+- Fingerprint: sha256:1cc7f234241c4ea99a560d7e24bda5cfbcaddfe8a90a2d09f4e56f608d005f64
 
 Roadmap entries MUST include GitHub milestone, issue, or PR links where useful, alongside local artifact paths that justify the roadmap assessment.
 
@@ -173,7 +173,7 @@ Source:
 - Capability: roadmap-github-sync
 - Change: none
 - Section: Requirements
-- Fingerprint: sha256:5fcee1859c0ff8e16b41f8d472f693c2ffc23cee8b82e1e8d71e106f28840d43
+- Fingerprint: sha256:1cc7f234241c4ea99a560d7e24bda5cfbcaddfe8a90a2d09f4e56f608d005f64
 
 `/aif-roadmap` MUST keep write ownership limited to the configured roadmap artifact and MUST NOT mutate GitHub, canonical OpenSpec artifacts, runtime state, QA evidence, generated rules, or implementation files.
 
@@ -182,3 +182,4 @@ Source:
 - WHEN `/aif-roadmap` refreshes the roadmap
 - THEN it may update `.ai-factory/ROADMAP.md`
 - AND it does not edit GitHub issues, GitHub milestones, PRs, `openspec/changes/**`, `openspec/specs/**`, `.ai-factory/state/**`, `.ai-factory/qa/**`, or `.ai-factory/rules/generated/**`.
+

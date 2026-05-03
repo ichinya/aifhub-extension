@@ -13,6 +13,8 @@ Different agents use different interaction tools:
 
 For Codex planning and refinement flows, prompts may recommend Plan mode, but they cannot switch the client mode automatically.
 
+If another CLI or IDE runtime exposes a planning mode, use that available planning-mode mechanism for structured planning questions. Do not fabricate unavailable tools or client actions; when a planning mode or question tool is unavailable, ask plain text or record assumptions according to the runtime.
+
 If you are writing or updating a skill, pick the format that matches the runtime instead of copying examples from another agent.
 
 ---
