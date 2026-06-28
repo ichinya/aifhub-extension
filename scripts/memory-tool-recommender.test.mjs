@@ -71,7 +71,8 @@ describe('recommendation metadata parsing', () => {
       'context-mode',
       'codex-mem',
       'eagle-mem',
-      'codegraph'
+      'codegraph',
+      'repowise'
     ]);
     assert.deepEqual(metadata.project_dimensions.languages, ['php', 'go', 'js', 'python', 'rust', 'multi']);
     assert.deepEqual(metadata.project_dimensions.volume, ['mini', 'standard', 'large']);
@@ -221,7 +222,8 @@ describe('recommendation results', () => {
       'context7',
       'codex-agent-mem',
       'context-mode',
-      'codegraph'
+      'codegraph',
+      'repowise'
     ]);
     assert.equal(result.body.tool_permissions.graphify['aif-implement'], 'forbidden');
     assert.equal(result.body.tool_permissions.codegraph['aif-analyze'], 'recommend_only');

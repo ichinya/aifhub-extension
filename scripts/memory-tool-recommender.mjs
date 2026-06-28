@@ -905,6 +905,9 @@ function nextStepForTool(toolId, tool) {
   if (toolId === 'codegraph') {
     return 'Use rg first and only when the screening policy matched this skill plus project labels; run codegraph init <project>, codegraph index --quiet <project>, codegraph query --path <project> ... --json, verify the output is non-empty and useful, then codegraph uninit --force <project>. Do not run codegraph install, sync, serve, serve --mcp, or mutate agent config.';
   }
+  if (toolId === 'repowise') {
+    return 'Use rg first and only when the screening policy matched this skill plus project labels; run repowise init <project> --index-only --no-claude-md --no-agents --no-codex --no-distill-hook --yes (deterministic tier, zero LLM), then repowise search/health/get_overview, verify the output is non-empty and useful, then two-stage purge (repowise delete feeding the interactive prompt, then rm -rf .repowise .mcp.json). The wiki tier (without --index-only) requires repowise doctor to confirm provider configuration and bills LLM API to the user. Do not run repowise init without constrained flags, repowise serve, repowise hook install, repowise generate-claude-md, or mutate agent config from AIFHub command ownership.';
+  }
   if (toolId === 'agent-memory') {
     return 'Use only as a manual markdown notebook when the user explicitly asks for durable notes.';
   }
@@ -1016,6 +1019,12 @@ async function runProbeForTool(toolId, options = {}) {
       ['codegraph', ['--version']],
       ['codegraph', ['--help']],
       ['codegraph', ['status']]
+    ]);
+  }
+  if (toolId === 'repowise') {
+    return probeAny([
+      ['repowise', ['--version']],
+      ['repowise', ['doctor']]
     ]);
   }
 
