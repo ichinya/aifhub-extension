@@ -1054,14 +1054,69 @@ tools:
       quality_gate: "Do not treat low token output as success by itself. Require non-empty useful repowise search/health/get_overview results; header-only or empty context is avoid_no_useful_context."
       condition: "Только после baseline rg и только когда tools.repowise.screening_policy содержит exact match по skill + project labels. Не выбирать по language-only, skill-only или broad project shape. Index-only tier (zero LLM) is the default; wiki tier requires repowise doctor to confirm provider configuration."
     screening_policy:
-      evidence: pending_ai_tester_matrix
+      evidence: repowise-paired-ab-glm5turbo-2026-06-29-smoke
+      report: docs/memory-tools-research/repowise-benchmark-results.md
       default_decision: avoid_by_default
       baseline: rg
       require_baseline_first: true
       require_match_granularity: skill_task_project_labels
       do_not_select_by: [language_only, skill_only, broad_shape_only]
-      conditional_cases: []
-      known_avoid_cases: []
+      aggregate:
+        rows_total: 6
+        rows_executed: 6
+        rows_pass: 5
+        rows_fail: 1
+        paired_rows: 3
+        pass_pass_pairs: 3
+        repowise_total_tokens_delta_percent: -24.8
+        repowise_cost_delta_percent: -45.9
+        repowise_duration_delta_percent: 139.3
+        repowise_turns_delta_percent: -33.2
+        repowise_lower_total_tokens_pairs: 3
+        repowise_lower_total_tokens_percent: 100.0
+        repowise_lower_cost_pairs: 3
+        repowise_lower_cost_percent: 100.0
+        repowise_faster_pairs: 0
+        repowise_faster_percent: 0.0
+        repowise_fewer_turns_pairs: 3
+        repowise_fewer_turns_percent: 100.0
+      profile_signals:
+        large:
+          - profile: project-6bfa82605c24
+            language: php
+            size: large
+            total_tokens_delta_percent: -27.3
+            cost_delta_percent: -41.0
+            turns_delta_percent: -44.4
+          - profile: project-ac1ab2d4c116
+            language: go
+            size: large
+            total_tokens_delta_percent: -32.6
+            cost_delta_percent: -39.9
+            turns_delta_percent: -34.1
+        mini:
+          - profile: project-0958c3a5928c
+            language: js
+            size: mini
+            total_tokens_delta_percent: -14.5
+            cost_delta_percent: -56.7
+            turns_delta_percent: -21.1
+            caveat: "Smallest token win but largest cost win; rg sufficient for basic exploration on mini projects."
+      conditional_cases:
+        - id: large_framework_app_architecture_or_impact_discovery
+          required_shapes: [large_framework_app, multirepo]
+          skills: [aif-analyze, aif-explore, aif-review]
+          tasks: [architecture_or_impact_discovery, multirepo_surface_mapping]
+          best_rows:
+            - "project-6bfa82605c24 (php/large): -27.3% total tokens, -41.0% cost, -44.4% turns vs rg"
+            - "project-ac1ab2d4c116 (go/large): -32.6% total tokens, -39.9% cost, -34.1% turns vs rg"
+          recommendation_gate: "Smoke signal only (3 paired runs, glm-5-turbo). repowise saves tokens via fewer turns from structured-data queries, at cost of wall-clock init overhead. Apply only on large/framework projects for architecture discovery; rg remains baseline."
+      known_avoid_cases:
+        - id: framework_service_container_dead_code_false_positives
+          shapes: [large_framework_app]
+          languages: [php]
+          tasks: [exact_file_or_symbol_lookup]
+          reason: "repowise dead-code analysis flags container-discovered services (Laravel DI) as unreachable (in_degree=0, 70% confidence). High false-positive rate on framework apps with service containers. Dead-code output unreliable without framework-aware tuning."
     do_not_recommend_for:
       project_shapes:
         - small_microservice
@@ -1251,6 +1306,32 @@ proven_label_evidence:
     provenance:
       report: .ai-factory/state/ai-tester-tool-evaluations/graphify-project-8d97432e6d7a-architecture-explore-plan-20260611t1821z/ai-tester-token-matrices.json
       generated_at: "2026-06-11T18:27:36.160Z"
+  - id: repowise-paired-ab-glm5turbo-2026-06-29-smoke
+    source_evidence: repowise-paired-ab-glm5turbo-2026-06-29
+    scenario_id: architecture-impact-discovery
+    run_class: smoke
+    tool_id: repowise
+    task_scenario: architecture_or_impact_discovery
+    skills: [aif-analyze, aif-explore, aif-review]
+    required_shapes: [large_framework_app, multirepo]
+    profiles:
+      total: 3
+      paired: 3
+      pass_pass: 3
+      useful: 3
+    aggregate_deltas:
+      total_tokens_percent: -24.8
+      cost_percent: -45.9
+      turns_percent: -33.2
+      duration_percent: 139.3
+    decision: conditional
+    caveat: "Smoke signal (3 paired runs, glm-5-turbo via z.ai). repowise saves tokens via fewer turns from structured-data queries on all 3 profiles (php/large, js/mini, go/large). Trade-off: wall-clock init overhead (+139%). dead-code false positives on framework service containers. Full screening matrix (300 rows like codegraph) not yet run — conditional_cases based on smoke only."
+    provenance:
+      report: docs/memory-tools-research/repowise-benchmark-results.md
+      runner: ai-tester 0.5.0
+      runtime: claude
+      model: glm-5-turbo
+      generated_at: "2026-06-29T00:00:00.000Z"
 evidence_runs:
   - id: live-ai-tester-path-hash-tool-batch-2026-06-11
     date: "2026-06-11"
