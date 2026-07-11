@@ -82,6 +82,18 @@ Read generated rules as derived fix guidance when present:
 - `.ai-factory/rules/generated/openspec-change-<change-id>.md`
 - `.ai-factory/rules/generated/openspec-base.md`
 
+Regression-first execution order:
+
+1. Select the narrowest current failing command or reproducible scenario from the chosen QA finding. Record its QA evidence path, command/check, non-sensitive inputs, and relevant environment assumptions before editing.
+2. Run or reproduce that exact check before editing and record `preFixResult` with exit code or observed status. Do not claim reproduction when the check passes unexpectedly or cannot run.
+3. When the failure is reproduced, apply the smallest root-cause fix within the selected finding's scope.
+4. Rerun the identical command/check after editing and record `postFixResult` with exit code or observed status.
+5. Persist `qaEvidenceRead`, `regressionCheck`, `preFixResult`, `postFixResult`, and `fallbackDecision` through `writeFixTrace()` under `.ai-factory/state/<change-id>/fixes/`. Redact credentials, tokens, authorization values, cookies, sensitive URL parameters, and raw provider output.
+6. If the pre-fix check passes unexpectedly or no useful check exists in an interactive session, record the fallback reason and ask whether to investigate further, adjust reproduction, or proceed with a bounded likely fix. Do not edit until the user chooses.
+7. In autonomous, Handoff, or bounded fixer-agent mode, investigate only within the selected finding. If no plausible safely bounded root cause is established, record a blocked or unreproducible `fallbackDecision` and stop without implementation edits.
+
+A passing post-fix check is supporting runtime evidence only. `/aif-fix` must not write or replace `verify.md`, `coverage.json`, rules evidence, done evidence, or archive evidence; `/aif-verify <change-id>` remains authoritative.
+
 Write fix traces only to runtime state:
 
 - Prefer `writeFixTrace(changeId, trace, options)` from `scripts/openspec-execution-context.mjs` for fix traces.
@@ -96,6 +108,7 @@ Normal fix responses should report:
 - selected QA findings;
 - canonical artifacts inspected;
 - generated rules freshness or missing/stale `WARN`;
+- regression check, pre-fix result, post-fix result, and fallback decision;
 - fix trace paths under `.ai-factory/state/<change-id>/`;
 - re-verification guidance: `/aif-verify <change-id>`.
 
@@ -118,6 +131,8 @@ Plan-folder contract:
 - create `.ai-factory/plans/<plan-id>/fixes/*.md`
 - keep plan artifacts read-only except for the fixes/status data they already own
 - if only the folder exists, preserve it and normalize the canonical plan id in user-facing guidance
+
+Legacy fix-plan cleanup remains owned by the upstream `/aif-fix` resolved-path workflow. This injection must not implement file deletion: upstream may remove only the default `.ai-factory/FIX_PLAN.md` after successful execution, while custom `paths.fix_plan` values and explicitly supplied non-default fix-plan files remain in place.
 
 After fixes are applied, suggest `/aif-verify`.
 

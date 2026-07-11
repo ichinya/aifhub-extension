@@ -532,6 +532,7 @@ function renderTraceMarkdown({ changeId, trace, type }) {
     '',
     ...renderList(trace?.generatedRulesRead),
     '',
+    ...renderFixEvidenceSections(type, trace),
     '## Changed files',
     '',
     ...renderList(trace?.changedFiles),
@@ -543,6 +544,58 @@ function renderTraceMarkdown({ changeId, trace, type }) {
   ];
 
   return lines.join('\n');
+}
+
+function renderFixEvidenceSections(type, trace) {
+  if (type !== 'Fix') {
+    return [];
+  }
+
+  return [
+    '## QA evidence read',
+    '',
+    ...renderEvidenceList(trace?.qaEvidenceRead),
+    '',
+    '## Regression check',
+    '',
+    ...renderTraceDetail(trace?.regressionCheck, 'Not recorded.'),
+    '',
+    '## Pre-fix result',
+    '',
+    ...renderTraceDetail(trace?.preFixResult, 'Not recorded.'),
+    '',
+    '## Post-fix result',
+    '',
+    ...renderTraceDetail(trace?.postFixResult, 'Not recorded.'),
+    '',
+    '## Fallback decision',
+    '',
+    ...renderTraceDetail(trace?.fallbackDecision, 'Not applicable or not recorded.'),
+    ''
+  ];
+}
+
+function renderEvidenceList(values) {
+  const rendered = renderList(values);
+  return rendered.length === 1 && rendered[0] === '- none'
+    ? ['- not recorded']
+    : rendered;
+}
+
+function renderTraceDetail(value, fallback) {
+  if (value === undefined || value === null || value === '') {
+    return [fallback];
+  }
+
+  if (typeof value === 'object') {
+    return [
+      '```json',
+      JSON.stringify(value, null, 2),
+      '```'
+    ];
+  }
+
+  return [normalizeTraceText(value, fallback)];
 }
 
 function renderList(values) {
