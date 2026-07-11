@@ -393,6 +393,42 @@ describe('complete OpenSpec workflow documentation contract', () => {
     assertNotIncludes(usageBugFixes, '.ai-factory/plans/<id>/task.md', 'docs/usage.md Bug Fix Workflows');
   });
 
+  it('documents branch-scoped QA-check binding, staleness, safety, and redaction', async () => {
+    const usage = await readRepoFile('docs/usage.md');
+    const contextPolicy = await readRepoFile('docs/context-loading-policy.md');
+    const compatibility = await readRepoFile('docs/openspec-compatibility.md');
+    const combined = [usage, contextPolicy, compatibility].join('\n');
+
+    for (const expected of [
+      '/aif-qa-check',
+      'paths.qa/<branch-slug>/test-cases.md',
+      'paths.qa/<branch-slug>/qa-check.md',
+      '<safe-prefix>-<hash8>',
+      'tested_revision',
+      'worktree_digest',
+      'manual_build_id',
+      'source_digest',
+      'case_digests',
+      'Stale',
+      'agent-context.md',
+      'agent-history.md',
+      'explicit authorization',
+      '[REDACTED]',
+      'no implicit bridge'
+    ]) {
+      assertIncludes(combined, expected, `QA-check docs contract: ${expected}`);
+    }
+
+    for (const sensitiveExample of [
+      'Authorization: Bearer ',
+      'Cookie: session=',
+      'access_token=secret',
+      'password=secret'
+    ]) {
+      assertNotIncludes(combined, sensitiveExample, `QA-check redaction contract: ${sensitiveExample}`);
+    }
+  });
+
   it('documents the AI Factory 2.17.0 baseline, archive boundary, distillation utility, and Codex runtime split', async () => {
     const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
     const readme = await readRepoFile('README.md');

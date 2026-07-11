@@ -213,6 +213,16 @@ Upstream `/aif-architecture`, `/aif-docs`, `/aif-qa`, and `/aif-roadmap` remain 
 
 These utilities must not create or mutate `openspec/changes/**`, `openspec/specs/**`, `.ai-factory/state/**`, `.ai-factory/rules/generated/**`, or AIFHub verification/finalization evidence under `.ai-factory/qa/<change-id>/`. `/aif-qa` may use the same configured `paths.qa` root as AIFHub, but upstream manual QA artifacts use branch slugs while `/aif-verify` and `/aif-done` evidence use OpenSpec `change-id` directories.
 
+### Branch-scoped QA design and execution
+
+Upstream `/aif-qa` writes `change-summary.md`, `test-plan.md`, and `test-cases.md` under `paths.qa/<branch-slug>/`; `/aif-qa-check` executes those cases and writes `qa-check.md` in the same directory. Both derive a collision-resistant `<safe-prefix>-<hash8>` from the original branch name.
+
+Current QA-check results bind to `tested_revision` plus `worktree_digest` for git or `manual_build_id` outside git, and to `source_digest` plus per-case `case_digests`. Changed bindings mark affected outcomes unchecked `Stale` while preserving prior comments and evidence as history. Evidence should match the execution surface: backend tests, CLI, API, file/docs, and database-read cases are not blocked solely by missing browser automation.
+
+`agent-context.md` and `agent-history.md` may preserve only reusable non-sensitive setup facts or cross-run lessons. Production, unknown targets, destructive actions, and external side effects require explicit authorization for the current target/action. Persisted evidence replaces credentials, cookies, authorization values, tokens, one-time codes, private data, and sensitive URL parameters with `[REDACTED]`.
+
+Branch-scoped `qa-check.md` is not change-scoped AIFHub evidence. It cannot by itself satisfy `/aif-verify`, `/aif-done`, `coverage.json`, rules evidence, `done-readiness.json`, `done.md`, or `openspec-archive.json`; no implicit bridge is registered.
+
 ## AI Factory 2.17 Reviewed Baseline
 
 The reviewed AI Factory `2.17.0` baseline is cumulative: it retains the existing AI Factory `2.13`-`2.15` compatibility facts, including config-aware project-context utilities, and adds a full audit of `2.15.0...2.16.0` (29 commits) and `2.16.0...2.17.0` (14 commits). AIFHub adapts only behavior that crosses its OpenSpec-native ownership boundaries; upstream-owned behavior remains upstream-owned.

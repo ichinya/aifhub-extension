@@ -27,6 +27,42 @@ function assertNotIncludes(source, unexpected, filePath) {
 }
 
 describe('aif-analyze OpenSpec-native bootstrap contract', () => {
+  it('derives base-rule control flow from evidence without duplicating the generated-rules compiler', async () => {
+    const skill = await readRepoFile('skills/aif-analyze/SKILL.md');
+    const template = await readRepoFile('skills/aif-analyze/references/rules-base-template.md');
+    const compiler = await readRepoFile('scripts/openspec-rules-compiler.mjs');
+
+    for (const expected of [
+      'guard clauses',
+      'early returns or continues',
+      'small classification helpers',
+      'intentional nested conditionals',
+      'evidence paths',
+      'omit the section or report it as unresolved',
+      'Do not add control-flow detection to the generated OpenSpec rules compiler'
+    ]) {
+      assertIncludes(skill, expected, 'base-rule generation');
+    }
+
+    for (const expected of [
+      '{{#if control_flow_supported}}',
+      '## Control Flow',
+      '{{control_flow_convention}}',
+      '{{control_flow_patterns}}',
+      '{{control_flow_evidence_paths}}'
+    ]) {
+      assertIncludes(template, expected, 'base-rule generation template');
+    }
+
+    for (const duplicateDetectionMarker of [
+      'control_flow_supported',
+      'control_flow_convention',
+      'control_flow_evidence_paths'
+    ]) {
+      assertNotIncludes(compiler, duplicateDetectionMarker, 'generated OpenSpec rules compiler');
+    }
+  });
+
   it('documents explicit mode selection and preserves legacy default config', async () => {
     const skill = await readRepoFile('skills/aif-analyze/SKILL.md');
     const template = await readRepoFile('skills/aif-analyze/references/config-template.yaml');

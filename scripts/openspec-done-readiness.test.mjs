@@ -301,6 +301,27 @@ describe('OpenSpec done readiness gate', () => {
     assert.match(readiness.suggested_next.reason, /\.ai-factory\/qa\/add-oauth\/rules\.md/);
   });
 
+  it('does not let branch-scoped qa-check.md satisfy verify, coverage, or rules readiness', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+    await writeFixture(rootDir, '.ai-factory/qa/feature-oauth-a1b2c3d4/qa-check.md', '# QA Check\n\n- [x] Manual smoke passed\n');
+
+    const readiness = await buildOpenSpecDoneReadiness({
+      rootDir,
+      changeId: 'add-oauth',
+      ...passingOptions({
+        readLatestVerificationEvidence: async () => verificationEvidence({ verifyExists: false }),
+        readOpenSpecCoverageMatrix: async () => coverageEvidence({ exists: false, coverage: null }),
+        readOpenSpecRulesGateEvidence: async () => missingRulesGateEvidence()
+      })
+    });
+
+    assert.equal(readiness.status, 'fail');
+    assert.equal(readiness.checks.verify_gate, 'fail', 'qa-check.md must not satisfy verify readiness');
+    assert.equal(readiness.checks.coverage, 'fail', 'qa-check.md must not satisfy coverage readiness');
+    assert.equal(readiness.checks.rules_gate, 'fail', 'qa-check.md must not satisfy rules readiness');
+  });
+
   it('blocks disallowed allowWarnOnDone.rules warnings with write-gate-evidence remediation', async () => {
     const rootDir = await createTempRoot();
     await createOpenSpecChange(rootDir);

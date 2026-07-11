@@ -29,11 +29,11 @@ The MCP client normally shows these with the server namespace:
 
 ## Runtime Formats
 
-The manifest stores one canonical stdio command template. AI Factory renders that template into the format required by each selected runtime.
+The manifest stores one canonical stdio command template. AI Factory `2.16+` renders that template into the format required by each selected runtime. The Universal / Other target writes standard `mcpServers` configuration to `.mcp.json`; this version-gated rendering behavior is not promised for AI Factory `2.11`-`2.15`.
 
-### Standard MCP Clients
+### Universal / Other (`.mcp.json`)
 
-Claude Code, Cursor, Roo Code, Kilo Code, Qwen Code, and other standard MCP settings use `mcpServers`:
+In AI Factory `2.16+`, Universal / Other and standard MCP clients such as Claude Code, Cursor, Roo Code, Kilo Code, and Qwen Code use `.mcp.json` with `mcpServers`:
 
 ```json
 {

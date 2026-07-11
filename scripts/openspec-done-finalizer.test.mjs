@@ -441,6 +441,34 @@ describe('OpenSpec done finalizer API', () => {
     assert.equal(passed.passed, true);
   });
 
+  it('does not treat branch-scoped qa-check.md as done or archive evidence', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+    await writeFixture(rootDir, '.ai-factory/qa/feature-oauth-a1b2c3d4/qa-check.md', '# QA Check\n\n- [x] Manual smoke passed\n');
+
+    const context = await buildDoneContext({
+      rootDir,
+      changeId: 'add-oauth',
+      detectOpenSpec: async () => availableCliDetection(),
+      readLatestVerificationEvidence: async () => ({
+        ok: false,
+        changeId: 'add-oauth',
+        validation: null,
+        status: null,
+        verify: { exists: false, path: null, content: '' },
+        coverage: { exists: false, relativePath: null, coverage: null },
+        warnings: [],
+        errors: []
+      }),
+      readOpenSpecCoverageMatrix: async () => coverageEvidence({ exists: false, coverage: null })
+    });
+
+    assert.equal(context.ok, false, 'branch qa-check.md must not make done context ready');
+    assert.equal(context.verification.passed, false, 'branch qa-check.md must not satisfy final verify gate');
+    assert.equal(await pathExists(path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'done.md')), false);
+    assert.equal(await pathExists(path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'openspec-archive.json')), false);
+  });
+
   it('requires a valid latest verify gate result before finalization', async () => {
     const missingGate = await assertVerificationPassed('add-oauth', {
       readLatestVerificationEvidence: async () => verificationEvidence({

@@ -31,6 +31,15 @@
 - {{dependency_rule_1}}
 - {{dependency_rule_2}}
 
+{{#if control_flow_supported}}
+## Control Flow
+
+<!-- Include only when repeated repository evidence supports a project convention. -->
+- **Convention:** {{control_flow_convention}}
+- **Supported patterns:** {{control_flow_patterns}}
+- **Evidence paths:** {{control_flow_evidence_paths}}
+{{/if}}
+
 ## Error Handling
 
 ### Required Patterns

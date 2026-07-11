@@ -440,10 +440,16 @@ Reads:
 
 Writes:
 
-- upstream manual QA artifacts under `paths.qa/<branch-slug>/`
+- upstream manual QA artifacts under `paths.qa/<branch-slug>/`, where `<branch-slug>` is a collision-resistant `<safe-prefix>-<hash8>` derived from the original branch name
 - `change-summary.md`
 - `test-plan.md`
 - `test-cases.md`
+
+`/aif-qa-check` is the matching upstream branch-scoped execution utility. It consumes `paths.qa/<branch-slug>/test-cases.md` and writes `paths.qa/<branch-slug>/qa-check.md`; both commands must derive the same branch slug. In agent mode, use evidence appropriate to the case surface: backend tests, CLI output, API results, file/docs inspection, or database reads do not require browser automation when concrete non-browser evidence exists.
+
+Current results in `qa-check.md` must bind to `tested_revision` and `worktree_digest` for a git worktree, or `manual_build_id` outside git, plus `source_digest` for `test-cases.md` and per-case `case_digests`. When a binding changes, affected results become unchecked `Stale`; previous comments and evidence remain history and do not count as current pass, fail, or blocked status.
+
+Reusable setup facts and cross-run lessons may be kept in `paths.qa/agent-context.md` and `paths.qa/agent-history.md` only when non-sensitive. Keep run-specific decisions and full transcripts out. Production, unknown targets, destructive actions, and external-side-effect cases require explicit authorization for the current target and action immediately before execution. Before writing any QA artifact, replace credentials, cookies, authorization values, tokens, one-time codes, private data, and sensitive URL parameters with `[REDACTED]`.
 
 Does not write:
 
@@ -454,6 +460,7 @@ Does not write:
 - AIFHub verification or finalization evidence under `.ai-factory/qa/<change-id>/`
 
 In OpenSpec-native mode, use `/aif-verify <change-id>` for authoritative verification evidence and `/aif-done <change-id>` for finalization evidence.
+Branch-scoped `qa-check.md` alone never satisfies AIFHub `verify.md`, `coverage.json`, rules evidence, `done-readiness.json`, `done.md`, or `openspec-archive.json`; no implicit bridge exists.
 
 ### `/aif-plan full`
 
