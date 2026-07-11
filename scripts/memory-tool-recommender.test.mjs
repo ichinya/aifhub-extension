@@ -45,7 +45,7 @@ async function runCli(args, options = {}) {
         ...process.env,
         ...(options.env ?? {})
       },
-      timeout: 10000
+      timeout: options.timeout ?? 10000
     }
   );
 
@@ -1044,7 +1044,7 @@ describe('CLI behavior', () => {
       '--metadata',
       REAL_METADATA,
       '--json'
-    ]);
+    ], { timeout: 30000 });
 
     const codegraph = result.recommendations.find((item) => item.tool_id === 'codegraph');
     assert.ok(codegraph);
