@@ -393,7 +393,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
     assertNotIncludes(usageBugFixes, '.ai-factory/plans/<id>/task.md', 'docs/usage.md Bug Fix Workflows');
   });
 
-  it('documents the AI Factory 2.15.0 baseline, archive boundary, distillation utility, and Codex runtime split', async () => {
+  it('documents the AI Factory 2.17.0 baseline, archive boundary, distillation utility, and Codex runtime split', async () => {
     const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
     const readme = await readRepoFile('README.md');
     const usage = await readRepoFile('docs/usage.md');
@@ -404,22 +404,22 @@ describe('complete OpenSpec workflow documentation contract', () => {
     const codexAgents = await readRepoFile('docs/codex-agents.md');
     const combinedDocs = [readme, usage, compatibility, docsIndex, contextPolicy, handoff].join('\n');
 
-    assert.equal(metadata.compat['ai-factory'], '>=2.11.0 <3.0.0');
-    assert.equal(metadata.sources['ai-factory'].version, '2.15.0');
-    assert.equal(metadata.sources['ai-factory'].baselineVersion, '2.15.0');
-    assert.equal(metadata.sources['ai-factory'].lastSync, '2026-06-08');
-    assertIncludes(metadata.sources['ai-factory'].notes, 'upstream 2.15.0', 'aifhub-extension.json');
-    assertIncludes(metadata.sources['ai-factory'].notes, 'Commit Plan grouping', 'aifhub-extension.json');
-    assertIncludes(metadata.sources['ai-factory'].notes, '/aif-distillation', 'aifhub-extension.json');
-    assertIncludes(metadata.sources['ai-factory'].notes, '/aif-archive', 'aifhub-extension.json');
-    assertIncludes(metadata.sources['ai-factory'].notes, '/aif-architecture', 'aifhub-extension.json');
-    assertIncludes(metadata.sources['ai-factory'].notes, '/aif-docs', 'aifhub-extension.json');
-    assertIncludes(metadata.sources['ai-factory'].notes, '/aif-qa', 'aifhub-extension.json');
-    assertIncludes(metadata.sources['ai-factory'].notes, 'paths.archive', 'aifhub-extension.json');
-    assertIncludes(metadata.sources['ai-factory'].notes, 'archive-aware sequential plan behavior', 'aifhub-extension.json');
-    assertIncludes(metadata.sources['ai-factory'].notes, 'config-aware project utilities', 'aifhub-extension.json');
-    assertIncludes(metadata.sources['ai-factory'].notes, 'managed agent config preservation', 'aifhub-extension.json');
-    assertIncludes(metadata.sources['ai-factory'].notes, 'Agent Skills', 'aifhub-extension.json');
+    assert.equal(metadata.compat['ai-factory'], '>=2.11.0 <3.0.0', 'aifhub-extension.json compat.ai-factory');
+    assert.equal(metadata.sources['ai-factory'].version, '2.17.0', 'aifhub-extension.json sources.ai-factory.version');
+    assert.equal(metadata.sources['ai-factory'].baselineVersion, '2.17.0', 'aifhub-extension.json sources.ai-factory.baselineVersion');
+    assert.equal(metadata.sources['ai-factory'].lastSync, '2026-07-09', 'aifhub-extension.json sources.ai-factory.lastSync');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'upstream 2.17.0', 'aifhub-extension.json sources.ai-factory.notes');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'Commit Plan grouping', 'aifhub-extension.json sources.ai-factory.notes');
+    assertIncludes(metadata.sources['ai-factory'].notes, '/aif-distillation', 'aifhub-extension.json sources.ai-factory.notes');
+    assertIncludes(metadata.sources['ai-factory'].notes, '/aif-archive', 'aifhub-extension.json sources.ai-factory.notes');
+    assertIncludes(metadata.sources['ai-factory'].notes, '/aif-architecture', 'aifhub-extension.json sources.ai-factory.notes');
+    assertIncludes(metadata.sources['ai-factory'].notes, '/aif-docs', 'aifhub-extension.json sources.ai-factory.notes');
+    assertIncludes(metadata.sources['ai-factory'].notes, '/aif-qa', 'aifhub-extension.json sources.ai-factory.notes');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'paths.archive', 'aifhub-extension.json sources.ai-factory.notes');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'archive-aware sequential plan behavior', 'aifhub-extension.json sources.ai-factory.notes');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'config-aware project utilities', 'aifhub-extension.json sources.ai-factory.notes');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'managed agent config preservation', 'aifhub-extension.json sources.ai-factory.notes');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'Agent Skills', 'aifhub-extension.json sources.ai-factory.notes');
 
     assertNotIncludes(readme, '### AI Factory 2.13 Sync', 'README.md');
     assertIncludes(
@@ -428,8 +428,8 @@ describe('complete OpenSpec workflow documentation contract', () => {
       'docs/openspec-compatibility.md'
     );
     for (const expected of [
-      'AI Factory 2.15 Reviewed Baseline',
-      'AI Factory `2.15.0`',
+      'AI Factory 2.17 Reviewed Baseline',
+      'AI Factory `2.17.0`',
       'config-aware project-context utilities',
       'project-context utilities',
       '/aif-architecture',
@@ -476,7 +476,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
       '/aif-distillation docs/memory-tools-research --name aifhub-memory-tool-selection',
       '/aif-distillation docs/context-providers.md --name aifhub-context-providers'
     ]) {
-      assertIncludes(combinedDocs, expected, '2.15.0 docs sync');
+      assertIncludes(combinedDocs, expected, '2.17.0 docs sync');
     }
     for (const forbiddenClaim of [
       '`/aif-done` creates commits',

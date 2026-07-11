@@ -6,10 +6,10 @@
   "sources": {
     "ai-factory": {
       "url": "https://github.com/lee-to/ai-factory",
-      "version": "2.15.0",
-      "baselineVersion": "2.15.0",
-      "lastSync": "2026-06-08",
-      "notes": "Validated against upstream 2.15.0 on the 2.x branch. Reviewed baseline preserves AI Factory 2.13.x plan-aware /aif-commit Commit Plan grouping and /aif-distillation for reusable Agent Skills, includes AI Factory 2.14 /aif-archive with paths.archive and archive-aware sequential plan behavior, includes config-aware project utilities /aif-architecture, /aif-docs, and /aif-qa as upstream-owned context outputs, and includes AI Factory 2.15 managed agent config preservation plus interactive newly available built-in skill update behavior."
+      "version": "2.17.0",
+      "baselineVersion": "2.17.0",
+      "lastSync": "2026-07-09",
+      "notes": "Validated against upstream 2.17.0 on the 2.x branch. The cumulative reviewed baseline preserves AI Factory 2.13.x plan-aware /aif-commit Commit Plan grouping and /aif-distillation for reusable Agent Skills, AI Factory 2.14 /aif-archive with paths.archive and archive-aware sequential plan behavior, config-aware project utilities /aif-architecture, /aif-docs, and /aif-qa as upstream-owned context outputs, and AI Factory 2.15 managed agent config preservation plus interactive newly available built-in skill update behavior. Headline 2.16-2.17 changes cover revision-bound research context, branch-scoped /aif-qa-check, regression-first /aif-fix evidence, and verbatim Original Request preservation. Direct follow-ups cover QA execution surfaces, collision-resistant branch identity, revision/worktree/source/case freshness, reusable non-sensitive QA memory, authorization and redaction, custom fix-plan preservation, plan/improve Original Request clarifications, Universal / Other MCP through .mcp.json, and project-evidence-backed Control Flow rules. Reviewed no-ops keep /aif-architecture structure upstream-owned, avoid duplicate generated-rules compiler logic, and do not copy community-extension documentation bodies."
     },
     "openspec": {
       "url": "https://github.com/Fission-AI/OpenSpec",
