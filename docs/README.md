@@ -15,11 +15,11 @@ OpenSpec CLI features вызываются через AIFHub wrappers и `script
 ## Порядок Чтения
 
 1. [Project README](../README.md) - landing page, quick start, artifact layout, compatibility summary, migration summary и troubleshooting summary.
-2. [Usage](usage.md) - полный command flow, `/aif-mode` switching and sync, upstream `/aif-architecture`, `/aif-docs`, `/aif-qa` project-context utility boundaries, rules/review/security gates, verification/fix/finalization tail, AI Factory 2.15 baseline notes, upstream `/aif-archive` legacy cleanup boundary, AI Factory 2.13+ `/aif-commit` Commit Plan ownership, upstream `/aif-distillation` utility boundaries, commit/evolve handoff, OAuth example, troubleshooting и smoke checks.
+2. [Usage](usage.md) - полный command flow, `/aif-mode` switching and sync, upstream `/aif-architecture`, `/aif-docs`, `/aif-qa` и `/aif-qa-check` utility boundaries, rules/review/security gates, verification/fix/finalization tail, AI Factory 2.17 baseline notes, regression-first fix flow, upstream `/aif-archive` legacy cleanup boundary, AI Factory 2.13+ `/aif-commit` Commit Plan ownership, upstream `/aif-distillation` utility boundaries, commit/evolve handoff, OAuth example, troubleshooting и smoke checks.
 3. [Context Providers](context-providers.md) - optional Graphify context, CodeGraph manual CLI context, Context7 documentation provider guidance, reviewed-note paths, degraded behavior и user-owned setup boundaries.
 4. [Memory Tool Recommendations](memory-tool-recommendations.md) - local metadata-driven optional tool recommendations и installed wrapper commands.
 5. [Context Loading Policy](context-loading-policy.md) - consumer context, optional Graphify/CodeGraph/Context7 guidance, GitHub-aware roadmap evidence, ownership boundaries, generated rules, quality gates, parent-owned commit grouping, upstream architecture/docs/QA/archive/distillation utilities, commit handoff и legacy path rules.
-6. [OpenSpec Compatibility](openspec-compatibility.md) - optional CLI adapter support, OpenSpec 1.4.1 reviewed baseline, AI Factory 2.15 baseline compatibility, upstream `/aif-architecture`, `/aif-docs`, `/aif-qa`, `/aif-archive` and `paths.archive` boundaries, AI Factory 2.13+ `/aif-commit` and `/aif-distillation` compatibility, artifact sync points, rules gate behavior, Node requirements, validation policy flags и degraded mode.
+6. [OpenSpec Compatibility](openspec-compatibility.md) - optional CLI adapter support, OpenSpec 1.4.1 reviewed baseline, AI Factory 2.17 baseline compatibility, Original Request/Research Context, regression-first fix, branch-scoped QA-check, Universal MCP, Control Flow и reviewed no-op boundaries, плюс archive/distillation compatibility, artifact sync points, rules gate behavior, Node requirements, validation policy flags и degraded mode.
 7. [OpenSpec Artifact Validation](openspec-validation.md) - AIFHub contract validator поверх OpenSpec CLI validation.
 8. [OpenSpec Coverage Matrix](spec-coverage.md) - requirement-to-task-to-code coverage evidence и verify/done policy.
 9. [Legacy Plan Migration](legacy-plan-migration.md) - если существующие `.ai-factory/plans` artifacts нужно перенести в OpenSpec-native changes.
@@ -41,18 +41,18 @@ OpenSpec CLI features вызываются через AIFHub wrappers и `script
 
 | Guide | Назначение |
 |---|---|
-| [Usage](usage.md) | Полный OpenSpec-native command flow, optional Graphify/CodeGraph/Context7 guidance, upstream architecture/docs/QA utility boundaries, gates, finalization tail, AI Factory 2.15 archive boundary, parent-owned commit grouping, upstream distillation utility и examples |
+| [Usage](usage.md) | Полный OpenSpec-native command flow, optional Graphify/CodeGraph/Context7 guidance, upstream architecture/docs/QA utility boundaries, regression-first fix, QA-check boundary, gates, finalization tail, AI Factory 2.17 compatibility, parent-owned commit grouping, upstream archive/distillation utilities и examples |
 | [Context Providers](context-providers.md) | Optional Graphify context, CodeGraph manual CLI context и Context7 provider guidance, reviewed-note paths, degraded behavior, credential safety и user-owned setup boundaries |
 | [Memory Tool Recommendations](memory-tool-recommendations.md) | Local metadata-driven optional memory/context tool recommendations и installed wrapper commands |
 | [Context Loading Policy](context-loading-policy.md) | Runtime context, optional Graphify/CodeGraph/Context7 context, GitHub-aware roadmap evidence, ownership, gates, commit handoff, upstream `/aif-architecture`, `/aif-docs`, `/aif-qa`, `/aif-archive` and `/aif-distillation` boundaries и legacy boundaries |
-| [OpenSpec Compatibility](openspec-compatibility.md) | CLI adapter policy, OpenSpec 1.4.1 reviewed baseline, AI Factory 2.15 baseline compatibility, upstream `/aif-architecture`, `/aif-docs`, `/aif-qa`, `/aif-archive` and `paths.archive` boundary, AI Factory 2.13+ `/aif-commit` Commit Plan ownership, upstream `/aif-distillation` boundaries, validation policy flags, sync points, rules gate, version support и degraded mode |
+| [OpenSpec Compatibility](openspec-compatibility.md) | CLI adapter policy, OpenSpec 1.4.1 reviewed baseline, AI Factory 2.17 baseline with planning/fix/QA/MCP/Control Flow adaptations and reviewed no-ops, upstream archive/distillation boundaries, validation policy flags, sync points, rules gate, version support и degraded mode |
 | [OpenSpec Artifact Validation](openspec-validation.md) | Read-only AIFHub contract validator для canonical artifacts, runtime evidence, QA и generated rules |
 | [OpenSpec Coverage Matrix](spec-coverage.md) | Requirement-to-task-to-code coverage evidence, policy, staleness и integration points |
 | [Legacy Plan Migration](legacy-plan-migration.md) | Explicit migration commands и artifact mapping |
 | [Active Change Resolver](active-change-resolver.md) | Active change selection и runtime paths |
 | [Handoff Validation Profile](handoff-validation-profile.md) | Read-only validation summary contract для Handoff orchestration |
 | [ADR 0001](adr/0001-openspec-native-artifact-protocol.md) | Canonical OpenSpec и AI Factory runtime state contract |
-| [AIFHub MCP](aifhub-mcp.md) | Optional MCP server tools и runtime-specific config shapes |
+| [AIFHub MCP](aifhub-mcp.md) | Optional MCP server tools, runtime-specific config shapes и AI Factory 2.16+ Universal / Other `.mcp.json` rendering |
 | [Codex Agents](codex-agents.md) | Namespaced Codex subagents и invocation contract |
 | [Claude Agents](claude-agents.md) | Namespaced Claude subagents и install target |
 | [Research по Memory Tools](memory-tools-research/README.md) | Результаты проверки local memory/retrieval кандидатов для optional context providers |
@@ -75,7 +75,7 @@ OpenSpec CLI features вызываются через AIFHub wrappers и `script
 - optional local memory/retrieval candidate research
 - optional rules, review и security gates
 - verification, fix, done, post-archive sync, commit и evolve handoff
-- AI Factory 2.15 reviewed baseline, including upstream `/aif-archive`, `paths.archive`, archive-aware sequential plan behavior, and managed agent config update preservation
+- AI Factory 2.17 reviewed baseline, including immutable Original Request, revision-bound Research Context, regression-first fixes, branch-scoped QA-check, Universal MCP, evidence-backed Control Flow, upstream `/aif-archive`, archive-aware sequential plan behavior, and managed agent config update preservation
 - upstream `/aif-architecture`, `/aif-docs`, and `/aif-qa` project-context utility boundaries; they are not required per-change OpenSpec lifecycle gates
 - AI Factory 2.13+ parent-owned `/aif-commit` `## Commit Plan` grouping
 - upstream `/aif-distillation` utility skill boundaries; it is not an AIFHub lifecycle stage and writes generated skill packages to the current agent skills directory
