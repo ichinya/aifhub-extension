@@ -69,6 +69,13 @@ Read QA findings and canonical context before editing implementation files:
 - `openspec/changes/<change-id>/tasks.md`
 - `openspec/changes/<change-id>/specs/**/spec.md`
 
+Treat planning source sections as read-only fix context:
+
+- Use `## Original Request` as the raw intent anchor for the selected QA finding; do not rewrite it or treat it as permission to widen the fix.
+- When `proposal.md` contains `## Research Context`, use the embedded snapshot and source revision as authoritative committed scope.
+- Compare live `paths.research` only for drift and rationale. If `Updated` or normalized `SHA256` differs, or legacy metadata is incomplete, emit `WARN [research-drift] change-id=<change-id> source=<path> expected=<embedded revision> current=<live revision>` and keep the fix bounded to existing QA evidence and committed scope.
+- Do not mutate or silently rebase either source section. Keep credentials, raw provider output, and full request/research bodies out of fix messages and traces.
+
 Read generated rules as derived fix guidance when present:
 
 - `.ai-factory/rules/generated/openspec-merged-<change-id>.md`

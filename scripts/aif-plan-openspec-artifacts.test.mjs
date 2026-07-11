@@ -180,6 +180,31 @@ describe('aif-plan OpenSpec-native planning contract', () => {
     }
   });
 
+  it('preserves multiline Original Request input and commits revision-bound research context', async () => {
+    const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
+    const openspec = extractSection(injection, 'OpenSpec-native mode');
+    const label = 'injections/core/aif-plan-plan-folder.md Original Request and Research Context contract';
+
+    assertOrder(openspec, ['## Original Request', '## Intent'], `${label} section ordering`);
+
+    for (const expected of [
+      'recognized invocation tokens that occur in command positions',
+      'Do not remove words such as `full`, `fast`, `--list`, or `--parallel` when they occur inside the actual request text',
+      'request wording, casing, punctuation, internal whitespace, and line breaks exactly',
+      'If planning starts only from the resolved research artifact and no explicit request exists, omit `## Original Request`',
+      'keep both `## Original Request` and `## Research Context`',
+      'Source: <resolved paths.research> (Active Summary, Updated: <timestamp>, SHA256: <digest>)',
+      'normalizing line endings to LF',
+      'ending the digest input with exactly one newline',
+      'WARN [research-drift]',
+      'expected=<embedded revision>',
+      'current=<live revision>',
+      'unless the user explicitly requests a research rebase'
+    ]) {
+      assertIncludes(openspec, expected, label);
+    }
+  });
+
   it('defines safe change IDs, runtime-state boundaries, and validation through the runner', async () => {
     const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
     const openspec = extractSection(injection, 'OpenSpec-native mode');

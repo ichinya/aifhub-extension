@@ -501,6 +501,56 @@ describe('OpenSpec-native prompt asset contract', () => {
     }
   });
 
+  it('enforces raw-source localization exceptions and immutable research snapshots', async () => {
+    const policy = await readRepoFile(SHARED_LANGUAGE_POLICY_ASSET);
+
+    for (const expected of [
+      '`## Original Request` is a raw-source exception',
+      'preserve the request body byte-for-byte',
+      'line endings, whitespace, punctuation, casing, and line breaks',
+      'An existing `## Research Context` is an immutable committed snapshot',
+      'unless the user explicitly requests a research rebase',
+      '`language.artifacts` still applies to generated'
+    ]) {
+      assertIncludes(policy, expected, `${SHARED_LANGUAGE_POLICY_ASSET} raw-source localization contract`);
+    }
+
+    for (const relativePath of PLAN_POLISHER_PROMPT_ASSETS) {
+      const asset = await readRepoFile(relativePath);
+      for (const expected of [
+        '## Original Request',
+        'byte-for-byte',
+        '## Research Context',
+        'WARN [research-drift]',
+        'expected=<embedded revision>',
+        'current=<live revision>',
+        'explicit user rebase request',
+        'Updated',
+        'SHA256',
+        'Do not duplicate preserved raw section bodies'
+      ]) {
+        assertIncludes(asset, expected, `${relativePath} immutable planning source contract`);
+      }
+    }
+
+    for (const relativePath of [...IMPLEMENT_PROMPT_ASSETS, ...VERIFY_PROMPT_ASSETS, ...FIX_PROMPT_ASSETS]) {
+      const asset = await readRepoFile(relativePath);
+      for (const expected of [
+        '## Original Request',
+        '## Research Context',
+        'WARN [research-drift]',
+        'change-id=<change-id>',
+        'source=<path>',
+        'expected=<embedded revision>',
+        'current=<live revision>',
+        'credentials',
+        'raw provider output'
+      ]) {
+        assertIncludes(asset, expected, `${relativePath} downstream research-drift contract`);
+      }
+    }
+  });
+
   it('defines OpenSpec-native and legacy sections for remaining mode-gated prompts', async () => {
     for (const relativePath of MODE_GATED_PROMPTS) {
       const asset = await readRepoFile(relativePath);

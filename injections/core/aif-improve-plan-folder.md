@@ -72,6 +72,11 @@ Patch only affected sections and avoid whole-file regeneration unless structural
 Preservation rules:
 
 - Read current artifact content before editing.
+- Treat the complete `## Original Request` heading and body as immutable raw source. Preserve its exact bytes, including line endings, whitespace, punctuation, casing, and line breaks; patch other sections around it instead of reconstructing `proposal.md`.
+- Treat an existing `## Research Context` body and `Source` revision metadata as the committed requirements snapshot. Do not translate, normalize, regenerate, or replace it unless the user explicitly requests a research rebase.
+- When live `paths.research` has a different `Updated` marker or normalized Active Summary `SHA256`, emit `WARN [research-drift] change-id=<change-id> source=<path> expected=<embedded revision> current=<live revision>`. Keep the embedded snapshot authoritative and do not log its full body, credentials, or raw provider output.
+- Live research `## Sessions` may be consulted only for rationale. Do not apply requirements from a newer Active Summary without an explicit user rebase request.
+- On an explicit research rebase, copy the selected current Active Summary, recompute the stable digest, update the `Source` path plus `Updated` and `SHA256` metadata, and report that committed scope changed.
 - Preserve user-written sections unless they are explicitly obsolete or contradict the refined requirement.
 - Prefer patch-style edits over whole-file regeneration.
 - If an artifact is missing, create only missing artifacts needed by the requested refinement.
@@ -106,6 +111,7 @@ Preserved:
 ```
 
 The response must report the selected change ID, selected source, changed canonical artifact paths, preserved user-written areas, and validation status. Do not install OpenSpec skills or slash commands.
+Report `Original Request` and `Research Context` as preserved section names when applicable, but do not duplicate their raw bodies in output.
 
 ### Legacy AI Factory-only mode
 
