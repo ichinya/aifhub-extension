@@ -28,7 +28,8 @@ export const SAFE_TOOL_IDS = [
   'graphify',
   'context7',
   'context-mode',
-  'codex-agent-mem'
+  'codex-agent-mem',
+  'repowise'
 ];
 export const REJECTED_FULL_INSTALL_IDS = new Set(['codex-mem', 'agent-memory', 'eagle-mem']);
 
@@ -98,6 +99,7 @@ const IGNORE_DIR_NAMES = new Set([
   'logs',
   'graphify-out',
   '.codegraph',
+  '.repowise',
   '.idea',
   '.vscode',
   '.windsurf',
@@ -253,6 +255,7 @@ export function getToolPlan(scope = 'safe') {
     { id: 'rg', fullInstall: false, role: 'baseline_search' },
     { id: 'git-gh', fullInstall: false, role: 'read_only_repo_context' },
     { id: 'codegraph', fullInstall: false, role: 'repo_graph_cli' },
+    { id: 'repowise', fullInstall: false, role: 'repo_intelligence_cli' },
     { id: 'graphify', fullInstall: true, role: 'repo_graph_ast' },
     { id: 'context7', fullInstall: true, role: 'docs_lookup' },
     { id: 'context-mode', fullInstall: true, role: 'temporary_output_index' },
@@ -334,6 +337,7 @@ async function runTool(tool, runtime) {
     if (tool.id === 'rg') return await runRgBaseline(tool, runtime);
     if (tool.id === 'git-gh') return await runGitGhProbe(tool, runtime);
     if (tool.id === 'codegraph') return await runCodeGraph(tool, runtime);
+    if (tool.id === 'repowise') return await runRepowise(tool, runtime);
     if (tool.id === 'graphify') return await runGraphify(tool, runtime);
     if (tool.id === 'context7') return await runContext7(tool, runtime);
     if (tool.id === 'context-mode') return await runContextMode(tool, runtime);
@@ -448,6 +452,81 @@ async function runCodeGraph(tool, runtime) {
     status: getProfileLifecycleRunStatus(profiles),
     installed_version: firstLine(version.stdout),
     npm_version: firstLine(npmVersion.stdout),
+    profiles
+  };
+}
+
+async function runRepowise(tool, runtime) {
+  const repowise = defaultCommandName('repowise');
+  const version = await execCommandShim(repowise, ['--version'], { timeoutMs: runtime.timeoutMs, allowFailure: true });
+  const doctor = await execCommandShim(repowise, ['doctor'], { timeoutMs: runtime.timeoutMs, allowFailure: true });
+
+  if (version.exitCode !== 0) {
+    return {
+      tool_id: tool.id,
+      status: 'unavailable',
+      installed_available: false,
+      doctor: doctor.exitCode === 0 ? 'ok' : 'unavailable'
+    };
+  }
+
+  const profiles = [];
+  for (const copy of runtime.copies) {
+    const started = performance.now();
+    // Tier 0: deterministic index-only init (zero LLM, zero API keys)
+    const init = await execCommandShim(repowise, [
+      'init', copy.copyPath,
+      '--index-only',
+      '--no-claude-md', '--no-agents', '--no-codex', '--no-distill-hook',
+      '--yes'
+    ], {
+      cwd: copy.copyPath,
+      timeoutMs: Math.max(runtime.timeoutMs, 180000),
+      allowFailure: true
+    });
+    // Data probe: symbol search over the freshly built index
+    const search = init.exitCode === 0
+      ? await execCommandShim(repowise, ['search', 'main', '--mode', 'symbol', '--limit', '5'], {
+        cwd: copy.copyPath,
+        timeoutMs: runtime.timeoutMs,
+        allowFailure: true
+      })
+      : { exitCode: 1, stdout: '' };
+    // Two-stage purge: registry removal + filesystem cleanup.
+    // `delete --force` still prompts interactively; feed `1\n` via shell wrapper.
+    const deleteCmd = process.platform === 'win32'
+      ? process.env.ComSpec || 'cmd.exe'
+      : 'sh';
+    const deleteArgs = process.platform === 'win32'
+      ? ['/d', '/s', '/c', `echo 1| "${repowise.replace(/"/g, '""')}" delete -p . --force`]
+      : ['-c', `printf '1\\n' | "${repowise}" delete -p . --force`];
+    const registryPurge = await execSafe(deleteCmd, deleteArgs, {
+      cwd: copy.copyPath,
+      timeoutMs: runtime.timeoutMs,
+      allowFailure: true
+    });
+    // Filesystem purge: remove .repowise/ index and project-local .mcp.json
+    const repowiseDir = path.join(copy.copyPath, '.repowise');
+    const repowiseExisted = await pathExists(repowiseDir);
+    await safeRemoveWithin(copy.copyPath, repowiseDir);
+    await safeRemoveWithin(copy.copyPath, path.join(copy.copyPath, '.mcp.json'));
+    const fsPurgePassed = !await pathExists(repowiseDir);
+    profiles.push({
+      profile_id: copy.profile_id,
+      elapsed_ms: elapsedMs(started),
+      lifecycle_passed: init.exitCode === 0 && search.exitCode === 0 && registryPurge.exitCode === 0 && fsPurgePassed,
+      search_output_chars: String(search.stdout ?? '').length,
+      registry_purge_passed: registryPurge.exitCode === 0,
+      filesystem_purge_passed: fsPurgePassed,
+      repowise_dir_existed: repowiseExisted
+    });
+  }
+
+  return {
+    tool_id: tool.id,
+    status: getProfileLifecycleRunStatus(profiles),
+    installed_version: firstLine(version.stdout),
+    doctor_status: doctor.exitCode === 0 ? 'ok' : 'unavailable',
     profiles
   };
 }

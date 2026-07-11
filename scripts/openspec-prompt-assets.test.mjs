@@ -103,6 +103,10 @@ const CONTEXT7_CONTEXT_PROMPT_ASSETS = [
   'agent-files/claude/aifhub-review-sidecar.md'
 ];
 
+const REPOWISE_CONTEXT_DOC_ASSETS = [
+  'docs/context-providers.md'
+];
+
 const ROADMAP_REFERENCE_ASSETS = [
   'injections/references/aif-roadmap/roadmap-template.md',
   'injections/references/aif-roadmap/slice-checklist.md'
@@ -348,6 +352,38 @@ function assertContext7OptionalDocumentationGuidance(source, label) {
     source,
     /Context7 MCP automatically|automatic(?:ally)? .*Context7 MCP|не .*регистрируйте Context7 MCP|не .*регистрирует Context7 MCP/i,
     `${label} should forbid automatic Context7 MCP registration`
+  );
+}
+
+function assertRepowiseOptionalContextGuidance(source, label) {
+  for (const expected of [
+    'Repowise',
+    'manual_cli_only',
+    'repo_intelligence_provider',
+    '--index-only',
+    'repowise doctor',
+    '.repowise',
+    '.mcp.json',
+    'supporting',
+    'canonical OpenSpec evidence'
+  ]) {
+    assertIncludes(source, expected, label);
+  }
+
+  assert.match(
+    source,
+    /repowise delete|delete -p/i,
+    `${label} should document repowise purge`
+  );
+  assert.match(
+    source,
+    /do not auto-install Repowise|не .*auto-install Repowise|auto-install Repowise.*(?:forbidden|запрещ)|AIFHub commands не должны auto-install Repowise/i,
+    `${label} should forbid automatic Repowise install`
+  );
+  assert.match(
+    source,
+    /repowise init.*without constrained|init без constrained-флагов|init.*без constrained/i,
+    `${label} should forbid unconstrained repowise init`
   );
 }
 
@@ -624,6 +660,13 @@ describe('OpenSpec-native prompt asset contract', () => {
 
     const rootReadme = await readRepoFile('README.md');
     assertIncludes(rootReadme, 'docs/context-providers.md', 'README.md');
+  });
+
+  it('documents Repowise as optional repo-intelligence context, not an AIFHub dependency', async () => {
+    for (const relativePath of REPOWISE_CONTEXT_DOC_ASSETS) {
+      const asset = await readRepoFile(relativePath);
+      assertRepowiseOptionalContextGuidance(asset, relativePath);
+    }
   });
 
   it('requires verifier prompts to use fail-fast OpenSpec verification context', async () => {

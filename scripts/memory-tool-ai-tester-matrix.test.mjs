@@ -408,6 +408,29 @@ describe('ai-tester matrix manifest', () => {
     assert.match(preinitializedScenario, /id: no-codegraph-init-during-turn/);
     assert.match(preinitializedScenario, /id: no-codegraph-index-during-turn/);
 
+    const repowisePreinitializedScenario = renderAiTesterScenario({
+      id: 'case-repowise-preinitialized',
+      suite: 'positive',
+      expectation: 'positive',
+      skill: 'aif-explore',
+      tool_id: 'repowise',
+      preinitialized_tool_ids: ['repowise'],
+      profile_id: 'matrix-profile-04',
+      fixture_path: '<sanitized-fixture>',
+      task_scenario: 'architecture_or_impact_discovery',
+      selector_mode: 'source-fallback'
+    });
+
+    assert.match(repowisePreinitializedScenario, /setup_commands:/);
+    assert.match(repowisePreinitializedScenario, /repowise init \. --index-only/);
+    assert.match(repowisePreinitializedScenario, /--no-claude-md --no-agents --no-codex --no-distill-hook/);
+    assert.match(repowisePreinitializedScenario, /repowise search/);
+    assert.match(repowisePreinitializedScenario, /id: repowise-data-called/);
+    assert.match(repowisePreinitializedScenario, /\(\?:search\|health\|dead-code\|risk\|query\|get_overview\)/);
+    assert.match(repowisePreinitializedScenario, /id: repowise-purge-called/);
+    assert.match(repowisePreinitializedScenario, /id: no-repowise-init-during-turn/);
+    assert.match(repowisePreinitializedScenario, /id: no-repowise-serve-during-turn/);
+
     const portableSetupScenario = renderAiTesterScenario({
       id: 'case-portable-preinitialized',
       suite: 'positive',

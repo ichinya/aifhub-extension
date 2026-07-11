@@ -138,6 +138,7 @@ No paired positive source-retrieval `ai-tester` benchmark is recorded yet for `c
 | [agent-memory](agent-memory.md) | [results](agent-memory-benchmark-results.md) | [jayzeng/agentmemory](https://github.com/jayzeng/agentmemory) | `myagentmemory 0.4.12` | Manual markdown memory. | Docs-only/manual notes; не project retrieval provider. |
 | [eagle-mem](eagle-mem.md) | [results](eagle-mem-benchmark-results.md) | [eagleisbatman/eagle-mem](https://github.com/eagleisbatman/eagle-mem) | `4.9.10` | Shared memory + hooks + guardrails + lanes. | Reject/defer; scoped read/purge и MCP не доказаны. |
 | [CodeGraph](codegraph.md) | [results](codegraph-benchmark-results.md) | [colbymchenry/codegraph](https://github.com/colbymchenry/codegraph) | installed `0.9.3`, npm `0.9.4` | Manual CLI-only repo graph для exact screening cases. | `manual_cli_only`, `avoid_by_default`; final screening: +55.7% total tokens vs `rg`, useful only for exact skill+label cases. |
+| [Repowise](repowise.md) | [results](repowise-benchmark-results.md) | [repowise-dev/repowise](https://github.com/repowise-dev/repowise) | `repowise 0.25.0` | Repo-intelligence: Graph + Git + Health + dead-code + risk. | `manual_cli_only`, `avoid_by_default`; tiered (`--index-only` default, wiki при `doctor` OK); screening_policy пуст до ai-tester матрицы. |
 
 ## Итоговые Таблицы По Форматам Проектов
 

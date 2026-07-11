@@ -175,7 +175,7 @@ describe('tool plan', () => {
     const installed = plan.filter((tool) => tool.fullInstall).map((tool) => tool.id);
     const ids = plan.map((tool) => tool.id);
 
-    assert.deepEqual(ids, ['rg', 'git-gh', 'codegraph', 'graphify', 'context7', 'context-mode', 'codex-agent-mem']);
+    assert.deepEqual(ids, ['rg', 'git-gh', 'codegraph', 'repowise', 'graphify', 'context7', 'context-mode', 'codex-agent-mem']);
     assert.equal(installed.includes('codex-mem'), false);
     assert.equal(installed.includes('eagle-mem'), false);
     assert.equal(installed.includes('agent-memory'), false);

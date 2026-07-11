@@ -9,7 +9,7 @@ scenarios:
     task_signal: architecture_or_impact_discovery
     run_class: accepted_evidence
     skills: [aif-analyze, aif-explore, aif-plan]
-    tools: [codegraph, graphify]
+    tools: [codegraph, graphify, repowise]
     fixture_requirements:
       labels_any:
         - [js, standard, framework, single_repo, openspec_native, large_framework_app]
@@ -32,7 +32,7 @@ scenarios:
     task_signal: exact_file_or_symbol_lookup
     run_class: screening
     skills: [aif-explore, aif-review, aif-fix]
-    tools: [codegraph, graphify, context-mode]
+    tools: [codegraph, graphify, context-mode, repowise]
     fixture_requirements:
       labels_any:
         - [js, mini, framework, single_repo, none, small_microservice]
@@ -53,7 +53,7 @@ scenarios:
     task_signal: multirepo_surface_mapping
     run_class: accepted_evidence
     skills: [aif-analyze, aif-explore, aif-review]
-    tools: [codegraph, graphify]
+    tools: [codegraph, graphify, repowise]
     fixture_requirements:
       labels_any:
         - [js, standard, framework, monorepo, legacy_ai_factory_only, multirepo]

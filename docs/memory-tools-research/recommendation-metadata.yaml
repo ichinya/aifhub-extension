@@ -17,6 +17,7 @@ skill_usage_matrix:
       - codex-agent-mem
       - context-mode
       - codegraph
+      - repowise
     forbidden:
       - codex-mem
       - eagle-mem
@@ -29,6 +30,7 @@ skill_usage_matrix:
       - codex-agent-mem
       - context-mode
       - codegraph
+      - repowise
     forbidden:
       - codex-mem
       - eagle-mem
@@ -44,6 +46,7 @@ skill_usage_matrix:
       - codex-mem
       - eagle-mem
       - codegraph
+      - repowise
     notes: "Project-level architecture context only; optional provider output is supporting reviewed context and must not drive OpenSpec writes."
   aif-plan:
     allowed:
@@ -63,6 +66,7 @@ skill_usage_matrix:
       - graphify
       - context7
       - codex-agent-mem
+      - repowise
     forbidden:
       - context-mode
       - codex-mem
@@ -226,6 +230,11 @@ tool_permissions:
     aif-explore: manual_purged_cli_execution
     aif-architecture: forbidden
     default: forbidden
+  repowise:
+    aif-analyze: recommend_only
+    aif-explore: manual_purged_cli_execution
+    aif-review: recommend_only
+    default: forbidden
 availability_probes:
   rg:
     - rg --version
@@ -246,6 +255,9 @@ availability_probes:
     - codegraph --version
     - codegraph --help
     - codegraph status
+  repowise:
+    - repowise --version
+    - repowise doctor
 forbidden_operations:
   - auto_install
   - auto_run_setup
@@ -1003,6 +1015,147 @@ tools:
           - codegraph serve
           - codegraph serve --mcp
         pre_existing_state: "If .codegraph/ already exists, treat it as user-owned and do not delete or reinitialize it silently."
+  repowise:
+    display_name: Repowise
+    doc: repowise.md
+    results_doc: repowise-benchmark-results.md
+    repository: "https://github.com/repowise-dev/repowise"
+    tested_version: "repowise 0.25.0"
+    decision: manual_cli_only
+    recommendation_action: suggest_manual_cli_for_repo_intelligence_when_enabled_or_explicit
+    integration_role: repo_intelligence_provider
+    install_policy: explicit_user_opt_in_only
+    stable_cli: verified_for_version_doctor_init_index_only_search_delete
+    mcp_status: registered_by_user_init_only_not_by_aifhub
+    read_scope: explicit_project_path_constrained_index_only
+    purge_path: "two-stage: repowise delete -p . --force (feed interactive prompt with 1) then rm -rf .repowise .mcp.json"
+    allowed_in:
+      - aif-analyze
+      - aif-explore
+      - aif-review
+    forbidden_in:
+      - aif-architecture
+      - aif-plan
+      - aif-rules-check
+      - aif-implement
+      - aif-fix
+      - aif-verify
+      - aif-done
+      - aif-commit
+    privacy_caveat: "Local constrained init creates .repowise/ under the explicit project path until purged. repowise init globally registers an MCP server and PostToolUse hook in ~/.claude/settings.json and a central ~/.repowise/platform.json registry; this is accepted MCP-provider behavior and AIFHub must not run init from command ownership. The wiki tier (without --index-only) issues LLM API calls billed to the user; provider keys live in user-owned .repowise/.env (gitignored)."
+    conditional_for:
+      project_shapes:
+        - large_framework_app
+        - large_legacy
+        - multirepo
+      tasks:
+        - architecture_or_impact_discovery
+        - multirepo_surface_mapping
+      quality_gate: "Do not treat low token output as success by itself. Require non-empty useful repowise search/health/get_overview results; header-only or empty context is avoid_no_useful_context."
+      condition: "Только после baseline rg и только когда tools.repowise.screening_policy содержит exact match по skill + project labels. Не выбирать по language-only, skill-only или broad project shape. Index-only tier (zero LLM) is the default; wiki tier requires repowise doctor to confirm provider configuration."
+    screening_policy:
+      evidence: repowise-paired-ab-glm5turbo-2026-06-29-smoke
+      report: docs/memory-tools-research/repowise-benchmark-results.md
+      default_decision: avoid_by_default
+      baseline: rg
+      require_baseline_first: true
+      require_match_granularity: skill_task_project_labels
+      do_not_select_by: [language_only, skill_only, broad_shape_only]
+      aggregate:
+        rows_total: 6
+        rows_executed: 6
+        rows_pass: 5
+        rows_fail: 1
+        paired_rows: 3
+        pass_pass_pairs: 3
+        repowise_total_tokens_delta_percent: -24.8
+        repowise_cost_delta_percent: -45.9
+        repowise_duration_delta_percent: 139.3
+        repowise_turns_delta_percent: -33.2
+        repowise_lower_total_tokens_pairs: 3
+        repowise_lower_total_tokens_percent: 100.0
+        repowise_lower_cost_pairs: 3
+        repowise_lower_cost_percent: 100.0
+        repowise_faster_pairs: 0
+        repowise_faster_percent: 0.0
+        repowise_fewer_turns_pairs: 3
+        repowise_fewer_turns_percent: 100.0
+      profile_signals:
+        large:
+          - profile: project-6bfa82605c24
+            language: php
+            size: large
+            total_tokens_delta_percent: -27.3
+            cost_delta_percent: -41.0
+            turns_delta_percent: -44.4
+          - profile: project-ac1ab2d4c116
+            language: go
+            size: large
+            total_tokens_delta_percent: -32.6
+            cost_delta_percent: -39.9
+            turns_delta_percent: -34.1
+        mini:
+          - profile: project-0958c3a5928c
+            language: js
+            size: mini
+            total_tokens_delta_percent: -14.5
+            cost_delta_percent: -56.7
+            turns_delta_percent: -21.1
+            caveat: "Smallest token win but largest cost win; rg sufficient for basic exploration on mini projects."
+      conditional_cases:
+        - id: large_framework_app_architecture_or_impact_discovery
+          required_shapes: [large_framework_app, multirepo]
+          skills: [aif-analyze, aif-explore, aif-review]
+          tasks: [architecture_or_impact_discovery, multirepo_surface_mapping]
+          best_rows:
+            - "project-6bfa82605c24 (php/large): -27.3% total tokens, -41.0% cost, -44.4% turns vs rg"
+            - "project-ac1ab2d4c116 (go/large): -32.6% total tokens, -39.9% cost, -34.1% turns vs rg"
+          recommendation_gate: "Smoke signal only (3 paired runs, glm-5-turbo). repowise saves tokens via fewer turns from structured-data queries, at cost of wall-clock init overhead. Apply only on large/framework projects for architecture discovery; rg remains baseline."
+      known_avoid_cases:
+        - id: framework_service_container_dead_code_false_positives
+          shapes: [large_framework_app]
+          languages: [php]
+          tasks: [exact_file_or_symbol_lookup]
+          reason: "repowise dead-code analysis flags container-discovered services (Laravel DI) as unreachable (in_degree=0, 70% confidence). High false-positive rate on framework apps with service containers. Dead-code output unreliable without framework-aware tuning."
+    do_not_recommend_for:
+      project_shapes:
+        - small_microservice
+      tasks:
+        - exact_file_or_symbol_lookup
+        - validation_gate
+        - implementation
+        - automatic_mcp_registration
+    suggestion_text: "Предлагать Repowise только когда screening_policy conditional_cases совпал по skill + project labels. После rg baseline: probe (repowise --version, repowise doctor), run constrained init --index-only --no-claude-md --no-agents --no-codex --no-distill-hook, verify useful non-empty output from repowise search/health, then two-stage purge. Do not run repowise init without constrained flags, repowise serve, repowise hook install, repowise generate-claude-md, or mutate agent config from AIFHub command ownership."
+    execution:
+      aif-explore:
+        mode: manual_purged_cli_execution
+        tiers:
+          default:
+            init: "repowise init <project> --index-only --no-claude-md --no-agents --no-codex --no-distill-hook --yes"
+            enables: [get_overview, get_context, get_health, get_risk, get_dead_code, search_symbol]
+            cost: zero_llm_zero_api
+          wiki:
+            gate_probe: "repowise doctor -> Provider config: OK"
+            init: "repowise init <project> --no-claude-md --no-agents --no-codex --no-distill-hook --yes"
+            enables: [get_answer, search_semantic, search_fulltext, query]
+            cost_note: "LLM API calls billed to user; keys in user-owned .repowise/.env"
+        safe_probes:
+          - repowise --version
+          - repowise doctor
+        commands:
+          - repowise search "<query>" --mode symbol --limit 5
+          - repowise health --format md
+          - repowise dead-code --format table
+          - repowise risk HEAD --format md
+        purge:
+          - repowise delete -p . --force
+          - rm -rf .repowise .mcp.json
+        forbidden_commands:
+          - repowise init
+          - repowise serve
+          - repowise hook install
+          - repowise generate-claude-md
+        pre_existing_state: "If .repowise/ already exists, treat it as user-owned and do not delete or reinitialize it silently."
 proven_label_evidence:
   - id: codegraph-js-mini-framework-small-microservice-2d6a0d2c-2026-05-27
     source_evidence: historical-codegraph-screening-gpt54mini-2026-05-27
@@ -1153,6 +1306,32 @@ proven_label_evidence:
     provenance:
       report: .ai-factory/state/ai-tester-tool-evaluations/graphify-project-8d97432e6d7a-architecture-explore-plan-20260611t1821z/ai-tester-token-matrices.json
       generated_at: "2026-06-11T18:27:36.160Z"
+  - id: repowise-paired-ab-glm5turbo-2026-06-29-smoke
+    source_evidence: repowise-paired-ab-glm5turbo-2026-06-29
+    scenario_id: architecture-impact-discovery
+    run_class: smoke
+    tool_id: repowise
+    task_scenario: architecture_or_impact_discovery
+    skills: [aif-analyze, aif-explore, aif-review]
+    required_shapes: [large_framework_app, multirepo]
+    profiles:
+      total: 3
+      paired: 3
+      pass_pass: 3
+      useful: 3
+    aggregate_deltas:
+      total_tokens_percent: -24.8
+      cost_percent: -45.9
+      turns_percent: -33.2
+      duration_percent: 139.3
+    decision: conditional
+    caveat: "Smoke signal (3 paired runs, glm-5-turbo via z.ai). repowise saves tokens via fewer turns from structured-data queries on all 3 profiles (php/large, js/mini, go/large). Trade-off: wall-clock init overhead (+139%). dead-code false positives on framework service containers. Full screening matrix (300 rows like codegraph) not yet run — conditional_cases based on smoke only."
+    provenance:
+      report: docs/memory-tools-research/repowise-benchmark-results.md
+      runner: ai-tester 0.5.0
+      runtime: claude
+      model: glm-5-turbo
+      generated_at: "2026-06-29T00:00:00.000Z"
 evidence_runs:
   - id: live-ai-tester-path-hash-tool-batch-2026-06-11
     date: "2026-06-11"

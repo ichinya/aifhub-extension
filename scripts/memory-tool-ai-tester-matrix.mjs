@@ -165,8 +165,8 @@ const DEFAULT_TASK_SCENARIOS = [
 const OPTIONAL_TOOLS = getToolPlan('safe')
   .map((tool) => tool.id)
   .filter((toolId) => toolId !== 'rg' && toolId !== 'git-gh');
-const REPO_GRAPH_TOOLS = new Set(['codegraph', 'graphify']);
-const PREINITIALIZABLE_TOOLS = new Set(['codegraph', 'graphify', 'context7', 'context-mode']);
+const REPO_GRAPH_TOOLS = new Set(['codegraph', 'graphify', 'repowise']);
+const PREINITIALIZABLE_TOOLS = new Set(['codegraph', 'graphify', 'context7', 'context-mode', 'repowise']);
 const SELECTOR_COMMANDS = {
   installed: 'ai-factory aifhub-memory-tools select --from-project --command <skill> --json',
   'source-fallback': 'node scripts/memory-tool-recommender.mjs select --from-project --command <skill> --json'
@@ -723,6 +723,15 @@ export function renderAiTesterScenario(input = {}) {
         `      command: ${quoteYamlSingle(toolSubcommandInvocationRegexForYaml('context-mode', ['doctor', 'ctx_index', 'ctx_search']))}`
       );
     }
+    if (input.tool_id === 'repowise') {
+      lines.push(
+        '  - id: repowise-data-called',
+        '    type: tool_called',
+        '    tool: Bash',
+        '    args_match:',
+        `      command: ${quoteYamlSingle(toolSubcommandInvocationRegexForYaml('repowise', ['search', 'health', 'dead-code', 'risk', 'query', 'get_overview']))}`
+      );
+    }
     if (isCodeGraphPreinitialized && input.tool_id === 'codegraph') {
       lines.push(
         '  - id: codegraph-purge-called',
@@ -740,6 +749,25 @@ export function renderAiTesterScenario(input = {}) {
         '    tool: Bash',
         '    args_match:',
         `      command: ${quoteYamlSingle(codegraphSubcommandInvocationRegexForYaml('index'))}`
+      );
+    }
+    if (isToolPrepared && input.tool_id === 'repowise') {
+      lines.push(
+        '  - id: repowise-purge-called',
+        '    type: tool_called',
+        '    tool: Bash',
+        '    args_match:',
+        `      command: ${quoteYamlSingle(toolSubcommandInvocationRegexForYaml('repowise', ['delete']))}`,
+        '  - id: no-repowise-init-during-turn',
+        '    type: no_tool_called',
+        '    tool: Bash',
+        '    args_match:',
+        `      command: ${quoteYamlSingle(toolSubcommandInvocationRegexForYaml('repowise', ['init']))}`,
+        '  - id: no-repowise-serve-during-turn',
+        '    type: no_tool_called',
+        '    tool: Bash',
+        '    args_match:',
+        `      command: ${quoteYamlSingle(toolSubcommandInvocationRegexForYaml('repowise', ['serve']))}`
       );
     }
     if (input.expectation === 'overhead') {
@@ -1197,6 +1225,9 @@ function setupCommandsForTools(toolIds = []) {
     commands.push('cd project && codegraph init .');
     commands.push('cd project && codegraph index --quiet .');
   }
+  if (toolIds.includes('repowise')) {
+    commands.push('cd project && repowise init . --index-only --no-claude-md --no-agents --no-codex --no-distill-hook --yes');
+  }
   if (toolIds.includes('graphify')) {
     commands.push('cd project && py -3 -m venv .ai-tester-tools/graphify-venv');
     commands.push('cd project && .ai-tester-tools/graphify-venv/Scripts/python.exe -m pip install --disable-pip-version-check graphifyy');
@@ -1211,6 +1242,15 @@ function setupCommandsForTools(toolIds = []) {
 }
 
 function preparedToolPromptLines(toolId) {
+  if (toolId === 'repowise') {
+    return [
+      '  setup_commands initialized a deterministic repowise index-only tier in project/.repowise before this model turn.',
+      '  Use the existing repowise index directly as the controlled optional tool_run for this benchmark pair.',
+      '  Do not run repowise init or repowise serve during the model turn.',
+      '  Use repowise search "<query>" --mode symbol, repowise health, or repowise dead-code to read supporting repo-intelligence context, then summarize whether it was useful versus rg.',
+      '  Before completion, purge the setup index with repowise delete (feeding the interactive prompt) or equivalent, then remove project/.repowise and project/.mcp.json.'
+    ];
+  }
   if (toolId === 'graphify') {
     return [
       '  setup_commands installed Graphify in project/.ai-tester-tools/graphify-venv before this model turn.',

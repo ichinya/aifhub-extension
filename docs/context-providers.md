@@ -144,3 +144,22 @@ Safe field run 2026-05-24 повторил scoped lifecycle на 55 anonymous te
 `/aif-analyze` может рекомендовать CodeGraph, когда metadata показывает, что broad repo graph полезен. `/aif-explore` может использовать scoped CLI lifecycle только когда `select --command aif-explore --json` возвращает CodeGraph в `selected_tools` с `manual_purged_cli_execution`, и только с purge command из returned `execution` field перед завершением.
 
 AIFHub commands не должны auto-install CodeGraph, запускать `codegraph install`, запускать `codegraph sync`, запускать `codegraph serve --mcp`, mutate agent configuration, register MCP automatically или treat CodeGraph output as canonical OpenSpec evidence. Manual `init/index/query/uninit` разрешен только в `/aif-explore` с explicit path, command-specific permission и purge.
+
+## Repowise
+
+Repowise - manual CLI-only repo-intelligence provider для analyze/explore/review. Local metadata фиксирует его как `manual_cli_only` с `suggest_manual_cli_for_repo_intelligence_when_enabled_or_explicit`, `integration_role: repo_intelligence_provider`. В отличие от CodeGraph (graph-only), Repowise даёт пять слоёв: Graph, Git (hotspots/co-change/bus factor), Docs (LLM-wiki), Decisions (ADR mining), Code Health (defect risk).
+
+Allowed availability probes для AIFHub automation ограничены:
+
+```bash
+repowise --version
+repowise doctor
+```
+
+Spike 2026-06-28 на копии проекта (1045 PHP-файлов, 480 коммитов) подтвердил constrained lifecycle `init --index-only --no-claude-md --no-agents --no-codex --no-distill-hook`, `search`, `health`, `risk`, `dead-code` и двухступенчатый purge (`delete -p . --force` требует подачи stdin `1\n`, т.к. `--force` не подавляет интерактивный prompt; затем `rm -rf .repowise .mcp.json`). Installed CLI был `0.25.0`. Это подтверждает `manual_cli_only`, но не расширяет разрешения на install/MCP/agent-config mutation.
+
+`/aif-analyze` может рекомендовать Repowise. `/aif-explore` может использовать scoped CLI lifecycle только когда `select --command aif-explore --json` возвращает Repowise в `selected_tools` с `manual_purged_cli_execution`. `/aif-review` может использовать Code Health/risk findings как supporting context. Purge обязателен перед завершением через returned `execution.purge` field.
+
+Tiered lifecycle управляется опцией `utilities.repowise.wiki` в `.ai-factory/config.yaml`: `off` (всегда детерминированный `--index-only`), `if_configured` (по умолчанию - Tier 0, Tier 1 wiki при `repowise doctor` → `Provider config: OK`), `on` (всегда wiki). LLM API-вызовы wiki tier'а оплачивает пользователь; ключи провайдера живут в user-owned `.repowise/.env` (gitignored).
+
+AIFHub commands не должны auto-install Repowise, запускать `repowise init` без constrained-флагов (полный init глобально мутирует `~/.claude/settings.json` и `~/.repowise/platform.json`), запускать `repowise serve`, `repowise hook install`, `repowise generate-claude-md`, mutate agent configuration из command ownership или treat Repowise output as canonical OpenSpec evidence. Repowise coexists с CodeGraph под разными `integration_role`; proven CodeGraph screening policy не переносится на Repowise без собственной evidence.
