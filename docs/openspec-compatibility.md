@@ -213,9 +213,43 @@ Upstream `/aif-architecture`, `/aif-docs`, `/aif-qa`, and `/aif-roadmap` remain 
 
 These utilities must not create or mutate `openspec/changes/**`, `openspec/specs/**`, `.ai-factory/state/**`, `.ai-factory/rules/generated/**`, or AIFHub verification/finalization evidence under `.ai-factory/qa/<change-id>/`. `/aif-qa` may use the same configured `paths.qa` root as AIFHub, but upstream manual QA artifacts use branch slugs while `/aif-verify` and `/aif-done` evidence use OpenSpec `change-id` directories.
 
-## AI Factory 2.15 Reviewed Baseline
+### Branch-scoped QA design and execution
 
-The reviewed AI Factory `2.15.0` baseline includes AI Factory `2.14.0` archive behavior, config-aware project-context utilities, and AI Factory `2.15.0` update behavior.
+Upstream `/aif-qa` writes `change-summary.md`, `test-plan.md`, and `test-cases.md` under `paths.qa/<branch-slug>/`; `/aif-qa-check` executes those cases and writes `qa-check.md` in the same directory. Both derive a collision-resistant `<safe-prefix>-<hash8>` from the original branch name.
+
+Current QA-check results bind to `tested_revision` plus `worktree_digest` for git or `manual_build_id` outside git, and to `source_digest` plus per-case `case_digests`. Changed bindings mark affected outcomes unchecked `Stale` while preserving prior comments and evidence as history. Evidence should match the execution surface: backend tests, CLI, API, file/docs, and database-read cases are not blocked solely by missing browser automation.
+
+`agent-context.md` and `agent-history.md` may preserve only reusable non-sensitive setup facts or cross-run lessons. Production, unknown targets, destructive actions, and external side effects require explicit authorization for the current target/action. Persisted evidence replaces credentials, cookies, authorization values, tokens, one-time codes, private data, and sensitive URL parameters with `[REDACTED]`.
+
+Branch-scoped `qa-check.md` is not change-scoped AIFHub evidence. It cannot by itself satisfy `/aif-verify`, `/aif-done`, `coverage.json`, rules evidence, `done-readiness.json`, `done.md`, or `openspec-archive.json`; no implicit bridge is registered.
+
+## AI Factory 2.17 Reviewed Baseline
+
+The reviewed AI Factory `2.17.0` baseline is cumulative: it retains the existing AI Factory `2.13`-`2.15` compatibility facts, including config-aware project-context utilities, and adds a full audit of `2.15.0...2.16.0` (29 commits) and `2.16.0...2.17.0` (14 commits). AIFHub adapts only behavior that crosses its OpenSpec-native ownership boundaries; upstream-owned behavior remains upstream-owned.
+
+### AI Factory 2.16 and 2.17 audit
+
+| Upstream change | AIFHub outcome |
+|---|---|
+| Revision-bound research context | Adapt through planning/improve prompts: a committed `## Research Context` snapshot remains authoritative until an explicit rebase, while live research is used only for drift detection and rationale. |
+| Branch-scoped `/aif-qa-check` | Document as an upstream QA execution utility over `paths.qa/<branch-slug>/test-cases.md`; its `qa-check.md` is not AIFHub change-scoped verify, coverage, rules, done, or archive evidence. |
+| Regression-first `/aif-fix` | Adapt the OpenSpec-native fix loop to record the narrow pre-fix check, identical post-fix check, QA provenance, and fallback decision under `.ai-factory/state/<change-id>/fixes/`; `/aif-verify` remains authoritative. |
+| Verbatim `## Original Request` | Adapt planning and refinement prompts so recognized control tokens are removed only from command positions and the preserved request section is not translated or regenerated. |
+| QA execution-surface follow-ups | Document that browser automation is not required for backend, CLI, API, file/docs, or database-read cases when another concrete evidence surface is appropriate. |
+| Collision-resistant QA branch identity | Document the shared filesystem-safe prefix plus digest contract used by `/aif-qa` and `/aif-qa-check`. |
+| QA freshness and reusable memory | Document `tested_revision`, `worktree_digest` or `manual_build_id`, `source_digest`, per-case digests, stale-result invalidation, and non-sensitive `agent-context.md` / `agent-history.md`. |
+| QA safety and redaction | Require explicit authorization for production, unknown-target, destructive, or external-side-effect execution and redact credentials, cookies, authorization values, tokens, one-time codes, private data, and sensitive URL parameters before persistence. |
+| Custom fix-plan preservation | Reviewed upstream ownership: AIFHub adds no delete implementation; upstream resolved-path behavior preserves custom or explicitly supplied non-default `paths.fix_plan` files. |
+| Plan/improve Original Request follow-ups | Fold into the same immutable-source contract across plan creation, improve, plan-polisher, implement, verify, and fix consumers. |
+| Universal / Other MCP | Adapt instruction and docs only. Upstream AI Factory `2.16+` renders standard `mcpServers` settings to `.mcp.json`; the AIFHub canonical server template stays runtime-neutral. This auto-configuration is version-gated and is not promised for supported AI Factory `2.11`-`2.15` runtimes. |
+| Project-evidence-backed control flow | Adapt through `aif-analyze` and its base-rules template only: emit project-specific guard-clause, early-return/continue, helper, or intentional nesting guidance only when repository evidence supports it. |
+| Refined `/aif-architecture` structure | Reviewed no-op: upstream `/aif-architecture` remains the command owner and `injections/core/aif-architecture-context-boundary.md` remains boundary-only. |
+| Generated-rules changes | Reviewed no-op: project-specific Control Flow detection belongs to `aif-analyze`; AIFHub does not duplicate it in the generated-rules compiler. |
+| Community-extension documentation | Reviewed no-op: no AIFHub contract changes, so complete upstream community documentation bodies are not copied. |
+
+The metadata compatibility range remains `>=2.11.0 <3.0.0`. Behaviors introduced by newer upstream runtimes are labeled by version instead of raising the minimum without a proven hard dependency.
+
+### Preserved earlier baseline behavior
 
 AI Factory 2.14+ includes upstream `/aif-archive` and `paths.archive`. AIFHub treats `/aif-archive` as legacy AI Factory-only cleanup, not as OpenSpec-native finalization:
 

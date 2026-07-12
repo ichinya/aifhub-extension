@@ -548,6 +548,21 @@ describe('OpenSpec execution context API', () => {
       summary: 'Fixed OAuth',
       canonicalArtifactsRead: ['openspec/changes/add-oauth/tasks.md'],
       generatedRulesRead: [],
+      qaEvidenceRead: ['.ai-factory/qa/add-oauth/verify.md'],
+      regressionCheck: {
+        command: 'node --test auth.test.mjs',
+        inputs: 'OAuth callback fixture',
+        environment: 'temporary test root'
+      },
+      preFixResult: {
+        exitCode: 1,
+        observed: 'callback regression reproduced'
+      },
+      postFixResult: {
+        exitCode: 0,
+        observed: 'same callback check passed'
+      },
+      fallbackDecision: 'Not applicable; regression reproduced.',
       changedFiles: ['src/auth.js']
     }, {
       rootDir,
@@ -558,8 +573,54 @@ describe('OpenSpec execution context API', () => {
     assert.equal(execution.relativePath, '.ai-factory/state/add-oauth/implementation/run-001.md');
     assert.equal(fix.ok, true);
     assert.equal(fix.relativePath, '.ai-factory/state/add-oauth/fixes/fix-001.md');
-    assert.match(await readFile(execution.path, 'utf8'), /# Implementation Trace: add-oauth/);
-    assert.match(await readFile(fix.path, 'utf8'), /# Fix Trace: add-oauth/);
+    assert.equal(
+      await readFile(execution.path, 'utf8'),
+      [
+        '# Implementation Trace: add-oauth',
+        '',
+        '## Summary',
+        '',
+        'Implemented OAuth',
+        '',
+        '## Canonical artifacts read',
+        '',
+        '- openspec/changes/add-oauth/tasks.md',
+        '',
+        '## Generated rules read',
+        '',
+        '- .ai-factory/rules/generated/openspec-base.md',
+        '',
+        '## Changed files',
+        '',
+        '- src/auth.js',
+        '',
+        '## Next step',
+        '',
+        '/aif-verify add-oauth',
+        ''
+      ].join('\n'),
+      'Implementation trace shape must remain byte-identical when Fix-only evidence fields are added.'
+    );
+    const fixContent = await readFile(fix.path, 'utf8');
+    for (const expected of [
+      '# Fix Trace: add-oauth',
+      '## QA evidence read',
+      '.ai-factory/qa/add-oauth/verify.md',
+      '## Regression check',
+      'node --test auth.test.mjs',
+      'OAuth callback fixture',
+      'temporary test root',
+      '## Pre-fix result',
+      '"exitCode": 1',
+      'callback regression reproduced',
+      '## Post-fix result',
+      '"exitCode": 0',
+      'same callback check passed',
+      '## Fallback decision',
+      'Not applicable; regression reproduced.'
+    ]) {
+      assert.match(fixContent, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `Fix trace should include ${expected}.`);
+    }
     assert.equal(await pathExists(path.join(rootDir, 'openspec', 'changes', 'add-oauth', '.ai-factory')), false);
     assert.equal(await pathExists(path.join(rootDir, '.ai-factory', 'plans', 'add-oauth')), false);
 
@@ -588,6 +649,31 @@ describe('OpenSpec execution context API', () => {
       await pathExists(path.join(rootDir, 'openspec', 'changes', 'add-oauth', 'implementation', 'escape.md')),
       false
     );
+
+    const unexpectedPass = await writeFixTrace('add-oauth', {
+      summary: 'Regression check passed unexpectedly.',
+      regressionCheck: { command: 'node --test auth.test.mjs' },
+      preFixResult: { exitCode: 0, observed: 'unexpected pass' },
+      fallbackDecision: { status: 'blocked', reason: 'unexpected-pass', action: 'no implementation edits' }
+    }, {
+      rootDir,
+      runId: 'fix-unexpected-pass'
+    });
+    const unexpectedPassContent = await readFile(unexpectedPass.path, 'utf8');
+    assert.match(unexpectedPassContent, /"reason": "unexpected-pass"/, 'Unexpected-pass fallback should be explicit.');
+    assert.match(unexpectedPassContent, /## Post-fix result\n\nNot recorded\./, 'Unexpected-pass fallback should make missing post-fix result explicit.');
+
+    const noCheck = await writeFixTrace('add-oauth', {
+      summary: 'No useful regression check was available.',
+      fallbackDecision: { status: 'blocked', reason: 'no-useful-check', action: 'no implementation edits' }
+    }, {
+      rootDir,
+      runId: 'fix-no-check'
+    });
+    const noCheckContent = await readFile(noCheck.path, 'utf8');
+    assert.match(noCheckContent, /## QA evidence read\n\n- not recorded/, 'No-check fallback should make missing QA provenance explicit.');
+    assert.match(noCheckContent, /## Regression check\n\nNot recorded\./, 'No-check fallback should make missing regression check explicit.');
+    assert.match(noCheckContent, /"reason": "no-useful-check"/, 'No-check fallback reason should be explicit.');
   });
 
   it('returns stable failure shape for unsafe change ids and rejects unsafe run ids', async () => {

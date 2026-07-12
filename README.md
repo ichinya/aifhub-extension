@@ -108,7 +108,17 @@ A dirty workspace is blocking by default before `/aif-done`. Inspect with `git s
 
 It does not replace `/aif-commit`. After `/aif-done`, run `/aif-commit` or your normal git workflow to commit implementation changes, OpenSpec archive/spec changes, QA evidence, and final summaries.
 
-### AI Factory 2.15 Reviewed Baseline
+### AI Factory 2.17 Reviewed Baseline
+
+AIFHub is reviewed against AI Factory `2.17.0` while retaining the compatibility range `>=2.11.0 <3.0.0`. The cumulative `2.16`/`2.17` adaptation keeps upstream skills as command owners and adds only AIFHub-owned OpenSpec boundaries:
+
+- Planning preserves explicit input as immutable `## Original Request`; research-backed plans use a revision-bound `## Research Context` and report `WARN [research-drift]` instead of silently rebasing scope. See [Usage](docs/usage.md) and [Context Loading Policy](docs/context-loading-policy.md).
+- Post-verify fixes use the same targeted regression check before and after the edit and keep the result as supporting runtime evidence; `/aif-verify` remains authoritative. See [Usage](docs/usage.md).
+- `/aif-qa-check` consumes branch-scoped `test-cases.md` and writes branch-scoped `qa-check.md`; it does not satisfy AIFHub verify, coverage, done, or archive gates. See [OpenSpec Compatibility](docs/openspec-compatibility.md).
+- AI Factory `2.16+` Universal / Other MCP rendering uses `.mcp.json` with `mcpServers`; older compatible runtimes are not promised this rendering. See [AIFHub MCP](docs/aifhub-mcp.md).
+- `aif-analyze` may add a project-specific `Control Flow` base rule only when repository evidence supports it. Generated OpenSpec rules remain a separate derived layer.
+
+The full tag audit and reviewed no-ops are recorded in [OpenSpec Compatibility](docs/openspec-compatibility.md): upstream architecture refinements remain upstream-owned, generated-rules compilation is not duplicated, community-extension docs are not copied, and legacy custom fix-plan cleanup remains upstream-owned.
 
 AI Factory 2.13+ owns generic active plan `## Commit Plan` grouping in `/aif-commit`. AIFHub must not duplicate that grouping logic, and `/aif-commit` remains the only commit owner; `/aif-done` finalizes OpenSpec lifecycle evidence but does not create git commits.
 
@@ -328,13 +338,13 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 | [Context Providers](docs/context-providers.md) | Optional Graphify and Context7 provider guidance, reviewed-note paths, degraded behavior, and user-owned setup boundaries |
 | [Memory Tool Recommendations](docs/memory-tool-recommendations.md) | Local metadata-driven optional memory/context tool recommendations and installed wrapper commands |
 | [Context Loading Policy](docs/context-loading-policy.md) | Consumer context, optional provider context, GitHub-aware roadmap evidence, command ownership, upstream utility boundaries, and legacy boundaries |
-| [OpenSpec Compatibility](docs/openspec-compatibility.md) | Optional CLI adapter policy, OpenSpec 1.4.1 reviewed baseline, AI Factory 2.15 baseline, upstream project-context utility boundaries, `/aif-archive` boundary, and capability flags |
+| [OpenSpec Compatibility](docs/openspec-compatibility.md) | Optional CLI adapter policy, OpenSpec 1.4.1 reviewed baseline, AI Factory 2.17 planning/fix/QA/MCP/Control Flow adaptations, reviewed no-ops, archive boundary, and capability flags |
 | [OpenSpec Artifact Validation](docs/openspec-validation.md) | Read-only AIFHub contract validator for OpenSpec-native artifacts |
 | [OpenSpec Coverage Matrix](docs/spec-coverage.md) | Requirement-to-code coverage artifact and verify/done policy |
 | [Legacy Plan Migration](docs/legacy-plan-migration.md) | Explicit migration from legacy plans to OpenSpec-native changes |
 | [Active Change Resolver](docs/active-change-resolver.md) | Active change selection and runtime paths |
 | [ADR 0001](docs/adr/0001-openspec-native-artifact-protocol.md) | v1 artifact ownership decision |
-| [AIFHub MCP](docs/aifhub-mcp.md) | Optional MCP server tools and runtime-specific settings shapes |
+| [AIFHub MCP](docs/aifhub-mcp.md) | Optional MCP server tools, runtime-specific settings shapes, and AI Factory 2.16+ Universal / Other rendering |
 | [Codex Agents](docs/codex-agents.md) | Namespaced Codex CLI agent files |
 | [Claude Agents](docs/claude-agents.md) | Namespaced Claude agent files |
 

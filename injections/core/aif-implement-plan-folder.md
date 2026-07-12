@@ -56,6 +56,14 @@ Read canonical OpenSpec artifacts before editing implementation files:
 - `openspec/changes/<change-id>/tasks.md`
 - `openspec/changes/<change-id>/specs/**/spec.md`
 
+Treat planning source sections as read-only implementation context:
+
+- Use `## Original Request` as the raw intent anchor that explains why the change exists. Do not translate, normalize, rewrite, or use it instead of the executable `tasks.md`, design decisions, or requirements.
+- When `proposal.md` contains `## Research Context`, use its embedded Active Summary and source revision as the authoritative committed scope.
+- Compare live `paths.research` only for revision drift and optional rationale. If `Updated` or normalized `SHA256` differs, or legacy source metadata is incomplete, emit `WARN [research-drift] change-id=<change-id> source=<path> expected=<embedded revision> current=<live revision>` and continue from the embedded snapshot.
+- Do not silently apply requirements from newer research, expand task scope, or mutate `## Original Request` or `## Research Context` during implementation.
+- Keep credentials, raw provider output, and the full request/research bodies out of drift diagnostics and execution traces.
+
 Hydrate runtime todo state from canonical OpenSpec tasks before editing implementation files:
 
 - Treat `openspec/changes/<change-id>/tasks.md` as the source checklist.

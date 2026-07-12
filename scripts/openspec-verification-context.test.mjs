@@ -634,6 +634,19 @@ describe('OpenSpec verification context API', () => {
     assert.equal(latest.coverage.exists, true, 'latest verification evidence should include coverage artifact status');
   });
 
+  it('does not treat branch-scoped qa-check.md as change-scoped verify or coverage evidence', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+    await writeFixture(rootDir, '.ai-factory/qa/feature-oauth-a1b2c3d4/qa-check.md', '# QA Check\n\n- [x] Browser smoke passed\n');
+
+    const latest = await readLatestVerificationEvidence('add-oauth', { rootDir });
+
+    assert.equal(latest.verify.exists, false, 'branch qa-check.md must not satisfy change-scoped verify.md evidence');
+    assert.equal(latest.coverage.exists, false, 'branch qa-check.md must not satisfy change-scoped coverage.json evidence');
+    assert.notEqual(latest.verify.path, '.ai-factory/qa/feature-oauth-a1b2c3d4/qa-check.md');
+    assert.notEqual(latest.coverage.relativePath, '.ai-factory/qa/feature-oauth-a1b2c3d4/qa-check.md');
+  });
+
   it('fails the verify gate when strict coverage has missing requirements', async () => {
     const rootDir = await createTempRoot();
     await writeFixture(rootDir, '.ai-factory/config.yaml', [

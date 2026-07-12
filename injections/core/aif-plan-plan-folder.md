@@ -33,7 +33,16 @@ If the task is docs/tooling-only and does not change product or workflow behavio
 
 #### Task Intake Normalization
 
-Before writing canonical OpenSpec artifacts, normalize the raw request into these fields:
+Before normalizing task content, preserve the explicit planning request as canonical raw source when one was supplied:
+
+- Remove only recognized invocation tokens that occur in command positions: the leading `/aif-plan` or runtime-equivalent skill token, the leading `full` mode token, and recognized control flags parsed before the request body.
+- Do not remove words such as `full`, `fast`, `--list`, or `--parallel` when they occur inside the actual request text.
+- Trim only parser-introduced outer whitespace. Preserve the remaining request wording, casing, punctuation, internal whitespace, and line breaks exactly; do not translate, summarize, normalize, or regenerate it.
+- Write the fixed `## Original Request` heading and preserved body to `proposal.md` before `## Intent`.
+- If planning starts only from the resolved research artifact and no explicit request exists, omit `## Original Request`.
+- If both an explicit request and relevant research influence the plan, keep both `## Original Request` and `## Research Context`; they have different source and mutability contracts.
+
+After preserving the raw request, normalize the task into these fields:
 
 - task type
 - goal
@@ -58,6 +67,21 @@ Write the normalized task content into canonical OpenSpec artifacts:
 Do not create a separate task-preparation command or artifact in OpenSpec-native mode. `/aif-task-prepare`, `.ai-factory/specs/<task-id>.md`, `task-prepare.md`, and legacy companion files under `openspec/changes/<change-id>/` must not be created.
 
 Raw input trace, normalization confidence, and temporary notes are runtime state only. They may be persisted only under `.ai-factory/state/<change-id>/` when needed and must never be written under `openspec/changes/<change-id>/`.
+
+#### Revision-bound Research Context
+
+When the resolved `paths.research` Active Summary materially affects scope, tasks, constraints, or tradeoffs, commit only the relevant summary to `proposal.md` under `## Research Context`:
+
+```text
+Source: <resolved paths.research> (Active Summary, Updated: <timestamp>, SHA256: <digest>)
+<copied Active Summary>
+```
+
+- Treat the embedded section as the committed requirements snapshot; do not copy the full `## Sessions` history into the proposal.
+- Compute `SHA256` from the copied Active Summary after excluding markdown comments and the `Source` line, normalizing line endings to LF, removing trailing spaces from each line, preserving line order, and ending the digest input with exactly one newline.
+- Once written, the snapshot and source revision remain immutable unless the user explicitly requests a research rebase through refinement.
+- If the live research revision changes while planning is in progress, emit `WARN [research-drift] change-id=<change-id> source=<path> expected=<embedded revision> current=<live revision>` and keep the embedded snapshot authoritative. Do not log or duplicate the full research body, provider output, credentials, or other sensitive content in the warning.
+- Live `## Sessions` may be consulted for rationale, but newer requirements must not silently expand committed scope.
 
 #### Enabled optional tool use
 
@@ -111,6 +135,10 @@ Context7 is optional supporting documentation context for current library/API do
 ```markdown
 # Proposal: <Title>
 
+## Original Request
+
+<verbatim explicit request; omit for research-only planning>
+
 ## Intent
 
 Why this change is needed.
@@ -123,6 +151,12 @@ Why this change is needed.
 ## Approach
 
 High-level implementation approach.
+
+## Research Context
+
+Source: <resolved paths.research> (Active Summary, Updated: <timestamp>, SHA256: <digest>)
+
+<committed relevant Active Summary; omit when research did not shape the plan>
 
 ## Risks / Open Questions
 

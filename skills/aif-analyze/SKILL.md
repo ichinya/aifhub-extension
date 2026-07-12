@@ -375,6 +375,12 @@ openspec:
   - Module boundaries (from project structure)
   - Error handling patterns (from existing code)
   - Testing requirements (from test files presence)
+  - Control-flow conventions, but only when repeated direct evidence supports them:
+    - Inspect representative implementation and test files for guard clauses, early returns or continues, and small classification helpers.
+    - Also inspect intentional nested conditionals such as framework lifecycle, parser/state-machine, or transaction branching; do not flatten those into generic "avoid nesting" advice.
+    - Record the evidence paths and the concrete patterns observed. Never copy secrets or sensitive values into the rule or report.
+    - Generate a `Control Flow` rule only when the evidence supports a project convention. If evidence is absent, mixed, or ambiguous, omit the section or report it as unresolved instead of inventing generic advice.
+    - Keep this project analysis in `.ai-factory/rules/base.md`. Do not add control-flow detection to the generated OpenSpec rules compiler; configured rule loading already composes base rules with generated rules.
 - Use [references/rules-base-template.md](references/rules-base-template.md) as scaffold.
 - Fill placeholders with project-specific values, not generic advice.
 - Do NOT create optional area rules (api.md, frontend.md, etc.) — planning owns those when the active plan needs them.
@@ -417,6 +423,7 @@ openspec init --tools none
 
 - Use the saved scope plus preferred language for the reply.
 - Mention created/updated files: `config.yaml`, `rules/base.md`, and artifact status (`DESCRIPTION.md`, `ARCHITECTURE.md`, `ROADMAP.md`).
+- If a `Control Flow` rule was generated, report the evidence paths and patterns that support it. If it was omitted or left unresolved, say that repository evidence was insufficient or mixed; do not substitute unsupported generic advice.
 - Report the resolved bootstrap mode.
 - Report the bootstrap mode selection source: existing config, explicit user request, first-bootstrap answer, or autonomous default.
 - Report whether config values were created or preserved.

@@ -229,6 +229,30 @@ describe('aif-explore and aif-improve OpenSpec-native contracts', () => {
     }
   });
 
+  it('preserves immutable planning source sections until an explicit research rebase', async () => {
+    const injection = await readRepoFile('injections/core/aif-improve-plan-folder.md');
+    const openspec = extractSection(injection, 'OpenSpec-native mode');
+    const label = 'injections/core/aif-improve-plan-folder.md immutable planning source contract';
+
+    for (const expected of [
+      'complete `## Original Request` heading and body as immutable raw source',
+      'Preserve its exact bytes, including line endings, whitespace, punctuation, casing, and line breaks',
+      'patch other sections around it instead of reconstructing `proposal.md`',
+      'existing `## Research Context` body and `Source` revision metadata as the committed requirements snapshot',
+      'unless the user explicitly requests a research rebase',
+      'WARN [research-drift]',
+      'expected=<embedded revision>',
+      'current=<live revision>',
+      'Do not apply requirements from a newer Active Summary',
+      'On an explicit research rebase',
+      'update the `Source` path plus `Updated` and `SHA256` metadata',
+      'Report `Original Request` and `Research Context` as preserved section names',
+      'do not duplicate their raw bodies in output'
+    ]) {
+      assertIncludes(openspec, expected, label);
+    }
+  });
+
   it('does not tell OpenSpec-native users to install OpenSpec skills', async () => {
     for (const relativePath of [
       'injections/core/aif-explore-plan-folder.md',

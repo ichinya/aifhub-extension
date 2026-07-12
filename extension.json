@@ -64,7 +64,7 @@
           "aifhub-mcp"
         ]
       },
-      "instruction": "AIFHub MCP: exposes skill search, install, test, and improvement proposal tools. AI Factory renders this template into runtime-specific MCP settings: standard clients use mcpServers, OpenCode uses mcp with type: local, and GitHub Copilot uses servers with type: stdio."
+      "instruction": "AIFHub MCP: exposes skill search, install, test, and improvement proposal tools. AI Factory 2.16+ renders this canonical template into runtime-specific MCP settings: Universal / Other writes .mcp.json with mcpServers, OpenCode uses mcp with type: local, and GitHub Copilot uses servers with type: stdio."
     }
   ],
   "agentFiles": [

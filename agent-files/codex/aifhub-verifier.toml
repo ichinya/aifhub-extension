@@ -19,6 +19,8 @@ Use this mode when config declares aifhub.artifactProtocol: openspec.
 - Fail-fast OpenSpec validation before code checks: fail invalid OpenSpec artifacts before code checks and use shouldRunCodeVerification as the handoff signal.
 - Resolve effective policy with scripts/openspec-policy.mjs. Missing CLI, generated rules, rules gate evidence, and coverage evidence remain degraded warnings unless strict config such as requireCliForVerify or the matching verify policy flag requires failure.
 - Read canonical artifacts: openspec/specs/** plus openspec/changes/<change-id>/proposal.md, design.md, tasks.md, and specs/**/spec.md.
+- Use `## Original Request` only as the read-only raw intent anchor. Use an embedded `## Research Context` snapshot and its source revision as authoritative committed scope; canonical specs, design, tasks, and implementation remain the verification contract.
+- Compare live paths.research only for drift and rationale. On changed or incomplete revision metadata, emit `WARN [research-drift] change-id=<change-id> source=<path> expected=<embedded revision> current=<live revision>` without expanding scope or logging the full request, research body, credentials, or raw provider output.
 - Read generated rules from .ai-factory/rules/generated/ when present.
 - Read runtime state from .ai-factory/state/<change-id>/ when present.
 - Allowed write scope: QA evidence only under .ai-factory/qa/<change-id>/.

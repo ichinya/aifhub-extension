@@ -501,6 +501,56 @@ describe('OpenSpec-native prompt asset contract', () => {
     }
   });
 
+  it('enforces raw-source localization exceptions and immutable research snapshots', async () => {
+    const policy = await readRepoFile(SHARED_LANGUAGE_POLICY_ASSET);
+
+    for (const expected of [
+      '`## Original Request` is a raw-source exception',
+      'preserve the request body byte-for-byte',
+      'line endings, whitespace, punctuation, casing, and line breaks',
+      'An existing `## Research Context` is an immutable committed snapshot',
+      'unless the user explicitly requests a research rebase',
+      '`language.artifacts` still applies to generated'
+    ]) {
+      assertIncludes(policy, expected, `${SHARED_LANGUAGE_POLICY_ASSET} raw-source localization contract`);
+    }
+
+    for (const relativePath of PLAN_POLISHER_PROMPT_ASSETS) {
+      const asset = await readRepoFile(relativePath);
+      for (const expected of [
+        '## Original Request',
+        'byte-for-byte',
+        '## Research Context',
+        'WARN [research-drift]',
+        'expected=<embedded revision>',
+        'current=<live revision>',
+        'explicit user rebase request',
+        'Updated',
+        'SHA256',
+        'Do not duplicate preserved raw section bodies'
+      ]) {
+        assertIncludes(asset, expected, `${relativePath} immutable planning source contract`);
+      }
+    }
+
+    for (const relativePath of [...IMPLEMENT_PROMPT_ASSETS, ...VERIFY_PROMPT_ASSETS, ...FIX_PROMPT_ASSETS]) {
+      const asset = await readRepoFile(relativePath);
+      for (const expected of [
+        '## Original Request',
+        '## Research Context',
+        'WARN [research-drift]',
+        'change-id=<change-id>',
+        'source=<path>',
+        'expected=<embedded revision>',
+        'current=<live revision>',
+        'credentials',
+        'raw provider output'
+      ]) {
+        assertIncludes(asset, expected, `${relativePath} downstream research-drift contract`);
+      }
+    }
+  });
+
   it('defines OpenSpec-native and legacy sections for remaining mode-gated prompts', async () => {
     for (const relativePath of MODE_GATED_PROMPTS) {
       const asset = await readRepoFile(relativePath);
@@ -730,6 +780,74 @@ describe('OpenSpec-native prompt asset contract', () => {
       assertNotIncludes(openspec, '.ai-factory/plans/<id>/status.yaml', `${relativePath} OpenSpec-native mode`);
       assertNotIncludes(openspec, 'legacy `status.yaml` source of truth', `${relativePath} OpenSpec-native mode`);
     }
+  });
+
+  it('requires regression-first fix evidence and preserves upstream legacy cleanup ownership', async () => {
+    for (const relativePath of FIX_PROMPT_ASSETS) {
+      const asset = await readRepoFile(relativePath);
+      const openspec = extractMarkdownSection(asset, 'OpenSpec-native mode');
+
+      for (const expected of [
+        'narrowest current failing',
+        'before editing',
+        'smallest root-cause fix',
+        'identical',
+        'qaEvidenceRead',
+        'regressionCheck',
+        'preFixResult',
+        'postFixResult',
+        'fallbackDecision',
+        '.ai-factory/state/<change-id>/fixes/',
+        'supporting runtime evidence',
+        '/aif-verify <change-id>',
+        'credentials',
+        'tokens',
+        'raw provider output'
+      ]) {
+        assertIncludes(openspec, expected, `${relativePath} regression-first fix contract`);
+      }
+
+      assert.match(
+        openspec,
+        /passes unexpectedly|no useful check exists/i,
+        `${relativePath} should define unexpected-pass or no-check fallback behavior`
+      );
+      assert.match(
+        openspec,
+        /stop without implementation edits|no implementation edits/i,
+        `${relativePath} should stop bounded autonomous fixes without a safe root cause`
+      );
+    }
+
+    const injectionPath = 'injections/core/aif-fix-plan-folder.md';
+    const injection = await readRepoFile(injectionPath);
+    const openspec = extractMarkdownSection(injection, 'OpenSpec-native mode');
+    const legacy = extractMarkdownSection(injection, 'Legacy AI Factory-only mode');
+
+    for (const expected of [
+      'interactive session',
+      'investigate further',
+      'adjust reproduction',
+      'bounded likely fix',
+      'autonomous, Handoff, or bounded fixer-agent mode'
+    ]) {
+      assertIncludes(openspec, expected, `${injectionPath} interactive and autonomous fallback contract`);
+    }
+
+    for (const expected of [
+      'upstream `/aif-fix` resolved-path workflow',
+      'must not implement file deletion',
+      'default `.ai-factory/FIX_PLAN.md`',
+      'custom `paths.fix_plan` values',
+      'remain in place'
+    ]) {
+      assertIncludes(legacy, expected, `${injectionPath} legacy cleanup ownership contract`);
+    }
+    assert.doesNotMatch(
+      injection,
+      /\b(?:rm|unlink)\b|Remove-Item/i,
+      `${injectionPath} must not add AIFHub-owned deletion commands or helpers`
+    );
   });
 
   it('requires plan-polisher prompts to validate touched OpenSpec artifacts', async () => {

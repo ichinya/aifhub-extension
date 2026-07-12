@@ -7,6 +7,11 @@
 ## [В разработке]
 
 ### Изменено
+- Reviewed AI Factory baseline обновлён до `2.17.0` при сохранении compatibility range `>=2.11.0 <3.0.0`; полный `2.15.0 -> 2.16.0 -> 2.17.0` audit включает planning, fix, QA, MCP, Control Flow и reviewed no-op adaptations.
+- OpenSpec-native planning сохраняет immutable `## Original Request`, а revision-bound `## Research Context` предупреждает `WARN [research-drift]` без silent scope rebase.
+- `/aif-fix` использует regression-first pre/post check как supporting runtime evidence, не заменяя authoritative `/aif-verify` evidence.
+- `/aif-qa-check` документирован как branch-scoped QA execution с source/worktree bindings, stale invalidation, authorization и redaction; `qa-check.md` не является verify/done/archive evidence.
+- AI Factory `2.16+` Universal / Other MCP rendering описан через `.mcp.json` и `mcpServers`; `aif-analyze` генерирует `Control Flow` base rule только по repository evidence.
 - Документация OpenSpec-native workflow теперь описывает полный tail: sync/rules/review/security gates, verify/fix loop, doctor, done, post-archive sync, commit и optional evolve.
 - Prompt assets для done/implement/verifier теперь явно передают финализацию в `/aif-mode sync`, `/aif-commit` и optional `/aif-evolve`, не представляя `/aif-done` заменой commit gate.
 - `extension.json` теперь указывает на upstream JSON Schema `https://raw.githubusercontent.com/lee-to/ai-factory/2.x/schemas/extension.schema.json` и больше не содержит private AIFHub поля.

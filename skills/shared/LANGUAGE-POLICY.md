@@ -25,4 +25,7 @@ Apply this policy before producing user-facing responses or generated artifacts 
 
 - When editing an existing artifact, preserve its established language unless the owning command is creating or replacing the artifact.
 - Translate an existing artifact only when the user explicitly asks for translation or the owning workflow explicitly performs a language migration.
+- `## Original Request` is a raw-source exception in canonical `proposal.md`: keep the fixed English heading and preserve the request body byte-for-byte in its original language, including line endings, whitespace, punctuation, casing, and line breaks. Do not translate, summarize, normalize, or regenerate it.
+- An existing `## Research Context` is an immutable committed snapshot. Preserve its body, source path, `Updated` marker, and `SHA256` metadata without translation or regeneration unless the user explicitly requests a research rebase.
+- Configured `language.artifacts` still applies to generated proposal, design, task, spec, response, and report prose outside these raw or committed source sections.
 - This policy does not expand ownership boundaries: prompts may only create or update artifacts they already own.

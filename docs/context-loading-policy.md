@@ -194,6 +194,7 @@ GitHub access is non-blocking. If `gh`, connector data, network access, authenti
 | `/aif-roadmap` | no | no |
 | `/aif-docs` | no | no |
 | `/aif-qa` | no | upstream manual QA artifacts under `paths.qa/<branch-slug>/`; not AIFHub `.ai-factory/qa/<change-id>/` evidence |
+| `/aif-qa-check` | no | branch-scoped `paths.qa/<branch-slug>/qa-check.md`; not AIFHub verify/done evidence |
 | `/aif-plan full` | `openspec/changes/<change-id>/proposal.md`, `design.md`, `tasks.md`, `specs/**/spec.md` | optional `.ai-factory/state/<change-id>/` |
 | `/aif-explore` | no | `.ai-factory/RESEARCH.md`, `.ai-factory/state/<change-id>/` |
 | `/aif-improve` | `proposal.md`, `design.md`, `tasks.md`, `specs/**/spec.md` | optional `.ai-factory/state/<change-id>/` |
@@ -215,7 +216,13 @@ GitHub access is non-blocking. If `gh`, connector data, network access, authenti
 
 `/aif-docs` writes documentation output only: root `README.md`, the resolved `paths.docs` directory, optional `docs-html/` output when explicitly requested, and the Documentation section in `AGENTS.md`.
 
-`/aif-qa` writes upstream manual QA artifacts under `paths.qa/<branch-slug>/`, such as `change-summary.md`, `test-plan.md`, and `test-cases.md`. This is distinct from AIFHub verification and finalization evidence under `.ai-factory/qa/<change-id>/`, which remains owned by `/aif-verify` and `/aif-done`.
+`/aif-qa` writes upstream manual QA artifacts under `paths.qa/<branch-slug>/`, such as `change-summary.md`, `test-plan.md`, and `test-cases.md`. `/aif-qa-check` consumes `test-cases.md` and writes branch-scoped `qa-check.md`. Both derive the same collision-resistant `<safe-prefix>-<hash8>` branch slug from the original branch name.
+
+`qa-check.md` current results bind to `tested_revision`, `worktree_digest` or `manual_build_id`, `source_digest`, and per-case `case_digests`. Binding changes mark affected results unchecked `Stale` while retaining old comments/evidence as history. Agent execution uses the least-invasive appropriate surface, so backend, CLI, API, file/docs, and database-read cases do not depend on browser automation alone.
+
+Reusable `agent-context.md` and `agent-history.md` contain only non-sensitive setup facts and cross-run lessons. Production, unknown-target, destructive, or external-side-effect execution requires explicit authorization for the current action. Persisted evidence must replace credentials, cookies, authorization values, tokens, one-time codes, private data, and sensitive URL parameters with `[REDACTED]`.
+
+These branch-scoped artifacts are distinct from AIFHub verification and finalization evidence under `.ai-factory/qa/<change-id>/`, which remains owned by `/aif-verify` and `/aif-done`. `qa-check.md` alone cannot satisfy verify, coverage, rules, done-readiness, done, or archive evidence, and no implicit bridge exists.
 
 ## Quality Gates and Finalization Tail
 
@@ -241,6 +248,7 @@ Adjacent upstream project-context utilities:
 | `/aif-architecture` | project description, source structure, optional OpenSpec context | project architecture context only |
 | `/aif-docs` | project description, architecture, source/docs | README and docs directory |
 | `/aif-qa` | git diff, description, architecture, source/docs | upstream manual QA artifacts under `paths.qa/<branch-slug>/` |
+| `/aif-qa-check` | branch-scoped `test-cases.md`, target-specific execution context | branch-scoped `qa-check.md` plus redacted reusable agent context/history |
 
 Upstream `/aif-archive` is not part of the OpenSpec-native quality/finalization tail. It owns legacy AI Factory-only cleanup from `paths.plans/*.md` to `paths.archive/plans/*.md` and optional roadmap snapshots under `paths.archive/roadmap/*.md`. It must not write `openspec/changes/**`, `openspec/specs/**`, `.ai-factory/qa/**`, `.ai-factory/state/**`, or `.ai-factory/rules/generated/**`, and it must not run `openspec archive <change-id> --yes`.
 

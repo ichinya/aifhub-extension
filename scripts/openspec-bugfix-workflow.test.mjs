@@ -421,6 +421,20 @@ describe('OpenSpec bug-fix workflow smoke', () => {
       canonicalArtifactsRead: [`openspec/changes/${changeId}/tasks.md`],
       generatedRulesRead: [],
       qaEvidenceRead: fixContext.qaEvidence.map((item) => item.path),
+      regressionCheck: {
+        command: 'node --test scripts/openspec-bugfix-workflow.test.mjs',
+        inputs: 'OAuth callback finding fixture',
+        environment: 'temporary OpenSpec workflow root'
+      },
+      preFixResult: {
+        exitCode: 1,
+        observed: 'oauth-callback-regression failed before the fix'
+      },
+      postFixResult: {
+        exitCode: 0,
+        observed: 'the identical OAuth callback check passed after the fix'
+      },
+      fallbackDecision: 'Not applicable; the selected finding reproduced.',
       changedFiles: ['scripts/openspec-bugfix-workflow.test.mjs'],
       nextStep: `/aif-verify ${changeId}`
     }, {
@@ -438,6 +452,23 @@ describe('OpenSpec bug-fix workflow smoke', () => {
       `.ai-factory/state/${changeId}/fixes/post-verify-fix.md`,
       'Path C2 /aif-fix should write fix trace under runtime state fixes.'
     );
+    const fixTraceContent = await readText(rootDir, fixTrace.relativePath);
+    for (const expected of [
+      '## QA evidence read',
+      `.ai-factory/qa/${changeId}/verify.md`,
+      '## Regression check',
+      'node --test scripts/openspec-bugfix-workflow.test.mjs',
+      '## Pre-fix result',
+      '"exitCode": 1',
+      'failed before the fix',
+      '## Post-fix result',
+      '"exitCode": 0',
+      'passed after the fix',
+      '## Fallback decision',
+      'Not applicable; the selected finding reproduced.'
+    ]) {
+      assert.ok(fixTraceContent.includes(expected), `Path C2 fix trace should include ${expected}.`);
+    }
     assert.equal(
       await readText(rootDir, `.ai-factory/qa/${changeId}/verify.md`),
       verifyBefore,

@@ -28,6 +28,10 @@ describe('AIFHub MCP extension contract', () => {
       args: ['aifhub-mcp']
     });
     assert.match(aifhubServer.instruction, /runtime-specific/i);
+    assert.match(aifhubServer.instruction, /Universal \/ Other/, 'MCP instruction must name the Universal / Other runtime');
+    assert.match(aifhubServer.instruction, /\.mcp\.json/, 'MCP instruction must name the Universal / Other .mcp.json path');
+    assert.match(aifhubServer.instruction, /mcpServers/, 'MCP instruction must name the standard mcpServers key');
+    assert.match(aifhubServer.instruction, /AI Factory 2\.16\+/, 'MCP instruction must gate Universal rendering at AI Factory 2.16+');
     assert.match(aifhubServer.instruction, /OpenCode/);
     assert.match(aifhubServer.instruction, /GitHub Copilot/);
 
@@ -54,27 +58,30 @@ describe('AIFHub MCP extension contract', () => {
     ]);
   });
 
-  it('documents runtime-specific MCP configuration without a universal mcpServers example', async () => {
+  it('documents version-gated Universal MCP configuration alongside runtime-specific formats', async () => {
     const docs = await readRepoFile('docs/aifhub-mcp.md');
 
-    for (const expected of [
-      'aifhub.search_skills',
-      'aifhub.install_skill',
-      'aifhub.run_skill_tests',
-      'aifhub.propose_skill_improvement',
-      'mcpServers',
-      'OpenCode',
-      'type: "local"',
-      'GitHub Copilot',
-      'servers',
-      'type: "stdio"'
+    for (const [expected, label] of [
+      ['aifhub.search_skills', 'search tool'],
+      ['aifhub.install_skill', 'install tool'],
+      ['aifhub.run_skill_tests', 'test tool'],
+      ['aifhub.propose_skill_improvement', 'improvement proposal tool'],
+      ['Universal / Other', 'Universal / Other runtime'],
+      ['.mcp.json', 'Universal / Other .mcp.json path'],
+      ['mcpServers', 'standard mcpServers key'],
+      ['AI Factory `2.16+`', 'AI Factory 2.16+ version boundary'],
+      ['AI Factory `2.11`-`2.15`', 'unsupported pre-2.16 version boundary'],
+      ['OpenCode', 'OpenCode runtime'],
+      ['type: "local"', 'OpenCode local transport'],
+      ['GitHub Copilot', 'GitHub Copilot runtime'],
+      ['servers', 'GitHub Copilot servers key'],
+      ['type: "stdio"', 'GitHub Copilot stdio transport']
     ]) {
-      assert.match(docs, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+      assert.match(
+        docs,
+        new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+        `MCP docs must include ${label}`
+      );
     }
-
-    assert.doesNotMatch(
-      docs,
-      /mcpServers[^.\n]*(all|every|any|universal)[^.\n]*(agent|runtime|client)|(?:all|every|any|universal)[^.\n]*(agent|runtime|client)[^.\n]*mcpServers/i
-    );
   });
 });

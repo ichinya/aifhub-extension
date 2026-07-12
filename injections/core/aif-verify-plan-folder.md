@@ -56,6 +56,13 @@ Validate and review against canonical OpenSpec artifacts:
 - `openspec/changes/<change-id>/tasks.md`
 - `openspec/changes/<change-id>/specs/**/spec.md`
 
+Treat planning source sections as read-only verification context:
+
+- Use `## Original Request` as the raw intent anchor, while canonical specs, design, tasks, and implemented behavior remain the verification contract.
+- When `proposal.md` contains `## Research Context`, use the embedded snapshot and source revision as authoritative committed scope.
+- Compare live `paths.research` only for drift and rationale. If `Updated` or normalized `SHA256` differs, or legacy metadata is incomplete, emit `WARN [research-drift] change-id=<change-id> source=<path> expected=<embedded revision> current=<live revision>` without expanding verification scope.
+- Do not mutate or silently rebase either source section. Keep credentials, raw provider output, and full request/research bodies out of QA diagnostics.
+
 Read generated rules as derived verification guidance when present:
 
 - `.ai-factory/rules/generated/openspec-merged-<change-id>.md`
