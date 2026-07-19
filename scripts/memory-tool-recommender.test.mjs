@@ -130,7 +130,24 @@ describe('recommendation metadata parsing', () => {
     assert.equal(continuity.repository, 'https://github.com/MarceloCaporale/codex-agent-mem');
     assert.equal(candidate.repository, 'https://github.com/rohitg00/agentmemory');
     assert.deepEqual(candidate.packages, ['@agentmemory/agentmemory', '@agentmemory/mcp']);
+    assert.equal(candidate.doc, 'agentmemory-rohitg00.md');
+    assert.equal(candidate.results_doc, 'agentmemory-rohitg00-benchmark-results.md');
     assert.match(candidate.tested_version, /0\.9\.28/);
+    assert.match(candidate.tested_version, /runtime NOT_RUN/);
+    assert.equal(candidate.decision, 'reject_default');
+    assert.equal(candidate.recommendation_action, 'do_not_suggest_as_aifhub_provider');
+    assert.equal(candidate.integration_role, 'user_owned_continuity_candidate_only');
+    assert.deepEqual(candidate.allowed_in, []);
+    assert.deepEqual(candidate.forbidden_operations, [
+      'auto_install',
+      'auto_run_setup',
+      'auto_sync_memory',
+      'auto_register_mcp',
+      'mutate_provider_config',
+      'install_hooks',
+      'start_background_daemons',
+      'run_provider_cli'
+    ]);
     assert.equal(metadata.tool_permissions['rohitg00-agentmemory'].default, 'forbidden');
     assert.equal(Object.hasOwn(metadata.availability_probes, 'rohitg00-agentmemory'), false);
     for (const [command, policy] of Object.entries(metadata.skill_usage_matrix)) {

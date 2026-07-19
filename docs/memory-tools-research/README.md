@@ -1,6 +1,6 @@
 # Research По Memory Tools
 
-Этот каталог фиксирует выводы по инструментам локальной памяти и retrieval для issue #85. Документы описывают результаты установки и полевых проверок без названий приватных проектов.
+Этот каталог фиксирует выводы по инструментам локальной памяти и retrieval для issue #85 и отдельную policy evaluation candidate из issue #114. Документы описывают результаты установки, static review и полевых проверок без названий приватных проектов.
 
 ## Метаинформация Для Анализа
 
@@ -12,6 +12,7 @@
 - если задача про большой command output, предложить `context-mode` как temporary manual helper с обязательным purge;
 - если проект маленький или нужен точный file/symbol lookup, оставить baseline `rg`;
 - `codex-mem` и `eagle-mem` не предлагать по умолчанию из-за scope/privacy risks.
+- `rohitg00-agentmemory` не предлагать для normal tasks: это отдельный `reject_default` candidate с broad runtime surface и `NOT_RUN` runtime status, а не alias для `agent-memory` или `codex-agent-mem`;
 - `CodeGraph` можно предлагать только как `manual_cli_only` и `avoid_by_default`; `/aif-explore` получает его в `selected_tools` только при exact screening match и purge-команде; `install`/MCP/agent-config surface не принят.
 - `Context7` можно предлагать как optional docs provider для version-sensitive library/API вопросов; `ctx7 setup` и MCP registration остаются user-owned.
 
@@ -126,16 +127,17 @@ Raw `ai-tester` artifacts лежат локально в `.ai-factory/state/ai-t
 | context-mode | `cross-context-mode-ai-tester` | 3 executed, 1 completed pair + 1 timeout | [context-mode-benchmark-results.md](context-mode-benchmark-results.md#ai-tester-cross-screening-2026-05-28), `.ai-factory/state/ai-tester-matrix-for-memory-tool-metadata/cross-context-mode-ai-tester/ai-tester-token-matrices.json` | `aif-analyze` x multirepo failed with +651.8% total tokens; large framework tool_run timed out. |
 | context-mode | `cm-p8d97432e-out-ae-1851` | 4 executed, 2 failed pairs | `.ai-factory/state/ai-tester-tool-evaluations/cm-p8d97432e-out-ae-1851/ai-tester-token-matrices.json` | `project-8d97432e6d7a`, generated-output compression, `aif-analyze/aif-explore`: tool_run failed useful assertions; +487.6% total tokens; no promotion. |
 
-No paired positive source-retrieval `ai-tester` benchmark is recorded yet for `codex-agent-mem` and `agent-memory`, because they are not source retrieval tools. The Python/OpenSpec matrix includes negative/not-applicable selector rows for `codex-agent-mem`, but these validate policy only. `codex-mem` and `eagle-mem` are rejected before positive benchmark because scoped read/purge/default privacy safety is not acceptable; they should only get negative/forbidden selector scenarios.
+No paired positive source-retrieval `ai-tester` benchmark is recorded yet for `codex-agent-mem` and `agent-memory`, because they are not source retrieval tools. The Python/OpenSpec matrix includes negative/not-applicable selector rows for `codex-agent-mem`, but these validate policy only. `rohitg00-agentmemory` has a separate [static evaluation](agentmemory-rohitg00.md) and [results artifact](agentmemory-rohitg00-benchmark-results.md) with runtime status `NOT_RUN`; it is rejected before positive benchmark and must not receive authored positive tool-run scenarios. `codex-mem` and `eagle-mem` are also rejected before positive benchmark because scoped read/purge/default privacy safety is not acceptable; rejected tools should only get negative/forbidden selector scenarios.
 
 | Tool | Tests | Repository | Проверенная версия | Где подходит | Решение |
 |---|---|---|---:|---|---|
 | [Graphify](graphify.md) | [results](graphify-benchmark-results.md) | [safishamsi/graphify](https://github.com/safishamsi/graphify) | `graphifyy 0.8.17` | Repo graph / architecture / impact discovery. Не memory. | ai-tester: проиграл `rg` на mini, large framework и multirepo; только explicit quality experiment, не token/time saver. |
 | [Context7](context7.md) | [results](context7-benchmark-results.md) | [upstash/context7](https://github.com/upstash/context7) | `ctx7 0.4.4` | Version-sensitive library/API docs. | ai-tester: overhead без explicit library/API/version; выбирать только по конкретному docs question. |
 | [codex-agent-mem](codex-agent-mem.md) | [results](codex-agent-mem-benchmark-results.md) | [MarceloCaporale/codex-agent-mem](https://github.com/MarceloCaporale/codex-agent-mem) | Python source package `1.0.2` | Cross-session continuity, open work, closure checks, compact context packs. | Optional read-only continuity provider; полезен по task label, не по языку/объему проекта. |
+| [agent-memory](agent-memory.md) | [results](agent-memory-benchmark-results.md) | [jayzeng/agentmemory](https://github.com/jayzeng/agentmemory) | `myagentmemory 0.4.12` | Manual markdown memory. | Docs-only/manual notes; не project retrieval provider. |
+| [agentmemory (rohitg00)](agentmemory-rohitg00.md) | [results](agentmemory-rohitg00-benchmark-results.md) | [rohitg00/agentmemory](https://github.com/rohitg00/agentmemory) | static audit `v0.9.28` at `a8e7d19a...`; runtime `NOT_RUN` | Только user-owned reviewed output как supporting context. | `reject_default`; не рекомендовать, не выбирать и не запускать из AIFHub. |
 | [context-mode](context-mode.md) | [results](context-mode-benchmark-results.md) | [mksglu/context-mode](https://github.com/mksglu/context-mode) | `1.0.151` | Temporary output/context indexing and compression. | ai-tester pilot на mini fixture failed useful assertion и дал экстремальный overhead; только для уже большого generated output. |
 | [codex-mem](codex-mem.md) | [results](codex-mem-benchmark-results.md) | package не содержит repository metadata; ближайший проверенный публичный repo: [Just-Boring-Cat/codex-mem](https://github.com/Just-Boring-Cat/codex-mem) | `0.1.1` | Codex session/history memory. | Reject as default; privacy risk без строгой изоляции. |
-| [agent-memory](agent-memory.md) | [results](agent-memory-benchmark-results.md) | [jayzeng/agentmemory](https://github.com/jayzeng/agentmemory) | `myagentmemory 0.4.12` | Manual markdown memory. | Docs-only/manual notes; не project retrieval provider. |
 | [eagle-mem](eagle-mem.md) | [results](eagle-mem-benchmark-results.md) | [eagleisbatman/eagle-mem](https://github.com/eagleisbatman/eagle-mem) | `4.9.10` | Shared memory + hooks + guardrails + lanes. | Reject/defer; scoped read/purge и MCP не доказаны. |
 | [CodeGraph](codegraph.md) | [results](codegraph-benchmark-results.md) | [colbymchenry/codegraph](https://github.com/colbymchenry/codegraph) | installed `0.9.3`, npm `0.9.4` | Manual CLI-only repo graph для exact screening cases. | `manual_cli_only`, `avoid_by_default`; final screening: +55.7% total tokens vs `rg`, useful only for exact skill+label cases. |
 | [Repowise](repowise.md) | [results](repowise-benchmark-results.md) | [repowise-dev/repowise](https://github.com/repowise-dev/repowise) | `repowise 0.25.0` | Repo-intelligence: Graph + Git + Health + dead-code + risk. | `manual_cli_only`, `avoid_by_default`; tiered (`--index-only` default, wiki при `doctor` OK); screening_policy пуст до ai-tester матрицы. |
@@ -198,7 +200,7 @@ No paired positive source-retrieval `ai-tester` benchmark is recorded yet for `c
 - `Graphify` можно документировать как optional repo-graph provider только для явного quality experiment; не выбирать автоматически по размеру, framework или multirepo labels.
 - `Context7` можно документировать как optional docs provider для актуальных library/API вопросов.
 - `context-mode` может остаться manual helper для temporary indexing больших command outputs.
-- `codex-mem`, `agent-memory` и `eagle-mem` не должны становиться default AIFHub integrations.
+- `codex-mem`, `agent-memory`, `eagle-mem` и `rohitg00-agentmemory` не должны становиться default AIFHub integrations; последний остаётся отдельным `reject_default` candidate, а не заменой manual-notes или read-only continuity policies.
 - `CodeGraph` остается manual CLI-only и `avoid_by_default`; selector может вернуть его только при exact `screening_policy` match по skill + project labels, после `rg`, с непустым useful output и обязательным purge; `install`/MCP/agent-config surface не принят.
 
 Любая будущая реализация должна требовать explicit opt-in, explicit local paths, отсутствие global hooks по умолчанию, отсутствие canonical OpenSpec writes, отсутствие зависимости от install path и документированный purge/delete-index path.

@@ -49,6 +49,7 @@ Recommender только советует:
 - Recommender учитывает language, volume, complexity, repo shape, artifact mode и legacy `project_shape`. Если rich dimensions недоступны, сохраняется fallback на `project_shape`.
 - Любой optional tool сравнивается с `rg`: сначала baseline search на том же task/profile, затем tool run только если selector и permissions разрешают его.
 - `proven_label_evidence` может включить optional tool только при exact match по tool, skill, task, accepted run class и всем project labels; `known_avoid_cases` и command-specific forbidden scopes остаются сильнее.
+- `rohitg00-agentmemory` остаётся source-denied `reject_default`: config enablement, continuity/manual-notes task labels и future positive labels не могут сделать его recommendation или `selected_tool`.
 
 Protected validation artifacts:
 
@@ -60,6 +61,14 @@ Protected validation artifacts:
 - exact evidence snippets
 
 ## Решения По Tools
+
+Три похожих имени обозначают разные providers и не взаимозаменяемы:
+
+| Tool ID | Exact identity | Policy |
+|---|---|---|
+| `agent-memory` | [`jayzeng/agentmemory`](https://github.com/jayzeng/agentmemory), `myagentmemory 0.4.12` | Manual notes только по явному запросу. |
+| `codex-agent-mem` | [`MarceloCaporale/codex-agent-mem`](https://github.com/MarceloCaporale/codex-agent-mem), Python package `1.0.2` | Optional read-only continuity с explicit SQLite DB. |
+| `rohitg00-agentmemory` | [`rohitg00/agentmemory`](https://github.com/rohitg00/agentmemory), `@agentmemory/agentmemory`, `@agentmemory/mcp` | [`reject_default`](memory-tools-research/agentmemory-rohitg00.md), runtime [`NOT_RUN`](memory-tools-research/agentmemory-rohitg00-benchmark-results.md). |
 
 Разрешенные рекомендации:
 
@@ -75,6 +84,7 @@ Protected validation artifacts:
 
 - `codex-mem`: default scope может ingest broad Codex history.
 - `eagle-mem`: scoped read и purge behavior не доказаны.
+- `rohitg00-agentmemory`: normal tasks, explicit config enablement и continuity/manual-notes signals не переопределяют `reject_default`; допустим только явно переданный и проверенный user-owned output как supporting context.
 
 AIFHub по-прежнему не принимает CodeGraph `install`, MCP serving, hooks/background services или agent configuration mutation.
 
@@ -99,6 +109,7 @@ project_dimensions:
 - Go service: Go label не дает CodeGraph recommendation; для repo graph оставлять Graphify/`rg`, пока нет exact screening match.
 - docs/version tasks: Context7 только для version-sensitive library/API вопросов.
 - continuity tasks: `codex-agent-mem` только для resume/open-work с explicit DB path.
+- `rohitg00-agentmemory` не выбирается ни по project dimensions, ни по continuity/manual-notes task signals; `rg` остаётся baseline для source lookup.
 
 Decision mapping из matrix:
 
@@ -120,6 +131,8 @@ Decision mapping из matrix:
 - `context-mode doctor`
 - `ctx7 --version` или `npx --no-install ctx7 --help` только когда передан `--check-docs-provider`
 - `codegraph --version`, `codegraph --help` или `codegraph status` только как availability probes
+
+Для `rohitg00-agentmemory` executable status probe отсутствует; `status --json` возвращает `availability: unknown` и `command: null`.
 
 Эти probes не должны install packages, run setup, register MCP servers, write hooks или start background processes. `codegraph init/index/query/uninit` разрешен только когда `select --command aif-explore --json` возвращает CodeGraph в `selected_tools` из-за exact screening/proven match, с `manual_purged_cli_execution`, explicit project path и purge через `codegraph uninit --force <project>`.
 
@@ -192,6 +205,7 @@ Recommended:
 Not recommended:
 - CodeGraph: no exact skill+labels match, or latest matching benchmark was worse than rg.
 - Graphify: no explicit graph-quality experiment requested.
+- rohitg00-agentmemory: reject_default; runtime NOT_RUN and lifecycle safety evidence is incomplete.
 - codex-mem: broad Codex history scope can cross project boundaries.
 - eagle-mem: scoped read and purge not proven.
 ```

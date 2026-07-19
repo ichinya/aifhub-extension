@@ -39,6 +39,29 @@ ai-factory aifhub-memory-tools metadata --json
 
 Recommender читает только local installed metadata и не должен обращаться к GitHub или internet. Follow-on skills должны использовать `select`, а затем только returned `selected_tools`; project config хранит accepted provider ids в `utilities.context_tools.enabled`.
 
+## AgentMemory (rohitg00)
+
+`rohitg00-agentmemory` обозначает [`rohitg00/agentmemory`](https://github.com/rohitg00/agentmemory) и packages `@agentmemory/agentmemory`/`@agentmemory/mcp`. Это отдельный candidate, не alias для `agent-memory` (`jayzeng/agentmemory`, manual notes) или `codex-agent-mem` (`MarceloCaporale/codex-agent-mem`, read-only continuity).
+
+Текущая AIFHub policy — `reject_default`, runtime status — `NOT_RUN`. Static evidence и решение описаны в [research note](memory-tools-research/agentmemory-rohitg00.md) и [benchmark-results artifact](memory-tools-research/agentmemory-rohitg00-benchmark-results.md).
+
+Provider lifecycle полностью user-owned и external to AIFHub. AIFHub не должен:
+
+- устанавливать или обновлять AgentMemory packages, plugins или skills;
+- запускать setup, provider CLI, server, viewer, stream или engine processes;
+- устанавливать или обслуживать hooks;
+- создавать, менять или регистрировать MCP server/client configuration;
+- менять Codex, Claude, Cursor, OpenCode или другую agent configuration;
+- запускать, перезапускать, наблюдать или удалять background daemons;
+- выполнять memory capture, sync, import, recall, export или cleanup lifecycle;
+- считать provider availability обязательной для любой AIFHub command.
+
+Explicit project config не переопределяет rejection: candidate не попадает в `selected_tools`, не имеет executable availability probe и отсутствует в safe field-run plan.
+
+Если пользователь независимо управляет provider и явно передаёт reviewed export/note, AIFHub может читать этот файл только как supporting context. Такой input должен быть сверён с direct repository/canonical sources и не может удовлетворять OpenSpec, generated-rules, QA, validation, review, verify, done, archive или roadmap gates. В durable artifacts нельзя переносить secrets, private absolute paths, raw prompts/tool transcripts или cross-project content.
+
+Отсутствие AgentMemory и его output всегда является допустимым состоянием и не блокирует AIFHub workflow.
+
 ## Защищенные Validation Artifacts
 
 Context и compression tools не должны rewrite validation artifacts и не должны compress protected artifacts in place. Protected validation artifacts: `aif-gate-result`, `coverage.json`, `done-readiness.json`, `openspec/specs/**`, generated-rules traces и exact evidence snippets.
