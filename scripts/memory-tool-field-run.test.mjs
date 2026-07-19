@@ -6,6 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 
 import {
+  REJECTED_FULL_INSTALL_IDS,
+  SAFE_TOOL_IDS,
   assertWithinDirectory,
   buildPublicRunSummary,
   discoverProjectRoots,
@@ -179,6 +181,9 @@ describe('tool plan', () => {
     assert.equal(installed.includes('codex-mem'), false);
     assert.equal(installed.includes('eagle-mem'), false);
     assert.equal(installed.includes('agent-memory'), false);
+    assert.equal(SAFE_TOOL_IDS.includes('rohitg00-agentmemory'), false);
+    assert.equal(ids.includes('rohitg00-agentmemory'), false);
+    assert.equal(REJECTED_FULL_INSTALL_IDS.has('rohitg00-agentmemory'), true);
   });
 });
 

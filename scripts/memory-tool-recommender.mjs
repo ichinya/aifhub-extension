@@ -28,7 +28,7 @@ const VALID_PROJECT_SHAPES = new Set([
 ]);
 const DEFAULT_TASK_SIGNAL = 'architecture_or_impact_discovery';
 const DEFAULT_COMMAND = 'aif-analyze';
-const ALWAYS_REJECTED_TOOLS = new Set(['codex-mem', 'eagle-mem']);
+const ALWAYS_REJECTED_TOOLS = new Set(['codex-mem', 'eagle-mem', 'rohitg00-agentmemory']);
 const MANUAL_ONLY_TASKS = new Map([
   ['agent-memory', new Set(['manual_durable_notes'])]
 ]);
@@ -536,13 +536,20 @@ function metadataSummary(metadata) {
   for (const [toolId, tool] of Object.entries(metadata.tools ?? {})) {
     tools[toolId] = {
       display_name: tool.display_name ?? toolId,
+      repository: tool.repository ?? null,
+      packages: asArray(tool.packages),
+      tested_version: tool.tested_version ?? null,
       decision: tool.decision ?? null,
       recommendation_action: tool.recommendation_action ?? null,
+      integration_role: tool.integration_role ?? null,
       install_policy: tool.install_policy ?? metadata.default_policy?.install_policy ?? null,
       read_scope: tool.read_scope ?? null,
+      storage_scope: tool.storage_scope ?? null,
       purge_path: tool.purge_path ?? null,
+      purge_status: tool.purge_status ?? null,
       allowed_in: asArray(tool.allowed_in),
       forbidden_in: asArray(tool.forbidden_in),
+      forbidden_operations: asArray(tool.forbidden_operations),
       privacy_caveat: tool.privacy_caveat ?? null,
       permissions: metadata.tool_permissions?.[toolId] ?? null,
       execution: tool.execution ?? null
