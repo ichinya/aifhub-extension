@@ -282,7 +282,8 @@ export async function syncOpenSpecArtifacts(options = {}) {
     ? await syncGeneratedRules({
       ...options,
       rootDir,
-      changeIds: changes.changeIds
+      changeIds: changes.changeIds,
+      resetIndexChanges: changes.source !== 'ambiguous-base-only'
     })
     : createSkippedGeneratedRulesSync(dryRun, 'compileRulesOnSync-disabled');
   const validation = openspecSettings.validateOnSync
@@ -806,7 +807,7 @@ async function syncGeneratedRules(options = {}) {
       ...options,
       rootDir,
       dryRun,
-      resetIndexChanges: true
+      resetIndexChanges: options.resetIndexChanges ?? true
     });
 
     return {
@@ -1053,6 +1054,22 @@ async function resolveSyncChangeIds(options = {}) {
       source: 'none',
       changeIds: [],
       warnings: [],
+      errors: []
+    };
+  }
+
+  if (resolved.errors.some((error) => error.code === 'ambiguous-active-change')) {
+    return {
+      ok: true,
+      source: 'ambiguous-base-only',
+      changeIds: [],
+      warnings: [
+        ...resolved.warnings,
+        {
+          code: 'ambiguous-active-change-base-only',
+          message: 'Multiple active OpenSpec changes are available; continuing with bounded base-only sync. Use --change <id> or --all to refresh change-specific rules.'
+        }
+      ],
       errors: []
     };
   }

@@ -845,6 +845,61 @@ describe('artifact sync and export', () => {
     assert.equal(await pathExists(rootDir, '.ai-factory/state/mode-switches/2026-04-29T02-00-00-000Z-sync-openspec.md'), true);
   });
 
+  it('falls back to bounded base-only sync when active change selection is ambiguous', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/config.yaml', 'project: test\n');
+    await writeFixture(rootDir, 'openspec/specs/auth/spec.md', [
+      '# Auth',
+      '',
+      '## Requirements',
+      '',
+      '### Requirement: Accepted Auth',
+      '',
+      'The system MUST support accepted authentication.',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/changes/unrelated-alpha/proposal.md', '# Proposal\n');
+    await writeFixture(rootDir, 'openspec/changes/unrelated-beta/proposal.md', '# Proposal\n');
+    await writeFixture(rootDir, '.ai-factory/rules/generated/index.json', `${JSON.stringify({
+      schema_version: 1,
+      generated_at: '2026-04-29T01:00:00.000Z',
+      base: null,
+      changes: [
+        { change_id: 'unrelated-alpha' },
+        { change_id: 'unrelated-beta' }
+      ]
+    }, null, 2)}\n`);
+
+    const result = await syncOpenSpecArtifacts({
+      rootDir,
+      detectOpenSpec: async () => missingCliDetection(),
+      getCurrentBranch: async () => 'main',
+      timestamp: '2026-04-29T02-30-00-000Z'
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.changes.source, 'ambiguous-base-only');
+    assert.deepEqual(result.changes.changeIds, []);
+    assert.ok(result.changes.warnings.some((warning) => warning.code === 'ambiguous-active-change-base-only'));
+    assert.equal(result.generatedRules.baseOnly, true);
+    assert.equal(result.generatedRules.changeSpecificSkipped, true);
+    assert.equal(result.validation.skipped, true);
+    assert.equal(result.validation.reason, 'no-selected-changes');
+    const index = await readJsonFixture(rootDir, '.ai-factory/rules/generated/index.json');
+    assert.deepEqual(index.changes.map((entry) => entry.change_id), ['unrelated-alpha', 'unrelated-beta']);
+  });
+
   it('respects compileRulesOnSync and validateOnSync config toggles', async () => {
     const rootDir = await createTempRoot();
     let validateCalls = 0;
