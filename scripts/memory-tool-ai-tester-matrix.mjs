@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // memory-tool-ai-tester-matrix.mjs - paired rg baseline + optional-tool ai-tester matrix generator
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
@@ -166,7 +166,14 @@ const OPTIONAL_TOOLS = getToolPlan('safe')
   .map((tool) => tool.id)
   .filter((toolId) => toolId !== 'rg' && toolId !== 'git-gh');
 const REPO_GRAPH_TOOLS = new Set(['codegraph', 'graphify', 'repowise']);
-const PREINITIALIZABLE_TOOLS = new Set(['codegraph', 'graphify', 'context7', 'context-mode', 'repowise']);
+const PREINITIALIZABLE_TOOLS = new Set([
+  'codegraph',
+  'graphify',
+  'context7',
+  'context-mode',
+  'repowise',
+  'rohitg00-agentmemory'
+]);
 const SELECTOR_COMMANDS = {
   installed: 'ai-factory aifhub-memory-tools select --from-project --command <skill> --json',
   'source-fallback': 'node scripts/memory-tool-recommender.mjs select --from-project --command <skill> --json'
@@ -243,6 +250,7 @@ export async function runMemoryToolAiTesterMatrix(args = [], options = {}) {
   });
 
   if (!parsed.dryRun) {
+    await injectTestOnlyAdapters({ manifest, copies, outDir });
     await writeScenarioFiles({
       outDir,
       manifest,
@@ -270,6 +278,29 @@ export async function runMemoryToolAiTesterMatrix(args = [], options = {}) {
   }
 
   return emit(summary, 0, options);
+}
+
+export async function injectTestOnlyAdapters({ manifest, copies = [], outDir } = {}) {
+  const requiresAgentMemory = asArray(manifest?.cases).some((item) => (
+    item.tool_id === 'rohitg00-agentmemory'
+    || item.optional_tool_id === 'rohitg00-agentmemory'
+  ));
+  if (!requiresAgentMemory) return [];
+
+  const adapterSource = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    'agentmemory-ai-tester-adapter.mjs'
+  );
+  const injected = [];
+  for (const copy of copies) {
+    assertWithinDirectory(outDir, copy.copyPath, 'sanitized fixture');
+    const adapterTarget = path.join(copy.copyPath, 'scripts', 'agentmemory-ai-tester-adapter.mjs');
+    assertWithinDirectory(copy.copyPath, adapterTarget, 'AgentMemory ai-tester adapter');
+    await mkdir(path.dirname(adapterTarget), { recursive: true });
+    await copyFile(adapterSource, adapterTarget);
+    injected.push(copy.profile_id);
+  }
+  return injected;
 }
 
 export async function discoverMatrixProfiles(rootInputs, options = {}) {
@@ -498,8 +529,11 @@ function buildPairedCases({
   const scenarioSegment = scenario?.id ? `__${scenario.id}` : '';
   const pairIdBase = `${profile.id}__${skill}__${toolId}__${taskScenario}${scenarioSegment}`;
   const pairId = scenarioPrefix ? `${scenarioPrefix}__${pairIdBase}` : pairIdBase;
-  const preinitialized = preinitializeTools.includes(toolId) ? [toolId] : [];
-  const expectation = expectedToolBehavior({ metadata, profile, skill, toolId, taskScenario });
+  const isolatedRuntime = scenario?.paired_runs?.candidate_mode === 'isolated_runtime_after_rg';
+  const preinitialized = preinitializeTools.includes(toolId) || isolatedRuntime ? [toolId] : [];
+  const expectation = isolatedRuntime
+    ? 'positive'
+    : expectedToolBehavior({ metadata, profile, skill, toolId, taskScenario });
   const common = {
     pair_id: pairId,
     skill,
@@ -569,6 +603,12 @@ export function renderAiTesterScenario(input = {}) {
           '  Before completion, purge the setup index with codegraph uninit --force . or equivalent.',
           '  Include the phrase "tool_run" in the final benchmark summary.'
         );
+      } else if (input.tool_id === 'rohitg00-agentmemory') {
+        lines.push(
+          '  Use the AgentMemory ai-tester adapter invocation below as the only controlled optional tool_run for this benchmark pair.',
+          '  Do not discover, invoke, or register any additional AgentMemory tool after the adapter returns.',
+          '  Include the phrase "tool_run" in the final benchmark summary.'
+        );
       } else {
         lines.push(
           `  Then run ${toolCommandLabel(input.tool_id)} directly as the controlled optional tool_run for this benchmark pair.`,
@@ -635,7 +675,10 @@ export function renderAiTesterScenario(input = {}) {
     );
   }
 
-  for (const command of setupCommandsForTools(preinitializedToolIds)) {
+  const setupToolIds = input.expectation === 'baseline_rg'
+    ? preinitializedToolIds.filter((toolId) => toolId !== 'rohitg00-agentmemory')
+    : preinitializedToolIds;
+  for (const command of setupCommandsForTools(setupToolIds)) {
     if (!lines.includes('  setup_commands:')) {
       lines.push('  setup_commands:');
     }
@@ -659,7 +702,11 @@ export function renderAiTesterScenario(input = {}) {
       '    args_match:',
       `      command: ${quoteYamlSingle(commandInvocationRegexForYaml('rg'))}`
     );
-    for (const toolId of OPTIONAL_TOOLS) {
+    const baselineForbiddenTools = unique([
+      ...OPTIONAL_TOOLS,
+      input.optional_tool_id
+    ]).filter((toolId) => toolId && toolId !== 'rg');
+    for (const toolId of baselineForbiddenTools) {
       lines.push(
         `  - id: no-${safeAssertionId(toolId)}`,
         '    type: no_tool_called',
@@ -730,6 +777,27 @@ export function renderAiTesterScenario(input = {}) {
         '    tool: Bash',
         '    args_match:',
         `      command: ${quoteYamlSingle(toolSubcommandInvocationRegexForYaml('repowise', ['search', 'health', 'dead-code', 'risk', 'query', 'get_overview']))}`
+      );
+    }
+    if (input.tool_id === 'rohitg00-agentmemory') {
+      lines.push(
+        '  - id: agentmemory-runtime-called',
+        '    type: tool_called',
+        '    tool: Bash',
+        '    args_match:',
+        `      command: ${quoteYamlSingle(commandInvocationRegexForYaml('rohitg00-agentmemory'))}`,
+        '  - id: agentmemory-continuity-pass',
+        '    type: output_contains',
+        '    pattern: "continuity_pass"',
+        '  - id: agentmemory-isolation-pass',
+        '    type: output_contains',
+        '    pattern: "isolation_pass"',
+        '  - id: agentmemory-privacy-pass',
+        '    type: output_contains',
+        '    pattern: "privacy_pass"',
+        '  - id: agentmemory-purge-pass',
+        '    type: output_contains',
+        '    pattern: "purge_pass"'
       );
     }
     if (isCodeGraphPreinitialized && input.tool_id === 'codegraph') {
@@ -1189,9 +1257,17 @@ function escapeRegexForYaml(value) {
 }
 
 export function commandInvocationRegexForYaml(commandName) {
+  return `${commandInvocationPrefixForYaml(commandName)}(?:\\s|$|["'])`;
+}
+
+function commandInvocationPrefixForYaml(commandName) {
+  if (commandName === 'rohitg00-agentmemory') {
+    const optionalPathPrefix = `(?:[A-Za-z0-9_.%:-]+[\\\\/])*`;
+    return `(?:^\\s*["']?|[;&]\\s*["']?|-(?:Command|c)\\s+["']?|(?:cmd(?:\\.exe)?|powershell(?:\\.exe)?)\\s+(?:/d\\s+)?(?:/s\\s+)?/c\\s+["']?)(?:node(?:\\.exe)?\\s+)?${optionalPathPrefix}agentmemory-ai-tester-adapter\\.mjs`;
+  }
   const escaped = escapeRegexForYaml(primaryCommandName(commandName));
   const optionalPathPrefix = `(?:[A-Za-z0-9_.%:-]+[\\\\/])*`;
-  return `(?:^\\s*["']?|[;&]\\s*["']?|(?:cmd(?:\\.exe)?|powershell(?:\\.exe)?)\\s+(?:/d\\s+)?(?:/s\\s+)?/c\\s+["']?)(?:npx\\s+)?${optionalPathPrefix}${escaped}(?:\\.cmd|\\.ps1|\\.exe)?(?=\\s|$|["'])`;
+  return `(?:^\\s*["']?|[;&]\\s*["']?|-(?:Command|c)\\s+["']?|(?:cmd(?:\\.exe)?|powershell(?:\\.exe)?)\\s+(?:/d\\s+)?(?:/s\\s+)?/c\\s+["']?)(?:npx\\s+)?${optionalPathPrefix}${escaped}(?:\\.cmd|\\.ps1|\\.exe)?`;
 }
 
 function primaryCommandName(toolId) {
@@ -1205,18 +1281,15 @@ function toolCommandLabel(toolId) {
 }
 
 function codegraphSubcommandInvocationRegexForYaml(subcommand) {
-  const command = commandInvocationRegexForYaml('codegraph').replace('(?=\\s|$|["\'])', '\\s+');
-  return `${command}[^;&|\\r\\n]*\\b${escapeRegexForYaml(subcommand)}\\b`;
+  return `${commandInvocationPrefixForYaml('codegraph')}\\s+[^;&|\\r\\n]*\\b${escapeRegexForYaml(subcommand)}\\b`;
 }
 
 function codegraphDataCommandInvocationRegexForYaml() {
-  const command = commandInvocationRegexForYaml('codegraph').replace('(?=\\s|$|["\'])', '\\s+');
-  return `${command}(?!(?:[^;&|\\r\\n]*\\b--help\\b))(?:files|query|context)\\b(?![^;&|\\r\\n]*\\b--help\\b)`;
+  return `${commandInvocationPrefixForYaml('codegraph')}\\s+(?:files|query|context)\\b`;
 }
 
 function toolSubcommandInvocationRegexForYaml(commandName, subcommands = []) {
-  const command = commandInvocationRegexForYaml(commandName).replace('(?=\\s|$|["\'])', '\\s+');
-  return `${command}(?:[^;&|\\r\\n]*\\b(?:${subcommands.map(escapeRegexForYaml).join('|')})\\b)`;
+  return `${commandInvocationPrefixForYaml(commandName)}\\s+(?:[^;&|\\r\\n]*\\b(?:${subcommands.map(escapeRegexForYaml).join('|')})\\b)`;
 }
 
 function setupCommandsForTools(toolIds = []) {
@@ -1271,6 +1344,15 @@ function preparedToolPromptLines(toolId) {
       '  setup_commands installed context-mode under project/.ai-tester-tools/context-mode before this model turn.',
       '  Before calling context-mode, prepend .ai-tester-tools/context-mode/node_modules/.bin to PATH in the same shell command.',
       '  Use context-mode only for temporary generated-output inspection, then summarize whether it was useful versus rg.'
+    ];
+  }
+  if (toolId === 'rohitg00-agentmemory') {
+    return [
+      '  After rg, run node scripts/agentmemory-ai-tester-adapter.mjs verify --install --package-root .ai-tester-tools/agentmemory --sandbox-root .ai-tester-agentmemory --purge-install.',
+      '  The adapter must install pinned @agentmemory/mcp@0.9.28 locally with --ignore-scripts --no-audit --no-fund, then purge that install.',
+      '  The adapter must use standalone local fallback with an isolated STANDALONE_PERSIST_PATH and synthetic canaries only.',
+      '  Treat its output only as benchmark evidence and include tool_run, continuity_pass, isolation_pass, privacy_pass, and purge_pass in the final summary.',
+      '  Do not start the full AgentMemory server or modify host agent configuration.'
     ];
   }
   return [];

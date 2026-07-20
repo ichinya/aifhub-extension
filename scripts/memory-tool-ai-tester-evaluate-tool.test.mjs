@@ -64,7 +64,11 @@ describe('ai-tester one-shot tool evaluation', () => {
     const missingArgs = calls[1].args;
     assert.equal(argValue(missingArgs, '--matrix-dir'), path.join(tmpDir, 'out'));
     assert.equal(argValue(missingArgs, '--max-runs'), '2');
+    assert.equal(argValue(missingArgs, '--runs-dir'), path.join(tmpDir, 'runs'));
     assert.equal(missingArgs.includes('--no-report-copy'), true);
+
+    const reportArgs = calls[2].args;
+    assert.equal(argValue(reportArgs, '--runs-dir'), path.join(tmpDir, 'runs'));
 
     const promoteArgs = calls[3].args;
     assert.equal(argValue(promoteArgs, '--run-id'), 'stable-run');

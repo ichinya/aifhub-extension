@@ -5,7 +5,11 @@ import path from 'node:path';
 export const AI_TESTER_SCENARIO_CATALOG_SCHEMA = 'aifhub.memory_tools.ai_tester_scenario_catalog.v1';
 
 const DEFAULT_ALLOWED_RUN_CLASSES = new Set(['screening', 'accepted_evidence', 'focused', 'smoke', 'safety']);
-const DEFAULT_ALLOWED_CANDIDATE_MODES = new Set(['direct_tool_run_after_rg', 'selector_expected_tool_run']);
+const DEFAULT_ALLOWED_CANDIDATE_MODES = new Set([
+  'direct_tool_run_after_rg',
+  'selector_expected_tool_run',
+  'isolated_runtime_after_rg'
+]);
 const DEFAULT_ALLOWED_DECISIONS = new Set(['recommend', 'conditional', 'avoid', 'forbid']);
 
 export async function loadAiTesterScenarioCatalog({ catalogPath, metadata = {}, cwd = process.cwd() } = {}) {

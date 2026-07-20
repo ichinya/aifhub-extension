@@ -101,6 +101,7 @@ describe('sanitized copies', () => {
     await writeFixtureFile(path.join('source-project', '.github', 'skills', 'aif-build-automation', 'templates', 'magefile.go'), 'package main');
     await writeFixtureFile(path.join('source-project', '.github', 'workflows', 'validate.yml'), 'name: validate\n');
     await writeFixtureFile(path.join('source-project', 'node_modules', 'pkg', 'index.js'), 'dependency');
+    await writeFixtureFile(path.join('source-project', 'runs', 'private-trace.json'), '{"private":"trace"}');
     await writeFixtureFile(path.join('source-project', 'package-lock.json'), '{}');
     await writeFixtureFile(path.join('source-project', 'dist', 'bundle.js'), 'built');
 
@@ -119,6 +120,7 @@ describe('sanitized copies', () => {
     assert.equal(await exists(path.join(copy.copyPath, '.github', 'skills')), false);
     assert.equal(await exists(path.join(copy.copyPath, '.github', 'workflows', 'validate.yml')), true);
     assert.equal(await exists(path.join(copy.copyPath, 'node_modules')), false);
+    assert.equal(await exists(path.join(copy.copyPath, 'runs')), false);
     assert.equal(await exists(path.join(copy.copyPath, 'package-lock.json')), false);
     assert.equal(await exists(path.join(copy.copyPath, 'dist')), false);
   });

@@ -290,7 +290,14 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
       'agentmemory-rohitg00.md',
       'agentmemory-rohitg00-benchmark-results.md',
       'reject_default',
-      'Runtime status: `NOT_RUN`',
+      'Isolated runtime status: `PASS`',
+      'Full-product runtime status: `NOT_RUN`',
+      'agentmemory-isolated-0-9-28-20260720-r4',
+      'agentmemory-object-python-mcp-gate-20260720-r1',
+      'agentmemory-object-php-uptime-20260720-r1',
+      'Python MCP ability/auth gate',
+      'PHP uptime interval merge',
+      '2/2 `PASS/PASS`',
       '`rg` остаётся baseline'
     ]) {
       assertIncludes(combined, expected, 'rohitg00 AgentMemory provider docs');

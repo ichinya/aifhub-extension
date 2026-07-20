@@ -782,13 +782,13 @@ tools:
     results_doc: agentmemory-rohitg00-benchmark-results.md
     repository: "https://github.com/rohitg00/agentmemory"
     packages: ["@agentmemory/agentmemory", "@agentmemory/mcp"]
-    tested_version: "static audit v0.9.28 at a8e7d19a814a24a21818afc715f3301b3eaeee80; runtime NOT_RUN"
+    tested_version: "static audit v0.9.28 at a8e7d19a814a24a21818afc715f3301b3eaeee80; isolated standalone ai-tester PASS"
     decision: reject_default
     recommendation_action: do_not_suggest_as_aifhub_provider
     integration_role: user_owned_continuity_candidate_only
     install_policy: user_owned_outside_aifhub_only
-    stable_cli: runtime_not_run
-    mcp_status: not_registered_or_run_by_aifhub
+    stable_cli: full_product_runtime_not_run
+    mcp_status: isolated_standalone_executed_no_registration
     read_scope: broad_prompt_tool_and_memory_data
     storage_scope: user_home_agentmemory_and_user_owned_runtime
     purge_path: unverified_no_aifhub_cleanup_ownership
@@ -806,8 +806,27 @@ tools:
       - aif-verify
       - aif-done
       - aif-commit
-    privacy_caveat: "Upstream may observe prompt, tool, and memory data and persist user-home or user-owned runtime state; AIFHub has not verified isolation, privacy, purge, or residual-state cleanup."
-    avoid_reason: "Runtime evidence is NOT_RUN and the documented install, hooks, MCP, config, storage, and daemon surface exceeds AIFHub default ownership boundaries."
+    privacy_caveat: "The exact synthetic standalone profile passed store isolation, privacy canaries, governance delete, and sandbox purge; full-product behavior on user data and residual-state cleanup remain unverified."
+    avoid_reason: "Two isolated ai-tester pairs passed safety assertions, but both decisions were avoid: candidate duration was +231.1% and total tokens +51.4% versus rg; broad full-product lifecycle remains unverified."
+    isolated_runtime_evidence:
+      status: pass
+      run_id: agentmemory-isolated-0-9-28-20260720-r4
+      scenario_id: agentmemory-isolated-continuity
+      run_class: safety
+      provider_version: "0.9.28"
+      mode: standalone_local_fallback
+      pairs: 2
+      pass_pairs: 2
+      executed_rows: 4
+      failed_rows: 0
+      not_run_rows: 0
+      continuity: pass
+      store_isolation: pass
+      privacy_canaries: pass
+      governance_delete: pass
+      runtime_install_purge: pass
+      eligible_for_metadata: false
+      decision: avoid
     forbidden_operations:
       - auto_install
       - auto_run_setup

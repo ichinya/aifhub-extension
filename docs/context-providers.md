@@ -43,9 +43,9 @@ Recommender читает только local installed metadata и не долж�
 
 `rohitg00-agentmemory` обозначает [`rohitg00/agentmemory`](https://github.com/rohitg00/agentmemory) и packages `@agentmemory/agentmemory`/`@agentmemory/mcp`. Это отдельный candidate, не alias для `agent-memory` (`jayzeng/agentmemory`, manual notes) или `codex-agent-mem` (`MarceloCaporale/codex-agent-mem`, read-only continuity).
 
-Текущая AIFHub policy — `reject_default`, runtime status — `NOT_RUN`. Static evidence и решение описаны в [research note](memory-tools-research/agentmemory-rohitg00.md) и [benchmark-results artifact](memory-tools-research/agentmemory-rohitg00-benchmark-results.md).
+Текущая AIFHub policy — `reject_default`: isolated standalone `ai-tester` safety profile имеет status `PASS`, обе пары дали `avoid`, а full-product runtime status остаётся `NOT_RUN`. Evidence и решение описаны в [research note](memory-tools-research/agentmemory-rohitg00.md) и [benchmark-results artifact](memory-tools-research/agentmemory-rohitg00-benchmark-results.md).
 
-Provider lifecycle полностью user-owned и external to AIFHub. AIFHub не должен:
+В normal workflows provider lifecycle полностью user-owned и external to AIFHub. AIFHub не должен:
 
 - устанавливать или обновлять AgentMemory packages, plugins или skills;
 - запускать setup, provider CLI, server, viewer, stream или engine processes;
@@ -55,6 +55,8 @@ Provider lifecycle полностью user-owned и external to AIFHub. AIFHub �
 - запускать, перезапускать, наблюдать или удалять background daemons;
 - выполнять memory capture, sync, import, recall, export или cleanup lifecycle;
 - считать provider availability обязательной для любой AIFHub command.
+
+Единственное test-only исключение — явно запущенный authored `ai-tester` safety scenario. Он может установить pinned `@agentmemory/mcp@0.9.28` в local confined fixture с disabled lifecycle scripts, запустить direct standalone MCP stdio на synthetic data и обязан удалить store/package fixture после попытки. Этот сценарий не создаёт hooks, MCP registration, host agent config или daemon ownership и не делает provider доступным normal recommendations.
 
 Explicit project config не переопределяет rejection: candidate не попадает в `selected_tools`, не имеет executable availability probe и отсутствует в safe field-run plan.
 

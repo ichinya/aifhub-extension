@@ -102,6 +102,7 @@ const IGNORE_DIR_NAMES = new Set([
   'tmp',
   'temp',
   'logs',
+  'runs',
   'graphify-out',
   '.codegraph',
   '.repowise',

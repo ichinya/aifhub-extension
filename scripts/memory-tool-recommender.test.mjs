@@ -133,7 +133,11 @@ describe('recommendation metadata parsing', () => {
     assert.equal(candidate.doc, 'agentmemory-rohitg00.md');
     assert.equal(candidate.results_doc, 'agentmemory-rohitg00-benchmark-results.md');
     assert.match(candidate.tested_version, /0\.9\.28/);
-    assert.match(candidate.tested_version, /runtime NOT_RUN/);
+    assert.match(candidate.tested_version, /isolated standalone ai-tester PASS/);
+    assert.equal(candidate.isolated_runtime_evidence.status, 'pass');
+    assert.equal(candidate.isolated_runtime_evidence.run_id, 'agentmemory-isolated-0-9-28-20260720-r4');
+    assert.equal(candidate.isolated_runtime_evidence.pass_pairs, 2);
+    assert.equal(candidate.isolated_runtime_evidence.eligible_for_metadata, false);
     assert.equal(candidate.decision, 'reject_default');
     assert.equal(candidate.recommendation_action, 'do_not_suggest_as_aifhub_provider');
     assert.equal(candidate.integration_role, 'user_owned_continuity_candidate_only');
@@ -283,7 +287,7 @@ describe('recommendation results', () => {
       '@agentmemory/agentmemory',
       '@agentmemory/mcp'
     ]);
-    assert.match(result.body.tools['rohitg00-agentmemory'].tested_version, /runtime NOT_RUN/);
+    assert.match(result.body.tools['rohitg00-agentmemory'].tested_version, /isolated standalone ai-tester PASS/);
     assert.equal(
       result.body.tools['rohitg00-agentmemory'].integration_role,
       'user_owned_continuity_candidate_only'

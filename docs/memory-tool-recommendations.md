@@ -68,7 +68,7 @@ Protected validation artifacts:
 |---|---|---|
 | `agent-memory` | [`jayzeng/agentmemory`](https://github.com/jayzeng/agentmemory), `myagentmemory 0.4.12` | Manual notes только по явному запросу. |
 | `codex-agent-mem` | [`MarceloCaporale/codex-agent-mem`](https://github.com/MarceloCaporale/codex-agent-mem), Python package `1.0.2` | Optional read-only continuity с explicit SQLite DB. |
-| `rohitg00-agentmemory` | [`rohitg00/agentmemory`](https://github.com/rohitg00/agentmemory), `@agentmemory/agentmemory`, `@agentmemory/mcp` | [`reject_default`](memory-tools-research/agentmemory-rohitg00.md), runtime [`NOT_RUN`](memory-tools-research/agentmemory-rohitg00-benchmark-results.md). |
+| `rohitg00-agentmemory` | [`rohitg00/agentmemory`](https://github.com/rohitg00/agentmemory), `@agentmemory/agentmemory`, `@agentmemory/mcp` | [`reject_default`](memory-tools-research/agentmemory-rohitg00.md); isolated safety [`PASS`](memory-tools-research/agentmemory-rohitg00-benchmark-results.md), full-product runtime `NOT_RUN`, runtime decision `avoid`. |
 
 Разрешенные рекомендации:
 
@@ -84,7 +84,7 @@ Protected validation artifacts:
 
 - `codex-mem`: default scope может ingest broad Codex history.
 - `eagle-mem`: scoped read и purge behavior не доказаны.
-- `rohitg00-agentmemory`: normal tasks, explicit config enablement и continuity/manual-notes signals не переопределяют `reject_default`; допустим только явно переданный и проверенный user-owned output как supporting context.
+- `rohitg00-agentmemory`: normal tasks, explicit config enablement и continuity/manual-notes signals не переопределяют `reject_default`; 2/2 isolated safety pairs прошли, но обе дали `avoid`, а full-product lifecycle не проверен. Допустим только явно переданный и проверенный user-owned output как supporting context.
 
 AIFHub по-прежнему не принимает CodeGraph `install`, MCP serving, hooks/background services или agent configuration mutation.
 
@@ -205,7 +205,7 @@ Recommended:
 Not recommended:
 - CodeGraph: no exact skill+labels match, or latest matching benchmark was worse than rg.
 - Graphify: no explicit graph-quality experiment requested.
-- rohitg00-agentmemory: reject_default; runtime NOT_RUN and lifecycle safety evidence is incomplete.
+- rohitg00-agentmemory: reject_default; isolated ai-tester safety PASS, full-product runtime NOT_RUN, both pairs avoid.
 - codex-mem: broad Codex history scope can cross project boundaries.
 - eagle-mem: scoped read and purge not proven.
 ```

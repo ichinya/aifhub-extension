@@ -1,10 +1,10 @@
 # Результаты Оценки agentmemory (rohitg00)
 
-> **Runtime status: `NOT_RUN`**
+> **Isolated runtime status: `PASS`**
 >
-> AgentMemory не устанавливался и не запускался. AIFHub не создавал MCP registration, hooks, plugin/config entries или daemon processes. В этом документе нет runtime benchmark, provider output или performance metrics.
+> **Full-product runtime status: `NOT_RUN`**
 
-Описание candidate и policy boundary: [agentmemory-rohitg00.md](agentmemory-rohitg00.md).
+Изолированный safety-сценарий проверен через `ai-tester` на synthetic canaries. Он не устанавливал hooks, не создавал MCP registration, не менял agent configuration и не запускал server/daemon lifecycle. Описание candidate и policy boundary: [agentmemory-rohitg00.md](agentmemory-rohitg00.md).
 
 ## Итог
 
@@ -13,91 +13,100 @@
 | Tool ID | `rohitg00-agentmemory` |
 | Repository | [`rohitg00/agentmemory`](https://github.com/rohitg00/agentmemory) |
 | Static snapshot | `v0.9.28`, commit `a8e7d19a814a24a21818afc715f3301b3eaeee80`, 2026-07-19 |
-| Runtime status | `NOT_RUN` |
-| Runtime metrics | Не собирались |
+| Tested package | `@agentmemory/mcp@0.9.28` |
+| ai-tester run | `agentmemory-isolated-0-9-28-20260720-r4` |
+| Scenario | `agentmemory-isolated-continuity`, `run_class: safety` |
+| Skills | `aif-explore`, `aif-review` |
+| Project labels | `js`, `standard`, `framework`, `single_repo`, `openspec_native`, `large_framework_app` |
+| Task | `resume_previous_work` |
+| Rows / pairs | 4/4 rows PASS; 2/2 `PASS/PASS` pairs |
+| Runtime decision | `avoid` for both pairs |
 | Policy decision | `reject_default` |
-| Metadata promotion | Запрещена по текущему evidence |
+| Metadata promotion | Не выполнялась; scenario имеет `eligible_for_metadata: false`, запуск использовал `--no-promote` |
 
-Static review достаточен, чтобы подтвердить широкий lifecycle/privacy scope и сохранить консервативное решение. Он недостаточен, чтобы подтвердить полезность continuity, безопасную isolation, privacy или complete purge.
+`rg` остаётся baseline для repository lookup. Изолированный PASS подтверждает только ограниченный standalone safety profile и не является положительным evidence для normal recommendations.
 
-## Выполненные Static Checks
+## Выполненный Isolated Profile
 
-| Проверка | Статус | Evidence |
+- native Windows, Node.js `v24.8.0`, `ai-tester 1.2.0`, model `gpt-5.4-mini`;
+- pinned local install `@agentmemory/mcp@0.9.28` с `--ignore-scripts --no-audit --no-fund`;
+- direct MCP stdio в `STANDALONE_MCP=true` и local fallback без server registration;
+- отдельные confined HOME/app-data/store paths внутри test sandbox;
+- credential-free child environment и synthetic markers без user corpus;
+- новый MCP process для каждого save/recall/delete шага;
+- обязательное завершение всех child processes и purge sandbox/package root после каждой candidate attempt.
+
+Adapter печатал только compact pass/fail tokens; raw prompts, tool transcripts, secrets и private fixture paths не переносились в durable report.
+
+## Safety Results
+
+| Проверка | Результат | Граница доказательства |
 |---|---|---|
-| Exact repository identity | `PASS_STATIC` | `https://github.com/rohitg00/agentmemory` |
-| Exact package identity | `PASS_STATIC` | `@agentmemory/agentmemory`, `@agentmemory/mcp` |
-| Release snapshot | `PASS_STATIC` | [`v0.9.28`](https://github.com/rohitg00/agentmemory/releases/tag/v0.9.28) |
-| Commit snapshot | `PASS_STATIC` | [`a8e7d19a...`](https://github.com/rohitg00/agentmemory/commit/a8e7d19a814a24a21818afc715f3301b3eaeee80) |
-| Node requirement | `PASS_STATIC` | Package metadata declares `>=20.0.0` |
-| Storage/process surface documented | `PASS_STATIC` | User-home state plus server/viewer/stream/iii lifecycle are described upstream |
-| MCP/plugin/hook surface documented | `PASS_STATIC` | Server-backed 53-tool surface, 7-tool fallback and agent plugin/hooks are described upstream |
-| Existing similarly named tools separated | `PASS_POLICY` | `agent-memory`, `codex-agent-mem`, `rohitg00-agentmemory` have distinct identity contracts |
-| Candidate excluded from normal selection | `PASS_POLICY` | `reject_default`, default forbidden permission and source denylist |
-| Candidate excluded from safe field run | `PASS_POLICY` | Absent from `SAFE_TOOL_IDS`; present in rejected full-install policy |
-| Executable provider probe absent | `PASS_POLICY` | Status contract remains `availability: unknown`, `command: null` |
+| Cross-process continuity | `continuity_pass` | Каждый isolated store вспомнил собственный synthetic marker в новом process. |
+| Cross-store isolation | `isolation_pass` | Marker одного store не появился в recall другого store. |
+| Privacy canaries | `privacy_pass` | Synthetic markers не пересекли store boundary; inherited credentials не передавались child process. |
+| Governance delete | `purge_pass` | После delete новые processes не нашли удалённые markers. |
+| Runtime/install purge | `PASS` | Test sandbox и pinned package root удалены. |
+| Host agent config mutation | `false` | Codex/Claude/Cursor/OpenCode configuration не менялась. |
+| Hooks/plugins/skills install | `false` | Не выполнялся. |
+| MCP registration | `false` | Использовался только direct local stdio child. |
+| Server/viewer/stream/engine/daemon ownership | `false` | Не запускались. |
 
-`PASS_STATIC` означает только успешную проверку публичного metadata/documentation snapshot. `PASS_POLICY` означает проверку локального AIFHub safety contract. Ни один из этих статусов не является runtime PASS provider’а.
+## Paired Performance
 
-## Runtime Claims: Не Проверены
+| Skill | `rg` baseline | AgentMemory candidate | Pair decision |
+|---|---:|---:|---|
+| `aif-explore` | 46.3 s; 1 call; 83,804 total tokens | 164.5 s; 2 calls; 116,708 total tokens | `avoid` |
+| `aif-review` | 51.2 s; 1 call; 66,568 total tokens | 158.3 s; 2 calls; 111,015 total tokens | `avoid` |
 
-| Claim | Статус | Почему нельзя считать подтверждённым |
-|---|---|---|
-| Cross-session continuity quality | `NOT_RUN` | Нет comparable baseline/candidate runs |
-| Recall precision и relevance | `NOT_RUN` | Нет controlled queries и scored outputs |
-| Token/time improvement | `NOT_RUN` | Метрики не собирались |
-| Project isolation | `NOT_RUN` | Не выполнялся cross-project canary |
-| Agent/tenant isolation | `NOT_RUN` | Upstream behavior не проверялся в AIFHub profile |
-| Prompt/tool-data privacy | `NOT_RUN` | Не выполнялся privacy-canary test |
-| Complete purge | `NOT_RUN` | Не проверено удаление observations, indexes, snapshots, exports и config residues |
-| Residual process cleanup | `NOT_RUN` | Server, viewer, stream, engine и daemon lifecycle не запускались |
-| Windows viability | `NOT_RUN` | Native, WSL2 и Docker paths не проверялись |
-| Linux/macOS viability | `NOT_RUN` | Platform runs не выполнялись |
-| MCP registration safety | `NOT_RUN` | MCP registration намеренно не выполнялась |
-| Hook/plugin safety | `NOT_RUN` | Hooks и plugins намеренно не устанавливались |
+Aggregate candidate delta против `rg`:
 
-## Evidence Boundary
+- duration: +231.1% (`3.3108x`);
+- tool calls: +100% (`2.0x`);
+- total tokens: +51.4% (`1.5144x`);
+- input+output tokens: +53.6% (`1.5365x`).
 
-В рамках этого change были разрешены только:
+Safety assertions прошли, но continuity provider не дал достаточного преимущества, чтобы оправдать overhead или расширить default ownership. Поэтому обе pair decisions — `avoid`, а policy остаётся `reject_default`.
 
-- read-only review публичных repository/release/package facts;
-- анализ upstream-documented runtime surface;
-- локальные metadata/recommender/field-run policy tests;
-- documentation и link validation.
+## Object-focused Project Samples
 
-Не выполнялись:
+Дополнительно выполнены две non-promotable `aif-explore` пары на sanitized copies реальных project objects. Исходные repositories не модифицировались; test-only adapter копировался только внутрь generated fixture. Публичные evidence IDs и profile IDs обезличены.
 
-- package install или setup;
-- provider CLI или server start;
-- MCP client/server registration;
-- hooks, plugins или skills installation;
-- agent configuration mutation;
-- Docker/iii runtime start;
+| Object | Evidence ID | Profile | `rg` baseline | AgentMemory candidate | Delta | Decision |
+|---|---|---|---:|---:|---:|---|
+| Python MCP ability/auth gate | `agentmemory-object-python-mcp-gate-20260720-r1` | `project-8d97432e6d7a` | 247.6 s; 21 calls; 845,783 total tokens | 631.8 s; 34 calls; 1,262,957 total tokens | +155.2% duration; +49.3% total tokens | `avoid` |
+| PHP uptime interval merge | `agentmemory-object-php-uptime-20260720-r1` | `project-6b511dc0445f` | 370.5 s; 13 calls; 473,382 total tokens | 588.0 s; 23 calls; 941,243 total tokens | +58.7% duration; +98.8% total tokens | `avoid` |
+
+Обе object-focused пары завершились `PASS/PASS`; candidate не был быстрее, не сделал меньше tool calls и не использовал меньше total либо input+output tokens ни в одной паре. Это расширяет safety evidence на external sanitized fixtures, но остаётся sample size 1 для каждого profile и не меняет metadata или policy decision.
+
+## Что Остаётся NOT_RUN
+
+Изолированный run не проверял и не разрешал:
+
+- full server, viewer, stream, engine или iii lifecycle;
+- real user corpus, prompt/tool transcript capture, import, sync или export;
+- hooks, plugins, skills или registered MCP integration;
+- host agent configuration mutation;
 - background daemon ownership;
-- импорт, sync, capture, recall или purge user data.
+- agent/tenant multi-user isolation;
+- Windows/WSL/Linux/macOS parity;
+- complete full-product cleanup всех observations, indexes, snapshots, exports, config/plugin/hook residues и external storage.
 
-Поэтому никакой provider transcript, runtime output, persisted memory или private path не является evidence этого документа.
+Поэтому `purge_status: unverified` сохраняется для полного продукта. Проверенный synthetic governance delete и sandbox purge нельзя экстраполировать на весь upstream lifecycle.
 
-## Future Promotion Gates
+## Evidence Boundary И Promotion Gates
 
-Любое предложение изменить decision на `conditional` или `recommend` должно выполняться отдельным change после explicit user authorization и включать все условия:
+Provider output не становится canonical OpenSpec spec или generated rule и не может удовлетворять QA, validation, review, verify, done или archive gates. Отсутствие provider не блокирует AIFHub workflow.
 
-1. Exact package, tag, commit, Node/runtime и platform profile зафиксированы до прогона.
-2. Выполнены минимум две comparable PASS/PASS continuity pairs для baseline и candidate.
-3. Пройден cross-project isolation test с обнаруживаемым canary.
-4. Пройден privacy-canary test для prompts, tool inputs/results и exports.
-5. Пройден complete-purge test, включая indexes, snapshots, config/plugin/hook residues и stopped processes.
-6. Подтверждена platform viability для заявленного Windows/Linux/macOS profile.
-7. Runtime artifacts анонимизированы и не содержат secrets, private paths или raw transcripts.
-8. Command permissions и forbidden operations остаются сильнее positive labels и metadata promotion.
-
-До выполнения всех gates решение остаётся `reject_default`, а baseline для repository lookup — `rg`.
+Любая будущая попытка изменить decision требует отдельного change и explicit user authorization. Помимо уже выполненных двух synthetic pairs, нужны real-scope privacy/isolation checks, full-product complete-purge evidence, platform matrix и доказанная польза по сравнению с `rg`. Command permissions и forbidden operations остаются сильнее positive labels.
 
 ## Evidence Checklist Log
 
 ```text
-INFO [agentmemory-evidence] repository_identity=PASS_STATIC package_identity=PASS_STATIC
-INFO [agentmemory-evidence] release=v0.9.28 revision=a8e7d19a814a24a21818afc715f3301b3eaeee80
-INFO [agentmemory-evidence] policy_contract=PASS_POLICY runtime=NOT_RUN
-WARN [agentmemory-evidence] continuity=isolation=privacy=purge=platform=NOT_RUN
-WARN [agentmemory-evidence] promotion=forbidden reason=incomplete_runtime_safety_evidence
+INFO [agentmemory-evidence] run_id=agentmemory-isolated-0-9-28-20260720-r4 provider_version=0.9.28
+INFO [agentmemory-evidence] rows=4/4_pass pairs=2/2_pass continuity=isolation=privacy=purge=PASS
+INFO [agentmemory-evidence] registration=hooks=config_mutation=daemon=false promotion=false
+WARN [agentmemory-evidence] decision=avoid duration_delta=+231.1% total_tokens_delta=+51.4%
+INFO [agentmemory-evidence] object_samples=2 pass_pairs=2 decisions=avoid,avoid promotion=false
+WARN [agentmemory-evidence] full_product_runtime=NOT_RUN policy=reject_default
 ```

@@ -8,7 +8,7 @@ Tool ID: `rohitg00-agentmemory`
 
 Issue boundary: [ichinya/aifhub-extension#114](https://github.com/ichinya/aifhub-extension/issues/114)
 
-Результаты static audit и границы непроведённого runtime benchmark: [agentmemory-rohitg00-benchmark-results.md](agentmemory-rohitg00-benchmark-results.md).
+Результаты static audit и изолированного `ai-tester` safety run: [agentmemory-rohitg00-benchmark-results.md](agentmemory-rohitg00-benchmark-results.md).
 
 ## Identity Boundary
 
@@ -24,7 +24,7 @@ Issue boundary: [ichinya/aifhub-extension#114](https://github.com/ichinya/aifhub
 
 ## Static Evidence Snapshot
 
-Evidence зафиксирован 2026-07-19 без установки или запуска provider:
+Static evidence зафиксирован 2026-07-19 без установки или запуска provider. Отдельный isolated runtime test выполнен 2026-07-20 и описан ниже.
 
 - release [`v0.9.28`](https://github.com/rohitg00/agentmemory/releases/tag/v0.9.28);
 - commit [`a8e7d19a814a24a21818afc715f3301b3eaeee80`](https://github.com/rohitg00/agentmemory/commit/a8e7d19a814a24a21818afc715f3301b3eaeee80);
@@ -37,7 +37,7 @@ Issue evidence отражало packages `0.9.27`, поэтому переход
 ```text
 INFO [agentmemory-static-audit] issue=https://github.com/ichinya/aifhub-extension/issues/114
 INFO [agentmemory-static-audit] release=https://github.com/rohitg00/agentmemory/releases/tag/v0.9.28
-INFO [agentmemory-static-audit] revision=a8e7d19a814a24a21818afc715f3301b3eaeee80 runtime=NOT_RUN
+INFO [agentmemory-static-audit] revision=a8e7d19a814a24a21818afc715f3301b3eaeee80 static_runtime=NOT_RUN
 WARN [agentmemory-version-drift] issue_snapshot=0.9.27 observed=0.9.28 action=refresh_before_any_promotion
 ```
 
@@ -53,7 +53,24 @@ Upstream documentation описывает не узкий read-only continuity r
 - capture и replay prompts, tool calls, tool results, responses и derived memory;
 - optional external/local model providers и связанные runtime credentials/configuration.
 
-Эти возможности могут быть полезны в independently managed installation, но расширяют read, storage, process и privacy scope намного дальше текущих AIFHub defaults. Static documentation не доказывает project isolation, privacy canaries, complete purge или continuity quality.
+Эти возможности могут быть полезны в independently managed installation, но расширяют read, storage, process и privacy scope намного дальше текущих AIFHub defaults. Static documentation сама по себе не доказывает project isolation, privacy canaries, complete purge или continuity quality.
+
+## Isolated ai-tester Evidence
+
+2026-07-20 через `ai-tester` выполнен non-promotable safety run `agentmemory-isolated-0-9-28-20260720-r4`:
+
+- exact package `@agentmemory/mcp@0.9.28`;
+- direct standalone MCP stdio в confined sandbox, без registration;
+- synthetic markers в двух отдельных stores;
+- skills `aif-explore` и `aif-review`;
+- 4/4 rows PASS и 2/2 `PASS/PASS` pairs;
+- `continuity_pass`, `isolation_pass`, `privacy_pass`, `purge_pass`;
+- sandbox и local package root удалены, child processes остановлены;
+- metadata promotion отключена через `--no-promote`.
+
+Hooks, plugins, agent config, registered MCP, server/viewer/stream/engine и background daemons не создавались. Full-product runtime и real user corpus остаются `NOT_RUN`.
+
+Обе пары получили decision `avoid`: против `rg` candidate потребовал +231.1% времени, +100% tool calls, +51.4% total tokens и +53.6% input+output tokens. Изолированный safety PASS не меняет `reject_default`.
 
 ## Политика AIFHub
 
@@ -82,18 +99,18 @@ Recommendation action: `do_not_suggest_as_aifhub_provider`.
 - provider output не удовлетворяет QA, validation, verify, done или archive gates;
 - отсутствие provider или его output не блокирует AIFHub workflow.
 
-AIFHub не берёт на себя install, setup, memory sync, MCP registration, agent config mutation, hooks, background daemons, provider CLI или cleanup lifecycle.
+AIFHub не берёт на себя install, setup, memory sync, MCP registration, agent config mutation, hooks, background daemons, provider CLI или cleanup lifecycle. Единственное исключение — явно запущенный test-only `ai-tester` safety scenario с pinned local package, synthetic data и обязательным purge; он не доступен normal recommendations или commands.
 
 ## Privacy И Purge
 
 Read scope классифицирован как `broad_prompt_tool_and_memory_data`. Storage scope классифицирован как `user_home_agentmemory_and_user_owned_runtime`.
 
-Upstream предоставляет команды удаления и governance operations, но в этом change они не запускались. Не подтверждено, что cleanup удаляет все observations, indexes, snapshots, exports, plugin/config mutations, process state и cross-project residual data. Поэтому:
+В isolated synthetic profile governance delete, store isolation и sandbox/install purge прошли. Это не подтверждает, что full-product cleanup удаляет все observations, indexes, snapshots, exports, plugin/config mutations, process state и cross-project residual data. Поэтому:
 
 - `purge_status: unverified`;
 - AIFHub не обещает complete cleanup;
 - AIFHub не выполняет provider cleanup;
-- positive recommendation невозможна без отдельного complete-purge check.
+- positive recommendation невозможна без отдельного full-product complete-purge check.
 
 ## Условия Future Promotion
 
@@ -106,7 +123,7 @@ Upstream предоставляет команды удаления и governanc
 - подтверждённая platform viability;
 - сохранение command permissions и forbidden operations сильнее любых positive labels.
 
-Текущий static audit и policy tests достаточны только для консервативного rejection. Runtime benchmark остаётся `NOT_RUN`.
+Две synthetic safety pairs уже выполнены, но не покрывают full-product lifecycle и показали overhead относительно `rg`. Консервативное rejection сохраняется: isolated runtime — `PASS`, full-product runtime — `NOT_RUN`.
 
 ## Мета Для Анализа
 
@@ -119,6 +136,8 @@ install_policy: user_owned_outside_aifhub_only
 read_scope: broad_prompt_tool_and_memory_data
 storage_scope: user_home_agentmemory_and_user_owned_runtime
 purge_status: unverified
-runtime_status: NOT_RUN
+isolated_runtime_status: PASS
+full_product_runtime_status: NOT_RUN
+runtime_decision: avoid
 analysis_hint: "Не предлагать как AIFHub provider; допускается только явно переданный и проверенный user-owned output как supporting context."
 ```
