@@ -31,7 +31,12 @@ export const SAFE_TOOL_IDS = [
   'codex-agent-mem',
   'repowise'
 ];
-export const REJECTED_FULL_INSTALL_IDS = new Set(['codex-mem', 'agent-memory', 'eagle-mem']);
+export const REJECTED_FULL_INSTALL_IDS = new Set([
+  'codex-mem',
+  'agent-memory',
+  'eagle-mem',
+  'rohitg00-agentmemory'
+]);
 
 const DEFAULT_QUERIES = ['architecture', 'workflow', 'OpenSpec', 'TODO'];
 const MANIFEST_NAMES = new Set([
@@ -97,6 +102,7 @@ const IGNORE_DIR_NAMES = new Set([
   'tmp',
   'temp',
   'logs',
+  'runs',
   'graphify-out',
   '.codegraph',
   '.repowise',

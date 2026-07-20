@@ -6,6 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 
 import {
+  REJECTED_FULL_INSTALL_IDS,
+  SAFE_TOOL_IDS,
   assertWithinDirectory,
   buildPublicRunSummary,
   discoverProjectRoots,
@@ -99,6 +101,7 @@ describe('sanitized copies', () => {
     await writeFixtureFile(path.join('source-project', '.github', 'skills', 'aif-build-automation', 'templates', 'magefile.go'), 'package main');
     await writeFixtureFile(path.join('source-project', '.github', 'workflows', 'validate.yml'), 'name: validate\n');
     await writeFixtureFile(path.join('source-project', 'node_modules', 'pkg', 'index.js'), 'dependency');
+    await writeFixtureFile(path.join('source-project', 'runs', 'private-trace.json'), '{"private":"trace"}');
     await writeFixtureFile(path.join('source-project', 'package-lock.json'), '{}');
     await writeFixtureFile(path.join('source-project', 'dist', 'bundle.js'), 'built');
 
@@ -117,6 +120,7 @@ describe('sanitized copies', () => {
     assert.equal(await exists(path.join(copy.copyPath, '.github', 'skills')), false);
     assert.equal(await exists(path.join(copy.copyPath, '.github', 'workflows', 'validate.yml')), true);
     assert.equal(await exists(path.join(copy.copyPath, 'node_modules')), false);
+    assert.equal(await exists(path.join(copy.copyPath, 'runs')), false);
     assert.equal(await exists(path.join(copy.copyPath, 'package-lock.json')), false);
     assert.equal(await exists(path.join(copy.copyPath, 'dist')), false);
   });
@@ -179,6 +183,9 @@ describe('tool plan', () => {
     assert.equal(installed.includes('codex-mem'), false);
     assert.equal(installed.includes('eagle-mem'), false);
     assert.equal(installed.includes('agent-memory'), false);
+    assert.equal(SAFE_TOOL_IDS.includes('rohitg00-agentmemory'), false);
+    assert.equal(ids.includes('rohitg00-agentmemory'), false);
+    assert.equal(REJECTED_FULL_INSTALL_IDS.has('rohitg00-agentmemory'), true);
   });
 });
 

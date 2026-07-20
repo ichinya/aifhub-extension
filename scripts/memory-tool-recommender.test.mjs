@@ -72,7 +72,8 @@ describe('recommendation metadata parsing', () => {
       'codex-mem',
       'eagle-mem',
       'codegraph',
-      'repowise'
+      'repowise',
+      'rohitg00-agentmemory'
     ]);
     assert.deepEqual(metadata.project_dimensions.languages, ['php', 'go', 'js', 'python', 'rust', 'multi']);
     assert.deepEqual(metadata.project_dimensions.volume, ['mini', 'standard', 'large']);
@@ -116,6 +117,49 @@ describe('recommendation metadata parsing', () => {
     assert.equal(metadata.tools.codegraph.screening_policy.default_decision, 'avoid_by_default');
     assert.equal(metadata.tools.codegraph.screening_policy.aggregate.rows_executed, 300);
     assert.ok(metadata.tools.codegraph.forbidden_in.includes('aif-architecture'));
+  });
+
+  it('keeps similarly named AgentMemory identities distinct', async () => {
+    const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
+    const manualNotes = metadata.tools['agent-memory'];
+    const continuity = metadata.tools['codex-agent-mem'];
+    const candidate = metadata.tools['rohitg00-agentmemory'];
+
+    assert.equal(manualNotes.repository, 'https://github.com/jayzeng/agentmemory');
+    assert.equal(manualNotes.tested_version, 'myagentmemory 0.4.12');
+    assert.equal(continuity.repository, 'https://github.com/MarceloCaporale/codex-agent-mem');
+    assert.equal(candidate.repository, 'https://github.com/rohitg00/agentmemory');
+    assert.deepEqual(candidate.packages, ['@agentmemory/agentmemory', '@agentmemory/mcp']);
+    assert.equal(candidate.doc, 'agentmemory-rohitg00.md');
+    assert.equal(candidate.results_doc, 'agentmemory-rohitg00-benchmark-results.md');
+    assert.match(candidate.tested_version, /0\.9\.28/);
+    assert.match(candidate.tested_version, /isolated standalone ai-tester PASS/);
+    assert.equal(candidate.isolated_runtime_evidence.status, 'pass');
+    assert.equal(candidate.isolated_runtime_evidence.run_id, 'agentmemory-isolated-0-9-28-20260720-r4');
+    assert.equal(candidate.isolated_runtime_evidence.pass_pairs, 2);
+    assert.equal(candidate.isolated_runtime_evidence.eligible_for_metadata, false);
+    assert.equal(candidate.decision, 'reject_default');
+    assert.equal(candidate.recommendation_action, 'do_not_suggest_as_aifhub_provider');
+    assert.equal(candidate.integration_role, 'user_owned_continuity_candidate_only');
+    assert.deepEqual(candidate.allowed_in, []);
+    assert.deepEqual(candidate.forbidden_operations, [
+      'auto_install',
+      'auto_run_setup',
+      'auto_sync_memory',
+      'auto_register_mcp',
+      'mutate_provider_config',
+      'install_hooks',
+      'start_background_daemons',
+      'run_provider_cli'
+    ]);
+    assert.equal(metadata.tool_permissions['rohitg00-agentmemory'].default, 'forbidden');
+    assert.equal(Object.hasOwn(metadata.availability_probes, 'rohitg00-agentmemory'), false);
+    for (const [command, policy] of Object.entries(metadata.skill_usage_matrix)) {
+      assert.ok(
+        policy.forbidden.includes('rohitg00-agentmemory'),
+        `${command}: rohitg00-agentmemory must be explicitly forbidden`
+      );
+    }
   });
 });
 
@@ -238,6 +282,24 @@ describe('recommendation results', () => {
     assert.equal(result.body.proven_label_evidence[0].tool_id, 'codegraph');
     assert.ok(result.body.dimension_signals.includes('mini_go_service'));
     assert.equal(metadata.tools.codegraph.recommendation_action, 'suggest_manual_cli_for_repo_graph_when_enabled_or_explicit');
+    assert.equal(result.body.tools['rohitg00-agentmemory'].repository, 'https://github.com/rohitg00/agentmemory');
+    assert.deepEqual(result.body.tools['rohitg00-agentmemory'].packages, [
+      '@agentmemory/agentmemory',
+      '@agentmemory/mcp'
+    ]);
+    assert.match(result.body.tools['rohitg00-agentmemory'].tested_version, /isolated standalone ai-tester PASS/);
+    assert.equal(
+      result.body.tools['rohitg00-agentmemory'].integration_role,
+      'user_owned_continuity_candidate_only'
+    );
+    assert.equal(
+      result.body.tools['rohitg00-agentmemory'].storage_scope,
+      'user_home_agentmemory_and_user_owned_runtime'
+    );
+    assert.equal(result.body.tools['rohitg00-agentmemory'].purge_status, 'unverified');
+    assert.ok(
+      result.body.tools['rohitg00-agentmemory'].forbidden_operations.includes('auto_register_mcp')
+    );
   });
 
   it('allows CodeGraph only as scoped manual CLI for analyze recommendations and enabled explore use', async () => {
@@ -907,6 +969,119 @@ describe('recommendation results', () => {
     assert.equal(withoutManualNotes.recommendations.some((item) => item.tool_id === 'agent-memory'), false);
     assert.equal(withManualNotes.recommendations.some((item) => item.tool_id === 'agent-memory'), true);
   });
+
+  it('rejects rohitg00-agentmemory for normal tasks even when project config enables it', async () => {
+    const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
+    const taskSignals = [
+      'architecture_or_impact_discovery',
+      'resume_previous_work',
+      'manual_durable_notes'
+    ];
+    let candidateProbeCalls = 0;
+    const probeRunner = async (toolId) => {
+      if (toolId === 'rohitg00-agentmemory') candidateProbeCalls += 1;
+      return { availability: 'unknown', command: null };
+    };
+
+    for (const taskSignal of taskSignals) {
+      const recommendation = await buildRecommendationResult({
+        metadata,
+        projectShape: 'large_framework_app',
+        taskSignals: [taskSignal],
+        command: 'aif-analyze',
+        probeRunner
+      });
+
+      assert.equal(
+        recommendation.recommendations.some((item) => item.tool_id === 'rohitg00-agentmemory'),
+        false,
+        `${taskSignal}: rejected candidate must not be recommended`
+      );
+      assert.ok(
+        recommendation.do_not_recommend.some((item) => item.tool_id === 'rohitg00-agentmemory'),
+        `${taskSignal}: rejected candidate must be reported in do_not_recommend`
+      );
+    }
+
+    await mkdir(path.join(tmpDir, '.ai-factory'), { recursive: true });
+    await writeFile(
+      path.join(tmpDir, '.ai-factory', 'config.yaml'),
+      'utilities:\n  context_tools:\n    enabled: [rohitg00-agentmemory]\n',
+      'utf8'
+    );
+
+    for (const taskSignal of taskSignals) {
+      const selection = await runMemoryToolRecommender([
+        'select',
+        '--shape',
+        'large_framework_app',
+        '--task',
+        taskSignal,
+        '--command',
+        'aif-analyze',
+        '--metadata',
+        REAL_METADATA,
+        '--json'
+      ], {
+        cwd: tmpDir,
+        stdout: [],
+        stderr: [],
+        exit: false,
+        probeRunner
+      });
+      const rejected = selection.body.not_selected_tools.find(
+        (item) => item.tool_id === 'rohitg00-agentmemory'
+      );
+
+      assert.equal(selection.exitCode, 0);
+      assert.equal(
+        selection.body.selected_tools.some((item) => item.tool_id === 'rohitg00-agentmemory'),
+        false,
+        `${taskSignal}: explicit config must not select rejected candidate`
+      );
+      assert.ok(rejected, `${taskSignal}: rejected candidate must be reported in not_selected_tools`);
+      assert.match(rejected.reason, /forbidden|reject/i);
+    }
+
+    assert.equal(candidateProbeCalls, 0, 'rejected candidate must never reach an availability probe');
+  });
+
+  it('preserves existing manual-notes and read-only continuity policies', async () => {
+    const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
+    const manualNotes = metadata.tools['agent-memory'];
+    const continuity = metadata.tools['codex-agent-mem'];
+
+    assert.equal(manualNotes.decision, 'docs_only_manual_notes');
+    assert.equal(manualNotes.integration_role, 'manual_markdown_memory');
+    assert.deepEqual(manualNotes.recommended_for.tasks, ['manual_durable_notes']);
+    assert.deepEqual(manualNotes.allowed_in, ['manual_notes_only']);
+    assert.ok(manualNotes.forbidden_in.includes('aif-implement'));
+
+    assert.equal(continuity.decision, 'optional');
+    assert.equal(continuity.integration_role, 'read_only_continuity_memory');
+    assert.equal(continuity.read_scope, 'explicit_sqlite_db_path');
+    assert.ok(continuity.recommended_for.tasks.includes('resume_previous_work'));
+    assert.ok(continuity.allowed_in.includes('aif-analyze'));
+    assert.ok(continuity.forbidden_in.includes('aif-implement'));
+
+    const manualResult = await buildRecommendationResult({
+      metadata,
+      projectShape: 'large_framework_app',
+      taskSignals: ['manual_durable_notes'],
+      probeRunner: async () => ({ availability: 'unknown', command: null })
+    });
+    const continuityResult = await buildRecommendationResult({
+      metadata,
+      projectShape: 'go_service',
+      taskSignals: ['resume_previous_work'],
+      probeRunner: async () => ({ availability: 'unknown', command: null })
+    });
+
+    assert.ok(manualResult.recommendations.some((item) => item.tool_id === 'agent-memory'));
+    assert.equal(manualResult.recommendations.some((item) => item.tool_id === 'codex-agent-mem'), false);
+    assert.ok(continuityResult.recommendations.some((item) => item.tool_id === 'codex-agent-mem'));
+    assert.equal(continuityResult.recommendations.some((item) => item.tool_id === 'agent-memory'), false);
+  });
 });
 
 function makeProvenLabelMetadataYaml() {
@@ -1004,6 +1179,39 @@ function makeNegativeProvenLabelMetadataYaml() {
 }
 
 describe('CLI behavior', () => {
+  it('uses the production-default no-probe path for rohitg00-agentmemory status', async () => {
+    const metadataPath = path.join(tmpDir, 'minimal-rejected-metadata.yaml');
+    await writeFile(metadataPath, [
+      'schema: aifhub.memory_tools.recommendation.v1',
+      'default_policy:',
+      '  baseline_tool: rg',
+      'tools:',
+      '  rohitg00-agentmemory:',
+      '    display_name: agentmemory (rohitg00)',
+      '    decision: reject_default',
+      '    recommendation_action: do_not_suggest_as_aifhub_provider',
+      ''
+    ].join('\n'), 'utf8');
+
+    const result = await runMemoryToolRecommender([
+      'status',
+      '--metadata',
+      metadataPath,
+      '--json'
+    ], {
+      cwd: tmpDir,
+      stdout: [],
+      stderr: [],
+      exit: false
+    });
+
+    assert.equal(result.exitCode, 0);
+    assert.deepEqual(result.body.probes['rohitg00-agentmemory'], {
+      availability: 'unknown',
+      command: null
+    });
+  });
+
   it('keeps broad architecture recommendation JSON on rg unless an exact tool policy matches', async () => {
     const result = await runCli([
       'recommend',

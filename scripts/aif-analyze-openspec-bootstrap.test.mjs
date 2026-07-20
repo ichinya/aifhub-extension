@@ -271,6 +271,51 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
     }
   });
 
+  it('aggregates rohitg00 AgentMemory docs without treating provider output as canonical evidence', async () => {
+    const research = await readRepoFile('docs/memory-tools-research/agentmemory-rohitg00.md');
+    const results = await readRepoFile('docs/memory-tools-research/agentmemory-rohitg00-benchmark-results.md');
+    const publicDocs = [
+      await readRepoFile('docs/memory-tools-research/README.md'),
+      await readRepoFile('docs/memory-tool-recommendations.md'),
+      await readRepoFile('docs/context-providers.md')
+    ].join('\n');
+    const combined = [research, results, publicDocs].join('\n');
+
+    for (const expected of [
+      'jayzeng/agentmemory',
+      'MarceloCaporale/codex-agent-mem',
+      'rohitg00/agentmemory',
+      '@agentmemory/agentmemory',
+      '@agentmemory/mcp',
+      'agentmemory-rohitg00.md',
+      'agentmemory-rohitg00-benchmark-results.md',
+      'reject_default',
+      'Isolated runtime status: `PASS`',
+      'Full-product runtime status: `NOT_RUN`',
+      'agentmemory-isolated-0-9-28-20260720-r4',
+      'agentmemory-object-python-mcp-gate-20260720-r1',
+      'agentmemory-object-php-uptime-20260720-r1',
+      'Python MCP ability/auth gate',
+      'PHP uptime interval merge',
+      '2/2 `PASS/PASS`',
+      '`rg` остаётся baseline'
+    ]) {
+      assertIncludes(combined, expected, 'rohitg00 AgentMemory provider docs');
+    }
+
+    for (const expected of [
+      'MCP registration',
+      'agent config mutation',
+      'hooks',
+      'background daemons',
+      'supporting context',
+      'provider output не становится canonical OpenSpec',
+      'не может удовлетворять OpenSpec'
+    ]) {
+      assertIncludes(combined, expected, 'rohitg00 AgentMemory lifecycle and evidence boundary');
+    }
+  });
+
   it('requires detectOpenSpec capability reporting and degraded missing-CLI behavior', async () => {
     const skill = await readRepoFile('skills/aif-analyze/SKILL.md');
 
