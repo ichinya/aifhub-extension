@@ -57,7 +57,7 @@ describe('ai-tester scenario catalog', () => {
     });
 
     assert.equal(catalog.schema, AI_TESTER_SCENARIO_CATALOG_SCHEMA);
-    assert.equal(catalog.scenarios.length, 6);
+    assert.equal(catalog.scenarios.length, 7);
     assert.equal(catalog.scenarios[0].id, 'architecture-impact-discovery');
     assert.equal(catalog.scenarios[0].fixture_requirements.labels_any.length, 4);
     assert.deepEqual(catalog.scenarios[0].fixture_requirements.labels_any[0], [
@@ -70,6 +70,25 @@ describe('ai-tester scenario catalog', () => {
     ]);
     assert.equal(catalog.scenarios[0].promotion_policy.eligible_for_metadata, true);
     assert.equal(catalog.scenarios[4].promotion_policy.eligible_for_metadata, false);
+    assert.equal(catalog.scenarios[6].id, 'agentmemory-isolated-continuity');
+    assert.equal(catalog.scenarios[6].paired_runs.candidate_mode, 'isolated_runtime_after_rg');
+    assert.deepEqual(catalog.scenarios[6].skills, ['aif-explore', 'aif-review']);
+    assert.deepEqual(catalog.scenarios[6].tools, ['rohitg00-agentmemory']);
+    assert.equal(catalog.scenarios[6].promotion_policy.eligible_for_metadata, false);
+    assert.equal(
+      scenarioMatchesProfileLabels(catalog.scenarios[6], new Set([
+        'php', 'js', 'python', 'standard', 'framework', 'single_repo', 'legacy_ai_factory_only', 'large_framework_app'
+      ])),
+      true,
+      'AgentMemory safety scenario should accept the selected pushhard profile.'
+    );
+    assert.equal(
+      scenarioMatchesProfileLabels(catalog.scenarios[6], new Set([
+        'php', 'js', 'standard', 'framework', 'single_repo', 'none', 'large_framework_app'
+      ])),
+      true,
+      'AgentMemory safety scenario should accept the selected this-is-fine profile.'
+    );
   });
 
   it('filters by scenario, run class, skill, tool, task, and profile labels', async () => {
@@ -247,6 +266,40 @@ describe('ai-tester matrix manifest', () => {
     assert.equal(summary.cases[0].promotion_policy.min_pass_pairs, 2);
   });
 
+  it('generates two isolated runtime pairs for the rejected AgentMemory candidate', async () => {
+    const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
+    const scenarioCatalog = parseAiTesterScenarioCatalog(await readFile(REAL_CATALOG, 'utf8'), { metadata });
+    const manifest = buildAiTesterMatrixManifest({
+      metadata,
+      scenarioCatalog,
+      profiles: [{
+        id: 'matrix-profile-agentmemory',
+        sourceRoot: path.join(tmpDir, 'fixture-project'),
+        project_shape: 'large_framework_app',
+        languages: ['js'],
+        volume: 'standard',
+        complexity: 'framework',
+        repo_shape: 'single_repo',
+        artifact_mode: 'openspec_native'
+      }],
+      skills: ['aif-explore', 'aif-review'],
+      tools: ['rohitg00-agentmemory'],
+      taskScenarios: ['resume_previous_work'],
+      scenarioIds: ['agentmemory-isolated-continuity'],
+      runClasses: ['safety']
+    });
+
+    assert.equal(manifest.cases.length, 4);
+    const toolRuns = manifest.cases.filter((item) => item.tool_id === 'rohitg00-agentmemory');
+    assert.equal(toolRuns.length, 2);
+    assert.deepEqual(toolRuns.map((item) => item.expectation), ['positive', 'positive']);
+    assert.deepEqual(toolRuns.map((item) => item.preinitialized_tool_ids), [
+      ['rohitg00-agentmemory'],
+      ['rohitg00-agentmemory']
+    ]);
+    assert.ok(toolRuns.every((item) => item.promotion_policy.eligible_for_metadata === false));
+  });
+
   it('prefixes scenario ids so separate matrix runs do not reuse old ai-tester traces', async () => {
     const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
     const manifest = buildAiTesterMatrixManifest({
@@ -403,7 +456,8 @@ describe('ai-tester matrix manifest', () => {
     assert.match(preinitializedScenario, /Do not run codegraph init or codegraph index during the model turn/);
     assert.match(preinitializedScenario, /id: codegraph-data-called/);
     assert.match(preinitializedScenario, /\(\?:files\|query\|context\)\\b/);
-    assert.match(preinitializedScenario, /--help\\b/);
+    assert.match(preinitializedScenario, /\(\?:files\|query\|context\)\\b/);
+    assert.doesNotMatch(preinitializedScenario, /\(\?[=!<]/);
     assert.match(preinitializedScenario, /id: codegraph-purge-called/);
     assert.match(preinitializedScenario, /id: no-codegraph-init-during-turn/);
     assert.match(preinitializedScenario, /id: no-codegraph-index-during-turn/);
@@ -449,20 +503,68 @@ describe('ai-tester matrix manifest', () => {
     assert.match(portableSetupScenario, /cmd\.exe \/c \\"cd project && npm install --prefix \.ai-tester-tools\/context7 ctx7\\"/);
     assert.match(portableSetupScenario, /cmd\.exe \/c \\"cd project && npm install --prefix \.ai-tester-tools\/context-mode context-mode\\"/);
     assert.doesNotMatch(portableSetupScenario, /\.ai-tester-tools\\/);
+
+    const agentmemoryScenario = renderAiTesterScenario({
+      id: 'case-agentmemory-isolated',
+      suite: 'continuity',
+      expectation: 'positive',
+      skill: 'aif-explore',
+      tool_id: 'rohitg00-agentmemory',
+      preinitialized_tool_ids: ['rohitg00-agentmemory'],
+      profile_id: 'matrix-profile-05',
+      fixture_path: '<sanitized-fixture>',
+      task_scenario: 'resume_previous_work',
+      selector_mode: 'source-fallback'
+    });
+    const agentmemoryBaseline = renderAiTesterScenario({
+      id: 'case-agentmemory-baseline',
+      suite: 'baseline',
+      expectation: 'baseline_rg',
+      skill: 'aif-explore',
+      tool_id: 'rg',
+      optional_tool_id: 'rohitg00-agentmemory',
+      preinitialized_tool_ids: ['rohitg00-agentmemory'],
+      profile_id: 'matrix-profile-05',
+      fixture_path: '<sanitized-fixture>',
+      task_scenario: 'resume_previous_work',
+      selector_mode: 'source-fallback'
+    });
+
+    assert.match(agentmemoryScenario, /@agentmemory\/mcp@0\.9\.28/);
+    assert.match(agentmemoryScenario, /--ignore-scripts --no-audit --no-fund/);
+    assert.match(agentmemoryScenario, /agentmemory-ai-tester-adapter\.mjs verify --install/);
+    assert.match(agentmemoryScenario, /STANDALONE_PERSIST_PATH/);
+    assert.match(agentmemoryScenario, /id: agentmemory-runtime-called/);
+    assert.match(agentmemoryScenario, /pattern: "continuity_pass"/);
+    assert.match(agentmemoryScenario, /pattern: "isolation_pass"/);
+    assert.match(agentmemoryScenario, /pattern: "privacy_pass"/);
+    assert.match(agentmemoryScenario, /pattern: "purge_pass"/);
+    assert.doesNotMatch(agentmemoryScenario, /agentmemory connect/);
+    assert.doesNotMatch(agentmemoryScenario, /register MCP|install hooks|start daemon/i);
+    assert.doesNotMatch(agentmemoryScenario, /setup_commands:/);
+    assert.doesNotMatch(agentmemoryScenario, /\(\?[=!<]/);
+    assert.doesNotMatch(agentmemoryBaseline, /@agentmemory\/mcp@0\.9\.28/);
+    assert.doesNotMatch(agentmemoryBaseline, /agentmemory-ai-tester-adapter\.mjs verify/);
+    assert.doesNotMatch(agentmemoryBaseline, /\(\?[=!<]/);
   });
 
   it('matches tool invocations without treating rg search terms as tool calls', () => {
     const codegraphCommand = new RegExp(commandInvocationRegexForYaml('codegraph'));
     const context7Command = new RegExp(commandInvocationRegexForYaml('context7'));
     const contextModeCommand = new RegExp(commandInvocationRegexForYaml('context-mode'));
+    const agentmemoryCommand = new RegExp(commandInvocationRegexForYaml('rohitg00-agentmemory'));
 
     assert.equal(codegraphCommand.test('cmd.exe /c "codegraph context --path project architecture"'), true);
     assert.equal(codegraphCommand.test('cmd.exe /c \'codegraph query --path project symbol\''), true);
     assert.equal(context7Command.test('cmd.exe /c "ctx7 library chalk api"'), true);
     assert.equal(contextModeCommand.test('cmd.exe /c "project\\.ai-tester-tools\\context-mode\\node_modules\\.bin\\context-mode.cmd doctor"'), true);
+    assert.equal(codegraphCommand.test('"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command \'codegraph context architecture\''), true);
     assert.equal(codegraphCommand.test('cmd.exe /c \'rg -n "codegraph|context-mode" project\''), false);
     assert.equal(codegraphCommand.test('rg -n "codegraph|context-mode" project'), false);
     assert.equal(contextModeCommand.test('rg -n "codegraph|context-mode" project'), false);
+    assert.equal(agentmemoryCommand.test('node scripts/agentmemory-ai-tester-adapter.mjs verify --package-root .ai-tester-tools/agentmemory'), true);
+    assert.equal(agentmemoryCommand.test('"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command \'node scripts/agentmemory-ai-tester-adapter.mjs verify --install\''), true);
+    assert.equal(agentmemoryCommand.test('rg -n "agentmemory-ai-tester-adapter" scripts'), false);
   });
 
   it('copies fixtures through sanitized temp paths and keeps public output anonymous', async () => {
@@ -552,6 +654,79 @@ describe('ai-tester matrix manifest', () => {
     const scenarioText = await readFile(scenarioPath, 'utf8');
     assert.match(scenarioText, /copy_trees:/);
     assert.match(scenarioText, /model: "gpt-test"/);
+  });
+
+  it('injects the test-only AgentMemory adapter into external sanitized fixtures', async () => {
+    const sourceRoot = path.join(tmpDir, 'external-product');
+    const outDir = path.join(tmpDir, 'external-agentmemory-matrix');
+    const catalogPath = await writeFixtureFile('external-agentmemory-catalog.yaml', [
+      `schema: ${AI_TESTER_SCENARIO_CATALOG_SCHEMA}`,
+      'scenarios:',
+      '  - id: external-agentmemory-safety',
+      '    title: "External AgentMemory safety"',
+      '    task_signal: resume_previous_work',
+      '    run_class: safety',
+      '    skills: [aif-explore]',
+      '    tools: [rohitg00-agentmemory]',
+      '    paired_runs:',
+      '      baseline: rg',
+      '      candidate_mode: isolated_runtime_after_rg',
+      '    baseline_assertions: [tool_called:rg, no_optional_tools, no_path_escape]',
+      '    candidate_assertions: [tool_call_sequence:rg_then_candidate, output_contains:tool_run, continuity_pass, isolation_pass, privacy_pass, purge_pass, no_path_escape]',
+      '    promotion_policy:',
+      '      eligible_for_metadata: false',
+      '      min_pass_pairs: 1',
+      '      require_exact_labels: true',
+      '      allowed_decisions: [avoid, forbid]',
+      ''
+    ].join('\n'));
+    await writeFixtureFile(path.join('external-product', 'package.json'), '{"name":"external-product"}');
+    await writeFixtureFile(path.join('external-product', 'src', 'index.js'), 'export const value = 1;');
+
+    const result = await runMemoryToolAiTesterMatrix([
+      '--roots',
+      sourceRoot,
+      '--out',
+      outDir,
+      '--scenario-catalog',
+      catalogPath,
+      '--metadata',
+      REAL_METADATA,
+      '--scenario-id',
+      'external-agentmemory-safety',
+      '--run-class',
+      'safety',
+      '--tool',
+      'rohitg00-agentmemory',
+      '--task',
+      'resume_previous_work',
+      '--skill',
+      'aif-explore',
+      '--max-profiles',
+      '1',
+      '--json'
+    ], {
+      cwd: REPO_ROOT,
+      stdout: [],
+      exit: false
+    });
+
+    const adapterTarget = path.join(
+      outDir,
+      'fixtures',
+      'matrix-profile-01',
+      'scripts',
+      'agentmemory-ai-tester-adapter.mjs'
+    );
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.body.case_count, 2);
+    assert.equal(await exists(adapterTarget), true);
+    assert.match(await readFile(adapterTarget, 'utf8'), /aifhub\.agentmemory\.ai_tester_adapter\.v1/);
+    assert.equal(
+      await exists(path.join(sourceRoot, 'scripts', 'agentmemory-ai-tester-adapter.mjs')),
+      false,
+      'The source project must remain untouched.'
+    );
   });
 
   it('builds public summaries with dimension counts but without private fixture paths', async () => {

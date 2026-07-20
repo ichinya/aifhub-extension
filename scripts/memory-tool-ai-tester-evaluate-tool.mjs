@@ -30,6 +30,7 @@ export async function runMemoryToolAiTesterToolEvaluation(args = [], options = {
   ));
   const scenarioPrefix = parsed.scenarioPrefix || `${safeId(parsed.tool)}-${timestampSlug(new Date())}`;
   const runId = parsed.runId || scenarioPrefix;
+  const runsDir = path.resolve(cwd, parsed.runsDir ?? 'runs');
   const runners = {
     matrix: options.runMatrix ?? runMemoryToolAiTesterMatrix,
     missing: options.runMissing ?? runMemoryToolAiTesterMissing,
@@ -51,7 +52,7 @@ export async function runMemoryToolAiTesterToolEvaluation(args = [], options = {
 
   let runResult = null;
   if (!parsed.dryRun && !parsed.noRun) {
-    const missingArgs = buildMissingArgs(parsed, { outDir });
+    const missingArgs = buildMissingArgs(parsed, { outDir, runsDir });
     runResult = await runners.missing(missingArgs, {
       cwd,
       stdout: [],
@@ -64,7 +65,7 @@ export async function runMemoryToolAiTesterToolEvaluation(args = [], options = {
 
   let reportResult = null;
   if (!parsed.dryRun) {
-    const reportArgs = buildReportArgs(parsed, { outDir });
+    const reportArgs = buildReportArgs(parsed, { outDir, runsDir });
     reportResult = await runners.report(reportArgs, {
       cwd,
       stdout: [],
@@ -163,7 +164,7 @@ function buildMatrixArgs(parsed, { outDir, scenarioPrefix }) {
   return args;
 }
 
-function buildMissingArgs(parsed, { outDir }) {
+function buildMissingArgs(parsed, { outDir, runsDir }) {
   const args = [
     '--matrix-dir',
     outDir,
@@ -171,7 +172,7 @@ function buildMissingArgs(parsed, { outDir }) {
     '--no-report-copy'
   ];
   for (const skill of parsed.skills) args.push('--skill', skill);
-  if (parsed.runsDir) args.push('--runs-dir', parsed.runsDir);
+  args.push('--runs-dir', runsDir);
   if (Number.isFinite(parsed.maxRuns)) args.push('--max-runs', String(parsed.maxRuns));
   if (Number.isFinite(parsed.timeoutMs)) args.push('--timeout-ms', String(parsed.timeoutMs));
   if (Number.isFinite(parsed.deadlineMinutes)) args.push('--deadline-minutes', String(parsed.deadlineMinutes));
@@ -179,7 +180,7 @@ function buildMissingArgs(parsed, { outDir }) {
   return args;
 }
 
-function buildReportArgs(parsed, { outDir }) {
+function buildReportArgs(parsed, { outDir, runsDir }) {
   const args = [
     '--matrix-dir',
     outDir,
@@ -187,7 +188,7 @@ function buildReportArgs(parsed, { outDir }) {
     outDir,
     '--json'
   ];
-  if (parsed.runsDir) args.push('--runs-dir', parsed.runsDir);
+  args.push('--runs-dir', runsDir);
   if (parsed.copyMarkdown) args.push('--copy-markdown', parsed.copyMarkdown);
   return args;
 }

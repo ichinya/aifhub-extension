@@ -1,5 +1,5 @@
 schema: aifhub.memory_tools.recommendation.v1
-updated: "2026-05-29"
+updated: "2026-07-19"
 purpose: "Метаданные для этапа анализа проекта: какие memory/retrieval инструменты можно предлагать пользователю, когда и с какими ограничениями."
 default_policy:
   install_policy: explicit_user_opt_in_only
@@ -21,6 +21,7 @@ skill_usage_matrix:
     forbidden:
       - codex-mem
       - eagle-mem
+      - rohitg00-agentmemory
     notes: "Recommend only; do not install, setup, index, register MCP, mutate provider config, or treat provider output as evidence."
   aif-explore:
     allowed:
@@ -34,6 +35,7 @@ skill_usage_matrix:
     forbidden:
       - codex-mem
       - eagle-mem
+      - rohitg00-agentmemory
     notes: "Read existing reviewed provider output, or use explicitly enabled tools only when metadata grants command-specific permission and purge is defined."
   aif-architecture:
     allowed:
@@ -47,6 +49,7 @@ skill_usage_matrix:
       - eagle-mem
       - codegraph
       - repowise
+      - rohitg00-agentmemory
     notes: "Project-level architecture context only; optional provider output is supporting reviewed context and must not drive OpenSpec writes."
   aif-plan:
     allowed:
@@ -59,6 +62,7 @@ skill_usage_matrix:
       - codex-mem
       - eagle-mem
       - codegraph
+      - rohitg00-agentmemory
     notes: "Optional supporting context before writing canonical OpenSpec artifacts; final plan must use direct repository evidence."
   aif-review:
     allowed:
@@ -72,6 +76,7 @@ skill_usage_matrix:
       - codex-mem
       - eagle-mem
       - codegraph
+      - rohitg00-agentmemory
     notes: "Optional supporting context for impact/docs/closure checks only."
   aif-rules-check:
     allowed:
@@ -84,6 +89,7 @@ skill_usage_matrix:
       - codex-mem
       - eagle-mem
       - codegraph
+      - rohitg00-agentmemory
     notes: "Context7 may support version-sensitive external docs only; generated rules and source evidence remain authoritative."
   aif-implement:
     allowed:
@@ -96,6 +102,7 @@ skill_usage_matrix:
       - codex-mem
       - eagle-mem
       - codegraph
+      - rohitg00-agentmemory
     notes: "Implementation commands must not use optional context providers by default."
   aif-fix:
     allowed:
@@ -108,6 +115,7 @@ skill_usage_matrix:
       - codex-mem
       - eagle-mem
       - codegraph
+      - rohitg00-agentmemory
     notes: "Fix commands must use QA evidence, source files, and canonical OpenSpec context."
   aif-verify:
     allowed:
@@ -120,6 +128,7 @@ skill_usage_matrix:
       - codex-mem
       - eagle-mem
       - codegraph
+      - rohitg00-agentmemory
     notes: "Verification must stay source-grounded and provider-independent."
   aif-done:
     allowed:
@@ -132,6 +141,7 @@ skill_usage_matrix:
       - codex-mem
       - eagle-mem
       - codegraph
+      - rohitg00-agentmemory
     notes: "Done/finalization must not depend on optional provider availability or output."
   aif-commit:
     allowed:
@@ -144,6 +154,7 @@ skill_usage_matrix:
       - codex-mem
       - eagle-mem
       - codegraph
+      - rohitg00-agentmemory
     notes: "Commit freshness checks may use direct repository and local artifact evidence only."
 permissions:
   recommend_only:
@@ -221,6 +232,8 @@ tool_permissions:
     aif-commit: forbidden
   agent-memory:
     default: recommend_only_if_user_requests_manual_notes
+  rohitg00-agentmemory:
+    default: forbidden
   codex-mem:
     default: forbidden
   eagle-mem:
@@ -763,6 +776,70 @@ tools:
         - project_analysis
         - mcp_provider_integration
     suggestion_text: "Предлагать только как ручной markdown notebook, если пользователь сам просит durable notes."
+  rohitg00-agentmemory:
+    display_name: "agentmemory (rohitg00)"
+    doc: agentmemory-rohitg00.md
+    results_doc: agentmemory-rohitg00-benchmark-results.md
+    repository: "https://github.com/rohitg00/agentmemory"
+    packages: ["@agentmemory/agentmemory", "@agentmemory/mcp"]
+    tested_version: "static audit v0.9.28 at a8e7d19a814a24a21818afc715f3301b3eaeee80; isolated standalone ai-tester PASS"
+    decision: reject_default
+    recommendation_action: do_not_suggest_as_aifhub_provider
+    integration_role: user_owned_continuity_candidate_only
+    install_policy: user_owned_outside_aifhub_only
+    stable_cli: full_product_runtime_not_run
+    mcp_status: isolated_standalone_executed_no_registration
+    read_scope: broad_prompt_tool_and_memory_data
+    storage_scope: user_home_agentmemory_and_user_owned_runtime
+    purge_path: unverified_no_aifhub_cleanup_ownership
+    purge_status: unverified
+    allowed_in: []
+    forbidden_in:
+      - aif-analyze
+      - aif-explore
+      - aif-architecture
+      - aif-plan
+      - aif-review
+      - aif-rules-check
+      - aif-implement
+      - aif-fix
+      - aif-verify
+      - aif-done
+      - aif-commit
+    privacy_caveat: "The exact synthetic standalone profile passed store isolation, privacy canaries, governance delete, and sandbox purge; full-product behavior on user data and residual-state cleanup remain unverified."
+    avoid_reason: "Two isolated ai-tester pairs passed safety assertions, but both decisions were avoid: candidate duration was +231.1% and total tokens +51.4% versus rg; broad full-product lifecycle remains unverified."
+    isolated_runtime_evidence:
+      status: pass
+      run_id: agentmemory-isolated-0-9-28-20260720-r4
+      scenario_id: agentmemory-isolated-continuity
+      run_class: safety
+      provider_version: "0.9.28"
+      mode: standalone_local_fallback
+      pairs: 2
+      pass_pairs: 2
+      executed_rows: 4
+      failed_rows: 0
+      not_run_rows: 0
+      continuity: pass
+      store_isolation: pass
+      privacy_canaries: pass
+      governance_delete: pass
+      runtime_install_purge: pass
+      eligible_for_metadata: false
+      decision: avoid
+    forbidden_operations:
+      - auto_install
+      - auto_run_setup
+      - auto_sync_memory
+      - auto_register_mcp
+      - mutate_provider_config
+      - install_hooks
+      - start_background_daemons
+      - run_provider_cli
+    execution:
+      default:
+        mode: manual_user_owned_execution
+        notes: "AIFHub may review an explicitly supplied export as supporting context; it never starts or configures the provider."
   eagle-mem:
     display_name: eagle-mem
     doc: eagle-mem.md
