@@ -416,4 +416,80 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
       assertNotIncludes(skill, stale, 'skills/aif-analyze/SKILL.md');
     }
   });
+
+  it('declares aif-analyze as the explicit-opt-in owner for non-empty glossary creation and approved patch updates', async () => {
+    const skill = await readRepoFile('skills/aif-analyze/SKILL.md');
+    const configTemplate = await readRepoFile('skills/aif-analyze/references/config-template.yaml');
+
+    for (const expected of [
+      '`/aif-analyze` is the only AIFHub command allowed to create or update the project glossary.',
+      'explicit user opt-in',
+      'concrete source-grounded terms',
+      'Do not create an empty placeholder',
+      'explicit update request or the user accepts a proposed glossary update',
+      'patch-style update',
+      'preserve manual entries and unknown headings',
+      '`created`, `updated`, `preserved`, or `skipped`',
+      'Never include glossary contents in the handoff'
+    ]) {
+      assertIncludes(skill, expected, 'skills/aif-analyze/SKILL.md glossary ownership contract');
+    }
+
+    for (const expected of [
+      'context: CONTEXT.md',
+      'Optional project glossary',
+      'created only with explicit opt-in'
+    ]) {
+      assertIncludes(configTemplate, expected, 'skills/aif-analyze/references/config-template.yaml glossary profile');
+    }
+  });
+
+  it('treats paths.context as an optional safe file rather than a required directory', async () => {
+    const skill = await readRepoFile('skills/aif-analyze/SKILL.md');
+
+    for (const expected of [
+      '### Step 3.25: Optional Project Glossary',
+      'normalized project-relative file path',
+      'Reject absolute paths, URI-like values, paths that escape the project root, and directory targets.',
+      'Do not read or write any rejected target.',
+      'Missing glossary files are a normal non-fatal state.',
+      'Continue without glossary context',
+      'one sanitized warning with the rejection reason',
+      'Do not include an external absolute path',
+      'file-valued paths such as `paths.context`',
+      'must never be created as directories'
+    ]) {
+      assertIncludes(skill, expected, 'skills/aif-analyze/SKILL.md glossary path-safety contract');
+    }
+  });
+
+  it('provides a glossary-only template without authority-bearing artifact sections', async () => {
+    const template = await readRepoFile('skills/aif-analyze/references/project-glossary-template.md');
+
+    for (const heading of [
+      '# Project Glossary',
+      '## Language',
+      '## Avoid',
+      '## Relationships',
+      '## Flagged Ambiguities'
+    ]) {
+      assertIncludes(template, heading, 'project glossary template allowed sections');
+    }
+
+    for (const forbiddenHeading of [
+      '## Requirements',
+      '## Rules',
+      '## Decisions',
+      '## Scratch Notes'
+    ]) {
+      assertNotIncludes(template, forbiddenHeading, 'project glossary template authority boundary');
+    }
+
+    for (const exclusion of [
+      'Do not store requirements, rules, architecture decisions, task notes, or scratch notes here.',
+      'Use only concise, source-grounded terminology.'
+    ]) {
+      assertIncludes(template, exclusion, 'project glossary template exclusions');
+    }
+  });
 });

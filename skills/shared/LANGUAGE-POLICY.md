@@ -7,6 +7,7 @@ Apply this policy before producing user-facing responses or generated artifacts 
 - Read `.ai-factory/config.yaml` first when it is available.
 - Treat `language.ui`, `language.artifacts`, and `language.technical_terms` as project-level preferences, not global user memory.
 - Do not infer or persist project language from OS locale, repository programming language, or the current conversation alone.
+- After config resolution, read and follow `skills/shared/PROJECT-GLOSSARY.md` for optional project terminology. That shared contract does not expand artifact ownership or make glossary loading mandatory.
 
 ## Output Rules
 

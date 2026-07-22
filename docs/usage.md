@@ -51,6 +51,19 @@ The `aifhub-extension` package repository stays artifact-light: root `openspec/`
 
 AIFHub commands request OpenSpec validation, status, instructions, and archive through `scripts/openspec-runner.mjs` when the CLI is available. Slash-command runtimes should keep using `/aif-*` commands. Codex app uses `$aif-*` skill invocations, as shown in the Recommended Codex App Flow. This extension does not install or rely on OpenSpec slash commands.
 
+## Optional Project Glossary
+
+Projects may configure a protocol-neutral glossary for preferred human-readable terminology:
+
+```yaml
+paths:
+  context: CONTEXT.md
+```
+
+The key is valid in OpenSpec-native and legacy AI Factory-only profiles, and a custom project-relative value is preserved during mode switches. The file itself is optional: missing or empty content does not block any command and `/aif-mode` never creates or validates it.
+
+`/aif-analyze` is the only AIFHub writer. Creation requires explicit opt-in plus concrete source-grounded terms; updates require an explicit request or accepted proposal and preserve manual/unknown sections. All other commands are read-only consumers. The glossary affects prose only and cannot override source/tests, canonical OpenSpec requirements, project rules, accepted architecture decisions, or verifiable QA facts. See [Context Loading Policy](context-loading-policy.md) and [ADR 0002](adr/0002-optional-project-context-glossary.md).
+
 ## Опциональные Context Providers
 
 Context providers - ручные, user-owned research aids. AIFHub может читать reviewed provider notes как optional supporting context, но provider availability всегда degraded behavior и никогда не является validation, verification, review, rules, security, done или commit gate.
@@ -341,6 +354,7 @@ Writes:
 
 - `.ai-factory/config.yaml`
 - `.ai-factory/rules/base.md`
+- configured `paths.context` project glossary only after explicit user opt-in
 - optional OpenSpec-native skeleton paths such as `openspec/specs/`, `openspec/changes/`, `.ai-factory/state/`, `.ai-factory/qa/`, and `.ai-factory/rules/generated/`
 
 Does not write:
@@ -348,6 +362,7 @@ Does not write:
 - OpenSpec skills or slash commands
 - canonical change artifacts for a feature request
 - `.ai-factory/plans` in OpenSpec-native mode
+- an empty or unapproved glossary placeholder
 
 Select OpenSpec-native mode explicitly by asking for it or by starting from config with:
 
@@ -1087,3 +1102,4 @@ npm test
 - [Legacy Plan Migration](legacy-plan-migration.md)
 - [Active Change Resolver](active-change-resolver.md)
 - [ADR 0001](adr/0001-openspec-native-artifact-protocol.md)
+- [ADR 0002: Optional Project Glossary](adr/0002-optional-project-context-glossary.md)

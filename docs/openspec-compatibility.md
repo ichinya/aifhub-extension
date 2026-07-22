@@ -63,6 +63,7 @@ aifhub:
   artifactProtocol: ai-factory
 
 paths:
+  context: CONTEXT.md
   plans: .ai-factory/plans
   specs: .ai-factory/specs
   rules: .ai-factory/rules
@@ -122,6 +123,7 @@ aifhub:
       openspecStatus: true
 
 paths:
+  context: CONTEXT.md
   plans: openspec/changes
   specs: openspec/specs
   state: .ai-factory/state
@@ -136,6 +138,8 @@ utilities:
     activate: graphify install
     report_command: graphify .
 ```
+
+`paths.context` is protocol-neutral and defaults to `CONTEXT.md`. Both profiles render the default or preserve a custom project-relative value; neither profile requires, creates, validates, or imports the optional glossary file. `/aif-analyze` owns opt-in creation and patch updates, while all other commands are read-only consumers.
 
 `installSkills: false` задан намеренно. AIFHub Extension использует OpenSpec artifacts и `scripts/openspec-runner.mjs` как optional CLI adapter, а не OpenSpec-installed skills или slash commands.
 
@@ -427,3 +431,4 @@ AIFHub artifact contract validation is a separate read-only layer over the CLI a
 - [OpenSpec Artifact Validation](openspec-validation.md)
 - [Active Change Resolver](active-change-resolver.md)
 - [ADR 0001](adr/0001-openspec-native-artifact-protocol.md)
+- [ADR 0002: Optional Project Glossary](adr/0002-optional-project-context-glossary.md)

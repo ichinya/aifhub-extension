@@ -18,6 +18,7 @@ AI Factory UX + OpenSpec artifact protocol
 - Publishes namespaced Codex CLI and Claude agent files through the extension manifest for explicit user or orchestrator invocation.
 - Publishes an optional `aifhub` MCP server whose settings are rendered by AI Factory per runtime.
 - Documents upstream project-context utilities such as `/aif-architecture`, `/aif-roadmap`, `/aif-docs`, `/aif-qa`, `/aif-archive`, and `/aif-distillation` with AIFHub write-boundary guardrails.
+- Supports an optional protocol-neutral project glossary at `paths.context` (`CONTEXT.md` by default) for consistent prose terminology.
 - Does not install OpenSpec skills or slash commands.
 
 ## Quick Start
@@ -107,6 +108,10 @@ OpenSpec validation overlay:
 A dirty workspace is blocking by default before `/aif-done`. Inspect with `git status --short`; commit or stash unrelated changes, or rerun `/aif-done <change-id> --record-dirty-state` when the current dirty state should be recorded in final QA evidence before archive.
 
 It does not replace `/aif-commit`. After `/aif-done`, run `/aif-commit` or your normal git workflow to commit implementation changes, OpenSpec archive/spec changes, QA evidence, and final summaries.
+
+### Optional Project Glossary
+
+`/aif-analyze` can create or patch an optional `paths.context` glossary after explicit opt-in. Other commands consume it read-only for prose terminology; source/tests, OpenSpec requirements, rules, architecture decisions, identifiers, and QA facts remain authoritative. Missing `CONTEXT.md` never blocks a workflow. See [Context Loading Policy](docs/context-loading-policy.md) and [ADR 0002](docs/adr/0002-optional-project-context-glossary.md).
 
 ### AI Factory 2.17 Reviewed Baseline
 
@@ -337,13 +342,14 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 | [Usage](docs/usage.md) | Full command flow, read/write boundaries, upstream project-context utilities, examples, and troubleshooting |
 | [Context Providers](docs/context-providers.md) | Optional Graphify and Context7 provider guidance, reviewed-note paths, degraded behavior, and user-owned setup boundaries |
 | [Memory Tool Recommendations](docs/memory-tool-recommendations.md) | Local metadata-driven optional memory/context tool recommendations and installed wrapper commands |
-| [Context Loading Policy](docs/context-loading-policy.md) | Consumer context, optional provider context, GitHub-aware roadmap evidence, command ownership, upstream utility boundaries, and legacy boundaries |
+| [Context Loading Policy](docs/context-loading-policy.md) | Consumer context, Optional Project Glossary, optional provider context, GitHub-aware roadmap evidence, command ownership, upstream utility boundaries, and legacy boundaries |
 | [OpenSpec Compatibility](docs/openspec-compatibility.md) | Optional CLI adapter policy, OpenSpec 1.4.1 reviewed baseline, AI Factory 2.17 planning/fix/QA/MCP/Control Flow adaptations, reviewed no-ops, archive boundary, and capability flags |
 | [OpenSpec Artifact Validation](docs/openspec-validation.md) | Read-only AIFHub contract validator for OpenSpec-native artifacts |
 | [OpenSpec Coverage Matrix](docs/spec-coverage.md) | Requirement-to-code coverage artifact and verify/done policy |
 | [Legacy Plan Migration](docs/legacy-plan-migration.md) | Explicit migration from legacy plans to OpenSpec-native changes |
 | [Active Change Resolver](docs/active-change-resolver.md) | Active change selection and runtime paths |
 | [ADR 0001](docs/adr/0001-openspec-native-artifact-protocol.md) | v1 artifact ownership decision |
+| [ADR 0002: Optional Project Glossary](docs/adr/0002-optional-project-context-glossary.md) | Configurable `CONTEXT.md`, lexical authority, and deferred OKF |
 | [AIFHub MCP](docs/aifhub-mcp.md) | Optional MCP server tools, runtime-specific settings shapes, and AI Factory 2.16+ Universal / Other rendering |
 | [Codex Agents](docs/codex-agents.md) | Namespaced Codex CLI agent files |
 | [Claude Agents](docs/claude-agents.md) | Namespaced Claude agent files |

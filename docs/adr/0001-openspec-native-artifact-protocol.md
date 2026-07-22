@@ -1,4 +1,4 @@
-[Previous Page](../active-change-resolver.md) | [Back to Documentation](../README.md)
+[Previous Page](../active-change-resolver.md) | [Back to Documentation](../README.md) | [Next Page](0002-optional-project-context-glossary.md)
 
 # ADR 0001: OpenSpec-native artifact protocol
 
@@ -152,3 +152,9 @@ Tradeoffs:
 - Legacy `.ai-factory/plans` consumers need migration or compatibility logic later.
 - Generated rules are operational only when the derived files are present and fresh; consumer migrations still need to preserve canonical OpenSpec precedence.
 - OpenSpec validate and archive-required done finalization remain unavailable until a compatible external CLI is present.
+
+## See Also
+
+- [Context Loading Policy](../context-loading-policy.md)
+- [OpenSpec Compatibility](../openspec-compatibility.md)
+- [ADR 0002: Optional Project Glossary](0002-optional-project-context-glossary.md)

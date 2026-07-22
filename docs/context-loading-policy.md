@@ -47,6 +47,7 @@ Consumer commands load these project context files when present:
 - `.ai-factory/ARCHITECTURE.md`
 - `.ai-factory/RULES.md`
 - `.ai-factory/rules/base.md`
+- configured `paths.context` project glossary (`CONTEXT.md` by default), when present
 - configured area rules from `.ai-factory/config.yaml`
 
 Consumer commands must not use bridge files such as `AGENTS.md`, `CLAUDE.md`, `QWEN.md`, or `AIFACTORY.md` as substitutes for configured context paths.
@@ -74,6 +75,18 @@ They may also load derived/runtime artifacts:
 Generated rules and generated trace metadata are derived guidance only. If generated rules conflict with canonical OpenSpec artifacts, canonical OpenSpec artifacts win.
 
 Runner output from OpenSpec CLI commands is runtime guidance or evidence. It does not replace the canonical filesystem artifacts under `openspec/`.
+
+## Optional Project Glossary
+
+The project glossary is protocol-neutral Base Context for preferred terminology. `paths.context` configures a project-relative Markdown file and defaults to `CONTEXT.md`; mode switching preserves a custom value but never creates the file.
+
+- `/aif-analyze` is the only writer. It creates or patch-updates the glossary only after explicit opt-in, only with source-grounded terms, and preserves manual or unknown sections.
+- All other AIFHub skills, injections, and packaged agents are read-only consumers through `skills/shared/LANGUAGE-POLICY.md` and `skills/shared/PROJECT-GLOSSARY.md`.
+- A missing or empty glossary is a normal non-fatal state. An unsafe or unreadable path is skipped with one bounded diagnostic that does not expose external paths or glossary contents.
+- Glossary terms apply only to human-readable prose; code and API identifiers, commands, filenames, paths, schema fields, and public wire values stay unchanged.
+- Conflict precedence is: source/tests and verifiable QA facts; canonical OpenSpec requirements; project rules and accepted architecture decisions; project description/architecture context; glossary terminology.
+- Glossary contents are excluded from canonical OpenSpec authority, generated-rule inputs, QA evidence, runtime traces, provider stores, status/doctor checks, verification gates, and done readiness.
+- OKF remains deferred until a concrete producer/consumer use case justifies a separate OpenSpec change and ADR.
 
 ## Опциональные Context Providers
 
@@ -189,7 +202,7 @@ GitHub access is non-blocking. If `gh`, connector data, network access, authenti
 | Command | May write canonical OpenSpec artifacts | May write runtime or QA artifacts |
 |---|---|---|
 | `/aif-mode` | skeleton only; never manual `openspec/specs/**` mutations | mode reports, generated rules, optional migration/export outputs |
-| `/aif-analyze` | Optional `openspec/` skeleton only when configured | capability/config setup |
+| `/aif-analyze` | Optional `openspec/` skeleton only when configured | capability/config setup; optional glossary creation or patch-update only with explicit opt-in |
 | `/aif-architecture` | no | no |
 | `/aif-roadmap` | no | no |
 | `/aif-docs` | no | no |
@@ -350,3 +363,4 @@ If `.ai-factory/config.yaml` is missing or incomplete:
 - [OpenSpec Compatibility](openspec-compatibility.md)
 - [Legacy Plan Migration](legacy-plan-migration.md)
 - [ADR 0001](adr/0001-openspec-native-artifact-protocol.md)
+- [ADR 0002: Optional Project Glossary](adr/0002-optional-project-context-glossary.md)

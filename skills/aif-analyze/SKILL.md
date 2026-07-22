@@ -1,7 +1,7 @@
 ---
 name: aif-analyze
 description: Bootstrap project context. Resolves localization and stack, creates/updates config.yaml and rules/base.md, then checks DESCRIPTION and guides core skill execution.
-version: 0.7.0
+version: 0.8.0
 author: ichi
 ---
 
@@ -15,6 +15,7 @@ Bootstrap project context for AI Factory. This skill prepares configuration and 
 |----------|-------|------------|
 | `config.yaml` | **aif-analyze** | Creates/updates |
 | `rules/base.md` | **aif-analyze** | Creates if missing |
+| `paths.context` / project glossary | **aif-analyze** | Registers the path; creates or patch-updates only with explicit user opt-in |
 | `DESCRIPTION.md` | core `aif` | Checks existence, suggests the selected runtime invocation (`$aif` for `codex-app`, `/aif` for slash-command runtimes) if missing |
 | `ARCHITECTURE.md` | core `aif-architecture` | Initiates the selected runtime invocation based on workflow flag |
 | `ROADMAP.md` | core `aif-roadmap` | Initiates the selected runtime invocation based on workflow flag |
@@ -311,6 +312,7 @@ aifhub:
 
 ```yaml
 paths:
+  context: CONTEXT.md
   plans: openspec/changes
   specs: openspec/specs
   state: .ai-factory/state
@@ -318,10 +320,23 @@ paths:
   generated_rules: .ai-factory/rules/generated
 ```
 
-  - Preserve `paths.description`, `paths.architecture`, `paths.roadmap`, `paths.research`, and `paths.rules` unless they are missing.
+  - Preserve `paths.description`, `paths.architecture`, `paths.context`, `paths.roadmap`, `paths.research`, and `paths.rules` unless they are missing.
   - Do not install OpenSpec skills, slash commands, or dependencies.
 
 Use [references/config-template.yaml](references/config-template.yaml) as reference.
+
+### Step 3.25: Optional Project Glossary
+
+`/aif-analyze` is the only AIFHub command allowed to create or update the project glossary. Other AIFHub commands and packaged agents are read-only consumers through the shared glossary policy.
+
+- Register or preserve `paths.context`; use `CONTEXT.md` when the key is missing. The configured value must be a normalized project-relative file path.
+- Reject absolute paths, URI-like values, paths that escape the project root, and directory targets. Do not read or write any rejected target.
+- On rejection, emit one sanitized warning with the rejection reason. Continue without glossary context. Do not include an external absolute path or any glossary contents.
+- Missing glossary files are a normal non-fatal state. Do not create an empty placeholder only because `paths.context` exists.
+- Create the glossary only after explicit user opt-in and only when repository evidence provides concrete source-grounded terms. If no concrete term is available, report `skipped`.
+- For an existing glossary, require an explicit update request or the user accepts a proposed glossary update. Use a patch-style update: preserve manual entries and unknown headings, and change only the accepted terminology entries.
+- Use [references/project-glossary-template.md](references/project-glossary-template.md) as the allowed lexical shape. Do not place requirements, project rules, architecture decisions, task notes, provider output, or scratch notes in the glossary.
+- In the final handoff, report the glossary status as `created`, `updated`, `preserved`, or `skipped` and include only its project-relative path. Never include glossary contents in the handoff.
 
 ### Step 3.5: Detect OpenSpec Capabilities
 
@@ -388,6 +403,8 @@ openspec:
 
 ### Step 5: Ensure Directories Exist
 
+- Create only directory-valued configured paths. File-valued paths such as `paths.description`, `paths.architecture`, `paths.context`, `paths.roadmap`, and `paths.research` must never be created as directories.
+
 - In legacy `ai-factory` mode, create directories from config paths if missing:
   - `paths.plans` (typically `.ai-factory/plans`)
   - `paths.specs` (typically `.ai-factory/specs`)
@@ -427,6 +444,7 @@ openspec init --tools none
 - Report the resolved bootstrap mode.
 - Report the bootstrap mode selection source: existing config, explicit user request, first-bootstrap answer, or autonomous default.
 - Report whether config values were created or preserved.
+- Report the optional glossary status as `created`, `updated`, `preserved`, or `skipped` plus its project-relative path; never report glossary contents.
 - Report project labels from `ai-factory aifhub-memory-tools labels --from-project --json` first: languages, volume, complexity, repo shape, artifact mode, project shape, task signals, matched dimension signals, and short evidence for the labels that affected recommendations.
 - Report optional local tool recommendations from explicit-label `ai-factory aifhub-memory-tools recommend --command aif-analyze ... --json` output when the installed wrapper is available, or from source-tree metadata only when running inside the AIFHub extension repository. Include baseline `rg`, recommended tools with availability/read scope/purge path/skill usefulness, and not-recommended tools with label-based reasons such as `codex-mem`, `eagle-mem`, tools forbidden for the skill, or tools without exact skill+label evidence. Ask which recommendations to enable and write accepted tool ids to `utilities.context_tools.enabled`. If metadata is unavailable, report a degraded note and continue.
 - Report that follow-on skills select their own usable subset with `ai-factory aifhub-memory-tools select --from-project --command <skill> --json`; enabled config entries are not permission to use a tool unless they appear in `selected_tools`.
@@ -485,6 +503,7 @@ aifhub:
 paths:
   description: .ai-factory/DESCRIPTION.md
   architecture: .ai-factory/ARCHITECTURE.md
+  context: CONTEXT.md
   roadmap: .ai-factory/ROADMAP.md
   research: .ai-factory/RESEARCH.md
   plans: .ai-factory/plans
@@ -526,6 +545,7 @@ aifhub:
 paths:
   description: .ai-factory/DESCRIPTION.md
   architecture: .ai-factory/ARCHITECTURE.md
+  context: CONTEXT.md
   roadmap: .ai-factory/ROADMAP.md
   research: .ai-factory/RESEARCH.md
   plans: openspec/changes
@@ -552,7 +572,7 @@ paths:
 - Follow workflow flags to suggest or initiate the selected runtime invocation for `aif-architecture` and `aif-roadmap`.
 - Create `rules/base.md` with project-specific rules, not generic advice.
 - Do NOT create optional area rules — planning owns those when needed.
-- Ensure all directories from config paths exist.
+- Ensure all directory-valued config paths exist; never create file-valued paths such as `paths.context` as directories.
 - Keep the result concise and repository-specific.
 
 ## Example Requests

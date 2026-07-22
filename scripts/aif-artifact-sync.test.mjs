@@ -281,6 +281,97 @@ describe('mode status', () => {
 });
 
 describe('mode switching', () => {
+  it('renders the optional glossary path in stable order without creating or requiring the file', async () => {
+    const rootDir = await createTempRoot();
+
+    const openSpecResult = await switchToOpenSpecMode({
+      rootDir,
+      detectOpenSpec: async () => missingCliDetection(),
+      timestamp: '2026-07-21T00-00-00-000Z'
+    });
+
+    assert.equal(openSpecResult.ok, true);
+    const openSpecConfig = await readFixture(rootDir, '.ai-factory/config.yaml');
+    assert.match(
+      openSpecConfig,
+      /  description: \.ai-factory\/DESCRIPTION\.md\n  architecture: \.ai-factory\/ARCHITECTURE\.md\n  context: CONTEXT\.md\n  roadmap: \.ai-factory\/ROADMAP\.md\n  research: \.ai-factory\/RESEARCH\.md/,
+      'OpenSpec profile should render paths.context in stable project-context order'
+    );
+    assert.equal(
+      await pathExists(rootDir, 'CONTEXT.md'),
+      false,
+      'OpenSpec profile should not create the optional glossary file'
+    );
+
+    const doctor = await doctorAifMode({
+      rootDir,
+      detectOpenSpec: async () => missingCliDetection()
+    });
+    assert.equal(
+      doctor.diagnostics.some((diagnostic) => /CONTEXT\.md|paths\.context/.test(diagnostic.message)),
+      false,
+      'Mode doctor should not inspect the optional glossary file'
+    );
+
+    const legacyResult = await switchToAiFactoryMode({
+      rootDir,
+      timestamp: '2026-07-21T00-00-01-000Z'
+    });
+
+    assert.equal(legacyResult.ok, true);
+    const legacyConfig = await readFixture(rootDir, '.ai-factory/config.yaml');
+    assert.match(
+      legacyConfig,
+      /  description: \.ai-factory\/DESCRIPTION\.md\n  architecture: \.ai-factory\/ARCHITECTURE\.md\n  context: CONTEXT\.md\n  roadmap: \.ai-factory\/ROADMAP\.md\n  research: \.ai-factory\/RESEARCH\.md/,
+      'Legacy profile should render paths.context in stable project-context order'
+    );
+    assert.equal(
+      await pathExists(rootDir, 'CONTEXT.md'),
+      false,
+      'Legacy profile should not create the optional glossary file'
+    );
+  });
+
+  it('preserves a custom project-relative glossary path across both mode profiles', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: ai-factory',
+      'paths:',
+      '  context: docs/project-glossary.md',
+      '  plans: .ai-factory/plans',
+      '  specs: .ai-factory/specs',
+      '  rules: .ai-factory/rules',
+      ''
+    ].join('\n'));
+
+    await switchToOpenSpecMode({
+      rootDir,
+      detectOpenSpec: async () => missingCliDetection(),
+      timestamp: '2026-07-21T00-00-02-000Z'
+    });
+    assert.match(
+      await readFixture(rootDir, '.ai-factory/config.yaml'),
+      /^  context: docs\/project-glossary\.md$/m,
+      'OpenSpec profile should preserve custom paths.context'
+    );
+
+    await switchToAiFactoryMode({
+      rootDir,
+      timestamp: '2026-07-21T00-00-03-000Z'
+    });
+    assert.match(
+      await readFixture(rootDir, '.ai-factory/config.yaml'),
+      /^  context: docs\/project-glossary\.md$/m,
+      'Legacy profile should preserve custom paths.context'
+    );
+    assert.equal(
+      await pathExists(rootDir, 'docs/project-glossary.md'),
+      false,
+      'Mode switching should not create a custom optional glossary file'
+    );
+  });
+
   it('switches to OpenSpec mode with missing CLI as degraded capability', async () => {
     const rootDir = await createTempRoot();
 

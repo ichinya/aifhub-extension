@@ -1,0 +1,70 @@
+{
+  "schema": "aifhub.project_glossary.ai_tester_scenario_catalog.v1",
+  "defaults": {
+    "runtime": "codex",
+    "model": "gpt-5.6-luna",
+    "reasoning": "low",
+    "repetitions": 2,
+    "conditions": [
+      "baseline_without_glossary",
+      "candidate_with_glossary"
+    ],
+    "max_turns": 10
+  },
+  "fixture": {
+    "id": "dispatch-observability-sanitized",
+    "config_path": ".ai-factory/config.yaml",
+    "context_path": "CONTEXT.md",
+    "sentinel": "GLOSSARY_SENTINEL_127_DO_NOT_COPY",
+    "source_files": {
+      "README.md": "# Dispatch Observatory\n\nThe service has a worker that accepts delivery jobs and retries them during a retry timeout. Operators need concise terminology for this flow.\n",
+      "docs/operations.md": "# Operations\n\nThe worker invokes `DispatchEngine` for each `DeliveryJob`. Recovery uses `POST /v1/jobs/:jobId/retry`. The current runbook informally calls the recovery period a retry timeout.\n",
+      "src/dispatch/DeliveryJob.ts": "export const RETRY_WINDOW_MS = 30000;\n\nexport class DeliveryJob {\n  constructor(readonly jobId: string) {}\n}\n\nexport class DispatchEngine {\n  retry(job: DeliveryJob): void {}\n}\n",
+      "bin/retry-help.txt": "Usage: dispatch retry --retry-window <milliseconds>\n",
+      "docs/authority.md": "# Authority facts\n\nExisting code and API identifiers are authoritative. This fixture defines no new requirement, rule, or architecture decision and does not authorize identifier renames.\n"
+    },
+    "synthetic_glossary": {
+      "canonical_terms": [
+        "Dispatch Relay",
+        "Recovery Window"
+      ],
+      "avoided_terms": [
+        "worker",
+        "retry timeout"
+      ],
+      "body": "# Project Glossary\n\n## Language\n\n- **Dispatch Relay** — the prose name for the component that processes a delivery job.\n- **Recovery Window** — the prose name for the period in which retry is allowed.\n\n## Avoid\n\n- Avoid **worker**; use **Dispatch Relay** in prose.\n- Avoid **retry timeout**; use **Recovery Window** in prose.\n\n## Relationships\n\n- **Dispatch Relay** invokes `DispatchEngine` for a `DeliveryJob` during the **Recovery Window**.\n\n## Flagged Ambiguities\n\n- **job** may mean a business work item or the `DeliveryJob` code identifier; preserve the identifier when referring to code.\n\n<!-- GLOSSARY_SENTINEL_127_DO_NOT_COPY -->\n"
+    }
+  },
+  "scenarios": [
+    {
+      "id": "terminology-synthesis",
+      "skill": "aif-explore",
+      "task": "Inspect the copied project and return exactly three concise bullets: component, recovery flow, and ambiguity. Use project terminology in prose, preserve exact code/API identifiers, do not edit files, and do not invent requirements, rules, or architecture decisions. End with evaluation_complete.",
+      "required_identifiers": [
+        "DispatchEngine",
+        "DeliveryJob",
+        "POST /v1/jobs/:jobId/retry"
+      ],
+      "forbidden_authority_claims": [
+        "new requirement",
+        "architecture decision requires",
+        "must rename"
+      ]
+    },
+    {
+      "id": "plan-identifier-preservation",
+      "skill": "aif-plan",
+      "task": "Inspect the copied project and return a four-step implementation plan for retry observability. Use project terminology in prose, preserve exact code identifiers, paths, and CLI flags, do not edit files, and do not invent requirements, rules, or architecture decisions. Include RETRY_WINDOW_MS, --retry-window, and src/dispatch/DeliveryJob.ts. End with evaluation_complete.",
+      "required_identifiers": [
+        "RETRY_WINDOW_MS",
+        "--retry-window",
+        "src/dispatch/DeliveryJob.ts"
+      ],
+      "forbidden_authority_claims": [
+        "new requirement",
+        "architecture decision requires",
+        "must rename"
+      ]
+    }
+  ]
+}

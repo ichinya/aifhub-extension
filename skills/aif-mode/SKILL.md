@@ -6,7 +6,7 @@ disable-model-invocation: true
 allowed-tools: Read Write Grep Glob Bash(ai-factory aifhub-mode *) Bash(ai-factory aifhub-migrate-legacy-plans *) Bash(npm run validate) Bash(npm test)
 metadata:
   author: aifhub-extension
-  version: "1.0.0"
+  version: "1.1.0"
   category: workflow
 ---
 
@@ -90,12 +90,15 @@ aifhub:
       openspecStatus: true
 
 paths:
+  context: CONTEXT.md
   plans: openspec/changes
   specs: openspec/specs
   state: .ai-factory/state
   qa: .ai-factory/qa
   generated_rules: .ai-factory/rules/generated
 ```
+
+`paths.context` is protocol-neutral. Render `CONTEXT.md` when the key is missing, preserve a custom project-relative value, and never create or inspect the optional glossary file during mode operations.
 
 If legacy plans exist, suggest these commands unless `--yes` is explicitly passed:
 
@@ -106,7 +109,7 @@ ai-factory aifhub-migrate-legacy-plans --all
 
 ### `ai-factory`
 
-Switch to legacy AI Factory-only mode and ensure `.ai-factory/plans`, `.ai-factory/specs`, and `.ai-factory/rules`. Never delete `openspec/`.
+Switch to legacy AI Factory-only mode and ensure `.ai-factory/plans`, `.ai-factory/specs`, and `.ai-factory/rules`. Preserve `paths.context` (default `CONTEXT.md`) without creating or inspecting the optional glossary. Never delete `openspec/`.
 
 When `--export-openspec` is passed, export compatibility artifacts from OpenSpec changes into legacy plan files. This is a compatibility export, not a migration, because OpenSpec delta structure can be lossy when flattened.
 
@@ -121,7 +124,7 @@ Refresh derived or compatibility artifacts without changing mode.
 
 ### `doctor`
 
-Read-only diagnostics for config marker, configured paths, OpenSpec CLI capability, Node compatibility, active change ambiguity, generated rules, coverage matrix status, legacy artifacts in OpenSpec-native mode, OpenSpec validation when available, and archive readiness for `/aif-done`.
+Read-only diagnostics for config marker, required configured directories, OpenSpec CLI capability, Node compatibility, active change ambiguity, generated rules, coverage matrix status, legacy artifacts in OpenSpec-native mode, OpenSpec validation when available, and archive readiness for `/aif-done`. Optional `paths.context` file states are not doctor diagnostics.
 
 AI Factory 2.12+ also exposes an optional read-only artifact audit bridge:
 
