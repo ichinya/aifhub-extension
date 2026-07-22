@@ -36,6 +36,8 @@ paths:
   # Core AI Factory artifacts (owned by core /aif skills)
   description: .ai-factory/DESCRIPTION.md
   architecture: .ai-factory/ARCHITECTURE.md
+  # Optional project glossary; the file is created only with explicit opt-in
+  context: CONTEXT.md
   roadmap: .ai-factory/ROADMAP.md
   research: .ai-factory/RESEARCH.md
   

@@ -34,6 +34,7 @@ aifhub:
       openspecStatus: true
 
 paths:
+  context: CONTEXT.md
   plans: openspec/changes
   specs: openspec/specs
   state: .ai-factory/state
@@ -50,6 +51,8 @@ utilities:
 ```
 
 Canonical requirements and change intent live under `openspec/`. Runtime state, QA evidence, migration reports, and generated rules live under `.ai-factory/`.
+
+`paths.context` is protocol-neutral optional context. Preserve a custom project-relative value; do not create or validate the glossary file.
 
 Ensure these paths:
 
@@ -73,6 +76,7 @@ aifhub:
   artifactProtocol: ai-factory
 
 paths:
+  context: CONTEXT.md
   plans: .ai-factory/plans
   specs: .ai-factory/specs
   rules: .ai-factory/rules
@@ -87,6 +91,8 @@ utilities:
 ```
 
 Legacy mode uses the companion plan model:
+
+`paths.context` remains protocol-neutral and optional in this profile. Its default is `CONTEXT.md`, and mode operations do not create or inspect the file.
 
 ```text
 .ai-factory/plans/<id>.md

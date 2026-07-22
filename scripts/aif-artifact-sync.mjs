@@ -91,6 +91,7 @@ const DEFAULT_AI_FACTORY_PATHS = {
 const DEFAULT_CONTEXT_PATHS = {
   description: '.ai-factory/DESCRIPTION.md',
   architecture: '.ai-factory/ARCHITECTURE.md',
+  context: 'CONTEXT.md',
   roadmap: '.ai-factory/ROADMAP.md',
   research: '.ai-factory/RESEARCH.md'
 };
@@ -1788,8 +1789,8 @@ function renderPathsBlock(mode, existingPaths) {
     ...modePaths
   };
   const keys = mode === MODES.openspec
-    ? ['description', 'architecture', 'roadmap', 'research', 'plans', 'specs', 'rules', 'state', 'qa', 'generated_rules']
-    : ['description', 'architecture', 'roadmap', 'research', 'plans', 'specs', 'rules'];
+    ? ['description', 'architecture', 'context', 'roadmap', 'research', 'plans', 'specs', 'rules', 'state', 'qa', 'generated_rules']
+    : ['description', 'architecture', 'context', 'roadmap', 'research', 'plans', 'specs', 'rules'];
   const extraKeys = Object.keys(merged)
     .filter((key) => !keys.includes(key))
     .sort((left, right) => left.localeCompare(right));

@@ -10,9 +10,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
 
 const SHARED_LANGUAGE_POLICY_ASSET = 'skills/shared/LANGUAGE-POLICY.md';
+const SHARED_PROJECT_GLOSSARY_ASSET = 'skills/shared/PROJECT-GLOSSARY.md';
 
 const EXPLICIT_REFERENCE_ASSETS = [
   SHARED_LANGUAGE_POLICY_ASSET,
+  SHARED_PROJECT_GLOSSARY_ASSET,
   'skills/aif-analyze/references/config-template.yaml',
   'skills/aif-done/references/finalization-contract.md',
   'injections/references/aif-roadmap/roadmap-template.md',
@@ -498,6 +500,74 @@ describe('OpenSpec-native prompt asset contract', () => {
       'injections/references/aif-roadmap/slice-checklist.md'
     ]) {
       assert.ok(!assets.includes(excluded), `language policy coverage should not require reference asset ${excluded}`);
+    }
+  });
+
+  it('loads optional project glossary policy only through the shared language policy', async () => {
+    const languagePolicy = await readRepoFile(SHARED_LANGUAGE_POLICY_ASSET);
+    const glossaryPolicy = await readRepoFile(SHARED_PROJECT_GLOSSARY_ASSET);
+
+    assertIncludes(
+      languagePolicy,
+      `\`${SHARED_PROJECT_GLOSSARY_ASSET}\``,
+      `${SHARED_LANGUAGE_POLICY_ASSET} glossary policy link`
+    );
+
+    for (const expected of [
+      '.ai-factory/config.yaml',
+      '`paths.context`',
+      '`CONTEXT.md`',
+      '`present`',
+      '`missing`',
+      '`empty`',
+      '`unreadable`',
+      '`unsafe`',
+      'normalized project-relative file path',
+      '`/aif-analyze` is the only AIFHub command allowed to create or update the glossary',
+      'read-only consumers',
+      'human-readable prose',
+      'code and API identifiers',
+      'source code, public APIs, schemas, and executable tests',
+      'canonical OpenSpec specs and active change requirements',
+      'project rules and accepted architecture decisions',
+      '`DESCRIPTION.md` and `ARCHITECTURE.md`',
+      'verifiable QA facts',
+      'concise terminology-drift warning',
+      'Never copy the glossary body',
+      'generated-rule inputs',
+      'QA schemas or evidence',
+      'runtime traces',
+      'provider stores',
+      'OKF is deferred'
+    ]) {
+      assertIncludes(glossaryPolicy, expected, `${SHARED_PROJECT_GLOSSARY_ASSET} consumer contract`);
+    }
+
+    for (const relativePath of await activeManifestPromptAssets()) {
+      const asset = await readRepoFile(relativePath);
+      assertIncludes(asset, `\`${SHARED_LANGUAGE_POLICY_ASSET}\``, `${relativePath} language policy link`);
+      assertNotIncludes(
+        asset,
+        SHARED_PROJECT_GLOSSARY_ASSET,
+        `${relativePath} should use only the transitive glossary policy entrypoint`
+      );
+    }
+  });
+
+  it('keeps glossary context out of canonical, generated-rules, QA and execution helpers', async () => {
+    for (const relativePath of [
+      'scripts/openspec-execution-context.mjs',
+      'scripts/openspec-verification-context.mjs',
+      'scripts/openspec-rules-compiler.mjs'
+    ]) {
+      const helper = await readRepoFile(relativePath);
+      for (const unexpected of [
+        'paths.context',
+        'PROJECT-GLOSSARY.md',
+        'CONTEXT.md'
+      ]) {
+        assertNotIncludes(helper, unexpected, `${relativePath} protected artifact boundary`);
+      }
     }
   });
 

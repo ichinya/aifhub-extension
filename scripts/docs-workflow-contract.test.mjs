@@ -132,6 +132,93 @@ describe('complete OpenSpec workflow documentation contract', () => {
     ], 'docs/usage.md workflow');
   });
 
+  it('documents optional project glossary ownership, lexical precedence, mode preservation, and deferred OKF', async () => {
+    const contextPolicy = await readRepoFile('docs/context-loading-policy.md');
+    const usage = await readRepoFile('docs/usage.md');
+    const compatibility = await readRepoFile('docs/openspec-compatibility.md');
+    const modeSkill = await readRepoFile('skills/aif-mode/SKILL.md');
+    const modes = await readRepoFile('skills/aif-mode/references/MODES.md');
+    const adr1 = await readRepoFile('docs/adr/0001-openspec-native-artifact-protocol.md');
+    const adr2 = await readRepoFile('docs/adr/0002-optional-project-context-glossary.md');
+    const docsIndex = await readRepoFile('docs/README.md');
+    const readme = await readRepoFile('README.md');
+    const glossarySection = extractSection(contextPolicy, '## Optional Project Glossary');
+
+    assertIncludes(
+      extractSection(contextPolicy, '## Base Context'),
+      'configured `paths.context` project glossary (`CONTEXT.md` by default), when present',
+      'docs/context-loading-policy.md Base Context glossary placement'
+    );
+
+    for (const expected of [
+      '`paths.context`',
+      '`CONTEXT.md`',
+      'project-relative',
+      '`/aif-analyze` is the only writer',
+      'explicit opt-in',
+      'read-only consumers',
+      'missing or empty',
+      'unsafe or unreadable',
+      'human-readable prose',
+      'code and API identifiers',
+      'source/tests and verifiable QA facts',
+      'canonical OpenSpec requirements',
+      'project rules and accepted architecture decisions',
+      'generated-rule inputs',
+      'QA evidence',
+      'runtime traces',
+      'provider stores',
+      'OKF remains deferred'
+    ]) {
+      assertIncludes(glossarySection, expected, 'docs/context-loading-policy.md Optional Project Glossary');
+    }
+
+    for (const [source, label] of [
+      [usage, 'docs/usage.md'],
+      [compatibility, 'docs/openspec-compatibility.md'],
+      [modeSkill, 'skills/aif-mode/SKILL.md'],
+      [modes, 'skills/aif-mode/references/MODES.md']
+    ]) {
+      assertIncludes(source, 'paths.context', `${label} glossary config key`);
+      assertIncludes(source, 'CONTEXT.md', `${label} glossary default path`);
+      assertIncludes(source, 'protocol-neutral', `${label} glossary mode boundary`);
+    }
+
+    assert.ok(
+      (compatibility.match(/^  context: CONTEXT\.md$/gm) ?? []).length >= 2,
+      'docs/openspec-compatibility.md should show paths.context in both artifact protocol profiles'
+    );
+    assert.ok(
+      (modes.match(/^  context: CONTEXT\.md$/gm) ?? []).length >= 2,
+      'skills/aif-mode/references/MODES.md should show paths.context in both mode profiles'
+    );
+
+    for (const expected of [
+      '# ADR 0002: Optional project context glossary',
+      '## Status\n\nAccepted',
+      'configurable `CONTEXT.md`',
+      '`/aif-analyze`',
+      'explicit opt-in',
+      'read-only consumers',
+      'lexical authority',
+      'OKF',
+      'separate OpenSpec change and ADR'
+    ]) {
+      assertIncludes(adr2, expected, 'docs/adr/0002-optional-project-context-glossary.md');
+    }
+
+    assertIncludes(adr1, '[Next Page](0002-optional-project-context-glossary.md)', 'ADR 0001 navigation');
+    for (const [source, label] of [
+      [docsIndex, 'docs/README.md'],
+      [readme, 'README.md']
+    ]) {
+      assertIncludes(source, 'Optional Project Glossary', `${label} glossary discoverability`);
+      assertIncludes(source, '0002-optional-project-context-glossary.md', `${label} ADR 0002 link`);
+    }
+    assertIncludes(docsIndex, 'context-loading-policy.md', 'docs/README.md context policy link');
+    assertIncludes(readme, 'docs/context-loading-policy.md', 'README.md context policy link');
+  });
+
   it('documents task intake normalization inside existing planning and refinement commands', async () => {
     const usage = await readRepoFile('docs/usage.md');
     const plan = extractSection(usage, '### `/aif-plan full`');
