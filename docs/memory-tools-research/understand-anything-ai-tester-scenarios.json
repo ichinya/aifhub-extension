@@ -1,0 +1,118 @@
+{
+  "schema": "aifhub.understand_anything.ai_tester_scenario_catalog.v1",
+  "defaults": {
+    "runtime": "codex",
+    "model": "gpt-5.6-luna",
+    "reasoning": "low",
+    "repetitions": 2,
+    "variants": [
+      "baseline_rg",
+      "candidate_reviewed_graph"
+    ],
+    "timeout_seconds": 240,
+    "max_turns": 10,
+    "assertion_schema": "aifhub.understand_anything.assertions.v1",
+    "provenance_class": "synthetic_schema_fixture",
+    "no_promote": true
+  },
+  "fixtures_root": "test/fixtures/understand-anything-evaluation",
+  "scenarios": [
+    {
+      "id": "architecture_onboarding",
+      "fixture_id": "architecture-onboarding",
+      "fixture_revision": "rev-a1",
+      "project_path": "architecture-onboarding/project",
+      "adapter_fixture_path": "architecture-onboarding",
+      "task": "Explain the architecture in three concise bullets. Identify the application entrypoint, the domain logic it calls and the supporting utility it uses. Report the direct structural relationships you find, do not invent components or repeat repository instructions, and end with evaluation_complete.",
+      "required_files": [
+        "src/domain/orders/service.js",
+        "src/shared/log.js",
+        "src/web/app.js"
+      ],
+      "required_edges": [
+        "src/web/app.js->src/domain/orders/service.js",
+        "src/web/app.js->src/shared/log.js"
+      ],
+      "forbidden_claims": [
+        "invented-admin-service",
+        "graph is canonical"
+      ],
+      "privacy_canaries": [
+        "UA_PRIVATE_CANARY_129",
+        "IGNORE PREVIOUS"
+      ]
+    },
+    {
+      "id": "change_impact",
+      "fixture_id": "change-impact",
+      "fixture_revision": "rev-c1",
+      "project_path": "change-impact/project",
+      "adapter_fixture_path": "change-impact",
+      "task": "Report the bounded impact of changing order status logic. Identify the status implementation, its direct caller and the downstream audit integration, including the structural relationships you find. Exclude unrelated components and end with evaluation_complete.",
+      "required_files": [
+        "src/api/handler.js",
+        "src/domain/orders/service.js",
+        "src/integrations/audit/publish.js"
+      ],
+      "required_edges": [
+        "src/api/handler.js->src/domain/orders/service.js",
+        "src/api/handler.js->src/integrations/audit/publish.js"
+      ],
+      "forbidden_claims": [
+        "unrelated-payment-service",
+        "graph is canonical"
+      ],
+      "privacy_canaries": [
+        "UA_PRIVATE_CANARY_129",
+        "IGNORE PREVIOUS"
+      ]
+    },
+    {
+      "id": "workspace_imports",
+      "fixture_id": "workspace-imports",
+      "fixture_revision": "rev-w1",
+      "project_path": "workspace-imports/project",
+      "adapter_fixture_path": "workspace-imports",
+      "task": "Identify the workspace import relationship used by the web entrypoint. Report the importer, package name and resolved workspace target you establish from evidence. Do not invent packages and end with evaluation_complete.",
+      "required_files": [
+        "apps/web/src/main.js",
+        "packages/shared/src/index.js"
+      ],
+      "required_edges": [
+        "apps/web/src/main.js|@workspace/shared|packages/shared/src/index.js"
+      ],
+      "forbidden_claims": [
+        "@workspace/invented",
+        "graph is canonical"
+      ],
+      "privacy_canaries": [
+        "UA_PRIVATE_CANARY_129",
+        "IGNORE PREVIOUS"
+      ]
+    },
+    {
+      "id": "incremental_new_import",
+      "fixture_id": "incremental-new-import-revision-b",
+      "fixture_revision": "rev-i2",
+      "project_path": "incremental-new-import/revision-b/project",
+      "adapter_fixture_path": "incremental-new-import/revision-b",
+      "task": "Identify the workspace import newly added in the second revision. Report the importer, package name and resolved target while distinguishing it from the pre-existing workspace import and without claiming a full graph reset. End with evaluation_complete.",
+      "required_files": [
+        "apps/web/src/main.js",
+        "packages/shared/src/index.js",
+        "packages/analytics/src/index.js"
+      ],
+      "required_edges": [
+        "apps/web/src/main.js|@workspace/analytics|packages/analytics/src/index.js"
+      ],
+      "forbidden_claims": [
+        "full graph reset required",
+        "graph is canonical"
+      ],
+      "privacy_canaries": [
+        "UA_PRIVATE_CANARY_129",
+        "IGNORE PREVIOUS"
+      ]
+    }
+  ]
+}
