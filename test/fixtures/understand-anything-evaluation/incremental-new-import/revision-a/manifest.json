@@ -1,0 +1,26 @@
+{
+  "schema": "aifhub.understand_anything.synthetic_fixture_manifest.v1",
+  "fixture_id": "incremental-new-import-revision-a",
+  "scenario_id": "incremental_new_import",
+  "project": {
+    "id": "anon-incremental-app",
+    "revision": "rev-i1"
+  },
+  "expected": {
+    "required_files": [
+      "apps/web/src/main.js",
+      "packages/shared/src/index.js"
+    ],
+    "required_components": [],
+    "allowed_component_ids": [],
+    "required_impacts": [],
+    "required_workspace_imports": [
+      {
+        "importer_path": "apps/web/src/main.js",
+        "package_name": "@workspace/shared",
+        "resolved_path": "packages/shared/src/index.js"
+      }
+    ],
+    "required_incremental_imports": []
+  }
+}

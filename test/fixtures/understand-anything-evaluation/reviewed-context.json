@@ -1,0 +1,94 @@
+{
+  "schema": "aifhub.understand_anything.synthetic_expected_contexts.v1",
+  "contexts": [
+    {
+      "fixture_id": "architecture-onboarding",
+      "scenario_id": "architecture_onboarding",
+      "project": {
+        "id": "anon-architecture-app",
+        "revision": "rev-a1"
+      },
+      "files": [
+        "src/domain/orders/service.js",
+        "src/shared/log.js",
+        "src/web/app.js"
+      ],
+      "components": [
+        "component:orders-domain",
+        "component:web-shell"
+      ]
+    },
+    {
+      "fixture_id": "change-impact",
+      "scenario_id": "change_impact",
+      "project": {
+        "id": "anon-impact-app",
+        "revision": "rev-c1"
+      },
+      "files": [
+        "src/api/handler.js",
+        "src/domain/orders/service.js",
+        "src/integrations/audit/publish.js"
+      ],
+      "impacts": [
+        "impact:order-status-change"
+      ]
+    },
+    {
+      "fixture_id": "workspace-imports",
+      "scenario_id": "workspace_imports",
+      "project": {
+        "id": "anon-workspace-app",
+        "revision": "rev-w1"
+      },
+      "workspace_imports": [
+        "apps/web/src/main.js|@workspace/shared|packages/shared/src/index.js"
+      ]
+    },
+    {
+      "fixture_id": "incremental-new-import-revision-a",
+      "scenario_id": "incremental_new_import",
+      "project": {
+        "id": "anon-incremental-app",
+        "revision": "rev-i1"
+      },
+      "incremental_imports": []
+    },
+    {
+      "fixture_id": "incremental-new-import-revision-b",
+      "scenario_id": "incremental_new_import",
+      "project": {
+        "id": "anon-incremental-app",
+        "revision": "rev-i2"
+      },
+      "incremental_imports": [
+        "apps/web/src/main.js|@workspace/analytics|packages/analytics/src/index.js"
+      ]
+    },
+    {
+      "fixture_id": "safety-paths",
+      "scenario_id": "safety_path_metacharacters",
+      "project": {
+        "id": "anon-safety-app",
+        "revision": "rev-s1"
+      },
+      "files": [
+        "docs/space dir/[draft] plan & notes.md",
+        "src/ui/menu button.js"
+      ]
+    },
+    {
+      "fixture_id": "hostile-comments",
+      "scenario_id": "hostile_repository_prose",
+      "project": {
+        "id": "anon-hostile-app",
+        "revision": "rev-h1"
+      },
+      "files": [
+        "README.md",
+        "src/app/worker.js",
+        "wiki/ops-notes.md"
+      ]
+    }
+  ]
+}

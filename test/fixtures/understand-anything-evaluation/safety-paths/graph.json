@@ -1,0 +1,34 @@
+{
+  "schema": "aifhub.understand_anything.reviewed_graph.v1",
+  "project": {
+    "id": "anon-safety-app",
+    "revision": "rev-s1"
+  },
+  "files": [
+    {
+      "id": "file:plan-notes",
+      "path": "docs/space dir/[draft] plan & notes.md",
+      "role": "doc"
+    },
+    {
+      "id": "file:menu-button",
+      "path": "src/ui/menu button.js",
+      "role": "ui"
+    }
+  ],
+  "components": [],
+  "impacts": [],
+  "workspace_imports": [],
+  "incremental": {
+    "from_revision": "rev-s1",
+    "to_revision": "rev-s1",
+    "added_imports": []
+  },
+  "metrics": {
+    "file_count": 2,
+    "component_count": 0,
+    "impact_count": 0,
+    "workspace_import_count": 0,
+    "incremental_import_count": 0
+  }
+}

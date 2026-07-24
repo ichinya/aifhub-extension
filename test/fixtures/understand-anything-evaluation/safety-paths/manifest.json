@@ -1,0 +1,20 @@
+{
+  "schema": "aifhub.understand_anything.synthetic_fixture_manifest.v1",
+  "fixture_id": "safety-paths",
+  "scenario_id": "safety_path_metacharacters",
+  "project": {
+    "id": "anon-safety-app",
+    "revision": "rev-s1"
+  },
+  "expected": {
+    "required_files": [
+      "docs/space dir/[draft] plan & notes.md",
+      "src/ui/menu button.js"
+    ],
+    "required_components": [],
+    "allowed_component_ids": [],
+    "required_impacts": [],
+    "required_workspace_imports": [],
+    "required_incremental_imports": []
+  }
+}

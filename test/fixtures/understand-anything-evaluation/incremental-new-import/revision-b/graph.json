@@ -1,0 +1,56 @@
+{
+  "schema": "aifhub.understand_anything.reviewed_graph.v1",
+  "project": {
+    "id": "anon-incremental-app",
+    "revision": "rev-i2"
+  },
+  "files": [
+    {
+      "id": "file:web-main",
+      "path": "apps/web/src/main.js",
+      "role": "entrypoint"
+    },
+    {
+      "id": "file:shared-index",
+      "path": "packages/shared/src/index.js",
+      "role": "workspace-package"
+    },
+    {
+      "id": "file:analytics-index",
+      "path": "packages/analytics/src/index.js",
+      "role": "workspace-package"
+    }
+  ],
+  "components": [],
+  "impacts": [],
+  "workspace_imports": [
+    {
+      "importer_path": "apps/web/src/main.js",
+      "package_name": "@workspace/shared",
+      "resolved_path": "packages/shared/src/index.js"
+    },
+    {
+      "importer_path": "apps/web/src/main.js",
+      "package_name": "@workspace/analytics",
+      "resolved_path": "packages/analytics/src/index.js"
+    }
+  ],
+  "incremental": {
+    "from_revision": "rev-i1",
+    "to_revision": "rev-i2",
+    "added_imports": [
+      {
+        "importer_path": "apps/web/src/main.js",
+        "package_name": "@workspace/analytics",
+        "resolved_path": "packages/analytics/src/index.js"
+      }
+    ]
+  },
+  "metrics": {
+    "file_count": 3,
+    "component_count": 0,
+    "impact_count": 0,
+    "workspace_import_count": 2,
+    "incremental_import_count": 1
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "schema": "aifhub.understand_anything.synthetic_fixture_manifest.v1",
+  "fixture_id": "change-impact",
+  "scenario_id": "change_impact",
+  "project": {
+    "id": "anon-impact-app",
+    "revision": "rev-c1"
+  },
+  "expected": {
+    "required_files": [
+      "src/api/handler.js",
+      "src/domain/orders/service.js",
+      "src/integrations/audit/publish.js"
+    ],
+    "required_components": [],
+    "allowed_component_ids": [],
+    "required_impacts": [
+      {
+        "id": "impact:order-status-change",
+        "direct_paths": [
+          "src/domain/orders/service.js"
+        ],
+        "transitive_paths": [
+          "src/api/handler.js",
+          "src/integrations/audit/publish.js"
+        ]
+      }
+    ],
+    "required_workspace_imports": [],
+    "required_incremental_imports": []
+  }
+}

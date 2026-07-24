@@ -31,11 +31,15 @@ export const SAFE_TOOL_IDS = [
   'codex-agent-mem',
   'repowise'
 ];
+export const SOURCE_DENYLIST_TOOL_IDS = new Set([
+  'understand-anything'
+]);
 export const REJECTED_FULL_INSTALL_IDS = new Set([
   'codex-mem',
   'agent-memory',
   'eagle-mem',
-  'rohitg00-agentmemory'
+  'rohitg00-agentmemory',
+  'understand-anything'
 ]);
 
 const DEFAULT_QUERIES = ['architecture', 'workflow', 'OpenSpec', 'TODO'];
@@ -266,7 +270,7 @@ export function getToolPlan(scope = 'safe') {
     { id: 'context7', fullInstall: true, role: 'docs_lookup' },
     { id: 'context-mode', fullInstall: true, role: 'temporary_output_index' },
     { id: 'codex-agent-mem', fullInstall: false, role: 'continuity_memory_probe' }
-  ].filter((tool) => !REJECTED_FULL_INSTALL_IDS.has(tool.id));
+  ].filter((tool) => !REJECTED_FULL_INSTALL_IDS.has(tool.id) && !SOURCE_DENYLIST_TOOL_IDS.has(tool.id));
 }
 
 export function getProfileLifecycleRunStatus(profiles = [], passKey = 'lifecycle_passed') {

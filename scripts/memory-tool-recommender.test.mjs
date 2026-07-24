@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   buildRecommendationResult,
+  buildSelectionResult,
   classifyProjectProfile,
   isWindowsShellCommandNotFound,
   loadRecommendationMetadata,
@@ -17,6 +18,7 @@ import {
   provenLabelAvoidsRequest,
   provenLabelAllowsRequest,
   resolveMetadataPath,
+  SOURCE_DENYLIST_TOOL_IDS,
   runMemoryToolRecommender
 } from './memory-tool-recommender.mjs';
 
@@ -73,7 +75,8 @@ describe('recommendation metadata parsing', () => {
       'eagle-mem',
       'codegraph',
       'repowise',
-      'rohitg00-agentmemory'
+      'rohitg00-agentmemory',
+      'understand-anything'
     ]);
     assert.deepEqual(metadata.project_dimensions.languages, ['php', 'go', 'js', 'python', 'rust', 'multi']);
     assert.deepEqual(metadata.project_dimensions.volume, ['mini', 'standard', 'large']);
@@ -117,6 +120,23 @@ describe('recommendation metadata parsing', () => {
     assert.equal(metadata.tools.codegraph.screening_policy.default_decision, 'avoid_by_default');
     assert.equal(metadata.tools.codegraph.screening_policy.aggregate.rows_executed, 300);
     assert.ok(metadata.tools.codegraph.forbidden_in.includes('aif-architecture'));
+    assert.equal(metadata.tools['understand-anything'].repository, 'https://github.com/Egonex-AI/Understand-Anything');
+    assert.match(metadata.tools['understand-anything'].tested_version, /v2\.9\.0/);
+    assert.match(metadata.tools['understand-anything'].tested_version, /f08763d11d0202a8a8f52b5dedda6d1b2e2ebac8/);
+    assert.equal(metadata.tools['understand-anything'].decision, 'reject_defer');
+    assert.equal(metadata.tools['understand-anything'].recommendation_action, 'do_not_suggest_install');
+    assert.equal(metadata.tools['understand-anything'].integration_role, 'user_owned_repo_graph');
+    assert.deepEqual(metadata.tools['understand-anything'].allowed_in, []);
+    assert.ok(metadata.tools['understand-anything'].forbidden_in.includes('aif-explore'));
+    assert.equal(metadata.tool_permissions['understand-anything'].default, 'forbidden');
+    assert.equal(Object.hasOwn(metadata.availability_probes, 'understand-anything'), false);
+    assert.equal(SOURCE_DENYLIST_TOOL_IDS.has('understand-anything'), true);
+    for (const [command, policy] of Object.entries(metadata.skill_usage_matrix)) {
+      assert.ok(
+        policy.forbidden.includes('understand-anything'),
+        `${command}: understand-anything must be explicitly forbidden`
+      );
+    }
   });
 
   it('keeps similarly named AgentMemory identities distinct', async () => {
@@ -1082,6 +1102,51 @@ describe('recommendation results', () => {
     assert.ok(continuityResult.recommendations.some((item) => item.tool_id === 'codex-agent-mem'));
     assert.equal(continuityResult.recommendations.some((item) => item.tool_id === 'agent-memory'), false);
   });
+
+  it('keeps understand-anything denylisted for recommendations, selection, and probes', async () => {
+    const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
+    let probeCalls = 0;
+    const probeRunner = async (toolId) => {
+      if (toolId === 'understand-anything') probeCalls += 1;
+      return { availability: 'installed', command: 'understand --help' };
+    };
+
+    const recommendation = await buildRecommendationResult({
+      metadata,
+      projectShape: 'large_framework_app',
+      taskSignals: ['explicit_graph_quality_experiment'],
+      command: 'aif-explore',
+      probeRunner
+    });
+
+    assert.equal(
+      recommendation.recommendations.some((item) => item.tool_id === 'understand-anything'),
+      false
+    );
+    assert.ok(
+      recommendation.do_not_recommend.some((item) => item.tool_id === 'understand-anything')
+    );
+
+    const selection = await buildSelectionResult({
+      metadata,
+      config: {
+        source_kind: 'project-config',
+        source_path: path.join(tmpDir, '.ai-factory', 'config.yaml'),
+        enabled_tools: ['understand-anything'],
+        warnings: []
+      },
+      projectShape: 'large_framework_app',
+      taskSignals: ['explicit_graph_quality_experiment'],
+      command: 'aif-explore',
+      probeRunner
+    });
+    const rejected = selection.not_selected_tools.find((item) => item.tool_id === 'understand-anything');
+
+    assert.equal(selection.selected_tools.some((item) => item.tool_id === 'understand-anything'), false);
+    assert.ok(rejected);
+    assert.match(rejected.reason, /forbidden|reject/i);
+    assert.equal(probeCalls, 0, 'source-denylisted tool must never reach an availability probe');
+  });
 });
 
 function makeProvenLabelMetadataYaml() {
@@ -1209,6 +1274,31 @@ describe('CLI behavior', () => {
     assert.deepEqual(result.body.probes['rohitg00-agentmemory'], {
       availability: 'unknown',
       command: null
+    });
+  });
+
+  it('uses the source-denylisted no-probe path for understand-anything status', async () => {
+    const result = await runMemoryToolRecommender([
+      'status',
+      '--metadata',
+      REAL_METADATA,
+      '--json'
+    ], {
+      cwd: tmpDir,
+      stdout: [],
+      stderr: [],
+      exit: false,
+      probeRunner: async (toolId) => {
+        assert.notEqual(toolId, 'understand-anything');
+        return { availability: 'unknown', command: null };
+      }
+    });
+
+    assert.equal(result.exitCode, 0);
+    assert.deepEqual(result.body.probes['understand-anything'], {
+      availability: 'unknown',
+      command: null,
+      note: 'Availability probe skipped by source denylist.'
     });
   });
 
