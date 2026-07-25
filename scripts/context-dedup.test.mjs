@@ -232,6 +232,17 @@ describe('recordRead decisions', () => {
     assert.deepEqual(Object.keys(ledger.entries).sort(), ['src/b.ts', 'src/c.ts']);
   });
 
+  it('rejects paths that escape the project root', async () => {
+    const policy = await enabledPolicy();
+
+    for (const filePath of ['../outside.txt', '../../etc/passwd', path.join(os.tmpdir(), 'outside.txt')]) {
+      await assert.rejects(
+        recordRead({ filePath, content: body('escape'), rootDir, policy, sessionId: 's1' }),
+        /must stay inside the project root/
+      );
+    }
+  });
+
   it('keeps serving content when maxEntries leaves no room for the current read', async () => {
     const policy = { ...(await enabledPolicy()), maxEntries: 0 };
     const content = body('no-room');

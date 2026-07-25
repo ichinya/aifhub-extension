@@ -18,6 +18,8 @@ Ledger сессии — локальный runtime state, не canonical artifac
 
 Ledger хранит только relative path, sha256 digest, размер, счетчики и timestamps. Содержимое файлов в ledger не пишется. Сеть не используется, телеметрии нет.
 
+Читаются только пути внутри project root: `check --file ../../etc/passwd` и абсолютные пути за пределами корня отклоняются с ошибкой, до чтения файла.
+
 `sessionId` санитизируется до `[A-Za-z0-9._-]`, а `.` и `..` заменяются на `default`; `purge` дополнительно проверяет, что удаляемый каталог лежит внутри `.ai-factory/state/context-dedup/`. Остальной `.ai-factory/state/` сервис не трогает.
 
 ## Таблица Решений

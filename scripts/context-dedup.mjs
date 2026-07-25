@@ -193,7 +193,12 @@ export async function recordRead(options = {}) {
     throw new Error('filePath must be a non-empty path');
   }
 
-  const content = options.content ?? await readFile(path.resolve(rootDir, relativePath), 'utf8');
+  const absolutePath = path.resolve(rootDir, relativePath);
+  if (absolutePath !== path.resolve(rootDir) && !absolutePath.startsWith(`${path.resolve(rootDir)}${path.sep}`)) {
+    throw new Error(`filePath must stay inside the project root: ${relativePath}`);
+  }
+
+  const content = options.content ?? await readFile(absolutePath, 'utf8');
   const bytes = Buffer.byteLength(content, 'utf8');
   const digest = hashContent(content);
 
