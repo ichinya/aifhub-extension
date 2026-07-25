@@ -231,7 +231,7 @@ export async function recordRead(options = {}) {
     revisions: existing ? existing.revisions + (existing.digest === digest ? 0 : 1) : 1
   };
 
-  evictOldestEntries(ledger, policy.maxEntries);
+  evictOldestEntries(ledger, policy.maxEntries, relativePath);
 
   let persisted = true;
   try {
@@ -335,13 +335,14 @@ function formatReplay(relativePath, entry, digest) {
   ].join('\n');
 }
 
-function evictOldestEntries(ledger, maxEntries) {
+function evictOldestEntries(ledger, maxEntries, keepPath = null) {
   const entries = Object.entries(ledger.entries);
   if (entries.length <= maxEntries) {
     return;
   }
 
   entries
+    .filter(([key]) => key !== keepPath)
     .sort((left, right) => String(left[1].lastSeenAt).localeCompare(String(right[1].lastSeenAt)))
     .slice(0, entries.length - maxEntries)
     .forEach(([key]) => {
@@ -424,10 +425,23 @@ function malformed(key, value, expected) {
 }
 
 function matchesGlob(value, pattern) {
-  const expression = pattern
-    .split('**')
-    .map((segment) => segment.split('*').map(escapeRegExp).join('[^/]*'))
-    .join('.*');
+  let expression = '';
+
+  for (let index = 0; index < pattern.length;) {
+    if (pattern.startsWith('**/', index)) {
+      expression += '(?:.*/)?';
+      index += 3;
+    } else if (pattern.startsWith('**', index)) {
+      expression += '.*';
+      index += 2;
+    } else if (pattern[index] === '*') {
+      expression += '[^/]*';
+      index += 1;
+    } else {
+      expression += escapeRegExp(pattern[index]);
+      index += 1;
+    }
+  }
 
   return new RegExp(`^${expression}$`).test(value);
 }

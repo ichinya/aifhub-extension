@@ -106,7 +106,10 @@ describe('context dedup policy', () => {
       '.ai-factory/rules/generated/openspec-rules-trace-add-oauth.md',
       '.ai-factory/qa/add-oauth/aif-gate-result.json',
       '.ai-factory/state/add-oauth/coverage.json',
-      '.ai-factory/state/add-oauth/done-readiness.json'
+      '.ai-factory/state/add-oauth/done-readiness.json',
+      'coverage.json',
+      'done-readiness.json',
+      'aif-gate-result.json'
     ]) {
       assert.equal(isProtectedReadPath(protectedPath, policy), true, protectedPath);
     }
@@ -227,6 +230,16 @@ describe('recordRead decisions', () => {
 
     const { ledger } = await loadLedger({ rootDir, sessionId: 's1' });
     assert.deepEqual(Object.keys(ledger.entries).sort(), ['src/b.ts', 'src/c.ts']);
+  });
+
+  it('keeps serving content when maxEntries leaves no room for the current read', async () => {
+    const policy = { ...(await enabledPolicy()), maxEntries: 0 };
+    const content = body('no-room');
+
+    const result = await recordRead({ filePath: 'src/session.ts', content, rootDir, policy, sessionId: 's1' });
+
+    assert.equal(result.decision, 'full');
+    assert.equal(result.content, content);
   });
 
   it('resets an unreadable ledger with a warning instead of throwing', async () => {
