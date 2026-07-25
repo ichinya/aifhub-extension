@@ -84,7 +84,16 @@ ai-factory aifhub-context-dedup purge --all
 
 ## Оценка Экономии
 
-`estimatedSavedTokens` — прозрачная эвристика `ceil(savedBytes / 4)`, а не биллинговый счетчик. `status` показывает реальные `savedBytes` по текущей сессии; для сравнения инструментов используйте paired прогоны из [AI Tester Matrix Для Memory Tools](memory-tools-research/ai-tester-matrix.md).
+`estimatedSavedTokens` — прозрачная эвристика `ceil(savedBytes / 4)`, а не биллинговый счетчик. `status` показывает реальные `savedBytes` по текущей сессии.
+
+Детерминированное сравнение трёх режимов (без dedup, этот сервис, внешний hook-инструмент) даёт `scripts/context-dedup-benchmark.mjs`:
+
+```bash
+node scripts/context-dedup-benchmark.mjs --mode baseline --mode variant-a
+node scripts/context-dedup-benchmark.mjs --mode external --external-command "<tool> compress-output" --json
+```
+
+Результаты и сравнение с готовым инструментом: [Результаты Тестов squeez И Трёхстороннее Сравнение Dedup](memory-tools-research/squeez-benchmark-results.md). Для модельных paired прогонов используется [AI Tester Matrix Для Memory Tools](memory-tools-research/ai-tester-matrix.md).
 
 ## Границы
 
@@ -113,3 +122,5 @@ ai-factory aifhub-context-dedup purge --all
 - [Memory Tool Recommendations](memory-tool-recommendations.md)
 - [Context Loading Policy](context-loading-policy.md)
 - [AIFHub MCP](aifhub-mcp.md)
+- [squeez](memory-tools-research/squeez.md)
+- [Результаты Тестов squeez И Трёхстороннее Сравнение Dedup](memory-tools-research/squeez-benchmark-results.md)

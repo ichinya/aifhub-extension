@@ -1,0 +1,41 @@
+scenario: context-dedup-baseline-no-dedup
+description: "issue=133 arm=baseline expectation=no_dedup run_class=screening"
+system_prompt: |
+  You are an AI coding agent measuring context cost of repeated file reads. Stay inside the sandbox project directory.
+user_prompt: |
+  Work only inside the project directory.
+  Read project/src/auth/session.ts, then project/openspec/specs/auth/spec.md, then project/src/auth/session.ts again,
+  then project/.ai-factory/qa/add-oauth/coverage.json twice.
+  Do not enable, install, or call any deduplication or compression tool.
+  Report how many exported symbols project/src/auth/session.ts has and list the requirement ids from the spec.
+  Include the phrase "no dedup baseline" in the final summary.
+runner:
+  runtime: codex
+  permission_mode: bypassPermissions
+fixtures:
+  files_committed:
+    - path: project/src/auth/session.ts
+      content: |
+        export const createSession = () => 'session';
+        export const readSession = () => 'session';
+        export const destroySession = () => null;
+    - path: project/openspec/specs/auth/spec.md
+      content: |
+        # Auth Spec
+        - REQ-1: sessions expire
+        - REQ-2: tokens rotate
+    - path: project/.ai-factory/qa/add-oauth/coverage.json
+      content: |
+        { "requirements": [{ "id": "REQ-1", "covered": true }, { "id": "REQ-2", "covered": true }] }
+assertions:
+  - id: stay-in-sandbox
+    type: no_path_escape
+  - id: efficient
+    type: turn_count_at_most
+    max: 8
+  - id: mentions-baseline
+    type: output_contains
+    pattern: "no dedup baseline"
+  - id: reports-requirement-ids
+    type: output_contains
+    pattern: "REQ-2"

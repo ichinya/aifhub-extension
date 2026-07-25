@@ -2,6 +2,8 @@
 
 Этот каталог фиксирует выводы по инструментам локальной памяти и retrieval для issue #85 и отдельную policy evaluation candidate из issue #114. Документы описывают результаты установки, static review и полевых проверок без названий приватных проектов.
 
+Отдельный трек — dedup повторных чтений из issue #133: [squeez](squeez.md) как external candidate и [трёхстороннее сравнение](squeez-benchmark-results.md) baseline / собственный [Session Context Dedup](../context-dedup.md) / `squeez`.
+
 ## Метаинформация Для Анализа
 
 Файл [recommendation-metadata.yaml](recommendation-metadata.yaml) содержит machine-readable правила для analysis-этапа. Его можно читать при анализе проекта и превращать project signals в предложение пользователю:
