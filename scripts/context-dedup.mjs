@@ -232,11 +232,18 @@ export async function recordRead(options = {}) {
   };
 
   evictOldestEntries(ledger, policy.maxEntries);
-  await saveLedger(ledger, { ...options, rootDir, ledgerPath });
+
+  let persisted = true;
+  try {
+    await saveLedger(ledger, { ...options, rootDir, ledgerPath });
+  } catch (error) {
+    persisted = false;
+    warnings.push({ code: 'context-dedup-ledger-unwritable', message: error.message });
+  }
 
   const entry = ledger.entries[relativePath];
 
-  if (deduplicated) {
+  if (deduplicated && persisted) {
     return {
       ...decision('deduplicated', 'Identical content was already provided in this session.', {
         relativePath,
@@ -253,12 +260,14 @@ export async function recordRead(options = {}) {
     };
   }
 
-  const reason = existing
-    ? 'Content changed since the previous read in this session.'
-    : 'First read of this path in this session.';
+  const reason = !persisted
+    ? 'Ledger could not be persisted; serving full content.'
+    : existing
+      ? 'Content changed since the previous read in this session.'
+      : 'First read of this path in this session.';
 
   return {
-    ...decision(existing ? 'changed' : 'full', reason, { relativePath, digest, bytes, content }),
+    ...decision(existing && persisted ? 'changed' : 'full', reason, { relativePath, digest, bytes, content }),
     firstSeenAt: entry.firstSeenAt,
     readCount: entry.readCount,
     previousDigest: existing?.digest ?? null,
@@ -296,7 +305,7 @@ export async function purgeSession(options = {}) {
   }
 
   const sessionId = await resolveSessionId(options);
-  const sessionDir = path.dirname(resolveLedgerPath(sessionId, { rootDir }));
+  const sessionDir = assertInsideDedupDir(path.dirname(resolveLedgerPath(sessionId, { rootDir })), rootDir);
   await rm(sessionDir, { recursive: true, force: true });
 
   return { all: false, sessionId, removed: [toPosix(path.relative(rootDir, sessionDir))] };
@@ -429,7 +438,19 @@ function escapeRegExp(value) {
 
 function sanitizeSessionId(value) {
   const normalized = String(value ?? '').trim().replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
-  return normalized || DEFAULT_SESSION_ID;
+  if (!normalized || /^\.+$/.test(normalized)) {
+    return DEFAULT_SESSION_ID;
+  }
+  return normalized;
+}
+
+function assertInsideDedupDir(targetDir, rootDir) {
+  const dedupDir = path.resolve(rootDir, DEDUP_STATE_DIR);
+  const resolved = path.resolve(targetDir);
+  if (resolved !== dedupDir && !resolved.startsWith(`${dedupDir}${path.sep}`)) {
+    throw new Error(`Refusing to operate outside ${DEDUP_STATE_DIR}: ${resolved}`);
+  }
+  return resolved;
 }
 
 function firstNonEmpty(...values) {
@@ -527,6 +548,12 @@ function usage() {
   ].join('\n');
 }
 
+function writeDiagnostics(stderr, diagnostics) {
+  for (const diagnostic of diagnostics ?? []) {
+    stderr.write(`[aifhub-context-dedup] ${diagnostic.code}: ${diagnostic.message}\n`);
+  }
+}
+
 export async function main(argv = process.argv.slice(2), io = {}) {
   const stdout = io.stdout ?? process.stdout;
   const stderr = io.stderr ?? process.stderr;
@@ -544,7 +571,11 @@ export async function main(argv = process.argv.slice(2), io = {}) {
         return 1;
       }
 
-      const result = await recordRead(options);
+      const policy = await readContextDedupPolicy(options);
+      writeDiagnostics(stderr, policy.diagnostics);
+
+      const result = await recordRead({ ...options, policy });
+      writeDiagnostics(stderr, result.warnings);
       if (options.json) {
         stdout.write(`${JSON.stringify({ ...result, content: undefined }, null, 2)}\n`);
       } else {
@@ -555,6 +586,7 @@ export async function main(argv = process.argv.slice(2), io = {}) {
 
     if (options.command === 'status') {
       const summary = await summarizeSession(options);
+      writeDiagnostics(stderr, summary.warnings);
       stdout.write(options.json
         ? `${JSON.stringify(summary, null, 2)}\n`
         : `session ${summary.sessionId}: ${summary.dedupHits}/${summary.reads} deduplicated reads, ${summary.savedBytes} bytes saved (~${summary.estimatedSavedTokens} tokens, ${summary.savedPercent}%)\n`);

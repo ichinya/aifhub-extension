@@ -1,7 +1,7 @@
 // context-dedup.test.mjs - tests for the optional session read dedup service
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -271,6 +271,40 @@ describe('session summary and purge', () => {
 
     await purgeSession({ rootDir, all: true });
     await assert.rejects(stat(path.join(rootDir, '.ai-factory', 'state', 'context-dedup')));
+  });
+
+  it('keeps traversal session ids inside the dedup state directory', async () => {
+    const policy = await enabledPolicy();
+    const stateDir = path.join(rootDir, '.ai-factory', 'state');
+    await writeProjectFile(path.join('.ai-factory', 'state', 'current.yaml'), 'change: demo\n');
+
+    for (const sessionId of ['..', '.', '../../escape']) {
+      const result = await recordRead({ filePath: 'src/session.ts', content: body('traversal'), rootDir, policy, sessionId });
+      assert.equal(result.decision, 'full');
+
+      await purgeSession({ rootDir, sessionId });
+      await stat(path.join(stateDir, 'current.yaml'));
+    }
+
+    await assert.rejects(stat(path.join(stateDir, 'ledger.json')));
+  });
+
+  it('serves full content when the ledger cannot be persisted', async () => {
+    const policy = await enabledPolicy();
+    const content = body('unwritable');
+    const stateDir = path.join(rootDir, '.ai-factory', 'state');
+    await mkdir(stateDir, { recursive: true });
+    await chmod(stateDir, 0o500);
+
+    try {
+      const result = await recordRead({ filePath: 'src/session.ts', content, rootDir, policy, sessionId: 'ro' });
+
+      assert.equal(result.decision, 'full');
+      assert.equal(result.content, content);
+      assert.ok(result.warnings.some((warning) => warning.code === 'context-dedup-ledger-unwritable'));
+    } finally {
+      await chmod(stateDir, 0o700);
+    }
   });
 
   it('writes a schema-versioned ledger', async () => {

@@ -18,6 +18,8 @@ Ledger сессии — локальный runtime state, не canonical artifac
 
 Ledger хранит только relative path, sha256 digest, размер, счетчики и timestamps. Содержимое файлов в ledger не пишется. Сеть не используется, телеметрии нет.
 
+`sessionId` санитизируется до `[A-Za-z0-9._-]`, а `.` и `..` заменяются на `default`; `purge` дополнительно проверяет, что удаляемый каталог лежит внутри `.ai-factory/state/context-dedup/`. Остальной `.ai-factory/state/` сервис не трогает.
+
 ## Таблица Решений
 
 | Условие | `decision` | Что возвращается |
@@ -29,6 +31,7 @@ Ledger хранит только relative path, sha256 digest, размер, с�
 | Path уже был, digest совпал | `deduplicated` | replay-ответ без содержимого |
 | Path уже был, digest изменился | `changed` | полное содержимое |
 | Запрошен `--force` | `changed` | полное содержимое |
+| Ledger не записывается (например, read-only state) | `full` | полное содержимое + warning `context-dedup-ledger-unwritable` |
 
 Replay-ответ содержит path, digest, размер, время первого чтения, номер чтения и команду для принудительного повторного чтения.
 
