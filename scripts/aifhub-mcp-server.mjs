@@ -5,6 +5,8 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import readline from 'node:readline';
 
+import { purgeSession, recordRead, summarizeSession } from './context-dedup.mjs';
+
 const SERVER_VERSION = '0.1.0';
 const PROTOCOL_VERSION = '2024-11-05';
 const DEFAULT_TIMEOUT_MS = 120000;
@@ -66,6 +68,43 @@ const TOOL_DEFINITIONS = [
         issue: { type: 'string', description: 'Problem or gap to address.' },
         proposal: { type: 'string', description: 'Proposed improvement.' },
         evidence: { type: 'string', description: 'Optional supporting evidence.' }
+      }
+    }
+  },
+  {
+    name: 'read_file_deduplicated',
+    description: 'Read a project file once per session. Repeated identical reads return a replay summary instead of the content. Protected validation artifacts are always returned in full.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['path'],
+      properties: {
+        path: { type: 'string', description: 'Project-relative file path.' },
+        sessionId: { type: 'string', description: 'Dedup session id. Defaults to AIFHUB_SESSION_ID or the current change pointer.' },
+        force: { type: 'boolean', description: 'When true, return full content even if the digest is unchanged.' }
+      }
+    }
+  },
+  {
+    name: 'context_dedup_status',
+    description: 'Report session dedup totals: reads, dedup hits, saved bytes and estimated saved tokens.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        sessionId: { type: 'string', description: 'Dedup session id.' }
+      }
+    }
+  },
+  {
+    name: 'context_dedup_purge',
+    description: 'Delete the local dedup ledger for one session, or for every session when all is true.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        sessionId: { type: 'string', description: 'Dedup session id.' },
+        all: { type: 'boolean', description: 'When true, purge every session ledger.' }
       }
     }
   }
@@ -269,11 +308,52 @@ Next step:
 Review the proposal, then apply it through the normal repository workflow with tests.`);
 }
 
+async function readFileDeduplicated(args, options = {}) {
+  const filePath = assertString(args.path, 'path');
+  const dedup = options.contextDedup ?? { recordRead, summarizeSession, purgeSession };
+  const result = await dedup.recordRead({
+    filePath,
+    sessionId: typeof args.sessionId === 'string' ? args.sessionId : undefined,
+    force: args.force === true,
+    rootDir: options.cwd ?? process.cwd()
+  });
+
+  if (result.decision === 'deduplicated') {
+    return textResult(result.replay.text);
+  }
+
+  return textResult(result.content ?? '');
+}
+
+async function contextDedupStatus(args, options = {}) {
+  const dedup = options.contextDedup ?? { recordRead, summarizeSession, purgeSession };
+  const summary = await dedup.summarizeSession({
+    sessionId: typeof args.sessionId === 'string' ? args.sessionId : undefined,
+    rootDir: options.cwd ?? process.cwd()
+  });
+
+  return textResult(jsonText(summary));
+}
+
+async function contextDedupPurge(args, options = {}) {
+  const dedup = options.contextDedup ?? { recordRead, summarizeSession, purgeSession };
+  const result = await dedup.purgeSession({
+    sessionId: typeof args.sessionId === 'string' ? args.sessionId : undefined,
+    all: args.all === true,
+    rootDir: options.cwd ?? process.cwd()
+  });
+
+  return textResult(jsonText(result));
+}
+
 const TOOL_HANDLERS = {
   search_skills: searchSkills,
   install_skill: installSkill,
   run_skill_tests: runSkillTests,
-  propose_skill_improvement: proposeSkillImprovement
+  propose_skill_improvement: proposeSkillImprovement,
+  read_file_deduplicated: readFileDeduplicated,
+  context_dedup_status: contextDedupStatus,
+  context_dedup_purge: contextDedupPurge
 };
 
 function success(id, result) {

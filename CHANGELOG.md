@@ -6,6 +6,9 @@
 
 ## [В разработке]
 
+### Добавлено
+- Optional session context dedup service: `scripts/context-dedup.mjs`, wrapper command `ai-factory aifhub-context-dedup` и MCP tools `read_file_deduplicated`, `context_dedup_status`, `context_dedup_purge`. Сервис выключен по умолчанию, включается через `aifhub.contextDedup.enabled`, никогда не дедуплицирует protected validation artifacts и не пишет ничего за пределы `.ai-factory/state/context-dedup/`.
+
 ### Изменено
 - Reviewed AI Factory baseline обновлён до `2.17.0` при сохранении compatibility range `>=2.11.0 <3.0.0`; полный `2.15.0 -> 2.16.0 -> 2.17.0` audit включает planning, fix, QA, MCP, Control Flow и reviewed no-op adaptations.
 - OpenSpec-native planning сохраняет immutable `## Original Request`, а revision-bound `## Research Context` предупреждает `WARN [research-drift]` без silent scope rebase.

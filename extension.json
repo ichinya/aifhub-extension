@@ -48,6 +48,11 @@
       "name": "aifhub-memory-tools",
       "description": "Run AIFHub optional memory and context tool recommendation diagnostics.",
       "module": "./commands/aifhub-memory-tools.mjs"
+    },
+    {
+      "name": "aifhub-context-dedup",
+      "description": "Run AIFHub session context dedup checks, status, and purge.",
+      "module": "./commands/aifhub-context-dedup.mjs"
     }
   ],
   "skills": [

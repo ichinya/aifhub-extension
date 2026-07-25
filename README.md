@@ -17,6 +17,7 @@ AI Factory UX + OpenSpec artifact protocol
 - Preserves legacy AI Factory-only plan folders as compatibility and migration input only.
 - Publishes namespaced Codex CLI and Claude agent files through the extension manifest for explicit user or orchestrator invocation.
 - Publishes an optional `aifhub` MCP server whose settings are rendered by AI Factory per runtime.
+- Ships an optional, opt-in session context dedup service (`ai-factory aifhub-context-dedup` and MCP dedup tools) that serves unchanged repeat file reads as a short replay instead of full content, while always returning protected validation artifacts in full.
 - Documents upstream project-context utilities such as `/aif-architecture`, `/aif-roadmap`, `/aif-docs`, `/aif-qa`, `/aif-archive`, and `/aif-distillation` with AIFHub write-boundary guardrails.
 - Supports an optional protocol-neutral project glossary at `paths.context` (`CONTEXT.md` by default) for consistent prose terminology.
 - Does not install OpenSpec skills or slash commands.

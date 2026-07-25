@@ -66,6 +66,13 @@ const WRAPPER_COMMANDS = [
     module: './commands/aifhub-memory-tools.mjs',
     script: 'memory-tool-recommender.mjs',
     args: ['recommend', '--shape', 'large_framework_app', '--task', 'architecture_or_impact_discovery', '--json']
+  },
+  {
+    name: 'aifhub-context-dedup',
+    description: 'Run AIFHub session context dedup checks, status, and purge.',
+    module: './commands/aifhub-context-dedup.mjs',
+    script: 'context-dedup.mjs',
+    args: ['status', '--json']
   }
 ];
 

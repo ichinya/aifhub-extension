@@ -1,4 +1,4 @@
-[Предыдущая страница](memory-tool-recommendations.md) | [К документации](README.md) | [Следующая страница](openspec-compatibility.md)
+[Предыдущая страница](context-dedup.md) | [К документации](README.md) | [Следующая страница](openspec-compatibility.md)
 
 # Context Loading Policy
 
@@ -97,6 +97,8 @@ Provider output можно копировать в `.ai-factory/` только �
 Central provider guide находится в [Context Providers](context-providers.md), local metadata-driven recommendation diagnostics - в [Memory Tool Recommendations](memory-tool-recommendations.md).
 
 Context/compression providers не должны rewrite validation artifacts и не должны compress protected artifacts in place. Protected validation artifacts включают `aif-gate-result`, `coverage.json`, `done-readiness.json`, `openspec/specs/**`, generated-rules traces и exact evidence snippets.
+
+Optional session dedup (см. [Session Context Dedup](context-dedup.md)) подчиняется тому же правилу. Он влияет только на ответ на повторное чтение неизменившегося файла, никогда не переписывает файлы и никогда не дедуплицирует protected validation artifacts.
 
 ## Опциональный Graphify Context
 
@@ -360,6 +362,7 @@ If `.ai-factory/config.yaml` is missing or incomplete:
 
 - [Usage](usage.md)
 - [Memory Tool Recommendations](memory-tool-recommendations.md)
+- [Session Context Dedup](context-dedup.md)
 - [OpenSpec Compatibility](openspec-compatibility.md)
 - [Legacy Plan Migration](legacy-plan-migration.md)
 - [ADR 0001](adr/0001-openspec-native-artifact-protocol.md)
