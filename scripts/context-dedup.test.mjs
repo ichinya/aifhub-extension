@@ -98,6 +98,19 @@ describe('context dedup policy', () => {
     );
   });
 
+  it('ignores prototype-polluting config keys', () => {
+    const policy = resolveContextDedupPolicy(`__proto__:
+  polluted: true
+aifhub:
+  contextDedup:
+    enabled: true
+`);
+
+    assert.equal(policy.enabled, true);
+    assert.equal({}.polluted, undefined);
+    assert.equal(Object.prototype.polluted, undefined);
+  });
+
   it('treats protected validation artifacts as never deduplicated', () => {
     const policy = defaultContextDedupPolicy();
 

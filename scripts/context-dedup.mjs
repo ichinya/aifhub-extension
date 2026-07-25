@@ -24,6 +24,7 @@ const DEDUP_STATE_DIR = path.join('.ai-factory', 'state', 'context-dedup');
 const LEDGER_FILE = 'ledger.json';
 const DEFAULT_SESSION_ID = 'default';
 const BYTES_PER_TOKEN_ESTIMATE = 4;
+const UNSAFE_YAML_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 export function defaultContextDedupPolicy() {
   return {
@@ -505,6 +506,10 @@ function parseSimpleYaml(raw) {
     const indent = match[1].length;
     const key = match[2];
     const rawValue = match[3] ?? '';
+
+    if (UNSAFE_YAML_KEYS.has(key)) {
+      continue;
+    }
 
     while (stack.length > 1 && indent <= stack.at(-1).indent) {
       stack.pop();
