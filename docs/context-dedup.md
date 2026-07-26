@@ -2,130 +2,151 @@
 
 # Session Context Dedup
 
-`scripts/context-dedup.mjs` — optional session-scoped сервис дедупликации чтений. Если один и тот же файл читается в сессии повторно и его содержимое не изменилось, сервис возвращает короткий replay-ответ вместо полного текста. Это убирает повторную оплату одного и того же контекста.
-
-Сервис выключен по умолчанию и включается только явным opt-in, как и остальные optional tools AIFHub.
+`scripts/context-dedup.mjs` — optional session-scoped сервис оптимизации чтений. `aifhub.contextDedup.mode` явно выбирает отсутствие оптимизации, встроенный AIFHub exact-read dedup или установленный пользователем `sqz`. Сервис выключен по умолчанию и включается только explicit opt-in.
 
 ## Модель Сессии
 
-Единица дедупликации — сессия. `sessionId` берется в порядке: `--session <id>`, затем `AIFHUB_SESSION_ID`, затем current change pointer (`.ai-factory/state/current.yaml`), затем `default`.
+Session id выбирается в порядке:
 
-Ledger сессии — локальный runtime state, не canonical artifact:
+1. explicit `--session` / internal `sessionId`;
+2. `AIFHUB_SESSION_ID`;
+3. host session id (`CODEX_THREAD_ID` или `CLAUDE_SESSION_ID`);
+4. process-local random nonce.
+
+Current change pointer и persistent `default` не используются: change lifetime не равен model session lifetime. MCP создаёт отдельный random id на каждый stdio server process и не позволяет caller выбирать чужой id.
+
+Ledger — local runtime state:
 
 ```text
-.ai-factory/state/context-dedup/<session-id>/ledger.json
+<paths.state>/context-dedup/session-<sha256(session-id)>/ledger.json
 ```
 
-Ledger хранит только relative path, sha256 digest, размер, счетчики и timestamps. Содержимое файлов в ledger не пишется. Сеть не используется, телеметрии нет.
+Hash storage key не даёт `team/a`, `team-a`, `..` и Unicode ids столкнуться или влиять на filesystem path. Ledger хранит relative canonical path, digest, размер, counters и timestamps, но не file content. Schema v3 считает model-visible net bytes; несовместимый/повреждённый ledger сбрасывается с fail-open warning.
 
-Читаются только пути внутри project root: `check --file ../../etc/passwd` и абсолютные пути за пределами корня отклоняются с ошибкой, до чтения файла.
+Canonical root и target проверяются через real path. `./`, `docs/../`, case aliases и in-root symlinks сходятся к одному key; symlink/junction escape за project root отклоняется до чтения.
 
-`sessionId` санитизируется до `[A-Za-z0-9._-]`, а `.` и `..` заменяются на `default`; `purge` дополнительно проверяет, что удаляемый каталог лежит внутри `.ai-factory/state/context-dedup/`. Остальной `.ai-factory/state/` сервис не трогает.
+Concurrent процессы используют bounded exclusive ledger lock и unique temporary files. Если lock/save не удался, сервис отдаёт полный content с `context-dedup-ledger-unwritable`.
 
-## Таблица Решений
+## Решения
 
-| Условие | `decision` | Что возвращается |
+| Условие | `decision` | Результат |
 |---|---|---|
-| `enabled: false` | `disabled` | полное содержимое |
-| Path совпал с protected pattern | `protected` | полное содержимое |
-| Размер меньше `minBytes` | `below-threshold` | полное содержимое |
-| Path впервые в сессии | `full` | полное содержимое |
-| Path уже был, digest совпал | `deduplicated` | replay-ответ без содержимого |
-| Path уже был, digest изменился | `changed` | полное содержимое |
-| Запрошен `--force` | `changed` | полное содержимое |
-| Ledger не записывается (например, read-only state) | `full` | полное содержимое + warning `context-dedup-ledger-unwritable` |
+| `mode: off` | `disabled` | полный content |
+| `mode: aifhub` и одинаковый повтор | `deduplicated` | AIFHub replay, только если он короче content |
+| `mode: sqz` и shorter output | `compressed` | stateless output внешнего `sqz`; exact repeat обслуживает AIFHub ledger как `deduplicated` |
+| `mode: sqz`, utility отсутствует/ошиблась | `full` | полный content + sanitized warning |
+| protected path | `protected` | полный content |
+| меньше `minBytes` | `below-threshold` | полный content |
+| `maxEntries: 0` | `full` | полный content без ledger entry |
+| первое чтение | `full` | полный content |
+| digest совпал и replay короче content | `deduplicated` | компактный replay без content |
+| digest совпал, но replay не даёт net savings | `full` | полный content |
+| digest изменился или `force` | `changed` | полный content |
+| ledger unavailable | `full` | полный content + warning |
 
-Replay-ответ содержит path, digest, размер, время первого чтения, номер чтения и команду для принудительного повторного чтения.
+Replay содержит path, короткий digest, reuse guidance, structured `forceRead: {path, force: true}` и инструкцию повторить тот же read с `force: true`; executable shell command с repo-controlled path не формируется. Полный SHA-256 остаётся в structured `digest`.
 
 ## Protected Artifacts
 
-Protected validation artifacts никогда не дедуплицируются, даже при полном совпадении digest:
+Non-removable defaults:
 
-- `openspec/specs/**`
-- `.ai-factory/rules/generated/**`
-- `.ai-factory/qa/**`
-- `**/aif-gate-result*`
-- `**/coverage.json`
-- `**/done-readiness.json`
+- `openspec/specs/**`;
+- `openspec/changes/**`;
+- `.ai-factory/plans/**`;
+- `.ai-factory/rules/generated/**`;
+- `.ai-factory/qa/**`;
+- `**/aif-gate-result*`;
+- `**/coverage.json`;
+- `**/done-readiness.json`.
 
-Список можно расширить через `protectedPatterns`, но нельзя сократить. Сервис не переписывает файлы: он влияет только на ответ на чтение, поэтому exact evidence snippets, gate evidence и canonical OpenSpec artifacts остаются нетронутыми на диске. См. [Context Loading Policy](context-loading-policy.md).
+Consumer дополнительно выводит protected roots из `aifhub.openspec.root`, `paths.plans`, `paths.specs`, `paths.qa`, `paths.generated_rules` и `paths.state`. `protectedPatterns` только расширяет список.
 
 ## Конфигурация
 
 ```yaml
 aifhub:
   contextDedup:
-    enabled: true
+    mode: off # off | aifhub | sqz
     minBytes: 2048
     maxEntries: 500
-    protectedPatterns: [docs/frozen/**]
+    protectedPatterns:
+      - docs/frozen/**
+    sqz:
+      command: sqz
 ```
 
-Неизвестные ключи и неверные типы дают `warning` diagnostics и fallback на defaults. Отсутствие `.ai-factory/config.yaml` означает выключенный сервис, а не ошибку.
+`mode` type-stable: boolean и string не смешиваются в одном новом selector. Legacy `enabled: false` читается как `off`, legacy `enabled: true` — как `aifhub`; при одновременном конфликтующем `mode` explicit mode имеет приоритет и даёт diagnostic.
 
-## Уровень 1: CLI И Shell-хук
+`aif-analyze` владеет public config shape: сохраняет существующие значения, добавляет missing `mode: off` defaults и никогда не включает dedup автоматически. Parser принимает inline и block YAML lists, игнорирует inline comments и отклоняет partial/fractional integers.
+
+### Выбор `sqz`
+
+`mode: sqz` означает, что AIFHub будет запускать новую стороннюю user-owned утилиту. Проверенный benchmark использовал `ojuschugh1/sqz` v1.3.0 под Elastic License 2.0. Перед выбором пользователь должен увидеть это предупреждение и подтвердить внешний dependency.
+
+Само изменение config **не устанавливает** binary. AIFHub не скачивает `sqz`, не запускает `sqz init`, не ставит hooks, не регистрирует MCP и не меняет agent config. Установите проверенный executable отдельно и укажите его через `sqz.command` либо обеспечьте доступность команды `sqz` в `PATH`.
+
+Runtime запускает fixed `sqz compress --no-cache` без shell, с bounded timeout/output и очищенным credential environment. SQZ cache references отключены, потому что v1.3.0 на Windows определяет `~/.sqz` через platform home API и environment-only redirect не гарантирует изоляцию. Exact same-session repeat обслуживает AIFHub ledger без второго вызова SQZ. Ошибка spawn/exit/timeout/output-limit или неожиданный `§ref`/`§delta` fail-open возвращает полный content; raw stderr модели не отдаётся. Сторонний CLI всё ещё может вести user-owned statistics под `~/.sqz`; AIFHub их не очищает.
+
+## CLI
 
 ```bash
-ai-factory aifhub-context-dedup check --file src/auth/session.ts --json
-ai-factory aifhub-context-dedup check --file src/auth/session.ts --force
-ai-factory aifhub-context-dedup status --json
+ai-factory aifhub-context-dedup check --file src/auth/session.ts --session <id> --json
+ai-factory aifhub-context-dedup check --file src/auth/session.ts --session <id> --force
+ai-factory aifhub-context-dedup status --session <id> --json
 ai-factory aifhub-context-dedup purge --session <id>
 ai-factory aifhub-context-dedup purge --all
 ```
 
-`check --json` возвращает decision, digest, размер, `savedBytes` и `estimatedSavedTokens` без содержимого файла и предназначен для shell-хука агентного runtime. Хук должен быть fail-open: при ненулевом exit code или отсутствии команды он отдает файл как обычно.
+Cross-process CLI/hook dedup должен передавать stable host session через `--session` или `AIFHUB_SESSION_ID`; process fallback намеренно не переживает новый процесс.
 
-## Уровень 2: MCP
+Status использует net model-visible accounting:
 
-Сервер `aifhub` публикует три инструмента:
+- `mode` — effective `off`, `aifhub` или `sqz`;
+- `observedBytes` — полный объём всех подходящих чтений до dedup;
+- `servedBytes` — реально выданный полный content или replay;
+- `savedBytes = observedBytes - servedBytes`;
+- `savedPercent = savedBytes / observedBytes`.
+
+Поэтому revisions, eviction и стоимость replay не искажают экономию. Невыгодный replay не считается dedup hit и fail-open отдаёт полный content.
+
+Debug diagnostics opt-in: `AIFHUB_CONTEXT_DEDUP_DEBUG=1` пишет bounded lines с prefix `[FIX:133]`, path/decision/bytes без file content.
+
+## MCP
 
 | Tool | Назначение |
 |---|---|
-| `aifhub.read_file_deduplicated` | Прочитать файл один раз за сессию; повтор возвращает replay-ответ. |
-| `aifhub.context_dedup_status` | Totals сессии: reads, dedup hits, saved bytes, estimated saved tokens. |
-| `aifhub.context_dedup_purge` | Удалить ledger одной сессии или всех сессий. |
+| `aifhub.read_file_deduplicated` | Read текущей MCP session; `path` + optional `force`, максимум 1 MiB. |
+| `aifhub.context_dedup_status` | Public totals без internal session id и ledger path. |
+| `aifhub.context_dedup_purge` | Dry-run по умолчанию; `confirm: true` удаляет только current MCP session. |
 
-См. [AIFHub MCP](aifhub-mcp.md).
+Policy diagnostics/warnings идут отдельным MCP text block, поэтому первый content block остаётся byte-exact.
 
-## Оценка Экономии
-
-`estimatedSavedTokens` — прозрачная эвристика `ceil(savedBytes / 4)`, а не биллинговый счетчик. `status` показывает реальные `savedBytes` по текущей сессии.
-
-Детерминированное сравнение трёх режимов (без dedup, этот сервис, внешний hook-инструмент) даёт `scripts/context-dedup-benchmark.mjs`:
+## Benchmark И AI Tester
 
 ```bash
 node scripts/context-dedup-benchmark.mjs --mode baseline --mode variant-a
-node scripts/context-dedup-benchmark.mjs --mode external --external-command "<tool> compress-output" --json
+node scripts/context-dedup-benchmark.mjs \
+  --mode external \
+  --external-command "<verified-sqz-adapter>" \
+  --external-protocol sqz-text \
+  --json
 ```
 
-Результаты и сравнение с готовым инструментом: [Результаты Тестов squeez И Трёхстороннее Сравнение Dedup](memory-tools-research/squeez-benchmark-results.md). Для модельных paired прогонов используется [AI Tester Matrix Для Memory Tools](memory-tools-research/ai-tester-matrix.md).
+Harness всегда создаёт owned temporary workspace, проверяет trace containment, ограничивает external timeout/output и использует isolated HOME/XDG/SQZ paths. Compression, delta и reference считаются отдельно; только reference является dedup hit.
+
+AI Tester matrix на `gpt-5.6-luna`, reasoning `low`: baseline `4/4`, AIFHub `4/4` и безопасный SQZ runtime `4/4`. На сопоставимом exact-repeat payload оба enabled mode сохранили `98.74%`, потому что repeat обслуживает один AIFHub ledger; SQZ raw aggregate `48.62%` дополнительно включает stateless first-read/changed-content compression. Исторический stateful run `r3` (`3/4`) сохранён как regression evidence. Подробности: [sqz benchmark results](memory-tools-research/sqz-benchmark-results.md).
 
 ## Границы
 
-Сервис не должен:
-
-- становиться gate: выключенный или недоступный dedup никогда не блокирует `/aif-verify`, `/aif-done` и другие команды;
-- переписывать, сжимать или удалять файлы проекта;
-- дедуплицировать protected validation artifacts;
-- отправлять данные по сети или собирать телеметрию;
-- перехватывать API-трафик через proxy или root CA;
-- устанавливаться или включаться автоматически.
-
-Browser extension и IDE extension не входят в состав AIFHub Extension. Ядро сервиса остается пригодным для таких интеграций, но их публикация — user-owned.
+Dedup не является gate, не переписывает project files, не отправляет content в сеть, не включает telemetry, не устанавливает tools и не меняет agent config. В `sqz` mode локальный content передаётся только выбранному user-owned executable через stdin.
 
 ## Purge
 
-```bash
-ai-factory aifhub-context-dedup purge --all
-```
-
-Или удалением каталога `.ai-factory/state/context-dedup/`.
+CLI user может удалить explicit session или весь configured AIFHub dedup state. Это удаляет AIFHub ledger и его session directory, но не user-owned SQZ statistics/cache под `~/.sqz`. MCP требует preview/confirm и не имеет all-session surface.
 
 ## См. Также
 
-- [Context Providers](context-providers.md)
-- [Memory Tool Recommendations](memory-tool-recommendations.md)
-- [Context Loading Policy](context-loading-policy.md)
 - [AIFHub MCP](aifhub-mcp.md)
-- [squeez](memory-tools-research/squeez.md)
-- [Результаты Тестов squeez И Трёхстороннее Сравнение Dedup](memory-tools-research/squeez-benchmark-results.md)
+- [Context Loading Policy](context-loading-policy.md)
+- [sqz](memory-tools-research/sqz.md)
+- [AI Tester results](memory-tools-research/sqz-benchmark-results.md)
