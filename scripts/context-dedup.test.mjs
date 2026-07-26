@@ -1,7 +1,7 @@
 // context-dedup.test.mjs - tests for the optional session read dedup service
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -16,7 +16,9 @@ import {
   recordRead,
   resolveContextDedupPolicy,
   resolveLedgerPath,
+  resolveSessionId,
   readContextDedupPolicy,
+  saveLedger,
   summarizeSession
 } from './context-dedup.mjs';
 
@@ -62,6 +64,7 @@ describe('context dedup policy', () => {
   it('is disabled by default and keeps built-in protected patterns', () => {
     const policy = defaultContextDedupPolicy();
 
+    assert.equal(policy.mode, 'off');
     assert.equal(policy.enabled, false);
     assert.equal(policy.minBytes, 2048);
     assert.ok(policy.protectedPatterns.includes('openspec/specs/**'));
@@ -76,9 +79,105 @@ describe('context dedup policy', () => {
 `);
 
     assert.equal(policy.enabled, true);
+    assert.equal(policy.mode, 'aifhub');
     assert.equal(policy.minBytes, 128);
     assert.ok(policy.protectedPatterns.includes('docs/frozen/**'));
     assert.ok(policy.protectedPatterns.includes('**/coverage.json'));
+    assert.deepEqual(policy.diagnostics, []);
+  });
+
+  it('resolves explicit modes and preserves legacy boolean compatibility', () => {
+    const off = resolveContextDedupPolicy('aifhub:\n  contextDedup:\n    mode: off\n');
+    const aifhub = resolveContextDedupPolicy('aifhub:\n  contextDedup:\n    mode: aifhub\n');
+    const sqz = resolveContextDedupPolicy(`aifhub:
+  contextDedup:
+    mode: sqz
+    sqz:
+      command: tools/sqz.exe
+`);
+    const legacyOn = resolveContextDedupPolicy('aifhub:\n  contextDedup:\n    enabled: true\n');
+    const legacyOff = resolveContextDedupPolicy('aifhub:\n  contextDedup:\n    enabled: false\n');
+
+    assert.deepEqual([off.mode, off.enabled], ['off', false]);
+    assert.deepEqual([aifhub.mode, aifhub.enabled], ['aifhub', true]);
+    assert.deepEqual([sqz.mode, sqz.enabled, sqz.sqz.command], ['sqz', true, 'tools/sqz.exe']);
+    assert.ok(sqz.diagnostics.some((entry) => entry.code === 'context-dedup-sqz-external-tool'));
+    assert.deepEqual([legacyOn.mode, legacyOn.enabled], ['aifhub', true]);
+    assert.deepEqual([legacyOff.mode, legacyOff.enabled], ['off', false]);
+  });
+
+  it('lets explicit mode override conflicting legacy enabled and rejects invalid modes', () => {
+    const conflict = resolveContextDedupPolicy(`aifhub:
+  contextDedup:
+    mode: off
+    enabled: true
+`);
+    const invalid = resolveContextDedupPolicy(`aifhub:
+  contextDedup:
+    mode: automatic
+    enabled: true
+`);
+
+    assert.deepEqual([conflict.mode, conflict.enabled], ['off', false]);
+    assert.ok(conflict.diagnostics.some((entry) => entry.code === 'context-dedup-mode-conflict'));
+    assert.deepEqual([invalid.mode, invalid.enabled], ['aifhub', true]);
+    assert.ok(invalid.diagnostics.some((entry) => entry.code === 'context-dedup-malformed-value'));
+  });
+
+  it('accepts block-list patterns and inline comments but rejects partial integers', () => {
+    const policy = resolveContextDedupPolicy(`aifhub:
+  contextDedup:
+    enabled: true # explicit opt-in
+    minBytes: 12junk
+    maxEntries: 1.5
+    protectedPatterns:
+      - docs/frozen/** # project policy
+      - "docs/quoted/**"
+`);
+
+    assert.equal(policy.enabled, true);
+    assert.equal(policy.minBytes, 2048);
+    assert.equal(policy.maxEntries, 500);
+    assert.ok(policy.protectedPatterns.includes('docs/frozen/**'));
+    assert.ok(policy.protectedPatterns.includes('docs/quoted/**'));
+    assert.equal(policy.diagnostics.filter((entry) => entry.code === 'context-dedup-malformed-value').length, 2);
+  });
+
+  it('derives protected paths and ledger state from configured project paths', () => {
+    const policy = resolveContextDedupPolicy(`aifhub:
+  artifactProtocol: openspec
+  contextDedup:
+    enabled: true
+paths:
+  plans: project-spec/changes
+  specs: project-spec/specs
+  qa: runtime/qa
+  generated_rules: runtime/rules
+  state: runtime/state
+`);
+
+    for (const protectedPath of [
+      'project-spec/changes/demo/proposal.md',
+      'project-spec/specs/demo/spec.md',
+      'runtime/qa/demo/aif-gate-result.json',
+      'runtime/rules/trace.md',
+      'runtime/state/demo/trace.json'
+    ]) {
+      assert.equal(isProtectedReadPath(protectedPath, policy), true, protectedPath);
+    }
+    assert.equal(policy.stateDir, 'runtime/state/context-dedup');
+  });
+
+  it('keeps context dedup disabled without emitting unrelated full-config warnings', () => {
+    const policy = resolveContextDedupPolicy(`language:
+  ui: ru
+aifhub:
+  artifactProtocol: openspec
+paths:
+  state: runtime/state
+`);
+
+    assert.equal(policy.enabled, false);
     assert.deepEqual(policy.diagnostics, []);
   });
 
@@ -135,6 +234,7 @@ describe('recordRead decisions', () => {
   it('returns full content on the first read and deduplicates the identical second read', async () => {
     const policy = await enabledPolicy();
     const content = body('session');
+    const contentBytes = Buffer.byteLength(content, 'utf8');
     await writeProjectFile('src/session.ts', content);
 
     const first = await recordRead({ filePath: 'src/session.ts', content, rootDir, policy, sessionId: 's1' });
@@ -146,9 +246,33 @@ describe('recordRead decisions', () => {
     assert.equal(second.decision, 'deduplicated');
     assert.equal(second.content, null);
     assert.equal(second.readCount, 2);
-    assert.equal(second.savedBytes, Buffer.byteLength(content, 'utf8'));
+    const replayBytes = Buffer.byteLength(second.replay.text, 'utf8');
+    assert.equal(second.replayBytes, replayBytes);
+    assert.equal(second.savedBytes, contentBytes - replayBytes);
+    assert.equal(second.estimatedSavedTokens, Math.ceil((contentBytes - replayBytes) / 4));
     assert.match(second.replay.text, /already provided in this session/);
-    assert.match(second.replay.text, new RegExp(hashContent(content)));
+    assert.match(second.replay.text, new RegExp(hashContent(content).slice(0, 23)));
+    assert.match(second.replay.text, /force=true/);
+    assert.ok(replayBytes <= 220, `replay must stay compact; received ${replayBytes} bytes`);
+  });
+
+  it('serves full content when a replay would not reduce the model-visible payload', async () => {
+    const policy = await enabledPolicy();
+    const content = 'small-but-above-configured-threshold'.repeat(3);
+    await writeProjectFile('src/small.txt', content);
+
+    const first = await recordRead({ filePath: 'src/small.txt', content, rootDir, policy, sessionId: 'small' });
+    const second = await recordRead({ filePath: 'src/small.txt', content, rootDir, policy, sessionId: 'small' });
+    const summary = await summarizeSession({ rootDir, policy, sessionId: 'small' });
+
+    assert.equal(first.decision, 'full');
+    assert.equal(second.decision, 'full');
+    assert.equal(second.content, content);
+    assert.match(second.reason, /would not reduce the model-visible payload/);
+    assert.equal(second.savedBytes, 0);
+    assert.equal(summary.dedupHits, 0);
+    assert.equal(summary.savedBytes, 0);
+    assert.equal(summary.servedBytes, summary.observedBytes);
   });
 
   it('serves full content again when the digest changes', async () => {
@@ -178,6 +302,121 @@ describe('recordRead decisions', () => {
     assert.equal(first.decision, 'protected');
     assert.equal(second.decision, 'protected');
     assert.equal(second.content, content);
+  });
+
+  it('canonicalizes aliases before protected matching and ledger keying', async () => {
+    const policy = await enabledPolicy();
+    const content = body('spec-alias');
+    await writeProjectFile('openspec/specs/auth/spec.md', content);
+
+    for (const alias of [
+      './openspec/specs/auth/spec.md',
+      'docs/../openspec/specs/auth/spec.md',
+      'OPENSPEC/SPECS/AUTH/SPEC.MD'
+    ]) {
+      const result = await recordRead({ filePath: alias, content, rootDir, policy, sessionId: 'aliases' });
+      assert.equal(result.decision, 'protected', alias);
+    }
+  });
+
+  it('rejects symlink escapes and treats in-root symlink aliases as their canonical target', async (t) => {
+    const policy = await enabledPolicy();
+    const outsideDir = await mkdtemp(path.join(os.tmpdir(), 'aifhub-context-outside-'));
+    const outsideFile = path.join(outsideDir, 'outside.md');
+    await writeFile(outsideFile, body('outside'), 'utf8');
+    await writeProjectFile('openspec/specs/auth/spec.md', body('linked-spec'));
+
+    try {
+      try {
+        const linkType = process.platform === 'win32' ? 'junction' : 'dir';
+        await symlink(outsideDir, path.join(rootDir, 'outside-link'), linkType);
+        await symlink(
+          path.join(rootDir, 'openspec', 'specs'),
+          path.join(rootDir, 'spec-link'),
+          linkType
+        );
+      } catch (error) {
+        if (error?.code === 'EPERM') {
+          t.skip('Windows symlink creation is unavailable without Developer Mode.');
+          return;
+        }
+        throw error;
+      }
+
+      await assert.rejects(
+        recordRead({ filePath: 'outside-link/outside.md', rootDir, policy, sessionId: 'links' }),
+        /must stay inside the project root/
+      );
+      await assert.rejects(
+        recordRead({
+          filePath: 'outside-link/missing.md',
+          content: body('missing-outside'),
+          rootDir,
+          policy,
+          sessionId: 'links'
+        }),
+        /must stay inside the project root/
+      );
+      const linked = await recordRead({ filePath: 'spec-link/auth/spec.md', rootDir, policy, sessionId: 'links' });
+      assert.equal(linked.decision, 'protected');
+      assert.equal(linked.path, 'openspec/specs/auth/spec.md');
+    } finally {
+      await rm(outsideDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a dedup state directory symlinked outside the project before writing', async () => {
+    const policy = await enabledPolicy();
+    const outsideState = await mkdtemp(path.join(os.tmpdir(), 'aifhub-context-state-outside-'));
+    const statePath = path.join(rootDir, '.ai-factory', 'state');
+
+    try {
+      await symlink(outsideState, statePath, process.platform === 'win32' ? 'junction' : 'dir');
+      await assert.rejects(
+        recordRead({ filePath: 'src/session.ts', content: body('state-escape'), rootDir, policy, sessionId: 'state' }),
+        /must stay inside the project root/
+      );
+      assert.deepEqual(await readdir(outsideState), []);
+    } finally {
+      await rm(outsideState, { recursive: true, force: true });
+    }
+  });
+
+  it('never writes or purges through a lock-directory symlink outside the project', async (t) => {
+    const policy = await enabledPolicy();
+    const outsideLocks = await mkdtemp(path.join(os.tmpdir(), 'aifhub-context-locks-outside-'));
+    const stateRoot = path.join(rootDir, '.ai-factory', 'state');
+    const lockPath = path.join(stateRoot, '.context-dedup-locks');
+
+    try {
+      await mkdir(stateRoot, { recursive: true });
+      try {
+        await symlink(outsideLocks, lockPath, process.platform === 'win32' ? 'junction' : 'dir');
+      } catch (error) {
+        if (error?.code === 'EPERM') {
+          t.skip('Windows symlink creation is unavailable without Developer Mode.');
+          return;
+        }
+        throw error;
+      }
+
+      const result = await recordRead({
+        filePath: 'src/session.ts',
+        content: body('lock-escape'),
+        rootDir,
+        policy,
+        sessionId: 'lock-escape'
+      });
+      assert.equal(result.decision, 'full');
+      assert.ok(result.warnings.some((warning) => warning.code === 'context-dedup-ledger-unwritable'));
+      await assert.rejects(
+        purgeSession({ rootDir, policy, all: true }),
+        /must stay inside the project root/
+      );
+      assert.deepEqual(await readdir(outsideLocks), []);
+    } finally {
+      await rm(outsideLocks, { recursive: true, force: true });
+    }
   });
 
   it('skips content below the minBytes threshold', async () => {
@@ -234,6 +473,155 @@ describe('recordRead decisions', () => {
     assert.equal(result.content, content);
   });
 
+  it('uses stateless SQZ compression plus the AIFHub session ledger for exact repeats', async () => {
+    const policy = resolveContextDedupPolicy(`aifhub:
+  contextDedup:
+    mode: sqz
+    minBytes: 64
+`);
+    const content = body('sqz');
+    const inputBytes = Buffer.byteLength(content, 'utf8');
+    const calls = [];
+    const output = 'compact sqz payload\n';
+    const sqzRunner = async (options) => {
+      calls.push(options);
+      return { ok: true, stdout: output };
+    };
+    await writeProjectFile('src/session.ts', content);
+
+    const first = await recordRead({
+      filePath: 'src/session.ts',
+      content,
+      rootDir,
+      policy,
+      sessionId: 'sqz-session',
+      sqzRunner
+    });
+    const second = await recordRead({
+      filePath: 'src/session.ts',
+      content,
+      rootDir,
+      policy,
+      sessionId: 'sqz-session',
+      sqzRunner
+    });
+    const summary = await summarizeSession({ rootDir, policy, sessionId: 'sqz-session' });
+
+    assert.equal(first.decision, 'compressed');
+    assert.equal(first.content, output);
+    assert.equal(second.decision, 'deduplicated');
+    assert.equal(second.providerOutcome, 'reference');
+    assert.equal(second.content, null);
+    assert.match(second.replay.text, /already provided in this session/);
+    assert.equal(summary.mode, 'sqz');
+    assert.equal(summary.reads, 2);
+    assert.equal(summary.dedupHits, 1);
+    assert.equal(summary.observedBytes, inputBytes * 2);
+    assert.equal(summary.observedBytes, summary.servedBytes + summary.savedBytes);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].command, 'sqz');
+    assert.match(calls[0].homeDir, /context-dedup.+sqz$/);
+  });
+
+  it('fails open if SQZ returns a state-dependent reference or delta', async () => {
+    const policy = resolveContextDedupPolicy(`aifhub:
+  contextDedup:
+    mode: sqz
+    minBytes: 64
+`);
+    const content = body('sqz-stateful');
+    for (const [index, stdout] of ['§ref:12345678§\n', '§delta:12345678§\npatch'].entries()) {
+      const result = await recordRead({
+        filePath: 'src/session.ts',
+        content,
+        rootDir,
+        policy,
+        sessionId: `sqz-stateful-${index}`,
+        sqzRunner: async () => ({ ok: true, stdout })
+      });
+
+      assert.equal(result.decision, 'full');
+      assert.equal(result.content, content);
+      assert.ok(result.warnings.some((warning) => warning.code === 'context-dedup-sqz-stateful-output'));
+    }
+  });
+
+  it('fails open when SQZ is unavailable and never exposes provider stderr', async () => {
+    const policy = resolveContextDedupPolicy(`aifhub:
+  contextDedup:
+    mode: sqz
+    minBytes: 64
+`);
+    const content = body('sqz-failure');
+    await writeProjectFile('src/session.ts', content);
+
+    const result = await recordRead({
+      filePath: 'src/session.ts',
+      content,
+      rootDir,
+      policy,
+      sessionId: 'sqz-failure',
+      sqzRunner: async () => ({
+        ok: false,
+        code: 'spawn-error',
+        stderr: 'OPENAI_API_KEY=must-not-leak C:\\private\\sqz.exe'
+      })
+    });
+
+    assert.equal(result.decision, 'full');
+    assert.equal(result.content, content);
+    assert.equal(result.savedBytes, 0);
+    assert.ok(result.warnings.some((warning) => warning.code === 'context-dedup-sqz-unavailable'));
+    assert.doesNotMatch(JSON.stringify(result), /must-not-leak|C:\\\\private/);
+  });
+
+  it('bypasses SQZ for protected, forced and non-beneficial reads', async () => {
+    const policy = resolveContextDedupPolicy(`aifhub:
+  contextDedup:
+    mode: sqz
+    minBytes: 64
+`);
+    const content = body('sqz-bypass');
+    let calls = 0;
+    const sqzRunner = async () => {
+      calls += 1;
+      return { ok: true, stdout: `${content}larger` };
+    };
+
+    const protectedRead = await recordRead({
+      filePath: 'openspec/specs/auth/spec.md',
+      content,
+      rootDir,
+      policy,
+      sessionId: 'sqz-bypass',
+      sqzRunner
+    });
+    const forcedRead = await recordRead({
+      filePath: 'src/session.ts',
+      content,
+      rootDir,
+      policy,
+      sessionId: 'sqz-forced',
+      force: true,
+      sqzRunner
+    });
+    const unprofitable = await recordRead({
+      filePath: 'src/session.ts',
+      content,
+      rootDir,
+      policy,
+      sessionId: 'sqz-bypass',
+      sqzRunner
+    });
+
+    assert.equal(protectedRead.decision, 'protected');
+    assert.equal(forcedRead.decision, 'full');
+    assert.equal(unprofitable.decision, 'full');
+    assert.equal(unprofitable.content, content);
+    assert.equal(unprofitable.savedBytes, 0);
+    assert.equal(calls, 1);
+  });
+
   it('evicts the oldest entries beyond maxEntries', async () => {
     const policy = { ...(await enabledPolicy()), maxEntries: 2 };
 
@@ -264,6 +652,11 @@ describe('recordRead decisions', () => {
 
     assert.equal(result.decision, 'full');
     assert.equal(result.content, content);
+
+    const repeated = await recordRead({ filePath: 'src/session.ts', content, rootDir, policy, sessionId: 's1' });
+    assert.equal(repeated.decision, 'full');
+    const { ledger } = await loadLedger({ rootDir, policy, sessionId: 's1' });
+    assert.deepEqual(Object.keys(ledger.entries), []);
   });
 
   it('resets an unreadable ledger with a warning instead of throwing', async () => {
@@ -277,6 +670,21 @@ describe('recordRead decisions', () => {
     assert.equal(result.decision, 'full');
     assert.equal(result.warnings[0].code, 'context-dedup-ledger-unreadable');
   });
+
+  it('resets an incompatible ledger with null totals instead of crashing', async () => {
+    const policy = await enabledPolicy();
+    const ledgerPath = resolveLedgerPath('s1', { rootDir, policy });
+    await mkdir(path.dirname(ledgerPath), { recursive: true });
+    await writeFile(
+      ledgerPath,
+      JSON.stringify({ schemaVersion: CONTEXT_DEDUP_SCHEMA_VERSION, sessionId: 's1', entries: {}, totals: null }),
+      'utf8'
+    );
+
+    const result = await recordRead({ filePath: 'src/session.ts', content: body('reset-null'), rootDir, policy, sessionId: 's1' });
+    assert.equal(result.decision, 'full');
+    assert.ok(result.warnings.some((warning) => warning.code === 'context-dedup-ledger-unreadable'));
+  });
 });
 
 describe('session summary and purge', () => {
@@ -285,16 +693,87 @@ describe('session summary and purge', () => {
     const content = body('summary');
 
     await recordRead({ filePath: 'src/session.ts', content, rootDir, policy, sessionId: 's1' });
-    await recordRead({ filePath: 'src/session.ts', content, rootDir, policy, sessionId: 's1' });
+    const repeated = await recordRead({ filePath: 'src/session.ts', content, rootDir, policy, sessionId: 's1' });
 
     const summary = await summarizeSession({ rootDir, sessionId: 's1' });
     const bytes = Buffer.byteLength(content, 'utf8');
+    const replayBytes = Buffer.byteLength(repeated.replay.text, 'utf8');
+    const savedBytes = bytes - replayBytes;
 
     assert.equal(summary.reads, 2);
     assert.equal(summary.dedupHits, 1);
-    assert.equal(summary.savedBytes, bytes);
-    assert.equal(summary.estimatedSavedTokens, Math.ceil(bytes / 4));
-    assert.equal(summary.savedPercent, 50);
+    assert.equal(summary.observedBytes, bytes * 2);
+    assert.equal(summary.servedBytes, bytes + replayBytes);
+    assert.equal(summary.savedBytes, savedBytes);
+    assert.equal(summary.estimatedSavedTokens, Math.ceil(savedBytes / 4));
+    assert.equal(summary.savedPercent, Number(((savedBytes / (bytes * 2)) * 100).toFixed(2)));
+  });
+
+  it('uses total input bytes for saved percent after changed revisions', async () => {
+    const policy = await enabledPolicy();
+    const first = body('summary-v1');
+    const changed = body('summary-v2');
+
+    await recordRead({ filePath: 'src/session.ts', content: first, rootDir, policy, sessionId: 's1' });
+    const repeated = await recordRead({ filePath: 'src/session.ts', content: first, rootDir, policy, sessionId: 's1' });
+    await recordRead({ filePath: 'src/session.ts', content: changed, rootDir, policy, sessionId: 's1' });
+
+    const summary = await summarizeSession({ rootDir, policy, sessionId: 's1' });
+    const totalInputBytes = Buffer.byteLength(first, 'utf8') * 2 + Buffer.byteLength(changed, 'utf8');
+    const savedBytes = Buffer.byteLength(first, 'utf8') - Buffer.byteLength(repeated.replay.text, 'utf8');
+    assert.equal(summary.savedPercent, Number(((savedBytes / totalInputBytes) * 100).toFixed(2)));
+  });
+
+  it('emits content-free opt-in fix metrics for profitable and rejected replays', async () => {
+    const policy = await enabledPolicy();
+    const logs = [];
+    const logger = (message) => logs.push(message);
+    const large = body('private-content-marker');
+    const tiny = 'tiny';
+
+    await recordRead({
+      filePath: 'src/large.ts',
+      content: large,
+      rootDir,
+      policy,
+      sessionId: 'debug',
+      logFix: true,
+      logger
+    });
+    await recordRead({
+      filePath: 'src/large.ts',
+      content: large,
+      rootDir,
+      policy,
+      sessionId: 'debug',
+      logFix: true,
+      logger
+    });
+    const zeroThresholdPolicy = { ...policy, minBytes: 0 };
+    await recordRead({
+      filePath: 'src/tiny.ts',
+      content: tiny,
+      rootDir,
+      policy: zeroThresholdPolicy,
+      sessionId: 'debug',
+      logFix: true,
+      logger
+    });
+    await recordRead({
+      filePath: 'src/tiny.ts',
+      content: tiny,
+      rootDir,
+      policy: zeroThresholdPolicy,
+      sessionId: 'debug',
+      logFix: true,
+      logger
+    });
+
+    const profitable = logs.find((line) => line.includes('read-deduplicated'));
+    const rejected = logs.find((line) => line.includes('replay-not-beneficial'));
+    assert.match(profitable, /"inputBytes":\d+,"outputBytes":\d+,"savedBytes":\d+/);
+    assert.match(rejected, /"candidateReplayBytes":\d+,"savedBytes":0/);
+    assert.doesNotMatch(logs.join('\n'), /private-content-marker/);
   });
 
   it('purges one session and every session', async () => {
@@ -308,6 +787,46 @@ describe('session summary and purge', () => {
 
     await purgeSession({ rootDir, all: true });
     await assert.rejects(stat(path.join(rootDir, '.ai-factory', 'state', 'context-dedup')));
+  });
+
+  it('waits for an in-flight ledger transaction before purging the session', async () => {
+    const policy = await enabledPolicy();
+    let releaseSave;
+    let notifySaveStarted;
+    const saveStarted = new Promise((resolve) => {
+      notifySaveStarted = resolve;
+    });
+    const saveBarrier = new Promise((resolve) => {
+      releaseSave = resolve;
+    });
+    const saveLedgerFn = async (ledger, options) => {
+      notifySaveStarted();
+      await saveBarrier;
+      return saveLedger(ledger, options);
+    };
+
+    const readPromise = recordRead({
+      filePath: 'src/session.ts',
+      content: body('purge-race'),
+      rootDir,
+      policy,
+      sessionId: 'race',
+      saveLedgerFn
+    });
+    await saveStarted;
+
+    let purgeSettled = false;
+    const purgePromise = purgeSession({ rootDir, policy, sessionId: 'race' }).then((result) => {
+      purgeSettled = true;
+      return result;
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(purgeSettled, false);
+
+    releaseSave();
+    await readPromise;
+    await purgePromise;
+    await assert.rejects(stat(resolveLedgerPath('race', { rootDir, policy })));
   });
 
   it('keeps traversal session ids inside the dedup state directory', async () => {
@@ -326,22 +845,51 @@ describe('session summary and purge', () => {
     await assert.rejects(stat(path.join(stateDir, 'ledger.json')));
   });
 
-  it('serves full content when the ledger cannot be persisted', async () => {
+  it('keeps unsafe session ids collision-resistant and uses a process-local fallback', async () => {
+    await writeProjectFile(path.join('.ai-factory', 'state', 'current.yaml'), 'change: persistent-change\n');
+
+    const slash = resolveLedgerPath('team/a', { rootDir });
+    const dash = resolveLedgerPath('team-a', { rootDir });
+    const dots = resolveLedgerPath('..', { rootDir });
+    const empty = resolveLedgerPath('', { rootDir });
+    assert.notEqual(slash, dash);
+    assert.notEqual(dots, empty);
+
+    const first = await resolveSessionId({ rootDir, env: {} });
+    const second = await resolveSessionId({ rootDir, env: {} });
+    assert.equal(first, second);
+    assert.match(first, /^process-/);
+    assert.notEqual(first, 'persistent-change');
+    assert.notEqual(first, 'default');
+  });
+
+  it('serves full content when the ledger persistence seam fails on every platform', async () => {
     const policy = await enabledPolicy();
     const content = body('unwritable');
-    const stateDir = path.join(rootDir, '.ai-factory', 'state');
-    await mkdir(stateDir, { recursive: true });
-    await chmod(stateDir, 0o500);
+    const saveLedgerFn = async () => {
+      throw new Error('synthetic persistence failure');
+    };
+    const result = await recordRead({ filePath: 'src/session.ts', content, rootDir, policy, sessionId: 'ro', saveLedgerFn });
 
-    try {
-      const result = await recordRead({ filePath: 'src/session.ts', content, rootDir, policy, sessionId: 'ro' });
+    assert.equal(result.decision, 'full');
+    assert.equal(result.content, content);
+    assert.ok(result.warnings.some((warning) => warning.code === 'context-dedup-ledger-unwritable'));
+  });
 
-      assert.equal(result.decision, 'full');
-      assert.equal(result.content, content);
-      assert.ok(result.warnings.some((warning) => warning.code === 'context-dedup-ledger-unwritable'));
-    } finally {
-      await chmod(stateDir, 0o700);
-    }
+  it('serializes concurrent updates without losing read totals', async () => {
+    const policy = await enabledPolicy();
+    const content = body('concurrent');
+
+    const results = await Promise.all(
+      Array.from({ length: 12 }, () =>
+        recordRead({ filePath: 'src/session.ts', content, rootDir, policy, sessionId: 'parallel' }))
+    );
+    const summary = await summarizeSession({ rootDir, policy, sessionId: 'parallel' });
+
+    assert.equal(summary.reads, 12);
+    assert.equal(summary.dedupHits, 11);
+    assert.equal(results.filter((result) => result.decision === 'full').length, 1);
+    assert.equal(results.filter((result) => result.decision === 'deduplicated').length, 11);
   });
 
   it('writes a schema-versioned ledger', async () => {

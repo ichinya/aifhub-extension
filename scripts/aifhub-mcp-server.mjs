@@ -1,15 +1,24 @@
 // aifhub-mcp-server.mjs - dependency-free stdio MCP server for AIFHub skill workflows
 import { spawn } from 'node:child_process';
-import { access, readFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { access, open, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import readline from 'node:readline';
 
-import { purgeSession, recordRead, summarizeSession } from './context-dedup.mjs';
+import {
+  purgeSession,
+  readContextDedupPolicy,
+  recordRead,
+  resolveCanonicalTarget,
+  summarizeSession
+} from './context-dedup.mjs';
 
 const SERVER_VERSION = '0.1.0';
 const PROTOCOL_VERSION = '2024-11-05';
 const DEFAULT_TIMEOUT_MS = 120000;
+const MCP_READ_LIMIT_BYTES = 1024 * 1024;
+const DEFAULT_MCP_SESSION_ID = `mcp-${randomUUID()}`;
 
 const TOOL_DEFINITIONS = [
   {
@@ -73,38 +82,34 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: 'read_file_deduplicated',
-    description: 'Read a project file once per session. Repeated identical reads return a replay summary instead of the content. Protected validation artifacts are always returned in full.',
+    description: 'Read a project file through the configured off, AIFHub, or user-owned SQZ context mode. Protected validation artifacts are always returned in full.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
       required: ['path'],
       properties: {
         path: { type: 'string', description: 'Project-relative file path.' },
-        sessionId: { type: 'string', description: 'Dedup session id. Defaults to AIFHUB_SESSION_ID or the current change pointer.' },
         force: { type: 'boolean', description: 'When true, return full content even if the digest is unchanged.' }
       }
     }
   },
   {
     name: 'context_dedup_status',
-    description: 'Report session dedup totals: reads, dedup hits, saved bytes and estimated saved tokens.',
+    description: 'Report effective mode and session totals: reads, dedup hits, observed/served/saved bytes and estimated saved tokens.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
-      properties: {
-        sessionId: { type: 'string', description: 'Dedup session id.' }
-      }
+      properties: {}
     }
   },
   {
     name: 'context_dedup_purge',
-    description: 'Delete the local dedup ledger for one session, or for every session when all is true.',
+    description: 'Preview deletion of this MCP connection ledger. Set confirm to true to delete it.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
       properties: {
-        sessionId: { type: 'string', description: 'Dedup session id.' },
-        all: { type: 'boolean', description: 'When true, purge every session ledger.' }
+        confirm: { type: 'boolean', description: 'Omitted or false previews; true deletes only this MCP session ledger.' }
       }
     }
   }
@@ -134,6 +139,67 @@ function textResult(text) {
   return {
     content: [{ type: 'text', text }]
   };
+}
+
+function textResultWithDiagnostics(text, diagnostics) {
+  const result = textResult(text);
+  if (diagnostics.length > 0) {
+    result.content.push({
+      type: 'text',
+      text: diagnostics.map((entry) => `[${entry.code}] ${entry.message}`).join('\n')
+    });
+  }
+  return result;
+}
+
+function sanitizeDiagnostics(diagnostics) {
+  return diagnostics
+    .filter((entry) => entry && typeof entry.code === 'string' && typeof entry.message === 'string')
+    .map((entry) => {
+      if (entry.code === 'context-dedup-config-unreadable') {
+        return { code: entry.code, message: 'Context dedup config could not be read; defaults were used.' };
+      }
+      if (entry.code === 'context-dedup-ledger-unreadable' || entry.code === 'context-dedup-ledger-unwritable') {
+        return { code: entry.code, message: 'Context dedup ledger was unavailable; full content was served.' };
+      }
+      return {
+        code: entry.code,
+        message: entry.message
+          .replace(/[A-Za-z]:[\\/][^\s]*/g, '<project-path>')
+          .replace(/\\\\[^\s]+/g, '<project-path>')
+      };
+    });
+}
+
+function assertAllowedKeys(args, allowed) {
+  const unknown = Object.keys(args ?? {}).filter((key) => !allowed.includes(key));
+  if (unknown.length > 0) {
+    throw new Error(`Unknown argument${unknown.length === 1 ? '' : 's'}: ${unknown.join(', ')}`);
+  }
+}
+
+async function readCappedText(absolutePath, limitBytes, openFile) {
+  const handle = await openFile(absolutePath, 'r');
+  try {
+    const buffer = Buffer.alloc(limitBytes + 1);
+    let totalBytes = 0;
+    while (totalBytes < buffer.length) {
+      const { bytesRead } = await handle.read(
+        buffer,
+        totalBytes,
+        buffer.length - totalBytes,
+        totalBytes
+      );
+      if (bytesRead === 0) break;
+      totalBytes += bytesRead;
+    }
+    if (totalBytes > limitBytes) {
+      throw new Error('read_file_deduplicated is limited to 1 MiB; use a bounded or native file reader for larger files.');
+    }
+    return buffer.subarray(0, totalBytes).toString('utf8');
+  } finally {
+    await handle.close();
+  }
 }
 
 function jsonText(value) {
@@ -309,41 +375,72 @@ Review the proposal, then apply it through the normal repository workflow with t
 }
 
 async function readFileDeduplicated(args, options = {}) {
+  assertAllowedKeys(args, ['path', 'force']);
   const filePath = assertString(args.path, 'path');
   const dedup = options.contextDedup ?? { recordRead, summarizeSession, purgeSession };
+  const rootDir = options.cwd ?? process.cwd();
+  const policy = await readContextDedupPolicy({ rootDir });
+  const target = await resolveCanonicalTarget(rootDir, filePath);
+  const content = await readCappedText(target.absolutePath, MCP_READ_LIMIT_BYTES, options.openFile ?? open);
   const result = await dedup.recordRead({
     filePath,
-    sessionId: typeof args.sessionId === 'string' ? args.sessionId : undefined,
+    content,
+    policy,
+    sessionId: options.mcpSessionId ?? DEFAULT_MCP_SESSION_ID,
     force: args.force === true,
-    rootDir: options.cwd ?? process.cwd()
+    rootDir,
+    sqzRunner: options.sqzRunner,
+    sqzTimeoutMs: options.sqzTimeoutMs,
+    sqzMaxOutputBytes: options.sqzMaxOutputBytes,
+    env: options.env
   });
 
+  const diagnostics = sanitizeDiagnostics([...(policy.diagnostics ?? []), ...(result.warnings ?? [])]);
   if (result.decision === 'deduplicated') {
-    return textResult(result.replay.text);
+    return textResultWithDiagnostics(result.replay?.text ?? result.content ?? '', diagnostics);
   }
 
-  return textResult(result.content ?? '');
+  return textResultWithDiagnostics(result.content ?? '', diagnostics);
 }
 
 async function contextDedupStatus(args, options = {}) {
+  assertAllowedKeys(args, []);
   const dedup = options.contextDedup ?? { recordRead, summarizeSession, purgeSession };
+  const rootDir = options.cwd ?? process.cwd();
+  const policy = await readContextDedupPolicy({ rootDir });
   const summary = await dedup.summarizeSession({
-    sessionId: typeof args.sessionId === 'string' ? args.sessionId : undefined,
-    rootDir: options.cwd ?? process.cwd()
+    sessionId: options.mcpSessionId ?? DEFAULT_MCP_SESSION_ID,
+    policy,
+    rootDir
   });
 
-  return textResult(jsonText(summary));
+  const { sessionId, ledgerPath, warnings, ...publicSummary } = summary;
+  return textResultWithDiagnostics(
+    jsonText(publicSummary),
+    sanitizeDiagnostics([...(policy.diagnostics ?? []), ...(warnings ?? [])])
+  );
 }
 
 async function contextDedupPurge(args, options = {}) {
+  assertAllowedKeys(args, ['confirm']);
+  if (args.confirm !== true) {
+    return textResult(jsonText({
+      dryRun: true,
+      scope: 'current-mcp-session',
+      requiresConfirmation: true
+    }));
+  }
+
   const dedup = options.contextDedup ?? { recordRead, summarizeSession, purgeSession };
-  const result = await dedup.purgeSession({
-    sessionId: typeof args.sessionId === 'string' ? args.sessionId : undefined,
-    all: args.all === true,
-    rootDir: options.cwd ?? process.cwd()
+  const rootDir = options.cwd ?? process.cwd();
+  const policy = await readContextDedupPolicy({ rootDir });
+  await dedup.purgeSession({
+    sessionId: options.mcpSessionId ?? DEFAULT_MCP_SESSION_ID,
+    policy,
+    rootDir
   });
 
-  return textResult(jsonText(result));
+  return textResult(jsonText({ dryRun: false, scope: 'current-mcp-session', removed: true }));
 }
 
 const TOOL_HANDLERS = {
@@ -416,6 +513,7 @@ export async function handleMcpMessage(message, options = {}) {
 
 export async function startMcpServer({ input = process.stdin, output = process.stdout } = {}) {
   const rl = readline.createInterface({ input, crlfDelay: Infinity });
+  const mcpSessionId = `mcp-${randomUUID()}`;
   for await (const line of rl) {
     if (!line.trim()) continue;
     let message;
@@ -426,7 +524,7 @@ export async function startMcpServer({ input = process.stdin, output = process.s
       continue;
     }
 
-    const response = await handleMcpMessage(message);
+    const response = await handleMcpMessage(message, { mcpSessionId });
     if (response) {
       output.write(`${JSON.stringify(response)}\n`);
     }

@@ -11,6 +11,8 @@ user_prompt: |
   Include the phrase "no dedup baseline" in the final summary.
 runner:
   runtime: codex
+  model: gpt-5.6-luna
+  reasoning: low
   permission_mode: bypassPermissions
 fixtures:
   files_committed:

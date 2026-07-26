@@ -81,17 +81,222 @@ describe('AIFHub MCP extension contract', () => {
         { cwd: rootDir }
       );
 
-      const first = await call('read_file_deduplicated', { path: 'notes.md', sessionId: 'mcp' });
+      const options = { cwd: rootDir, mcpSessionId: 'mcp-test-session' };
+      const scopedCall = async (name, args) => handleMcpMessage(
+        { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name, arguments: args } },
+        options
+      );
+
+      const first = await scopedCall('read_file_deduplicated', { path: 'notes.md' });
       assert.equal(first.result.content[0].text, content);
 
-      const second = await call('read_file_deduplicated', { path: 'notes.md', sessionId: 'mcp' });
+      const second = await scopedCall('read_file_deduplicated', { path: 'notes.md' });
       assert.match(second.result.content[0].text, /already provided in this session/);
+      assert.doesNotMatch(second.result.content[0].text, /ai-factory .*--file/);
 
-      const status = await call('context_dedup_status', { sessionId: 'mcp' });
-      assert.equal(JSON.parse(status.result.content[0].text).dedupHits, 1);
+      const status = await scopedCall('context_dedup_status', {});
+      const statusPayload = JSON.parse(status.result.content[0].text);
+      assert.equal(statusPayload.dedupHits, 1);
+      assert.equal(
+        statusPayload.observedBytes,
+        statusPayload.servedBytes + statusPayload.savedBytes,
+        'MCP status must expose net model-visible byte accounting'
+      );
+      assert.equal(statusPayload.ledgerPath, undefined);
+      assert.equal(statusPayload.sessionId, undefined);
+      assert.doesNotMatch(status.result.content[0].text, new RegExp(rootDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 
-      const purge = await call('context_dedup_purge', { sessionId: 'mcp' });
-      assert.equal(JSON.parse(purge.result.content[0].text).sessionId, 'mcp');
+      const preview = await scopedCall('context_dedup_purge', {});
+      assert.equal(JSON.parse(preview.result.content[0].text).dryRun, true);
+      assert.equal((await scopedCall('context_dedup_status', {})).result.content[0].text, status.result.content[0].text);
+
+      const purge = await scopedCall('context_dedup_purge', { confirm: true });
+      assert.equal(JSON.parse(purge.result.content[0].text).scope, 'current-mcp-session');
+      assert.equal(JSON.parse((await scopedCall('context_dedup_status', {})).result.content[0].text).reads, 0);
+
+      const otherSession = await handleMcpMessage(
+        { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'read_file_deduplicated', arguments: { path: 'notes.md' } } },
+        { cwd: rootDir, mcpSessionId: 'mcp-other-session' }
+      );
+      assert.equal(otherSession.result.content[0].text, content);
+
+      const crafted = await scopedCall('context_dedup_purge', { all: true });
+      assert.equal(crafted.result.isError, true);
+    } finally {
+      await rm(rootDir, { recursive: true, force: true });
+    }
+  });
+
+  it('dispatches SQZ mode through a bounded injected runner and keeps protected reads full', async () => {
+    const { handleMcpMessage } = await import('../scripts/aifhub-mcp-server.mjs');
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), 'aifhub-mcp-sqz-'));
+
+    try {
+      await mkdir(path.join(rootDir, '.ai-factory'), { recursive: true });
+      await mkdir(path.join(rootDir, 'openspec', 'specs', 'auth'), { recursive: true });
+      await writeFile(
+        path.join(rootDir, '.ai-factory', 'config.yaml'),
+        'aifhub:\n  contextDedup:\n    mode: sqz\n    minBytes: 16\n',
+        'utf8'
+      );
+      const content = `${'compressible context\n'.repeat(50)}`;
+      await writeFile(path.join(rootDir, 'notes.md'), content, 'utf8');
+      await writeFile(path.join(rootDir, 'openspec', 'specs', 'auth', 'spec.md'), content, 'utf8');
+
+      let calls = 0;
+      const options = {
+        cwd: rootDir,
+        mcpSessionId: 'mcp-sqz-session',
+        sqzRunner: async () => {
+          calls += 1;
+          return { ok: true, stdout: 'compact\n' };
+        }
+      };
+      const call = async (pathValue) => handleMcpMessage(
+        {
+          jsonrpc: '2.0',
+          id: 6,
+          method: 'tools/call',
+          params: { name: 'read_file_deduplicated', arguments: { path: pathValue } }
+        },
+        options
+      );
+
+      const first = await call('notes.md');
+      const second = await call('notes.md');
+      const protectedRead = await call('openspec/specs/auth/spec.md');
+      const status = await handleMcpMessage(
+        {
+          jsonrpc: '2.0',
+          id: 7,
+          method: 'tools/call',
+          params: { name: 'context_dedup_status', arguments: {} }
+        },
+        options
+      );
+      const statusPayload = JSON.parse(status.result.content[0].text);
+
+      assert.equal(first.result.content[0].text, 'compact\n');
+      assert.match(second.result.content[0].text, /already provided in this session/);
+      assert.equal(protectedRead.result.content[0].text, content);
+      assert.equal(calls, 1);
+      assert.equal(statusPayload.mode, 'sqz');
+      assert.equal(statusPayload.dedupHits, 1);
+      assert.equal(statusPayload.observedBytes, statusPayload.servedBytes + statusPayload.savedBytes);
+      assert.match(first.result.content[1].text, /context-dedup-sqz-external-tool/);
+    } finally {
+      await rm(rootDir, { recursive: true, force: true });
+    }
+  });
+
+  it('serves full MCP content when SQZ fails without exposing raw stderr', async () => {
+    const { handleMcpMessage } = await import('../scripts/aifhub-mcp-server.mjs');
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), 'aifhub-mcp-sqz-fail-'));
+
+    try {
+      await mkdir(path.join(rootDir, '.ai-factory'), { recursive: true });
+      await writeFile(
+        path.join(rootDir, '.ai-factory', 'config.yaml'),
+        'aifhub:\n  contextDedup:\n    mode: sqz\n    minBytes: 1\n',
+        'utf8'
+      );
+      const content = 'full content must survive provider failure\n';
+      await writeFile(path.join(rootDir, 'notes.md'), content, 'utf8');
+
+      const response = await handleMcpMessage(
+        {
+          jsonrpc: '2.0',
+          id: 8,
+          method: 'tools/call',
+          params: { name: 'read_file_deduplicated', arguments: { path: 'notes.md' } }
+        },
+        {
+          cwd: rootDir,
+          mcpSessionId: 'mcp-sqz-failure',
+          sqzRunner: async () => ({
+            ok: false,
+            code: 'spawn-error',
+            stderr: 'OPENAI_API_KEY=must-not-leak C:\\private\\sqz.exe'
+          })
+        }
+      );
+
+      assert.equal(response.result.content[0].text, content);
+      assert.match(response.result.content[1].text, /context-dedup-sqz-unavailable/);
+      assert.doesNotMatch(JSON.stringify(response), /must-not-leak|C:\\\\private/);
+    } finally {
+      await rm(rootDir, { recursive: true, force: true });
+    }
+  });
+
+  it('publishes bounded session-owned schemas and surfaces config diagnostics', async () => {
+    const { handleMcpMessage } = await import('../scripts/aifhub-mcp-server.mjs');
+    const listed = await handleMcpMessage({ jsonrpc: '2.0', id: 4, method: 'tools/list' });
+    const tools = Object.fromEntries(listed.result.tools.map((tool) => [tool.name, tool]));
+
+    assert.deepEqual(Object.keys(tools.read_file_deduplicated.inputSchema.properties).sort(), ['force', 'path']);
+    assert.deepEqual(tools.context_dedup_status.inputSchema.properties, {});
+    assert.deepEqual(Object.keys(tools.context_dedup_purge.inputSchema.properties), ['confirm']);
+    assert.equal(tools.context_dedup_purge.annotations, undefined);
+
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), 'aifhub-mcp-diagnostics-'));
+    try {
+      await mkdir(path.join(rootDir, '.ai-factory'), { recursive: true });
+      await writeFile(
+        path.join(rootDir, '.ai-factory', 'config.yaml'),
+        'aifhub:\n  contextDedup:\n    enabled: sometimes\n',
+        'utf8'
+      );
+      await writeFile(path.join(rootDir, 'small.md'), 'safe text\n', 'utf8');
+      await writeFile(path.join(rootDir, 'large.md'), 'x'.repeat((1024 * 1024) + 1), 'utf8');
+
+      const call = async (pathValue) => handleMcpMessage(
+        { jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'read_file_deduplicated', arguments: { path: pathValue } } },
+        { cwd: rootDir, mcpSessionId: 'mcp-bounds' }
+      );
+      const diagnostic = await call('small.md');
+      assert.equal(diagnostic.result.content[0].text, 'safe text\n');
+      assert.match(diagnostic.result.content[1].text, /context-dedup-malformed-value/);
+
+      const bounded = await call('large.md');
+      assert.equal(bounded.result.isError, true);
+      assert.match(bounded.result.content[0].text, /1 MiB/);
+      assert.doesNotMatch(bounded.result.content[0].text, /xxxxx/);
+    } finally {
+      await rm(rootDir, { recursive: true, force: true });
+    }
+  });
+
+  it('continues bounded reads after short filesystem chunks until EOF', async () => {
+    const { handleMcpMessage } = await import('../scripts/aifhub-mcp-server.mjs');
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), 'aifhub-mcp-short-read-'));
+    const expected = 'short chunks still produce the complete file\n';
+    const source = Buffer.from(expected);
+    let sourceOffset = 0;
+
+    try {
+      await writeFile(path.join(rootDir, 'notes.md'), expected, 'utf8');
+      const openFile = async () => ({
+        read: async (buffer, bufferOffset, length) => {
+          if (sourceOffset >= source.length) return { bytesRead: 0, buffer };
+          const chunk = source.subarray(sourceOffset, sourceOffset + Math.min(2, length));
+          chunk.copy(buffer, bufferOffset);
+          sourceOffset += chunk.length;
+          return { bytesRead: chunk.length, buffer };
+        },
+        close: async () => {}
+      });
+
+      const response = await handleMcpMessage(
+        {
+          jsonrpc: '2.0',
+          id: 6,
+          method: 'tools/call',
+          params: { name: 'read_file_deduplicated', arguments: { path: 'notes.md' } }
+        },
+        { cwd: rootDir, mcpSessionId: 'mcp-short-read', openFile }
+      );
+      assert.equal(response.result.content[0].text, expected);
     } finally {
       await rm(rootDir, { recursive: true, force: true });
     }

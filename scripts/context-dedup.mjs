@@ -1,17 +1,18 @@
 #!/usr/bin/env node
 // context-dedup.mjs - optional session-scoped read deduplication service
-import { createHash } from 'node:crypto';
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { createHash, randomUUID } from 'node:crypto';
+import { mkdir, open, readFile, realpath, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
-import { readCurrentChangePointer } from './active-change-resolver.mjs';
-
-export const CONTEXT_DEDUP_SCHEMA_VERSION = 1;
+export const CONTEXT_DEDUP_SCHEMA_VERSION = 3;
 
 export const PROTECTED_READ_PATTERNS = [
   'openspec/specs/**',
+  'openspec/changes/**',
+  '.ai-factory/plans/**',
   '.ai-factory/rules/generated/**',
   '.ai-factory/qa/**',
   '**/aif-gate-result*',
@@ -22,32 +23,47 @@ export const PROTECTED_READ_PATTERNS = [
 const DEFAULT_CONFIG_PATH = path.join('.ai-factory', 'config.yaml');
 const DEDUP_STATE_DIR = path.join('.ai-factory', 'state', 'context-dedup');
 const LEDGER_FILE = 'ledger.json';
-const DEFAULT_SESSION_ID = 'default';
 const BYTES_PER_TOKEN_ESTIMATE = 4;
+const PROCESS_SESSION_ID = `process-${process.pid}-${randomUUID()}`;
+const LOCK_RETRY_MS = 20;
+const LOCK_ATTEMPTS = 100;
+const LOCK_STALE_MS = 30_000;
+const SQZ_TIMEOUT_MS = 15_000;
+const SQZ_MAX_OUTPUT_BYTES = 1024 * 1024;
+const SQZ_REFERENCE_PATTERN = /^§ref:[0-9a-f]{8,64}§\s*$/iu;
+const SQZ_DELTA_PATTERN = /^§delta:[0-9a-f]{8,64}§(?:\r?\n|$)/iu;
 const UNSAFE_YAML_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 export function defaultContextDedupPolicy() {
   return {
+    mode: 'off',
     enabled: false,
     minBytes: 2048,
     maxEntries: 500,
+    sqz: {
+      command: 'sqz'
+    },
     protectedPatterns: [...PROTECTED_READ_PATTERNS],
+    stateDir: toPosix(DEDUP_STATE_DIR),
     diagnostics: []
   };
 }
 
 export function resolveContextDedupPolicy(configOrRaw, options = {}) {
   const defaults = defaultContextDedupPolicy();
-  const raw = extractContextDedupConfig(configOrRaw);
+  const parsedConfig = extractParsedConfig(configOrRaw);
+  const raw = extractContextDedupConfig(parsedConfig);
   const diagnostics = [];
 
-  const enabled = normalizeBoolean('enabled', raw.enabled, defaults.enabled, diagnostics);
+  const legacyEnabled = normalizeOptionalBoolean('enabled', raw.enabled, diagnostics);
+  const mode = normalizeMode(raw.mode, legacyEnabled, diagnostics);
   const minBytes = normalizeInteger('minBytes', raw.minBytes, defaults.minBytes, diagnostics);
   const maxEntries = normalizeInteger('maxEntries', raw.maxEntries, defaults.maxEntries, diagnostics);
   const extraPatterns = normalizeStringList('protectedPatterns', raw.protectedPatterns, diagnostics);
+  const sqz = normalizeSqzConfig(raw.sqz, defaults.sqz, diagnostics);
 
   for (const key of Object.keys(raw)) {
-    if (!['enabled', 'minBytes', 'maxEntries', 'protectedPatterns'].includes(key)) {
+    if (!['mode', 'enabled', 'minBytes', 'maxEntries', 'protectedPatterns', 'sqz'].includes(key)) {
       diagnostics.push({
         code: 'context-dedup-unknown-key',
         severity: 'warning',
@@ -56,11 +72,26 @@ export function resolveContextDedupPolicy(configOrRaw, options = {}) {
     }
   }
 
+  if (mode === 'sqz') {
+    diagnostics.push({
+      code: 'context-dedup-sqz-external-tool',
+      severity: 'warning',
+      message: 'SQZ mode requires a separately installed user-owned sqz executable; AIFHub does not download it, run sqz init, install hooks, or mutate agent config.'
+    });
+  }
+
   return {
-    enabled,
+    mode,
+    enabled: mode !== 'off',
     minBytes,
     maxEntries,
-    protectedPatterns: [...defaults.protectedPatterns, ...extraPatterns],
+    sqz,
+    protectedPatterns: unique([
+      ...defaults.protectedPatterns,
+      ...deriveProtectedPatterns(parsedConfig, diagnostics),
+      ...extraPatterns
+    ]),
+    stateDir: deriveStateDir(parsedConfig, diagnostics),
     diagnostics,
     configPath: options.configPath ?? null
   };
@@ -72,7 +103,10 @@ export async function readContextDedupPolicy(options = {}) {
 
   try {
     const raw = await readFile(configPath, 'utf8');
-    return resolveContextDedupPolicy(raw, { configPath });
+    return canonicalizePolicyProtectedPatterns(
+      resolveContextDedupPolicy(raw, { configPath }),
+      rootDir
+    );
   } catch (err) {
     const policy = defaultContextDedupPolicy();
     if (err?.code === 'ENOENT') {
@@ -101,52 +135,58 @@ export function hashContent(content) {
 
 export function isProtectedReadPath(filePath, policy) {
   const patterns = policy?.protectedPatterns ?? PROTECTED_READ_PATTERNS;
-  const normalized = toPosix(filePath);
-  return patterns.some((pattern) => matchesGlob(normalized, toPosix(pattern)));
+  const normalized = toPosix(filePath).toLowerCase();
+  return patterns.some((pattern) => matchesGlob(normalized, toPosix(pattern).toLowerCase()));
 }
 
 export async function resolveSessionId(options = {}) {
-  const explicit = firstNonEmpty(options.sessionId, options.env?.AIFHUB_SESSION_ID, process.env.AIFHUB_SESSION_ID);
+  const env = options.env ?? process.env;
+  const explicit = firstNonEmpty(
+    options.sessionId,
+    env.AIFHUB_SESSION_ID,
+    env.CODEX_THREAD_ID,
+    env.CLAUDE_SESSION_ID
+  );
   if (explicit) {
-    return sanitizeSessionId(explicit);
+    return normalizeSessionId(explicit);
   }
 
-  const pointer = await readCurrentChangePointer({ rootDir: resolveRootDir(options) });
-  if (pointer) {
-    return sanitizeSessionId(pointer);
-  }
-
-  return DEFAULT_SESSION_ID;
+  return PROCESS_SESSION_ID;
 }
 
 export function resolveLedgerPath(sessionId, options = {}) {
-  return path.join(resolveRootDir(options), DEDUP_STATE_DIR, sanitizeSessionId(sessionId), LEDGER_FILE);
+  const stateDir = resolveDedupStateDir(options);
+  return path.join(resolveRootDir(options), stateDir, sessionStorageKey(sessionId), LEDGER_FILE);
 }
 
 export function createLedger(sessionId) {
   const now = new Date().toISOString();
   return {
     schemaVersion: CONTEXT_DEDUP_SCHEMA_VERSION,
-    sessionId: sanitizeSessionId(sessionId),
+    sessionId: normalizeSessionId(sessionId),
     createdAt: now,
     updatedAt: now,
-    entries: {},
-    totals: { reads: 0, dedupHits: 0, savedBytes: 0, estimatedSavedTokens: 0 }
+    entries: Object.create(null),
+    totals: {
+      reads: 0,
+      dedupHits: 0,
+      observedBytes: 0,
+      servedBytes: 0,
+      savedBytes: 0,
+      estimatedSavedTokens: 0
+    }
   };
 }
 
 export async function loadLedger(options = {}) {
   const sessionId = await resolveSessionId(options);
-  const ledgerPath = resolveLedgerPath(sessionId, options);
+  await assertSafeStateDir(resolveRootDir(options), resolveDedupStateDir(options));
+  const ledgerPath = resolveLedgerPath(sessionId, { ...options, policy: options.policy });
 
   try {
     const parsed = JSON.parse(await readFile(ledgerPath, 'utf8'));
-    if (!isPlainObject(parsed) || !isPlainObject(parsed.entries)) {
-      throw new Error('Ledger payload is not a context dedup ledger object.');
-    }
-
     return {
-      ledger: { ...createLedger(sessionId), ...parsed, sessionId },
+      ledger: normalizeLedger(parsed, sessionId),
       ledgerPath,
       warnings: []
     };
@@ -171,14 +211,19 @@ export async function loadLedger(options = {}) {
 }
 
 export async function saveLedger(ledger, options = {}) {
-  const sessionId = sanitizeSessionId(ledger?.sessionId ?? (await resolveSessionId(options)));
+  const sessionId = normalizeSessionId(ledger?.sessionId ?? (await resolveSessionId(options)));
+  await assertSafeStateDir(resolveRootDir(options), resolveDedupStateDir(options));
   const ledgerPath = options.ledgerPath ?? resolveLedgerPath(sessionId, options);
   const payload = { ...ledger, sessionId, updatedAt: new Date().toISOString() };
-  const tmpPath = `${ledgerPath}.${process.pid}.tmp`;
+  const tmpPath = `${ledgerPath}.${process.pid}.${randomUUID()}.tmp`;
 
   await mkdir(path.dirname(ledgerPath), { recursive: true });
-  await writeFile(tmpPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
-  await rename(tmpPath, ledgerPath);
+  try {
+    await writeFile(tmpPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+    await rename(tmpPath, ledgerPath);
+  } finally {
+    await rm(tmpPath, { force: true }).catch(() => {});
+  }
 
   return { ledgerPath, ledger: payload };
 }
@@ -186,22 +231,12 @@ export async function saveLedger(ledger, options = {}) {
 export async function recordRead(options = {}) {
   const rootDir = resolveRootDir(options);
   const policy = options.policy ?? (await readContextDedupPolicy({ rootDir, configPath: options.configPath }));
-  const relativePath = toPosix(path.isAbsolute(options.filePath ?? '')
-    ? path.relative(rootDir, options.filePath)
-    : options.filePath ?? '');
-
-  if (!relativePath) {
-    throw new Error('filePath must be a non-empty path');
-  }
-
-  const absolutePath = path.resolve(rootDir, relativePath);
-  if (absolutePath !== path.resolve(rootDir) && !absolutePath.startsWith(`${path.resolve(rootDir)}${path.sep}`)) {
-    throw new Error(`filePath must stay inside the project root: ${relativePath}`);
-  }
-
-  const content = options.content ?? await readFile(absolutePath, 'utf8');
+  const target = await resolveCanonicalTarget(rootDir, options.filePath);
+  const relativePath = target.relativePath;
+  const content = options.content ?? await readFile(target.absolutePath, 'utf8');
   const bytes = Buffer.byteLength(content, 'utf8');
   const digest = hashContent(content);
+  debugFix(options, 'read-observed', { path: relativePath, bytes });
 
   if (!policy.enabled) {
     return decision('disabled', 'Context dedup is disabled in aifhub.contextDedup.', { relativePath, digest, bytes, content });
@@ -215,106 +250,530 @@ export async function recordRead(options = {}) {
     return decision('below-threshold', `Content is smaller than minBytes (${policy.minBytes}).`, { relativePath, digest, bytes, content });
   }
 
-  const { ledger, ledgerPath, warnings } = await loadLedger({ ...options, rootDir });
-  const existing = ledger.entries[relativePath] ?? null;
-  const now = new Date().toISOString();
-  const force = options.force === true;
-  const deduplicated = Boolean(existing) && existing.digest === digest && !force;
-
-  ledger.totals.reads += 1;
-  if (deduplicated) {
-    ledger.totals.dedupHits += 1;
-    ledger.totals.savedBytes += bytes;
-    ledger.totals.estimatedSavedTokens = estimateTokens(ledger.totals.savedBytes);
+  if (policy.maxEntries === 0) {
+    return decision('full', 'maxEntries is zero; no content is retained for deduplication.', {
+      relativePath,
+      digest,
+      bytes,
+      content
+    });
   }
 
-  ledger.entries[relativePath] = {
+  const sessionId = await resolveSessionId(options);
+  const stateDir = resolveDedupStateDir({ ...options, policy });
+  await assertSafeStateDir(rootDir, stateDir);
+  const ledgerPath = resolveLedgerPath(sessionId, { ...options, rootDir, policy });
+  const locks = [];
+  try {
+    locks.push(await acquireLedgerLock(resolveGlobalLockPath(rootDir, stateDir), rootDir));
+    locks.push(await acquireLedgerLock(resolveSessionLockPath(ledgerPath), rootDir));
+  } catch (error) {
+    await releaseLedgerLocks(locks);
+    return {
+      ...decision('full', 'Ledger lock could not be acquired; serving full content.', {
+        relativePath,
+        digest,
+        bytes,
+        content
+      }),
+      warnings: [{ code: 'context-dedup-ledger-unwritable', severity: 'warning', message: error.message }]
+    };
+  }
+
+  try {
+    const { ledger, warnings } = await loadLedger({ ...options, rootDir, policy, sessionId });
+    const existing = ledger.entries[relativePath] ?? null;
+    const now = new Date().toISOString();
+    const force = options.force === true;
+
+    if (policy.mode === 'sqz') {
+      return await recordSqzRead({
+        ...options,
+        rootDir,
+        policy,
+        sessionId,
+        ledgerPath,
+        ledger,
+        warnings,
+        existing,
+        now,
+        force,
+        relativePath,
+        content,
+        bytes,
+        digest
+      });
+    }
+
+    const sameDigest = Boolean(existing) && existing.digest === digest && !force;
+    const entry = {
+      digest,
+      bytes,
+      firstSeenAt: existing?.firstSeenAt ?? now,
+      lastSeenAt: now,
+      readCount: (existing?.readCount ?? 0) + 1,
+      revisions: existing ? existing.revisions + (existing.digest === digest ? 0 : 1) : 1
+    };
+    const replay = sameDigest ? formatReplay(relativePath, digest) : null;
+    const replayBytes = replay ? Buffer.byteLength(replay.text, 'utf8') : 0;
+    const deduplicated = sameDigest && replayBytes < bytes;
+    const netSavedBytes = deduplicated ? bytes - replayBytes : 0;
+
+    ledger.totals.reads += 1;
+    ledger.totals.observedBytes += bytes;
+    if (deduplicated) {
+      ledger.totals.dedupHits += 1;
+      ledger.totals.servedBytes += replayBytes;
+      ledger.totals.savedBytes += netSavedBytes;
+      ledger.totals.estimatedSavedTokens = estimateTokens(ledger.totals.savedBytes);
+    } else {
+      ledger.totals.servedBytes += bytes;
+    }
+
+    ledger.entries[relativePath] = entry;
+    evictOldestEntries(ledger, policy.maxEntries, relativePath);
+
+    try {
+      const persistLedger = options.saveLedgerFn ?? options.persistLedger ?? saveLedger;
+      await persistLedger(ledger, { ...options, rootDir, policy, ledgerPath });
+    } catch (error) {
+      debugFix(options, 'ledger-persist-failed', { path: relativePath, message: error.message });
+      return {
+        ...decision('full', 'Ledger could not be persisted; serving full content.', {
+          relativePath,
+          digest,
+          bytes,
+          content
+        }),
+        firstSeenAt: existing?.firstSeenAt ?? now,
+        readCount: (existing?.readCount ?? 0) + 1,
+        previousDigest: existing?.digest ?? null,
+        warnings: [
+          ...warnings,
+          { code: 'context-dedup-ledger-unwritable', severity: 'warning', message: error.message }
+        ]
+      };
+    }
+
+    if (deduplicated) {
+      debugFix(options, 'read-deduplicated', {
+        path: relativePath,
+        inputBytes: bytes,
+        outputBytes: replayBytes,
+        savedBytes: netSavedBytes
+      });
+      return {
+        ...decision('deduplicated', 'Identical content was already provided in this session.', {
+          relativePath,
+          digest,
+          bytes,
+          content: null
+        }),
+        firstSeenAt: entry.firstSeenAt,
+        readCount: entry.readCount,
+        replayBytes,
+        savedBytes: netSavedBytes,
+        estimatedSavedTokens: estimateTokens(netSavedBytes),
+        replay,
+        warnings
+      };
+    }
+
+    if (sameDigest) {
+      debugFix(options, 'replay-not-beneficial', {
+        path: relativePath,
+        inputBytes: bytes,
+        outputBytes: bytes,
+        candidateReplayBytes: replayBytes,
+        savedBytes: 0
+      });
+      return {
+        ...decision('full', 'Dedup replay would not reduce the model-visible payload; serving full content.', {
+          relativePath,
+          digest,
+          bytes,
+          content
+        }),
+        firstSeenAt: entry.firstSeenAt,
+        readCount: entry.readCount,
+        previousDigest: existing?.digest ?? null,
+        warnings
+      };
+    }
+
+    return {
+      ...decision(existing ? 'changed' : 'full', existing
+        ? 'Content changed since the previous read in this session.'
+        : 'First read of this path in this session.', {
+        relativePath,
+        digest,
+        bytes,
+        content
+      }),
+      firstSeenAt: entry.firstSeenAt,
+      readCount: entry.readCount,
+      previousDigest: existing?.digest ?? null,
+      warnings
+    };
+  } finally {
+    await releaseLedgerLocks(locks);
+  }
+}
+
+export async function summarizeSession(options = {}) {
+  const rootDir = resolveRootDir(options);
+  const policy = options.policy ?? (await readContextDedupPolicy({ rootDir, configPath: options.configPath }));
+  const { ledger, ledgerPath, warnings } = await loadLedger({ ...options, rootDir, policy });
+  const totals = ledger.totals;
+
+  return {
+    mode: policy.mode,
+    sessionId: ledger.sessionId,
+    ledgerPath: toPosix(path.relative(resolveRootDir(options), ledgerPath)),
+    reads: totals.reads,
+    dedupHits: totals.dedupHits,
+    trackedPaths: Object.keys(ledger.entries).length,
+    observedBytes: totals.observedBytes,
+    servedBytes: totals.servedBytes,
+    savedBytes: totals.savedBytes,
+    estimatedSavedTokens: estimateTokens(totals.savedBytes),
+    estimateBasis: `${BYTES_PER_TOKEN_ESTIMATE} bytes per token`,
+    savedPercent: totals.observedBytes > 0
+      ? Number(((totals.savedBytes / totals.observedBytes) * 100).toFixed(2))
+      : 0,
+    warnings
+  };
+}
+
+async function recordSqzRead(context) {
+  const {
+    rootDir,
+    policy,
+    sessionId,
+    ledgerPath,
+    ledger,
+    warnings,
+    existing,
+    now,
+    force,
+    relativePath,
+    content,
+    bytes,
+    digest
+  } = context;
+
+  let outcome = {
+    ok: true,
+    kind: 'full',
+    content,
+    bytes,
+    warning: null
+  };
+  const sameDigest = Boolean(existing) && existing.digest === digest && !force;
+  const replay = sameDigest ? formatReplay(relativePath, digest) : null;
+  const replayBytes = replay ? Buffer.byteLength(replay.text, 'utf8') : 0;
+  const useSessionReplay = sameDigest && replayBytes < bytes;
+
+  if (useSessionReplay) {
+    outcome = {
+      ok: true,
+      kind: 'reference',
+      content: replay.text,
+      bytes: replayBytes,
+      warning: null
+    };
+  } else if (!force) {
+    const sqzHome = assertInsideDedupDir(
+      path.join(path.dirname(ledgerPath), 'sqz'),
+      rootDir,
+      resolveDedupStateDir({ ...context, policy })
+    );
+    await mkdir(sqzHome, { recursive: true });
+    debugFix(context, 'sqz-start', { path: relativePath, inputBytes: bytes, mode: 'sqz' });
+
+    const runner = context.sqzRunner ?? runSqzCompression;
+    const result = await runner({
+      command: policy.sqz.command,
+      content,
+      cwd: rootDir,
+      homeDir: sqzHome,
+      env: context.env,
+      timeoutMs: context.sqzTimeoutMs ?? SQZ_TIMEOUT_MS,
+      maxOutputBytes: context.sqzMaxOutputBytes ?? SQZ_MAX_OUTPUT_BYTES
+    });
+
+    outcome = classifySqzResult(result, content);
+    debugFix(context, outcome.ok ? 'sqz-outcome' : 'sqz-failed', {
+      path: relativePath,
+      outcome: outcome.kind,
+      inputBytes: bytes,
+      outputBytes: outcome.bytes,
+      code: outcome.warning?.code ?? null
+    });
+  }
+
+  const servedContent = outcome.ok && outcome.bytes < bytes ? outcome.content : content;
+  const servedBytes = Buffer.byteLength(servedContent, 'utf8');
+  const savedBytes = Math.max(0, bytes - servedBytes);
+  const decisionKind = savedBytes === 0
+    ? 'full'
+    : outcome.kind === 'reference'
+      ? 'deduplicated'
+      : outcome.kind;
+  const entry = {
     digest,
     bytes,
     firstSeenAt: existing?.firstSeenAt ?? now,
     lastSeenAt: now,
     readCount: (existing?.readCount ?? 0) + 1,
-    revisions: existing ? existing.revisions + (existing.digest === digest ? 0 : 1) : 1
+    revisions: existing ? existing.revisions + (existing.digest === digest ? 0 : 1) : 1,
+    provider: 'sqz',
+    providerOutcome: decisionKind
   };
 
+  ledger.totals.reads += 1;
+  ledger.totals.observedBytes += bytes;
+  ledger.totals.servedBytes += servedBytes;
+  ledger.totals.savedBytes += savedBytes;
+  if (decisionKind === 'deduplicated') {
+    ledger.totals.dedupHits += 1;
+  }
+  ledger.totals.estimatedSavedTokens = estimateTokens(ledger.totals.savedBytes);
+  ledger.entries[relativePath] = entry;
   evictOldestEntries(ledger, policy.maxEntries, relativePath);
 
-  let persisted = true;
   try {
-    await saveLedger(ledger, { ...options, rootDir, ledgerPath });
+    const persistLedger = context.saveLedgerFn ?? context.persistLedger ?? saveLedger;
+    await persistLedger(ledger, { ...context, rootDir, policy, sessionId, ledgerPath });
   } catch (error) {
-    persisted = false;
-    warnings.push({ code: 'context-dedup-ledger-unwritable', message: error.message });
-  }
-
-  const entry = ledger.entries[relativePath];
-
-  if (deduplicated && persisted) {
+    debugFix(context, 'ledger-persist-failed', { path: relativePath, message: error.message });
+    const sqzHome = assertInsideDedupDir(
+      path.join(path.dirname(ledgerPath), 'sqz'),
+      rootDir,
+      resolveDedupStateDir({ ...context, policy })
+    );
+    await rm(sqzHome, { recursive: true, force: true }).catch(() => {});
     return {
-      ...decision('deduplicated', 'Identical content was already provided in this session.', {
+      ...decision('full', 'Ledger could not be persisted after SQZ execution; serving full content.', {
         relativePath,
         digest,
         bytes,
-        content: null
+        content
       }),
+      provider: 'sqz',
       firstSeenAt: entry.firstSeenAt,
       readCount: entry.readCount,
-      savedBytes: bytes,
-      estimatedSavedTokens: estimateTokens(bytes),
-      replay: { text: formatReplay(relativePath, entry, digest), digest },
-      warnings
+      previousDigest: existing?.digest ?? null,
+      warnings: [
+        ...warnings,
+        { code: 'context-dedup-ledger-unwritable', severity: 'warning', message: error.message }
+      ]
     };
   }
 
-  const reason = !persisted
-    ? 'Ledger could not be persisted; serving full content.'
-    : existing
-      ? 'Content changed since the previous read in this session.'
-      : 'First read of this path in this session.';
-
+  const providerWarnings = outcome.warning ? [...warnings, outcome.warning] : warnings;
   return {
-    ...decision(existing && persisted ? 'changed' : 'full', reason, { relativePath, digest, bytes, content }),
+    ...decision(
+      decisionKind,
+      sqzDecisionReason(decisionKind, force, outcome),
+      {
+        relativePath,
+        digest,
+        bytes,
+        content: decisionKind === 'deduplicated' ? null : servedContent
+      }
+    ),
+    provider: 'sqz',
+    providerOutcome: outcome.kind,
     firstSeenAt: entry.firstSeenAt,
     readCount: entry.readCount,
     previousDigest: existing?.digest ?? null,
-    warnings
+    outputBytes: servedBytes,
+    savedBytes,
+    estimatedSavedTokens: estimateTokens(savedBytes),
+    replay: decisionKind === 'deduplicated' ? replay : null,
+    replayBytes: decisionKind === 'deduplicated' ? replayBytes : 0,
+    warnings: providerWarnings
   };
 }
 
-export async function summarizeSession(options = {}) {
-  const { ledger, ledgerPath, warnings } = await loadLedger(options);
-  const totals = ledger.totals ?? { reads: 0, dedupHits: 0, savedBytes: 0, estimatedSavedTokens: 0 };
-  const trackedBytes = Object.values(ledger.entries).reduce((sum, entry) => sum + (entry.bytes ?? 0), 0);
-  const servedBytes = trackedBytes + totals.savedBytes;
+function sqzDecisionReason(kind, force, outcome) {
+  if (force) return 'Forced full read bypassed SQZ.';
+  if (!outcome.ok) return 'SQZ was unavailable or failed; serving full content.';
+  if (kind === 'full') return 'SQZ output did not reduce the model-visible payload; serving full content.';
+  if (kind === 'deduplicated') return 'AIFHub recognized identical content already served through SQZ in this session.';
+  return 'SQZ returned a shorter compressed payload.';
+}
+
+function classifySqzResult(result, originalContent) {
+  const originalBytes = Buffer.byteLength(originalContent, 'utf8');
+  if (!result?.ok) {
+    return {
+      ok: false,
+      kind: 'full',
+      content: originalContent,
+      bytes: originalBytes,
+      warning: {
+        code: result?.code === 'timeout'
+          ? 'context-dedup-sqz-timeout'
+          : result?.code === 'output-limit'
+            ? 'context-dedup-sqz-output-limit'
+            : 'context-dedup-sqz-unavailable',
+        severity: 'warning',
+        message: 'SQZ could not produce a bounded response; full content was served.'
+      }
+    };
+  }
+
+  const output = typeof result.stdout === 'string' ? result.stdout : '';
+  const outputBytes = Buffer.byteLength(output, 'utf8');
+  if (outputBytes === 0) {
+    return {
+      ok: false,
+      kind: 'full',
+      content: originalContent,
+      bytes: originalBytes,
+      warning: {
+        code: 'context-dedup-sqz-invalid-output',
+        severity: 'warning',
+        message: 'SQZ returned an empty response; full content was served.'
+      }
+    };
+  }
+
+  if (SQZ_REFERENCE_PATTERN.test(output) || SQZ_DELTA_PATTERN.test(output)) {
+    return {
+      ok: false,
+      kind: 'full',
+      content: originalContent,
+      bytes: originalBytes,
+      warning: {
+        code: 'context-dedup-sqz-stateful-output',
+        severity: 'warning',
+        message: 'SQZ returned state-dependent output despite cache bypass; full content was served.'
+      }
+    };
+  }
 
   return {
-    sessionId: ledger.sessionId,
-    ledgerPath,
-    reads: totals.reads,
-    dedupHits: totals.dedupHits,
-    trackedPaths: Object.keys(ledger.entries).length,
-    savedBytes: totals.savedBytes,
-    estimatedSavedTokens: estimateTokens(totals.savedBytes),
-    estimateBasis: `${BYTES_PER_TOKEN_ESTIMATE} bytes per token`,
-    savedPercent: servedBytes > 0 ? Number(((totals.savedBytes / servedBytes) * 100).toFixed(2)) : 0,
-    warnings
+    ok: true,
+    kind: outputBytes < originalBytes ? 'compressed' : 'full',
+    content: output,
+    bytes: outputBytes,
+    warning: null
   };
+}
+
+export async function runSqzCompression(options = {}) {
+  const command = typeof options.command === 'string' && options.command.trim()
+    ? options.command.trim()
+    : 'sqz';
+  const content = String(options.content ?? '');
+  const maxOutputBytes = options.maxOutputBytes ?? SQZ_MAX_OUTPUT_BYTES;
+  const timeoutMs = options.timeoutMs ?? SQZ_TIMEOUT_MS;
+  const env = buildSqzEnv(options.env ?? process.env, options.homeDir);
+
+  return new Promise((resolve) => {
+    let child;
+    try {
+      child = spawn(command, ['compress', '--no-cache'], {
+        cwd: options.cwd ?? process.cwd(),
+        env,
+        shell: false,
+        windowsHide: true,
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+    } catch {
+      resolve({ ok: false, code: 'spawn-error', stdout: '' });
+      return;
+    }
+
+    let stdout = '';
+    let stdoutBytes = 0;
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(result);
+    };
+    const timer = setTimeout(() => {
+      child.kill('SIGTERM');
+      finish({ ok: false, code: 'timeout', stdout: '' });
+    }, timeoutMs);
+
+    child.stdout.on('data', (chunk) => {
+      stdoutBytes += chunk.length;
+      if (stdoutBytes > maxOutputBytes) {
+        child.kill('SIGTERM');
+        finish({ ok: false, code: 'output-limit', stdout: '' });
+        return;
+      }
+      stdout += chunk.toString('utf8');
+    });
+    child.stderr.on('data', () => {});
+    child.on('error', () => finish({ ok: false, code: 'spawn-error', stdout: '' }));
+    child.on('close', (code) => finish({
+      ok: code === 0,
+      code: code === 0 ? 'ok' : 'exit-error',
+      stdout: code === 0 ? stdout : ''
+    }));
+    child.stdin.on('error', () => {});
+    child.stdin.end(content);
+  });
+}
+
+function buildSqzEnv(baseEnv, homeDir) {
+  const env = {};
+  for (const [key, value] of Object.entries(baseEnv ?? {})) {
+    if (/(?:TOKEN|SECRET|PASSWORD|PASSWD|API[_-]?KEY|AUTHORIZATION|COOKIE|CREDENTIAL)/iu.test(key)) {
+      continue;
+    }
+    env[key] = value;
+  }
+
+  if (homeDir) {
+    env.HOME = homeDir;
+    env.USERPROFILE = homeDir;
+    env.XDG_CACHE_HOME = path.join(homeDir, 'cache');
+    env.XDG_CONFIG_HOME = path.join(homeDir, 'config');
+    env.XDG_DATA_HOME = path.join(homeDir, 'data');
+    env.SQZ_HOME = homeDir;
+  }
+  return env;
 }
 
 export async function purgeSession(options = {}) {
   const rootDir = resolveRootDir(options);
+  const policy = options.policy ?? (await readContextDedupPolicy({ rootDir, configPath: options.configPath }));
+  const stateDir = resolveDedupStateDir({ ...options, policy });
+  await assertSafeStateDir(rootDir, stateDir);
 
   if (options.all === true) {
-    const dedupDir = path.join(rootDir, DEDUP_STATE_DIR);
-    await rm(dedupDir, { recursive: true, force: true });
-    return { all: true, removed: [toPosix(path.relative(rootDir, dedupDir))] };
+    const dedupDir = path.join(rootDir, stateDir);
+    const globalLock = await acquireLedgerLock(resolveGlobalLockPath(rootDir, stateDir), rootDir);
+    try {
+      await rm(dedupDir, { recursive: true, force: true });
+      return { all: true, removed: [toPosix(path.relative(rootDir, dedupDir))] };
+    } finally {
+      await releaseLedgerLock(globalLock);
+    }
   }
 
   const sessionId = await resolveSessionId(options);
-  const sessionDir = assertInsideDedupDir(path.dirname(resolveLedgerPath(sessionId, { rootDir })), rootDir);
-  await rm(sessionDir, { recursive: true, force: true });
-
-  return { all: false, sessionId, removed: [toPosix(path.relative(rootDir, sessionDir))] };
+  const ledgerPath = resolveLedgerPath(sessionId, { ...options, rootDir, policy });
+  const sessionDir = assertInsideDedupDir(
+    path.dirname(ledgerPath),
+    rootDir,
+    stateDir
+  );
+  const sessionLock = await acquireLedgerLock(resolveSessionLockPath(ledgerPath), rootDir);
+  try {
+    await rm(sessionDir, { recursive: true, force: true });
+    return { all: false, sessionId, removed: [toPosix(path.relative(rootDir, sessionDir))] };
+  } finally {
+    await releaseLedgerLock(sessionLock);
+  }
 }
 
 function decision(kind, reason, { relativePath, digest, bytes, content }) {
@@ -332,13 +791,13 @@ function decision(kind, reason, { relativePath, digest, bytes, content }) {
   };
 }
 
-function formatReplay(relativePath, entry, digest) {
-  return [
-    `[aifhub-context-dedup] ${relativePath} was already provided in this session.`,
-    `digest ${digest} (unchanged), ${entry.bytes} bytes, first read ${entry.firstSeenAt}, read #${entry.readCount}.`,
-    'Reuse the earlier content from this session. Force a full re-read with:',
-    `  ai-factory aifhub-context-dedup check --file ${relativePath} --force`
-  ].join('\n');
+function formatReplay(relativePath, digest) {
+  const shortDigest = digest.startsWith('sha256:') ? digest.slice(0, 23) : digest.slice(0, 16);
+  return {
+    text: `[aifhub-context-dedup] ${relativePath} was already provided in this session (${shortDigest}, unchanged); reuse earlier session content. Use force=true for a full read.`,
+    digest,
+    forceRead: { path: relativePath, force: true }
+  };
 }
 
 function evictOldestEntries(ledger, maxEntries, keepPath = null) {
@@ -360,28 +819,290 @@ function estimateTokens(bytes) {
   return Math.ceil((bytes ?? 0) / BYTES_PER_TOKEN_ESTIMATE);
 }
 
-function extractContextDedupConfig(configOrRaw) {
+function extractParsedConfig(configOrRaw) {
   if (typeof configOrRaw === 'string') {
-    return parseSimpleYaml(configOrRaw).aifhub?.contextDedup ?? {};
+    return parseSimpleYaml(configOrRaw);
   }
+  if (isPlainObject(configOrRaw?.raw)) {
+    return configOrRaw.raw;
+  }
+  if (typeof configOrRaw?.raw === 'string') {
+    return parseSimpleYaml(configOrRaw.raw);
+  }
+  return isPlainObject(configOrRaw) ? configOrRaw : {};
+}
 
+function extractContextDedupConfig(configOrRaw) {
   if (!isPlainObject(configOrRaw)) {
     return {};
   }
 
-  if (typeof configOrRaw.raw === 'string') {
-    return parseSimpleYaml(configOrRaw.raw).aifhub?.contextDedup ?? {};
-  }
-
-  if (isPlainObject(configOrRaw.aifhub?.contextDedup)) {
-    return configOrRaw.aifhub.contextDedup;
+  if (isPlainObject(configOrRaw.aifhub)) {
+    return isPlainObject(configOrRaw.aifhub.contextDedup) ? configOrRaw.aifhub.contextDedup : {};
   }
 
   if (isPlainObject(configOrRaw.contextDedup)) {
     return configOrRaw.contextDedup;
   }
 
-  return configOrRaw;
+  const policyKeys = new Set(['mode', 'enabled', 'minBytes', 'maxEntries', 'protectedPatterns', 'sqz']);
+  return Object.keys(configOrRaw).every((key) => policyKeys.has(key)) ? configOrRaw : {};
+}
+
+function deriveProtectedPatterns(config, diagnostics) {
+  const aifhub = isPlainObject(config?.aifhub) ? config.aifhub : {};
+  const paths = isPlainObject(config?.paths)
+    ? config.paths
+    : isPlainObject(aifhub.paths)
+      ? aifhub.paths
+      : {};
+  const openspec = isPlainObject(aifhub.openspec) ? aifhub.openspec : {};
+  const openspecRoot = normalizeProjectRelativeDir(openspec.root, 'openspec', diagnostics, 'aifhub.openspec.root');
+  const defaults = {
+    plans: aifhub.artifactProtocol === 'openspec' ? `${openspecRoot}/changes` : '.ai-factory/plans',
+    specs: `${openspecRoot}/specs`,
+    qa: '.ai-factory/qa',
+    generated_rules: '.ai-factory/rules/generated',
+    state: '.ai-factory/state'
+  };
+  const plans = normalizeProjectRelativeDir(paths.plans, defaults.plans, diagnostics, 'paths.plans');
+  const specs = normalizeProjectRelativeDir(paths.specs, defaults.specs, diagnostics, 'paths.specs');
+  const qa = normalizeProjectRelativeDir(paths.qa, defaults.qa, diagnostics, 'paths.qa');
+  const generated = normalizeProjectRelativeDir(
+    paths.generated_rules,
+    defaults.generated_rules,
+    diagnostics,
+    'paths.generated_rules'
+  );
+  const state = normalizeProjectRelativeDir(paths.state, defaults.state, diagnostics, 'paths.state');
+  return [
+    `${plans}/**`,
+    `${specs}/**`,
+    `${qa}/**`,
+    `${generated}/**`,
+    `${state}/**`
+  ];
+}
+
+function deriveStateDir(config, diagnostics) {
+  const paths = isPlainObject(config?.paths)
+    ? config.paths
+    : isPlainObject(config?.aifhub?.paths)
+      ? config.aifhub.paths
+      : {};
+  const state = normalizeProjectRelativeDir(paths.state, '.ai-factory/state', diagnostics, 'paths.state');
+  return `${state}/context-dedup`;
+}
+
+function normalizeProjectRelativeDir(value, fallback, diagnostics, key) {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return toPosix(fallback);
+  }
+  const normalized = toPosix(String(value).trim()).replace(/^\.\/+/, '').replace(/\/+$/g, '');
+  if (!normalized || path.isAbsolute(normalized) || /^[A-Za-z]:\//.test(normalized) || isEscapingRelativePath(normalized)) {
+    diagnostics.push({
+      code: 'context-dedup-unsafe-config-path',
+      severity: 'warning',
+      message: `${key} must be a safe project-relative directory; default was used.`
+    });
+    return toPosix(fallback);
+  }
+  return normalized;
+}
+
+async function canonicalizePolicyProtectedPatterns(policy, rootDir) {
+  const canonicalRoot = await realpath(rootDir).catch(() => path.resolve(rootDir));
+  const canonicalPatterns = [];
+
+  for (const pattern of policy.protectedPatterns) {
+    const normalized = toPosix(pattern);
+    const wildcardIndex = normalized.search(/[*?]/);
+    const prefix = (wildcardIndex === -1 ? normalized : normalized.slice(0, wildcardIndex))
+      .replace(/\/+$/g, '');
+    if (!prefix) continue;
+
+    const canonicalPrefix = await realpath(path.resolve(rootDir, prefix)).catch(() => null);
+    if (!canonicalPrefix) continue;
+    try {
+      assertPathInside(canonicalPrefix, canonicalRoot, prefix);
+    } catch {
+      continue;
+    }
+
+    const suffix = wildcardIndex === -1 ? '' : normalized.slice(wildcardIndex);
+    const canonicalRelative = toPosix(path.relative(canonicalRoot, canonicalPrefix));
+    canonicalPatterns.push(`${canonicalRelative}/${suffix}`.replace(/\/+/g, '/'));
+  }
+
+  return { ...policy, protectedPatterns: unique([...policy.protectedPatterns, ...canonicalPatterns]) };
+}
+
+async function assertSafeStateDir(rootDir, stateDir) {
+  const lexicalRoot = path.resolve(rootDir);
+  const lexicalState = path.resolve(lexicalRoot, stateDir);
+  assertPathInside(lexicalState, lexicalRoot, stateDir);
+  const canonicalRoot = await realpath(lexicalRoot).catch(() => lexicalRoot);
+
+  let existing = lexicalState;
+  while (true) {
+    try {
+      const canonicalExisting = await realpath(existing);
+      assertPathInside(canonicalExisting, canonicalRoot, stateDir);
+      return;
+    } catch (error) {
+      if (error?.message?.startsWith('filePath must stay inside')) throw error;
+      if (error?.code !== 'ENOENT') throw error;
+      const parent = path.dirname(existing);
+      if (parent === existing) throw error;
+      existing = parent;
+    }
+  }
+}
+
+export async function resolveCanonicalTarget(rootDir, filePath) {
+  const rawPath = String(filePath ?? '').trim();
+  if (!rawPath) {
+    throw new Error('filePath must be a non-empty path');
+  }
+
+  const lexicalRoot = path.resolve(rootDir);
+  const canonicalRoot = await realpath(lexicalRoot).catch(() => lexicalRoot);
+  const lexicalTarget = path.isAbsolute(rawPath) ? path.resolve(rawPath) : path.resolve(lexicalRoot, rawPath);
+  assertPathInside(lexicalTarget, lexicalRoot, rawPath);
+  const canonicalTarget = await canonicalizeExistingAncestor(lexicalTarget);
+  assertPathInside(canonicalTarget, canonicalRoot, rawPath);
+
+  return {
+    absolutePath: canonicalTarget,
+    relativePath: toPosix(path.relative(canonicalRoot, canonicalTarget))
+  };
+}
+
+async function canonicalizeExistingAncestor(target) {
+  let candidate = target;
+  const missingParts = [];
+
+  while (true) {
+    try {
+      const canonicalAncestor = await realpath(candidate);
+      return path.resolve(canonicalAncestor, ...missingParts);
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+      const parent = path.dirname(candidate);
+      if (parent === candidate) throw error;
+      missingParts.unshift(path.basename(candidate));
+      candidate = parent;
+    }
+  }
+}
+
+function assertPathInside(target, root, displayPath) {
+  const relative = path.relative(root, target);
+  if (relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative))) {
+    return;
+  }
+  throw new Error(`filePath must stay inside the project root: ${displayPath}`);
+}
+
+function normalizeLedger(parsed, sessionId) {
+  if (!isPlainObject(parsed)
+    || parsed.schemaVersion !== CONTEXT_DEDUP_SCHEMA_VERSION
+    || parsed.sessionId !== normalizeSessionId(sessionId)
+    || !isPlainObject(parsed.entries)
+    || !isPlainObject(parsed.totals)) {
+    throw new Error('Ledger payload is not a compatible context dedup ledger object.');
+  }
+
+  const ledger = createLedger(sessionId);
+  ledger.createdAt = typeof parsed.createdAt === 'string' ? parsed.createdAt : ledger.createdAt;
+  ledger.updatedAt = typeof parsed.updatedAt === 'string' ? parsed.updatedAt : ledger.updatedAt;
+
+  for (const [entryPath, entry] of Object.entries(parsed.entries)) {
+    if (!isPlainObject(entry)
+      || typeof entry.digest !== 'string'
+      || !isNonNegativeSafeInteger(entry.bytes)
+      || !isNonNegativeSafeInteger(entry.readCount)
+      || !isNonNegativeSafeInteger(entry.revisions)) {
+      throw new Error(`Ledger entry is malformed: ${entryPath}`);
+    }
+    ledger.entries[entryPath] = { ...entry };
+  }
+
+  for (const key of ['reads', 'dedupHits', 'observedBytes', 'servedBytes', 'savedBytes', 'estimatedSavedTokens']) {
+    if (!isNonNegativeSafeInteger(parsed.totals[key])) {
+      throw new Error(`Ledger total is malformed: ${key}`);
+    }
+    ledger.totals[key] = parsed.totals[key];
+  }
+  return ledger;
+}
+
+function isNonNegativeSafeInteger(value) {
+  return Number.isSafeInteger(value) && value >= 0;
+}
+
+function resolveGlobalLockPath(rootDir, stateDir) {
+  return path.join(rootDir, path.dirname(stateDir), '.context-dedup-locks', 'all.lock');
+}
+
+function resolveSessionLockPath(ledgerPath) {
+  const sessionDir = path.dirname(ledgerPath);
+  const dedupDir = path.dirname(sessionDir);
+  return path.join(path.dirname(dedupDir), '.context-dedup-locks', `${path.basename(sessionDir)}.lock`);
+}
+
+async function acquireLedgerLock(lockPath, rootDir) {
+  const lockDir = path.dirname(lockPath);
+  const safeLockDir = path.relative(path.resolve(rootDir), path.resolve(lockDir));
+  await assertSafeStateDir(rootDir, safeLockDir);
+  await mkdir(lockDir, { recursive: true });
+  await assertSafeStateDir(rootDir, safeLockDir);
+
+  for (let attempt = 0; attempt < LOCK_ATTEMPTS; attempt += 1) {
+    await assertSafeStateDir(rootDir, safeLockDir);
+    try {
+      const handle = await open(lockPath, 'wx');
+      await handle.writeFile(`${process.pid}:${randomUUID()}\n`, 'utf8');
+      return { handle, lockPath, rootDir, safeLockDir };
+    } catch (error) {
+      if (error?.code !== 'EEXIST') throw error;
+      const lockStat = await stat(lockPath).catch(() => null);
+      if (lockStat && Date.now() - lockStat.mtimeMs > LOCK_STALE_MS) {
+        await assertSafeStateDir(rootDir, safeLockDir);
+        await unlink(lockPath).catch(() => {});
+        continue;
+      }
+      await delay(LOCK_RETRY_MS);
+    }
+  }
+  throw new Error('Timed out waiting for the context dedup ledger lock.');
+}
+
+async function releaseLedgerLock(lock) {
+  if (!lock) return;
+  await lock.handle.close().catch(() => {});
+  try {
+    await assertSafeStateDir(lock.rootDir, lock.safeLockDir);
+  } catch {
+    return;
+  }
+  await unlink(lock.lockPath).catch(() => {});
+}
+
+async function releaseLedgerLocks(locks) {
+  for (const lock of [...locks].reverse()) {
+    await releaseLedgerLock(lock);
+  }
+}
+
+function delay(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function debugFix(options, event, fields) {
+  if (options.logFix !== true && process.env.AIFHUB_CONTEXT_DEDUP_DEBUG !== '1') return;
+  const logger = options.logger ?? console.error;
+  logger(`[FIX:133] ${event} ${JSON.stringify(fields)}`);
 }
 
 function normalizeBoolean(key, value, fallback, diagnostics) {
@@ -394,10 +1115,69 @@ function normalizeBoolean(key, value, fallback, diagnostics) {
   return fallback;
 }
 
+function normalizeOptionalBoolean(key, value, diagnostics) {
+  if (value === undefined || value === null) return null;
+  return normalizeBoolean(key, value, null, diagnostics);
+}
+
+function normalizeMode(value, legacyEnabled, diagnostics) {
+  const legacyMode = legacyEnabled === true ? 'aifhub' : 'off';
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return legacyMode;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  if (!['off', 'aifhub', 'sqz'].includes(normalized)) {
+    diagnostics.push(malformed('mode', value, 'one of off | aifhub | sqz'));
+    return legacyMode;
+  }
+
+  if (legacyEnabled !== null && (legacyEnabled === true) !== (normalized !== 'off')) {
+    diagnostics.push({
+      code: 'context-dedup-mode-conflict',
+      severity: 'warning',
+      message: `aifhub.contextDedup.mode=${normalized} overrides conflicting legacy enabled=${legacyEnabled}.`
+    });
+  }
+
+  return normalized;
+}
+
+function normalizeSqzConfig(value, fallback, diagnostics) {
+  if (value === undefined || value === null) return { ...fallback };
+  if (!isPlainObject(value)) {
+    diagnostics.push(malformed('sqz', value, 'mapping'));
+    return { ...fallback };
+  }
+
+  const command = typeof value.command === 'string' && value.command.trim()
+    ? value.command.trim()
+    : fallback.command;
+  if (value.command !== undefined && command === fallback.command && value.command !== fallback.command) {
+    diagnostics.push(malformed('sqz.command', value.command, 'non-empty string'));
+  }
+
+  for (const key of Object.keys(value)) {
+    if (key !== 'command') {
+      diagnostics.push({
+        code: 'context-dedup-unknown-key',
+        severity: 'warning',
+        message: `Unknown aifhub.contextDedup.sqz key: ${key}`
+      });
+    }
+  }
+
+  return { command };
+}
+
 function normalizeInteger(key, value, fallback, diagnostics) {
   if (value === undefined || value === null) return fallback;
-  const parsed = typeof value === 'number' ? value : Number.parseInt(String(value), 10);
-  if (Number.isInteger(parsed) && parsed >= 0) return parsed;
+  const parsed = typeof value === 'number'
+    ? value
+    : /^\d+$/.test(String(value).trim())
+      ? Number(String(value).trim())
+      : Number.NaN;
+  if (Number.isSafeInteger(parsed) && parsed >= 0) return parsed;
 
   diagnostics.push(malformed(key, value, 'non-negative integer'));
   return fallback;
@@ -456,19 +1236,29 @@ function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function sanitizeSessionId(value) {
-  const normalized = String(value ?? '').trim().replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
-  if (!normalized || /^\.+$/.test(normalized)) {
-    return DEFAULT_SESSION_ID;
+function normalizeSessionId(value) {
+  const normalized = String(value ?? '').trim();
+  return normalized || PROCESS_SESSION_ID;
+}
+
+function sessionStorageKey(value) {
+  return `session-${createHash('sha256').update(normalizeSessionId(value)).digest('hex')}`;
+}
+
+function resolveDedupStateDir(options = {}) {
+  const candidate = options.stateDir ?? options.policy?.stateDir ?? DEDUP_STATE_DIR;
+  const normalized = toPosix(candidate).replace(/\/+$/g, '');
+  if (!normalized || path.isAbsolute(normalized) || isEscapingRelativePath(normalized)) {
+    return toPosix(DEDUP_STATE_DIR);
   }
   return normalized;
 }
 
-function assertInsideDedupDir(targetDir, rootDir) {
-  const dedupDir = path.resolve(rootDir, DEDUP_STATE_DIR);
+function assertInsideDedupDir(targetDir, rootDir, stateDir = DEDUP_STATE_DIR) {
+  const dedupDir = path.resolve(rootDir, stateDir);
   const resolved = path.resolve(targetDir);
   if (resolved !== dedupDir && !resolved.startsWith(`${dedupDir}${path.sep}`)) {
-    throw new Error(`Refusing to operate outside ${DEDUP_STATE_DIR}: ${resolved}`);
+    throw new Error(`Refusing to operate outside ${stateDir}: ${resolved}`);
   }
   return resolved;
 }
@@ -491,10 +1281,27 @@ function toPosix(value) {
 
 function parseSimpleYaml(raw) {
   const root = {};
-  const stack = [{ indent: -1, value: root }];
+  const stack = [{ indent: -1, value: root, parent: null, key: null }];
 
   for (const rawLine of String(raw ?? '').split(/\r?\n/)) {
     if (!rawLine.trim() || rawLine.trimStart().startsWith('#')) {
+      continue;
+    }
+
+    const listMatch = rawLine.match(/^(\s*)-\s+(.+?)\s*$/);
+    if (listMatch) {
+      const indent = listMatch[1].length;
+      while (stack.length > 1 && indent <= stack.at(-1).indent) {
+        stack.pop();
+      }
+      const holder = stack.at(-1);
+      if (!Array.isArray(holder.value) && holder.parent && holder.key) {
+        holder.value = [];
+        holder.parent[holder.key] = holder.value;
+      }
+      if (Array.isArray(holder.value)) {
+        holder.value.push(parseScalar(listMatch[2]));
+      }
       continue;
     }
 
@@ -519,7 +1326,7 @@ function parseSimpleYaml(raw) {
 
     if (rawValue.length === 0) {
       parent[key] = {};
-      stack.push({ indent, value: parent[key] });
+      stack.push({ indent, value: parent[key], parent, key });
     } else {
       parent[key] = parseScalar(rawValue);
     }
@@ -529,11 +1336,34 @@ function parseSimpleYaml(raw) {
 }
 
 function parseScalar(rawValue) {
-  const value = rawValue.trim().replace(/^['"]|['"]$/g, '');
+  const value = stripYamlInlineComment(rawValue).trim().replace(/^['"]|['"]$/g, '');
   if (value === 'true') return true;
   if (value === 'false') return false;
   if (/^-?\d+$/.test(value)) return Number.parseInt(value, 10);
   return value;
+}
+
+function stripYamlInlineComment(value) {
+  let quote = null;
+  for (let index = 0; index < String(value).length; index += 1) {
+    const character = value[index];
+    if ((character === '"' || character === "'") && value[index - 1] !== '\\') {
+      quote = quote === character ? null : quote ?? character;
+    }
+    if (character === '#' && quote === null && (index === 0 || /\s/.test(value[index - 1]))) {
+      return value.slice(0, index);
+    }
+  }
+  return String(value);
+}
+
+function isEscapingRelativePath(value) {
+  const normalized = toPosix(value);
+  return normalized.split('/').some((part) => part === '..');
+}
+
+function unique(values) {
+  return [...new Set(values.filter(Boolean).map((value) => toPosix(value)))];
 }
 
 function parseArgs(argv) {
@@ -564,7 +1394,7 @@ function usage() {
     '  purge                 Remove ledger state for the session, or --all sessions.',
     '',
     'Options:',
-    '  --session <id>        Session id. Defaults to AIFHUB_SESSION_ID, then the current change pointer.',
+    '  --session <id>        Session id. Defaults to a host session id, then a process-local nonce.',
     '  --root <dir>          Project root. Defaults to the current directory.',
     '  --force               Treat the read as a full read even when the digest is unchanged.',
     '  --all                 Purge every session ledger.',
@@ -603,7 +1433,7 @@ export async function main(argv = process.argv.slice(2), io = {}) {
       if (options.json) {
         stdout.write(`${JSON.stringify({ ...result, content: undefined }, null, 2)}\n`);
       } else {
-        stdout.write(`${result.decision === 'deduplicated' ? result.replay.text : result.content}\n`);
+        stdout.write(`${result.decision === 'deduplicated' ? result.replay?.text ?? result.content : result.content}\n`);
       }
       return 0;
     }
