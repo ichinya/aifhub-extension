@@ -25,6 +25,15 @@ language:
 aifhub:
   # ai-factory | openspec
   artifactProtocol: ai-factory
+  # Optional session read optimization. Preserve existing values and never
+  # enable automatically; mode is off | aifhub | sqz.
+  contextDedup:
+    mode: off
+    minBytes: 2048
+    maxEntries: 500
+    protectedPatterns: []
+    sqz:
+      command: sqz
 # OpenSpec-native mode writes its own aifhub settings profile only when
 # aifhub.artifactProtocol is openspec.
 

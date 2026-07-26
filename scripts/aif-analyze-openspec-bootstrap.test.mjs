@@ -77,6 +77,34 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
     assertIncludes(template, 'enabled: false', 'skills/aif-analyze/references/config-template.yaml');
   });
 
+  it('owns a disabled-by-default context dedup profile without auto-enabling it', async () => {
+    const skill = await readRepoFile('skills/aif-analyze/SKILL.md');
+    const template = await readRepoFile('skills/aif-analyze/references/config-template.yaml');
+
+    for (const expected of [
+      'contextDedup:',
+      'mode: off',
+      'minBytes: 2048',
+      'maxEntries: 500',
+      'protectedPatterns: []',
+      'command: sqz'
+    ]) {
+      assertIncludes(skill, expected, 'skills/aif-analyze/SKILL.md context dedup ownership');
+      assertIncludes(template, expected, 'skills/aif-analyze/references/config-template.yaml context dedup profile');
+    }
+
+    for (const expected of [
+      'Preserve existing `aifhub.contextDedup` values',
+      'add only missing keys',
+      'never enable context dedup automatically',
+      'off | aifhub | sqz',
+      'require explicit confirmation before any install action',
+      'MUST NOT download `sqz`'
+    ]) {
+      assertIncludes(skill, expected, 'skills/aif-analyze/SKILL.md context dedup preservation');
+    }
+  });
+
   it('keeps the legacy default template exclusive to the selected protocol', async () => {
     const template = await readRepoFile('skills/aif-analyze/references/config-template.yaml');
 

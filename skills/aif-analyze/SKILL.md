@@ -1,7 +1,7 @@
 ---
 name: aif-analyze
 description: Bootstrap project context. Resolves localization and stack, creates/updates config.yaml and rules/base.md, then checks DESCRIPTION and guides core skill execution.
-version: 0.8.0
+version: 0.9.0
 author: ichi
 ---
 
@@ -239,6 +239,21 @@ Resolve the bootstrap/config mode before creating directories:
 - Preserve existing `language.ui`, `language.artifacts`, and `language.technical_terms` values. If `language.technical_terms` is missing, default it to `keep`; accepted values are `keep | translate | mixed`.
 - If localization answers were collected while config was missing, write those pending config values into the selected legacy `ai-factory` or `openspec-native` config shape.
 - Keep schema consistent with nested sections: `language`, `aifhub`, `paths`, `utilities`, `rules`, `workflow`.
+- Preserve existing `aifhub.contextDedup` values, add only missing keys, and never enable context dedup automatically. The optional profile is protocol-neutral and disabled by default. `enabled: false|true` remains a legacy read-compatible alias for `mode: off|aifhub`, but new config MUST use the type-stable mode enum:
+
+```yaml
+aifhub:
+  contextDedup:
+    mode: off # off | aifhub | sqz
+    minBytes: 2048
+    maxEntries: 500
+    protectedPatterns: []
+    sqz:
+      command: sqz
+```
+
+- `protectedPatterns` contains only additional project patterns. Built-in protection for canonical plans, specs, QA, generated rules, coverage, gate, and done-readiness artifacts remains non-removable.
+- If the user explicitly selects `sqz`, disclose before activation that it is a new third-party user-owned executable, name the tested `ojuschugh1/sqz` v1.3.0 source and Elastic License 2.0, explain the cross-session cache/reference risk and that the CLI may keep user-owned statistics under `~/.sqz`, and require explicit confirmation before any install action. This skill MUST NOT download `sqz`, run `sqz init`, install hooks, register MCP, mutate agent config, start a daemon, or claim ownership of SQZ user state. Write `mode: sqz` only after the user accepts the external-tool requirement; manual config edits are handled later by bounded runtime readiness diagnostics.
 - Ensure the shared optional utility config is present in both legacy `ai-factory` and `openspec-native` modes, preserving existing user values. `utilities.context_tools.enabled` is the stable user-accepted tool id list. `utilities.graphify.enabled` and `utilities.codegraph.enabled` are backward-compatible preference shims. New optional memory/context recommendations come from local `recommendation-metadata.yaml`, not from a generic provider config abstraction:
 
 ```yaml
@@ -268,6 +283,13 @@ utilities:
 ```yaml
 aifhub:
   artifactProtocol: ai-factory
+  contextDedup:
+    mode: off
+    minBytes: 2048
+    maxEntries: 500
+    protectedPatterns: []
+    sqz:
+      command: sqz
 ```
 
   - Preserve the existing AI Factory-only path defaults.
@@ -281,6 +303,13 @@ aifhub:
 ```yaml
 aifhub:
   artifactProtocol: openspec
+  contextDedup:
+    mode: off
+    minBytes: 2048
+    maxEntries: 500
+    protectedPatterns: []
+    sqz:
+      command: sqz
   openspec:
     root: openspec
     installSkills: false
