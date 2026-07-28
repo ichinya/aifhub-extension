@@ -264,7 +264,7 @@ describe('AIFHub MCP extension contract', () => {
       const statusPayload = JSON.parse(status.result.content[0].text);
 
       assert.equal(first.result.content[0].text, 'compact\n');
-      assert.match(second.result.content[0].text, /already provided in this session/);
+      assert.match(second.result.content[0].text, /self-contained compressed payload/);
       assert.equal(protectedRead.result.content[0].text, content);
       assert.equal(calls, 1);
       assert.equal(statusPayload.mode, 'sqz');

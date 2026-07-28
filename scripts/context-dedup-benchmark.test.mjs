@@ -221,14 +221,25 @@ describe('context dedup benchmark', () => {
     const adapter = path.join(fixture, 'adapter.mjs');
     await writeFile(
       worker,
-      `import { writeFile } from 'node:fs/promises';\nsetTimeout(() => writeFile(${JSON.stringify(marker)}, 'survived'), 500);\n`,
+      [
+        "import { writeFile } from 'node:fs/promises';",
+        'const parentPid = Number(process.argv[2]);',
+        'setInterval(async () => {',
+        '  try {',
+        '    process.kill(parentPid, 0);',
+        '  } catch {',
+        `    await writeFile(${JSON.stringify(marker)}, 'survived');`,
+        '    process.exit(0);',
+        '  }',
+        '}, 25);'
+      ].join('\n'),
       'utf8'
     );
     await writeFile(
       adapter,
       [
         "import { spawn } from 'node:child_process';",
-        `spawn(process.execPath, [${JSON.stringify(worker)}], { stdio: 'ignore', windowsHide: true });`,
+        `spawn(process.execPath, [${JSON.stringify(worker)}, String(process.pid)], { stdio: 'ignore', windowsHide: true });`,
         'setInterval(() => {}, 1000);'
       ].join('\n'),
       'utf8'

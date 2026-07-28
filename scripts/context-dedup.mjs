@@ -2,9 +2,10 @@
 // context-dedup.mjs - optional session-scoped read deduplication service
 import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, open, readFile, realpath, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, open, readFile, readdir, realpath, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { StringDecoder } from 'node:string_decoder';
 import { pathToFileURL } from 'node:url';
 
 export const CONTEXT_DEDUP_SCHEMA_VERSION = 3;
@@ -30,6 +31,7 @@ const LOCK_ATTEMPTS = 500;
 const LOCK_STALE_MS = 30_000;
 const SQZ_TIMEOUT_MS = 15_000;
 const SQZ_MAX_OUTPUT_BYTES = 1024 * 1024;
+const PURGE_LOCK_ATTEMPTS = Math.ceil((SQZ_TIMEOUT_MS + 5_000) / LOCK_RETRY_MS);
 const SQZ_REFERENCE_PATTERN = /^§ref:[0-9a-f]{8,64}§\s*$/iu;
 const SQZ_DELTA_PATTERN = /^§delta:[0-9a-f]{8,64}§(?:\r?\n|$)/iu;
 const UNSAFE_YAML_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -263,12 +265,10 @@ export async function recordRead(options = {}) {
   const stateDir = resolveDedupStateDir({ ...options, policy });
   await assertSafeStateDir(rootDir, stateDir);
   const ledgerPath = resolveLedgerPath(sessionId, { ...options, rootDir, policy });
-  const locks = [];
+  let sessionLock;
   try {
-    locks.push(await acquireLedgerLock(resolveGlobalLockPath(rootDir, stateDir), rootDir));
-    locks.push(await acquireLedgerLock(resolveSessionLockPath(ledgerPath), rootDir));
+    sessionLock = await acquireSessionTransactionLock(rootDir, stateDir, ledgerPath);
   } catch (error) {
-    await releaseLedgerLocks(locks);
     return {
       ...decision('full', 'Ledger lock could not be acquired; serving full content.', {
         relativePath,
@@ -416,7 +416,7 @@ export async function recordRead(options = {}) {
       warnings
     };
   } finally {
-    await releaseLedgerLocks(locks);
+    await releaseLedgerLock(sessionLock);
   }
 }
 
@@ -470,7 +470,7 @@ async function recordSqzRead(context) {
     warning: null
   };
   const sameDigest = Boolean(existing) && existing.digest === digest && !force;
-  const replay = sameDigest ? formatReplay(relativePath, digest) : null;
+  const replay = sameDigest ? formatReplay(relativePath, digest, { provider: 'sqz' }) : null;
   const replayBytes = replay ? Buffer.byteLength(replay.text, 'utf8') : 0;
   const useSessionReplay = sameDigest && replayBytes < bytes;
 
@@ -673,11 +673,12 @@ export async function runSqzCompression(options = {}) {
   const maxOutputBytes = options.maxOutputBytes ?? SQZ_MAX_OUTPUT_BYTES;
   const timeoutMs = options.timeoutMs ?? SQZ_TIMEOUT_MS;
   const env = buildSqzEnv(options.env ?? process.env, options.homeDir);
+  const spawnFn = options.spawnFn ?? spawn;
 
   return new Promise((resolve) => {
     let child;
     try {
-      child = spawn(command, ['compress', '--no-cache'], {
+      child = spawnFn(command, ['compress', '--no-cache'], {
         cwd: options.cwd ?? process.cwd(),
         env,
         shell: false,
@@ -691,6 +692,7 @@ export async function runSqzCompression(options = {}) {
 
     let stdout = '';
     let stdoutBytes = 0;
+    const stdoutDecoder = new StringDecoder('utf8');
     let settled = false;
     const finish = (result) => {
       if (settled) return;
@@ -710,15 +712,19 @@ export async function runSqzCompression(options = {}) {
         finish({ ok: false, code: 'output-limit', stdout: '' });
         return;
       }
-      stdout += chunk.toString('utf8');
+      stdout += stdoutDecoder.write(chunk);
     });
     child.stderr.on('data', () => {});
     child.on('error', () => finish({ ok: false, code: 'spawn-error', stdout: '' }));
-    child.on('close', (code) => finish({
-      ok: code === 0,
-      code: code === 0 ? 'ok' : 'exit-error',
-      stdout: code === 0 ? stdout : ''
-    }));
+    child.on('close', (code) => {
+      if (settled) return;
+      const decodedStdout = code === 0 ? `${stdout}${stdoutDecoder.end()}` : '';
+      finish({
+        ok: code === 0,
+        code: code === 0 ? 'ok' : 'exit-error',
+        stdout: decodedStdout
+      });
+    });
     child.stdin.on('error', () => {});
     child.stdin.end(content);
   });
@@ -753,6 +759,7 @@ export async function purgeSession(options = {}) {
     const dedupDir = path.join(rootDir, stateDir);
     const globalLock = await acquireLedgerLock(resolveGlobalLockPath(rootDir, stateDir), rootDir);
     try {
+      await waitForActiveSessionLocks(rootDir, stateDir);
       await rm(dedupDir, { recursive: true, force: true });
       return { all: true, removed: [toPosix(path.relative(rootDir, dedupDir))] };
     } finally {
@@ -791,10 +798,13 @@ function decision(kind, reason, { relativePath, digest, bytes, content }) {
   };
 }
 
-function formatReplay(relativePath, digest) {
+function formatReplay(relativePath, digest, options = {}) {
   const shortDigest = digest.startsWith('sha256:') ? digest.slice(0, 23) : digest.slice(0, 16);
+  const contextDescription = options.provider === 'sqz'
+    ? 'was already provided as a self-contained compressed payload in this session'
+    : 'was already provided in this session';
   return {
-    text: `[aifhub-context-dedup] ${relativePath} was already provided in this session (${shortDigest}, unchanged); reuse earlier session content. Use force=true for a full read.`,
+    text: `[aifhub-context-dedup] ${relativePath} ${contextDescription} (${shortDigest}, unchanged); reuse that earlier session context. Use force=true for a full read.`,
     digest,
     forceRead: { path: relativePath, force: true }
   };
@@ -1054,14 +1064,15 @@ function resolveSessionLockPath(ledgerPath) {
   return path.join(path.dirname(dedupDir), '.context-dedup-locks', `${path.basename(sessionDir)}.lock`);
 }
 
-async function acquireLedgerLock(lockPath, rootDir) {
+async function acquireLedgerLock(lockPath, rootDir, options = {}) {
   const lockDir = path.dirname(lockPath);
   const safeLockDir = path.relative(path.resolve(rootDir), path.resolve(lockDir));
+  const attempts = options.attempts ?? LOCK_ATTEMPTS;
   await assertSafeStateDir(rootDir, safeLockDir);
   await mkdir(lockDir, { recursive: true });
   await assertSafeStateDir(rootDir, safeLockDir);
 
-  for (let attempt = 0; attempt < LOCK_ATTEMPTS; attempt += 1) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
     await assertSafeStateDir(rootDir, safeLockDir);
     try {
       const handle = await open(lockPath, 'wx');
@@ -1075,10 +1086,59 @@ async function acquireLedgerLock(lockPath, rootDir) {
         await unlink(lockPath).catch(() => {});
         continue;
       }
+      if (attempt + 1 < attempts) {
+        await delay(LOCK_RETRY_MS);
+      }
+    }
+  }
+  const error = new Error('Timed out waiting for the context dedup ledger lock.');
+  error.code = 'CONTEXT_DEDUP_LOCK_TIMEOUT';
+  throw error;
+}
+
+async function acquireSessionTransactionLock(rootDir, stateDir, ledgerPath) {
+  const globalLockPath = resolveGlobalLockPath(rootDir, stateDir);
+  const sessionLockPath = resolveSessionLockPath(ledgerPath);
+
+  for (let attempt = 0; attempt < LOCK_ATTEMPTS; attempt += 1) {
+    let globalLock;
+    try {
+      globalLock = await acquireLedgerLock(globalLockPath, rootDir);
+      try {
+        return await acquireLedgerLock(sessionLockPath, rootDir, { attempts: 1 });
+      } catch (error) {
+        if (error?.code !== 'CONTEXT_DEDUP_LOCK_TIMEOUT') throw error;
+      }
+    } finally {
+      await releaseLedgerLock(globalLock);
+    }
+
+    if (attempt + 1 < LOCK_ATTEMPTS) {
       await delay(LOCK_RETRY_MS);
     }
   }
-  throw new Error('Timed out waiting for the context dedup ledger lock.');
+
+  const error = new Error('Timed out waiting for the context dedup session lock.');
+  error.code = 'CONTEXT_DEDUP_LOCK_TIMEOUT';
+  throw error;
+}
+
+async function waitForActiveSessionLocks(rootDir, stateDir) {
+  const lockDir = path.dirname(resolveGlobalLockPath(rootDir, stateDir));
+  const entries = await readdir(lockDir, { withFileTypes: true }).catch((error) => {
+    if (error?.code === 'ENOENT') return [];
+    throw error;
+  });
+
+  for (const entry of entries) {
+    if (!entry.isFile() || entry.name === 'all.lock' || !entry.name.endsWith('.lock')) continue;
+    const sessionLock = await acquireLedgerLock(
+      path.join(lockDir, entry.name),
+      rootDir,
+      { attempts: PURGE_LOCK_ATTEMPTS }
+    );
+    await releaseLedgerLock(sessionLock);
+  }
 }
 
 async function releaseLedgerLock(lock) {
@@ -1090,12 +1150,6 @@ async function releaseLedgerLock(lock) {
     return;
   }
   await unlink(lock.lockPath).catch(() => {});
-}
-
-async function releaseLedgerLocks(locks) {
-  for (const lock of [...locks].reverse()) {
-    await releaseLedgerLock(lock);
-  }
 }
 
 function delay(milliseconds) {

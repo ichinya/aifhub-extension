@@ -1,9 +1,11 @@
 // context-dedup.test.mjs - tests for the optional session read dedup service
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { PassThrough } from 'node:stream';
 
 import {
   CONTEXT_DEDUP_SCHEMA_VERSION,
@@ -19,6 +21,7 @@ import {
   resolveLedgerPath,
   resolveSessionId,
   readContextDedupPolicy,
+  runSqzCompression,
   saveLedger,
   summarizeSession
 } from './context-dedup.mjs';
@@ -513,7 +516,8 @@ describe('recordRead decisions', () => {
     assert.equal(second.decision, 'deduplicated');
     assert.equal(second.providerOutcome, 'reference');
     assert.equal(second.content, null);
-    assert.match(second.replay.text, /already provided in this session/);
+    assert.match(second.replay.text, /self-contained compressed payload/);
+    assert.doesNotMatch(second.replay.text, /was already provided in this session/);
     assert.equal(summary.mode, 'sqz');
     assert.equal(summary.reads, 2);
     assert.equal(summary.dedupHits, 1);
@@ -522,6 +526,87 @@ describe('recordRead decisions', () => {
     assert.equal(calls.length, 1);
     assert.equal(calls[0].command, 'sqz');
     assert.match(calls[0].homeDir, /context-dedup.+sqz$/);
+  });
+
+  it('decodes SQZ stdout when a UTF-8 character crosses chunk boundaries', async () => {
+    const child = new EventEmitter();
+    child.stdout = new PassThrough();
+    child.stderr = new PassThrough();
+    child.stdin = new PassThrough();
+    child.kill = () => {};
+    const expected = 'compact кириллица payload\n';
+    const encoded = Buffer.from(expected, 'utf8');
+    const splitAt = encoded.indexOf(Buffer.from('и', 'utf8')) + 1;
+
+    const resultPromise = runSqzCompression({
+      content: body('utf8'),
+      cwd: rootDir,
+      spawnFn: () => {
+        queueMicrotask(() => {
+          child.stdout.write(encoded.subarray(0, splitAt));
+          child.stdout.end(encoded.subarray(splitAt));
+          child.emit('close', 0);
+        });
+        return child;
+      }
+    });
+
+    const result = await resultPromise;
+    assert.equal(result.ok, true);
+    assert.equal(result.stdout, expected);
+    assert.doesNotMatch(result.stdout, /\uFFFD/);
+  });
+
+  it('does not hold the project gate while SQZ runs in another session', async () => {
+    const policy = resolveContextDedupPolicy(`aifhub:
+  contextDedup:
+    mode: sqz
+    minBytes: 64
+`);
+    let notifyFirstStarted;
+    let releaseFirst;
+    const firstStarted = new Promise((resolve) => {
+      notifyFirstStarted = resolve;
+    });
+    const firstBarrier = new Promise((resolve) => {
+      releaseFirst = resolve;
+    });
+    const firstPromise = recordRead({
+      filePath: 'src/first.ts',
+      content: body('first-session'),
+      rootDir,
+      policy,
+      sessionId: 'first-session',
+      sqzRunner: async () => {
+        notifyFirstStarted();
+        await firstBarrier;
+        return { ok: true, stdout: 'first compact\n' };
+      }
+    });
+    await firstStarted;
+
+    const secondPromise = recordRead({
+      filePath: 'src/second.ts',
+      content: body('second-session'),
+      rootDir,
+      policy,
+      sessionId: 'second-session',
+      sqzRunner: async () => ({ ok: true, stdout: 'second compact\n' })
+    });
+    let timeout;
+    try {
+      const second = await Promise.race([
+        secondPromise,
+        new Promise((_, reject) => {
+          timeout = setTimeout(() => reject(new Error('cross-session SQZ read was blocked by the project gate')), 1000);
+        })
+      ]);
+      assert.equal(second.decision, 'compressed');
+    } finally {
+      clearTimeout(timeout);
+      releaseFirst();
+      await Promise.allSettled([firstPromise, secondPromise]);
+    }
   });
 
   it('passes only an allowlisted isolated environment to an injected SQZ runner', async () => {
@@ -897,6 +982,44 @@ describe('session summary and purge', () => {
     await readPromise;
     await purgePromise;
     await assert.rejects(stat(resolveLedgerPath('race', { rootDir, policy })));
+  });
+
+  it('waits for in-flight session locks before purging all dedup state', async () => {
+    const policy = await enabledPolicy();
+    let releaseSave;
+    let notifySaveStarted;
+    const saveStarted = new Promise((resolve) => {
+      notifySaveStarted = resolve;
+    });
+    const saveBarrier = new Promise((resolve) => {
+      releaseSave = resolve;
+    });
+    const readPromise = recordRead({
+      filePath: 'src/session.ts',
+      content: body('purge-all-race'),
+      rootDir,
+      policy,
+      sessionId: 'race-all',
+      saveLedgerFn: async (ledger, options) => {
+        notifySaveStarted();
+        await saveBarrier;
+        return saveLedger(ledger, options);
+      }
+    });
+    await saveStarted;
+
+    let purgeSettled = false;
+    const purgePromise = purgeSession({ rootDir, policy, all: true }).then((result) => {
+      purgeSettled = true;
+      return result;
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(purgeSettled, false);
+
+    releaseSave();
+    await readPromise;
+    await purgePromise;
+    await assert.rejects(stat(path.join(rootDir, '.ai-factory', 'state', 'context-dedup')));
   });
 
   it('keeps traversal session ids inside the dedup state directory', async () => {

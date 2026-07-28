@@ -25,7 +25,7 @@ Hash storage key не даёт `team/a`, `team-a`, `..` и Unicode ids стол�
 
 Canonical root и target проверяются через real path. `./`, `docs/../`, case aliases и in-root symlinks сходятся к одному key; symlink/junction escape за project root отклоняется до чтения.
 
-Concurrent процессы используют bounded exclusive ledger lock и unique temporary files. Если lock/save не удался, сервис отдаёт полный content с `context-dedup-ledger-unwritable`.
+Concurrent процессы используют session-exclusive ledger locks и unique temporary files. Короткий project gate координирует только получение session lock и `purge --all`; он не удерживается во время SQZ subprocess, поэтому разные sessions не сериализуются внешним compressor. Если lock/save не удался, сервис отдаёт полный content с `context-dedup-ledger-unwritable`.
 
 ## Решения
 
@@ -33,7 +33,7 @@ Concurrent процессы используют bounded exclusive ledger lock �
 |---|---|---|
 | `mode: "off"` | `disabled` | полный content |
 | `mode: aifhub` и одинаковый повтор | `deduplicated` | AIFHub replay, только если он короче content |
-| `mode: sqz` и shorter output | `compressed` | stateless output внешнего `sqz`; exact repeat обслуживает AIFHub ledger как `deduplicated` |
+| `mode: sqz` и shorter output | `compressed` | self-contained stateless output внешнего `sqz`; exact repeat ссылается на этот ранее отданный compressed session context |
 | `mode: sqz`, utility отсутствует/ошиблась | `full` | полный content + sanitized warning |
 | protected path | `protected` | полный content |
 | меньше `minBytes` | `below-threshold` | полный content |
@@ -102,9 +102,9 @@ Cross-process CLI/hook dedup должен передавать stable host sessi
 Status использует net model-visible accounting:
 
 - `mode` — effective `off`, `aifhub` или `sqz`;
-- `observedBytes` — полный объём всех подходящих чтений до dedup;
+- `observedBytes` — полный объём всех подходящих чтений до любой оптимизации (включая SQZ compression), то есть no-optimization baseline;
 - `servedBytes` — реально выданный полный content или replay;
-- `savedBytes = observedBytes - servedBytes`;
+- `savedBytes = observedBytes - servedBytes` относительно этого no-optimization baseline;
 - `savedPercent = savedBytes / observedBytes`.
 
 Поэтому revisions, eviction и стоимость replay не искажают экономию. Невыгодный replay не считается dedup hit и fail-open отдаёт полный content.
