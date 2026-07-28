@@ -873,7 +873,7 @@ function deriveProtectedPatterns(config, diagnostics) {
   const openspecRoot = normalizeProjectRelativeDir(openspec.root, 'openspec', diagnostics, 'aifhub.openspec.root');
   const defaults = {
     plans: aifhub.artifactProtocol === 'openspec' ? `${openspecRoot}/changes` : '.ai-factory/plans',
-    specs: `${openspecRoot}/specs`,
+    specs: aifhub.artifactProtocol === 'openspec' ? `${openspecRoot}/specs` : '.ai-factory/specs',
     qa: '.ai-factory/qa',
     generated_rules: '.ai-factory/rules/generated',
     state: '.ai-factory/state'

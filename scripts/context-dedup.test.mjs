@@ -172,6 +172,17 @@ paths:
     assert.equal(policy.stateDir, 'runtime/state/context-dedup');
   });
 
+  it('protects legacy specs by default when ai-factory paths are omitted', () => {
+    const policy = resolveContextDedupPolicy(`aifhub:
+  artifactProtocol: ai-factory
+  contextDedup:
+    enabled: true
+`);
+
+    assert.equal(isProtectedReadPath('.ai-factory/plans/demo.md', policy), true);
+    assert.equal(isProtectedReadPath('.ai-factory/specs/auth/spec.md', policy), true);
+  });
+
   it('keeps context dedup disabled without emitting unrelated full-config warnings', () => {
     const policy = resolveContextDedupPolicy(`language:
   ui: ru
