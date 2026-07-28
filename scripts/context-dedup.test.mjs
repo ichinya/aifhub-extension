@@ -7,6 +7,7 @@ import path from 'node:path';
 
 import {
   CONTEXT_DEDUP_SCHEMA_VERSION,
+  createLedger,
   defaultContextDedupPolicy,
   hashContent,
   isProtectedReadPath,
@@ -87,7 +88,7 @@ describe('context dedup policy', () => {
   });
 
   it('resolves explicit modes and preserves legacy boolean compatibility', () => {
-    const off = resolveContextDedupPolicy('aifhub:\n  contextDedup:\n    mode: off\n');
+    const off = resolveContextDedupPolicy('aifhub:\n  contextDedup:\n    mode: "off"\n');
     const aifhub = resolveContextDedupPolicy('aifhub:\n  contextDedup:\n    mode: aifhub\n');
     const sqz = resolveContextDedupPolicy(`aifhub:
   contextDedup:
@@ -109,7 +110,7 @@ describe('context dedup policy', () => {
   it('lets explicit mode override conflicting legacy enabled and rejects invalid modes', () => {
     const conflict = resolveContextDedupPolicy(`aifhub:
   contextDedup:
-    mode: off
+    mode: "off"
     enabled: true
 `);
     const invalid = resolveContextDedupPolicy(`aifhub:
@@ -523,6 +524,51 @@ describe('recordRead decisions', () => {
     assert.match(calls[0].homeDir, /context-dedup.+sqz$/);
   });
 
+  it('passes only an allowlisted isolated environment to an injected SQZ runner', async () => {
+    const policy = resolveContextDedupPolicy(`aifhub:
+  contextDedup:
+    mode: sqz
+    minBytes: 64
+`);
+    const content = body('sqz-env');
+    let runnerEnv;
+
+    await recordRead({
+      filePath: 'src/session.ts',
+      content,
+      rootDir,
+      policy,
+      sessionId: 'sqz-env-session',
+      env: {
+        Path: 'C:\\safe-bin',
+        SystemRoot: 'C:\\Windows',
+        TEMP: 'C:\\safe-temp',
+        LANG: 'en_US.UTF-8',
+        AWS_ACCESS_KEY_ID: 'must-not-reach-sqz',
+        OPENAI_KEY: 'must-not-reach-sqz',
+        DATABASE_URL: 'postgres://must-not-reach-sqz',
+        CUSTOM_PRIVATE_VALUE: 'must-not-reach-sqz'
+      },
+      sqzRunner: async (options) => {
+        runnerEnv = options.env;
+        return { ok: true, stdout: 'compact\n' };
+      }
+    });
+
+    assert.equal(runnerEnv.Path, 'C:\\safe-bin');
+    assert.equal(runnerEnv.SystemRoot, 'C:\\Windows');
+    assert.equal(runnerEnv.TEMP, 'C:\\safe-temp');
+    assert.equal(runnerEnv.LANG, 'en_US.UTF-8');
+    assert.equal(runnerEnv.AWS_ACCESS_KEY_ID, undefined);
+    assert.equal(runnerEnv.OPENAI_KEY, undefined);
+    assert.equal(runnerEnv.DATABASE_URL, undefined);
+    assert.equal(runnerEnv.CUSTOM_PRIVATE_VALUE, undefined);
+    assert.match(runnerEnv.HOME, /context-dedup.+sqz$/);
+    assert.equal(runnerEnv.USERPROFILE, runnerEnv.HOME);
+    assert.equal(runnerEnv.SQZ_HOME, runnerEnv.HOME);
+    assert.equal(runnerEnv.XDG_CACHE_HOME, path.join(runnerEnv.HOME, 'cache'));
+  });
+
   it('fails open if SQZ returns a state-dependent reference or delta', async () => {
     const policy = resolveContextDedupPolicy(`aifhub:
   contextDedup:
@@ -631,6 +677,30 @@ describe('recordRead decisions', () => {
 
     const { ledger } = await loadLedger({ rootDir, sessionId: 's1' });
     assert.deepEqual(Object.keys(ledger.entries).sort(), ['src/b.ts', 'src/c.ts']);
+  });
+
+  it('uses the path as a deterministic tie-breaker for equally old entries', async () => {
+    const policy = { ...(await enabledPolicy()), maxEntries: 2 };
+    const ledger = createLedger('s1');
+    const tiedAt = '2026-01-01T00:00:00.000Z';
+
+    for (const name of ['z', 'a']) {
+      const content = body(name);
+      ledger.entries[`src/${name}.ts`] = {
+        digest: hashContent(content),
+        bytes: Buffer.byteLength(content, 'utf8'),
+        firstSeenAt: tiedAt,
+        lastSeenAt: tiedAt,
+        readCount: 1,
+        revisions: 1
+      };
+    }
+    await saveLedger(ledger, { rootDir, policy });
+
+    await recordRead({ filePath: 'src/c.ts', content: body('c'), rootDir, policy, sessionId: 's1' });
+
+    const { ledger: reloaded } = await loadLedger({ rootDir, policy, sessionId: 's1' });
+    assert.deepEqual(Object.keys(reloaded.entries).sort(), ['src/c.ts', 'src/z.ts']);
   });
 
   it('rejects paths that escape the project root', async () => {
@@ -890,6 +960,7 @@ describe('session summary and purge', () => {
     assert.equal(summary.dedupHits, 11);
     assert.equal(results.filter((result) => result.decision === 'full').length, 1);
     assert.equal(results.filter((result) => result.decision === 'deduplicated').length, 11);
+    assert.ok(results.every((result) => !result.warnings.some((warning) => warning.code === 'context-dedup-ledger-unwritable')));
   });
 
   it('writes a schema-versioned ledger', async () => {

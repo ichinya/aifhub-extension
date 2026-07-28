@@ -26,7 +26,7 @@ const LEDGER_FILE = 'ledger.json';
 const BYTES_PER_TOKEN_ESTIMATE = 4;
 const PROCESS_SESSION_ID = `process-${process.pid}-${randomUUID()}`;
 const LOCK_RETRY_MS = 20;
-const LOCK_ATTEMPTS = 100;
+const LOCK_ATTEMPTS = 500;
 const LOCK_STALE_MS = 30_000;
 const SQZ_TIMEOUT_MS = 15_000;
 const SQZ_MAX_OUTPUT_BYTES = 1024 * 1024;
@@ -492,12 +492,13 @@ async function recordSqzRead(context) {
     debugFix(context, 'sqz-start', { path: relativePath, inputBytes: bytes, mode: 'sqz' });
 
     const runner = context.sqzRunner ?? runSqzCompression;
+    const sqzEnv = buildSqzEnv(context.env ?? process.env, sqzHome);
     const result = await runner({
       command: policy.sqz.command,
       content,
       cwd: rootDir,
       homeDir: sqzHome,
-      env: context.env,
+      env: sqzEnv,
       timeoutMs: context.sqzTimeoutMs ?? SQZ_TIMEOUT_MS,
       maxOutputBytes: context.sqzMaxOutputBytes ?? SQZ_MAX_OUTPUT_BYTES
     });
@@ -726,10 +727,9 @@ export async function runSqzCompression(options = {}) {
 function buildSqzEnv(baseEnv, homeDir) {
   const env = {};
   for (const [key, value] of Object.entries(baseEnv ?? {})) {
-    if (/(?:TOKEN|SECRET|PASSWORD|PASSWD|API[_-]?KEY|AUTHORIZATION|COOKIE|CREDENTIAL)/iu.test(key)) {
-      continue;
+    if (/^(?:PATH|PATHEXT|SYSTEMROOT|WINDIR|TEMP|TMP|TMPDIR|LANG|LC_ALL|LC_CTYPE)$/iu.test(key)) {
+      env[key] = value;
     }
-    env[key] = value;
   }
 
   if (homeDir) {
@@ -808,7 +808,10 @@ function evictOldestEntries(ledger, maxEntries, keepPath = null) {
 
   entries
     .filter(([key]) => key !== keepPath)
-    .sort((left, right) => String(left[1].lastSeenAt).localeCompare(String(right[1].lastSeenAt)))
+    .sort((left, right) => {
+      const timestampOrder = String(left[1].lastSeenAt).localeCompare(String(right[1].lastSeenAt));
+      return timestampOrder || left[0].localeCompare(right[0]);
+    })
     .slice(0, entries.length - maxEntries)
     .forEach(([key]) => {
       delete ledger.entries[key];

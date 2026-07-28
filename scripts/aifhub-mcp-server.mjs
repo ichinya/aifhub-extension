@@ -267,7 +267,10 @@ async function searchSkills(args, options = {}) {
   const query = assertString(args.query, 'query');
   const limit = Number.isInteger(args.limit) ? args.limit : 10;
   const runner = options.runner || runCommand;
-  const result = await runner(commandName('npx'), ['-y', 'skills', 'search', query], { timeoutMs: DEFAULT_TIMEOUT_MS });
+  const result = await runner(commandName('npx'), ['-y', 'skills', 'search', query], {
+    cwd: options.cwd ?? process.cwd(),
+    timeoutMs: DEFAULT_TIMEOUT_MS
+  });
 
   return textResult(jsonText({
     query,
@@ -297,7 +300,10 @@ async function installSkill(args, options = {}) {
   }
 
   const runner = options.runner || runCommand;
-  const result = await runner(commandName('npx'), commandArgs, { timeoutMs: DEFAULT_TIMEOUT_MS });
+  const result = await runner(commandName('npx'), commandArgs, {
+    cwd: options.cwd ?? process.cwd(),
+    timeoutMs: DEFAULT_TIMEOUT_MS
+  });
   return textResult(jsonText({
     dryRun: false,
     skill,
@@ -334,7 +340,10 @@ async function resolveTestCommand(skillPath, args) {
 }
 
 async function runSkillTests(args, options = {}) {
-  const skillPath = path.resolve(process.cwd(), typeof args.skillPath === 'string' && args.skillPath ? args.skillPath : '.');
+  const skillPath = path.resolve(
+    options.cwd ?? process.cwd(),
+    typeof args.skillPath === 'string' && args.skillPath ? args.skillPath : '.'
+  );
   const testCommand = await resolveTestCommand(skillPath, args);
   const runner = options.runner || runCommand;
   const result = await runner(testCommand.command, testCommand.args, {
@@ -511,9 +520,20 @@ export async function handleMcpMessage(message, options = {}) {
   return failure(id, -32601, `Method not found: ${method}`);
 }
 
-export async function startMcpServer({ input = process.stdin, output = process.stdout } = {}) {
+export async function startMcpServer({
+  input = process.stdin,
+  output = process.stdout,
+  projectRoot,
+  cwd,
+  env = process.env,
+  runner
+} = {}) {
   const rl = readline.createInterface({ input, crlfDelay: Infinity });
   const mcpSessionId = `mcp-${randomUUID()}`;
+  const configuredRoot = typeof env?.AIFHUB_PROJECT_ROOT === 'string'
+    ? env.AIFHUB_PROJECT_ROOT.trim()
+    : '';
+  const resolvedProjectRoot = path.resolve(projectRoot ?? cwd ?? (configuredRoot || process.cwd()));
   for await (const line of rl) {
     if (!line.trim()) continue;
     let message;
@@ -524,7 +544,12 @@ export async function startMcpServer({ input = process.stdin, output = process.s
       continue;
     }
 
-    const response = await handleMcpMessage(message, { mcpSessionId });
+    const response = await handleMcpMessage(message, {
+      mcpSessionId,
+      cwd: resolvedProjectRoot,
+      env,
+      runner
+    });
     if (response) {
       output.write(`${JSON.stringify(response)}\n`);
     }
@@ -532,5 +557,7 @@ export async function startMcpServer({ input = process.stdin, output = process.s
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  await startMcpServer();
+  await startMcpServer({
+    projectRoot: process.env.AIFHUB_PROJECT_ROOT?.trim() || process.cwd()
+  });
 }

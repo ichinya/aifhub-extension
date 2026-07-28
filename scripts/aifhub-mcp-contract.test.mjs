@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -60,6 +61,92 @@ describe('AIFHub MCP extension contract', () => {
       'run_skill_tests',
       'search_skills'
     ]);
+  });
+
+  it('resolves and threads an explicit project root for the stdio server loop', async () => {
+    const { startMcpServer } = await import('../scripts/aifhub-mcp-server.mjs');
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), 'aifhub-mcp-root-'));
+
+    try {
+      await mkdir(path.join(rootDir, '.ai-factory'), { recursive: true });
+      await writeFile(
+        path.join(rootDir, '.ai-factory', 'config.yaml'),
+        'aifhub:\n  contextDedup:\n    mode: aifhub\n    minBytes: 16\n',
+        'utf8'
+      );
+      const content = `${'project-root context\n'.repeat(20)}`;
+      await writeFile(path.join(rootDir, 'notes.md'), content, 'utf8');
+
+      const request = JSON.stringify({
+        jsonrpc: '2.0',
+        id: 10,
+        method: 'tools/call',
+        params: {
+          name: 'read_file_deduplicated',
+          arguments: { path: 'notes.md' }
+        }
+      });
+      const chunks = [];
+
+      await startMcpServer({
+        input: Readable.from([`${request}\n`]),
+        output: { write: (chunk) => chunks.push(String(chunk)) },
+        env: { AIFHUB_PROJECT_ROOT: rootDir }
+      });
+
+      assert.equal(chunks.length, 1);
+      const response = JSON.parse(chunks[0]);
+      assert.equal(response.result.isError, undefined, JSON.stringify(response));
+      assert.equal(response.result.content[0].text, content);
+    } finally {
+      await rm(rootDir, { recursive: true, force: true });
+    }
+  });
+
+  it('uses the connection project root for relative skill test paths', async () => {
+    const { startMcpServer } = await import('../scripts/aifhub-mcp-server.mjs');
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), 'aifhub-mcp-skill-root-'));
+
+    try {
+      await mkdir(path.join(rootDir, 'skill', 'scripts'), { recursive: true });
+      await writeFile(
+        path.join(rootDir, 'skill', 'scripts', 'test.mjs'),
+        "process.stdout.write('rooted skill test\\n');\n",
+        'utf8'
+      );
+      const request = JSON.stringify({
+        jsonrpc: '2.0',
+        id: 11,
+        method: 'tools/call',
+        params: {
+          name: 'run_skill_tests',
+          arguments: { skillPath: 'skill' }
+        }
+      });
+      const chunks = [];
+      let runnerOptions;
+
+      await startMcpServer({
+        input: Readable.from([`${request}\n`]),
+        output: { write: (chunk) => chunks.push(String(chunk)) },
+        env: { AIFHUB_PROJECT_ROOT: rootDir },
+        runner: async (_command, _args, options) => {
+          runnerOptions = options;
+          return { ok: true, code: 0, stdout: 'rooted skill test\n', stderr: '' };
+        }
+      });
+
+      assert.equal(chunks.length, 1);
+      const response = JSON.parse(chunks[0]);
+      assert.equal(response.result.isError, undefined, JSON.stringify(response));
+      const payload = JSON.parse(response.result.content[0].text);
+      assert.equal(payload.skillPath, path.join(rootDir, 'skill'));
+      assert.equal(payload.exitCode, 0);
+      assert.equal(payload.stdout, 'rooted skill test\n');
+      assert.equal(runnerOptions.cwd, path.join(rootDir, 'skill'));
+    } finally {
+      await rm(rootDir, { recursive: true, force: true });
+    }
   });
 
   it('returns full content first and a replay summary for repeated dedup reads', async () => {

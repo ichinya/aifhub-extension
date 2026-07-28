@@ -1,6 +1,7 @@
 // context-dedup-benchmark.test.mjs - tests for the deterministic three-way dedup replay benchmark
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -64,6 +65,32 @@ describe('context dedup benchmark', () => {
     assert.equal(result.savedBytes, 0);
     assert.equal(result.emittedBytes, result.baselineBytes);
     assert.equal(result.correctness.changedContentAlwaysServed, true);
+  });
+
+  it('writes the disabled benchmark mode as an unambiguous YAML string', async () => {
+    const workspace = await mkdtemp(path.join(os.tmpdir(), 'aifhub-benchmark-config-'));
+    let generatedConfig;
+
+    try {
+      await runBenchmark({
+        mode: 'baseline',
+        workspace,
+        emit: () => {
+          if (generatedConfig !== undefined) return;
+          const nestedWorkspace = readdirSync(workspace, { withFileTypes: true })
+            .find((entry) => entry.isDirectory() && entry.name.startsWith('aifhub-dedup-bench-'));
+          generatedConfig = readFileSync(
+            path.join(workspace, nestedWorkspace.name, '.ai-factory', 'config.yaml'),
+            'utf8'
+          );
+        }
+      });
+
+      assert.match(generatedConfig, /^\s*mode:\s+"off"\s*$/m);
+      assert.doesNotMatch(generatedConfig, /^\s*mode:\s+off(?:\s+#.*)?$/m);
+    } finally {
+      await rm(workspace, { recursive: true, force: true });
+    }
   });
 
   it('saves bytes in variant-a mode without touching protected artifacts or changed content', async () => {

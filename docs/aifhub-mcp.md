@@ -16,6 +16,8 @@ AIFHub Extension publishes one optional MCP server through `extension.json -> mc
 
 The server runs over stdio through the extension command `ai-factory aifhub-mcp`.
 
+Start it from the project root, or set `AIFHUB_PROJECT_ROOT` to an absolute project path in the MCP server environment. The command resolves the environment override or startup `cwd` once, then threads that fixed root through every tool call.
+
 ## Tools
 
 The MCP client normally shows these with the server namespace:
@@ -90,7 +92,7 @@ GitHub Copilot uses the VS Code MCP shape with `servers` and `type: "stdio"`:
 
 MCP callers cannot select another `sessionId` or purge all ledgers. `aifhub.context_dedup_status` omits internal session/path values and reports net accounting with the invariant `observedBytes = servedBytes + savedBytes`. `aifhub.context_dedup_purge` is dry-run by default and deletes only the current MCP connection ledger after `confirm: true`. CLI retains explicit `--session` and `--all` operations for user-owned local lifecycle. See [Session Context Dedup](context-dedup.md).
 
-`mode: sqz` requires a separately installed third-party executable and always emits a bounded readiness/ownership warning. AIFHub does not auto-download it or run `sqz init`; runtime execution uses fixed `compress --no-cache` args, `shell: false`, bounded timeout/output and a sanitized environment. Exact repeats use the connection-scoped AIFHub ledger. Missing/failing `sqz` or unexpected state-dependent provider output serves the original content and does not expose raw stderr. The third-party CLI may still write user-owned statistics under `~/.sqz`; MCP purge does not own that state.
+`mode: sqz` requires a separately installed third-party executable and always emits a bounded readiness/ownership warning. AIFHub does not auto-download it or run `sqz init`; runtime execution uses fixed `compress --no-cache` args, `shell: false`, bounded timeout/output and an allowlisted child environment containing only executable lookup/platform temp/locale keys plus session-owned home directories. Unknown credentials, cloud, proxy and runtime variables are not inherited. Exact repeats use the connection-scoped AIFHub ledger. Missing/failing `sqz` or unexpected state-dependent provider output serves the original content and does not expose raw stderr. The third-party CLI may still write user-owned statistics under `~/.sqz`; MCP purge does not own that state.
 
 ## See Also
 

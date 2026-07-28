@@ -472,7 +472,7 @@ async function writeConfig(workspace, mode) {
   await mkdir(path.dirname(configPath), { recursive: true });
   await writeFile(
     configPath,
-    ['aifhub:', '  artifactProtocol: openspec', '  contextDedup:', `    mode: ${mode === 'variant-a' ? 'aifhub' : 'off'}`, '    minBytes: 2048', ''].join('\n'),
+    ['aifhub:', '  artifactProtocol: openspec', '  contextDedup:', `    mode: ${mode === 'variant-a' ? 'aifhub' : '"off"'}`, '    minBytes: 2048', ''].join('\n'),
     'utf8'
   );
 }

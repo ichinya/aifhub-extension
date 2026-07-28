@@ -31,7 +31,7 @@ Concurrent процессы используют bounded exclusive ledger lock �
 
 | Условие | `decision` | Результат |
 |---|---|---|
-| `mode: off` | `disabled` | полный content |
+| `mode: "off"` | `disabled` | полный content |
 | `mode: aifhub` и одинаковый повтор | `deduplicated` | AIFHub replay, только если он короче content |
 | `mode: sqz` и shorter output | `compressed` | stateless output внешнего `sqz`; exact repeat обслуживает AIFHub ledger как `deduplicated` |
 | `mode: sqz`, utility отсутствует/ошиблась | `full` | полный content + sanitized warning |
@@ -66,7 +66,7 @@ Consumer дополнительно выводит protected roots из `aifhub.
 ```yaml
 aifhub:
   contextDedup:
-    mode: off # off | aifhub | sqz
+    mode: "off" # off | aifhub | sqz
     minBytes: 2048
     maxEntries: 500
     protectedPatterns:
@@ -77,7 +77,7 @@ aifhub:
 
 `mode` type-stable: boolean и string не смешиваются в одном новом selector. Legacy `enabled: false` читается как `off`, legacy `enabled: true` — как `aifhub`; при одновременном конфликтующем `mode` explicit mode имеет приоритет и даёт diagnostic.
 
-`aif-analyze` владеет public config shape: сохраняет существующие значения, добавляет missing `mode: off` defaults и никогда не включает dedup автоматически. Parser принимает inline и block YAML lists, игнорирует inline comments и отклоняет partial/fractional integers.
+`aif-analyze` владеет public config shape: сохраняет существующие значения, добавляет missing `mode: "off"` defaults и никогда не включает dedup автоматически. Parser принимает inline и block YAML lists, игнорирует inline comments и отклоняет partial/fractional integers.
 
 ### Выбор `sqz`
 
@@ -85,7 +85,7 @@ aifhub:
 
 Само изменение config **не устанавливает** binary. AIFHub не скачивает `sqz`, не запускает `sqz init`, не ставит hooks, не регистрирует MCP и не меняет agent config. Установите проверенный executable отдельно и укажите его через `sqz.command` либо обеспечьте доступность команды `sqz` в `PATH`.
 
-Runtime запускает fixed `sqz compress --no-cache` без shell, с bounded timeout/output и очищенным credential environment. SQZ cache references отключены, потому что v1.3.0 на Windows определяет `~/.sqz` через platform home API и environment-only redirect не гарантирует изоляцию. Exact same-session repeat обслуживает AIFHub ledger без второго вызова SQZ. Ошибка spawn/exit/timeout/output-limit или неожиданный `§ref`/`§delta` fail-open возвращает полный content; raw stderr модели не отдаётся. Сторонний CLI всё ещё может вести user-owned statistics под `~/.sqz`; AIFHub их не очищает.
+Runtime запускает fixed `sqz compress --no-cache` без shell, с bounded timeout/output и allowlisted environment: только ключи поиска executable/platform temp/locale плюс session-owned `HOME`, `USERPROFILE`, `XDG_*` и `SQZ_HOME`. Неизвестные, credential, cloud, proxy и runtime variables дочернему процессу не передаются. SQZ cache references отключены, потому что v1.3.0 на Windows определяет `~/.sqz` через platform home API и environment-only redirect не гарантирует изоляцию. Exact same-session repeat обслуживает AIFHub ledger без второго вызова SQZ. Ошибка spawn/exit/timeout/output-limit или неожиданный `§ref`/`§delta` fail-open возвращает полный content; raw stderr модели не отдаётся. Сторонний CLI всё ещё может вести user-owned statistics под `~/.sqz`; AIFHub их не очищает.
 
 ## CLI
 

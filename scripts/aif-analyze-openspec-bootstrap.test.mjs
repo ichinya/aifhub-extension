@@ -83,7 +83,7 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
 
     for (const expected of [
       'contextDedup:',
-      'mode: off',
+      'mode: "off"',
       'minBytes: 2048',
       'maxEntries: 500',
       'protectedPatterns: []',
@@ -92,6 +92,9 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
       assertIncludes(skill, expected, 'skills/aif-analyze/SKILL.md context dedup ownership');
       assertIncludes(template, expected, 'skills/aif-analyze/references/config-template.yaml context dedup profile');
     }
+
+    assert.doesNotMatch(skill, /^\s*mode:\s+off(?:\s+#.*)?$/m);
+    assert.doesNotMatch(template, /^\s*mode:\s+off(?:\s+#.*)?$/m);
 
     for (const expected of [
       'Preserve existing `aifhub.contextDedup` values',

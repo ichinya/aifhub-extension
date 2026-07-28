@@ -28,7 +28,7 @@ aifhub:
   # Optional session read optimization. Preserve existing values and never
   # enable automatically; mode is off | aifhub | sqz.
   contextDedup:
-    mode: off
+    mode: "off"
     minBytes: 2048
     maxEntries: 500
     protectedPatterns: []

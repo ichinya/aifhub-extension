@@ -1,7 +1,7 @@
 ---
 name: aif-analyze
 description: Bootstrap project context. Resolves localization and stack, creates/updates config.yaml and rules/base.md, then checks DESCRIPTION and guides core skill execution.
-version: 0.9.0
+version: 0.9.1
 author: ichi
 ---
 
@@ -244,7 +244,7 @@ Resolve the bootstrap/config mode before creating directories:
 ```yaml
 aifhub:
   contextDedup:
-    mode: off # off | aifhub | sqz
+    mode: "off" # off | aifhub | sqz
     minBytes: 2048
     maxEntries: 500
     protectedPatterns: []
@@ -284,7 +284,7 @@ utilities:
 aifhub:
   artifactProtocol: ai-factory
   contextDedup:
-    mode: off
+    mode: "off"
     minBytes: 2048
     maxEntries: 500
     protectedPatterns: []
@@ -304,7 +304,7 @@ aifhub:
 aifhub:
   artifactProtocol: openspec
   contextDedup:
-    mode: off
+    mode: "off"
     minBytes: 2048
     maxEntries: 500
     protectedPatterns: []
