@@ -325,10 +325,10 @@ export async function recordRead(options = {}) {
       ledger.totals.dedupHits += 1;
       ledger.totals.servedBytes += replayBytes;
       ledger.totals.savedBytes += netSavedBytes;
-      ledger.totals.estimatedSavedTokens = estimateTokens(ledger.totals.savedBytes);
     } else {
       ledger.totals.servedBytes += bytes;
     }
+    ledger.totals.estimatedSavedTokens = estimateTokens(ledger.totals.savedBytes);
 
     ledger.entries[relativePath] = entry;
     evictOldestEntries(ledger, policy.maxEntries, relativePath);

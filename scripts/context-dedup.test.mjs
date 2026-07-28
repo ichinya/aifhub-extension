@@ -307,6 +307,26 @@ describe('recordRead decisions', () => {
     assert.equal(ledger.entries['src/session.ts'].revisions, 2);
   });
 
+  it('repairs persisted token estimates after a non-deduplicated read', async () => {
+    const policy = await enabledPolicy();
+    const first = body('estimate-v1');
+    const changed = body('estimate-v2');
+    await writeProjectFile('src/session.ts', first);
+
+    await recordRead({ filePath: 'src/session.ts', content: first, rootDir, policy, sessionId: 'estimate' });
+    await recordRead({ filePath: 'src/session.ts', content: first, rootDir, policy, sessionId: 'estimate' });
+
+    const ledgerPath = resolveLedgerPath('estimate', { rootDir, policy });
+    const persisted = JSON.parse(await readFile(ledgerPath, 'utf8'));
+    assert.ok(persisted.totals.savedBytes > 0);
+    persisted.totals.estimatedSavedTokens = 0;
+    await writeFile(ledgerPath, JSON.stringify(persisted), 'utf8');
+
+    await recordRead({ filePath: 'src/session.ts', content: changed, rootDir, policy, sessionId: 'estimate' });
+    const { ledger } = await loadLedger({ rootDir, policy, sessionId: 'estimate' });
+    assert.equal(ledger.totals.estimatedSavedTokens, Math.ceil(ledger.totals.savedBytes / 4));
+  });
+
   it('never deduplicates protected artifacts', async () => {
     const policy = await enabledPolicy();
     const content = body('spec');

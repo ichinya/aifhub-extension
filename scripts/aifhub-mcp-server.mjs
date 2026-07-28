@@ -167,6 +167,7 @@ function sanitizeDiagnostics(diagnostics) {
         message: entry.message
           .replace(/[A-Za-z]:[\\/][^\s]*/g, '<project-path>')
           .replace(/\\\\[^\s]+/g, '<project-path>')
+          .replace(/(^|[\s"'(=:])\/(?!\/)[^\s"'`)]+/g, '$1<project-path>')
       };
     });
 }

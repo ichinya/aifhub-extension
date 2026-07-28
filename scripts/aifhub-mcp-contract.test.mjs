@@ -316,6 +316,42 @@ describe('AIFHub MCP extension contract', () => {
     }
   });
 
+  it('redacts POSIX paths from MCP diagnostics', async () => {
+    const { handleMcpMessage } = await import('../scripts/aifhub-mcp-server.mjs');
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), 'aifhub-mcp-posix-diagnostic-'));
+
+    try {
+      await writeFile(path.join(rootDir, 'notes.md'), 'safe text\n', 'utf8');
+      const response = await handleMcpMessage(
+        {
+          jsonrpc: '2.0',
+          id: 9,
+          method: 'tools/call',
+          params: { name: 'read_file_deduplicated', arguments: { path: 'notes.md' } }
+        },
+        {
+          cwd: rootDir,
+          contextDedup: {
+            recordRead: async () => ({
+              decision: 'full',
+              content: 'safe text\n',
+              warnings: [{
+                code: 'context-dedup-provider-warning',
+                message: 'Provider failed at /home/user/private/sqz.log; retry=/opt/sqz/bin/sqz.'
+              }]
+            })
+          }
+        }
+      );
+
+      assert.equal(response.result.content[0].text, 'safe text\n');
+      assert.match(response.result.content[1].text, /<project-path>/);
+      assert.doesNotMatch(JSON.stringify(response), /\/home\/user|\/opt\/sqz/);
+    } finally {
+      await rm(rootDir, { recursive: true, force: true });
+    }
+  });
+
   it('publishes bounded session-owned schemas and surfaces config diagnostics', async () => {
     const { handleMcpMessage } = await import('../scripts/aifhub-mcp-server.mjs');
     const listed = await handleMcpMessage({ jsonrpc: '2.0', id: 4, method: 'tools/list' });
