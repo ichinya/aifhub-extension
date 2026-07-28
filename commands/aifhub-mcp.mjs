@@ -6,6 +6,8 @@ export function register(program) {
     .command('aifhub-mcp')
     .description('Run the AIFHub MCP server over stdio')
     .action(async () => {
-      await startMcpServer();
+      await startMcpServer({
+        projectRoot: process.env.AIFHUB_PROJECT_ROOT?.trim() || process.cwd()
+      });
     });
 }

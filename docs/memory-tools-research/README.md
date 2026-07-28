@@ -2,6 +2,13 @@
 
 Этот каталог фиксирует выводы по инструментам локальной памяти и retrieval для issue #85 и отдельную policy evaluation candidate из issue #114. Документы описывают результаты установки, static review и полевых проверок без названий приватных проектов.
 
+Отдельный трек — dedup повторных чтений из issue #133. Текущий кандидат
+[ojuschugh1/sqz](sqz.md) проверяется в [AI Tester сравнении](sqz-benchmark-results.md)
+baseline / собственный [Session Context Dedup](../context-dedup.md) / `sqz`. Историческое
+исследование другого инструмента, [claudioemmanuel/squeez](squeez.md), и его
+[offline benchmark](squeez-benchmark-results.md) сохранены отдельно; `sqz` не заменяет
+и не перезаписывает эти evidence.
+
 ## Метаинформация Для Анализа
 
 Файл [recommendation-metadata.yaml](recommendation-metadata.yaml) содержит machine-readable правила для analysis-этапа. Его можно читать при анализе проекта и превращать project signals в предложение пользователю:

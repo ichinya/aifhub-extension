@@ -1,0 +1,54 @@
+scenario: context-dedup-variant-b-squeez
+description: "issue=133 arm=variant_b tool=squeez run_class=screening"
+system_prompt: |
+  You are an AI coding agent measuring context cost of repeated file reads with the squeez hook compressor. Stay inside the sandbox project directory.
+user_prompt: |
+  Work only inside the project directory.
+  For every file read, pipe a PostToolUse payload through the local squeez binary:
+  printf '%s' "$PAYLOAD" | ./bin/squeez compress-output
+  Read project/src/auth/session.ts, then project/openspec/specs/auth/spec.md, then project/src/auth/session.ts again,
+  then project/.ai-factory/qa/add-oauth/coverage.json twice.
+  When squeez returns updatedToolOutput, reuse the content you already have instead of re-reading the file.
+  Report how many exported symbols project/src/auth/session.ts has and list the requirement ids from the spec.
+  Include the phrase "squeez tool_run" in the final summary.
+runner:
+  runtime: codex
+  permission_mode: bypassPermissions
+env:
+  HOME: "./isolated-home"
+fixtures:
+  setup_commands:
+    - "mkdir -p bin isolated-home"
+    - "curl -fsSL -o bin/squeez https://github.com/claudioemmanuel/squeez/releases/download/v1.43.0/squeez-linux-x86_64"
+    - "chmod +x bin/squeez"
+  files_committed:
+    - path: project/src/auth/session.ts
+      content: |
+        export const createSession = () => 'session';
+        export const readSession = () => 'session';
+        export const destroySession = () => null;
+    - path: project/openspec/specs/auth/spec.md
+      content: |
+        # Auth Spec
+        - REQ-1: sessions expire
+        - REQ-2: tokens rotate
+    - path: project/.ai-factory/qa/add-oauth/coverage.json
+      content: |
+        { "requirements": [{ "id": "REQ-1", "covered": true }, { "id": "REQ-2", "covered": true }] }
+assertions:
+  - id: stay-in-sandbox
+    type: no_path_escape
+  - id: efficient
+    type: turn_count_at_most
+    max: 10
+  - id: squeez-called
+    type: tool_called
+    tool: Bash
+    args_match:
+      command: 'squeez compress-output'
+  - id: mentions-tool-run
+    type: output_contains
+    pattern: "squeez tool_run"
+  - id: protected-artifact-content-survives
+    type: output_contains
+    pattern: "REQ-2"
