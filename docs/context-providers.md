@@ -6,6 +6,19 @@ AIFHub может использовать optional provider output как suppo
 
 Provider availability всегда является degraded behavior: отсутствующие tools, reports, MCP servers, API credentials или неподдерживаемые local runtimes сами по себе не должны ломать `/aif-explore`, `/aif-plan`, `/aif-review`, `/aif-implement`, `/aif-verify`, `/aif-done` или любую другую AIFHub command.
 
+## context-mode Codex
+
+`context-mode` остаётся optional user-owned provider с явным opt-in; `rg` — baseline. Historical MCP-only evidence `1.0.151` разрешает только manual temporary indexing уже созданного generated output с purge.
+
+Re-evaluation exact `v1.0.169` разделяет surfaces:
+
+- package snapshot: PASS как `plugin_snapshot_isolated`, но install lifecycle — `NOT_RUN(postinstall_forbidden)`;
+- MCP-only и direct hooks: `BLOCKED(runtime_dependency_self_install)`;
+- actual Codex plugin: `NOT_RUN(auth_isolation_unavailable)`;
+- test-only `direct_hook_contract` не является actual event/compaction evidence.
+
+Обычные `/aif-plan`, `/aif-implement`, `/aif-verify` и `/aif-done` не auto-install provider, не register MCP, не доверяют hooks и не выбирают plugin. Generic floating routes отключены с `dedicated_harness_required`. Пользовательская установка остаётся вне AIFHub ownership; перед ней нужно отдельно принять version-sensitive install/hook risk.
+
 ## Роли Providers
 
 Graphify - optional provider для repository architecture и relation discovery. Он может помочь найти dependencies, ownership paths и impact areas перед прямой проверкой репозитория.

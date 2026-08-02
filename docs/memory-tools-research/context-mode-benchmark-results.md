@@ -133,6 +133,30 @@ Project id: `project-8d97432e6d7a`. Labels: `framework`, `js`, `large_framework_
 
 Tool-run rows did not produce a valid useful `context-mode` data call: one run stopped at `context-mode --help`, the other did not call `context-mode`. This focused scenario remains manual-helper evidence only and is not eligible for `proven_label_evidence`.
 
+## Codex Plugin Re-evaluation v1.0.169 — 2026-07-28
+
+Run id: `context-mode-134-luna-low-20260728`. Exact identity: tag `v1.0.169`, commit `589d8214d56740a28b5f7bf63167743d586b0b40`, npm shasum `d5aa9acc648ed420c5dd32ee5f15aa5608f09fea`, package integrity `sha512-94JIaFuLjF9SO2BsGTrbGtyT44K95+9OC8BdbaL/UT76xOkanJLfUR5CzmNw+GELXZQqH4nBrKg9wjBnSFkVnQ==`.
+
+| Evidence class | Rows / probes | Status | Reason |
+|---|---:|---|---|
+| `plugin_snapshot_isolated` | 1 | PASS | Exact tag/commit/package/manifests/license/Node floor and tarball shasum matched. |
+| install lifecycle | 0 | `NOT_RUN(postinstall_forbidden)` | Upstream package declares mutating `postinstall`; lifecycle scripts were never executed. |
+| `ai-tester` dry-run | 18/18 | PASS | Three scenarios × baseline/MCP-only/plugin × two repetitions; `codex`, `gpt-5.6-luna`, `low`. |
+| baseline model rows | 0/6 | `NOT_RUN(isolated_codex_execution_unavailable)` | Isolated `CODEX_HOME` probe failed before a trace; no real auth/config was copied. |
+| MCP-only rows | 0/6 | `BLOCKED(runtime_dependency_self_install)` | Hook/server bootstrap can run `npm install` and shell at runtime. |
+| Codex plugin rows | 0/6 | `NOT_RUN(auth_isolation_unavailable)` | No credential-safe isolated auth mechanism was available. |
+| direct hook runtime | 0 | `BLOCKED(runtime_dependency_self_install)` | Static safety veto ran before provider code. |
+| `direct_hook_contract` | focused adapter tests | PASS | Test-only event/redaction/isolation contract; not actual Codex event delivery. |
+| host manifests / sandbox cleanup | 1 | PASS | Project Git, Codex plugin/cache and provider-home fingerprints were unchanged; disposable package/runtime roots were removed. |
+
+Token, duration and quality deltas are not reported: there are no complete executed triads. Resource savings cannot be inferred from dry-run or direct adapter tests. Actual compaction remains `NOT_RUN(compaction_control_unavailable)`.
+
+Current decision is split:
+
+- historical MCP-only `1.0.151` manual-helper evidence is preserved without rewriting;
+- current `v1.0.169` MCP/runtime path is blocked pending removal or containment of runtime self-install;
+- Codex plugin is deferred and remains user-owned; no auto-install, registration, hook trust or normal-command selection is authorized.
+
 ## Когда Использовать
 
 Лучшие signals:

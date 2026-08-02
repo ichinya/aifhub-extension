@@ -2,7 +2,9 @@
 
 Репозиторий: [mksglu/context-mode](https://github.com/mksglu/context-mode)
 
-Проверенный package: `context-mode 1.0.151`.
+Исторически проверенный runtime package: `context-mode 1.0.151`.
+
+Текущий Codex surface проверен статически на exact release `v1.0.169`, commit `589d8214d56740a28b5f7bf63167743d586b0b40`, npm shasum `d5aa9acc648ed420c5dd32ee5f15aa5608f09fea`. Это не runtime promotion: package snapshot прошёл identity/manifests audit, но executable lifecycle заблокирован.
 
 Результаты тестов и выводы по labels: [context-mode-benchmark-results.md](context-mode-benchmark-results.md).
 
@@ -34,9 +36,24 @@
 
 Не рекомендовать для `small_microservice`, exact lookup и любых задач, где `rg` напрямую дает нужные файлы.
 
+`rg` остаётся baseline. Установка и любое доверие hooks требуют явного user opt-in; normal `/aif-plan`, `/aif-implement`, `/aif-verify` и `/aif-done` не выбирают provider.
+
+## Codex Surface v1.0.169
+
+Выводы разделены:
+
+- MCP-only: historical `1.0.151` evidence сохраняет manual helper для уже созданного generated output. Текущий `v1.0.169` runtime получил `BLOCKED(runtime_dependency_self_install)`: `hooks/ensure-deps.mjs` может самостоятельно запускать `npm install` и shell.
+- Codex plugin/hooks: `NOT_RUN(auth_isolation_unavailable)`. Изолированный `CODEX_HOME` не дал безопасного model run, а реальные `auth.json`, API keys и долгоживущие credentials не копировались.
+- Direct hook entrypoints также не запускались после static veto. Unit-level `direct_hook_contract` проверяет adapter contract, но не считается actual Codex delivery.
+- `plugin_snapshot_isolated` подтверждает только package/manifests snapshot. Install lifecycle остаётся `NOT_RUN(postinstall_forbidden)`.
+
+Dedicated matrix содержит 18 строк: три synthetic scenarios, baseline/MCP-only/plugin, две repetitions, `codex`, `gpt-5.6-luna`, `reasoning: low`. Все 18 прошли реальный `ai-tester --dry-run`; model rows не исполнялись после lifecycle/auth gates. Это `NOT_RUN`, а не отрицательное сравнение качества или tokens.
+
+AIFHub не auto-install, не register MCP, не доверяет hooks и не выбирает Codex plugin в normal commands. Generic historical routes возвращают `dedicated_harness_required`.
+
 ## CLI И MCP
 
-Проверенный безопасный flow:
+Исторически проверенный на `1.0.151` flow:
 
 ```text
 context-mode doctor
@@ -54,6 +71,8 @@ MCP exposes широкий surface: `ctx_execute`, `ctx_index`, `ctx_search`, `c
 Все, что explicit indexed, становится retrievable. Поэтому нельзя индексировать raw secrets, private snippets, local paths или protected validation artifacts.
 
 Не устанавливать hooks и не register MCP automatically.
+
+Для `v1.0.169` этот flow нельзя считать текущим runtime PASS: self-install bootstrap требует отдельного upstream-safe режима или новой review/evaluation.
 
 ## Очистка
 

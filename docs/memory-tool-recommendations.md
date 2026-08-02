@@ -104,6 +104,8 @@ project_dimensions:
 Практический смысл:
 
 - mini или exact lookup: оставить `rg`, избегать on-demand CodeGraph/Graphify/context-mode setup; уже готовый CodeGraph index не является default-рекомендацией.
+
+Для `context-mode` Codex surface `v1.0.169` действует отдельная граница: exact snapshot прошёл static audit, но MCP/direct hooks заблокированы из-за runtime self-install bootstrap, а actual plugin — `NOT_RUN(auth_isolation_unavailable)`. Исторический `1.0.151` manual-helper вывод не переписан. Любое использование остаётся явным user opt-in; normal AIFHub commands не устанавливают package, не register MCP, не доверяют hooks и не выбирают plugin. `rg` остаётся baseline.
 - large framework или multirepo broad discovery: предлагать Graphify условно после `rg`; CodeGraph только при exact skill+task+labels screening/proven match.
 - legacy integration-heavy: рекомендовать только conditional tools с явным объяснением noise/time tradeoff.
 - Go service: Go label не дает CodeGraph recommendation; для repo graph оставлять Graphify/`rg`, пока нет exact screening match.

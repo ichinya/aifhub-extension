@@ -1,5 +1,5 @@
 schema: aifhub.memory_tools.recommendation.v1
-updated: "2026-07-19"
+updated: "2026-07-28"
 purpose: "Метаданные для этапа анализа проекта: какие memory/retrieval инструменты можно предлагать пользователю, когда и с какими ограничениями."
 default_policy:
   install_policy: explicit_user_opt_in_only
@@ -262,8 +262,7 @@ availability_probes:
   codex-agent-mem:
     - codex-agent-mem-policy --help
     - codex-agent-mem-smoke --help
-  context-mode:
-    - context-mode doctor
+  context-mode: []
   codegraph:
     - codegraph --version
     - codegraph --help
@@ -628,8 +627,12 @@ tools:
     doc: context-mode.md
     results_doc: context-mode-benchmark-results.md
     repository: "https://github.com/mksglu/context-mode"
-    tested_version: "1.0.151"
+    tested_version: "historical runtime 1.0.151; static Codex audit v1.0.169"
     decision: manual_helper_only
+    mcp_only_status: blocked_runtime_dependency_self_install_v1_0_169
+    codex_plugin_status: not_run_auth_isolation_unavailable
+    normal_command_selection: forbidden
+    auto_register_hooks: false
     recommendation_action: suggest_only_for_large_temporary_outputs
     integration_role: temporary_output_index
     install_policy: explicit_user_opt_in_only
@@ -662,6 +665,20 @@ tools:
       project_shapes:
         - small_microservice
     suggestion_text: "Если анализ генерирует очень большой output, можно предложить context-mode как manual temporary index с обязательным purge."
+    current_codex_evidence:
+      date: "2026-07-28"
+      tag: v1.0.169
+      commit: 589d8214d56740a28b5f7bf63167743d586b0b40
+      npm_integrity: "sha512-94JIaFuLjF9SO2BsGTrbGtyT44K95+9OC8BdbaL/UT76xOkanJLfUR5CzmNw+GELXZQqH4nBrKg9wjBnSFkVnQ=="
+      planned_rows: 18
+      dry_run_rows: 18
+      executed_rows: 0
+      package_snapshot: pass
+      install_lifecycle: not_run_postinstall_forbidden
+      mcp_only: blocked_runtime_dependency_self_install
+      direct_hooks: blocked_runtime_dependency_self_install
+      codex_plugin: not_run_auth_isolation_unavailable
+      recommendation_update: "Preserve the historical manual helper only; do not run v1.0.169 through generic or normal-command routes."
     execution:
       default:
         mode: recommend_only

@@ -547,6 +547,11 @@ function metadataSummary(metadata) {
       storage_scope: tool.storage_scope ?? null,
       purge_path: tool.purge_path ?? null,
       purge_status: tool.purge_status ?? null,
+      mcp_only_status: tool.mcp_only_status ?? null,
+      codex_plugin_status: tool.codex_plugin_status ?? null,
+      normal_command_selection: tool.normal_command_selection ?? null,
+      auto_register_hooks: tool.auto_register_hooks ?? null,
+      current_codex_evidence: tool.current_codex_evidence ?? null,
       allowed_in: asArray(tool.allowed_in),
       forbidden_in: asArray(tool.forbidden_in),
       forbidden_operations: asArray(tool.forbidden_operations),
@@ -1010,7 +1015,14 @@ async function runProbeForTool(toolId, options = {}) {
       ['codex-agent-mem-smoke', ['--help']]
     ]);
   }
-  if (toolId === 'context-mode') return probeAny([['context-mode', ['doctor']]]);
+  if (toolId === 'context-mode') {
+    return {
+      availability: 'unknown',
+      command: null,
+      reason: 'dedicated_harness_required',
+      note: 'Automatic context-mode probes are disabled because the current runtime lifecycle is not eligible.'
+    };
+  }
   if (toolId === 'context7') {
     if (!options.checkDocsProvider) {
       return {
