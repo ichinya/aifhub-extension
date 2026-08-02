@@ -108,6 +108,10 @@ describe('recommendation metadata parsing', () => {
     assert.ok(metadata.evidence_runs.some((run) => run.id === 'targeted-graphify-context7-ai-tester-2026-05-28'));
     assert.equal(metadata.tools['codex-agent-mem'].read_scope, 'explicit_sqlite_db_path');
     assert.equal(metadata.tools['context-mode'].decision, 'manual_helper_only');
+    assert.equal(metadata.tools['context-mode'].codex_plugin_status, 'not_run_auth_isolation_unavailable');
+    assert.equal(metadata.tools['context-mode'].normal_command_selection, 'forbidden');
+    assert.equal(metadata.tools['context-mode'].auto_register_hooks, false);
+    assert.deepEqual(metadata.availability_probes['context-mode'], []);
     assert.equal(metadata.tools['codex-mem'].decision, 'reject_default');
     assert.equal(metadata.tools['eagle-mem'].decision, 'reject_defer');
     assert.equal(metadata.tools.context7.decision, 'optional');
@@ -300,6 +304,11 @@ describe('recommendation results', () => {
     assert.ok(
       result.body.tools['rohitg00-agentmemory'].forbidden_operations.includes('auto_register_mcp')
     );
+    assert.equal(result.body.tools['context-mode'].codex_plugin_status, 'not_run_auth_isolation_unavailable');
+    assert.equal(result.body.tools['context-mode'].mcp_only_status, 'blocked_runtime_dependency_self_install_v1_0_169');
+    assert.equal(result.body.tools['context-mode'].normal_command_selection, 'forbidden');
+    assert.equal(result.body.tools['context-mode'].auto_register_hooks, false);
+    assert.deepEqual(result.body.availability_probes['context-mode'], []);
   });
 
   it('allows CodeGraph only as scoped manual CLI for analyze recommendations and enabled explore use', async () => {
@@ -1179,6 +1188,27 @@ function makeNegativeProvenLabelMetadataYaml() {
 }
 
 describe('CLI behavior', () => {
+  it('does not execute context-mode during installed-facing status', async () => {
+    const result = await runMemoryToolRecommender([
+      'status',
+      '--metadata',
+      REAL_METADATA,
+      '--json'
+    ], {
+      cwd: tmpDir,
+      stdout: [],
+      stderr: [],
+      exit: false
+    });
+    assert.equal(result.exitCode, 0);
+    assert.deepEqual(result.body.probes['context-mode'], {
+      availability: 'unknown',
+      command: null,
+      reason: 'dedicated_harness_required',
+      note: 'Automatic context-mode probes are disabled because the current runtime lifecycle is not eligible.'
+    });
+  });
+
   it('uses the production-default no-probe path for rohitg00-agentmemory status', async () => {
     const metadataPath = path.join(tmpDir, 'minimal-rejected-metadata.yaml');
     await writeFile(metadataPath, [

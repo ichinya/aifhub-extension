@@ -347,6 +347,25 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
     }
   });
 
+  it('keeps context-mode Codex lifecycle out of normal command ownership', async () => {
+    const research = await readRepoFile('docs/memory-tools-research/context-mode.md');
+    const results = await readRepoFile('docs/memory-tools-research/context-mode-benchmark-results.md');
+    const metadata = await readRepoFile('docs/memory-tools-research/recommendation-metadata.yaml');
+    const combined = [research, results, metadata].join('\n');
+    for (const expected of [
+      '`rg` остаётся baseline',
+      'v1.0.169',
+      'plugin_snapshot_isolated',
+      'NOT_RUN(postinstall_forbidden)',
+      'BLOCKED(runtime_dependency_self_install)',
+      'NOT_RUN(auth_isolation_unavailable)',
+      'normal_command_selection: forbidden',
+      'auto_register_hooks: false'
+    ]) {
+      assertIncludes(combined, expected, 'context-mode Codex lifecycle boundary');
+    }
+  });
+
   it('requires detectOpenSpec capability reporting and degraded missing-CLI behavior', async () => {
     const skill = await readRepoFile('skills/aif-analyze/SKILL.md');
 

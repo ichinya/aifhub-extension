@@ -1,0 +1,58 @@
+{
+  "schema": "aifhub.context_mode_codex.ai_tester_catalog.v1",
+  "defaults": {
+    "runtime": "codex",
+    "model": "gpt-5.6-luna",
+    "reasoning": "low",
+    "repetitions": 2,
+    "timeout_ms": 300000,
+    "variants": [
+      "baseline",
+      "mcp_only",
+      "codex_plugin"
+    ]
+  },
+  "fixture": {
+    "revision": "context-mode-134-synthetic-v1",
+    "artifact": "generated-output.txt",
+    "content_class": "synthetic_generated_output",
+    "content": "Record D-134 selects the amber deployment lane. File state F-134 is pending review. Error class E-134 is retryable. Required facts: north=17, east=29, checksum=46. Control status: ready."
+  },
+  "scenarios": [
+    {
+      "id": "large_generated_output_retrieval",
+      "prompts": ["Read the generated artifact and retain its three required numeric facts without reporting values yet.", "Return exactly three lines in key=value form, ordered north, east, checksum, with no other text."],
+      "assertions": [
+        {
+          "id": "exact-required-facts",
+          "type": "output_contains",
+          "pattern": "(?i)\\A[ \\t]*north[ \\t]*=[ \\t]*17[ \\t]*\\r?\\neast[ \\t]*=[ \\t]*29[ \\t]*\\r?\\nchecksum[ \\t]*=[ \\t]*46[ \\t]*\\z"
+        }
+      ]
+    },
+    {
+      "id": "decision_and_file_state_continuity",
+      "prompts": ["Read and retain the decision, file state, and error class from the generated artifact without reporting their values yet.", "Resume the same thread and return exactly three lines in key=value form, ordered decision, file_state, error, with no other text."],
+      "assertions": [
+        {
+          "id": "exact-continuity-state",
+          "type": "output_contains",
+          "pattern": "(?i)\\A[ \\t]*decision[ \\t]*=[ \\t]*D-134 selects the amber deployment lane[ \\t]*\\r?\\nfile_state[ \\t]*=[ \\t]*F-134 is pending review[ \\t]*\\r?\\nerror[ \\t]*=[ \\t]*E-134 is retryable[ \\t]*\\z"
+        }
+      ]
+    },
+    {
+      "id": "fresh_session_isolation_and_purge",
+      "session_mode": "external_fresh_pair",
+      "prompts": ["Return the generated artifact's control status as exactly control=VALUE with no other text."],
+      "assertions": [
+        {
+          "id": "fresh-probe-control-fact",
+          "type": "output_contains",
+          "pattern": "(?i)\\A[ \\t]*control[ \\t]*=[ \\t]*ready[ \\t]*\\z"
+        }
+      ],
+      "lifecycle_assertions": ["fresh_session_isolated", "provider_purged", "sandbox_clean"]
+    }
+  ]
+}
