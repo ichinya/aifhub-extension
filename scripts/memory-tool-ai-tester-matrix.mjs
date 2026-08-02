@@ -1309,7 +1309,7 @@ function setupCommandsForTools(toolIds = []) {
     commands.push('cmd.exe /c "cd project && npm install --prefix .ai-tester-tools/context7 ctx7"');
   }
   if (toolIds.includes('context-mode')) {
-    commands.push('cmd.exe /c "cd project && npm install --prefix .ai-tester-tools/context-mode context-mode"');
+    commands.push('cmd.exe /d /s /c "echo dedicated_harness_required 1>&2 & exit /b 78"');
   }
   return commands;
 }
@@ -1341,9 +1341,9 @@ function preparedToolPromptLines(toolId) {
   }
   if (toolId === 'context-mode') {
     return [
-      '  setup_commands installed context-mode under project/.ai-tester-tools/context-mode before this model turn.',
-      '  Before calling context-mode, prepend .ai-tester-tools/context-mode/node_modules/.bin to PATH in the same shell command.',
-      '  Use context-mode only for temporary generated-output inspection, then summarize whether it was useful versus rg.'
+      '  This generic route is unavailable: dedicated_harness_required.',
+      '  Do not install, execute, register, or trust context-mode from this scenario.',
+      '  Issue #134 evaluation must use scripts/context-mode-codex-ai-tester-*.mjs with the pinned package and isolated lifecycle.'
     ];
   }
   if (toolId === 'rohitg00-agentmemory') {

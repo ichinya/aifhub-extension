@@ -501,7 +501,8 @@ describe('ai-tester matrix manifest', () => {
     assert.match(portableSetupScenario, /py -3 -m venv \.ai-tester-tools\/graphify-venv/);
     assert.match(portableSetupScenario, /\.ai-tester-tools\/graphify-venv\/Scripts\/python\.exe/);
     assert.match(portableSetupScenario, /cmd\.exe \/c \\"cd project && npm install --prefix \.ai-tester-tools\/context7 ctx7\\"/);
-    assert.match(portableSetupScenario, /cmd\.exe \/c \\"cd project && npm install --prefix \.ai-tester-tools\/context-mode context-mode\\"/);
+    assert.match(portableSetupScenario, /dedicated_harness_required/);
+    assert.doesNotMatch(portableSetupScenario, /npm install --prefix \.ai-tester-tools\/context-mode/);
     assert.doesNotMatch(portableSetupScenario, /\.ai-tester-tools\\/);
 
     const agentmemoryScenario = renderAiTesterScenario({

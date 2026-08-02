@@ -623,46 +623,16 @@ async function runContext7(tool, runtime) {
 }
 
 async function runContextMode(tool, runtime) {
-  const prefix = path.join(runtime.toolsDir, 'context-mode');
-  assertWithinDirectory(runtime.toolsDir, prefix, 'context-mode install prefix');
-  await mkdir(prefix, { recursive: true });
-  const registry = await execNpm(runtime, ['view', 'context-mode', 'version'], {
-    timeoutMs: runtime.timeoutMs,
-    allowFailure: true
-  });
-  const install = await execNpm(runtime, ['install', '--prefix', prefix, 'context-mode'], {
-    timeoutMs: 180000,
-    allowFailure: true
-  });
-  if (install.exitCode !== 0) {
-    return {
-      tool_id: tool.id,
-      status: 'unavailable',
-      npm_version: firstLine(registry.stdout),
-      reason: 'temp-install-failed'
-    };
-  }
-  const cli = npmBin(prefix, 'context-mode');
-  const entrypoint = path.join(prefix, 'node_modules', 'context-mode', 'cli.bundle.mjs');
-  const dataDir = path.join(runtime.toolsDir, 'context-mode-data');
-  assertWithinDirectory(runtime.toolsDir, dataDir, 'context-mode data dir');
-  await mkdir(dataDir, { recursive: true });
-  const env = { CONTEXT_MODE_DIR: dataDir };
-  const doctor = await execSafe(process.execPath, [entrypoint, 'doctor'], {
-    timeoutMs: runtime.timeoutMs,
-    allowFailure: true,
-    env
-  });
-  const indexSmoke = doctor.exitCode === 0
-    ? await runContextModeIndexSmoke(entrypoint, runtime, dataDir)
-    : { attempted: false, reason: 'doctor-failed' };
+  return getContextModeGenericRouteStatus(tool);
+}
+
+export function getContextModeGenericRouteStatus(tool = { id: 'context-mode' }) {
   return {
     tool_id: tool.id,
-    status: doctor.exitCode === 0 && indexSmoke.index_passed ? 'pass' : 'degraded',
-    npm_version: firstLine(registry.stdout),
-    doctor_passed: doctor.exitCode === 0,
-    index_smoke: indexSmoke,
-    notes: 'MCP smoke indexed generated rg summary text only; source files were not indexed'
+    status: 'unavailable',
+    reason: 'dedicated_harness_required',
+    issue: 134,
+    notes: 'Use the pinned isolated context-mode Codex harness; the generic floating install route is disabled.'
   };
 }
 

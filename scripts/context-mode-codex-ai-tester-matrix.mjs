@@ -1,0 +1,428 @@
+// context-mode-codex-ai-tester-matrix.mjs - dedicated three-way matrix for issue #134
+import { createHash } from 'node:crypto';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+export const CONTEXT_MODE_MATRIX_SCHEMA = 'aifhub.context_mode_codex.ai_tester_matrix.v1';
+export const CONTEXT_MODE_SCENARIOS = Object.freeze([
+  'large_generated_output_retrieval',
+  'decision_and_file_state_continuity',
+  'fresh_session_isolation_and_purge'
+]);
+export const CONTEXT_MODE_VARIANTS = Object.freeze([
+  'baseline',
+  'mcp_only',
+  'codex_plugin'
+]);
+const DEFAULT_CATALOG = path.join(
+  'docs',
+  'memory-tools-research',
+  'context-mode-codex-ai-tester',
+  'scenario-catalog.json'
+);
+
+export async function loadContextModeScenarioCatalog({
+  cwd = process.cwd(),
+  catalogPath = path.join(cwd, DEFAULT_CATALOG)
+} = {}) {
+  return JSON.parse(await readFile(catalogPath, 'utf8'));
+}
+
+export function validateContextModeScenarioCatalog(catalog = {}) {
+  const errors = [];
+  if (catalog.schema !== 'aifhub.context_mode_codex.ai_tester_catalog.v1') errors.push('schema');
+  if (catalog.defaults?.runtime !== 'codex') errors.push('defaults.runtime');
+  if (catalog.defaults?.model !== 'gpt-5.6-luna') errors.push('defaults.model');
+  if (catalog.defaults?.reasoning !== 'low') errors.push('defaults.reasoning');
+  if (catalog.defaults?.repetitions !== 2) errors.push('defaults.repetitions');
+  if (!Number.isInteger(catalog.defaults?.timeout_ms) || catalog.defaults.timeout_ms <= 0) {
+    errors.push('defaults.timeout_ms');
+  }
+  if (!sameArray(catalog.defaults?.variants, CONTEXT_MODE_VARIANTS)) errors.push('defaults.variants');
+  if (!sameArray(catalog.scenarios?.map((item) => item.id), CONTEXT_MODE_SCENARIOS)) {
+    errors.push('scenarios');
+  }
+  if (!isSafeRelativeFile(catalog.fixture?.artifact)) errors.push('fixture.artifact');
+  for (const scenario of catalog.scenarios ?? []) {
+    const expectedPromptCount = scenario.session_mode === 'external_fresh_pair' ? 1 : 2;
+    if (!Array.isArray(scenario.prompts) || scenario.prompts.length !== expectedPromptCount ||
+        scenario.prompts.some((prompt) => typeof prompt !== 'string' || prompt.length === 0)) {
+      errors.push(`${scenario.id}.prompts`);
+    }
+    if (!Array.isArray(scenario.assertions) || scenario.assertions.length === 0) {
+      errors.push(`${scenario.id}.assertions`);
+    } else {
+      const ids = new Set();
+      for (const assertion of scenario.assertions) {
+        if (!assertion || typeof assertion !== 'object' ||
+            !/^[a-z0-9][a-z0-9-]*$/.test(String(assertion.id ?? '')) ||
+            assertion.type !== 'output_contains' ||
+            typeof assertion.pattern !== 'string' || assertion.pattern.length === 0 ||
+            assertion.pattern.length > 1000 || ids.has(assertion.id)) {
+          errors.push(`${scenario.id}.assertions`);
+          break;
+        }
+        ids.add(assertion.id);
+      }
+    }
+    if (scenario.session_mode === 'external_fresh_pair') {
+      if (!sameArray(scenario.lifecycle_assertions, [
+        'fresh_session_isolated',
+        'provider_purged',
+        'sandbox_clean'
+      ])) errors.push(`${scenario.id}.lifecycle_assertions`);
+    } else if (scenario.lifecycle_assertions !== undefined) {
+      errors.push(`${scenario.id}.lifecycle_assertions`);
+    }
+  }
+  if (looksPrivate(JSON.stringify(catalog))) errors.push('private_material');
+  return errors;
+}
+
+export function buildContextModeMatrix({
+  catalog,
+  runId,
+  provenance,
+  generatedAt = new Date().toISOString()
+}) {
+  const errors = validateContextModeScenarioCatalog(catalog);
+  if (errors.length > 0) throw matrixError('invalid_catalog', errors);
+  validateProvenance(provenance);
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(String(runId ?? ''))) throw matrixError('invalid_run_id');
+  const rows = [];
+  for (const scenario of catalog.scenarios) {
+    for (let repetition = 1; repetition <= catalog.defaults.repetitions; repetition += 1) {
+      const triadId = `${runId}__${scenario.id}__r${String(repetition).padStart(2, '0')}`;
+      const settings = {
+        fixture_revision: catalog.fixture.revision,
+        prompts: scenario.prompts,
+        assertions: scenario.assertions,
+        session_mode: scenario.session_mode ?? 'same_thread',
+        lifecycle_assertions: scenario.lifecycle_assertions ?? [],
+        timeout_ms: catalog.defaults.timeout_ms,
+        runtime: catalog.defaults.runtime,
+        model: catalog.defaults.model,
+        reasoning: catalog.defaults.reasoning,
+        provenance
+      };
+      const settingsFingerprint = sha256(stableJson(settings));
+      for (const variant of CONTEXT_MODE_VARIANTS) {
+        const id = `${triadId}__${variant}`;
+        rows.push({
+          id,
+          triad_id: triadId,
+          scenario_id: scenario.id,
+          variant,
+          repetition,
+          runtime: catalog.defaults.runtime,
+          model: catalog.defaults.model,
+          reasoning: catalog.defaults.reasoning,
+          timeout_ms: catalog.defaults.timeout_ms,
+          fixture_revision: catalog.fixture.revision,
+          fixture_artifact: catalog.fixture.artifact,
+          prompts: [...scenario.prompts],
+          assertions: structuredClone(scenario.assertions),
+          session_mode: scenario.session_mode ?? 'same_thread',
+          lifecycle_assertions: [...(scenario.lifecycle_assertions ?? [])],
+          execution_gate: executionGateForVariant(variant),
+          settings_fingerprint: settingsFingerprint,
+          settings_provenance: structuredClone(provenance),
+          scenario_file: `scenarios/${id}.yaml`,
+          expected_trace_root: `runs/inline_${id}`
+        });
+      }
+    }
+  }
+  return {
+    schema: CONTEXT_MODE_MATRIX_SCHEMA,
+    run_id: runId,
+    generated_at: generatedAt,
+    planned_rows: rows.length,
+    scenarios: [...CONTEXT_MODE_SCENARIOS],
+    variants: [...CONTEXT_MODE_VARIANTS],
+    repetitions: catalog.defaults.repetitions,
+    rows
+  };
+}
+
+export async function generateContextModeMatrix({
+  outDir,
+  runId,
+  provenance,
+  catalogPath,
+  cwd = process.cwd(),
+  dryRun = false
+}) {
+  const catalog = await loadContextModeScenarioCatalog({ cwd, catalogPath });
+  const matrix = buildContextModeMatrix({ catalog, runId, provenance });
+  if (dryRun) return { matrix, dry_run: true, written_files: [] };
+  const scenariosDir = path.join(outDir, 'scenarios');
+  await mkdir(scenariosDir, { recursive: true });
+  const writtenFiles = [];
+  await writeFile(path.join(outDir, '.ai-tester.yaml'), 'runs_dir: runs\n', 'utf8');
+  writtenFiles.push('.ai-tester.yaml');
+  for (const row of matrix.rows) {
+    const target = path.join(outDir, row.scenario_file);
+    await writeFile(target, renderAiTesterScenario(row), 'utf8');
+    writtenFiles.push(row.scenario_file);
+  }
+  await writeFile(path.join(outDir, 'matrix.json'), `${JSON.stringify(matrix, null, 2)}\n`, 'utf8');
+  writtenFiles.push('matrix.json');
+  return { matrix, dry_run: false, written_files: writtenFiles };
+}
+
+export function renderAiTesterScenario(row) {
+  const assertionLines = row.assertions
+    .map((assertion) => `  - id: ${quoteYaml(assertion.id)}\n    type: ${assertion.type}\n    pattern: ${quoteYaml(assertion.pattern)}`)
+    .join('\n');
+  const systemPrompt = systemPromptForVariant(row.variant);
+  return [
+    `scenario: ${quoteYaml(row.id)}`,
+    `description: ${quoteYaml(`context-mode-134 variant=${row.variant} triad=${row.triad_id} settings=${row.settings_fingerprint}`)}`,
+    'system_prompt: |',
+    ...systemPrompt.map((line) => `  ${line}`),
+    'max_turns: 8',
+    'runner:',
+    '  runtime: codex',
+    '  model: "gpt-5.6-luna"',
+    '  reasoning: "low"',
+    '  permission_mode: bypassPermissions',
+    `  acp_turn_timeout_seconds: ${Math.ceil(row.timeout_ms / 1000)}`,
+    'user_prompts:',
+    ...row.prompts.map((prompt) => `  - ${quoteYaml(prompt)}`),
+    'fixtures:',
+    '  git_init: true',
+    '  files_committed:',
+    '    - path: "project/generated-output.txt"',
+    `      content: ${quoteYaml('Record D-134 selects the amber deployment lane. File state F-134 is pending review. Error class E-134 is retryable. Required facts: north=17, east=29, checksum=46. Control status: ready.')}`,
+    'assertions:',
+    assertionLines,
+    ...toolAssertionLinesForVariant(row.variant),
+    '  - id: "stay-in-sandbox"',
+    '    type: no_path_escape',
+    '  - id: "bounded-turns"',
+    '    type: turn_count_at_most',
+    '    max: 8',
+    ''
+  ].join('\n');
+}
+
+function executionGateForVariant(variant) {
+  if (variant === 'baseline') return { status: 'PASS', reason: 'baseline_ready' };
+  if (variant === 'mcp_only') {
+    return { status: 'BLOCKED', reason: 'runtime_dependency_self_install' };
+  }
+  return { status: 'NOT_RUN', reason: 'auth_isolation_unavailable' };
+}
+
+function systemPromptForVariant(variant) {
+  const shared = [
+    'This is a controlled synthetic evaluation. Work only in the sandbox.',
+    'Never reveal absolute paths, environment values, credentials, or raw fixture content.',
+    'Return only the requested facts in the exact requested format.'
+  ];
+  if (variant === 'baseline') {
+    return [...shared, 'Use rg directly against project/generated-output.txt. Do not use context-mode.'];
+  }
+  if (variant === 'mcp_only') {
+    return [
+      ...shared,
+      'Use only the isolated context_mode MCP tools for the generated artifact.',
+      'Index only project/generated-output.txt, query it, then purge project scope.'
+    ];
+  }
+  return [
+    ...shared,
+    'Use only the isolated registered context-mode Codex plugin and its reviewed hooks.',
+    'Do not install, update, or trust any provider outside the supplied isolated Codex home.'
+  ];
+}
+
+function toolAssertionLinesForVariant(variant) {
+  if (variant === 'baseline') {
+    return [
+      '  - id: "baseline-rg-called"',
+      '    type: tool_called',
+      '    tool: "Bash"',
+      '    args_match:',
+      `      command: ${quoteYaml('(?:^|[\\\\/ ;])rg(?:\\.exe)?(?:[ \\t]|$)')}`
+    ];
+  }
+  return [
+    '  - id: "context-mode-search-called"',
+    '    type: tool_called',
+    '    tool_pattern: "(?i)(?:^|__)ctx_search$"'
+  ];
+}
+
+export function buildCodexReasoningWrapper({ realCodex }) {
+  if (!realCodex || !path.isAbsolute(realCodex) && !/^[A-Za-z0-9_.-]+$/.test(realCodex)) {
+    throw matrixError('invalid_codex_executable');
+  }
+  return [
+    '#!/usr/bin/env node',
+    "import { spawnSync } from 'node:child_process';",
+    "import { appendFileSync, existsSync } from 'node:fs';",
+    "import path from 'node:path';",
+    `const realCodex = ${JSON.stringify(realCodex)};`,
+    "const original = process.argv.slice(2);",
+    "const isInitial = original[0] === 'exec' && original[1] !== 'resume';",
+    "const isResume = original[0] === 'exec' && original[1] === 'resume';",
+    "const isProbe = original.length === 1 && ['--version', '--help'].includes(original[0]);",
+    "if (!isInitial && !isResume && !isProbe) process.exit(64);",
+    "const args = isProbe ? original : ['-c', 'model_reasoning_effort=\"low\"', ...original];",
+    "if (!isProbe && process.env.CONTEXT_MODE_REASONING_PROOF) {",
+    "  appendFileSync(process.env.CONTEXT_MODE_REASONING_PROOF, JSON.stringify({ phase: isResume ? 'resume' : 'initial', profile: 'low' }) + '\\n');",
+    "}",
+    "const executable = realCodex === '__PATH_AFTER_WRAPPER__' ? findRealCodex() : realCodex;",
+    "const result = spawnSync(executable, args, { stdio: 'inherit', env: process.env });",
+    "process.exit(result.status ?? 1);",
+    "function findRealCodex() {",
+    "  const own = path.dirname(process.argv[1]).toLowerCase();",
+    "  const dirs = String(process.env.PATH ?? process.env.Path ?? '').split(path.delimiter).filter((dir) => path.resolve(dir).toLowerCase() !== own);",
+    "  for (const suffix of process.platform === 'win32' ? ['codex.exe', 'codex.cmd'] : ['codex']) {",
+    "    for (const dir of dirs) { const candidate = path.join(dir, suffix); if (existsSync(candidate)) return candidate; }",
+    "  }",
+    "  process.exit(69);",
+    "}",
+    ''
+  ].join('\n');
+}
+
+export function validateReasoningProof(argvRecords = []) {
+  const hasInitial = argvRecords.some((args) =>
+    args.includes('exec') &&
+    args[args.indexOf('exec') + 1] !== 'resume' &&
+    args.includes('model_reasoning_effort="low"')
+  );
+  const hasResume = argvRecords.some((args) =>
+    args.includes('exec') &&
+    args[args.indexOf('exec') + 1] === 'resume' &&
+    args.includes('model_reasoning_effort="low"')
+  );
+  return hasInitial && hasResume
+    ? { status: 'PASS', reason: 'profile_enforced_initial_and_resume' }
+    : { status: 'NOT_RUN', reason: 'profile_unenforced' };
+}
+
+export async function writeCodexReasoningWrapper({ outDir }) {
+  await mkdir(outDir, { recursive: true });
+  const modulePath = path.join(outDir, 'codex-wrapper.mjs');
+  const commandPath = path.join(outDir, process.platform === 'win32' ? 'codex.cmd' : 'codex');
+  await writeFile(
+    modulePath,
+    buildCodexReasoningWrapper({ realCodex: '__PATH_AFTER_WRAPPER__' }),
+    'utf8'
+  );
+  if (process.platform === 'win32') {
+    await writeFile(commandPath, '@echo off\r\nnode "%~dp0codex-wrapper.mjs" %*\r\n', 'utf8');
+    await writeFile(path.join(outDir, 'which.cmd'), '@echo off\r\nwhere.exe %*\r\n', 'utf8');
+  } else {
+    await writeFile(commandPath, '#!/bin/sh\nexec node "$(dirname "$0")/codex-wrapper.mjs" "$@"\n', { mode: 0o755 });
+  }
+  return {
+    module_file: path.basename(modulePath),
+    command_file: path.basename(commandPath),
+    proof_schema: 'aifhub.context_mode_codex.reasoning_proof.v1'
+  };
+}
+
+function validateProvenance(provenance = {}) {
+  const required = [
+    'fixture_revision',
+    'ai_tester_source_clean',
+    'ai_tester_source_commit',
+    'ai_tester_binary_sha256',
+    'ai_tester_version',
+    'codex_version',
+    'codex_features',
+    'context_mode_tag',
+    'context_mode_commit',
+    'context_mode_integrity'
+  ];
+  const missing = required.filter((key) => provenance[key] === undefined);
+  if (missing.length > 0) throw matrixError('incomplete_provenance', missing);
+  if (!/^[a-f0-9]{40}$/.test(provenance.ai_tester_source_commit)) {
+    throw matrixError('invalid_ai_tester_source_commit');
+  }
+  if (provenance.ai_tester_source_clean !== true) throw matrixError('ai_tester_source_dirty');
+  if (!/^[a-f0-9]{64}$/.test(provenance.ai_tester_binary_sha256)) {
+    throw matrixError('invalid_ai_tester_binary_sha256');
+  }
+  if (looksPrivate(JSON.stringify(provenance))) throw matrixError('private_provenance');
+}
+
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function sha256(value) {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function sameArray(actual, expected) {
+  return Array.isArray(actual) &&
+    actual.length === expected.length &&
+    actual.every((value, index) => value === expected[index]);
+}
+
+function isSafeRelativeFile(value) {
+  const raw = String(value ?? '');
+  return raw.length > 0 &&
+    path.basename(raw) === raw &&
+    !path.isAbsolute(raw) &&
+    !/^[A-Za-z][A-Za-z0-9+.-]*:/.test(raw);
+}
+
+function looksPrivate(value) {
+  return /(?:[A-Za-z]:\\Users\\|\/Users\/|\/home\/[^/]+\/|BEGIN (?:RSA |OPENSSH )?PRIVATE KEY|(?:api[_-]?key|token|password)\s*[:=]\s*\S+)/i.test(value);
+}
+
+function quoteYaml(value) {
+  return JSON.stringify(String(value));
+}
+
+function matrixError(code, details = []) {
+  const error = new Error(`${code}${details.length ? `:${details.join(',')}` : ''}`);
+  error.code = code;
+  return error;
+}
+
+async function main(argv = process.argv.slice(2)) {
+  const catalog = await loadContextModeScenarioCatalog();
+  const provenancePath = valueAfter(argv, '--provenance');
+  const outDir = valueAfter(argv, '--out');
+  const runId = valueAfter(argv, '--run-id');
+  if (!provenancePath || !outDir || !runId) throw matrixError('required_arguments_missing');
+  const provenance = JSON.parse(await readFile(provenancePath, 'utf8'));
+  const result = await generateContextModeMatrix({
+    catalogPath: path.join(process.cwd(), DEFAULT_CATALOG),
+    outDir: path.resolve(outDir),
+    runId,
+    provenance,
+    dryRun: argv.includes('--dry-run')
+  });
+  process.stdout.write(`${JSON.stringify({
+    schema: result.matrix.schema,
+    run_id: result.matrix.run_id,
+    planned_rows: result.matrix.rows.length,
+    dry_run: result.dry_run
+  })}\n`);
+}
+
+function valueAfter(argv, flag) {
+  const index = argv.indexOf(flag);
+  return index >= 0 ? argv[index + 1] : undefined;
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+  main().catch((error) => {
+    process.stderr.write(`${error?.code ?? 'matrix_failed'}\n`);
+    process.exitCode = 1;
+  });
+}

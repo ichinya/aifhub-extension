@@ -12,6 +12,7 @@ import {
   buildPublicRunSummary,
   discoverProjectRoots,
   getContext7RunStatus,
+  getContextModeGenericRouteStatus,
   getProfileLifecycleRunStatus,
   getToolPlan,
   hasSensitivePathLeak,
@@ -174,6 +175,16 @@ describe('path guards', () => {
 });
 
 describe('tool plan', () => {
+  it('fails the legacy floating context-mode lifecycle closed', () => {
+    assert.deepEqual(getContextModeGenericRouteStatus(), {
+      tool_id: 'context-mode',
+      status: 'unavailable',
+      reason: 'dedicated_harness_required',
+      issue: 134,
+      notes: 'Use the pinned isolated context-mode Codex harness; the generic floating install route is disabled.'
+    });
+  });
+
   it('keeps rejected providers out of safe full-install runs', () => {
     const plan = getToolPlan('safe');
     const installed = plan.filter((tool) => tool.fullInstall).map((tool) => tool.id);
