@@ -15,6 +15,15 @@ export const CONTEXT_MODE_VARIANTS = Object.freeze([
   'mcp_only',
   'codex_plugin'
 ]);
+export const BASELINE_RG_COMMAND_PATTERN = String.raw`(?:^|[^A-Za-z0-9_.-])rg(?:\.exe)?(?:['"])?(?:[ \t]|$)`;
+const BASELINE_NODE_COMMAND_PATTERN = String.raw`(?:^|[^A-Za-z0-9_.-])node(?:\.exe)?(?:['"])?(?:[ \t]|$)`;
+const AUTHORIZATION_KEYS = Object.freeze([
+  'scope',
+  'provider_snapshot',
+  'runtime_dependency_bootstrap',
+  'auth_mode',
+  'native_codex'
+]);
 const DEFAULT_CATALOG = path.join(
   'docs',
   'memory-tools-research',
@@ -44,8 +53,28 @@ export function validateContextModeScenarioCatalog(catalog = {}) {
     errors.push('scenarios');
   }
   if (!isSafeRelativeFile(catalog.fixture?.artifact)) errors.push('fixture.artifact');
+  const profiles = catalog.fixture?.profiles;
+  if (!profiles || profiles.standard?.kind !== 'file' ||
+      profiles.large_stdout_tail?.kind !== 'generated_stdout' ||
+      !Number.isInteger(profiles.large_stdout_tail?.line_count) ||
+      profiles.large_stdout_tail.line_count <= 0 ||
+      !Number.isInteger(profiles.large_stdout_tail?.filler_width) ||
+      profiles.large_stdout_tail.filler_width <= 0 ||
+      !Number.isInteger(profiles.large_stdout_tail?.minimum_bytes) ||
+      profiles.large_stdout_tail.minimum_bytes <= 1_048_576 ||
+      !Array.isArray(profiles.large_stdout_tail?.tail_lines) ||
+      profiles.large_stdout_tail.tail_lines.length !== 3) {
+    errors.push('fixture.profiles');
+  }
   for (const scenario of catalog.scenarios ?? []) {
-    const expectedPromptCount = scenario.session_mode === 'external_fresh_pair' ? 1 : 2;
+    const sessionMode = scenario.session_mode ?? 'same_thread';
+    const expectedPromptCount = ['single_turn', 'external_fresh_pair'].includes(sessionMode) ? 1 : 2;
+    if (!['single_turn', 'same_thread', 'external_fresh_pair'].includes(sessionMode)) {
+      errors.push(`${scenario.id}.session_mode`);
+    }
+    if (!profiles?.[scenario.fixture_profile ?? 'standard']) {
+      errors.push(`${scenario.id}.fixture_profile`);
+    }
     if (!Array.isArray(scenario.prompts) || scenario.prompts.length !== expectedPromptCount ||
         scenario.prompts.some((prompt) => typeof prompt !== 'string' || prompt.length === 0)) {
       errors.push(`${scenario.id}.prompts`);
@@ -84,11 +113,13 @@ export function buildContextModeMatrix({
   catalog,
   runId,
   provenance,
+  authorization,
   generatedAt = new Date().toISOString()
 }) {
   const errors = validateContextModeScenarioCatalog(catalog);
   if (errors.length > 0) throw matrixError('invalid_catalog', errors);
   validateProvenance(provenance);
+  const normalizedAuthorization = normalizeContextModeAuthorization(authorization);
   if (!/^[a-z0-9][a-z0-9-]*$/.test(String(runId ?? ''))) throw matrixError('invalid_run_id');
   const rows = [];
   for (const scenario of catalog.scenarios) {
@@ -96,6 +127,8 @@ export function buildContextModeMatrix({
       const triadId = `${runId}__${scenario.id}__r${String(repetition).padStart(2, '0')}`;
       const settings = {
         fixture_revision: catalog.fixture.revision,
+        fixture_profile: scenario.fixture_profile ?? 'standard',
+        fixture_profile_config: catalog.fixture.profiles[scenario.fixture_profile ?? 'standard'],
         prompts: scenario.prompts,
         assertions: scenario.assertions,
         session_mode: scenario.session_mode ?? 'same_thread',
@@ -104,7 +137,8 @@ export function buildContextModeMatrix({
         runtime: catalog.defaults.runtime,
         model: catalog.defaults.model,
         reasoning: catalog.defaults.reasoning,
-        provenance
+        provenance,
+        authorization_class: normalizedAuthorization.class
       };
       const settingsFingerprint = sha256(stableJson(settings));
       for (const variant of CONTEXT_MODE_VARIANTS) {
@@ -121,11 +155,21 @@ export function buildContextModeMatrix({
           timeout_ms: catalog.defaults.timeout_ms,
           fixture_revision: catalog.fixture.revision,
           fixture_artifact: catalog.fixture.artifact,
+          fixture_seed: catalog.fixture.profiles[scenario.fixture_profile ?? 'standard'].kind === 'file'
+            ? catalog.fixture.content
+            : null,
+          fixture_profile: scenario.fixture_profile ?? 'standard',
+          fixture_profile_config: structuredClone(
+            catalog.fixture.profiles[scenario.fixture_profile ?? 'standard']
+          ),
           prompts: [...scenario.prompts],
           assertions: structuredClone(scenario.assertions),
           session_mode: scenario.session_mode ?? 'same_thread',
+          resume_driver_parity: scenario.resume_driver_parity === true,
           lifecycle_assertions: [...(scenario.lifecycle_assertions ?? [])],
-          execution_gate: executionGateForVariant(variant),
+          execution_gate: executionGateForVariant(variant, normalizedAuthorization),
+          authorization_class: normalizedAuthorization.class,
+          raw_provider_policy: rawProviderPolicyForRow(variant, scenario.id),
           settings_fingerprint: settingsFingerprint,
           settings_provenance: structuredClone(provenance),
           scenario_file: `scenarios/${id}.yaml`,
@@ -142,6 +186,7 @@ export function buildContextModeMatrix({
     scenarios: [...CONTEXT_MODE_SCENARIOS],
     variants: [...CONTEXT_MODE_VARIANTS],
     repetitions: catalog.defaults.repetitions,
+    authorization_class: normalizedAuthorization.class,
     rows
   };
 }
@@ -150,12 +195,13 @@ export async function generateContextModeMatrix({
   outDir,
   runId,
   provenance,
+  authorization,
   catalogPath,
   cwd = process.cwd(),
   dryRun = false
 }) {
   const catalog = await loadContextModeScenarioCatalog({ cwd, catalogPath });
-  const matrix = buildContextModeMatrix({ catalog, runId, provenance });
+  const matrix = buildContextModeMatrix({ catalog, runId, provenance, authorization });
   if (dryRun) return { matrix, dry_run: true, written_files: [] };
   const scenariosDir = path.join(outDir, 'scenarios');
   await mkdir(scenariosDir, { recursive: true });
@@ -176,7 +222,19 @@ export function renderAiTesterScenario(row) {
   const assertionLines = row.assertions
     .map((assertion) => `  - id: ${quoteYaml(assertion.id)}\n    type: ${assertion.type}\n    pattern: ${quoteYaml(assertion.pattern)}`)
     .join('\n');
-  const systemPrompt = systemPromptForVariant(row.variant);
+  const systemPrompt = systemPromptForVariant(row.variant, row);
+  const fixtureLines = ['  files_committed:'];
+  if (row.fixture_profile_config?.kind === 'generated_stdout') {
+    fixtureLines.push(
+      '    - path: "project/emit-large-output.mjs"',
+      `      content: ${quoteYaml(buildLargeOutputEmitterSource(row.fixture_profile_config))}`
+    );
+  } else {
+    fixtureLines.push(
+      '    - path: "project/generated-output.txt"',
+      `      content: ${quoteYaml(row.fixture_seed)}`
+    );
+  }
   return [
     `scenario: ${quoteYaml(row.id)}`,
     `description: ${quoteYaml(`context-mode-134 variant=${row.variant} triad=${row.triad_id} settings=${row.settings_fingerprint}`)}`,
@@ -193,12 +251,10 @@ export function renderAiTesterScenario(row) {
     ...row.prompts.map((prompt) => `  - ${quoteYaml(prompt)}`),
     'fixtures:',
     '  git_init: true',
-    '  files_committed:',
-    '    - path: "project/generated-output.txt"',
-    `      content: ${quoteYaml('Record D-134 selects the amber deployment lane. File state F-134 is pending review. Error class E-134 is retryable. Required facts: north=17, east=29, checksum=46. Control status: ready.')}`,
+    ...fixtureLines,
     'assertions:',
     assertionLines,
-    ...toolAssertionLinesForVariant(row.variant),
+    ...toolAssertionLinesForVariant(row.variant, row),
     '  - id: "stay-in-sandbox"',
     '    type: no_path_escape',
     '  - id: "bounded-turns"',
@@ -208,52 +264,121 @@ export function renderAiTesterScenario(row) {
   ].join('\n');
 }
 
-function executionGateForVariant(variant) {
+export function normalizeContextModeAuthorization(authorization) {
+  const fallback = {
+    class: 'default_fail_closed',
+    mcp_allowed: false,
+    plugin_allowed: false
+  };
+  if (!authorization || typeof authorization !== 'object' || Array.isArray(authorization)) return fallback;
+  const keys = Object.keys(authorization).sort();
+  if (!sameArray(keys, [...AUTHORIZATION_KEYS].sort())) return fallback;
+  const mcpAllowed = authorization.scope === 'isolated_evaluation' &&
+    authorization.provider_snapshot === 'prepared_pinned_snapshot' &&
+    authorization.runtime_dependency_bootstrap === 'approved';
+  if (!mcpAllowed) return fallback;
+  const pluginAllowed = authorization.auth_mode === 'scoped_ephemeral' &&
+    authorization.native_codex === true;
+  return {
+    class: pluginAllowed ? 'explicit_isolated_full' : 'explicit_isolated_mcp',
+    mcp_allowed: true,
+    plugin_allowed: pluginAllowed
+  };
+}
+
+function executionGateForVariant(variant, authorization) {
   if (variant === 'baseline') return { status: 'PASS', reason: 'baseline_ready' };
   if (variant === 'mcp_only') {
+    if (authorization.mcp_allowed) {
+      return { status: 'PASS', reason: 'explicit_isolated_authorization' };
+    }
     return { status: 'BLOCKED', reason: 'runtime_dependency_self_install' };
+  }
+  if (authorization.plugin_allowed) {
+    return { status: 'PASS', reason: 'explicit_isolated_authorization' };
   }
   return { status: 'NOT_RUN', reason: 'auth_isolation_unavailable' };
 }
 
-function systemPromptForVariant(variant) {
+function systemPromptForVariant(variant, row) {
   const shared = [
     'This is a controlled synthetic evaluation. Work only in the sandbox.',
     'Never reveal absolute paths, environment values, credentials, or raw fixture content.',
     'Return only the requested facts in the exact requested format.'
   ];
+  const largeOutput = row.scenario_id === 'large_generated_output_retrieval';
   if (variant === 'baseline') {
-    return [...shared, 'Use rg directly against project/generated-output.txt. Do not use context-mode.'];
+    return [...shared, largeOutput
+      ? 'Run node project/emit-large-output.mjs through the shell. Do not inspect the emitter source or use context-mode.'
+      : 'Use rg directly against project/generated-output.txt. Do not use context-mode.'];
   }
   if (variant === 'mcp_only') {
     return [
       ...shared,
-      'Use only the isolated context_mode MCP tools for the generated artifact.',
-      'Index only project/generated-output.txt, query it, then purge project scope.'
+      largeOutput
+        ? 'Use only evaluation-scoped ctx_batch_execute for node project/emit-large-output.mjs, query the indexed output, then purge project scope.'
+        : 'Use only the isolated context_mode MCP tools for the generated artifact.',
+      ...(largeOutput ? [] : ['Index only project/generated-output.txt, query it, then purge project scope.'])
     ];
   }
   return [
     ...shared,
     'Use only the isolated registered context-mode Codex plugin and its reviewed hooks.',
+    ...(largeOutput ? ['Run node project/emit-large-output.mjs through the shell so the plugin hooks can observe its output.'] : []),
     'Do not install, update, or trust any provider outside the supplied isolated Codex home.'
   ];
 }
 
-function toolAssertionLinesForVariant(variant) {
+function toolAssertionLinesForVariant(variant, row) {
   if (variant === 'baseline') {
+    const pattern = row.scenario_id === 'large_generated_output_retrieval'
+      ? BASELINE_NODE_COMMAND_PATTERN
+      : BASELINE_RG_COMMAND_PATTERN;
     return [
       '  - id: "baseline-rg-called"',
       '    type: tool_called',
       '    tool: "Bash"',
       '    args_match:',
-      `      command: ${quoteYaml('(?:^|[\\\\/ ;])rg(?:\\.exe)?(?:[ \\t]|$)')}`
+      `      command: ${quoteYaml(pattern)}`
     ];
   }
+  return [];
+}
+
+export function buildLargeOutputEmitterSource(profile = {}) {
+  if (profile.kind !== 'generated_stdout' || !Number.isInteger(profile.line_count) ||
+      profile.line_count <= 0 || !Number.isInteger(profile.filler_width) ||
+      profile.filler_width <= 0 || !Array.isArray(profile.tail_lines) ||
+      profile.tail_lines.some((line) => typeof line !== 'string' || /[\r\n]/.test(line))) {
+    throw matrixError('invalid_large_fixture_profile');
+  }
   return [
-    '  - id: "context-mode-search-called"',
-    '    type: tool_called',
-    '    tool_pattern: "(?i)(?:^|__)ctx_search$"'
-  ];
+    `const lineCount = ${profile.line_count};`,
+    `const filler = ${JSON.stringify('x'.repeat(profile.filler_width))};`,
+    "for (let index = 0; index < lineCount; index += 1) process.stdout.write(`filler-${String(index).padStart(5, '0')} ${filler}\\n`);",
+    `process.stdout.write(${JSON.stringify(`${profile.tail_lines.join('\n')}\n`)});`,
+    ''
+  ].join('\n');
+}
+
+function rawProviderPolicyForRow(variant, scenarioId) {
+  if (variant === 'baseline') return null;
+  if (variant === 'mcp_only' && scenarioId === 'large_generated_output_retrieval') {
+    return {
+      required_tools: ['ctx_batch_execute', 'ctx_purge'],
+      allowed_tools: ['ctx_batch_execute', 'ctx_search', 'ctx_stats', 'ctx_purge']
+    };
+  }
+  if (variant === 'mcp_only') {
+    return {
+      required_tools: ['ctx_index', 'ctx_search', 'ctx_purge'],
+      allowed_tools: ['ctx_doctor', 'ctx_index', 'ctx_search', 'ctx_stats', 'ctx_purge']
+    };
+  }
+  return {
+    required_tools: ['ctx_search'],
+    allowed_tools: ['ctx_search', 'ctx_stats', 'ctx_purge']
+  };
 }
 
 export function buildCodexReasoningWrapper({ realCodex }) {
@@ -306,13 +431,13 @@ export function validateReasoningProof(argvRecords = []) {
     : { status: 'NOT_RUN', reason: 'profile_unenforced' };
 }
 
-export async function writeCodexReasoningWrapper({ outDir }) {
+export async function writeCodexReasoningWrapper({ outDir, realCodex = '__PATH_AFTER_WRAPPER__' }) {
   await mkdir(outDir, { recursive: true });
   const modulePath = path.join(outDir, 'codex-wrapper.mjs');
   const commandPath = path.join(outDir, process.platform === 'win32' ? 'codex.cmd' : 'codex');
   await writeFile(
     modulePath,
-    buildCodexReasoningWrapper({ realCodex: '__PATH_AFTER_WRAPPER__' }),
+    buildCodexReasoningWrapper({ realCodex }),
     'utf8'
   );
   if (process.platform === 'win32') {
@@ -324,6 +449,7 @@ export async function writeCodexReasoningWrapper({ outDir }) {
   return {
     module_file: path.basename(modulePath),
     command_file: path.basename(commandPath),
+    codex_resolution: realCodex === '__PATH_AFTER_WRAPPER__' ? 'path_fallback' : 'explicit',
     proof_schema: 'aifhub.context_mode_codex.reasoning_proof.v1'
   };
 }
@@ -396,15 +522,20 @@ function matrixError(code, details = []) {
 async function main(argv = process.argv.slice(2)) {
   const catalog = await loadContextModeScenarioCatalog();
   const provenancePath = valueAfter(argv, '--provenance');
+  const authorizationPath = valueAfter(argv, '--authorization');
   const outDir = valueAfter(argv, '--out');
   const runId = valueAfter(argv, '--run-id');
   if (!provenancePath || !outDir || !runId) throw matrixError('required_arguments_missing');
   const provenance = JSON.parse(await readFile(provenancePath, 'utf8'));
+  const authorization = authorizationPath
+    ? JSON.parse(await readFile(authorizationPath, 'utf8'))
+    : undefined;
   const result = await generateContextModeMatrix({
     catalogPath: path.join(process.cwd(), DEFAULT_CATALOG),
     outDir: path.resolve(outDir),
     runId,
     provenance,
+    authorization,
     dryRun: argv.includes('--dry-run')
   });
   process.stdout.write(`${JSON.stringify({

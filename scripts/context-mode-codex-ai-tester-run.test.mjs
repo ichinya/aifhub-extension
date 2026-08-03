@@ -1,6 +1,6 @@
 // context-mode-codex-ai-tester-run.test.mjs - provenance-safe runner contracts
 import assert from 'node:assert/strict';
-import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { access, appendFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'node:test';
@@ -132,6 +132,22 @@ describe('context-mode dedicated runner', () => {
     assert.equal(result.statuses[0].reason, 'fresh_session_driver_unavailable');
   });
 
+  it('does not claim same-thread continuity while ai-tester resume parity is unavailable', async () => {
+    let calls = 0;
+    const options = await runnerOptions({
+      runProcess: async () => { calls += 1; return { exitCode: 0 }; }
+    });
+    Object.assign(options.matrix.rows[0], {
+      session_mode: 'same_thread',
+      prompts: ['first', 'second'],
+      resume_driver_parity: false
+    });
+    const result = await runVerifiedMatrix(options);
+    assert.equal(calls, 1, 'only schema dry-run may execute without resume parity');
+    assert.equal(result.status, 'NOT_RUN');
+    assert.equal(result.statuses[0].reason, 'resume_driver_parity_unavailable');
+  });
+
   it('does not execute a provider variant without an explicit provisioning boundary', async () => {
     let calls = 0;
     const options = await runnerOptions({
@@ -178,6 +194,103 @@ describe('context-mode dedicated runner', () => {
     const result = await runVerifiedMatrix(options);
     assert.equal(result.status, 'FAIL');
     assert.equal(result.statuses[0].reason, 'incomplete_trace_evidence');
+  });
+
+  it('does not pass a provider row when the outer trace lacks raw nested-provider audit evidence', async () => {
+    let calls = 0;
+    const options = await runnerOptions({
+      runProcess: async () => {
+        calls += 1;
+        if (calls === 2) {
+          const tracePath = path.join(tempDir, 'sandbox', 'runs', 'inline', 'provider.json');
+          await mkdir(path.dirname(tracePath), { recursive: true });
+          await writeFile(tracePath, JSON.stringify(validTrace('row-a')), 'utf8');
+        }
+        return { exitCode: 0 };
+      }
+    });
+    Object.assign(options.matrix.rows[0], {
+      variant: 'mcp_only',
+      execution_gate: { status: 'PASS', reason: 'explicit_isolated_authorization' },
+      raw_provider_policy: {
+        required_tools: ['ctx_search', 'ctx_purge'],
+        allowed_tools: ['ctx_index', 'ctx_search', 'ctx_purge']
+      }
+    });
+    options.provisionRow = async () => ({ status: 'PASS' });
+    const result = await runVerifiedMatrix(options);
+    assert.equal(result.status, 'NOT_RUN');
+    assert.equal(result.statuses[0].reason, 'raw_provider_audit_missing');
+  });
+
+  it('joins a matching outer trace with a fresh confined raw provider audit', async () => {
+    let calls = 0;
+    const options = await runnerOptions({
+      runProcess: async () => {
+        calls += 1;
+        if (calls === 2) {
+          const tracePath = path.join(tempDir, 'sandbox', 'runs', 'inline', 'provider-pass.json');
+          const rolloutPath = path.join(tempDir, 'sandbox', 'codex-home', 'sessions', 'run', 'rollout.jsonl');
+          await mkdir(path.dirname(tracePath), { recursive: true });
+          await mkdir(path.dirname(rolloutPath), { recursive: true });
+          await writeFile(tracePath, JSON.stringify(validTrace('row-a')), 'utf8');
+          await writeFile(rolloutPath, `${JSON.stringify(rolloutTool('ctx_search', {
+            source: 'generated-output.txt',
+            queries: ['required facts']
+          }))}\n${JSON.stringify(rolloutTool('ctx_purge', { confirm: true, scope: 'project' }))}\n`, 'utf8');
+        }
+        return { exitCode: 0 };
+      }
+    });
+    Object.assign(options.matrix.rows[0], {
+      variant: 'mcp_only',
+      execution_gate: { status: 'PASS', reason: 'explicit_isolated_authorization' },
+      raw_provider_policy: {
+        required_tools: ['ctx_search', 'ctx_purge'],
+        allowed_tools: ['ctx_index', 'ctx_search', 'ctx_purge']
+      }
+    });
+    options.provisionRow = async () => ({ status: 'PASS' });
+    const result = await runVerifiedMatrix(options);
+    assert.equal(result.status, 'PASS');
+    assert.equal(result.statuses[0].status, 'PASS');
+    assert.doesNotMatch(JSON.stringify(result), /provider-pass|rollout\.jsonl|generated-output/);
+  });
+
+  it('audits only records appended by the current provider row', async () => {
+    let calls = 0;
+    const options = await runnerOptions({
+      runProcess: async () => {
+        calls += 1;
+        if (calls === 2) {
+          const tracePath = path.join(tempDir, 'sandbox', 'runs', 'inline', 'provider-current.json');
+          const rolloutPath = path.join(tempDir, 'sandbox', 'codex-home', 'sessions', 'run', 'rollout.jsonl');
+          await mkdir(path.dirname(tracePath), { recursive: true });
+          await writeFile(tracePath, JSON.stringify(validTrace('row-a')), 'utf8');
+          await appendFile(rolloutPath, `${JSON.stringify(rolloutTool('ctx_stats', {}))}\n`, 'utf8');
+        }
+        return { exitCode: 0 };
+      }
+    });
+    const rolloutPath = path.join(tempDir, 'sandbox', 'codex-home', 'sessions', 'run', 'rollout.jsonl');
+    await mkdir(path.dirname(rolloutPath), { recursive: true });
+    await writeFile(rolloutPath, `${JSON.stringify(rolloutTool('ctx_search', {
+      source: 'old-output.txt',
+      queries: ['old fact']
+    }))}\n${JSON.stringify(rolloutTool('ctx_purge', { confirm: true, scope: 'project' }))}\n`, 'utf8');
+    Object.assign(options.matrix.rows[0], {
+      variant: 'mcp_only',
+      execution_gate: { status: 'PASS', reason: 'explicit_isolated_authorization' },
+      raw_provider_policy: {
+        required_tools: ['ctx_search', 'ctx_purge'],
+        allowed_tools: ['ctx_search', 'ctx_stats', 'ctx_purge']
+      }
+    });
+    options.provisionRow = async () => ({ status: 'PASS' });
+    const result = await runVerifiedMatrix(options);
+    assert.equal(result.status, 'NOT_RUN');
+    assert.equal(result.statuses[0].reason, 'raw_provider_audit_missing');
+    assert.deepEqual(result.statuses[0].provider_audit.tool_counts, { ctx_stats: 1 });
   });
 
   it('accepts only a fresh matching trace under the isolated run root', async () => {
@@ -303,5 +416,16 @@ function validTrace(scenarioName) {
     scoring: { allPassed: true, overallPass: true },
     cost: { inputTokens: 1, outputTokens: 1 },
     errors: []
+  };
+}
+
+function rolloutTool(tool, argumentsValue) {
+  return {
+    type: 'response_item',
+    payload: {
+      type: 'custom_tool_call',
+      name: 'functions.exec',
+      input: { server: 'context-mode', tool, arguments: argumentsValue }
+    }
   };
 }

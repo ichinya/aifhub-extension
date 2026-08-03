@@ -267,7 +267,7 @@ export async function runMcpContract({ artifact, invokeTool, hashContent = sha25
       source: artifact.name,
       content: artifact.content
     },
-    ctx_search: { query: artifact.search_query, limit: 5 },
+    ctx_search: { queries: [artifact.search_query], limit: 5 },
     ctx_stats: {},
     ctx_purge: { confirm: true, scope: 'project' }
   };
@@ -408,6 +408,18 @@ export function parseCodexFeatureList(output) {
     .sort();
 }
 
+export function validateNativeCodexExecutable(command, { platform = process.platform } = {}) {
+  const executable = String(command ?? '');
+  if (!path.isAbsolute(executable)) {
+    return { status: 'NOT_RUN', reason: 'native_codex_executable_required' };
+  }
+  const extension = path.extname(executable).toLowerCase();
+  if ((platform === 'win32' && extension !== '.exe') || ['.cmd', '.bat'].includes(extension)) {
+    return { status: 'NOT_RUN', reason: 'native_codex_executable_required' };
+  }
+  return { status: 'PASS', reason: 'native_codex_executable_verified' };
+}
+
 export function buildActualPluginPlan({
   layout,
   sandboxOwnerRoot,
@@ -423,11 +435,17 @@ export function buildActualPluginPlan({
     supportedFeatures,
     authMode
   });
+  const nativeExecutable = eligibility.status === 'PASS'
+    ? validateNativeCodexExecutable(codexExecutable)
+    : { status: eligibility.status, reason: eligibility.reason };
+  const effectiveEligibility = eligibility.status === 'PASS' && nativeExecutable.status !== 'PASS'
+    ? { ...eligibility, ...nativeExecutable }
+    : eligibility;
   const env = buildContextModeEnv({ layout, baseEnv });
   const marketplaceName = 'context-mode-134';
   const marketplaceRoot = layout.marketplace;
   return {
-    ...eligibility,
+    ...effectiveEligibility,
     command: codexExecutable,
     steps: [
       {

@@ -6,6 +6,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 
 import {
+  auditCodexRolloutRecords,
   buildContextModeResults,
   normalizeContextModeTrace,
   scanCompleteTrace,
@@ -116,6 +117,81 @@ describe('context-mode complete-record normalization', () => {
   });
 });
 
+describe('context-mode raw Codex rollout audit', () => {
+  it('keeps only bounded tool counts while accepting nested confined MCP calls', () => {
+    const result = auditCodexRolloutRecords([
+      rolloutTool('ctx_batch_execute', {
+        cwd: path.join(tempDir, 'sandbox', 'fixture'),
+        commands: [{
+          label: 'large-output',
+          command: `node ${path.join(tempDir, 'sandbox', 'fixture', 'emit-large-output.mjs')}`
+        }],
+        queries: ['north', 'east', 'checksum']
+      }),
+      rolloutTool('ctx_purge', { confirm: true, scope: 'project' })
+    ], {
+      sandboxRoot: path.join(tempDir, 'sandbox'),
+      requiredTools: ['ctx_batch_execute', 'ctx_purge'],
+      allowedTools: ['ctx_batch_execute', 'ctx_search', 'ctx_purge']
+    });
+    assert.deepEqual(result, {
+      status: 'PASS',
+      reason: 'raw_provider_audit_verified',
+      record_count: 2,
+      tool_counts: { ctx_batch_execute: 1, ctx_purge: 1 },
+      required_tools_present: true,
+      forbidden_tools_absent: true,
+      paths_confined: true
+    });
+    assert.doesNotMatch(JSON.stringify(result), /context-mode-results-|sandbox|fixture/);
+  });
+
+  it('fails closed for a missing required call, a forbidden tool or an escaped nested path', () => {
+    const sandboxRoot = path.join(tempDir, 'sandbox');
+    assert.equal(auditCodexRolloutRecords([], {
+      sandboxRoot,
+      requiredTools: ['ctx_search'],
+      allowedTools: ['ctx_search']
+    }).reason, 'raw_provider_audit_missing');
+    assert.equal(auditCodexRolloutRecords([rolloutTool('ctx_execute', { cwd: sandboxRoot })], {
+      sandboxRoot,
+      requiredTools: ['ctx_search'],
+      allowedTools: ['ctx_search']
+    }).reason, 'raw_provider_tool_forbidden');
+    const unrelatedServer = rolloutTool('ctx_search', { queries: ['fact'] });
+    unrelatedServer.payload.input.server = 'unrelated-provider';
+    assert.equal(auditCodexRolloutRecords([unrelatedServer], {
+      sandboxRoot,
+      requiredTools: ['ctx_search'],
+      allowedTools: ['ctx_search']
+    }).reason, 'raw_provider_audit_missing');
+    assert.equal(auditCodexRolloutRecords([rolloutTool('ctx_search', {
+      path: path.resolve(tempDir, '..', 'outside.txt'),
+      queries: ['fact']
+    })], {
+      sandboxRoot,
+      requiredTools: ['ctx_search'],
+      allowedTools: ['ctx_search']
+    }).reason, 'raw_provider_path_escape');
+    assert.equal(auditCodexRolloutRecords([rolloutTool('ctx_batch_execute', {
+      cwd: sandboxRoot,
+      commands: [{ command: `node ${path.resolve(tempDir, '..', 'outside.mjs')}` }]
+    })], {
+      sandboxRoot,
+      requiredTools: ['ctx_batch_execute'],
+      allowedTools: ['ctx_batch_execute']
+    }).reason, 'raw_provider_path_escape');
+    assert.equal(auditCodexRolloutRecords([rolloutTool('ctx_search', {
+      path: 'C:\\outside\\facts.txt',
+      queries: ['fact']
+    })], {
+      sandboxRoot,
+      requiredTools: ['ctx_search'],
+      allowedTools: ['ctx_search']
+    }).reason, 'raw_provider_path_escape');
+  });
+});
+
 describe('context-mode triad decisions', () => {
   it('lets correctness, privacy, lifecycle and purge veto token savings', () => {
     const common = {
@@ -162,5 +238,20 @@ function safeRow(variant) {
     purge_pass: true,
     cleanup_pass: true,
     cost: { input_tokens: 100, output_tokens: 20, input_output_tokens: 120 }
+  };
+}
+
+function rolloutTool(tool, argumentsValue) {
+  return {
+    type: 'response_item',
+    payload: {
+      type: 'custom_tool_call',
+      name: 'functions.exec',
+      input: {
+        server: 'context-mode',
+        tool,
+        arguments: argumentsValue
+      }
+    }
   };
 }

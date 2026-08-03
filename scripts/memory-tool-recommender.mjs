@@ -552,6 +552,7 @@ function metadataSummary(metadata) {
       normal_command_selection: tool.normal_command_selection ?? null,
       auto_register_hooks: tool.auto_register_hooks ?? null,
       current_codex_evidence: tool.current_codex_evidence ?? null,
+      authorized_live_followup: tool.authorized_live_followup ?? null,
       allowed_in: asArray(tool.allowed_in),
       forbidden_in: asArray(tool.forbidden_in),
       forbidden_operations: asArray(tool.forbidden_operations),

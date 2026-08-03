@@ -627,10 +627,10 @@ tools:
     doc: context-mode.md
     results_doc: context-mode-benchmark-results.md
     repository: "https://github.com/mksglu/context-mode"
-    tested_version: "historical runtime 1.0.151; static Codex audit v1.0.169"
+    tested_version: "historical runtime 1.0.151; static and authorized isolated live Codex evaluation v1.0.169"
     decision: manual_helper_only
-    mcp_only_status: blocked_runtime_dependency_self_install_v1_0_169
-    codex_plugin_status: not_run_auth_isolation_unavailable
+    mcp_only_status: conditional_large_truncating_output_only
+    codex_plugin_status: avoid_tested_nested_shell_stack
     normal_command_selection: forbidden
     auto_register_hooks: false
     recommendation_action: suggest_only_for_large_temporary_outputs
@@ -664,7 +664,7 @@ tools:
         - source_code_indexing
       project_shapes:
         - small_microservice
-    suggestion_text: "Если анализ генерирует очень большой output, можно предложить context-mode как manual temporary index с обязательным purge."
+    suggestion_text: "Если direct output реально обрезается и теряется correctness, можно предложить context-mode MCP-only как manual temporary index с обязательным purge; это не экономия tokens. Codex plugin для tested nested shell stack не предлагать."
     current_codex_evidence:
       date: "2026-07-28"
       tag: v1.0.169
@@ -679,6 +679,33 @@ tools:
       direct_hooks: blocked_runtime_dependency_self_install
       codex_plugin: not_run_auth_isolation_unavailable
       recommendation_update: "Preserve the historical manual helper only; do not run v1.0.169 through generic or normal-command routes."
+    authorized_live_followup:
+      date: "2026-08-03"
+      authorization_class: explicit_isolated_full
+      evidence: ".ai-factory/state/persist-context-mode-live-evaluation-issue-134/evaluation/live-authorized-evidence.json"
+      context_mode_version: "1.0.169"
+      codex_version: "0.144.6"
+      ai_tester_version: "1.1.0"
+      model: gpt-5.6-luna
+      reasoning_effort: low
+      dry_run_rows: 18
+      invalid_rows: 0
+      small_fixture:
+        baseline: pass
+        mcp_only: pass
+        mcp_total_token_delta_percent: 376.8
+        mcp_duration_delta_percent: 50.8
+      large_stdout_truncation:
+        baseline: fail_stdout_truncated
+        mcp_only: pass_correctness_recovered
+        mcp_total_token_delta_percent_vs_failed_baseline: 120.2
+        mcp_duration_delta_percent_vs_failed_baseline: -13.2
+        codex_plugin: fail_nested_shell_output_not_intercepted
+      session_continuity: not_run_resume_driver_parity_unavailable
+      raw_rollout_audit: pass_nested_calls_and_confined_paths
+      token_savings: not_demonstrated
+      install_lifecycle: not_run_postinstall_forbidden
+      recommendation_update: "MCP-only is conditional for large truncating output when correctness outweighs token cost; avoid the plugin for the tested nested shell stack; keep rg/direct shell as baseline."
     execution:
       default:
         mode: recommend_only

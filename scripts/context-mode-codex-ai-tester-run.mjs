@@ -13,6 +13,7 @@ import {
 } from './context-mode-codex-ai-tester-adapter.mjs';
 import {
   buildContextModeResults,
+  auditCodexRolloutRecords,
   normalizeContextModeTrace,
   sanitizeAndDeleteUnsafeTrace,
   scanCompleteTrace
@@ -188,6 +189,15 @@ export async function executeMissingRows({
       statuses.push(rowStatus(row, 'NOT_RUN', 'dry_run_failed'));
       continue;
     }
+    if (row.session_mode === 'same_thread' && (row.prompts?.length ?? 0) > 1 &&
+        row.resume_driver_parity !== true) {
+      statuses.push(rowStatus(row, 'NOT_RUN', 'resume_driver_parity_unavailable'));
+      continue;
+    }
+    if (row.session_mode === 'external_fresh_pair') {
+      statuses.push(rowStatus(row, 'NOT_RUN', 'fresh_session_driver_unavailable'));
+      continue;
+    }
     if (row.variant !== 'baseline') {
       let provisioned;
       try {
@@ -204,11 +214,10 @@ export async function executeMissingRows({
         continue;
       }
     }
-    if (row.session_mode === 'external_fresh_pair') {
-      statuses.push(rowStatus(row, 'NOT_RUN', 'fresh_session_driver_unavailable'));
-      continue;
-    }
     const before = await snapshotTraceFiles(runRoot);
+    const rawBefore = row.variant === 'baseline'
+      ? null
+      : await snapshotRolloutFiles(path.join(env.CODEX_HOME, 'sessions'));
     const run = buildRunnerInvocation({ executable, scenarioFile, runRoot, row });
     let result;
     try {
@@ -234,6 +243,9 @@ export async function executeMissingRows({
       before,
       row,
       evidence: rowEvidence[row.id],
+      rawBefore,
+      codexHome: env.CODEX_HOME,
+      sandboxRoot: path.dirname(env.HOME),
       logger
     });
     statuses.push(trace);
@@ -322,7 +334,16 @@ export async function runVerifiedMatrix(options) {
   return { ...result, ...aggregate, provenance, results };
 }
 
-async function inspectFreshTrace({ runRoot, before, row, evidence, logger }) {
+async function inspectFreshTrace({
+  runRoot,
+  before,
+  row,
+  evidence,
+  rawBefore,
+  codexHome,
+  sandboxRoot,
+  logger
+}) {
   const after = await snapshotTraceFiles(runRoot);
   const changed = [...after.entries()]
     .filter(([file, digest]) => before.get(file) !== digest)
@@ -357,6 +378,19 @@ async function inspectFreshTrace({ runRoot, before, row, evidence, logger }) {
       reason_codes: sanitized.reason_codes,
       raw_trace_deleted: sanitized.raw_trace_deleted
     });
+  }
+  if (row.variant !== 'baseline') {
+    const providerAudit = await inspectFreshProviderRollouts({
+      codexHome,
+      before: rawBefore,
+      row,
+      sandboxRoot
+    });
+    if (providerAudit.status !== 'PASS') {
+      return rowStatus(row, providerAudit.status, providerAudit.reason, {
+        provider_audit: providerAudit
+      });
+    }
   }
   const traceHealthy = Array.isArray(trace.errors) && trace.errors.length === 0 &&
     typeof trace.scoring?.overallPass === 'boolean';
@@ -398,6 +432,47 @@ async function inspectFreshTrace({ runRoot, before, row, evidence, logger }) {
   return { ...normalized, trace_class: 'isolated_run_descendant' };
 }
 
+async function inspectFreshProviderRollouts({ codexHome, before, row, sandboxRoot }) {
+  const sessionsRoot = path.join(codexHome, 'sessions');
+  const after = await snapshotRolloutFiles(sessionsRoot);
+  const changed = [...after.entries()]
+    .filter(([file, snapshot]) => before?.get(file)?.digest !== snapshot.digest)
+    .map(([file]) => file);
+  const records = [];
+  for (const file of changed) {
+    if (!await isCanonicalDescendant(sessionsRoot, file, { file: true })) {
+      return auditCodexRolloutRecords([], {
+        sandboxRoot,
+        requiredTools: row.raw_provider_policy?.required_tools,
+        allowedTools: row.raw_provider_policy?.allowed_tools
+      });
+    }
+    const previous = before?.get(file);
+    const body = await readFile(file);
+    let delta = body;
+    if (previous) {
+      const prefix = body.subarray(0, previous.size);
+      const prefixDigest = createHash('sha256').update(prefix).digest('hex');
+      if (body.length < previous.size || !previous.ends_with_newline || prefixDigest !== previous.digest) {
+        return invalidRawProviderAudit(records.length);
+      }
+      delta = body.subarray(previous.size);
+    }
+    for (const line of delta.toString('utf8').split(/\r?\n/).filter(Boolean)) {
+      try {
+        records.push(JSON.parse(line));
+      } catch {
+        return invalidRawProviderAudit(records.length);
+      }
+    }
+  }
+  return auditCodexRolloutRecords(records, {
+    sandboxRoot,
+    requiredTools: row.raw_provider_policy?.required_tools ?? [],
+    allowedTools: row.raw_provider_policy?.allowed_tools ?? []
+  });
+}
+
 async function snapshotTraceFiles(runRoot) {
   const files = await collectJsonFiles(runRoot);
   const entries = await Promise.all(files.map(async (file) => [
@@ -407,7 +482,36 @@ async function snapshotTraceFiles(runRoot) {
   return new Map(entries);
 }
 
+async function snapshotRolloutFiles(root) {
+  const files = await collectFilesBySuffix(root, '.jsonl');
+  const entries = await Promise.all(files.map(async (file) => {
+    const body = await readFile(file);
+    return [file, {
+      digest: createHash('sha256').update(body).digest('hex'),
+      size: body.length,
+      ends_with_newline: body.length === 0 || body.at(-1) === 0x0a
+    }];
+  }));
+  return new Map(entries);
+}
+
+function invalidRawProviderAudit(recordCount) {
+  return {
+    status: 'NOT_RUN',
+    reason: 'raw_provider_audit_invalid',
+    record_count: recordCount,
+    tool_counts: {},
+    required_tools_present: false,
+    forbidden_tools_absent: false,
+    paths_confined: false
+  };
+}
+
 async function collectJsonFiles(root) {
+  return collectFilesBySuffix(root, '.json');
+}
+
+async function collectFilesBySuffix(root, suffix) {
   const files = [];
   let entries;
   try {
@@ -420,8 +524,8 @@ async function collectJsonFiles(root) {
     const target = path.join(root, entry.name);
     const info = await lstat(target);
     if (info.isSymbolicLink()) continue;
-    if (info.isDirectory()) files.push(...await collectJsonFiles(target));
-    else if (info.isFile() && entry.name.endsWith('.json')) files.push(target);
+    if (info.isDirectory()) files.push(...await collectFilesBySuffix(target, suffix));
+    else if (info.isFile() && entry.name.endsWith(suffix)) files.push(target);
   }
   return files.sort();
 }

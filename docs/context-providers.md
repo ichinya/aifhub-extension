@@ -17,6 +17,16 @@ Re-evaluation exact `v1.0.169` разделяет surfaces:
 - actual Codex plugin: `NOT_RUN(auth_isolation_unavailable)`;
 - test-only `direct_hook_contract` не является actual event/compaction evidence.
 
+Authorized live follow-up от `2026-08-03` с class `explicit_isolated_full` добавляет runtime evidence, не переписывая эти исторические gates:
+
+- единственный полезный MCP-only PASS получен на >1 MiB stdout case, где baseline потерял tail facts из-за truncation; MCP использовал `+120.2%` total tokens против уже failed baseline, поэтому token savings не доказаны;
+- на small fixture MCP тоже был корректен, но использовал `+376.8%` tokens и `+50.8%` duration;
+- Codex plugin FAIL на tested nested shell path: `ctx_search` был вызван, но hooks не перехватили output;
+- session continuity остаётся `NOT_RUN(resume_driver_parity_unavailable)`;
+- raw rollout audit подтвердил nested provider calls, confined paths и purge без сохранения raw traces.
+
+Следовательно, MCP-only допустим лишь как conditional manual helper для большого truncating output, когда correctness важнее token cost. Plugin для этого stack следует избегать. Санитизированный evidence хранится в `.ai-factory/state/persist-context-mode-live-evaluation-issue-134/evaluation/live-authorized-evidence.json`.
+
 Обычные `/aif-plan`, `/aif-implement`, `/aif-verify` и `/aif-done` не auto-install provider, не register MCP, не доверяют hooks и не выбирают plugin. Generic floating routes отключены с `dedicated_harness_required`. Пользовательская установка остаётся вне AIFHub ownership; перед ней нужно отдельно принять version-sensitive install/hook risk.
 
 ## Роли Providers

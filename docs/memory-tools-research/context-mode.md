@@ -4,7 +4,7 @@
 
 Исторически проверенный runtime package: `context-mode 1.0.151`.
 
-Текущий Codex surface проверен статически на exact release `v1.0.169`, commit `589d8214d56740a28b5f7bf63167743d586b0b40`, npm shasum `d5aa9acc648ed420c5dd32ee5f15aa5608f09fea`. Это не runtime promotion: package snapshot прошёл identity/manifests audit, но executable lifecycle заблокирован.
+Архивированный этап issue `#134` проверил Codex surface статически на exact release `v1.0.169`, commit `589d8214d56740a28b5f7bf63167743d586b0b40`, npm shasum `d5aa9acc648ed420c5dd32ee5f15aa5608f09fea`. Последующий test-only live follow-up от `2026-08-03` исполнил изолированные MCP/plugin probes по отдельной authorization envelope; это не runtime promotion и не разрешение normal AIFHub commands.
 
 Результаты тестов и выводы по labels: [context-mode-benchmark-results.md](context-mode-benchmark-results.md).
 
@@ -38,7 +38,7 @@
 
 `rg` остаётся baseline. Установка и любое доверие hooks требуют явного user opt-in; normal `/aif-plan`, `/aif-implement`, `/aif-verify` и `/aif-done` не выбирают provider.
 
-## Codex Surface v1.0.169
+## Архивированный Codex Surface v1.0.169
 
 Выводы разделены:
 
@@ -50,6 +50,28 @@
 Dedicated matrix содержит 18 строк: три synthetic scenarios, baseline/MCP-only/plugin, две repetitions, `codex`, `gpt-5.6-luna`, `reasoning: low`. Все 18 прошли реальный `ai-tester --dry-run`; model rows не исполнялись после lifecycle/auth gates. Это `NOT_RUN`, а не отрицательное сравнение качества или tokens.
 
 AIFHub не auto-install, не register MCP, не доверяет hooks и не выбирает Codex plugin в normal commands. Generic historical routes возвращают `dedicated_harness_required`.
+
+## Authorized Live Follow-up 2026-08-03
+
+Follow-up использовал authorization class `explicit_isolated_full`: test-only scope, disposable runtime/provider homes, scoped ephemeral auth copy и native Codex executable. Host auth/manifests остались неизменными, временные auth copies удалены. Package `postinstall` по-прежнему не запускался: install lifecycle остаётся `NOT_RUN(postinstall_forbidden)`.
+
+Проверенные версии: `context-mode 1.0.169`, Codex `0.144.6`, `ai-tester 1.1.0`, model `gpt-5.6-luna`, reasoning `low`. Санитизированный evidence: [live-authorized-evidence.json](../../.ai-factory/state/persist-context-mode-live-evaluation-issue-134/evaluation/live-authorized-evidence.json).
+
+| Scenario | Baseline | MCP-only | Codex plugin | Вывод |
+|---|---|---|---|---|
+| small fixture | PASS, 89,809 tokens | PASS, 428,221 tokens (`+376.8%`) | excluded by privacy boundary | MCP корректен, но намного дороже и медленнее baseline. |
+| >1 MiB stdout | FAIL: required tail facts truncated | PASS, 70,579 tokens | FAIL: nested shell output не intercepted | MCP восстановил correctness, но использовал `+120.2%` tokens против уже failed baseline; token savings нет. |
+| session continuity | n/a | first turn PASS | resume FAIL | `NOT_RUN(resume_driver_parity_unavailable)`; continuity не доказана. |
+
+Raw Codex rollout audit подтвердил реальные nested MCP calls и sandbox-confined paths. Для large fixture MCP вызвал `ctx_batch_execute` и `ctx_purge`; plugin вызвал `ctx_search`, но его knowledge base осталась пустой, поэтому факты не были восстановлены. Outer `ai-tester` trace используется для correctness/cost, raw rollout — только для provider call/path proof.
+
+Текущий bounded decision:
+
+- MCP-only можно предложить только для explicit user-owned temporary indexing большого output, когда direct output реально обрезается и correctness важнее token cost; обязательны isolated scope и purge;
+- Codex plugin следует избегать для проверенного nested `functions.exec`/shell stack: hooks не перехватили output;
+- общей экономии billed model tokens не обнаружено;
+- `rg` и direct shell остаются baseline;
+- normal AIFHub commands по-прежнему не auto-install package, не register MCP и не доверяют hooks.
 
 ## CLI И MCP
 
@@ -72,7 +94,7 @@ MCP exposes широкий surface: `ctx_execute`, `ctx_index`, `ctx_search`, `c
 
 Не устанавливать hooks и не register MCP automatically.
 
-Для `v1.0.169` этот flow нельзя считать текущим runtime PASS: self-install bootstrap требует отдельного upstream-safe режима или новой review/evaluation.
+Test-only live probe не превращает normal lifecycle в PASS: self-install bootstrap и package `postinstall` остаются запрещены за пределами отдельной authorization envelope.
 
 ## Очистка
 

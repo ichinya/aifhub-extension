@@ -108,7 +108,13 @@ describe('recommendation metadata parsing', () => {
     assert.ok(metadata.evidence_runs.some((run) => run.id === 'targeted-graphify-context7-ai-tester-2026-05-28'));
     assert.equal(metadata.tools['codex-agent-mem'].read_scope, 'explicit_sqlite_db_path');
     assert.equal(metadata.tools['context-mode'].decision, 'manual_helper_only');
-    assert.equal(metadata.tools['context-mode'].codex_plugin_status, 'not_run_auth_isolation_unavailable');
+    assert.equal(metadata.tools['context-mode'].mcp_only_status, 'conditional_large_truncating_output_only');
+    assert.equal(metadata.tools['context-mode'].codex_plugin_status, 'avoid_tested_nested_shell_stack');
+    assert.equal(metadata.tools['context-mode'].authorized_live_followup.token_savings, 'not_demonstrated');
+    assert.equal(
+      metadata.tools['context-mode'].authorized_live_followup.session_continuity,
+      'not_run_resume_driver_parity_unavailable'
+    );
     assert.equal(metadata.tools['context-mode'].normal_command_selection, 'forbidden');
     assert.equal(metadata.tools['context-mode'].auto_register_hooks, false);
     assert.deepEqual(metadata.availability_probes['context-mode'], []);
@@ -304,8 +310,13 @@ describe('recommendation results', () => {
     assert.ok(
       result.body.tools['rohitg00-agentmemory'].forbidden_operations.includes('auto_register_mcp')
     );
-    assert.equal(result.body.tools['context-mode'].codex_plugin_status, 'not_run_auth_isolation_unavailable');
-    assert.equal(result.body.tools['context-mode'].mcp_only_status, 'blocked_runtime_dependency_self_install_v1_0_169');
+    assert.equal(result.body.tools['context-mode'].codex_plugin_status, 'avoid_tested_nested_shell_stack');
+    assert.equal(result.body.tools['context-mode'].mcp_only_status, 'conditional_large_truncating_output_only');
+    assert.equal(result.body.tools['context-mode'].authorized_live_followup.token_savings, 'not_demonstrated');
+    assert.equal(
+      result.body.tools['context-mode'].authorized_live_followup.session_continuity,
+      'not_run_resume_driver_parity_unavailable'
+    );
     assert.equal(result.body.tools['context-mode'].normal_command_selection, 'forbidden');
     assert.equal(result.body.tools['context-mode'].auto_register_hooks, false);
     assert.deepEqual(result.body.availability_probes['context-mode'], []);

@@ -7,12 +7,16 @@ import { spawnSync } from 'node:child_process';
 import { describe, it } from 'node:test';
 
 import {
+  BASELINE_RG_COMMAND_PATTERN,
   CONTEXT_MODE_SCENARIOS,
   CONTEXT_MODE_VARIANTS,
+  buildLargeOutputEmitterSource,
   buildContextModeMatrix,
   buildCodexReasoningWrapper,
   loadContextModeScenarioCatalog,
+  normalizeContextModeAuthorization,
   renderAiTesterScenario,
+  writeCodexReasoningWrapper,
   validateContextModeScenarioCatalog,
   validateReasoningProof
 } from './context-mode-codex-ai-tester-matrix.mjs';
@@ -39,6 +43,7 @@ describe('context-mode scenario catalog', () => {
     assert.equal(catalog.defaults.runtime, 'codex');
     assert.equal(catalog.defaults.model, 'gpt-5.6-luna');
     assert.equal(catalog.defaults.reasoning, 'low');
+    assert.equal(catalog.fixture.profiles.large_stdout_tail.minimum_bytes, 1_048_577);
     assert.deepEqual(validateContextModeScenarioCatalog(catalog), []);
     assert.doesNotMatch(JSON.stringify(catalog), /[A-Za-z]:\\Users\\|\/Users\/|BEGIN PRIVATE KEY/i);
     for (const scenario of catalog.scenarios) {
@@ -85,6 +90,42 @@ describe('context-mode three-way matrix', () => {
     }
   });
 
+  it('keeps provider gates closed unless a complete path-free authorization envelope is supplied', async () => {
+    const catalog = await loadContextModeScenarioCatalog();
+    assert.deepEqual(normalizeContextModeAuthorization(), {
+      class: 'default_fail_closed',
+      mcp_allowed: false,
+      plugin_allowed: false
+    });
+    assert.equal(normalizeContextModeAuthorization({
+      scope: 'isolated_evaluation',
+      provider_snapshot: 'prepared_pinned_snapshot',
+      runtime_dependency_bootstrap: 'approved',
+      auth_mode: 'scoped_ephemeral',
+      native_codex: true,
+      path: 'C:/private'
+    }).class, 'default_fail_closed');
+    const matrix = buildContextModeMatrix({
+      catalog,
+      runId: 'context-mode-134-authorized',
+      provenance,
+      authorization: {
+        scope: 'isolated_evaluation',
+        provider_snapshot: 'prepared_pinned_snapshot',
+        runtime_dependency_bootstrap: 'approved',
+        auth_mode: 'scoped_ephemeral',
+        native_codex: true
+      },
+      generatedAt: '2026-08-03T12:00:00.000Z'
+    });
+    assert.equal(matrix.authorization_class, 'explicit_isolated_full');
+    assert.ok(matrix.rows.filter((row) => row.variant !== 'baseline').every((row) =>
+      row.execution_gate.status === 'PASS' &&
+      row.execution_gate.reason === 'explicit_isolated_authorization'
+    ));
+    assert.doesNotMatch(JSON.stringify(matrix), /scoped_ephemeral|prepared_pinned_snapshot|runtime_dependency_bootstrap/);
+  });
+
   it('injects low reasoning before both initial exec and resume', () => {
     const wrapper = buildCodexReasoningWrapper({ realCodex: 'codex-real' });
     assert.match(wrapper, /model_reasoning_effort="low"/);
@@ -115,7 +156,8 @@ describe('context-mode three-way matrix', () => {
       for (const assertion of row.assertions) {
         assert.match(rendered, new RegExp(`pattern: ${escapeRegex(JSON.stringify(assertion.pattern))}`));
       }
-      assert.match(rendered, /type: tool_called/);
+      if (row.variant === 'baseline') assert.match(rendered, /type: tool_called/);
+      else assert.doesNotMatch(rendered, /type: tool_called/);
       assert.doesNotMatch(rendered, /setup_commands:|npm install|context-mode@/i);
     }
     const freshRows = matrix.rows.filter((row) => row.scenario_id === 'fresh_session_isolation_and_purge');
@@ -142,11 +184,49 @@ describe('context-mode three-way matrix', () => {
         () => JSON.parse(commandScalar),
         `invalid JSON-compatible YAML scalar for ${row.id}: ${commandScalar}`
       );
-      assert.equal(
-        JSON.parse(commandScalar),
-        '(?:^|[\\\\/ ;])rg(?:\\.exe)?(?:[ \\t]|$)'
-      );
+      const decoded = JSON.parse(commandScalar);
+      if (row.scenario_id === 'large_generated_output_retrieval') {
+        assert.match(decoded, /node/);
+      } else {
+        assert.equal(decoded, BASELINE_RG_COMMAND_PATTERN);
+      }
     }
+    const matcher = new RegExp(BASELINE_RG_COMMAND_PATTERN, 'i');
+    assert.match("& 'C:\\tools\\rg.exe' north project/generated-output.txt", matcher);
+    assert.match('pwsh -Command "rg --files"', matcher);
+    assert.doesNotMatch('larger-value', matcher);
+    assert.doesNotMatch('myrg --files', matcher);
+  });
+
+  it('renders the large-output scenario as a compact deterministic emitter whose facts cross 1 MiB', async () => {
+    const catalog = await loadContextModeScenarioCatalog();
+    const profile = catalog.fixture.profiles.large_stdout_tail;
+    const source = buildLargeOutputEmitterSource(profile);
+    const emitted = spawnSync(process.execPath, ['--input-type=module', '--eval', source], {
+      encoding: 'utf8',
+      maxBuffer: 2 * 1024 * 1024
+    });
+    assert.equal(emitted.status, 0);
+    assert.ok(Buffer.byteLength(emitted.stdout) >= profile.minimum_bytes);
+    assert.ok(Buffer.byteLength(emitted.stdout.slice(0, emitted.stdout.indexOf('north=731'))) > 1_048_576);
+    assert.match(emitted.stdout, /north=731\r?\neast=409\r?\nchecksum=1140\r?\n$/);
+    assert.ok(Buffer.byteLength(source) < 2048, 'tracked scenario metadata must not embed the large output');
+
+    const matrix = buildContextModeMatrix({
+      catalog,
+      runId: 'context-mode-134-large-fixture',
+      provenance,
+      generatedAt: '2026-08-03T12:00:00.000Z'
+    });
+    const largeRow = matrix.rows.find((row) =>
+      row.scenario_id === 'large_generated_output_retrieval' && row.variant === 'baseline'
+    );
+    assert.equal(largeRow.session_mode, 'single_turn');
+    assert.equal(largeRow.prompts.length, 1);
+    const rendered = renderAiTesterScenario(largeRow);
+    assert.match(rendered, /emit-large-output\.mjs/);
+    assert.doesNotMatch(rendered, /project\/generated-output\.txt|north=17|east=29|checksum=46/);
+    assert.ok(Buffer.byteLength(JSON.stringify(matrix)) < 250_000);
   });
 
   it('emits sanitized proof events from executable initial and resume wrapper paths', async () => {
@@ -164,6 +244,19 @@ describe('context-mode three-way matrix', () => {
         { phase: 'resume', profile: 'low' }
       ]);
       assert.doesNotMatch(JSON.stringify(proof), /Users|projects|session/);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('pins the explicit native Codex path when writing a live reasoning wrapper', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'context-mode-wrapper-native-'));
+    try {
+      const written = await writeCodexReasoningWrapper({ outDir: root, realCodex: process.execPath });
+      assert.equal(written.codex_resolution, 'explicit');
+      const moduleText = await readFile(path.join(root, written.module_file), 'utf8');
+      assert.match(moduleText, new RegExp(escapeRegex(JSON.stringify(process.execPath))));
+      assert.doesNotMatch(moduleText, /const realCodex = "__PATH_AFTER_WRAPPER__"/);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

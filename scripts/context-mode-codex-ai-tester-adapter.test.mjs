@@ -23,7 +23,8 @@ import {
   runDirectHookContract,
   runActualPluginLifecycle,
   runSandboxLifecycle,
-  runMcpContract
+  runMcpContract,
+  validateNativeCodexExecutable
 } from './context-mode-codex-ai-tester-adapter.mjs';
 
 let tempDir;
@@ -166,7 +167,7 @@ describe('context-mode sandbox and lifecycle boundary', () => {
         required_facts: ['north=17', 'east=29', 'checksum=46']
       },
       invokeTool: async (name, payload) => {
-        calls.push({ name, payload: Object.keys(payload).sort() });
+        calls.push({ name, payload: structuredClone(payload) });
         const count = (callCounts.get(name) ?? 0) + 1;
         callCounts.set(name, count);
         if (name === 'ctx_doctor') return mcpText('Server test: PASS\nFTS5 / SQLite: PASS\nVersion: v1.0.169');
@@ -185,7 +186,12 @@ describe('context-mode sandbox and lifecycle boundary', () => {
       'ctx_search',
       'ctx_stats'
     ]);
-    assert.deepEqual(calls.find((item) => item.name === 'ctx_index').payload, ['content', 'source']);
+    assert.deepEqual(Object.keys(calls.find((item) => item.name === 'ctx_index').payload).sort(), ['content', 'source']);
+    assert.deepEqual(calls.filter((item) => item.name === 'ctx_search').map((item) => item.payload), [
+      { queries: ['required facts'], limit: 5 },
+      { queries: ['required facts'], limit: 5 }
+    ]);
+    assert.ok(calls.filter((item) => item.name === 'ctx_search').every((item) => item.payload.query === undefined));
     assert.doesNotMatch(JSON.stringify(result), /synthetic output/);
     await assert.rejects(
       runMcpContract({
@@ -331,7 +337,7 @@ describe('context-mode sandbox and lifecycle boundary', () => {
     const plan = buildActualPluginPlan({
       layout,
       packageRoot: path.join(layout.package, 'node_modules', 'context-mode'),
-      codexExecutable: 'codex',
+      codexExecutable: path.join(tempDir, 'codex.exe'),
       codexVersion: 'codex-cli 0.144.6',
       supportedFeatures: ['hooks', 'plugins'],
       authMode: 'none'
@@ -346,12 +352,37 @@ describe('context-mode sandbox and lifecycle boundary', () => {
     assert.deepEqual(plan.steps[0].args, ['plugin', 'marketplace', 'add', layout.marketplace, '--json']);
   });
 
+  it('requires an explicit native Codex executable before eligible plugin lifecycle', () => {
+    assert.deepEqual(validateNativeCodexExecutable('codex'), {
+      status: 'NOT_RUN',
+      reason: 'native_codex_executable_required'
+    });
+    assert.deepEqual(validateNativeCodexExecutable('C:/tools/codex.cmd', { platform: 'win32' }), {
+      status: 'NOT_RUN',
+      reason: 'native_codex_executable_required'
+    });
+    assert.equal(validateNativeCodexExecutable('C:/tools/codex.exe', { platform: 'win32' }).status, 'PASS');
+
+    const layout = buildSandboxLayout(tempDir);
+    const plan = buildActualPluginPlan({
+      layout,
+      sandboxOwnerRoot: tempDir,
+      packageRoot: path.join(layout.package, 'node_modules', 'context-mode'),
+      codexExecutable: 'codex.cmd',
+      codexVersion: 'codex-cli 0.144.6',
+      supportedFeatures: ['hooks', 'plugins'],
+      authMode: 'scoped_ephemeral'
+    });
+    assert.equal(plan.status, 'NOT_RUN');
+    assert.equal(plan.reason, 'native_codex_executable_required');
+  });
+
   it('never mutates plugin state when preflight is NOT_RUN and executes only an eligible isolated plan', async () => {
     const layout = buildSandboxLayout(tempDir);
     const blocked = buildActualPluginPlan({
       layout,
       packageRoot: path.join(layout.package, 'node_modules', 'context-mode'),
-      codexExecutable: 'codex',
+      codexExecutable: path.join(tempDir, 'codex.exe'),
       codexVersion: 'codex-cli 0.144.6',
       supportedFeatures: ['hooks', 'plugins'],
       authMode: 'none'
@@ -372,7 +403,7 @@ describe('context-mode sandbox and lifecycle boundary', () => {
       layout: isolatedLayout,
       sandboxOwnerRoot: ownerRoot,
       packageRoot,
-      codexExecutable: 'codex',
+      codexExecutable: path.join(tempDir, 'codex.exe'),
       codexVersion: 'codex-cli 0.144.6',
       supportedFeatures: ['hooks', 'plugins'],
       authMode: 'scoped_ephemeral'
@@ -434,7 +465,7 @@ describe('context-mode sandbox and lifecycle boundary', () => {
       layout,
       sandboxOwnerRoot: ownerRoot,
       packageRoot,
-      codexExecutable: 'codex',
+      codexExecutable: path.join(tempDir, 'codex.exe'),
       codexVersion: 'codex-cli 0.144.6',
       supportedFeatures: ['hooks', 'plugins'],
       authMode: 'scoped_ephemeral'

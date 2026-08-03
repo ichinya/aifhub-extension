@@ -6,6 +6,8 @@ import { describe, it } from 'node:test';
 
 const ROOT = process.cwd();
 const readDoc = (relativePath) => readFile(path.join(ROOT, relativePath), 'utf8');
+const readJson = async (relativePath) => JSON.parse(await readDoc(relativePath));
+const LIVE_EVIDENCE = '.ai-factory/state/persist-context-mode-live-evaluation-issue-134/evaluation/live-authorized-evidence.json';
 
 describe('context-mode Codex documentation policy', () => {
   it('preserves historical 1.0.151 evidence and appends exact 1.0.169 evidence classes', async () => {
@@ -33,5 +35,53 @@ describe('context-mode Codex documentation policy', () => {
     assert.match(research, /Codex plugin/i);
     assert.match(metadata, /codex_plugin_status:/);
     assert.match(metadata, /normal_command_selection:\s*forbidden/);
+  });
+
+  it('records sanitized authorized live evidence without promoting normal lifecycle', async () => {
+    const [evidence, research, results, recommendations, providers, metadata] = await Promise.all([
+      readJson(LIVE_EVIDENCE),
+      readDoc('docs/memory-tools-research/context-mode.md'),
+      readDoc('docs/memory-tools-research/context-mode-benchmark-results.md'),
+      readDoc('docs/memory-tool-recommendations.md'),
+      readDoc('docs/context-providers.md'),
+      readDoc('docs/memory-tools-research/recommendation-metadata.yaml')
+    ]);
+
+    assert.equal(evidence.schema, 'aifhub.context_mode_codex.live_evaluation.v1');
+    assert.equal(evidence.authorization.class, 'explicit_isolated_full');
+    assert.equal(evidence.authorization.scope, 'isolated_evaluation');
+    assert.equal(evidence.authorization.purpose, 'test_only');
+    assert.equal(evidence.authorization.auth_copy_disposition, 'deleted');
+    assert.equal(evidence.authorization.normal_command_authorized, false);
+    assert.equal(evidence.lifecycle.install_lifecycle, 'NOT_RUN(postinstall_forbidden)');
+    assert.equal(evidence.matrix.fixture_revision, 'context-mode-134-synthetic-v2');
+    assert.equal(evidence.matrix.dry_run_rows, 18);
+    assert.equal(evidence.scenarios.large_stdout_truncation.baseline.status, 'FAIL');
+    assert.equal(evidence.scenarios.large_stdout_truncation.mcp_only.status, 'PASS');
+    assert.equal(evidence.scenarios.large_stdout_truncation.mcp_only.raw_rollout_audit.status, 'PASS');
+    assert.equal(evidence.scenarios.large_stdout_truncation.plugin.status, 'FAIL');
+    assert.equal(evidence.scenarios.session_continuity.status, 'NOT_RUN(resume_driver_parity_unavailable)');
+    assert.equal(evidence.decision.token_savings, 'not_demonstrated');
+    assert.deepEqual(evidence.privacy, {
+      tracked_raw_traces: 0,
+      tracked_raw_rollout_records: 0,
+      tracked_raw_content: 0,
+      tracked_absolute_paths: 0,
+      tracked_environment_values: 0,
+      tracked_credentials: 0,
+      tracked_auth_fingerprints: 0
+    });
+
+    const serializedEvidence = JSON.stringify(evidence);
+    assert.doesNotMatch(serializedEvidence, /[A-Za-z]:\\\\|\/Users\/|\/home\//);
+    assert.doesNotMatch(serializedEvidence, /auth\.json|CODEX_HOME|Bearer\s|API_KEY/i);
+
+    for (const body of [research, results, recommendations, providers, metadata]) {
+      assert.match(body, /explicit_isolated_full/);
+      assert.match(body, /resume_driver_parity_unavailable/);
+      assert.match(body, /token savings|token_savings|эконом(?:ит|ии).*token|не экономит billed tokens/i);
+    }
+    assert.match(metadata, /mcp_only_status:\s*conditional_large_truncating_output_only/);
+    assert.match(metadata, /codex_plugin_status:\s*avoid_tested_nested_shell_stack/);
   });
 });

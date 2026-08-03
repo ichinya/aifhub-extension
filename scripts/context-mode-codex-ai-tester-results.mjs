@@ -104,6 +104,120 @@ export function scanCompleteTrace(record, {
   };
 }
 
+export function auditCodexRolloutRecords(records = [], {
+  sandboxRoot,
+  requiredTools = [],
+  allowedTools = [],
+  providerServer = 'context-mode'
+} = {}) {
+  const calls = [];
+  let invalidArguments = false;
+  for (const record of records) {
+    walkRecord(record, (candidate) => {
+      if (candidate.server !== providerServer || typeof candidate.tool !== 'string' ||
+          !/^ctx_[a-z0-9_]+$/.test(candidate.tool)) return;
+      let args = candidate.arguments ?? {};
+      if (typeof args === 'string') {
+        try {
+          args = JSON.parse(args);
+        } catch {
+          invalidArguments = true;
+          args = {};
+        }
+      }
+      calls.push({ tool: candidate.tool, arguments: args });
+    });
+  }
+  const toolCounts = {};
+  for (const call of calls) toolCounts[call.tool] = (toolCounts[call.tool] ?? 0) + 1;
+  const sortedToolCounts = Object.fromEntries(Object.entries(toolCounts).sort(([left], [right]) =>
+    left.localeCompare(right)
+  ));
+  const requiredPresent = requiredTools.every((tool) => toolCounts[tool] > 0);
+  const allowed = new Set(allowedTools);
+  const forbiddenAbsent = calls.every((call) => allowed.has(call.tool));
+  const pathsConfined = Boolean(sandboxRoot) && calls.every((call) =>
+    argumentsStayConfined(call.arguments, sandboxRoot)
+  );
+  const common = {
+    record_count: records.length,
+    tool_counts: sortedToolCounts,
+    required_tools_present: requiredPresent,
+    forbidden_tools_absent: forbiddenAbsent,
+    paths_confined: pathsConfined
+  };
+  if (invalidArguments || !sandboxRoot) {
+    return { status: 'NOT_RUN', reason: 'raw_provider_audit_invalid', ...common };
+  }
+  if (!pathsConfined) {
+    return { status: 'FAIL', reason: 'raw_provider_path_escape', ...common };
+  }
+  if (!forbiddenAbsent) {
+    return { status: 'FAIL', reason: 'raw_provider_tool_forbidden', ...common };
+  }
+  if (calls.length === 0 || !requiredPresent) {
+    return { status: 'NOT_RUN', reason: 'raw_provider_audit_missing', ...common };
+  }
+  return { status: 'PASS', reason: 'raw_provider_audit_verified', ...common };
+}
+
+function walkRecord(value, visit, seen = new Set()) {
+  if (!value || typeof value !== 'object' || seen.has(value)) return;
+  seen.add(value);
+  visit(value);
+  for (const child of Object.values(value)) {
+    if (Array.isArray(child)) {
+      for (const item of child) walkRecord(item, visit, seen);
+    } else {
+      walkRecord(child, visit, seen);
+    }
+  }
+}
+
+function argumentsStayConfined(value, sandboxRoot, key = '') {
+  if (Array.isArray(value)) {
+    return value.every((item) => argumentsStayConfined(item, sandboxRoot, key));
+  }
+  if (value && typeof value === 'object') {
+    return Object.entries(value).every(([childKey, child]) =>
+      argumentsStayConfined(child, sandboxRoot, childKey)
+    );
+  }
+  if (typeof value !== 'string') return true;
+  const pathLikeKey = /^(?:cwd|path|file|filename|directory|dir|root|source)$/i.test(key);
+  const candidates = new Set(embeddedAbsolutePaths(value));
+  if (pathLikeKey) candidates.add(value);
+  if (candidates.size === 0) return true;
+  return [...candidates].every((candidate) => pathValueStaysConfined(candidate, sandboxRoot));
+}
+
+function embeddedAbsolutePaths(value) {
+  const matches = [];
+  for (const match of value.matchAll(/[A-Za-z]:[\\/][^\s"'`;,\])}]+/g)) {
+    matches.push(match[0]);
+  }
+  for (const match of value.matchAll(/(?:^|[\s"'`=(:,])((?:\/(?!\/)[^\s"'`;,\])}]+)+)/g)) {
+    matches.push(match[1]);
+  }
+  return matches;
+}
+
+function pathValueStaysConfined(value, sandboxRoot) {
+  let pathApi = path;
+  if (path.win32.isAbsolute(value)) {
+    if (!path.win32.isAbsolute(sandboxRoot)) return false;
+    pathApi = path.win32;
+  } else if (path.posix.isAbsolute(value)) {
+    if (!path.posix.isAbsolute(sandboxRoot)) return false;
+    pathApi = path.posix;
+  }
+  const target = pathApi.isAbsolute(value)
+    ? pathApi.resolve(value)
+    : pathApi.resolve(sandboxRoot, value);
+  const relative = pathApi.relative(pathApi.resolve(sandboxRoot), target);
+  return !relative.startsWith('..') && !pathApi.isAbsolute(relative);
+}
+
 export async function sanitizeAndDeleteUnsafeTrace({ tracePath, scan, allowedRoot, logger }) {
   if (scan?.safe !== false) {
     return { status: 'PASS', reason_codes: [], match_count: 0, raw_trace_deleted: false };

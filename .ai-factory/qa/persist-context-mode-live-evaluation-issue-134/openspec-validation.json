@@ -1,0 +1,51 @@
+{
+  "changeId": "persist-context-mode-live-evaluation-issue-134",
+  "command": "openspec",
+  "args": [
+    "validate",
+    "persist-context-mode-live-evaluation-issue-134",
+    "--type",
+    "change",
+    "--strict",
+    "--json",
+    "--no-interactive",
+    "--no-color"
+  ],
+  "exitCode": 0,
+  "ok": true,
+  "skipped": false,
+  "reason": null,
+  "message": null,
+  "parsedJson": {
+    "items": [
+      {
+        "id": "persist-context-mode-live-evaluation-issue-134",
+        "type": "change",
+        "valid": true,
+        "issues": [],
+        "durationMs": 2
+      }
+    ],
+    "summary": {
+      "totals": {
+        "items": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      "byType": {
+        "change": {
+          "items": 1,
+          "passed": 1,
+          "failed": 0
+        }
+      }
+    },
+    "version": "1.0"
+  },
+  "jsonParseError": null,
+  "rawStdoutPath": ".ai-factory/qa/persist-context-mode-live-evaluation-issue-134/raw/openspec-validate.stdout",
+  "rawStderrPath": ".ai-factory/qa/persist-context-mode-live-evaluation-issue-134/raw/openspec-validate.stderr",
+  "stdout": "{\n  \"items\": [\n    {\n      \"id\": \"persist-context-mode-live-evaluation-issue-134\",\n      \"type\": \"change\",\n      \"valid\": true,\n      \"issues\": [],\n      \"durationMs\": 2\n    }\n  ],\n  \"summary\": {\n    \"totals\": {\n      \"items\": 1,\n      \"passed\": 1,\n      \"failed\": 0\n    },\n    \"byType\": {\n      \"change\": {\n        \"items\": 1,\n        \"passed\": 1,\n        \"failed\": 0\n      }\n    }\n  },\n  \"version\": \"1.0\"\n}\n",
+  "stderr": "",
+  "error": null
+}
