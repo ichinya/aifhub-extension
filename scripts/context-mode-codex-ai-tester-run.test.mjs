@@ -448,6 +448,46 @@ describe('context-mode dedicated runner', () => {
     assert.equal(calls, before);
   });
 
+  it('creates a missing sandbox under the verified owner without leaking ENOENT', async () => {
+    let calls = 0;
+    const options = await runnerOptions({
+      runProcess: async () => {
+        calls += 1;
+        if (calls === 2) {
+          const tracePath = path.join(options.runRoot, 'inline', 'fresh.json');
+          await mkdir(path.dirname(tracePath), { recursive: true });
+          await writeFile(tracePath, JSON.stringify(validTrace('row-a')), 'utf8');
+        }
+        return { exitCode: 0 };
+      }
+    });
+    await rm(options.sandboxRoot, { recursive: true, force: true });
+    const result = await runVerifiedMatrix(options);
+    assert.equal(result.status, 'PASS');
+    assert.equal(result.cleanup, 'PASS');
+    assert.notEqual(result.reason, 'ENOENT');
+  });
+
+  it('accepts transient absolute paths inside the sandbox but omits them from results', async () => {
+    let calls = 0;
+    const options = await runnerOptions({
+      runProcess: async () => {
+        calls += 1;
+        if (calls === 2) {
+          const tracePath = path.join(options.runRoot, 'inline', 'sandbox-path.json');
+          await mkdir(path.dirname(tracePath), { recursive: true });
+          const trace = validTrace('row-a');
+          trace.debug = { transient_path: path.join(options.sandboxRoot, 'runs', 'scratch.json') };
+          await writeFile(tracePath, JSON.stringify(trace), 'utf8');
+        }
+        return { exitCode: 0 };
+      }
+    });
+    const result = await runVerifiedMatrix(options);
+    assert.equal(result.status, 'PASS');
+    assert.doesNotMatch(JSON.stringify(result), /context-mode-runner-|scratch\.json|sandbox-path\.json/);
+  });
+
   it('deletes an unsafe fresh trace and returns only bounded reason codes', async () => {
     let calls = 0;
     let tracePath;

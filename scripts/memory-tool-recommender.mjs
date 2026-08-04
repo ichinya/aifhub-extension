@@ -898,6 +898,10 @@ function buildRecommendation(toolId, tool, context) {
     purge_path: tool.purge_path ?? 'unknown',
     allowed_in: asArray(tool.allowed_in),
     forbidden_in: asArray(tool.forbidden_in),
+    normal_command_selection: tool.normal_command_selection ?? null,
+    selection_policy: tool.normal_command_selection === 'forbidden'
+      ? 'recommendation_only'
+      : 'normal_command_selection_allowed',
     permission: context.permission ?? null,
     privacy_caveat: tool.privacy_caveat ?? null,
     next_step: nextStepForTool(toolId, tool)
@@ -1025,12 +1029,12 @@ async function runProbeForTool(toolId, options = {}) {
     ]);
   }
   if (toolId === 'context-mode') {
-    return {
+    return normalizeProbeResult({
       availability: 'unknown',
       command: null,
       reason: 'dedicated_harness_required',
       note: 'Automatic context-mode probes are disabled because the current runtime lifecycle is not eligible.'
-    };
+    });
   }
   if (toolId === 'context7') {
     if (!options.checkDocsProvider) {

@@ -198,7 +198,7 @@ describe('ai-tester matrix manifest', () => {
       metadata,
       profiles,
       skills: ['aif-explore'],
-      tools: ['codegraph', 'graphify', 'context-mode'],
+      tools: ['codegraph', 'graphify', 'context7'],
       taskScenarios: ['architecture_or_impact_discovery']
     });
 
@@ -220,6 +220,33 @@ describe('ai-tester matrix manifest', () => {
       assert.ok(baseline, `missing rg baseline for ${toolCase.id}`);
       assert.ok(manifest.cases.indexOf(baseline) < manifest.cases.indexOf(toolCase));
     }
+  });
+
+  it('routes context-mode only through its dedicated issue 134 harness', async () => {
+    const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
+    const profile = {
+      id: 'matrix-profile-context-mode',
+      sourceRoot: path.join(tmpDir, 'fixture-project'),
+      project_shape: 'large_framework_app',
+      languages: ['js'],
+      volume: 'large',
+      complexity: 'framework',
+      repo_shape: 'single_repo',
+      artifact_mode: 'openspec_native'
+    };
+    assert.throws(() => buildAiTesterMatrixManifest({
+      metadata,
+      profiles: [profile],
+      skills: ['aif-explore'],
+      tools: ['context-mode'],
+      taskScenarios: ['large_command_output_compression']
+    }), /context_mode_requires_dedicated_harness/);
+    assert.throws(() => renderAiTesterScenario({
+      id: 'generic-context-mode',
+      expectation: 'positive',
+      tool_id: 'context-mode',
+      optional_tool_id: 'context-mode'
+    }), /context_mode_requires_dedicated_harness/);
   });
 
   it('generates catalog-driven accepted-evidence pairs with scenario metadata', async () => {

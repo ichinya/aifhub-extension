@@ -67,7 +67,8 @@ export function normalizeContextModeTrace(record = {}) {
 
 export function scanCompleteTrace(record, {
   canaries = [],
-  contentFingerprints = []
+  contentFingerprints = [],
+  allowedAbsoluteRoots = []
 } = {}) {
   const serialized = JSON.stringify(record);
   const scanText = serialized.replaceAll('\\\\', '\\');
@@ -75,8 +76,7 @@ export function scanCompleteTrace(record, {
   let matchCount = 0;
   const patterns = [
     ['credential_material', /(?:OPENAI_API_KEY|GITHUB_TOKEN|AWS_SECRET_ACCESS_KEY|DATABASE_URL|SSH_AUTH_SOCK|authorization|password|api[_-]?key|token)\s*["']?\s*[:=]\s*["']?[^\s"',}]{4,}/gi],
-    ['private_key_material', /BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY/gi],
-    ['absolute_path', /(?:[A-Za-z]:\\(?:Users|projects|Temp)\\|\/(?:Users|home|tmp)\/)[^"'\s]*/gi]
+    ['private_key_material', /BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY/gi]
   ];
   for (const [reason, pattern] of patterns) {
     const matches = scanText.match(pattern) ?? [];
@@ -84,6 +84,16 @@ export function scanCompleteTrace(record, {
       reasons.add(reason);
       matchCount += matches.length;
     }
+  }
+  const absoluteMatches = scanText.match(
+    /(?:[A-Za-z]:\\(?:Users|projects|Temp)\\|\/(?:Users|home|tmp)\/)[^"'\s]*/gi
+  ) ?? [];
+  const unsafeAbsoluteMatches = absoluteMatches.filter((candidate) =>
+    !allowedAbsoluteRoots.some((root) => pathValueStaysConfined(candidate, root))
+  );
+  if (unsafeAbsoluteMatches.length > 0) {
+    reasons.add('absolute_path');
+    matchCount += unsafeAbsoluteMatches.length;
   }
   for (const canary of canaries) {
     if (canary && serialized.includes(canary)) {
@@ -139,14 +149,16 @@ export function auditCodexRolloutRecords(records = [], {
   const commandAllowlist = new Set(allowedCommands);
   const forbiddenAbsent = calls.every((call) => allowed.has(call.tool));
   const pathsConfined = Boolean(sandboxRoot) && calls.every((call) =>
-    argumentsStayConfined(call.arguments, sandboxRoot, '', commandAllowlist)
+    argumentsStayConfined(call.arguments, sandboxRoot)
   );
+  const commandsAllowed = calls.every((call) => commandValuesAllowed(call.arguments, commandAllowlist));
   const common = {
     record_count: records.length,
     tool_counts: sortedToolCounts,
     required_tools_present: requiredPresent,
     forbidden_tools_absent: forbiddenAbsent,
-    paths_confined: pathsConfined
+    paths_confined: pathsConfined,
+    commands_allowed: commandsAllowed
   };
   if (invalidArguments || !sandboxRoot) {
     return { status: 'NOT_RUN', reason: 'raw_provider_audit_invalid', ...common };
@@ -156,6 +168,9 @@ export function auditCodexRolloutRecords(records = [], {
   }
   if (!forbiddenAbsent) {
     return { status: 'FAIL', reason: 'raw_provider_tool_forbidden', ...common };
+  }
+  if (!commandsAllowed) {
+    return { status: 'FAIL', reason: 'raw_provider_command_forbidden', ...common };
   }
   if (calls.length === 0 || !requiredPresent) {
     return { status: 'NOT_RUN', reason: 'raw_provider_audit_missing', ...common };
@@ -176,17 +191,17 @@ function walkRecord(value, visit, seen = new Set()) {
   }
 }
 
-function argumentsStayConfined(value, sandboxRoot, key = '', allowedCommands = new Set()) {
+function argumentsStayConfined(value, sandboxRoot, key = '') {
   if (Array.isArray(value)) {
-    return value.every((item) => argumentsStayConfined(item, sandboxRoot, key, allowedCommands));
+    return value.every((item) => argumentsStayConfined(item, sandboxRoot, key));
   }
   if (value && typeof value === 'object') {
     return Object.entries(value).every(([childKey, child]) =>
-      argumentsStayConfined(child, sandboxRoot, childKey, allowedCommands)
+      argumentsStayConfined(child, sandboxRoot, childKey)
     );
   }
   if (/^command$/i.test(key)) {
-    return commandValueStaysConfined(value, sandboxRoot, allowedCommands);
+    return commandPathsStayConfined(value, sandboxRoot);
   }
   if (typeof value !== 'string') return true;
   const pathLikeKey = /^(?:cwd|path|file|filename|directory|dir|root|source)$/i.test(key);
@@ -196,11 +211,30 @@ function argumentsStayConfined(value, sandboxRoot, key = '', allowedCommands = n
   return [...candidates].every((candidate) => pathValueStaysConfined(candidate, sandboxRoot));
 }
 
-function commandValueStaysConfined(value, sandboxRoot, allowedCommands) {
+function commandValuesAllowed(value, allowedCommands, key = '') {
+  if (Array.isArray(value)) {
+    return value.every((item) => commandValuesAllowed(item, allowedCommands, key));
+  }
+  if (value && typeof value === 'object') {
+    return Object.entries(value).every(([childKey, child]) =>
+      commandValuesAllowed(child, allowedCommands, childKey)
+    );
+  }
+  if (!/^command$/i.test(key)) return true;
+  return commandValueAllowed(value, allowedCommands);
+}
+
+function commandValueAllowed(value, allowedCommands) {
   if (typeof value !== 'string' || !allowedCommands.has(value)) return false;
   if (/[\r\n;&|<>`$]/.test(value)) return false;
   const tokens = value.trim().split(/\s+/).filter(Boolean);
   if (!/^(?:node|node\.exe)$/i.test(tokens[0] ?? '')) return false;
+  return tokens.slice(1).every((rawToken) => !/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(rawToken));
+}
+
+function commandPathsStayConfined(value, sandboxRoot) {
+  if (typeof value !== 'string') return true;
+  const tokens = value.trim().split(/\s+/).filter(Boolean);
   return tokens.slice(1).every((rawToken) => {
     const token = rawToken.replace(/^(?:"([\s\S]*)"|'([\s\S]*)')$/, '$1$2');
     if (!token || token.startsWith('-')) return true;

@@ -71,6 +71,20 @@ describe('context-mode complete-record normalization', () => {
     assert.ok(scan.reason_codes.includes('canary_material'));
   });
 
+  it('allows absolute paths only inside the verified disposable sandbox', () => {
+    const sandboxRoot = '/tmp/aifhub-context-mode-sandbox';
+    const inside = scanCompleteTrace({
+      trace_path: `${sandboxRoot}/runs/trace.json`
+    }, { allowedAbsoluteRoots: [sandboxRoot] });
+    const outside = scanCompleteTrace({
+      trace_path: '/tmp/aifhub-context-mode-sibling/trace.json'
+    }, { allowedAbsoluteRoots: [sandboxRoot] });
+    assert.equal(inside.safe, true);
+    assert.deepEqual(inside.reason_codes, []);
+    assert.equal(outside.safe, false);
+    assert.deepEqual(outside.reason_codes, ['absolute_path']);
+  });
+
   it('deletes an unsafe raw trace after retaining only bounded aggregate reasons', async () => {
     const tracePath = path.join(tempDir, 'trace.json');
     await writeFile(tracePath, '{"token":"secret-value"}', 'utf8');
@@ -142,7 +156,8 @@ describe('context-mode raw Codex rollout audit', () => {
       tool_counts: { ctx_batch_execute: 1, ctx_purge: 1 },
       required_tools_present: true,
       forbidden_tools_absent: true,
-      paths_confined: true
+      paths_confined: true,
+      commands_allowed: true
     });
     assert.doesNotMatch(JSON.stringify(result), /context-mode-results-|sandbox|fixture/);
   });
@@ -203,6 +218,24 @@ describe('context-mode raw Codex rollout audit', () => {
       requiredTools: ['ctx_search'],
       allowedTools: ['ctx_search']
     }).reason, 'raw_provider_path_escape');
+  });
+
+  it('reports a safe but unlisted command separately from a path escape', () => {
+    const sandboxRoot = path.join(tempDir, 'sandbox');
+    const result = auditCodexRolloutRecords([rolloutTool('ctx_batch_execute', {
+      cwd: path.join(sandboxRoot, 'fixture'),
+      commands: [{ command: 'node project/other-safe.mjs' }]
+    })], {
+      sandboxRoot,
+      requiredTools: ['ctx_batch_execute'],
+      allowedTools: ['ctx_batch_execute'],
+      allowedCommands: ['node project/emit-large-output.mjs']
+    });
+    assert.equal(result.status, 'FAIL');
+    assert.equal(result.reason, 'raw_provider_command_forbidden');
+    assert.equal(result.paths_confined, true);
+    assert.equal(result.commands_allowed, false);
+    assert.doesNotMatch(JSON.stringify(result), /other-safe\.mjs|emit-large-output/);
   });
 });
 

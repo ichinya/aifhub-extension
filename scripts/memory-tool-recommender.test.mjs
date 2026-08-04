@@ -413,6 +413,8 @@ describe('recommendation results', () => {
     assert.ok(contextMode);
     assert.equal(contextMode.status, 'manual_helper_only');
     assert.equal(contextMode.read_scope, 'explicit_indexed_content');
+    assert.equal(contextMode.normal_command_selection, 'forbidden');
+    assert.equal(contextMode.selection_policy, 'recommendation_only');
     assert.match(contextMode.next_step, /manual temporary/i);
   });
 

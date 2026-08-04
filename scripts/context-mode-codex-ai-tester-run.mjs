@@ -6,6 +6,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 
 import {
+  assertCanonicalConfinedPath,
   buildContextModeEnv,
   buildSandboxLayout,
   prepareSandbox,
@@ -318,7 +319,30 @@ export async function runVerifiedMatrix(options) {
       statuses: []
     };
   }
-  if (!await isCanonicalDescendant(options.sandboxOwnerRoot, options.sandboxRoot)) {
+  let ownerInfo;
+  try {
+    ownerInfo = await lstat(options.sandboxOwnerRoot);
+  } catch {
+    return {
+      schema: CONTEXT_MODE_RUNNER_SCHEMA,
+      status: 'NOT_RUN',
+      reason: 'cleanup_boundary_unavailable',
+      statuses: []
+    };
+  }
+  if (!ownerInfo.isDirectory() || ownerInfo.isSymbolicLink()) {
+    return {
+      schema: CONTEXT_MODE_RUNNER_SCHEMA,
+      status: 'NOT_RUN',
+      reason: 'cleanup_boundary_unavailable',
+      statuses: []
+    };
+  }
+  try {
+    await assertCanonicalConfinedPath(options.sandboxOwnerRoot, options.sandboxRoot, {
+      allowMissingLeaf: true
+    });
+  } catch {
     return {
       schema: CONTEXT_MODE_RUNNER_SCHEMA,
       status: 'NOT_RUN',
@@ -446,7 +470,10 @@ async function inspectFreshTrace({
   if (scanMaterial.status !== 'PASS') {
     return rowStatus(row, 'NOT_RUN', scanMaterial.reason);
   }
-  const scan = scanCompleteTrace({ trace, evidence }, scanMaterial);
+  const scan = scanCompleteTrace({ trace, evidence }, {
+    ...scanMaterial,
+    allowedAbsoluteRoots: [sandboxRoot]
+  });
   if (!scan.safe) {
     const sanitized = await sanitizeAndDeleteUnsafeTrace({
       tracePath,

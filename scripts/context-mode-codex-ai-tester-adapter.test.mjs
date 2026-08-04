@@ -1,9 +1,11 @@
 // context-mode-codex-ai-tester-adapter.test.mjs - issue #134 safety contracts
 import assert from 'node:assert/strict';
+import { execFile as execFileCallback } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'node:test';
+import { promisify } from 'node:util';
 
 import {
   CONTEXT_MODE_IDENTITY,
@@ -22,10 +24,13 @@ import {
   evaluateActualPluginEligibility,
   runDirectHookContract,
   runActualPluginLifecycle,
+  runBoundedProcess,
   runSandboxLifecycle,
   runMcpContract,
   validateNativeCodexExecutable
 } from './context-mode-codex-ai-tester-adapter.mjs';
+
+const execFileAsync = promisify(execFileCallback);
 
 let tempDir;
 
@@ -83,9 +88,53 @@ describe('context-mode exact static identity', () => {
     assert.deepEqual(result.manifests, ['plugin.json', 'mcp.json', 'hooks.json']);
     assert.ok(result.checked_contracts.includes('postinstall_present_and_suppressed'));
   });
+
+  it('does not let the package-only audit CLI manufacture pinned provenance', async () => {
+    const packageRoot = await writePackageFixture(tempDir);
+    await assert.rejects(
+      execFileAsync(process.execPath, [
+        path.join(process.cwd(), 'scripts', 'context-mode-codex-ai-tester-adapter.mjs'),
+        '--audit',
+        '--package-root',
+        packageRoot
+      ], { cwd: process.cwd(), windowsHide: true }),
+      (error) => {
+        const result = JSON.parse(error.stdout);
+        assert.equal(result.status, 'NOT_RUN');
+        assert.equal(result.audit_scope, 'package_structure_only');
+        assert.equal(result.provenance_verified, false);
+        assert.equal(result.checked_contracts.includes('source_identity'), false);
+        assert.equal(result.checked_contracts.includes('npm_package_identity'), false);
+        return true;
+      }
+    );
+  });
 });
 
 describe('context-mode sandbox and lifecycle boundary', () => {
+  it('caps stdout and stderr by UTF-8 bytes without corrupting multibyte output', async () => {
+    const result = await runBoundedProcess(process.execPath, [
+      '-e',
+      'process.stdout.write("😀".repeat(4)); process.stderr.write("€".repeat(4));'
+    ], {
+      cwd: tempDir,
+      env: process.env,
+      outputCapBytes: 8
+    });
+    assert.equal(result.exitCode, 0);
+    assert.ok(Buffer.byteLength(result.stdout) <= 8);
+    assert.ok(Buffer.byteLength(result.stderr) <= 8);
+    assert.doesNotMatch(`${result.stdout}${result.stderr}`, /�/);
+    await assert.rejects(
+      runBoundedProcess(process.execPath, ['--version'], {
+        cwd: tempDir,
+        env: process.env,
+        outputCapBytes: 0
+      }),
+      /invalid_output_cap/
+    );
+  });
+
   it('keeps mutable roots under the sandbox and drops unknown credentials', () => {
     const layout = buildSandboxLayout(tempDir);
     const env = buildContextModeEnv({
@@ -322,6 +371,27 @@ describe('context-mode sandbox and lifecycle boundary', () => {
       removeVerifiedSandbox({ ownerRoot, sandboxRoot: external }),
       /unsafe_delete_target|unsafe_path/
     );
+  });
+
+  it('acquires a cleanup lease for a new sandbox before preparation', async () => {
+    const ownerRoot = path.join(tempDir, 'owned-new-sandbox');
+    const sandboxRoot = path.join(ownerRoot, 'sandbox');
+    await mkdir(ownerRoot, { recursive: true });
+    let called = false;
+    const result = await runSandboxLifecycle({
+      ownerRoot,
+      sandboxRoot,
+      run: async () => {
+        called = true;
+        await writeFile(path.join(sandboxRoot, 'state.json'), '{}', 'utf8');
+        return { status: 'PASS' };
+      },
+      purgeRequired: false
+    });
+    assert.equal(called, true);
+    assert.equal(result.status, 'PASS');
+    assert.equal(result.cleanup, 'PASS');
+    await assert.rejects(readFile(path.join(sandboxRoot, 'state.json'), 'utf8'));
   });
 
   it('labels deterministic direct hooks separately from actual Codex delivery', async () => {

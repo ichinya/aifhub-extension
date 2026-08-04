@@ -45,6 +45,7 @@ Recommender только советует:
 - Если metadata содержит поля, рекомендации включают allowed command scopes, forbidden command scopes, command-specific permission, privacy caveat, read scope, purge path, availability и explicit opt-in install policy.
 - Context/compression tools не должны rewrite validation artifacts и не должны compress protected artifacts in place.
 - `/aif-analyze` записывает только user-accepted tool ids в `utilities.context_tools.enabled`.
+- Рекомендация с `normal_command_selection: forbidden` является recommendation-only manual guidance: ее нельзя предлагать для enablement или записывать в `utilities.context_tools.enabled`.
 - Follow-on skills вызывают `select` для своей команды и используют только `selected_tools`; изменение списка tools должно требовать metadata/config changes, а не prompt rewrites.
 - Recommender учитывает language, volume, complexity, repo shape, artifact mode и legacy `project_shape`. Если rich dimensions недоступны, сохраняется fallback на `project_shape`.
 - Любой optional tool сравнивается с `rg`: сначала baseline search на том же task/profile, затем tool run только если selector и permissions разрешают его.
@@ -136,6 +137,8 @@ Decision mapping из matrix:
 Для `context-mode` active executable probe отсутствует; metadata/runtime возвращают `dedicated_harness_required`, а проверка разрешена только pinned isolated harness для issue `#134`.
 
 Для `rohitg00-agentmemory` executable status probe отсутствует; `status --json` возвращает `availability: unknown` и `command: null`.
+
+Каждый `probes.<tool>` object содержит обязательные поля `availability` и `command`. Поля `reason` и `note` являются optional diagnostics для намеренно skipped или disabled probes.
 
 Эти probes не должны install packages, run setup, register MCP servers, write hooks или start background processes. `codegraph init/index/query/uninit` разрешен только когда `select --command aif-explore --json` возвращает CodeGraph в `selected_tools` из-за exact screening/proven match, с `manual_purged_cli_execution`, explicit project path и purge через `codegraph uninit --force <project>`.
 

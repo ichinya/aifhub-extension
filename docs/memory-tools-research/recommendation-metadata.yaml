@@ -1,5 +1,5 @@
 schema: aifhub.memory_tools.recommendation.v1
-updated: "2026-07-28"
+updated: "2026-08-04"
 purpose: "Метаданные для этапа анализа проекта: какие memory/retrieval инструменты можно предлагать пользователю, когда и с какими ограничениями."
 default_policy:
   install_policy: explicit_user_opt_in_only

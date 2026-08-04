@@ -173,13 +173,22 @@ export async function assertCanonicalConfinedPath(
 export async function auditContextModeSnapshot({ packageRoot, tarballPath, source, packageMeta }) {
   const checked = [];
   const mismatches = [];
-  compareField(mismatches, 'repository', source?.repository, CONTEXT_MODE_IDENTITY.repository);
-  compareField(mismatches, 'tag', source?.tag, CONTEXT_MODE_IDENTITY.tag);
-  compareField(mismatches, 'commit', source?.commit, CONTEXT_MODE_IDENTITY.commit);
-  for (const key of ['version', 'integrity', 'shasum', 'license', 'node']) {
-    compareField(mismatches, key, packageMeta?.[key], CONTEXT_MODE_IDENTITY[key]);
+  const sourceObserved = source && typeof source === 'object' && !Array.isArray(source);
+  const packageMetaObserved = packageMeta && typeof packageMeta === 'object' && !Array.isArray(packageMeta);
+  const provenanceVerified = Boolean(sourceObserved && packageMetaObserved);
+  if (sourceObserved) {
+    compareField(mismatches, 'repository', source.repository, CONTEXT_MODE_IDENTITY.repository);
+    compareField(mismatches, 'tag', source.tag, CONTEXT_MODE_IDENTITY.tag);
+    compareField(mismatches, 'commit', source.commit, CONTEXT_MODE_IDENTITY.commit);
+    checked.push('source_identity');
   }
-  checked.push('source_identity', 'npm_package_identity');
+  if (packageMetaObserved) {
+    for (const key of ['version', 'integrity', 'shasum', 'license', 'node']) {
+      compareField(mismatches, key, packageMeta[key], CONTEXT_MODE_IDENTITY[key]);
+    }
+    checked.push('npm_package_identity');
+  }
+  if (!provenanceVerified) mismatches.push('pinned_identity_evidence_missing');
 
   const packageJson = JSON.parse(await readFile(path.join(packageRoot, 'package.json'), 'utf8'));
   compareField(mismatches, 'package_name', packageJson.name, CONTEXT_MODE_IDENTITY.package);
@@ -221,8 +230,10 @@ export async function auditContextModeSnapshot({ packageRoot, tarballPath, sourc
 
   return {
     schema: CONTEXT_MODE_ADAPTER_SCHEMA,
-    status: mismatches.length === 0 ? 'PASS' : 'FAIL',
+    status: !provenanceVerified ? 'NOT_RUN' : (mismatches.length === 0 ? 'PASS' : 'FAIL'),
     reason_codes: mismatches,
+    audit_scope: provenanceVerified ? 'pinned_identity_observations' : 'package_structure_only',
+    provenance_verified: provenanceVerified,
     identity: CONTEXT_MODE_IDENTITY,
     manifests,
     checked_contracts: checked,
@@ -550,6 +561,8 @@ function validateSnapshotAudit(snapshotAudit) {
   ];
   const verified = snapshotAudit.schema === CONTEXT_MODE_ADAPTER_SCHEMA &&
     snapshotAudit.status === 'PASS' &&
+    snapshotAudit.audit_scope === 'pinned_identity_observations' &&
+    snapshotAudit.provenance_verified === true &&
     snapshotAudit.evidence_class === 'plugin_snapshot_isolated' &&
     snapshotAudit.install_lifecycle === 'NOT_RUN(postinstall_forbidden)' &&
     Array.isArray(snapshotAudit.reason_codes) && snapshotAudit.reason_codes.length === 0 &&
@@ -850,7 +863,18 @@ export async function runSandboxLifecycle({
   purgeRequired = true,
   logger
 }) {
-  const lease = await createSandboxLease({ ownerRoot, sandboxRoot });
+  let lease;
+  try {
+    lease = await createSandboxLease({ ownerRoot, sandboxRoot });
+  } catch (error) {
+    return {
+      schema: CONTEXT_MODE_ADAPTER_SCHEMA,
+      status: 'NOT_RUN',
+      reason: error?.code ?? 'sandbox_lease_failed',
+      purge: 'NOT_APPLICABLE',
+      cleanup: 'NOT_APPLICABLE'
+    };
+  }
   let runResult = null;
   let runFailure = null;
   try {
@@ -926,6 +950,9 @@ export async function runBoundedProcess(command, args, {
   timeoutMs = DEFAULT_TIMEOUT_MS,
   outputCapBytes = DEFAULT_OUTPUT_CAP_BYTES
 } = {}) {
+  if (!Number.isSafeInteger(outputCapBytes) || outputCapBytes < 1) {
+    throw adapterError('invalid_output_cap');
+  }
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd,
@@ -934,10 +961,13 @@ export async function runBoundedProcess(command, args, {
       windowsHide: true,
       detached: process.platform !== 'win32'
     });
-    let stdout = '';
-    let stderr = '';
+    let stdout = Buffer.alloc(0);
+    let stderr = Buffer.alloc(0);
     let settled = false;
-    const append = (current, chunk) => `${current}${chunk.toString()}`.slice(-outputCapBytes);
+    const append = (current, chunk) => {
+      const combined = Buffer.concat([current, Buffer.from(chunk)]);
+      return combined.length > outputCapBytes ? combined.subarray(combined.length - outputCapBytes) : combined;
+    };
     child.stdout.on('data', (chunk) => { stdout = append(stdout, chunk); });
     child.stderr.on('data', (chunk) => { stderr = append(stderr, chunk); });
     const timer = setTimeout(async () => {
@@ -957,7 +987,12 @@ export async function runBoundedProcess(command, args, {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      resolve({ exitCode, signal, stdout, stderr });
+      resolve({
+        exitCode,
+        signal,
+        stdout: decodeUtf8Tail(stdout),
+        stderr: decodeUtf8Tail(stderr)
+      });
     });
   });
 }
@@ -1020,23 +1055,61 @@ async function createSandboxLease({ ownerRoot, sandboxRoot }) {
   if (!ownerRoot || !sandboxRoot) throw adapterError('unsafe_delete_target');
   const owner = path.resolve(ownerRoot);
   const target = path.resolve(sandboxRoot);
-  if (path.parse(owner).root === owner || path.parse(target).root === target) {
-    throw adapterError('unsafe_delete_target');
+  if (path.parse(owner).root === owner) {
+    throw adapterError('cleanup_boundary_unavailable');
   }
-  const [ownerInfo, targetInfo] = await Promise.all([lstat(owner), lstat(target)]);
-  if (!ownerInfo.isDirectory() || ownerInfo.isSymbolicLink() ||
-      !targetInfo.isDirectory() || targetInfo.isSymbolicLink()) {
+  if (path.parse(target).root === target) {
+    throw adapterError('sandbox_outside_cleanup_owner');
+  }
+  let ownerInfo;
+  try {
+    ownerInfo = await lstat(owner);
+  } catch {
+    throw adapterError('cleanup_boundary_unavailable');
+  }
+  if (!ownerInfo.isDirectory() || ownerInfo.isSymbolicLink()) {
+    throw adapterError('cleanup_boundary_unavailable');
+  }
+  try {
+    await assertCanonicalConfinedPath(owner, target, { allowMissingLeaf: true });
+  } catch {
+    throw adapterError('sandbox_outside_cleanup_owner');
+  }
+  if (!await pathExists(target)) {
+    try {
+      await mkdir(target, { recursive: true });
+    } catch {
+      throw adapterError('sandbox_lease_failed');
+    }
+  }
+  let targetInfo;
+  try {
+    targetInfo = await lstat(target);
+  } catch {
+    throw adapterError('sandbox_lease_failed');
+  }
+  if (!targetInfo.isDirectory() || targetInfo.isSymbolicLink()) {
     throw adapterError('reparse_escape');
   }
   await assertCanonicalConfinedPath(owner, target);
   const token = randomUUID();
   const markerPath = path.join(target, SANDBOX_MARKER);
   await assertCanonicalConfinedPath(target, markerPath, { allowMissingLeaf: true });
-  await writeFile(markerPath, `${JSON.stringify({ schema: SANDBOX_MARKER_SCHEMA, token })}\n`, {
-    encoding: 'utf8',
-    flag: 'wx'
-  });
+  try {
+    await writeFile(markerPath, `${JSON.stringify({ schema: SANDBOX_MARKER_SCHEMA, token })}\n`, {
+      encoding: 'utf8',
+      flag: 'wx'
+    });
+  } catch {
+    throw adapterError('sandbox_lease_failed');
+  }
   return { ownerRoot: owner, sandboxRoot: target, token };
+}
+
+function decodeUtf8Tail(buffer) {
+  let start = 0;
+  while (start < buffer.length && (buffer[start] & 0xc0) === 0x80) start += 1;
+  return buffer.subarray(start).toString('utf8');
 }
 
 async function assertNoReparseEntries(root, current) {
@@ -1131,9 +1204,7 @@ async function main(argv = process.argv.slice(2)) {
   const packageRoot = valueAfter(argv, '--package-root');
   if (!packageRoot) throw adapterError('package_root_required');
   const result = await auditContextModeSnapshot({
-    packageRoot: path.resolve(packageRoot),
-    source: CONTEXT_MODE_IDENTITY,
-    packageMeta: CONTEXT_MODE_IDENTITY
+    packageRoot: path.resolve(packageRoot)
   });
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   if (result.status !== 'PASS') process.exitCode = 1;

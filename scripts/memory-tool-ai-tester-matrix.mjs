@@ -165,6 +165,10 @@ const DEFAULT_TASK_SCENARIOS = [
 const OPTIONAL_TOOLS = getToolPlan('safe')
   .map((tool) => tool.id)
   .filter((toolId) => toolId !== 'rg' && toolId !== 'git-gh');
+const DEDICATED_HARNESS_ONLY_TOOLS = new Set(['context-mode']);
+const GENERIC_MATRIX_TOOLS = OPTIONAL_TOOLS.filter((toolId) =>
+  !DEDICATED_HARNESS_ONLY_TOOLS.has(toolId)
+);
 const REPO_GRAPH_TOOLS = new Set(['codegraph', 'graphify', 'repowise']);
 const PREINITIALIZABLE_TOOLS = new Set([
   'codegraph',
@@ -173,7 +177,6 @@ const PREINITIALIZABLE_TOOLS = new Set([
   'repowise',
   'rohitg00-agentmemory'
 ]);
-const DEDICATED_HARNESS_ONLY_TOOLS = new Set(['context-mode']);
 const SELECTOR_COMMANDS = {
   installed: 'ai-factory aifhub-memory-tools select --from-project --command <skill> --json',
   'source-fallback': 'node scripts/memory-tool-recommender.mjs select --from-project --command <skill> --json'
@@ -236,7 +239,7 @@ export async function runMemoryToolAiTesterMatrix(args = [], options = {}) {
     scenarioCatalog,
     profiles,
     skills: matrixStrategy.skills,
-    tools: parsed.tools.length > 0 ? parsed.tools : OPTIONAL_TOOLS,
+    tools: parsed.tools.length > 0 ? parsed.tools : GENERIC_MATRIX_TOOLS,
     taskScenarios: matrixStrategy.task_scenarios,
     preinitializeTools: parsed.preinitializeTools,
     selectorMode: parsed.selectorMode,
@@ -389,7 +392,8 @@ export function buildAiTesterMatrixManifest(options = {}) {
   const scenarioCatalog = options.scenarioCatalog ?? null;
   const profiles = asArray(options.profiles).map(sanitizeProfile);
   const skills = asArray(options.skills).length > 0 ? asArray(options.skills) : DEFAULT_SKILLS;
-  const tools = asArray(options.tools).length > 0 ? asArray(options.tools) : OPTIONAL_TOOLS;
+  const tools = asArray(options.tools).length > 0 ? asArray(options.tools) : GENERIC_MATRIX_TOOLS;
+  assertGenericMatrixToolsAllowed(tools);
   const requestedPreinitializeTools = asArray(options.preinitializeTools);
   assertGenericPreinitializationAllowed(requestedPreinitializeTools);
   const preinitializeTools = requestedPreinitializeTools.filter((tool) => PREINITIALIZABLE_TOOLS.has(tool));
@@ -567,6 +571,7 @@ function buildPairedCases({
 }
 
 export function renderAiTesterScenario(input = {}) {
+  assertGenericMatrixToolsAllowed([input.tool_id, input.optional_tool_id].filter(Boolean));
   const selectorMode = normalizeSelectorMode(input.selector_mode);
   const fixturePath = input.fixture_path ?? '<sanitized-fixture>';
   const promptFile = input.system_prompt_file ?? '../system-prompt.md';
@@ -762,15 +767,6 @@ export function renderAiTesterScenario(input = {}) {
         '    tool: Bash',
         '    args_match:',
         `      command: ${quoteYamlSingle(toolSubcommandInvocationRegexForYaml('graphify', ['update', 'query', 'benchmark']))}`
-      );
-    }
-    if (input.tool_id === 'context-mode') {
-      lines.push(
-        '  - id: context-mode-data-called',
-        '    type: tool_called',
-        '    tool: Bash',
-        '    args_match:',
-        `      command: ${quoteYamlSingle(toolSubcommandInvocationRegexForYaml('context-mode', ['doctor', 'ctx_index', 'ctx_search']))}`
       );
     }
     if (input.tool_id === 'repowise') {
@@ -1321,6 +1317,13 @@ function assertGenericPreinitializationAllowed(toolIds = []) {
   }
 }
 
+function assertGenericMatrixToolsAllowed(toolIds = []) {
+  const dedicatedTool = asArray(toolIds).find((toolId) => DEDICATED_HARNESS_ONLY_TOOLS.has(toolId));
+  if (dedicatedTool) {
+    throw new Error(`${dedicatedTool.replaceAll('-', '_')}_requires_dedicated_harness`);
+  }
+}
+
 function preparedToolPromptLines(toolId) {
   if (toolId === 'repowise') {
     return [
@@ -1344,13 +1347,6 @@ function preparedToolPromptLines(toolId) {
       '  setup_commands installed ctx7 under project/.ai-tester-tools/context7 before this model turn.',
       '  Before calling Context7, prepend .ai-tester-tools/context7/node_modules/.bin to PATH in the same shell command.',
       '  Use ctx7 only for an explicit library/docs lookup related to the fixture stack, then summarize whether the docs lookup was useful versus rg.'
-    ];
-  }
-  if (toolId === 'context-mode') {
-    return [
-      '  This generic route is unavailable: dedicated_harness_required.',
-      '  Do not install, execute, register, or trust context-mode from this scenario.',
-      '  Issue #134 evaluation must use scripts/context-mode-codex-ai-tester-*.mjs with the pinned package and isolated lifecycle.'
     ];
   }
   if (toolId === 'rohitg00-agentmemory') {

@@ -537,7 +537,6 @@ function matrixError(code, details = []) {
 }
 
 async function main(argv = process.argv.slice(2)) {
-  const catalog = await loadContextModeScenarioCatalog();
   const provenancePath = valueAfter(argv, '--provenance');
   const authorizationPath = valueAfter(argv, '--authorization');
   const outDir = valueAfter(argv, '--out');
