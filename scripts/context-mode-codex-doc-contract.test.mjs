@@ -7,7 +7,7 @@ import { describe, it } from 'node:test';
 const ROOT = process.cwd();
 const readDoc = (relativePath) => readFile(path.join(ROOT, relativePath), 'utf8');
 const readJson = async (relativePath) => JSON.parse(await readDoc(relativePath));
-const LIVE_EVIDENCE = '.ai-factory/state/persist-context-mode-live-evaluation-issue-134/evaluation/live-authorized-evidence.json';
+const LIVE_EVIDENCE = 'docs/memory-tools-research/context-mode-codex-ai-tester/live-authorized-evidence.json';
 
 describe('context-mode Codex documentation policy', () => {
   it('preserves historical 1.0.151 evidence and appends exact 1.0.169 evidence classes', async () => {
@@ -47,7 +47,9 @@ describe('context-mode Codex documentation policy', () => {
       readDoc('docs/memory-tools-research/recommendation-metadata.yaml')
     ]);
 
+    assert.match(LIVE_EVIDENCE, /^docs\//);
     assert.equal(evidence.schema, 'aifhub.context_mode_codex.live_evaluation.v1');
+    assert.equal(evidence.artifact_class, 'sanitized_public_evaluation_evidence');
     assert.equal(evidence.authorization.class, 'explicit_isolated_full');
     assert.equal(evidence.authorization.scope, 'isolated_evaluation');
     assert.equal(evidence.authorization.purpose, 'test_only');

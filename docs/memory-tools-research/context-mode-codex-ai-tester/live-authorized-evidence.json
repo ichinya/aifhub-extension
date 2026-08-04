@@ -1,5 +1,6 @@
 {
   "schema": "aifhub.context_mode_codex.live_evaluation.v1",
+  "artifact_class": "sanitized_public_evaluation_evidence",
   "change_id": "persist-context-mode-live-evaluation-issue-134",
   "issue": 134,
   "recorded_date": "2026-08-03",

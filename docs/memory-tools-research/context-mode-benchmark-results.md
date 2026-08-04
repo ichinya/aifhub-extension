@@ -161,7 +161,7 @@ Current decision is split:
 
 Этот append-only follow-up не меняет исторические статусы выше. Он использовал отдельную test-only authorization class `explicit_isolated_full`, disposable homes, scoped ephemeral auth copy и native Codex executable. Host auth/manifests остались неизменными, auth copies были удалены; package install lifecycle не исполнялся и остаётся `NOT_RUN(postinstall_forbidden)`.
 
-Exact runtime identity: `context-mode 1.0.169` / commit `589d8214d56740a28b5f7bf63167743d586b0b40`, Codex `0.144.6`, `ai-tester 1.1.0` / commit `98dd5afb3fe9b9b7593d21dc93bcbc6d98c2cca9`, model `gpt-5.6-luna`, reasoning `low`. Санитизированный artifact: [live-authorized-evidence.json](../../.ai-factory/state/persist-context-mode-live-evaluation-issue-134/evaluation/live-authorized-evidence.json).
+Exact runtime identity: `context-mode 1.0.169` / commit `589d8214d56740a28b5f7bf63167743d586b0b40`, Codex `0.144.6`, `ai-tester 1.1.0` / commit `98dd5afb3fe9b9b7593d21dc93bcbc6d98c2cca9`, model `gpt-5.6-luna`, reasoning `low`. Санитизированный artifact: [live-authorized-evidence.json](context-mode-codex-ai-tester/live-authorized-evidence.json).
 
 Lifecycle/provenance gates:
 

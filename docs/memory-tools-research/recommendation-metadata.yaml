@@ -682,7 +682,7 @@ tools:
     authorized_live_followup:
       date: "2026-08-03"
       authorization_class: explicit_isolated_full
-      evidence: ".ai-factory/state/persist-context-mode-live-evaluation-issue-134/evaluation/live-authorized-evidence.json"
+      evidence: "docs/memory-tools-research/context-mode-codex-ai-tester/live-authorized-evidence.json"
       context_mode_version: "1.0.169"
       codex_version: "0.144.6"
       ai_tester_version: "1.1.0"
