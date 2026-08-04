@@ -56,6 +56,48 @@ describe('context-mode complete-record normalization', () => {
     assert.equal(row.tool_calls, 2);
   });
 
+  it('rejects coercible non-number cost, scoring and turn evidence', () => {
+    const completeTrace = () => ({
+      row_id: 'row',
+      triad_id: 'triad',
+      variant: 'baseline',
+      status: 'PASS',
+      settings_fingerprint: 'same',
+      scoring: { overall_pass: true, required_facts: 1, recovered_facts: 1 },
+      lifecycle: { privacy: true, purge: true, cleanup: true, continuity: true },
+      evidence_class: 'ai_tester_trace',
+      cost: {
+        cold_setup_ms: 0,
+        mcp_startup_ms: 0,
+        index_ms: 0,
+        warm_query_ms: 0,
+        answer_ms: 1,
+        input_tokens: 1,
+        output_tokens: 1
+      },
+      turns: [{ tool_calls: 0 }],
+      final_output: 'safe'
+    });
+
+    for (const value of ['', '1', false, []]) {
+      const trace = completeTrace();
+      trace.cost.input_tokens = value;
+      assert.equal(normalizeContextModeTrace(trace).reason, 'incomplete_trace_evidence');
+    }
+
+    const booleanScore = completeTrace();
+    booleanScore.scoring.required_facts = true;
+    assert.equal(normalizeContextModeTrace(booleanScore).reason, 'incomplete_trace_evidence');
+
+    const arrayScore = completeTrace();
+    arrayScore.scoring.recovered_facts = [1];
+    assert.equal(normalizeContextModeTrace(arrayScore).reason, 'incomplete_trace_evidence');
+
+    const booleanTurn = completeTrace();
+    booleanTurn.turns = [{ tool_calls: false }];
+    assert.equal(normalizeContextModeTrace(booleanTurn).reason, 'incomplete_trace_evidence');
+  });
+
   it('scans the complete trace, not only final output', () => {
     const scan = scanCompleteTrace({
       final_output: 'safe',
@@ -236,6 +278,71 @@ describe('context-mode raw Codex rollout audit', () => {
     assert.equal(result.paths_confined, true);
     assert.equal(result.commands_allowed, false);
     assert.doesNotMatch(JSON.stringify(result), /other-safe\.mjs|emit-large-output/);
+  });
+
+  it('keeps array-form command path confinement independent from the command allowlist', () => {
+    const sandboxRoot = path.join(tempDir, 'sandbox');
+    const result = auditCodexRolloutRecords([rolloutTool('ctx_batch_execute', {
+      cwd: path.join(sandboxRoot, 'fixture'),
+      commands: [{ command: ['node', '../../outside.mjs'] }]
+    })], {
+      sandboxRoot,
+      requiredTools: ['ctx_batch_execute'],
+      allowedTools: ['ctx_batch_execute'],
+      allowedCommands: ['node project/emit-large-output.mjs']
+    });
+    assert.equal(result.status, 'FAIL');
+    assert.equal(result.reason, 'raw_provider_path_escape');
+    assert.equal(result.paths_confined, false);
+    assert.doesNotMatch(JSON.stringify(result), /outside\.mjs|\.\.[\\/]/);
+
+    const unlisted = auditCodexRolloutRecords([rolloutTool('ctx_batch_execute', {
+      cwd: path.join(sandboxRoot, 'fixture'),
+      commands: [{ command: ['node', 'project/other-safe.mjs'] }]
+    })], {
+      sandboxRoot,
+      requiredTools: ['ctx_batch_execute'],
+      allowedTools: ['ctx_batch_execute'],
+      allowedCommands: ['node project/emit-large-output.mjs']
+    });
+    assert.equal(unlisted.reason, 'raw_provider_command_forbidden');
+    assert.equal(unlisted.paths_confined, true);
+
+    const allowed = auditCodexRolloutRecords([rolloutTool('ctx_batch_execute', {
+      cwd: path.join(sandboxRoot, 'fixture'),
+      commands: [{ command: ['node', 'project/emit-large-output.mjs'] }]
+    })], {
+      sandboxRoot,
+      requiredTools: ['ctx_batch_execute'],
+      allowedTools: ['ctx_batch_execute'],
+      allowedCommands: ['node project/emit-large-output.mjs']
+    });
+    assert.equal(allowed.status, 'PASS');
+
+    const malformed = auditCodexRolloutRecords([rolloutTool('ctx_batch_execute', {
+      cwd: path.join(sandboxRoot, 'fixture'),
+      commands: [{ command: { argv: ['node', '../../outside.mjs'] } }]
+    })], {
+      sandboxRoot,
+      requiredTools: ['ctx_batch_execute'],
+      allowedTools: ['ctx_batch_execute'],
+      allowedCommands: ['node project/emit-large-output.mjs']
+    });
+    assert.equal(malformed.status, 'NOT_RUN');
+    assert.equal(malformed.reason, 'raw_provider_audit_invalid');
+  });
+
+  it('reports rollout containment violations separately from missing provider calls', () => {
+    const result = auditCodexRolloutRecords([], {
+      sandboxRoot: path.join(tempDir, 'sandbox'),
+      requiredTools: ['ctx_search'],
+      allowedTools: ['ctx_search'],
+      containmentViolation: true
+    });
+    assert.equal(result.status, 'FAIL');
+    assert.equal(result.reason, 'raw_provider_rollout_escape');
+    assert.equal(result.record_count, 0);
+    assert.doesNotMatch(JSON.stringify(result), /context-mode-results-|sandbox/);
   });
 });
 

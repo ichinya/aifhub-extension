@@ -97,12 +97,24 @@ describe('context-mode three-way matrix', () => {
       mcp_allowed: false,
       plugin_allowed: false
     });
+    assert.deepEqual(normalizeContextModeAuthorization({
+      scope: 'isolated_evaluation',
+      provider_snapshot: 'prepared_pinned_snapshot',
+      runtime_dependency_bootstrap: 'approved',
+      auth_mode: 'scoped_ephemeral',
+      native_codex: true
+    }), {
+      class: 'explicit_isolated_mcp',
+      mcp_allowed: true,
+      plugin_allowed: false
+    });
     assert.equal(normalizeContextModeAuthorization({
       scope: 'isolated_evaluation',
       provider_snapshot: 'prepared_pinned_snapshot',
       runtime_dependency_bootstrap: 'approved',
       auth_mode: 'scoped_ephemeral',
       native_codex: true,
+      hook_trust_mode: 'test_only_pinned_snapshot_bypass',
       path: 'C:/private'
     }).class, 'default_fail_closed');
     const matrix = buildContextModeMatrix({
@@ -114,7 +126,8 @@ describe('context-mode three-way matrix', () => {
         provider_snapshot: 'prepared_pinned_snapshot',
         runtime_dependency_bootstrap: 'approved',
         auth_mode: 'scoped_ephemeral',
-        native_codex: true
+        native_codex: true,
+        hook_trust_mode: 'test_only_pinned_snapshot_bypass'
       },
       generatedAt: '2026-08-03T12:00:00.000Z'
     });
@@ -159,7 +172,8 @@ describe('context-mode three-way matrix', () => {
         provider_snapshot: 'prepared_pinned_snapshot',
         runtime_dependency_bootstrap: 'approved',
         auth_mode: 'scoped_ephemeral',
-        native_codex: true
+        native_codex: true,
+        hook_trust_mode: 'test_only_pinned_snapshot_bypass'
       }
     }), /context_mode_provenance_mismatch/);
   });

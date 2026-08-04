@@ -25,7 +25,7 @@ export function normalizeContextModeTrace(record = {}) {
   const scoringComplete = typeof record.scoring?.overall_pass === 'boolean' &&
     required !== null && recovered !== null && recovered <= required;
   const turnsComplete = Array.isArray(record.turns) && record.turns.every((turn) =>
-    Number.isInteger(Number(turn?.tool_calls)) && Number(turn.tool_calls) >= 0
+    typeof turn?.tool_calls === 'number' && Number.isInteger(turn.tool_calls) && turn.tool_calls >= 0
   );
   const identityComplete = [record.row_id, record.triad_id, record.variant,
     record.settings_fingerprint, record.evidence_class]
@@ -119,7 +119,8 @@ export function auditCodexRolloutRecords(records = [], {
   requiredTools = [],
   allowedTools = [],
   allowedCommands = [],
-  providerServer = 'context-mode'
+  providerServer = 'context-mode',
+  containmentViolation = false
 } = {}) {
   const calls = [];
   let invalidArguments = false;
@@ -147,6 +148,9 @@ export function auditCodexRolloutRecords(records = [], {
   const requiredPresent = requiredTools.every((tool) => toolCounts[tool] > 0);
   const allowed = new Set(allowedTools);
   const commandAllowlist = new Set(allowedCommands);
+  invalidArguments = invalidArguments || calls.some((call) =>
+    !argumentsHaveValidCommandShapes(call.arguments)
+  );
   const forbiddenAbsent = calls.every((call) => allowed.has(call.tool));
   const pathsConfined = Boolean(sandboxRoot) && calls.every((call) =>
     argumentsStayConfined(call.arguments, sandboxRoot)
@@ -160,6 +164,9 @@ export function auditCodexRolloutRecords(records = [], {
     paths_confined: pathsConfined,
     commands_allowed: commandsAllowed
   };
+  if (containmentViolation) {
+    return { status: 'FAIL', reason: 'raw_provider_rollout_escape', ...common };
+  }
   if (invalidArguments || !sandboxRoot) {
     return { status: 'NOT_RUN', reason: 'raw_provider_audit_invalid', ...common };
   }
@@ -192,6 +199,9 @@ function walkRecord(value, visit, seen = new Set()) {
 }
 
 function argumentsStayConfined(value, sandboxRoot, key = '') {
+  if (/^command$/i.test(key)) {
+    return commandPathsStayConfined(value, sandboxRoot);
+  }
   if (Array.isArray(value)) {
     return value.every((item) => argumentsStayConfined(item, sandboxRoot, key));
   }
@@ -199,9 +209,6 @@ function argumentsStayConfined(value, sandboxRoot, key = '') {
     return Object.entries(value).every(([childKey, child]) =>
       argumentsStayConfined(child, sandboxRoot, childKey)
     );
-  }
-  if (/^command$/i.test(key)) {
-    return commandPathsStayConfined(value, sandboxRoot);
   }
   if (typeof value !== 'string') return true;
   const pathLikeKey = /^(?:cwd|path|file|filename|directory|dir|root|source)$/i.test(key);
@@ -212,6 +219,9 @@ function argumentsStayConfined(value, sandboxRoot, key = '') {
 }
 
 function commandValuesAllowed(value, allowedCommands, key = '') {
+  if (/^command$/i.test(key)) {
+    return commandValueAllowed(value, allowedCommands);
+  }
   if (Array.isArray(value)) {
     return value.every((item) => commandValuesAllowed(item, allowedCommands, key));
   }
@@ -220,21 +230,22 @@ function commandValuesAllowed(value, allowedCommands, key = '') {
       commandValuesAllowed(child, allowedCommands, childKey)
     );
   }
-  if (!/^command$/i.test(key)) return true;
-  return commandValueAllowed(value, allowedCommands);
+  return true;
 }
 
 function commandValueAllowed(value, allowedCommands) {
-  if (typeof value !== 'string' || !allowedCommands.has(value)) return false;
-  if (/[\r\n;&|<>`$]/.test(value)) return false;
-  const tokens = value.trim().split(/\s+/).filter(Boolean);
+  const tokens = normalizeCommandTokens(value);
+  if (!tokens) return false;
+  const normalized = typeof value === 'string' ? value : tokens.join(' ');
+  if (!allowedCommands.has(normalized)) return false;
+  if (/[\r\n;&|<>`$]/.test(normalized)) return false;
   if (!/^(?:node|node\.exe)$/i.test(tokens[0] ?? '')) return false;
   return tokens.slice(1).every((rawToken) => !/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(rawToken));
 }
 
 function commandPathsStayConfined(value, sandboxRoot) {
-  if (typeof value !== 'string') return true;
-  const tokens = value.trim().split(/\s+/).filter(Boolean);
+  const tokens = normalizeCommandTokens(value);
+  if (!tokens) return false;
   return tokens.slice(1).every((rawToken) => {
     const token = rawToken.replace(/^(?:"([\s\S]*)"|'([\s\S]*)')$/, '$1$2');
     if (!token || token.startsWith('-')) return true;
@@ -243,6 +254,32 @@ function commandPathsStayConfined(value, sandboxRoot) {
     if (!/[\\/]/.test(token) && !/\.[A-Za-z0-9]+$/.test(token)) return true;
     return pathValueStaysConfined(token, sandboxRoot);
   });
+}
+
+function argumentsHaveValidCommandShapes(value, key = '') {
+  if (/^command$/i.test(key)) return normalizeCommandTokens(value) !== null;
+  if (Array.isArray(value)) {
+    return value.every((item) => argumentsHaveValidCommandShapes(item, key));
+  }
+  if (value && typeof value === 'object') {
+    return Object.entries(value).every(([childKey, child]) =>
+      argumentsHaveValidCommandShapes(child, childKey)
+    );
+  }
+  return true;
+}
+
+function normalizeCommandTokens(value) {
+  if (typeof value === 'string') {
+    const tokens = value.trim().split(/\s+/).filter(Boolean);
+    return tokens.length > 0 ? tokens : null;
+  }
+  if (Array.isArray(value) && value.length > 0 && value.every((item) =>
+    typeof item === 'string' && item.length > 0
+  )) {
+    return [...value];
+  }
+  return null;
 }
 
 function embeddedAbsolutePaths(value) {
@@ -399,24 +436,21 @@ function sanitizeRow(row) {
 }
 
 function numberOrZero(value) {
-  return Number.isFinite(Number(value)) ? Number(value) : 0;
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
 function finiteNonNegativeOrNull(value) {
-  const numeric = Number(value);
-  return value !== null && value !== undefined && Number.isFinite(numeric) && numeric >= 0
-    ? numeric
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? value
     : null;
 }
 
 function positiveIntegerOrNull(value) {
-  const numeric = Number(value);
-  return Number.isInteger(numeric) && numeric > 0 ? numeric : null;
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : null;
 }
 
 function nonNegativeIntegerOrNull(value) {
-  const numeric = Number(value);
-  return Number.isInteger(numeric) && numeric >= 0 ? numeric : null;
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
 }
 
 function logFix(logger, event, fields) {

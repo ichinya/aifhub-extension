@@ -25,7 +25,7 @@ Authorized live follow-up от `2026-08-03` с class `explicit_isolated_full` д
 - session continuity остаётся `NOT_RUN(resume_driver_parity_unavailable)`;
 - raw rollout audit подтвердил nested provider calls, confined paths и purge без сохранения raw traces.
 
-Использованный hook trust bypass был явно разрешён только для audited pinned snapshot в disposable test sandbox; это разрешение не распространяется на normal commands или user-owned installs.
+Использованный hook trust bypass был явно разрешён только для audited pinned snapshot в disposable test sandbox; это разрешение не распространяется на normal commands или user-owned installs. Текущий replay contract связывает разрешение с exact envelope field `hook_trust_mode: test_only_pinned_snapshot_bypass`; отдельного default или независимого boolean grant нет.
 
 Следовательно, MCP-only допустим лишь как conditional manual helper для большого truncating output, когда correctness важнее token cost. Plugin для этого stack следует избегать. Санитизированный evidence хранится в `docs/memory-tools-research/context-mode-codex-ai-tester/live-authorized-evidence.json`.
 

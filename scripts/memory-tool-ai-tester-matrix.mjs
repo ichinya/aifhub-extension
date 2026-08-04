@@ -205,6 +205,20 @@ export async function runMemoryToolAiTesterMatrix(args = [], options = {}) {
     return emitText(getCliUsage(), 0, options);
   }
 
+  const dedicatedTool = findDedicatedHarnessTool([
+    ...parsed.tools,
+    ...parsed.preinitializeTools
+  ]);
+  if (dedicatedTool) {
+    return emit({
+      schema: AI_TESTER_MATRIX_SCHEMA,
+      status: 'NOT_RUN',
+      reason: `${dedicatedTool.replaceAll('-', '_')}_requires_dedicated_harness`,
+      tool_id: dedicatedTool,
+      dedicated_harness: 'scripts/context-mode-codex-ai-tester-matrix.mjs'
+    }, 2, options);
+  }
+
   const cwd = path.resolve(options.cwd ?? process.cwd());
   const outDir = path.resolve(cwd, parsed.out ?? await mkdtemp(path.join(os.tmpdir(), 'aifhub-ai-tester-matrix-')));
   await mkdir(outDir, { recursive: true });
@@ -393,9 +407,9 @@ export function buildAiTesterMatrixManifest(options = {}) {
   const profiles = asArray(options.profiles).map(sanitizeProfile);
   const skills = asArray(options.skills).length > 0 ? asArray(options.skills) : DEFAULT_SKILLS;
   const tools = asArray(options.tools).length > 0 ? asArray(options.tools) : GENERIC_MATRIX_TOOLS;
-  assertGenericMatrixToolsAllowed(tools);
+  assertGenericRouteAllowed(tools);
   const requestedPreinitializeTools = asArray(options.preinitializeTools);
-  assertGenericPreinitializationAllowed(requestedPreinitializeTools);
+  assertGenericRouteAllowed(requestedPreinitializeTools);
   const preinitializeTools = requestedPreinitializeTools.filter((tool) => PREINITIALIZABLE_TOOLS.has(tool));
   const taskScenarios = asArray(options.taskScenarios).length > 0
     ? asArray(options.taskScenarios)
@@ -571,12 +585,12 @@ function buildPairedCases({
 }
 
 export function renderAiTesterScenario(input = {}) {
-  assertGenericMatrixToolsAllowed([input.tool_id, input.optional_tool_id].filter(Boolean));
+  assertGenericRouteAllowed([input.tool_id, input.optional_tool_id].filter(Boolean));
   const selectorMode = normalizeSelectorMode(input.selector_mode);
   const fixturePath = input.fixture_path ?? '<sanitized-fixture>';
   const promptFile = input.system_prompt_file ?? '../system-prompt.md';
   const preinitializedToolIds = asArray(input.preinitialized_tool_ids);
-  assertGenericPreinitializationAllowed(preinitializedToolIds);
+  assertGenericRouteAllowed(preinitializedToolIds);
   const isCodeGraphPreinitialized = preinitializedToolIds.includes('codegraph');
   const isToolPrepared = preinitializedToolIds.includes(input.tool_id);
   const lines = [
@@ -1310,15 +1324,12 @@ function setupCommandsForTools(toolIds = []) {
   return commands;
 }
 
-function assertGenericPreinitializationAllowed(toolIds = []) {
-  const dedicatedTool = asArray(toolIds).find((toolId) => DEDICATED_HARNESS_ONLY_TOOLS.has(toolId));
-  if (dedicatedTool) {
-    throw new Error(`${dedicatedTool.replaceAll('-', '_')}_requires_dedicated_harness`);
-  }
+function findDedicatedHarnessTool(toolIds = []) {
+  return asArray(toolIds).find((toolId) => DEDICATED_HARNESS_ONLY_TOOLS.has(toolId)) ?? null;
 }
 
-function assertGenericMatrixToolsAllowed(toolIds = []) {
-  const dedicatedTool = asArray(toolIds).find((toolId) => DEDICATED_HARNESS_ONLY_TOOLS.has(toolId));
+function assertGenericRouteAllowed(toolIds = []) {
+  const dedicatedTool = findDedicatedHarnessTool(toolIds);
   if (dedicatedTool) {
     throw new Error(`${dedicatedTool.replaceAll('-', '_')}_requires_dedicated_harness`);
   }

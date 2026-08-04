@@ -1,7 +1,7 @@
 ---
 name: aif-analyze
 description: Bootstrap project context. Resolves localization and stack, creates/updates config.yaml and rules/base.md, then checks DESCRIPTION and guides core skill execution.
-version: 0.9.2
+version: 0.9.3
 author: ichi
 ---
 
@@ -159,9 +159,9 @@ Recommendation rules:
 - Recommend only tools allowed by local metadata.
 - Prefer installed/local tools in recommendations; non-installed tools may be described as optional manual install only when metadata allows.
 - Include enriched recommendation details when metadata provides them: allowed command scopes, forbidden command scopes, command-specific permission, execution guidance, privacy caveat, read scope, purge path, availability, and explicit opt-in install policy.
-- The final analysis response must include a concise optional tool block with `Project labels`, `Recommended tools`, and `Do not use` sections. `Project labels` must include languages, volume, complexity, repo shape, artifact mode, project shape, task signals, and matched dimension signals when present.
-- Ask the user which recommended tools to enable. Write only accepted tool ids to `utilities.context_tools.enabled`; do not enable a tool just because it was recommended.
-- Treat any recommendation with `normal_command_selection: forbidden` as recommendation-only manual guidance. Do not offer it for enablement and do not write it to `utilities.context_tools.enabled`.
+- The final analysis response must include a concise optional tool block with `Project labels`, `Recommended tools`, `Manual guidance`, and `Do not use` sections. `Project labels` must include languages, volume, complexity, repo shape, artifact mode, project shape, task signals, and matched dimension signals when present.
+- Ask the user which entries from `recommendations` to enable. Write only accepted tool ids from that array to `utilities.context_tools.enabled`; do not enable a tool just because it was recommended.
+- Treat `manual_guidance` entries with `normal_command_selection: forbidden` and `configuration_policy: do_not_enable` as recommendation-only manual guidance. Do not probe them, offer them for enablement, or write them to `utilities.context_tools.enabled`.
 - After config is updated, follow-on skills should call `ai-factory aifhub-memory-tools select --from-project --command <skill> --json` and use only `selected_tools`. Do not hard-code provider-specific tool lists into follow-on skills.
 - Never auto-install, run setup, start MCP, register MCP, index source, sync memory, install hooks, start background daemons, or persist provider output.
 - Provider output is supporting context only, never canonical OpenSpec evidence.
@@ -477,7 +477,7 @@ openspec init --tools none
 - Report whether config values were created or preserved.
 - Report the optional glossary status as `created`, `updated`, `preserved`, or `skipped` plus its project-relative path; never report glossary contents.
 - Report project labels from `ai-factory aifhub-memory-tools labels --from-project --json` first: languages, volume, complexity, repo shape, artifact mode, project shape, task signals, matched dimension signals, and short evidence for the labels that affected recommendations.
-- Report optional local tool recommendations from explicit-label `ai-factory aifhub-memory-tools recommend --command aif-analyze ... --json` output when the installed wrapper is available, or from source-tree metadata only when running inside the AIFHub extension repository. Include baseline `rg`, recommended tools with availability/read scope/purge path/skill usefulness, and not-recommended tools with label-based reasons such as `codex-mem`, `eagle-mem`, tools forbidden for the skill, or tools without exact skill+label evidence. Ask which recommendations to enable and write accepted tool ids to `utilities.context_tools.enabled`. If metadata is unavailable, report a degraded note and continue.
+- Report optional local tool recommendations from explicit-label `ai-factory aifhub-memory-tools recommend --command aif-analyze ... --json` output when the installed wrapper is available, or from source-tree metadata only when running inside the AIFHub extension repository. Include baseline `rg`, enablement-eligible `recommendations` with availability/read scope/purge path/skill usefulness, separate non-configurable `manual_guidance`, and not-recommended tools with label-based reasons such as `codex-mem`, `eagle-mem`, tools forbidden for the skill, or tools without exact skill+label evidence. Ask which entries from `recommendations` to enable and write only those accepted tool ids to `utilities.context_tools.enabled`; never enable `manual_guidance`. If metadata is unavailable, report a degraded note and continue.
 - Report that follow-on skills select their own usable subset with `ai-factory aifhub-memory-tools select --from-project --command <skill> --json`; enabled config entries are not permission to use a tool unless they appear in `selected_tools`.
 - When the recommender output includes enriched fields, include allowed command scopes, forbidden command scopes, command-specific permission, execution guidance, privacy caveat, and protected validation artifacts in the concise recommendation summary when relevant.
 - Report the backward-compatible Graphify utility setting and `uv` availability only as compatibility context. If `utilities.graphify.enabled` is missing or `false`, Graphify may still be recommended only through local metadata; show manual setup commands only as explicit opt-in guidance: `uv --version`, `uv tool install graphifyy`, `graphify install`, and `graphify .`.

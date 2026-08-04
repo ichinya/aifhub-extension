@@ -19,12 +19,16 @@ export const CONTEXT_MODE_VARIANTS = Object.freeze([
 ]);
 export const BASELINE_RG_COMMAND_PATTERN = String.raw`(?:^|[^A-Za-z0-9_.-])rg(?:\.exe)?(?:['"])?(?:[ \t]|$)`;
 const BASELINE_NODE_COMMAND_PATTERN = String.raw`(?:^|[^A-Za-z0-9_.-])node(?:\.exe)?(?:['"])?(?:[ \t]|$)`;
-const AUTHORIZATION_KEYS = Object.freeze([
+const AUTHORIZATION_BASE_KEYS = Object.freeze([
   'scope',
   'provider_snapshot',
   'runtime_dependency_bootstrap',
   'auth_mode',
   'native_codex'
+]);
+const AUTHORIZATION_KEYS = Object.freeze([
+  ...AUTHORIZATION_BASE_KEYS,
+  'hook_trust_mode'
 ]);
 const DEFAULT_CATALOG = path.join(
   'docs',
@@ -274,13 +278,15 @@ export function normalizeContextModeAuthorization(authorization) {
   };
   if (!authorization || typeof authorization !== 'object' || Array.isArray(authorization)) return fallback;
   const keys = Object.keys(authorization).sort();
-  if (!sameArray(keys, [...AUTHORIZATION_KEYS].sort())) return fallback;
+  if (keys.some((key) => !AUTHORIZATION_KEYS.includes(key)) ||
+      !AUTHORIZATION_BASE_KEYS.every((key) => keys.includes(key))) return fallback;
   const mcpAllowed = authorization.scope === 'isolated_evaluation' &&
     authorization.provider_snapshot === 'prepared_pinned_snapshot' &&
     authorization.runtime_dependency_bootstrap === 'approved';
   if (!mcpAllowed) return fallback;
   const pluginAllowed = authorization.auth_mode === 'scoped_ephemeral' &&
-    authorization.native_codex === true;
+    authorization.native_codex === true &&
+    authorization.hook_trust_mode === 'test_only_pinned_snapshot_bypass';
   return {
     class: pluginAllowed ? 'explicit_isolated_full' : 'explicit_isolated_mcp',
     mcp_allowed: true,

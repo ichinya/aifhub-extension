@@ -92,6 +92,12 @@ export function validateTraceRoot(runRoot, tracePath) {
     : { status: 'NOT_RUN', reason: 'unexpected_trace_root' };
 }
 
+export async function validateRolloutFileContainment(sessionsRoot, rolloutFile) {
+  return await isCanonicalDescendant(sessionsRoot, rolloutFile, { file: true })
+    ? { status: 'PASS', reason: 'raw_provider_rollout_confined' }
+    : { status: 'FAIL', reason: 'raw_provider_rollout_escape' };
+}
+
 export function buildRunnerInvocation({
   executable,
   scenarioFile,
@@ -138,6 +144,7 @@ export async function executeMissingRows({
   executable,
   runRoot,
   scenarioRoot,
+  sandboxRoot,
   completedRowIds = new Set(),
   env,
   rowEvidence = {},
@@ -250,7 +257,7 @@ export async function executeMissingRows({
       privacyScan: privacyScanByRow[row.id],
       rawBefore,
       codexHome: env.CODEX_HOME,
-      sandboxRoot: path.dirname(env.HOME),
+      sandboxRoot,
       logger
     });
     statuses.push(trace);
@@ -547,14 +554,18 @@ async function inspectFreshProviderRollouts({ codexHome, before, row, sandboxRoo
     .map(([file]) => file);
   const records = [];
   for (const file of changed) {
-    if (!await isCanonicalDescendant(sessionsRoot, file, { file: true })) {
+    const containment = await validateRolloutFileContainment(sessionsRoot, file);
+    if (containment.status !== 'PASS') {
       return auditCodexRolloutRecords([], {
         sandboxRoot,
         requiredTools: row.raw_provider_policy?.required_tools,
         allowedTools: row.raw_provider_policy?.allowed_tools,
-        allowedCommands: row.raw_provider_policy?.allowed_commands
+        allowedCommands: row.raw_provider_policy?.allowed_commands,
+        containmentViolation: true
       });
     }
+  }
+  for (const file of changed) {
     const previous = before?.get(file);
     const body = await readFile(file);
     let delta = body;
@@ -766,10 +777,9 @@ function rowStatus(row, status, reason, extra = {}) {
 function countToolCalls(turn) {
   for (const value of [turn?.tool_calls, turn?.toolCalls]) {
     if (Array.isArray(value)) return value.length;
-    const numeric = Number(value);
-    if (Number.isInteger(numeric) && numeric >= 0) return numeric;
+    if (typeof value === 'number' && Number.isInteger(value) && value >= 0) return value;
   }
-  return 0;
+  return null;
 }
 
 function aggregateStatuses(statuses) {

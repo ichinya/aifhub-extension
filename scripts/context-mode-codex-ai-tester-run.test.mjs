@@ -7,8 +7,10 @@ import { afterEach, beforeEach, describe, it } from 'node:test';
 
 import {
   buildRunnerInvocation,
+  executeMissingRows,
   planMissingRows,
   runVerifiedMatrix,
+  validateRolloutFileContainment,
   validateRunnerProvenance,
   validateTraceRoot
 } from './context-mode-codex-ai-tester-run.mjs';
@@ -72,6 +74,17 @@ describe('context-mode dedicated runner', () => {
   it('rejects traces outside the isolated run root', () => {
     assert.equal(validateTraceRoot('C:/sandbox/runs', 'C:/sandbox/runs/a/trace.json').status, 'PASS');
     assert.equal(validateTraceRoot('C:/sandbox/runs', 'C:/other/trace.json').reason, 'unexpected_trace_root');
+  });
+
+  it('classifies changed rollout files outside the sessions root as containment failures', async () => {
+    const sessionsRoot = path.join(tempDir, 'sandbox', 'codex-home', 'sessions');
+    const outside = path.join(tempDir, 'outside-rollout.jsonl');
+    await mkdir(sessionsRoot, { recursive: true });
+    await writeFile(outside, '{}\n', 'utf8');
+    assert.deepEqual(await validateRolloutFileContainment(sessionsRoot, outside), {
+      status: 'FAIL',
+      reason: 'raw_provider_rollout_escape'
+    });
   });
 
   it('prepares a fresh generated run root before canonical containment checks', async () => {
@@ -486,6 +499,71 @@ describe('context-mode dedicated runner', () => {
     const result = await runVerifiedMatrix(options);
     assert.equal(result.status, 'PASS');
     assert.doesNotMatch(JSON.stringify(result), /context-mode-runner-|scratch\.json|sandbox-path\.json/);
+  });
+
+  it('passes the explicit sandbox root to privacy scanning instead of deriving it from HOME', async () => {
+    const sandboxRoot = path.join(tempDir, 'explicit-sandbox');
+    const scenarioRoot = path.join(sandboxRoot, 'scenarios');
+    const runRoot = path.join(sandboxRoot, 'runs');
+    const codexHome = path.join(sandboxRoot, 'codex-home');
+    await mkdir(scenarioRoot, { recursive: true });
+    await mkdir(runRoot, { recursive: true });
+    let calls = 0;
+    const result = await executeMissingRows({
+      matrix: { rows: [{
+        id: 'row-a',
+        triad_id: 'triad-a',
+        variant: 'baseline',
+        settings_fingerprint: 'same',
+        model: 'gpt-5.6-luna',
+        reasoning: 'low',
+        assertions: [{ id: 'north' }],
+        execution_gate: { status: 'PASS', reason: 'baseline_ready' }
+      }] },
+      executable: path.join(tempDir, 'ai-tester.exe'),
+      runRoot,
+      scenarioRoot,
+      sandboxRoot,
+      env: {
+        CODEX_HOME: codexHome,
+        HOME: path.join(sandboxRoot, 'homes', 'default')
+      },
+      rowEvidence: defaultRowEvidence(),
+      privacyScanByRow: defaultPrivacyScan(),
+      runProcess: async () => {
+        calls += 1;
+        if (calls === 2) {
+          const tracePath = path.join(runRoot, 'inline', 'explicit-root.json');
+          await mkdir(path.dirname(tracePath), { recursive: true });
+          const trace = validTrace('row-a');
+          trace.debug = { transient_path: path.join(sandboxRoot, 'runs', 'scratch.json') };
+          await writeFile(tracePath, JSON.stringify(trace), 'utf8');
+        }
+        return { exitCode: 0 };
+      }
+    });
+    assert.equal(result.statuses[0].status, 'PASS');
+    assert.doesNotMatch(JSON.stringify(result), /explicit-root|scratch\.json|explicit-sandbox/);
+  });
+
+  it('does not coerce malformed ai-tester turn counts into complete evidence', async () => {
+    let calls = 0;
+    const options = await runnerOptions({
+      runProcess: async () => {
+        calls += 1;
+        if (calls === 2) {
+          const tracePath = path.join(options.runRoot, 'inline', 'coercible-turn.json');
+          await mkdir(path.dirname(tracePath), { recursive: true });
+          const trace = validTrace('row-a');
+          trace.turns = [{ toolCalls: '1' }];
+          await writeFile(tracePath, JSON.stringify(trace), 'utf8');
+        }
+        return { exitCode: 0 };
+      }
+    });
+    const result = await runVerifiedMatrix(options);
+    assert.equal(result.status, 'FAIL');
+    assert.equal(result.statuses[0].reason, 'incomplete_trace_evidence');
   });
 
   it('deletes an unsafe fresh trace and returns only bounded reason codes', async () => {

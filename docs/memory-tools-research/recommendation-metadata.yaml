@@ -683,6 +683,7 @@ tools:
       date: "2026-08-03"
       authorization_class: explicit_isolated_full
       hook_trust_bypass: approved_test_only_for_pinned_snapshot
+      hook_trust_mode: test_only_pinned_snapshot_bypass
       evidence: "docs/memory-tools-research/context-mode-codex-ai-tester/live-authorized-evidence.json"
       context_mode_version: "1.0.169"
       codex_version: "0.144.6"

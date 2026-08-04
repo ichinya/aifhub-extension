@@ -341,6 +341,7 @@ export async function buildRecommendationResult(options = {}) {
   const dimensionMatches = collectDimensionMatches(metadata, projectProfile);
   const candidates = collectCandidateTools(metadata, projectShape, taskSignals, projectProfile, dimensionMatches, command);
   const recommendations = [];
+  const manualGuidance = [];
 
   for (const toolId of candidates) {
     const tool = metadata.tools?.[toolId];
@@ -348,6 +349,18 @@ export async function buildRecommendationResult(options = {}) {
     if (!isAllowedForRequest(toolId, tool, projectShape, taskSignals, metadata, projectProfile, dimensionMatches, command)) continue;
     const permission = permissionForTool(metadata, toolId, command);
     if (commandBoundaryReason(tool, command, permission)) continue;
+
+    if (tool.normal_command_selection === 'forbidden') {
+      manualGuidance.push(buildRecommendation(toolId, tool, {
+        projectShape,
+        taskSignals,
+        command,
+        permission,
+        availability: 'unknown',
+        command: null
+      }));
+      continue;
+    }
 
     const probe = await runProbeForTool(toolId, {
       checkDocsProvider: Boolean(options.checkDocsProvider),
@@ -373,6 +386,7 @@ export async function buildRecommendationResult(options = {}) {
     task_signals: taskSignals,
     baseline,
     recommendations: dedupeRecommendations(recommendations),
+    manual_guidance: dedupeRecommendations(manualGuidance),
     do_not_recommend: buildDoNotRecommend(metadata, projectShape, taskSignals, projectProfile, dimensionMatches, command),
     protected_artifacts: asArray(metadata.protected_artifacts),
     forbidden_operations: asArray(metadata.forbidden_operations),
@@ -596,6 +610,7 @@ function degradedRecommendationResult(options = {}) {
     task_signals: normalizeTaskSignals(options.taskSignals),
     baseline: ['rg'],
     recommendations: [],
+    manual_guidance: [],
     do_not_recommend: [],
     warnings: [metadataWarning(options.metadataError)]
   };
@@ -902,6 +917,9 @@ function buildRecommendation(toolId, tool, context) {
     selection_policy: tool.normal_command_selection === 'forbidden'
       ? 'recommendation_only'
       : 'normal_command_selection_allowed',
+    configuration_policy: tool.normal_command_selection === 'forbidden'
+      ? 'do_not_enable'
+      : 'may_enable_with_explicit_opt_in',
     permission: context.permission ?? null,
     privacy_caveat: tool.privacy_caveat ?? null,
     next_step: nextStepForTool(toolId, tool)
@@ -922,7 +940,7 @@ function nextStepForTool(toolId, tool) {
     return 'Use only for continuity with read-only/minimal mode and an explicit DB path.';
   }
   if (toolId === 'context-mode') {
-    return 'Use only as a manual temporary index for explicit generated output, then purge it.';
+    return 'Follow the dedicated evaluation guidance for a manual user-owned MCP-only run, then purge it; do not enable it in project config.';
   }
   if (toolId === 'context7') {
     return 'Use only as optional user-owned docs lookup for version-sensitive library/API questions.';

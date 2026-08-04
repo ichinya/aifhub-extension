@@ -67,6 +67,8 @@ describe('context-mode Codex documentation policy', () => {
     for (const body of [analyzeSkill, recommendations]) {
       assert.match(body, /normal_command_selection:\s*forbidden/);
       assert.match(body, /recommendation-only|manual guidance/i);
+      assert.match(body, /manual_guidance/);
+      assert.match(body, /configuration_policy:\s*do_not_enable/);
       assert.match(body, /utilities\.context_tools\.enabled/);
     }
     const updated = metadata.match(/^updated:\s*"([^"]+)"/m)?.[1];
@@ -125,6 +127,10 @@ describe('context-mode Codex documentation policy', () => {
       assert.match(body, /explicit_isolated_full/);
       assert.match(body, /resume_driver_parity_unavailable/);
       assert.match(body, /token savings|token_savings|эконом(?:ит|ии).*token|не экономит billed tokens/i);
+    }
+    for (const body of [research, recommendations, providers, metadata]) {
+      assert.match(body, /hook_trust_mode/);
+      assert.match(body, /test_only_pinned_snapshot_bypass/);
     }
     assert.match(metadata, /mcp_only_status:\s*conditional_large_truncating_output_only/);
     assert.match(metadata, /codex_plugin_status:\s*avoid_tested_nested_shell_stack/);

@@ -373,6 +373,37 @@ describe('context-mode sandbox and lifecycle boundary', () => {
     );
   });
 
+  it('unlinks internal package symlinks during cleanup without touching their targets', async () => {
+    const ownerRoot = path.join(tempDir, 'owned-symlink-cleanup');
+    const sandboxRoot = path.join(ownerRoot, 'sandbox');
+    const externalRoot = path.join(tempDir, 'external-package-target');
+    const externalSentinel = path.join(externalRoot, 'keep.txt');
+    await mkdir(ownerRoot, { recursive: true });
+    await mkdir(externalRoot, { recursive: true });
+    await writeFile(externalSentinel, 'keep', 'utf8');
+
+    const result = await runSandboxLifecycle({
+      ownerRoot,
+      sandboxRoot,
+      purgeRequired: false,
+      run: async () => {
+        const binRoot = path.join(sandboxRoot, 'package', 'node_modules', '.bin');
+        await mkdir(binRoot, { recursive: true });
+        await symlink(
+          externalRoot,
+          path.join(binRoot, 'context-mode'),
+          process.platform === 'win32' ? 'junction' : 'dir'
+        );
+        return { status: 'PASS' };
+      }
+    });
+
+    assert.equal(result.status, 'PASS');
+    assert.equal(result.cleanup, 'PASS');
+    assert.equal(await readFile(externalSentinel, 'utf8'), 'keep');
+    await assert.rejects(readFile(path.join(sandboxRoot, '.aifhub-context-mode-sandbox.json'), 'utf8'));
+  });
+
   it('acquires a cleanup lease for a new sandbox before preparation', async () => {
     const ownerRoot = path.join(tempDir, 'owned-new-sandbox');
     const sandboxRoot = path.join(ownerRoot, 'sandbox');
@@ -475,7 +506,7 @@ describe('context-mode sandbox and lifecycle boundary', () => {
     assert.equal(plan.reason, 'native_codex_executable_required');
   });
 
-  it('requires a successful pinned snapshot audit, complete authorization and explicit test-only trust grant', async () => {
+  it('binds the test-only hook trust bypass to the exact authorization envelope', async () => {
     const ownerRoot = path.join(tempDir, 'owned-plugin-preflight');
     const sandboxRoot = path.join(ownerRoot, 'sandbox');
     const layout = buildSandboxLayout(sandboxRoot);
@@ -498,17 +529,37 @@ describe('context-mode sandbox and lifecycle boundary', () => {
       supportedFeatures: ['hooks', 'plugins'],
       authMode: 'scoped_ephemeral',
       authorization: liveAuthorization(),
-      snapshotAudit,
-      hookTrustBypassAuthorized: true
+      snapshotAudit
     };
     assert.equal(buildActualPluginPlan({ ...common, snapshotAudit: undefined }).reason, 'snapshot_audit_required');
     assert.equal(buildActualPluginPlan({ ...common, authorization: undefined }).reason, 'explicit_isolated_authorization_required');
-    assert.equal(buildActualPluginPlan({ ...common, hookTrustBypassAuthorized: false }).reason, 'hook_trust_bypass_not_authorized');
+    const withoutTrustGrant = { ...liveAuthorization() };
+    delete withoutTrustGrant.hook_trust_mode;
+    assert.equal(buildActualPluginPlan({ ...common, authorization: withoutTrustGrant }).reason, 'hook_trust_bypass_not_authorized');
+    assert.equal(buildActualPluginPlan({
+      ...common,
+      authorization: { ...liveAuthorization(), hook_trust_mode: 'unknown' }
+    }).reason, 'hook_trust_bypass_not_authorized');
     const eligible = buildActualPluginPlan(common);
     assert.equal(eligible.status, 'PASS');
     assert.equal(eligible.snapshot_audit_status, 'PASS');
     assert.equal(eligible.authorization_class, 'explicit_isolated_full');
-    assert.equal(eligible.hook_trust_bypass_authorized, true);
+    assert.equal(eligible.hook_trust_mode, 'test_only_pinned_snapshot_bypass');
+    const execStep = eligible.steps.find((step) => step.phase === 'codex_exec');
+    assert.ok(execStep);
+    assert.equal(execStep.args.filter((arg) => arg === '--dangerously-bypass-hook-trust').length, 1);
+
+    let calls = 0;
+    const mutated = await runActualPluginLifecycle({
+      plan: { ...eligible, hook_trust_mode: 'unknown' },
+      runProcess: async () => {
+        calls += 1;
+        return { exitCode: 0 };
+      }
+    });
+    assert.equal(mutated.status, 'NOT_RUN');
+    assert.equal(mutated.reason, 'plugin_plan_integrity_invalid');
+    assert.equal(calls, 0);
   });
 
   it('rechecks snapshot integrity and plan binding before any plugin process starts', async () => {
@@ -534,8 +585,7 @@ describe('context-mode sandbox and lifecycle boundary', () => {
       supportedFeatures: ['hooks', 'plugins'],
       authMode: 'scoped_ephemeral',
       authorization: liveAuthorization(),
-      snapshotAudit,
-      hookTrustBypassAuthorized: true
+      snapshotAudit
     });
     await writeFile(path.join(packageRoot, 'post-audit-change.txt'), 'changed', 'utf8');
     let calls = 0;
@@ -585,8 +635,7 @@ describe('context-mode sandbox and lifecycle boundary', () => {
       supportedFeatures: ['hooks', 'plugins'],
       authMode: 'scoped_ephemeral',
       authorization: liveAuthorization(),
-      snapshotAudit: await auditPackageSnapshot(packageRoot),
-      hookTrustBypassAuthorized: true
+      snapshotAudit: await auditPackageSnapshot(packageRoot)
     });
     const hostManifestTargets = {
       projectRoot: path.join(tempDir, 'real-project'),
@@ -650,8 +699,7 @@ describe('context-mode sandbox and lifecycle boundary', () => {
       supportedFeatures: ['hooks', 'plugins'],
       authMode: 'scoped_ephemeral',
       authorization: liveAuthorization(),
-      snapshotAudit: await auditPackageSnapshot(packageRoot),
-      hookTrustBypassAuthorized: true
+      snapshotAudit: await auditPackageSnapshot(packageRoot)
     });
     let changed = false;
     const result = await runActualPluginLifecycle({
@@ -708,7 +756,8 @@ function liveAuthorization() {
     provider_snapshot: 'prepared_pinned_snapshot',
     runtime_dependency_bootstrap: 'approved',
     auth_mode: 'scoped_ephemeral',
-    native_codex: true
+    native_codex: true,
+    hook_trust_mode: 'test_only_pinned_snapshot_bypass'
   };
 }
 

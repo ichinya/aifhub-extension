@@ -400,22 +400,29 @@ describe('recommendation results', () => {
     assert.match(continuity.next_step, /explicit DB path/i);
   });
 
-  it('recommends context-mode only for large temporary output compression', async () => {
+  it('keeps context-mode as non-configurable manual guidance for large temporary output compression', async () => {
     const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
+    let probes = 0;
     const result = await buildRecommendationResult({
       metadata,
       projectShape: 'large_framework_app',
       taskSignals: ['large_command_output_compression'],
-      probeRunner: async () => ({ availability: 'unknown' })
+      probeRunner: async () => {
+        probes += 1;
+        return { availability: 'installed' };
+      }
     });
 
-    const contextMode = result.recommendations.find((item) => item.tool_id === 'context-mode');
+    const contextMode = result.manual_guidance.find((item) => item.tool_id === 'context-mode');
     assert.ok(contextMode);
+    assert.equal(result.recommendations.some((item) => item.tool_id === 'context-mode'), false);
     assert.equal(contextMode.status, 'manual_helper_only');
     assert.equal(contextMode.read_scope, 'explicit_indexed_content');
     assert.equal(contextMode.normal_command_selection, 'forbidden');
     assert.equal(contextMode.selection_policy, 'recommendation_only');
-    assert.match(contextMode.next_step, /manual temporary/i);
+    assert.equal(contextMode.configuration_policy, 'do_not_enable');
+    assert.match(contextMode.next_step, /manual user-owned MCP-only.*purge/i);
+    assert.equal(probes, 0);
   });
 
   it('keeps context-mode recommendation-only even when project config enables it', async () => {

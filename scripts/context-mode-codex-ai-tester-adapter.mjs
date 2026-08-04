@@ -62,12 +62,17 @@ const REQUIRED_MANIFESTS = Object.freeze([
 ]);
 const SANDBOX_MARKER = '.aifhub-context-mode-sandbox.json';
 const SANDBOX_MARKER_SCHEMA = 'aifhub.context_mode_codex.sandbox_owner.v1';
-const LIVE_AUTHORIZATION_KEYS = Object.freeze([
+const TEST_ONLY_HOOK_TRUST_MODE = 'test_only_pinned_snapshot_bypass';
+const LIVE_AUTHORIZATION_BASE_KEYS = Object.freeze([
   'scope',
   'provider_snapshot',
   'runtime_dependency_bootstrap',
   'auth_mode',
   'native_codex'
+]);
+const LIVE_AUTHORIZATION_KEYS = Object.freeze([
+  ...LIVE_AUTHORIZATION_BASE_KEYS,
+  'hook_trust_mode'
 ]);
 
 export function buildSandboxLayout(sandboxRoot) {
@@ -460,7 +465,6 @@ export function buildActualPluginPlan({
   authMode,
   authorization,
   snapshotAudit,
-  hookTrustBypassAuthorized = false,
   baseEnv = process.env
 }) {
   const effectiveAuthMode = authorization?.auth_mode ?? authMode;
@@ -483,9 +487,6 @@ export function buildActualPluginPlan({
     const gate = validateSnapshotAudit(snapshotAudit);
     if (gate.status !== 'PASS') effectiveEligibility = { ...eligibility, ...gate };
   }
-  if (effectiveEligibility.status === 'PASS' && hookTrustBypassAuthorized !== true) {
-    effectiveEligibility = { status: 'NOT_RUN', reason: 'hook_trust_bypass_not_authorized' };
-  }
   if (effectiveEligibility.status === 'PASS') {
     const gate = validatePluginSandboxBinding({ layout, sandboxOwnerRoot, packageRoot });
     if (gate.status !== 'PASS') effectiveEligibility = { ...eligibility, ...gate };
@@ -494,7 +495,11 @@ export function buildActualPluginPlan({
   const marketplaceName = 'context-mode-134';
   const marketplaceRoot = layout.marketplace;
   const steps = effectiveEligibility.status === 'PASS'
-    ? buildActualPluginSteps({ marketplaceRoot, marketplaceName })
+    ? buildActualPluginSteps({
+      marketplaceRoot,
+      marketplaceName,
+      hookTrustMode: authorization.hook_trust_mode
+    })
     : [];
   return {
     ...effectiveEligibility,
@@ -519,21 +524,34 @@ export function buildActualPluginPlan({
     snapshot_tree_fingerprint: effectiveEligibility.status === 'PASS'
       ? snapshotAudit.package_tree_fingerprint
       : null,
-    hook_trust_bypass_authorized: effectiveEligibility.status === 'PASS',
+    hook_trust_mode: effectiveEligibility.status === 'PASS'
+      ? authorization.hook_trust_mode
+      : null,
     trust_mode: effectiveEligibility.status === 'PASS'
-      ? 'test_only_pinned_snapshot_bypass'
+      ? authorization.hook_trust_mode
       : eligibility.trust_mode
   };
 }
 
 function validateActualPluginAuthorization(authorization) {
-  if (!authorization || typeof authorization !== 'object' || Array.isArray(authorization) ||
-      !sameStringArray(Object.keys(authorization).sort(), [...LIVE_AUTHORIZATION_KEYS].sort()) ||
+  if (!authorization || typeof authorization !== 'object' || Array.isArray(authorization)) {
+    return { status: 'NOT_RUN', reason: 'explicit_isolated_authorization_required' };
+  }
+  const keys = Object.keys(authorization);
+  const hasUnexpectedKey = keys.some((key) => !LIVE_AUTHORIZATION_KEYS.includes(key));
+  const hasAllBaseKeys = LIVE_AUTHORIZATION_BASE_KEYS.every((key) => keys.includes(key));
+  if (hasUnexpectedKey || !hasAllBaseKeys ||
       authorization.scope !== 'isolated_evaluation' ||
       authorization.provider_snapshot !== 'prepared_pinned_snapshot' ||
       authorization.runtime_dependency_bootstrap !== 'approved' ||
       authorization.auth_mode !== 'scoped_ephemeral' ||
       authorization.native_codex !== true) {
+    return { status: 'NOT_RUN', reason: 'explicit_isolated_authorization_required' };
+  }
+  if (authorization.hook_trust_mode !== TEST_ONLY_HOOK_TRUST_MODE) {
+    return { status: 'NOT_RUN', reason: 'hook_trust_bypass_not_authorized' };
+  }
+  if (!sameStringArray(keys.sort(), [...LIVE_AUTHORIZATION_KEYS].sort())) {
     return { status: 'NOT_RUN', reason: 'explicit_isolated_authorization_required' };
   }
   return { status: 'PASS', reason: 'explicit_isolated_authorization_verified' };
@@ -595,7 +613,10 @@ function validatePluginSandboxBinding({ layout, sandboxOwnerRoot, packageRoot })
   }
 }
 
-function buildActualPluginSteps({ marketplaceRoot, marketplaceName }) {
+function buildActualPluginSteps({ marketplaceRoot, marketplaceName, hookTrustMode }) {
+  const hookTrustArgs = hookTrustMode === TEST_ONLY_HOOK_TRUST_MODE
+    ? ['--dangerously-bypass-hook-trust']
+    : [];
   return [
     {
       phase: 'marketplace_add',
@@ -610,7 +631,7 @@ function buildActualPluginSteps({ marketplaceRoot, marketplaceName }) {
       args: [
         '-c',
         'model_reasoning_effort="low"',
-        '--dangerously-bypass-hook-trust',
+        ...hookTrustArgs,
         'exec',
         '--json',
         '--skip-git-repo-check',
@@ -623,8 +644,8 @@ function buildActualPluginSteps({ marketplaceRoot, marketplaceName }) {
 async function validateActualPluginPlanForExecution(plan) {
   const native = validateNativeCodexExecutable(plan.command);
   if (native.status !== 'PASS' || plan.authorization_class !== 'explicit_isolated_full' ||
-      plan.snapshot_audit_status !== 'PASS' || plan.hook_trust_bypass_authorized !== true ||
-      plan.trust_mode !== 'test_only_pinned_snapshot_bypass') {
+      plan.snapshot_audit_status !== 'PASS' || plan.hook_trust_mode !== TEST_ONLY_HOOK_TRUST_MODE ||
+      plan.trust_mode !== TEST_ONLY_HOOK_TRUST_MODE) {
     return { status: 'NOT_RUN', reason: 'plugin_plan_integrity_invalid' };
   }
   const layout = buildSandboxLayout(plan.sandbox_root);
@@ -635,7 +656,8 @@ async function validateActualPluginPlanForExecution(plan) {
   });
   const expectedSteps = buildActualPluginSteps({
     marketplaceRoot: layout.marketplace,
-    marketplaceName: 'context-mode-134'
+    marketplaceName: 'context-mode-134',
+    hookTrustMode: plan.hook_trust_mode
   });
   const rootsMatch = binding.status === 'PASS' &&
     plan.working_directory === layout.fixture &&
@@ -842,6 +864,7 @@ async function runActualPluginSteps({ plan, prepareMarketplace, runProcess, time
     evidence_class: 'actual_codex_plugin',
     phases,
     trust_mode: plan.trust_mode,
+    hook_trust_mode: plan.hook_trust_mode,
     hook_trust_bypass: 'PASS(test_only_authorized)'
   };
 }
@@ -938,8 +961,15 @@ export async function removeVerifiedSandbox({ ownerRoot, sandboxRoot, token }) {
   if (marker.schema !== SANDBOX_MARKER_SCHEMA || marker.token !== token) {
     throw adapterError('sandbox_owner_mismatch');
   }
-  await assertNoReparseEntries(target, target);
-  await rm(target, { recursive: true, force: true });
+  // Nested npm .bin symlinks and junctions are unlinked by fs.rm; they are not
+  // followed. The owned root itself, canonical boundary and lease marker were
+  // verified above, so refusing nested links would strand scoped credentials.
+  await rm(target, {
+    recursive: true,
+    force: true,
+    maxRetries: 3,
+    retryDelay: 50
+  });
   if (await pathExists(target)) throw adapterError('sandbox_cleanup_failed');
   return { status: 'PASS', target_class: 'verified_sandbox_descendant' };
 }
@@ -1110,16 +1140,6 @@ function decodeUtf8Tail(buffer) {
   let start = 0;
   while (start < buffer.length && (buffer[start] & 0xc0) === 0x80) start += 1;
   return buffer.subarray(start).toString('utf8');
-}
-
-async function assertNoReparseEntries(root, current) {
-  for (const entry of await readdir(current, { withFileTypes: true })) {
-    const target = path.join(current, entry.name);
-    const info = await lstat(target);
-    if (info.isSymbolicLink()) throw adapterError('reparse_escape');
-    await assertCanonicalConfinedPath(root, target);
-    if (info.isDirectory()) await assertNoReparseEntries(root, target);
-  }
 }
 
 function logFix(logger, event, fields) {

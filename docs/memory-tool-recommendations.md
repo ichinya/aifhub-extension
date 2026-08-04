@@ -112,7 +112,7 @@ project_dimensions:
 - continuity tasks: `codex-agent-mem` только для resume/open-work с explicit DB path.
 - `rohitg00-agentmemory` не выбирается ни по project dimensions, ни по continuity/manual-notes task signals; `rg` остаётся baseline для source lookup.
 
-Для `context-mode` Codex surface `v1.0.169` исторический static audit остаётся неизменным. Authorized live follow-up с `explicit_isolated_full` показал: MCP-only восстанавливает correctness при >1 MiB stdout truncation, но не экономит billed tokens (`+120.2%` против уже failed baseline); на small fixture overhead составил `+376.8%` tokens. Codex plugin не перехватил tested nested shell path, continuity остаётся `NOT_RUN(resume_driver_parity_unavailable)`. Test-only hook trust bypass был явно разрешён только для audited pinned snapshot в disposable sandbox. Поэтому MCP можно только предложить как manual temporary helper для реально большого truncating output с purge, plugin для этого stack следует избегать. Любое использование остаётся явным user opt-in; normal AIFHub commands не устанавливают package, не register MCP, не доверяют hooks и не выбирают plugin. `rg` остаётся baseline.
+Для `context-mode` Codex surface `v1.0.169` исторический static audit остаётся неизменным. Authorized live follow-up с `explicit_isolated_full` показал: MCP-only восстанавливает correctness при >1 MiB stdout truncation, но не экономит billed tokens (`+120.2%` против уже failed baseline); на small fixture overhead составил `+376.8%` tokens. Codex plugin не перехватил tested nested shell path, continuity остаётся `NOT_RUN(resume_driver_parity_unavailable)`. Test-only hook trust bypass был явно разрешён только для audited pinned snapshot в disposable sandbox. Повторный harness принимает его только как exact authorization field `hook_trust_mode: test_only_pinned_snapshot_bypass`; отдельный boolean или default generated step не даёт разрешения. Поэтому MCP можно только предложить как manual temporary helper для реально большого truncating output с purge, plugin для этого stack следует избегать. Любое использование остаётся явным user opt-in; normal AIFHub commands не устанавливают package, не register MCP, не доверяют hooks и не выбирают plugin. `rg` остаётся baseline.
 
 Decision mapping из matrix:
 
@@ -151,6 +151,8 @@ ai-factory aifhub-memory-tools labels --from-project --json
 ```
 
 `labels` возвращает `available_labels`, `project_profile`, `selected_labels`, `matched_dimension_signals` и краткий `evidence` по выбранным labels. После этого `/aif-analyze` выбирает task signals из запроса и запускает `recommend` с явными labels из `project_profile`; `recommend --from-project` остается shortcut для диагностики и совместимости, но не основной flow анализа.
+
+`recommendations` содержит только tools, которые можно предложить пользователю для enablement. Отдельный `manual_guidance` содержит non-configurable guidance: записи с `normal_command_selection: forbidden` и `configuration_policy: do_not_enable` не probe-ятся, не предлагаются для enablement и никогда не записываются в `utilities.context_tools.enabled`.
 
 Затем `/aif-analyze` спрашивает пользователя, какие рекомендации включить, и сохраняет accepted tool ids в config:
 

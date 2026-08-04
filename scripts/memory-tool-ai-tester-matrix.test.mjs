@@ -247,6 +247,30 @@ describe('ai-tester matrix manifest', () => {
       tool_id: 'context-mode',
       optional_tool_id: 'context-mode'
     }), /context_mode_requires_dedicated_harness/);
+
+    for (const flag of ['--tool', '--preinitialize-tool']) {
+      const stdout = [];
+      const outDir = path.join(tmpDir, `forbidden-${flag.slice(2)}`);
+      const result = await runMemoryToolAiTesterMatrix([
+        flag,
+        'context-mode',
+        '--out',
+        outDir,
+        '--dry-run'
+      ], {
+        cwd: tmpDir,
+        stdout,
+        exit: false
+      });
+      assert.equal(result.exitCode, 2);
+      assert.equal(result.body.schema, AI_TESTER_MATRIX_SCHEMA);
+      assert.equal(result.body.status, 'NOT_RUN');
+      assert.equal(result.body.reason, 'context_mode_requires_dedicated_harness');
+      assert.equal(result.body.tool_id, 'context-mode');
+      assert.match(result.body.dedicated_harness, /context-mode-codex-ai-tester-matrix\.mjs$/);
+      assert.doesNotMatch(stdout.join(''), /\bat\s+runMemoryToolAiTesterMatrix\b|Error:/);
+      await assert.rejects(stat(outDir));
+    }
   });
 
   it('generates catalog-driven accepted-evidence pairs with scenario metadata', async () => {

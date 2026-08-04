@@ -123,7 +123,7 @@ Windows note: runner должен уметь выполнять `fixtures.setup_
 | `graphify` | Python venv под `project/.ai-tester-tools/graphify-venv`, install `graphifyy` | prepend venv `Scripts` to PATH, then call `graphify update/query/benchmark` |
 | `context7` | npm prefix под `project/.ai-tester-tools/context7`, install `ctx7` | prepend `.bin` to PATH, then call `ctx7` |
 
-`context-mode` не входит в generic memory-tool matrix и не поддерживает `--preinitialize-tool`: прямой запрос завершается с `context_mode_requires_dedicated_harness`. Для issue `#134` используйте только pinned isolated `scripts/context-mode-codex-ai-tester-{matrix,adapter,run,results}.mjs` harness.
+`context-mode` не входит в generic memory-tool matrix и не поддерживает `--preinitialize-tool`: прямой запрос до создания output directory возвращает structured JSON с `status: NOT_RUN`, `reason: context_mode_requires_dedicated_harness`, `tool_id: context-mode` и путём dedicated harness. Для issue `#134` используйте только pinned isolated `scripts/context-mode-codex-ai-tester-{matrix,adapter,run,results}.mjs` harness.
 
 Rejected tools (`codex-mem`, `eagle-mem`) не получают positive tool_run setup; для них допустимы только negative/forbidden ai-tester scenarios. Safety/smoke runs не считаются benchmark.
 
