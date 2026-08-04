@@ -124,7 +124,7 @@ describe('context-mode raw Codex rollout audit', () => {
         cwd: path.join(tempDir, 'sandbox', 'fixture'),
         commands: [{
           label: 'large-output',
-          command: `node ${path.join(tempDir, 'sandbox', 'fixture', 'emit-large-output.mjs')}`
+          command: 'node project/emit-large-output.mjs'
         }],
         queries: ['north', 'east', 'checksum']
       }),
@@ -132,7 +132,8 @@ describe('context-mode raw Codex rollout audit', () => {
     ], {
       sandboxRoot: path.join(tempDir, 'sandbox'),
       requiredTools: ['ctx_batch_execute', 'ctx_purge'],
-      allowedTools: ['ctx_batch_execute', 'ctx_search', 'ctx_purge']
+      allowedTools: ['ctx_batch_execute', 'ctx_search', 'ctx_purge'],
+      allowedCommands: ['node project/emit-large-output.mjs']
     });
     assert.deepEqual(result, {
       status: 'PASS',
@@ -181,6 +182,19 @@ describe('context-mode raw Codex rollout audit', () => {
       requiredTools: ['ctx_batch_execute'],
       allowedTools: ['ctx_batch_execute']
     }).reason, 'raw_provider_path_escape');
+    for (const command of ['node ..\\..\\outside.mjs', 'node ../../outside.mjs']) {
+      const escaped = auditCodexRolloutRecords([rolloutTool('ctx_batch_execute', {
+        cwd: path.join(sandboxRoot, 'fixture'),
+        commands: [{ command }]
+      })], {
+        sandboxRoot,
+        requiredTools: ['ctx_batch_execute'],
+        allowedTools: ['ctx_batch_execute'],
+        allowedCommands: ['node project/emit-large-output.mjs']
+      });
+      assert.equal(escaped.reason, 'raw_provider_path_escape');
+      assert.doesNotMatch(JSON.stringify(escaped), /outside\.mjs|\.\.[\\/]/);
+    }
     assert.equal(auditCodexRolloutRecords([rolloutTool('ctx_search', {
       path: 'C:\\outside\\facts.txt',
       queries: ['fact']

@@ -62,6 +62,13 @@ const REQUIRED_MANIFESTS = Object.freeze([
 ]);
 const SANDBOX_MARKER = '.aifhub-context-mode-sandbox.json';
 const SANDBOX_MARKER_SCHEMA = 'aifhub.context_mode_codex.sandbox_owner.v1';
+const LIVE_AUTHORIZATION_KEYS = Object.freeze([
+  'scope',
+  'provider_snapshot',
+  'runtime_dependency_bootstrap',
+  'auth_mode',
+  'native_codex'
+]);
 
 export function buildSandboxLayout(sandboxRoot) {
   const root = path.resolve(sandboxRoot);
@@ -78,6 +85,7 @@ export function buildSandboxLayout(sandboxRoot) {
     cache: path.join(root, 'cache'),
     logs: path.join(root, 'logs'),
     runs: path.join(root, 'runs'),
+    scenarios: path.join(root, 'scenarios'),
     wrappers: path.join(root, 'wrappers')
   });
 }
@@ -225,7 +233,8 @@ export async function auditContextModeSnapshot({ packageRoot, tarballPath, sourc
     evidence_class: 'plugin_snapshot_isolated',
     install_lifecycle: 'NOT_RUN(postinstall_forbidden)',
     floating_install: false,
-    global_install: false
+    global_install: false,
+    package_tree_fingerprint: await digestPath(packageRoot)
   };
 }
 
@@ -319,6 +328,15 @@ export async function runMcpContract({ artifact, invokeTool, hashContent = sha25
   const residualFact = artifact.required_facts.some((fact) => postSearchText?.includes(fact));
   const postSearchEmpty = postSearchText && /(?:no (?:indexed )?(?:context|results|matches)|nothing found|0 (?:results|matches))/i.test(postSearchText);
   const postStatsEmpty = parseIndexedArtifactCount(postStatsText) === 0;
+  if (!postSearchText || !postStatsText) {
+    return {
+      schema: CONTEXT_MODE_ADAPTER_SCHEMA,
+      status: 'FAIL',
+      reason: 'post_purge_probe_failed',
+      evidence_class: 'direct_mcp_contract',
+      timings: durations
+    };
+  }
   if (!postSearchEmpty || residualFact || !postStatsEmpty) {
     return {
       schema: CONTEXT_MODE_ADAPTER_SCHEMA,
@@ -429,47 +447,48 @@ export function buildActualPluginPlan({
   codexVersion,
   supportedFeatures,
   authMode,
+  authorization,
+  snapshotAudit,
+  hookTrustBypassAuthorized = false,
   baseEnv = process.env
 }) {
+  const effectiveAuthMode = authorization?.auth_mode ?? authMode;
   const eligibility = evaluateActualPluginEligibility({
     codexVersion,
     supportedFeatures,
-    authMode
+    authMode: effectiveAuthMode
   });
   const nativeExecutable = eligibility.status === 'PASS'
     ? validateNativeCodexExecutable(codexExecutable)
     : { status: eligibility.status, reason: eligibility.reason };
-  const effectiveEligibility = eligibility.status === 'PASS' && nativeExecutable.status !== 'PASS'
+  let effectiveEligibility = eligibility.status === 'PASS' && nativeExecutable.status !== 'PASS'
     ? { ...eligibility, ...nativeExecutable }
     : eligibility;
+  if (effectiveEligibility.status === 'PASS') {
+    const gate = validateActualPluginAuthorization(authorization);
+    if (gate.status !== 'PASS') effectiveEligibility = { ...eligibility, ...gate };
+  }
+  if (effectiveEligibility.status === 'PASS') {
+    const gate = validateSnapshotAudit(snapshotAudit);
+    if (gate.status !== 'PASS') effectiveEligibility = { ...eligibility, ...gate };
+  }
+  if (effectiveEligibility.status === 'PASS' && hookTrustBypassAuthorized !== true) {
+    effectiveEligibility = { status: 'NOT_RUN', reason: 'hook_trust_bypass_not_authorized' };
+  }
+  if (effectiveEligibility.status === 'PASS') {
+    const gate = validatePluginSandboxBinding({ layout, sandboxOwnerRoot, packageRoot });
+    if (gate.status !== 'PASS') effectiveEligibility = { ...eligibility, ...gate };
+  }
   const env = buildContextModeEnv({ layout, baseEnv });
   const marketplaceName = 'context-mode-134';
   const marketplaceRoot = layout.marketplace;
+  const steps = effectiveEligibility.status === 'PASS'
+    ? buildActualPluginSteps({ marketplaceRoot, marketplaceName })
+    : [];
   return {
     ...effectiveEligibility,
     command: codexExecutable,
-    steps: [
-      {
-        phase: 'marketplace_add',
-        args: ['plugin', 'marketplace', 'add', marketplaceRoot, '--json']
-      },
-      {
-        phase: 'plugin_add',
-        args: ['plugin', 'add', 'context-mode', '--marketplace', marketplaceName, '--json']
-      },
-      {
-        phase: 'codex_exec',
-        args: [
-          '-c',
-          'model_reasoning_effort="low"',
-          '--dangerously-bypass-hook-trust',
-          'exec',
-          '--json',
-          '--skip-git-repo-check',
-          'Return evaluation_complete only.'
-        ]
-      }
-    ],
+    steps,
     env,
     sandbox_root: layout.root,
     sandbox_owner_root: sandboxOwnerRoot,
@@ -483,8 +502,156 @@ export function buildActualPluginPlan({
     package_root_class: path.relative(layout.root, packageRoot),
     feature_flags: [...supportedFeatures].filter((name) => ['hooks', 'plugins'].includes(name)).sort(),
     copied_auth: false,
-    inherited_long_lived_credentials: false
+    inherited_long_lived_credentials: false,
+    authorization_class: effectiveEligibility.status === 'PASS' ? 'explicit_isolated_full' : null,
+    snapshot_audit_status: effectiveEligibility.status === 'PASS' ? 'PASS' : null,
+    snapshot_tree_fingerprint: effectiveEligibility.status === 'PASS'
+      ? snapshotAudit.package_tree_fingerprint
+      : null,
+    hook_trust_bypass_authorized: effectiveEligibility.status === 'PASS',
+    trust_mode: effectiveEligibility.status === 'PASS'
+      ? 'test_only_pinned_snapshot_bypass'
+      : eligibility.trust_mode
   };
+}
+
+function validateActualPluginAuthorization(authorization) {
+  if (!authorization || typeof authorization !== 'object' || Array.isArray(authorization) ||
+      !sameStringArray(Object.keys(authorization).sort(), [...LIVE_AUTHORIZATION_KEYS].sort()) ||
+      authorization.scope !== 'isolated_evaluation' ||
+      authorization.provider_snapshot !== 'prepared_pinned_snapshot' ||
+      authorization.runtime_dependency_bootstrap !== 'approved' ||
+      authorization.auth_mode !== 'scoped_ephemeral' ||
+      authorization.native_codex !== true) {
+    return { status: 'NOT_RUN', reason: 'explicit_isolated_authorization_required' };
+  }
+  return { status: 'PASS', reason: 'explicit_isolated_authorization_verified' };
+}
+
+function validateSnapshotAudit(snapshotAudit) {
+  if (!snapshotAudit) return { status: 'NOT_RUN', reason: 'snapshot_audit_required' };
+  const identityMatches = Object.entries(CONTEXT_MODE_IDENTITY)
+    .every(([key, value]) => snapshotAudit.identity?.[key] === value);
+  const runtimeReasons = Array.isArray(snapshotAudit.runtime_eligibility?.reason_codes)
+    ? snapshotAudit.runtime_eligibility.reason_codes
+    : [];
+  const acceptedRuntimeAudit = snapshotAudit.runtime_eligibility?.status === 'PASS' ||
+    (snapshotAudit.runtime_eligibility?.status === 'BLOCKED' &&
+      runtimeReasons.length > 0 &&
+      runtimeReasons.every((reason) => reason === 'runtime_dependency_self_install'));
+  const requiredContracts = [
+    'source_identity',
+    'npm_package_identity',
+    'package_json',
+    'postinstall_present_and_suppressed',
+    'codex_manifests',
+    'hook_events',
+    'mcp_entrypoint'
+  ];
+  const verified = snapshotAudit.schema === CONTEXT_MODE_ADAPTER_SCHEMA &&
+    snapshotAudit.status === 'PASS' &&
+    snapshotAudit.evidence_class === 'plugin_snapshot_isolated' &&
+    snapshotAudit.install_lifecycle === 'NOT_RUN(postinstall_forbidden)' &&
+    Array.isArray(snapshotAudit.reason_codes) && snapshotAudit.reason_codes.length === 0 &&
+    identityMatches &&
+    sameStringArray(snapshotAudit.manifests, ['plugin.json', 'mcp.json', 'hooks.json']) &&
+    requiredContracts.every((contract) => snapshotAudit.checked_contracts?.includes(contract)) &&
+    acceptedRuntimeAudit &&
+    /^dir:[a-f0-9]{64}$/.test(String(snapshotAudit.package_tree_fingerprint ?? ''));
+  return verified
+    ? { status: 'PASS', reason: 'snapshot_audit_verified' }
+    : { status: 'NOT_RUN', reason: 'snapshot_audit_failed' };
+}
+
+function validatePluginSandboxBinding({ layout, sandboxOwnerRoot, packageRoot }) {
+  try {
+    if (!layout || typeof layout !== 'object' || !path.isAbsolute(String(layout.root ?? '')) ||
+        !path.isAbsolute(String(sandboxOwnerRoot ?? '')) || !path.isAbsolute(String(packageRoot ?? ''))) {
+      return { status: 'NOT_RUN', reason: 'sandbox_layout_invalid' };
+    }
+    const expected = buildSandboxLayout(layout.root);
+    if (!sameStringArray(Object.keys(layout).sort(), Object.keys(expected).sort()) ||
+        Object.keys(expected).some((key) => path.resolve(layout[key]) !== expected[key]) ||
+        !isLexicalDescendant(sandboxOwnerRoot, layout.root) ||
+        !isLexicalDescendant(layout.root, packageRoot)) {
+      return { status: 'NOT_RUN', reason: 'sandbox_layout_invalid' };
+    }
+    return { status: 'PASS', reason: 'sandbox_layout_verified' };
+  } catch {
+    return { status: 'NOT_RUN', reason: 'sandbox_layout_invalid' };
+  }
+}
+
+function buildActualPluginSteps({ marketplaceRoot, marketplaceName }) {
+  return [
+    {
+      phase: 'marketplace_add',
+      args: ['plugin', 'marketplace', 'add', marketplaceRoot, '--json']
+    },
+    {
+      phase: 'plugin_add',
+      args: ['plugin', 'add', 'context-mode', '--marketplace', marketplaceName, '--json']
+    },
+    {
+      phase: 'codex_exec',
+      args: [
+        '-c',
+        'model_reasoning_effort="low"',
+        '--dangerously-bypass-hook-trust',
+        'exec',
+        '--json',
+        '--skip-git-repo-check',
+        'Return evaluation_complete only.'
+      ]
+    }
+  ];
+}
+
+async function validateActualPluginPlanForExecution(plan) {
+  const native = validateNativeCodexExecutable(plan.command);
+  if (native.status !== 'PASS' || plan.authorization_class !== 'explicit_isolated_full' ||
+      plan.snapshot_audit_status !== 'PASS' || plan.hook_trust_bypass_authorized !== true ||
+      plan.trust_mode !== 'test_only_pinned_snapshot_bypass') {
+    return { status: 'NOT_RUN', reason: 'plugin_plan_integrity_invalid' };
+  }
+  const layout = buildSandboxLayout(plan.sandbox_root);
+  const binding = validatePluginSandboxBinding({
+    layout,
+    sandboxOwnerRoot: plan.sandbox_owner_root,
+    packageRoot: plan.package_root
+  });
+  const expectedSteps = buildActualPluginSteps({
+    marketplaceRoot: layout.marketplace,
+    marketplaceName: 'context-mode-134'
+  });
+  const rootsMatch = binding.status === 'PASS' &&
+    plan.working_directory === layout.fixture &&
+    plan.marketplace_root === layout.marketplace &&
+    plan.marketplace_plugin_root === path.join(layout.marketplace, 'plugins', 'context-mode') &&
+    plan.marketplace_manifest === path.join(layout.marketplace, '.agents', 'plugins', 'marketplace.json') &&
+    plan.env?.HOME === layout.home &&
+    plan.env?.CODEX_HOME === layout.codex_home &&
+    plan.env?.CONTEXT_MODE_DIR === layout.context_mode_dir &&
+    plan.env?.TEMP === layout.temp &&
+    plan.env?.TMP === layout.temp;
+  if (!rootsMatch || JSON.stringify(plan.steps) !== JSON.stringify(expectedSteps)) {
+    return { status: 'NOT_RUN', reason: 'plugin_plan_integrity_invalid' };
+  }
+  await assertCanonicalConfinedPath(layout.root, plan.package_root);
+  if (await digestPath(plan.package_root) !== plan.snapshot_tree_fingerprint) {
+    return { status: 'NOT_RUN', reason: 'snapshot_changed' };
+  }
+  return { status: 'PASS', reason: 'plugin_plan_verified' };
+}
+
+function sameStringArray(actual, expected) {
+  return Array.isArray(actual) && actual.length === expected.length &&
+    actual.every((value, index) => value === expected[index]);
+}
+
+function isLexicalDescendant(root, target) {
+  const relative = path.relative(path.resolve(root), path.resolve(target));
+  return Boolean(relative) && !relative.startsWith('..') && !path.isAbsolute(relative);
 }
 
 export async function prepareActualPluginMarketplace(plan) {
@@ -538,6 +705,19 @@ export async function runActualPluginLifecycle({
       schema: CONTEXT_MODE_ADAPTER_SCHEMA,
       status: plan?.status ?? 'NOT_RUN',
       reason: plan?.reason ?? 'plugin_preflight_missing',
+      phases: []
+    };
+  }
+  let executionPreflight;
+  try {
+    executionPreflight = await validateActualPluginPlanForExecution(plan);
+  } catch {
+    executionPreflight = { status: 'NOT_RUN', reason: 'plugin_plan_integrity_invalid' };
+  }
+  if (executionPreflight.status !== 'PASS') {
+    return {
+      schema: CONTEXT_MODE_ADAPTER_SCHEMA,
+      ...executionPreflight,
       phases: []
     };
   }
@@ -648,7 +828,8 @@ async function runActualPluginSteps({ plan, prepareMarketplace, runProcess, time
     status: 'PASS',
     evidence_class: 'actual_codex_plugin',
     phases,
-    trust_mode: plan.trust_mode
+    trust_mode: plan.trust_mode,
+    hook_trust_bypass: 'PASS(test_only_authorized)'
   };
 }
 
@@ -661,7 +842,14 @@ export async function prepareSandbox(layout) {
   }
 }
 
-export async function runSandboxLifecycle({ ownerRoot, sandboxRoot, run, purge, logger }) {
+export async function runSandboxLifecycle({
+  ownerRoot,
+  sandboxRoot,
+  run,
+  purge,
+  purgeRequired = true,
+  logger
+}) {
   const lease = await createSandboxLease({ ownerRoot, sandboxRoot });
   let runResult = null;
   let runFailure = null;
@@ -670,11 +858,13 @@ export async function runSandboxLifecycle({ ownerRoot, sandboxRoot, run, purge, 
   } catch (error) {
     runFailure = error?.code ?? 'sandbox_operation_failed';
   }
-  let purgeStatus = 'FAIL';
-  try {
-    purgeStatus = (await purge())?.status === 'PASS' ? 'PASS' : 'FAIL';
-  } catch {
-    purgeStatus = 'FAIL';
+  let purgeStatus = purgeRequired ? 'FAIL' : 'NOT_APPLICABLE';
+  if (purgeRequired) {
+    try {
+      purgeStatus = typeof purge === 'function' && (await purge())?.status === 'PASS' ? 'PASS' : 'FAIL';
+    } catch {
+      purgeStatus = 'FAIL';
+    }
   }
   let cleanupStatus = 'FAIL';
   try {
@@ -692,13 +882,16 @@ export async function runSandboxLifecycle({ ownerRoot, sandboxRoot, run, purge, 
       cleanup: 'FAIL'
     };
   }
-  const operationStatus = runFailure ? 'FAIL' : runResult?.status;
-  const status = operationStatus === 'PASS' && purgeStatus === 'PASS' ? 'PASS' : 'FAIL';
+  const operationStatus = runFailure ? 'FAIL' : (runResult?.status ?? 'FAIL');
+  const status = purgeRequired && purgeStatus !== 'PASS'
+    ? (operationStatus === 'BLOCKED' ? 'BLOCKED' : 'FAIL')
+    : operationStatus;
   return {
     ...(runResult ?? {}),
     schema: CONTEXT_MODE_ADAPTER_SCHEMA,
     status,
-    reason: runFailure ?? runResult?.reason ?? (purgeStatus === 'PASS' ? undefined : 'provider_purge_failed'),
+    reason: runFailure ?? runResult?.reason ??
+      (purgeRequired && purgeStatus !== 'PASS' ? 'provider_purge_failed' : undefined),
     purge: purgeStatus,
     cleanup: cleanupStatus
   };

@@ -259,6 +259,33 @@ describe('context-mode sandbox and lifecycle boundary', () => {
     assert.equal(misleadingResidual.reason, 'provider_purge_residual');
   });
 
+  it('distinguishes a failed post-purge probe from confirmed residual provider state', async () => {
+    const artifact = {
+      name: 'generated-output.txt',
+      content: 'synthetic output north=17',
+      sha256: 'expected',
+      search_query: 'required facts',
+      required_facts: ['north=17']
+    };
+    const counts = new Map();
+    const result = await runMcpContract({
+      artifact,
+      invokeTool: async (name) => {
+        const count = (counts.get(name) ?? 0) + 1;
+        counts.set(name, count);
+        if (name === 'ctx_doctor') return mcpText('Server test: PASS\nFTS5 / SQLite: PASS\nVersion: v1.0.169');
+        if (name === 'ctx_index') return mcpText('Indexed 1 sections from: generated-output.txt');
+        if (name === 'ctx_search' && count === 1) return mcpText('generated-output.txt\nnorth=17');
+        if (name === 'ctx_search') throw new Error('transport unavailable');
+        if (name === 'ctx_stats') return mcpText(count === 1 ? 'Indexed artifacts: 1' : 'Indexed artifacts: 0');
+        return mcpText('Purged: project');
+      },
+      hashContent: () => 'expected'
+    });
+    assert.equal(result.status, 'FAIL');
+    assert.equal(result.reason, 'post_purge_probe_failed');
+  });
+
   it('binds recursive cleanup to an explicit owner and runs it after PASS, FAIL and timeout', async () => {
     const ownerRoot = path.join(tempDir, 'owned');
     await mkdir(ownerRoot, { recursive: true });
@@ -349,7 +376,7 @@ describe('context-mode sandbox and lifecycle boundary', () => {
     assert.doesNotMatch(JSON.stringify(plan), /plugin_hooks/);
     assert.match(plan.marketplace_manifest, /marketplace\.json$/);
     assert.match(plan.marketplace_manifest, /\.agents[\\/]plugins[\\/]marketplace\.json$/);
-    assert.deepEqual(plan.steps[0].args, ['plugin', 'marketplace', 'add', layout.marketplace, '--json']);
+    assert.deepEqual(plan.steps, []);
   });
 
   it('requires an explicit native Codex executable before eligible plugin lifecycle', () => {
@@ -376,6 +403,85 @@ describe('context-mode sandbox and lifecycle boundary', () => {
     });
     assert.equal(plan.status, 'NOT_RUN');
     assert.equal(plan.reason, 'native_codex_executable_required');
+  });
+
+  it('requires a successful pinned snapshot audit, complete authorization and explicit test-only trust grant', async () => {
+    const ownerRoot = path.join(tempDir, 'owned-plugin-preflight');
+    const sandboxRoot = path.join(ownerRoot, 'sandbox');
+    const layout = buildSandboxLayout(sandboxRoot);
+    const packageRoot = await writePackageFixture(layout.package);
+    const snapshotAudit = await auditContextModeSnapshot({
+      packageRoot,
+      source: {
+        repository: CONTEXT_MODE_IDENTITY.repository,
+        tag: CONTEXT_MODE_IDENTITY.tag,
+        commit: CONTEXT_MODE_IDENTITY.commit
+      },
+      packageMeta: CONTEXT_MODE_IDENTITY
+    });
+    const common = {
+      layout,
+      sandboxOwnerRoot: ownerRoot,
+      packageRoot,
+      codexExecutable: path.join(tempDir, 'codex.exe'),
+      codexVersion: 'codex-cli 0.144.6',
+      supportedFeatures: ['hooks', 'plugins'],
+      authMode: 'scoped_ephemeral',
+      authorization: liveAuthorization(),
+      snapshotAudit,
+      hookTrustBypassAuthorized: true
+    };
+    assert.equal(buildActualPluginPlan({ ...common, snapshotAudit: undefined }).reason, 'snapshot_audit_required');
+    assert.equal(buildActualPluginPlan({ ...common, authorization: undefined }).reason, 'explicit_isolated_authorization_required');
+    assert.equal(buildActualPluginPlan({ ...common, hookTrustBypassAuthorized: false }).reason, 'hook_trust_bypass_not_authorized');
+    const eligible = buildActualPluginPlan(common);
+    assert.equal(eligible.status, 'PASS');
+    assert.equal(eligible.snapshot_audit_status, 'PASS');
+    assert.equal(eligible.authorization_class, 'explicit_isolated_full');
+    assert.equal(eligible.hook_trust_bypass_authorized, true);
+  });
+
+  it('rechecks snapshot integrity and plan binding before any plugin process starts', async () => {
+    const ownerRoot = path.join(tempDir, 'owned-plugin-recheck');
+    const sandboxRoot = path.join(ownerRoot, 'sandbox');
+    const layout = buildSandboxLayout(sandboxRoot);
+    const packageRoot = await writePackageFixture(layout.package);
+    const snapshotAudit = await auditContextModeSnapshot({
+      packageRoot,
+      source: {
+        repository: CONTEXT_MODE_IDENTITY.repository,
+        tag: CONTEXT_MODE_IDENTITY.tag,
+        commit: CONTEXT_MODE_IDENTITY.commit
+      },
+      packageMeta: CONTEXT_MODE_IDENTITY
+    });
+    const plan = buildActualPluginPlan({
+      layout,
+      sandboxOwnerRoot: ownerRoot,
+      packageRoot,
+      codexExecutable: path.join(tempDir, 'codex.exe'),
+      codexVersion: 'codex-cli 0.144.6',
+      supportedFeatures: ['hooks', 'plugins'],
+      authMode: 'scoped_ephemeral',
+      authorization: liveAuthorization(),
+      snapshotAudit,
+      hookTrustBypassAuthorized: true
+    });
+    await writeFile(path.join(packageRoot, 'post-audit-change.txt'), 'changed', 'utf8');
+    let calls = 0;
+    const result = await runActualPluginLifecycle({
+      plan,
+      hostManifestTargets: {
+        projectRoot: path.join(tempDir, 'host-project'),
+        codexHome: path.join(tempDir, 'host-codex'),
+        providerHome: path.join(tempDir, 'host-provider')
+      },
+      purgeProvider: async () => ({ status: 'PASS' }),
+      runProcess: async () => { calls += 1; return { exitCode: 0 }; }
+    });
+    assert.equal(result.status, 'NOT_RUN');
+    assert.equal(result.reason, 'snapshot_changed');
+    assert.equal(calls, 0);
   });
 
   it('never mutates plugin state when preflight is NOT_RUN and executes only an eligible isolated plan', async () => {
@@ -407,7 +513,10 @@ describe('context-mode sandbox and lifecycle boundary', () => {
       codexExecutable: path.join(tempDir, 'codex.exe'),
       codexVersion: 'codex-cli 0.144.6',
       supportedFeatures: ['hooks', 'plugins'],
-      authMode: 'scoped_ephemeral'
+      authMode: 'scoped_ephemeral',
+      authorization: liveAuthorization(),
+      snapshotAudit: await auditPackageSnapshot(packageRoot),
+      hookTrustBypassAuthorized: true
     });
     const hostManifestTargets = {
       projectRoot: path.join(tempDir, 'real-project'),
@@ -469,7 +578,10 @@ describe('context-mode sandbox and lifecycle boundary', () => {
       codexExecutable: path.join(tempDir, 'codex.exe'),
       codexVersion: 'codex-cli 0.144.6',
       supportedFeatures: ['hooks', 'plugins'],
-      authMode: 'scoped_ephemeral'
+      authMode: 'scoped_ephemeral',
+      authorization: liveAuthorization(),
+      snapshotAudit: await auditPackageSnapshot(packageRoot),
+      hookTrustBypassAuthorized: true
     });
     let changed = false;
     const result = await runActualPluginLifecycle({
@@ -518,4 +630,26 @@ async function writePackageFixture(root) {
 
 function mcpText(text, isError = false) {
   return { content: [{ type: 'text', text }], isError };
+}
+
+function liveAuthorization() {
+  return {
+    scope: 'isolated_evaluation',
+    provider_snapshot: 'prepared_pinned_snapshot',
+    runtime_dependency_bootstrap: 'approved',
+    auth_mode: 'scoped_ephemeral',
+    native_codex: true
+  };
+}
+
+async function auditPackageSnapshot(packageRoot) {
+  return auditContextModeSnapshot({
+    packageRoot,
+    source: {
+      repository: CONTEXT_MODE_IDENTITY.repository,
+      tag: CONTEXT_MODE_IDENTITY.tag,
+      commit: CONTEXT_MODE_IDENTITY.commit
+    },
+    packageMeta: CONTEXT_MODE_IDENTITY
+  });
 }

@@ -104,14 +104,14 @@ project_dimensions:
 Практический смысл:
 
 - mini или exact lookup: оставить `rg`, избегать on-demand CodeGraph/Graphify/context-mode setup; уже готовый CodeGraph index не является default-рекомендацией.
-
-Для `context-mode` Codex surface `v1.0.169` исторический static audit остаётся неизменным. Authorized live follow-up с `explicit_isolated_full` показал: MCP-only восстанавливает correctness при >1 MiB stdout truncation, но не экономит billed tokens (`+120.2%` против уже failed baseline); на small fixture overhead составил `+376.8%` tokens. Codex plugin не перехватил tested nested shell path, continuity остаётся `NOT_RUN(resume_driver_parity_unavailable)`. Поэтому MCP можно только предложить как manual temporary helper для реально большого truncating output с purge, plugin для этого stack следует избегать. Любое использование остаётся явным user opt-in; normal AIFHub commands не устанавливают package, не register MCP, не доверяют hooks и не выбирают plugin. `rg` остаётся baseline.
 - large framework или multirepo broad discovery: предлагать Graphify условно после `rg`; CodeGraph только при exact skill+task+labels screening/proven match.
 - legacy integration-heavy: рекомендовать только conditional tools с явным объяснением noise/time tradeoff.
 - Go service: Go label не дает CodeGraph recommendation; для repo graph оставлять Graphify/`rg`, пока нет exact screening match.
 - docs/version tasks: Context7 только для version-sensitive library/API вопросов.
 - continuity tasks: `codex-agent-mem` только для resume/open-work с explicit DB path.
 - `rohitg00-agentmemory` не выбирается ни по project dimensions, ни по continuity/manual-notes task signals; `rg` остаётся baseline для source lookup.
+
+Для `context-mode` Codex surface `v1.0.169` исторический static audit остаётся неизменным. Authorized live follow-up с `explicit_isolated_full` показал: MCP-only восстанавливает correctness при >1 MiB stdout truncation, но не экономит billed tokens (`+120.2%` против уже failed baseline); на small fixture overhead составил `+376.8%` tokens. Codex plugin не перехватил tested nested shell path, continuity остаётся `NOT_RUN(resume_driver_parity_unavailable)`. Test-only hook trust bypass был явно разрешён только для audited pinned snapshot в disposable sandbox. Поэтому MCP можно только предложить как manual temporary helper для реально большого truncating output с purge, plugin для этого stack следует избегать. Любое использование остаётся явным user opt-in; normal AIFHub commands не устанавливают package, не register MCP, не доверяют hooks и не выбирают plugin. `rg` остаётся baseline.
 
 Decision mapping из matrix:
 
@@ -130,9 +130,10 @@ Decision mapping из matrix:
 - `uv --version`
 - `graphify --version` или `graphify --help`
 - `codex-agent-mem-policy --help` или `codex-agent-mem-smoke --help`
-- `context-mode doctor`
 - `ctx7 --version` или `npx --no-install ctx7 --help` только когда передан `--check-docs-provider`
 - `codegraph --version`, `codegraph --help` или `codegraph status` только как availability probes
+
+Для `context-mode` active executable probe отсутствует; metadata/runtime возвращают `dedicated_harness_required`, а проверка разрешена только pinned isolated harness для issue `#134`.
 
 Для `rohitg00-agentmemory` executable status probe отсутствует; `status --json` возвращает `availability: unknown` и `command: null`.
 

@@ -132,13 +132,36 @@ describe('context-mode three-way matrix', () => {
     assert.match(wrapper, /exec/);
     assert.match(wrapper, /resume/);
     assert.equal(validateReasoningProof([
-      ['-c', 'model_reasoning_effort="low"', 'exec', '--json'],
-      ['-c', 'model_reasoning_effort="low"', 'exec', 'resume', 'session']
+      { phase: 'initial', profile: 'low' },
+      { phase: 'resume', profile: 'low' }
     ]).status, 'PASS');
     assert.equal(validateReasoningProof([
-      ['exec', '--json'],
-      ['exec', 'resume', 'session']
+      { phase: 'initial', profile: 'default' },
+      { phase: 'resume', profile: 'default' }
     ]).reason, 'profile_unenforced');
+    assert.equal(validateReasoningProof([
+      { phase: 'initial', profile: 'low' },
+      null
+    ]).reason, 'reasoning_proof_invalid');
+  });
+
+  it('rejects authorized matrix generation when context-mode provenance is not the reviewed release', async () => {
+    const catalog = await loadContextModeScenarioCatalog();
+    assert.throws(() => buildContextModeMatrix({
+      catalog,
+      runId: 'context-mode-134-wrong-provider',
+      provenance: {
+        ...provenance,
+        context_mode_commit: '0'.repeat(40)
+      },
+      authorization: {
+        scope: 'isolated_evaluation',
+        provider_snapshot: 'prepared_pinned_snapshot',
+        runtime_dependency_bootstrap: 'approved',
+        auth_mode: 'scoped_ephemeral',
+        native_codex: true
+      }
+    }), /context_mode_provenance_mismatch/);
   });
 
   it('keeps expected answers out of prompts and renders independently checkable facts', async () => {
@@ -243,6 +266,10 @@ describe('context-mode three-way matrix', () => {
         { phase: 'initial', profile: 'low' },
         { phase: 'resume', profile: 'low' }
       ]);
+      assert.deepEqual(validateReasoningProof(proof), {
+        status: 'PASS',
+        reason: 'profile_enforced_initial_and_resume'
+      });
       assert.doesNotMatch(JSON.stringify(proof), /Users|projects|session/);
     } finally {
       await rm(root, { recursive: true, force: true });

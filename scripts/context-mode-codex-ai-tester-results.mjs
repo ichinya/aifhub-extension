@@ -108,6 +108,7 @@ export function auditCodexRolloutRecords(records = [], {
   sandboxRoot,
   requiredTools = [],
   allowedTools = [],
+  allowedCommands = [],
   providerServer = 'context-mode'
 } = {}) {
   const calls = [];
@@ -135,9 +136,10 @@ export function auditCodexRolloutRecords(records = [], {
   ));
   const requiredPresent = requiredTools.every((tool) => toolCounts[tool] > 0);
   const allowed = new Set(allowedTools);
+  const commandAllowlist = new Set(allowedCommands);
   const forbiddenAbsent = calls.every((call) => allowed.has(call.tool));
   const pathsConfined = Boolean(sandboxRoot) && calls.every((call) =>
-    argumentsStayConfined(call.arguments, sandboxRoot)
+    argumentsStayConfined(call.arguments, sandboxRoot, '', commandAllowlist)
   );
   const common = {
     record_count: records.length,
@@ -174,14 +176,17 @@ function walkRecord(value, visit, seen = new Set()) {
   }
 }
 
-function argumentsStayConfined(value, sandboxRoot, key = '') {
+function argumentsStayConfined(value, sandboxRoot, key = '', allowedCommands = new Set()) {
   if (Array.isArray(value)) {
-    return value.every((item) => argumentsStayConfined(item, sandboxRoot, key));
+    return value.every((item) => argumentsStayConfined(item, sandboxRoot, key, allowedCommands));
   }
   if (value && typeof value === 'object') {
     return Object.entries(value).every(([childKey, child]) =>
-      argumentsStayConfined(child, sandboxRoot, childKey)
+      argumentsStayConfined(child, sandboxRoot, childKey, allowedCommands)
     );
+  }
+  if (/^command$/i.test(key)) {
+    return commandValueStaysConfined(value, sandboxRoot, allowedCommands);
   }
   if (typeof value !== 'string') return true;
   const pathLikeKey = /^(?:cwd|path|file|filename|directory|dir|root|source)$/i.test(key);
@@ -189,6 +194,21 @@ function argumentsStayConfined(value, sandboxRoot, key = '') {
   if (pathLikeKey) candidates.add(value);
   if (candidates.size === 0) return true;
   return [...candidates].every((candidate) => pathValueStaysConfined(candidate, sandboxRoot));
+}
+
+function commandValueStaysConfined(value, sandboxRoot, allowedCommands) {
+  if (typeof value !== 'string' || !allowedCommands.has(value)) return false;
+  if (/[\r\n;&|<>`$]/.test(value)) return false;
+  const tokens = value.trim().split(/\s+/).filter(Boolean);
+  if (!/^(?:node|node\.exe)$/i.test(tokens[0] ?? '')) return false;
+  return tokens.slice(1).every((rawToken) => {
+    const token = rawToken.replace(/^(?:"([\s\S]*)"|'([\s\S]*)')$/, '$1$2');
+    if (!token || token.startsWith('-')) return true;
+    if (/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(token)) return false;
+    if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(token) && !path.win32.isAbsolute(token)) return false;
+    if (!/[\\/]/.test(token) && !/\.[A-Za-z0-9]+$/.test(token)) return true;
+    return pathValueStaysConfined(token, sandboxRoot);
+  });
 }
 
 function embeddedAbsolutePaths(value) {

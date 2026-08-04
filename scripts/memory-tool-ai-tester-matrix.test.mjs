@@ -491,7 +491,7 @@ describe('ai-tester matrix manifest', () => {
       expectation: 'positive',
       skill: 'aif-explore',
       tool_id: 'context7',
-      preinitialized_tool_ids: ['graphify', 'context7', 'context-mode'],
+      preinitialized_tool_ids: ['graphify', 'context7'],
       profile_id: 'matrix-profile-04',
       fixture_path: '<sanitized-fixture>',
       task_scenario: 'version_sensitive_library_docs',
@@ -501,9 +501,27 @@ describe('ai-tester matrix manifest', () => {
     assert.match(portableSetupScenario, /py -3 -m venv \.ai-tester-tools\/graphify-venv/);
     assert.match(portableSetupScenario, /\.ai-tester-tools\/graphify-venv\/Scripts\/python\.exe/);
     assert.match(portableSetupScenario, /cmd\.exe \/c \\"cd project && npm install --prefix \.ai-tester-tools\/context7 ctx7\\"/);
-    assert.match(portableSetupScenario, /dedicated_harness_required/);
     assert.doesNotMatch(portableSetupScenario, /npm install --prefix \.ai-tester-tools\/context-mode/);
     assert.doesNotMatch(portableSetupScenario, /\.ai-tester-tools\\/);
+
+    assert.throws(() => renderAiTesterScenario({
+      id: 'case-context-mode-generic-preinitialize',
+      suite: 'positive',
+      expectation: 'positive',
+      skill: 'aif-explore',
+      tool_id: 'context7',
+      preinitialized_tool_ids: ['context7', 'context-mode'],
+      profile_id: 'matrix-profile-04',
+      fixture_path: '<sanitized-fixture>',
+      task_scenario: 'version_sensitive_library_docs',
+      selector_mode: 'source-fallback'
+    }), /context_mode_requires_dedicated_harness/);
+
+    assert.throws(() => buildAiTesterMatrixManifest({
+      metadata: {},
+      profiles: [],
+      preinitializeTools: ['context-mode']
+    }), /context_mode_requires_dedicated_harness/);
 
     const agentmemoryScenario = renderAiTesterScenario({
       id: 'case-agentmemory-isolated',

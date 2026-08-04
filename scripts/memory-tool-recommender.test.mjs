@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   buildRecommendationResult,
+  buildSelectionResult,
   classifyProjectProfile,
   isWindowsShellCommandNotFound,
   loadRecommendationMetadata,
@@ -413,6 +414,31 @@ describe('recommendation results', () => {
     assert.equal(contextMode.status, 'manual_helper_only');
     assert.equal(contextMode.read_scope, 'explicit_indexed_content');
     assert.match(contextMode.next_step, /manual temporary/i);
+  });
+
+  it('keeps context-mode recommendation-only even when project config enables it', async () => {
+    const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
+    let probes = 0;
+    const result = await buildSelectionResult({
+      metadata,
+      projectShape: 'large_framework_app',
+      taskSignals: ['large_command_output_compression'],
+      command: 'aif-analyze',
+      config: {
+        source_kind: 'project_config',
+        source_path: null,
+        enabled_tools: ['context-mode'],
+        warnings: []
+      },
+      probeRunner: async () => {
+        probes += 1;
+        return { availability: 'installed', command: 'context-mode doctor' };
+      }
+    });
+    assert.deepEqual(result.selected_tools, []);
+    assert.equal(result.not_selected_tools[0].tool_id, 'context-mode');
+    assert.match(result.not_selected_tools[0].reason, /normal command selection is forbidden/i);
+    assert.equal(probes, 0);
   });
 
   it('keeps small microservices on rg baseline and avoids repo graph helpers', async () => {

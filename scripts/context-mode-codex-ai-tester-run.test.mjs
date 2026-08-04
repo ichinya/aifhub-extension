@@ -74,6 +74,14 @@ describe('context-mode dedicated runner', () => {
     assert.equal(validateTraceRoot('C:/sandbox/runs', 'C:/other/trace.json').reason, 'unexpected_trace_root');
   });
 
+  it('prepares a fresh generated run root before canonical containment checks', async () => {
+    const options = await runnerOptions({ runProcess: async () => ({ exitCode: 1 }) });
+    await rm(options.runRoot, { recursive: true, force: true });
+    const result = await runVerifiedMatrix(options);
+    assert.notEqual(result.reason, 'run_root_outside_sandbox');
+    assert.equal(result.statuses[0].reason, 'dry_run_failed');
+  });
+
   it('does not execute when provenance or low-reasoning proof is unavailable', async () => {
     let calls = 0;
     const executable = path.join(tempDir, 'ai-tester');
@@ -328,6 +336,118 @@ describe('context-mode dedicated runner', () => {
     assert.doesNotMatch(JSON.stringify(result), /context-mode-runner-|fresh\.json/);
   });
 
+  it('uses row-owned canaries and indexed-content fingerprints in the live trace scan', async () => {
+    let calls = 0;
+    let tracePath;
+    const options = await runnerOptions({
+      runProcess: async () => {
+        calls += 1;
+        if (calls === 2) {
+          tracePath = path.join(tempDir, 'sandbox', 'runs', 'inline', 'privacy.json');
+          await mkdir(path.dirname(tracePath), { recursive: true });
+          const trace = validTrace('row-a');
+          trace.debug = {
+            canary: 'CM_CANARY_134',
+            indexed_fragment: 'PRIVATE_FIXTURE_FRAGMENT_134'
+          };
+          await writeFile(tracePath, JSON.stringify(trace), 'utf8');
+        }
+        return { exitCode: 0 };
+      },
+      privacyScanByRow: {
+        'row-a': {
+          canaries: ['CM_CANARY_134'],
+          contentFingerprints: ['PRIVATE_FIXTURE_FRAGMENT_134']
+        }
+      }
+    });
+    const result = await runVerifiedMatrix(options);
+    assert.equal(result.status, 'FAIL');
+    assert.equal(result.statuses[0].reason, 'unsafe_trace_evidence');
+    assert.deepEqual(result.statuses[0].reason_codes, ['canary_material', 'indexed_content']);
+    assert.equal(result.statuses[0].raw_trace_deleted, true);
+    await assert.rejects(access(tracePath));
+    assert.doesNotMatch(JSON.stringify(result), /CM_CANARY_134|PRIVATE_FIXTURE_FRAGMENT_134/);
+  });
+
+  it('does not accept bare completed row IDs without matching prior evidence', async () => {
+    let calls = 0;
+    const options = await runnerOptions({
+      runProcess: async () => { calls += 1; return { exitCode: 0 }; }
+    });
+    options.matrix.rows.push({
+      ...structuredClone(options.matrix.rows[0]),
+      id: 'row-b',
+      triad_id: 'triad-b',
+      settings_fingerprint: 'other'
+    });
+    options.completedRowIds = new Set(['row-a']);
+    const result = await runVerifiedMatrix(options);
+    assert.equal(result.status, 'NOT_RUN');
+    assert.equal(result.reason, 'completed_row_evidence_missing');
+    assert.equal(calls, 0);
+  });
+
+  it('merges validated prior rows with fresh results before aggregate PASS', async () => {
+    let calls = 0;
+    const options = await runnerOptions({
+      runProcess: async () => {
+        calls += 1;
+        if (calls === 2) {
+          const tracePath = path.join(tempDir, 'sandbox', 'runs', 'inline', 'remaining.json');
+          await mkdir(path.dirname(tracePath), { recursive: true });
+          await writeFile(tracePath, JSON.stringify(validTrace('row-b')), 'utf8');
+        }
+        return { exitCode: 0 };
+      }
+    });
+    const priorRow = options.matrix.rows[0];
+    const remaining = {
+      ...structuredClone(priorRow),
+      id: 'row-b',
+      triad_id: 'triad-b',
+      settings_fingerprint: 'other'
+    };
+    options.matrix.rows.push(remaining);
+    options.completedRowIds = new Set(['row-a']);
+    options.priorRowResults = [validPriorRow(priorRow)];
+    options.rowEvidence['row-b'] = defaultRowEvidence()['row-a'];
+    options.privacyScanByRow['row-b'] = defaultPrivacyScan()['row-a'];
+    const result = await runVerifiedMatrix(options);
+    assert.equal(result.status, 'PASS');
+    assert.deepEqual(result.statuses.map((item) => item.row_id), ['row-a', 'row-b']);
+    assert.equal(result.results.rows.length, 2);
+  });
+
+  it('deletes the verified matrix sandbox after PASS and requires an explicit owner boundary', async () => {
+    let calls = 0;
+    const options = await runnerOptions({
+      runProcess: async () => {
+        calls += 1;
+        if (calls === 2) {
+          const tracePath = path.join(tempDir, 'sandbox', 'runs', 'inline', 'cleanup.json');
+          await mkdir(path.dirname(tracePath), { recursive: true });
+          await writeFile(tracePath, JSON.stringify(validTrace('row-a')), 'utf8');
+        }
+        return { exitCode: 0 };
+      }
+    });
+    const result = await runVerifiedMatrix(options);
+    assert.equal(result.status, 'PASS');
+    assert.equal(result.cleanup, 'PASS');
+    await assert.rejects(access(options.sandboxRoot));
+
+    const withoutOwner = await runnerOptions({
+      runProcess: async () => { calls += 1; return { exitCode: 0 }; }
+    });
+    delete withoutOwner.sandboxOwnerRoot;
+    const before = calls;
+    const blocked = await runVerifiedMatrix(withoutOwner);
+    assert.equal(blocked.status, 'NOT_RUN');
+    assert.equal(blocked.reason, 'cleanup_boundary_unavailable');
+    assert.equal(calls, before);
+  });
+
   it('deletes an unsafe fresh trace and returns only bounded reason codes', async () => {
     let calls = 0;
     let tracePath;
@@ -353,7 +473,12 @@ describe('context-mode dedicated runner', () => {
   });
 });
 
-async function runnerOptions({ runProcess, rowEvidence = defaultRowEvidence(), env = {} }) {
+async function runnerOptions({
+  runProcess,
+  rowEvidence = defaultRowEvidence(),
+  privacyScanByRow = defaultPrivacyScan(),
+  env = {}
+}) {
   const sandboxRoot = path.join(tempDir, 'sandbox');
   const scenarioRoot = path.join(sandboxRoot, 'scenarios');
   const runRoot = path.join(sandboxRoot, 'runs');
@@ -384,13 +509,59 @@ async function runnerOptions({ runProcess, rowEvidence = defaultRowEvidence(), e
       version: 'test'
     }),
     profileProof: { status: 'PASS' },
+    reasoningProofRecords: [
+      { phase: 'initial', profile: 'low' },
+      { phase: 'resume', profile: 'low' }
+    ],
+    sandboxOwnerRoot: tempDir,
     sandboxRoot,
     scenarioRoot,
     runRoot,
     executable: path.join(tempDir, 'ai-tester.exe'),
     env,
     rowEvidence,
+    privacyScanByRow,
+    purgeProvider: async () => ({ status: 'PASS' }),
     runProcess
+  };
+}
+
+function defaultPrivacyScan() {
+  return {
+    'row-a': {
+      canaries: ['CM_CANARY_134'],
+      contentFingerprints: ['PRIVATE_FIXTURE_FRAGMENT_134']
+    }
+  };
+}
+
+function validPriorRow(row) {
+  return {
+    row_id: row.id,
+    triad_id: row.triad_id,
+    variant: row.variant,
+    settings_fingerprint: row.settings_fingerprint,
+    status: 'PASS',
+    reason: 'trace_verified',
+    correctness_pass: true,
+    privacy_pass: true,
+    purge_pass: true,
+    cleanup_pass: true,
+    continuity_pass: true,
+    evidence_class: 'ai_tester_trace_plus_external_lifecycle',
+    cost: {
+      cold_setup_ms: 10,
+      mcp_startup_ms: 0,
+      index_ms: 0,
+      warm_query_ms: 0,
+      answer_ms: 5,
+      input_tokens: 1,
+      output_tokens: 1,
+      input_output_tokens: 2
+    },
+    tool_calls: 0,
+    turns: 0,
+    final_output_bytes: 8
   };
 }
 

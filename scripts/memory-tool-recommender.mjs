@@ -408,7 +408,8 @@ export async function buildSelectionResult(options = {}) {
     }
 
     const permission = permissionForTool(metadata, toolId, command);
-    const boundaryReason = commandBoundaryReason(tool, command, permission);
+    const boundaryReason = selectionBoundaryReason(tool, command) ??
+      commandBoundaryReason(tool, command, permission);
     if (boundaryReason) {
       notSelectedTools.push({
         tool_id: toolId,
@@ -873,6 +874,13 @@ function commandBoundaryReason(tool, command, permission) {
   const allowedIn = asArray(tool.allowed_in).filter((scope) => String(scope).startsWith('aif-'));
   if (allowedIn.length > 0 && !allowedIn.includes(command)) {
     return `${tool.display_name ?? 'Tool'} is not allowed for ${command}.`;
+  }
+  return null;
+}
+
+function selectionBoundaryReason(tool, command) {
+  if (tool?.normal_command_selection === 'forbidden') {
+    return `${tool.display_name ?? 'Tool'} normal command selection is forbidden for ${command}; use recommendation guidance only.`;
   }
   return null;
 }

@@ -9,8 +9,10 @@ import {
   buildContextModeEnv,
   buildSandboxLayout,
   prepareSandbox,
-  runBoundedProcess
+  runBoundedProcess,
+  runSandboxLifecycle
 } from './context-mode-codex-ai-tester-adapter.mjs';
+import { validateReasoningProof } from './context-mode-codex-ai-tester-matrix.mjs';
 import {
   buildContextModeResults,
   auditCodexRolloutRecords,
@@ -138,6 +140,7 @@ export async function executeMissingRows({
   completedRowIds = new Set(),
   env,
   rowEvidence = {},
+  privacyScanByRow = {},
   provisionRow,
   timeoutMs = 300_000,
   runProcess = runBoundedProcess,
@@ -243,6 +246,7 @@ export async function executeMissingRows({
       before,
       row,
       evidence: rowEvidence[row.id],
+      privacyScan: privacyScanByRow[row.id],
       rawBefore,
       codexHome: env.CODEX_HOME,
       sandboxRoot: path.dirname(env.HOME),
@@ -287,15 +291,18 @@ export async function runVerifiedMatrix(options) {
   if (provenance.status !== 'PASS') {
     return { schema: CONTEXT_MODE_RUNNER_SCHEMA, ...provenance, statuses: [] };
   }
-  if (options.profileProof?.status !== 'PASS') {
+  const profileProof = validateReasoningProof(options.reasoningProofRecords);
+  if (profileProof.status !== 'PASS') {
     return {
       schema: CONTEXT_MODE_RUNNER_SCHEMA,
       status: 'NOT_RUN',
-      reason: 'profile_unenforced',
+      reason: profileProof.reason,
       statuses: []
     };
   }
-  if (path.resolve(options.runRoot) !== path.join(path.dirname(path.resolve(options.scenarioRoot)), 'runs')) {
+  const layout = buildSandboxLayout(options.sandboxRoot);
+  if (path.resolve(options.scenarioRoot) !== layout.scenarios ||
+      path.resolve(options.runRoot) !== layout.runs) {
     return {
       schema: CONTEXT_MODE_RUNNER_SCHEMA,
       status: 'NOT_RUN',
@@ -303,35 +310,103 @@ export async function runVerifiedMatrix(options) {
       statuses: []
     };
   }
-  for (const [label, target] of [['scenario_root', options.scenarioRoot], ['run_root', options.runRoot]]) {
-    if (!await isCanonicalDescendant(options.sandboxRoot, target)) {
-      return {
-        schema: CONTEXT_MODE_RUNNER_SCHEMA,
-        status: 'NOT_RUN',
-        reason: `${label}_outside_sandbox`,
-        statuses: []
-      };
-    }
-  }
-  const layout = buildSandboxLayout(options.sandboxRoot);
-  try {
-    await prepareSandbox(layout);
-  } catch {
+  if (!options.sandboxOwnerRoot) {
     return {
       schema: CONTEXT_MODE_RUNNER_SCHEMA,
       status: 'NOT_RUN',
-      reason: 'sandbox_prepare_failed',
+      reason: 'cleanup_boundary_unavailable',
       statuses: []
     };
   }
-  const boundedEnv = buildContextModeEnv({
-    layout,
-    baseEnv: options.env ?? process.env
+  if (!await isCanonicalDescendant(options.sandboxOwnerRoot, options.sandboxRoot)) {
+    return {
+      schema: CONTEXT_MODE_RUNNER_SCHEMA,
+      status: 'NOT_RUN',
+      reason: 'sandbox_outside_cleanup_owner',
+      statuses: []
+    };
+  }
+  const checkpoint = validatePriorRowResults(options.matrix, {
+    completedRowIds: options.completedRowIds,
+    priorRowResults: options.priorRowResults
   });
-  const result = await executeMissingRows({ ...options, env: boundedEnv });
-  const aggregate = aggregateStatuses(result.statuses);
-  const results = buildContextModeResults(result.statuses);
-  return { ...result, ...aggregate, provenance, results };
+  if (checkpoint.status !== 'PASS') {
+    return {
+      schema: CONTEXT_MODE_RUNNER_SCHEMA,
+      status: 'NOT_RUN',
+      reason: checkpoint.reason,
+      statuses: []
+    };
+  }
+  const pendingRows = planMissingRows(options.matrix.rows, checkpoint.completedRowIds);
+  const providerPurgeRequired = pendingRows.some((row) =>
+    row.variant !== 'baseline' && row.execution_gate?.status === 'PASS'
+  );
+  if (providerPurgeRequired && typeof options.purgeProvider !== 'function') {
+    return {
+      schema: CONTEXT_MODE_RUNNER_SCHEMA,
+      status: 'NOT_RUN',
+      reason: 'provider_purge_unavailable',
+      statuses: []
+    };
+  }
+  let lifecycle;
+  try {
+    lifecycle = await runSandboxLifecycle({
+      ownerRoot: options.sandboxOwnerRoot,
+      sandboxRoot: options.sandboxRoot,
+      purge: options.purgeProvider,
+      purgeRequired: providerPurgeRequired,
+      logger: options.logger,
+      run: async () => {
+        try {
+          await prepareSandbox(layout);
+        } catch {
+          return {
+            schema: CONTEXT_MODE_RUNNER_SCHEMA,
+            status: 'NOT_RUN',
+            reason: 'sandbox_prepare_failed',
+            statuses: []
+          };
+        }
+        for (const [label, target] of [['scenario_root', options.scenarioRoot], ['run_root', options.runRoot]]) {
+          if (!await isCanonicalDescendant(options.sandboxRoot, target)) {
+            return {
+              schema: CONTEXT_MODE_RUNNER_SCHEMA,
+              status: 'NOT_RUN',
+              reason: `${label}_outside_sandbox`,
+              statuses: []
+            };
+          }
+        }
+        const boundedEnv = buildContextModeEnv({
+          layout,
+          baseEnv: options.env ?? process.env
+        });
+        const executed = await executeMissingRows({
+          ...options,
+          completedRowIds: checkpoint.completedRowIds,
+          env: boundedEnv
+        });
+        const statuses = mergeMatrixStatuses(
+          options.matrix.rows,
+          checkpoint.rows,
+          executed.statuses
+        );
+        const aggregate = aggregateStatuses(statuses);
+        const results = buildContextModeResults(statuses);
+        return { ...executed, ...aggregate, statuses, provenance, profileProof, results };
+      }
+    });
+  } catch (error) {
+    return {
+      schema: CONTEXT_MODE_RUNNER_SCHEMA,
+      status: 'NOT_RUN',
+      reason: error?.code ?? 'cleanup_boundary_unavailable',
+      statuses: []
+    };
+  }
+  return { ...lifecycle, schema: CONTEXT_MODE_RUNNER_SCHEMA };
 }
 
 async function inspectFreshTrace({
@@ -339,6 +414,7 @@ async function inspectFreshTrace({
   before,
   row,
   evidence,
+  privacyScan,
   rawBefore,
   codexHome,
   sandboxRoot,
@@ -366,7 +442,11 @@ async function inspectFreshTrace({
       trace.runner?.reasoning !== row.reasoning) {
     return rowStatus(row, 'NOT_RUN', 'trace_identity_mismatch');
   }
-  const scan = scanCompleteTrace({ trace, evidence });
+  const scanMaterial = normalizePrivacyScanMaterial(privacyScan);
+  if (scanMaterial.status !== 'PASS') {
+    return rowStatus(row, 'NOT_RUN', scanMaterial.reason);
+  }
+  const scan = scanCompleteTrace({ trace, evidence }, scanMaterial);
   if (!scan.safe) {
     const sanitized = await sanitizeAndDeleteUnsafeTrace({
       tracePath,
@@ -444,7 +524,8 @@ async function inspectFreshProviderRollouts({ codexHome, before, row, sandboxRoo
       return auditCodexRolloutRecords([], {
         sandboxRoot,
         requiredTools: row.raw_provider_policy?.required_tools,
-        allowedTools: row.raw_provider_policy?.allowed_tools
+        allowedTools: row.raw_provider_policy?.allowed_tools,
+        allowedCommands: row.raw_provider_policy?.allowed_commands
       });
     }
     const previous = before?.get(file);
@@ -469,7 +550,8 @@ async function inspectFreshProviderRollouts({ codexHome, before, row, sandboxRoo
   return auditCodexRolloutRecords(records, {
     sandboxRoot,
     requiredTools: row.raw_provider_policy?.required_tools ?? [],
-    allowedTools: row.raw_provider_policy?.allowed_tools ?? []
+    allowedTools: row.raw_provider_policy?.allowed_tools ?? [],
+    allowedCommands: row.raw_provider_policy?.allowed_commands ?? []
   });
 }
 
@@ -541,6 +623,105 @@ async function isCanonicalDescendant(rootPath, targetPath, { file = false } = {}
   } catch {
     return false;
   }
+}
+
+function normalizePrivacyScanMaterial(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { status: 'NOT_RUN', reason: 'privacy_scan_material_missing' };
+  }
+  const canaries = normalizeScanStrings(value.canaries);
+  const contentFingerprints = normalizeScanStrings(value.contentFingerprints);
+  if (!canaries || !contentFingerprints || canaries.length === 0 || contentFingerprints.length === 0) {
+    return { status: 'NOT_RUN', reason: 'privacy_scan_material_missing' };
+  }
+  return { status: 'PASS', canaries, contentFingerprints };
+}
+
+function normalizeScanStrings(values) {
+  if (!Array.isArray(values) || values.some((value) =>
+    typeof value !== 'string' || value.length === 0 || value.length > 512
+  )) return null;
+  return [...new Set(values)];
+}
+
+function validatePriorRowResults(matrix, { completedRowIds, priorRowResults } = {}) {
+  const matrixRows = Array.isArray(matrix?.rows) ? matrix.rows : [];
+  const matrixById = new Map(matrixRows.map((row) => [row.id, row]));
+  const requested = completedRowIds instanceof Set
+    ? new Set([...completedRowIds].map(String))
+    : new Set(Array.isArray(completedRowIds) ? completedRowIds.map(String) : []);
+  const prior = Array.isArray(priorRowResults) ? priorRowResults : [];
+  if (requested.size > 0 && prior.length === 0) {
+    return { status: 'NOT_RUN', reason: 'completed_row_evidence_missing' };
+  }
+  if (requested.size === 0) {
+    for (const record of prior) requested.add(String(record?.row_id ?? ''));
+  }
+  const byId = new Map();
+  for (const record of prior) {
+    const rowId = String(record?.row_id ?? '');
+    const expected = matrixById.get(rowId);
+    if (!expected || byId.has(rowId) || !requested.has(rowId) ||
+        record.triad_id !== expected.triad_id || record.variant !== expected.variant ||
+        record.settings_fingerprint !== expected.settings_fingerprint ||
+        !['PASS', 'FAIL', 'BLOCKED', 'NOT_RUN'].includes(record.status) ||
+        !priorStatusEvidenceComplete(record)) {
+      return { status: 'NOT_RUN', reason: 'completed_row_evidence_invalid' };
+    }
+    byId.set(rowId, sanitizePriorRowResult(record));
+  }
+  if (requested.size !== byId.size || [...requested].some((rowId) => !byId.has(rowId))) {
+    return { status: 'NOT_RUN', reason: 'completed_row_evidence_missing' };
+  }
+  return {
+    status: 'PASS',
+    completedRowIds: requested,
+    rows: matrixRows.filter((row) => byId.has(row.id)).map((row) => byId.get(row.id))
+  };
+}
+
+function priorStatusEvidenceComplete(record) {
+  if (record.status !== 'PASS') return typeof record.reason === 'string' && record.reason.length > 0;
+  const costKeys = [
+    'cold_setup_ms', 'mcp_startup_ms', 'index_ms', 'warm_query_ms', 'answer_ms',
+    'input_tokens', 'output_tokens', 'input_output_tokens'
+  ];
+  return record.correctness_pass === true && record.privacy_pass === true &&
+    record.purge_pass === true && record.cleanup_pass === true &&
+    typeof record.continuity_pass === 'boolean' &&
+    typeof record.evidence_class === 'string' && record.evidence_class.length > 0 &&
+    costKeys.every((key) => Number.isFinite(record.cost?.[key]) && record.cost[key] >= 0);
+}
+
+function sanitizePriorRowResult(record) {
+  return {
+    row_id: record.row_id,
+    triad_id: record.triad_id,
+    variant: record.variant,
+    settings_fingerprint: record.settings_fingerprint,
+    status: record.status,
+    reason: record.reason,
+    correctness_pass: record.correctness_pass,
+    privacy_pass: record.privacy_pass,
+    purge_pass: record.purge_pass,
+    cleanup_pass: record.cleanup_pass,
+    continuity_pass: record.continuity_pass,
+    evidence_class: record.evidence_class,
+    cost: record.cost ? { ...record.cost } : undefined,
+    tool_calls: Number.isInteger(record.tool_calls) ? record.tool_calls : undefined,
+    turns: Number.isInteger(record.turns) ? record.turns : undefined,
+    final_output_bytes: Number.isInteger(record.final_output_bytes) ? record.final_output_bytes : undefined
+  };
+}
+
+function mergeMatrixStatuses(matrixRows, priorRows, currentRows) {
+  const byId = new Map();
+  for (const row of [...priorRows, ...currentRows]) byId.set(row.row_id, row);
+  return matrixRows.map((row) => byId.get(row.id) ?? rowStatus(
+    row,
+    'NOT_RUN',
+    'row_evidence_missing'
+  ));
 }
 
 function rowStatus(row, status, reason, extra = {}) {

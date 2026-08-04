@@ -37,6 +37,22 @@ describe('context-mode Codex documentation policy', () => {
     assert.match(metadata, /normal_command_selection:\s*forbidden/);
   });
 
+  it('keeps disabled context-mode probing out of active safe-probe guidance', async () => {
+    const [analyzeSkill, recommendations] = await Promise.all([
+      readDoc('skills/aif-analyze/SKILL.md'),
+      readDoc('docs/memory-tool-recommendations.md')
+    ]);
+    for (const body of [analyzeSkill, recommendations]) {
+      assert.doesNotMatch(body, /context-mode doctor/);
+      assert.match(body, /dedicated_harness_required/);
+    }
+    assert.ok(
+      recommendations.indexOf('Для `context-mode` Codex surface') >
+      recommendations.indexOf('- continuity tasks:'),
+      'the context-mode note must not split the dimension-selection bullet list'
+    );
+  });
+
   it('records sanitized authorized live evidence without promoting normal lifecycle', async () => {
     const [evidence, research, results, recommendations, providers, metadata] = await Promise.all([
       readJson(LIVE_EVIDENCE),
@@ -55,6 +71,7 @@ describe('context-mode Codex documentation policy', () => {
     assert.equal(evidence.authorization.purpose, 'test_only');
     assert.equal(evidence.authorization.auth_copy_disposition, 'deleted');
     assert.equal(evidence.authorization.normal_command_authorized, false);
+    assert.equal(evidence.authorization.hook_trust_bypass, 'approved_test_only_for_pinned_snapshot');
     assert.equal(evidence.lifecycle.install_lifecycle, 'NOT_RUN(postinstall_forbidden)');
     assert.equal(evidence.matrix.fixture_revision, 'context-mode-134-synthetic-v2');
     assert.equal(evidence.matrix.dry_run_rows, 18);

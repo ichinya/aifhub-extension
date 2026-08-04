@@ -25,6 +25,8 @@ Authorized live follow-up от `2026-08-03` с class `explicit_isolated_full` д
 - session continuity остаётся `NOT_RUN(resume_driver_parity_unavailable)`;
 - raw rollout audit подтвердил nested provider calls, confined paths и purge без сохранения raw traces.
 
+Использованный hook trust bypass был явно разрешён только для audited pinned snapshot в disposable test sandbox; это разрешение не распространяется на normal commands или user-owned installs.
+
 Следовательно, MCP-only допустим лишь как conditional manual helper для большого truncating output, когда correctness важнее token cost. Plugin для этого stack следует избегать. Санитизированный evidence хранится в `docs/memory-tools-research/context-mode-codex-ai-tester/live-authorized-evidence.json`.
 
 Обычные `/aif-plan`, `/aif-implement`, `/aif-verify` и `/aif-done` не auto-install provider, не register MCP, не доверяют hooks и не выбирают plugin. Generic floating routes отключены с `dedicated_harness_required`. Пользовательская установка остаётся вне AIFHub ownership; перед ней нужно отдельно принять version-sensitive install/hook risk.

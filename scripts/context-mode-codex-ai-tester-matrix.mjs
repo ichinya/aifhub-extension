@@ -4,6 +4,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { CONTEXT_MODE_IDENTITY } from './context-mode-codex-ai-tester-adapter.mjs';
+
 export const CONTEXT_MODE_MATRIX_SCHEMA = 'aifhub.context_mode_codex.ai_tester_matrix.v1';
 export const CONTEXT_MODE_SCENARIOS = Object.freeze([
   'large_generated_output_retrieval',
@@ -366,7 +368,8 @@ function rawProviderPolicyForRow(variant, scenarioId) {
   if (variant === 'mcp_only' && scenarioId === 'large_generated_output_retrieval') {
     return {
       required_tools: ['ctx_batch_execute', 'ctx_purge'],
-      allowed_tools: ['ctx_batch_execute', 'ctx_search', 'ctx_stats', 'ctx_purge']
+      allowed_tools: ['ctx_batch_execute', 'ctx_search', 'ctx_stats', 'ctx_purge'],
+      allowed_commands: ['node project/emit-large-output.mjs']
     };
   }
   if (variant === 'mcp_only') {
@@ -415,16 +418,25 @@ export function buildCodexReasoningWrapper({ realCodex }) {
   ].join('\n');
 }
 
-export function validateReasoningProof(argvRecords = []) {
-  const hasInitial = argvRecords.some((args) =>
-    args.includes('exec') &&
-    args[args.indexOf('exec') + 1] !== 'resume' &&
-    args.includes('model_reasoning_effort="low"')
+export function validateReasoningProof(proofRecords = []) {
+  if (!Array.isArray(proofRecords)) {
+    return { status: 'NOT_RUN', reason: 'reasoning_proof_invalid' };
+  }
+  const validRecord = (record) => {
+    if (!record || typeof record !== 'object' || Array.isArray(record)) return false;
+    const keys = Object.keys(record).sort();
+    return sameArray(keys, ['phase', 'profile']) &&
+      ['initial', 'resume'].includes(record.phase) &&
+      typeof record.profile === 'string';
+  };
+  if (!proofRecords.every(validRecord)) {
+    return { status: 'NOT_RUN', reason: 'reasoning_proof_invalid' };
+  }
+  const hasInitial = proofRecords.some((record) =>
+    record.phase === 'initial' && record.profile === 'low'
   );
-  const hasResume = argvRecords.some((args) =>
-    args.includes('exec') &&
-    args[args.indexOf('exec') + 1] === 'resume' &&
-    args.includes('model_reasoning_effort="low"')
+  const hasResume = proofRecords.some((record) =>
+    record.phase === 'resume' && record.profile === 'low'
   );
   return hasInitial && hasResume
     ? { status: 'PASS', reason: 'profile_enforced_initial_and_resume' }
@@ -475,6 +487,11 @@ function validateProvenance(provenance = {}) {
   if (provenance.ai_tester_source_clean !== true) throw matrixError('ai_tester_source_dirty');
   if (!/^[a-f0-9]{64}$/.test(provenance.ai_tester_binary_sha256)) {
     throw matrixError('invalid_ai_tester_binary_sha256');
+  }
+  if (provenance.context_mode_tag !== CONTEXT_MODE_IDENTITY.tag ||
+      provenance.context_mode_commit !== CONTEXT_MODE_IDENTITY.commit ||
+      provenance.context_mode_integrity !== CONTEXT_MODE_IDENTITY.integrity) {
+    throw matrixError('context_mode_provenance_mismatch');
   }
   if (looksPrivate(JSON.stringify(provenance))) throw matrixError('private_provenance');
 }

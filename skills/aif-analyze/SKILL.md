@@ -1,7 +1,7 @@
 ---
 name: aif-analyze
 description: Bootstrap project context. Resolves localization and stack, creates/updates config.yaml and rules/base.md, then checks DESCRIPTION and guides core skill execution.
-version: 0.9.1
+version: 0.9.2
 author: ichi
 ---
 
@@ -189,13 +189,14 @@ graphify --version
 graphify --help
 codex-agent-mem-policy --help
 codex-agent-mem-smoke --help
-context-mode doctor
 codegraph --version
 codegraph --help
 codegraph status
 ctx7 --version
 npx --no-install ctx7 --help
 ```
+
+`context-mode` has no normal status probe. Metadata and runtime selection return `dedicated_harness_required`; use it only through the pinned, isolated issue `#134` evaluation harness.
 
 Run the Context7 probes only when a docs-provider check is explicitly requested. Do not run `ctx7 setup`.
 

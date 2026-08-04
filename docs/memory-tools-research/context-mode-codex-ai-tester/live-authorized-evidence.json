@@ -13,6 +13,7 @@
     "auth_copy_disposition": "deleted",
     "host_auth_unchanged": true,
     "remaining_auth_copies": 0,
+    "hook_trust_bypass": "approved_test_only_for_pinned_snapshot",
     "normal_command_authorized": false
   },
   "provenance": {

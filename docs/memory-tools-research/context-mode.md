@@ -55,6 +55,8 @@ AIFHub не auto-install, не register MCP, не доверяет hooks и не
 
 Follow-up использовал authorization class `explicit_isolated_full`: test-only scope, disposable runtime/provider homes, scoped ephemeral auth copy и native Codex executable. Host auth/manifests остались неизменными, временные auth copies удалены. Package `postinstall` по-прежнему не запускался: install lifecycle остаётся `NOT_RUN(postinstall_forbidden)`.
 
+Hook trust bypass был явно разрешён только для audited pinned snapshot внутри disposable test sandbox. Это test-only разрешение не применяется к normal AIFHub commands или user-owned installations.
+
 Проверенные версии: `context-mode 1.0.169`, Codex `0.144.6`, `ai-tester 1.1.0`, model `gpt-5.6-luna`, reasoning `low`. Санитизированный evidence: [live-authorized-evidence.json](context-mode-codex-ai-tester/live-authorized-evidence.json).
 
 | Scenario | Baseline | MCP-only | Codex plugin | Вывод |

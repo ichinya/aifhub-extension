@@ -170,10 +170,10 @@ const PREINITIALIZABLE_TOOLS = new Set([
   'codegraph',
   'graphify',
   'context7',
-  'context-mode',
   'repowise',
   'rohitg00-agentmemory'
 ]);
+const DEDICATED_HARNESS_ONLY_TOOLS = new Set(['context-mode']);
 const SELECTOR_COMMANDS = {
   installed: 'ai-factory aifhub-memory-tools select --from-project --command <skill> --json',
   'source-fallback': 'node scripts/memory-tool-recommender.mjs select --from-project --command <skill> --json'
@@ -390,7 +390,9 @@ export function buildAiTesterMatrixManifest(options = {}) {
   const profiles = asArray(options.profiles).map(sanitizeProfile);
   const skills = asArray(options.skills).length > 0 ? asArray(options.skills) : DEFAULT_SKILLS;
   const tools = asArray(options.tools).length > 0 ? asArray(options.tools) : OPTIONAL_TOOLS;
-  const preinitializeTools = asArray(options.preinitializeTools).filter((tool) => PREINITIALIZABLE_TOOLS.has(tool));
+  const requestedPreinitializeTools = asArray(options.preinitializeTools);
+  assertGenericPreinitializationAllowed(requestedPreinitializeTools);
+  const preinitializeTools = requestedPreinitializeTools.filter((tool) => PREINITIALIZABLE_TOOLS.has(tool));
   const taskScenarios = asArray(options.taskScenarios).length > 0
     ? asArray(options.taskScenarios)
     : DEFAULT_TASK_SCENARIOS;
@@ -569,6 +571,7 @@ export function renderAiTesterScenario(input = {}) {
   const fixturePath = input.fixture_path ?? '<sanitized-fixture>';
   const promptFile = input.system_prompt_file ?? '../system-prompt.md';
   const preinitializedToolIds = asArray(input.preinitialized_tool_ids);
+  assertGenericPreinitializationAllowed(preinitializedToolIds);
   const isCodeGraphPreinitialized = preinitializedToolIds.includes('codegraph');
   const isToolPrepared = preinitializedToolIds.includes(input.tool_id);
   const lines = [
@@ -1308,10 +1311,14 @@ function setupCommandsForTools(toolIds = []) {
   if (toolIds.includes('context7')) {
     commands.push('cmd.exe /c "cd project && npm install --prefix .ai-tester-tools/context7 ctx7"');
   }
-  if (toolIds.includes('context-mode')) {
-    commands.push('cmd.exe /d /s /c "echo dedicated_harness_required 1>&2 & exit /b 78"');
-  }
   return commands;
+}
+
+function assertGenericPreinitializationAllowed(toolIds = []) {
+  const dedicatedTool = asArray(toolIds).find((toolId) => DEDICATED_HARNESS_ONLY_TOOLS.has(toolId));
+  if (dedicatedTool) {
+    throw new Error(`${dedicatedTool.replaceAll('-', '_')}_requires_dedicated_harness`);
+  }
 }
 
 function preparedToolPromptLines(toolId) {

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // memory-tool-field-run.mjs - isolated field runner for optional memory/context tools
-import { execFile, spawn } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import {
   cp,
   lstat,
@@ -264,7 +264,7 @@ export function getToolPlan(scope = 'safe') {
     { id: 'repowise', fullInstall: false, role: 'repo_intelligence_cli' },
     { id: 'graphify', fullInstall: true, role: 'repo_graph_ast' },
     { id: 'context7', fullInstall: true, role: 'docs_lookup' },
-    { id: 'context-mode', fullInstall: true, role: 'temporary_output_index' },
+    { id: 'context-mode', fullInstall: false, role: 'dedicated_harness_only' },
     { id: 'codex-agent-mem', fullInstall: false, role: 'continuity_memory_probe' }
   ].filter((tool) => !REJECTED_FULL_INSTALL_IDS.has(tool.id));
 }
@@ -387,9 +387,7 @@ async function runRgBaseline(tool, runtime) {
       queries: queryResults
     });
   }
-  const result = { tool_id: tool.id, status: 'pass', profiles };
-  runtime.rgSummaryText = formatRgSummaryForIndex(result);
-  return result;
+  return { tool_id: tool.id, status: 'pass', profiles };
 }
 
 async function runGitGhProbe(tool, runtime) {
@@ -668,61 +666,6 @@ async function runCodexAgentMem(tool, runtime) {
     package: pyproject,
     notes: 'Python package source inspected from GitHub; PyPI registry package may be unavailable. No source indexing was run.'
   };
-}
-
-async function runContextModeIndexSmoke(entrypoint, runtime, dataDir) {
-  const content = runtime.rgSummaryText ?? '# Field run rg summary\nNo rg summary was available.';
-  const source = 'aifhub-field-run-rg-summary';
-  const result = {
-    attempted: true,
-    input_chars: content.length,
-    source,
-    index_passed: false,
-    search_passed: false,
-    purge_passed: false
-  };
-
-  const client = await createMcpStdioClient(process.execPath, [entrypoint], {
-    timeoutMs: Math.max(runtime.timeoutMs, 45000),
-    env: { CONTEXT_MODE_DIR: dataDir }
-  });
-
-  try {
-    const init = await client.request('initialize', {
-      protocolVersion: '2024-11-05',
-      capabilities: {},
-      clientInfo: { name: 'aifhub-memory-tool-field-run', version: '0.0.0' }
-    });
-    result.initialize_passed = !init.error;
-    client.notify('notifications/initialized', {});
-
-    const index = await client.request('tools/call', {
-      name: 'ctx_index',
-      arguments: { content, source }
-    });
-    result.index_passed = !index.error;
-    result.index_output_chars = JSON.stringify(index.result ?? index.error ?? {}).length;
-
-    const search = await client.request('tools/call', {
-      name: 'ctx_search',
-      arguments: { queries: ['architecture workflow'], limit: 2, source }
-    });
-    result.search_passed = !search.error;
-    result.search_output_chars = JSON.stringify(search.result ?? search.error ?? {}).length;
-
-    const purge = await client.request('tools/call', {
-      name: 'ctx_purge',
-      arguments: { confirm: true, scope: 'project' }
-    });
-    result.purge_passed = !purge.error;
-    result.purge_output_chars = JSON.stringify(purge.result ?? purge.error ?? {}).length;
-  } catch (err) {
-    result.error = err?.message ?? String(err);
-  } finally {
-    await client.close();
-  }
-
-  return result;
 }
 
 async function runContext7Lookup(cli, runtime) {
@@ -1235,111 +1178,12 @@ function splitLines(value) {
   return String(value ?? '').split(/\r?\n/).filter(Boolean);
 }
 
-function formatRgSummaryForIndex(rgResult) {
-  const lines = ['# Field run rg summary'];
-  for (const profile of rgResult.profiles ?? []) {
-    lines.push(`## ${profile.profile_id}`);
-    lines.push(`files: ${profile.file_count}`);
-    for (const query of profile.queries ?? []) {
-      lines.push(
-        `query=${query.query}; exit=${query.exit_code}; chars=${query.output_chars}; tokens=${query.token_estimate}`
-      );
-    }
-  }
-  return `${lines.join('\n')}\n`;
-}
-
 function firstLine(value) {
   return splitLines(value)[0] ?? null;
 }
 
 function elapsedMs(started) {
   return Math.round((performance.now() - started) * 10) / 10;
-}
-
-async function createMcpStdioClient(command, args, options = {}) {
-  const child = spawn(command, args, {
-    env: { ...process.env, ...(options.env ?? {}) },
-    stdio: ['pipe', 'pipe', 'pipe'],
-    windowsHide: true
-  });
-  const timeoutMs = options.timeoutMs ?? 30000;
-  let stdoutBuffer = '';
-  let stderrBuffer = '';
-  let nextId = 1;
-  const pending = new Map();
-
-  child.stdout.on('data', (chunk) => {
-    stdoutBuffer += chunk.toString();
-    let newline;
-    while ((newline = stdoutBuffer.indexOf('\n')) >= 0) {
-      const line = stdoutBuffer.slice(0, newline).trim();
-      stdoutBuffer = stdoutBuffer.slice(newline + 1);
-      if (!line) continue;
-      let message;
-      try {
-        message = JSON.parse(line);
-      } catch {
-        continue;
-      }
-      if (Object.hasOwn(message, 'id') && pending.has(message.id)) {
-        const waiter = pending.get(message.id);
-        clearTimeout(waiter.timer);
-        pending.delete(message.id);
-        waiter.resolve(message);
-      }
-    }
-  });
-
-  child.stderr.on('data', (chunk) => {
-    stderrBuffer = `${stderrBuffer}${chunk.toString()}`.slice(-4000);
-  });
-
-  child.on('error', (err) => rejectPending(err));
-  child.on('exit', (code) => {
-    if (pending.size > 0) {
-      rejectPending(new Error(`MCP server exited with code ${code}. ${firstLine(stderrBuffer) ?? ''}`));
-    }
-  });
-
-  function rejectPending(err) {
-    for (const [id, waiter] of pending.entries()) {
-      clearTimeout(waiter.timer);
-      pending.delete(id);
-      waiter.reject(err);
-    }
-  }
-
-  function writeMessage(message) {
-    child.stdin.write(`${JSON.stringify(message)}\n`);
-  }
-
-  return {
-    request(method, params = {}) {
-      const id = nextId;
-      nextId += 1;
-      return new Promise((resolve, reject) => {
-        const timer = setTimeout(() => {
-          pending.delete(id);
-          reject(new Error(`MCP request timed out: ${method}. ${firstLine(stderrBuffer) ?? ''}`));
-        }, timeoutMs);
-        pending.set(id, { resolve, reject, timer });
-        writeMessage({ jsonrpc: '2.0', id, method, params });
-      });
-    },
-    notify(method, params = {}) {
-      writeMessage({ jsonrpc: '2.0', method, params });
-    },
-    async close() {
-      for (const [id, waiter] of pending.entries()) {
-        clearTimeout(waiter.timer);
-        pending.delete(id);
-        waiter.reject(new Error('MCP client closed.'));
-      }
-      child.stdin.end();
-      if (!child.killed) child.kill();
-    }
-  };
 }
 
 function isDirectRun() {
