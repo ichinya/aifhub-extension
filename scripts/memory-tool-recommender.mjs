@@ -354,10 +354,8 @@ export async function buildRecommendationResult(options = {}) {
       manualGuidance.push(buildRecommendation(toolId, tool, {
         projectShape,
         taskSignals,
-        command,
         permission,
-        availability: 'unknown',
-        command: null
+        availability: 'unknown'
       }));
       continue;
     }
@@ -369,10 +367,8 @@ export async function buildRecommendationResult(options = {}) {
     recommendations.push(buildRecommendation(toolId, tool, {
       projectShape,
       taskSignals,
-      command,
       permission,
-      availability: probe.availability,
-      command: probe.command
+      availability: probe.availability
     }));
   }
 
@@ -410,6 +406,7 @@ export async function buildSelectionResult(options = {}) {
   const dimensionMatches = collectDimensionMatches(metadata, projectProfile);
   const selectedTools = [];
   const notSelectedTools = [];
+  const warnings = [...asArray(config.warnings)];
 
   for (const toolId of asArray(config.enabled_tools)) {
     const tool = metadata.tools?.[toolId];
@@ -430,6 +427,13 @@ export async function buildSelectionResult(options = {}) {
         reason: boundaryReason,
         permission
       });
+      if (tool.normal_command_selection === 'forbidden') {
+        warnings.push({
+          code: 'configured-tool-manual-guidance-only',
+          tool_id: toolId,
+          message: `${tool.display_name ?? toolId} is configured but normal command selection is forbidden; remove it from utilities.context_tools.enabled and use manual guidance only.`
+        });
+      }
       continue;
     }
 
@@ -459,10 +463,8 @@ export async function buildSelectionResult(options = {}) {
       ...buildRecommendation(toolId, tool, {
         projectShape,
         taskSignals,
-        command,
         permission,
-        availability: probe.availability,
-        command: probe.command
+        availability: probe.availability
       }),
       configured: true,
       execution: executionForTool(tool, command)
@@ -488,7 +490,7 @@ export async function buildSelectionResult(options = {}) {
     not_selected_tools: notSelectedTools,
     protected_artifacts: asArray(metadata.protected_artifacts),
     forbidden_operations: asArray(metadata.forbidden_operations),
-    warnings: asArray(config.warnings)
+    warnings
   };
 }
 

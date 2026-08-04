@@ -271,6 +271,36 @@ describe('ai-tester matrix manifest', () => {
       assert.doesNotMatch(stdout.join(''), /\bat\s+runMemoryToolAiTesterMatrix\b|Error:/);
       await assert.rejects(stat(outDir));
     }
+
+    const catalogStdout = [];
+    const catalogOutDir = path.join(tmpDir, 'forbidden-catalog-scenario');
+    const catalogResult = await runMemoryToolAiTesterMatrix([
+      '--roots',
+      tmpDir,
+      '--out',
+      catalogOutDir,
+      '--metadata',
+      REAL_METADATA,
+      '--scenario-catalog',
+      REAL_CATALOG,
+      '--scenario-id',
+      'generated-output-compression',
+      '--max-profiles',
+      '1',
+      '--dry-run'
+    ], {
+      cwd: REPO_ROOT,
+      stdout: catalogStdout,
+      exit: false
+    });
+    assert.equal(catalogResult.exitCode, 2);
+    assert.equal(catalogResult.body.schema, AI_TESTER_MATRIX_SCHEMA);
+    assert.equal(catalogResult.body.status, 'NOT_RUN');
+    assert.equal(catalogResult.body.reason, 'context_mode_requires_dedicated_harness');
+    assert.equal(catalogResult.body.tool_id, 'context-mode');
+    assert.match(catalogResult.body.dedicated_harness, /context-mode-codex-ai-tester-matrix\.mjs$/);
+    assert.doesNotMatch(catalogStdout.join(''), /\bat\s+runMemoryToolAiTesterMatrix\b|Error:/);
+    await assert.rejects(stat(catalogOutDir));
   });
 
   it('generates catalog-driven accepted-evidence pairs with scenario metadata', async () => {

@@ -152,7 +152,7 @@ ai-factory aifhub-memory-tools labels --from-project --json
 
 `labels` возвращает `available_labels`, `project_profile`, `selected_labels`, `matched_dimension_signals` и краткий `evidence` по выбранным labels. После этого `/aif-analyze` выбирает task signals из запроса и запускает `recommend` с явными labels из `project_profile`; `recommend --from-project` остается shortcut для диагностики и совместимости, но не основной flow анализа.
 
-`recommendations` содержит только tools, которые можно предложить пользователю для enablement. Отдельный `manual_guidance` содержит non-configurable guidance: записи с `normal_command_selection: forbidden` и `configuration_policy: do_not_enable` не probe-ятся, не предлагаются для enablement и никогда не записываются в `utilities.context_tools.enabled`.
+`recommendations` содержит только tools, которые можно предложить пользователю для enablement. Отдельный `manual_guidance` содержит non-configurable guidance: записи с `normal_command_selection: forbidden` и `configuration_policy: do_not_enable` не probe-ятся, не предлагаются для enablement и никогда не записываются в `utilities.context_tools.enabled`. Если legacy config всё ещё содержит такой tool, `select` оставляет его в `not_selected_tools` и возвращает warning `configured-tool-manual-guidance-only` с инструкцией удалить запись; config автоматически не переписывается.
 
 Затем `/aif-analyze` спрашивает пользователя, какие рекомендации включить, и сохраняет accepted tool ids в config:
 

@@ -324,6 +324,7 @@ export async function runMcpContract({ artifact, invokeTool, hashContent = sha25
       schema: CONTEXT_MODE_ADAPTER_SCHEMA,
       status: 'FAIL',
       reason: 'provider_purge_failed',
+      ...(failedStage ? { stage_reason: failedStage } : {}),
       evidence_class: 'direct_mcp_contract',
       timings: durations
     };
@@ -349,6 +350,7 @@ export async function runMcpContract({ artifact, invokeTool, hashContent = sha25
       schema: CONTEXT_MODE_ADAPTER_SCHEMA,
       status: 'FAIL',
       reason: 'post_purge_probe_failed',
+      ...(failedStage ? { stage_reason: failedStage } : {}),
       evidence_class: 'direct_mcp_contract',
       timings: durations
     };
@@ -358,6 +360,7 @@ export async function runMcpContract({ artifact, invokeTool, hashContent = sha25
       schema: CONTEXT_MODE_ADAPTER_SCHEMA,
       status: 'FAIL',
       reason: 'provider_purge_residual',
+      ...(failedStage ? { stage_reason: failedStage } : {}),
       evidence_class: 'direct_mcp_contract',
       timings: durations
     };
@@ -1013,7 +1016,7 @@ export async function runBoundedProcess(command, args, {
       await terminateProcessTree(child.pid);
       reject(adapterError('process_spawn_failed'));
     });
-    child.once('exit', (exitCode, signal) => {
+    child.once('close', (exitCode, signal) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);

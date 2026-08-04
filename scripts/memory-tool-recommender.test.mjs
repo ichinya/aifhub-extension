@@ -425,6 +425,17 @@ describe('recommendation results', () => {
     assert.equal(probes, 0);
   });
 
+  it('does not pass duplicate command fields to recommendation builders', async () => {
+    const source = await readFile(path.join(REPO_ROOT, 'scripts', 'memory-tool-recommender.mjs'), 'utf8');
+    const builderContexts = [...source.matchAll(/buildRecommendation\(toolId, tool, \{([\s\S]*?)\}\)/g)]
+      .map((match) => match[1]);
+
+    assert.ok(builderContexts.length >= 3);
+    for (const context of builderContexts) {
+      assert.doesNotMatch(context, /^\s*command(?:\s*:|,)/m);
+    }
+  });
+
   it('keeps context-mode recommendation-only even when project config enables it', async () => {
     const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
     let probes = 0;
@@ -447,6 +458,11 @@ describe('recommendation results', () => {
     assert.deepEqual(result.selected_tools, []);
     assert.equal(result.not_selected_tools[0].tool_id, 'context-mode');
     assert.match(result.not_selected_tools[0].reason, /normal command selection is forbidden/i);
+    assert.deepEqual(result.warnings, [{
+      code: 'configured-tool-manual-guidance-only',
+      tool_id: 'context-mode',
+      message: 'context-mode is configured but normal command selection is forbidden; remove it from utilities.context_tools.enabled and use manual guidance only.'
+    }]);
     assert.equal(probes, 0);
   });
 
@@ -890,6 +906,14 @@ describe('recommendation results', () => {
     assert.deepEqual(selectedIds, ['context7']);
     assert.equal(result.body.selected_tools[0].permission, 'read_existing_reviewed_output');
     assert.equal(result.body.selected_tools.some((item) => item.permission === 'forbidden'), false);
+    assert.deepEqual(
+      result.body.warnings.filter((warning) => warning.code === 'configured-tool-manual-guidance-only'),
+      [{
+        code: 'configured-tool-manual-guidance-only',
+        tool_id: 'context-mode',
+        message: 'context-mode is configured but normal command selection is forbidden; remove it from utilities.context_tools.enabled and use manual guidance only.'
+      }]
+    );
 
     for (const toolId of ['codegraph', 'codex-agent-mem', 'context-mode']) {
       assert.equal(

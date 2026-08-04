@@ -162,6 +162,7 @@ Recommendation rules:
 - The final analysis response must include a concise optional tool block with `Project labels`, `Recommended tools`, `Manual guidance`, and `Do not use` sections. `Project labels` must include languages, volume, complexity, repo shape, artifact mode, project shape, task signals, and matched dimension signals when present.
 - Ask the user which entries from `recommendations` to enable. Write only accepted tool ids from that array to `utilities.context_tools.enabled`; do not enable a tool just because it was recommended.
 - Treat `manual_guidance` entries with `normal_command_selection: forbidden` and `configuration_policy: do_not_enable` as recommendation-only manual guidance. Do not probe them, offer them for enablement, or write them to `utilities.context_tools.enabled`.
+- Surface `configured-tool-manual-guidance-only` selector warnings to the user. Ask them to remove the legacy tool id from `utilities.context_tools.enabled`; do not rewrite config without approval.
 - After config is updated, follow-on skills should call `ai-factory aifhub-memory-tools select --from-project --command <skill> --json` and use only `selected_tools`. Do not hard-code provider-specific tool lists into follow-on skills.
 - Never auto-install, run setup, start MCP, register MCP, index source, sync memory, install hooks, start background daemons, or persist provider output.
 - Provider output is supporting context only, never canonical OpenSpec evidence.

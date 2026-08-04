@@ -210,19 +210,10 @@ export async function runMemoryToolAiTesterMatrix(args = [], options = {}) {
     ...parsed.preinitializeTools
   ]);
   if (dedicatedTool) {
-    return emit({
-      schema: AI_TESTER_MATRIX_SCHEMA,
-      status: 'NOT_RUN',
-      reason: `${dedicatedTool.replaceAll('-', '_')}_requires_dedicated_harness`,
-      tool_id: dedicatedTool,
-      dedicated_harness: 'scripts/context-mode-codex-ai-tester-matrix.mjs'
-    }, 2, options);
+    return emitDedicatedHarnessNotRun(dedicatedTool, options);
   }
 
   const cwd = path.resolve(options.cwd ?? process.cwd());
-  const outDir = path.resolve(cwd, parsed.out ?? await mkdtemp(path.join(os.tmpdir(), 'aifhub-ai-tester-matrix-')));
-  await mkdir(outDir, { recursive: true });
-
   const metadata = await loadRecommendationMetadata({
     metadataPath: parsed.metadata,
     cwd
@@ -232,6 +223,13 @@ export async function runMemoryToolAiTesterMatrix(args = [], options = {}) {
     metadata,
     cwd
   });
+  const catalogDedicatedTool = findDedicatedOnlyCatalogTool(scenarioCatalog, parsed);
+  if (catalogDedicatedTool) {
+    return emitDedicatedHarnessNotRun(catalogDedicatedTool, options);
+  }
+
+  const outDir = path.resolve(cwd, parsed.out ?? await mkdtemp(path.join(os.tmpdir(), 'aifhub-ai-tester-matrix-')));
+  await mkdir(outDir, { recursive: true });
   const matrixStrategy = resolveMatrixStrategy({ parsed, metadata });
   const rootInputs = parsed.roots.length > 0 ? parsed.roots : [cwd];
   const profiles = await discoverMatrixProfiles(rootInputs, {
@@ -1326,6 +1324,33 @@ function setupCommandsForTools(toolIds = []) {
 
 function findDedicatedHarnessTool(toolIds = []) {
   return asArray(toolIds).find((toolId) => DEDICATED_HARNESS_ONLY_TOOLS.has(toolId)) ?? null;
+}
+
+function findDedicatedOnlyCatalogTool(scenarioCatalog, parsed = {}) {
+  if (!scenarioCatalog || asArray(parsed.scenarioIds).length === 0 || asArray(parsed.tools).length > 0) {
+    return null;
+  }
+  const entries = filterScenarioCatalogEntries(scenarioCatalog, {
+    scenarioIds: parsed.scenarioIds,
+    runClasses: parsed.runClasses,
+    skills: parsed.skills,
+    taskScenarios: parsed.tasks
+  });
+  const candidateTools = unique(entries.flatMap((scenario) => asArray(scenario.tools)));
+  if (candidateTools.length === 0 || !candidateTools.every((toolId) => DEDICATED_HARNESS_ONLY_TOOLS.has(toolId))) {
+    return null;
+  }
+  return candidateTools[0];
+}
+
+function emitDedicatedHarnessNotRun(toolId, options) {
+  return emit({
+    schema: AI_TESTER_MATRIX_SCHEMA,
+    status: 'NOT_RUN',
+    reason: `${toolId.replaceAll('-', '_')}_requires_dedicated_harness`,
+    tool_id: toolId,
+    dedicated_harness: 'scripts/context-mode-codex-ai-tester-matrix.mjs'
+  }, 2, options);
 }
 
 function assertGenericRouteAllowed(toolIds = []) {

@@ -135,6 +135,26 @@ describe('context-mode sandbox and lifecycle boundary', () => {
     );
   });
 
+  it('waits for inherited stdio to close before returning bounded output', async () => {
+    const parentScript = [
+      "const { spawn } = require('node:child_process');",
+      `const child = spawn(${JSON.stringify(process.execPath)}, ['-e', 'setTimeout(() => process.stdout.write("late-output"), 100)'], {`,
+      "  stdio: ['ignore', 'inherit', 'inherit'],",
+      '  windowsHide: true,',
+      '  detached: true',
+      '});',
+      'child.unref();'
+    ].join('\n');
+    const result = await runBoundedProcess(process.execPath, ['-e', parentScript], {
+      cwd: tempDir,
+      env: process.env,
+      timeoutMs: 3_000
+    });
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.stdout, 'late-output');
+  });
+
   it('keeps mutable roots under the sandbox and drops unknown credentials', () => {
     const layout = buildSandboxLayout(tempDir);
     const env = buildContextModeEnv({
@@ -333,6 +353,53 @@ describe('context-mode sandbox and lifecycle boundary', () => {
     });
     assert.equal(result.status, 'FAIL');
     assert.equal(result.reason, 'post_purge_probe_failed');
+  });
+
+  it('preserves the primary MCP stage reason when cleanup evidence also fails', async () => {
+    const artifact = {
+      name: 'generated-output.txt',
+      content: 'synthetic output north=17',
+      sha256: 'expected',
+      search_query: 'required facts',
+      required_facts: ['north=17']
+    };
+    const purgeFailure = await runMcpContract({
+      artifact,
+      invokeTool: async (name) => {
+        if (name === 'ctx_doctor') return { content: [], isError: true };
+        if (name === 'ctx_purge') return mcpText('Purge unavailable');
+        throw new Error('unexpected tool call');
+      },
+      hashContent: () => 'expected'
+    });
+    assert.equal(purgeFailure.reason, 'provider_purge_failed');
+    assert.equal(purgeFailure.stage_reason, 'ctx_doctor_contract_failed');
+
+    const postPurgeFailure = await runMcpContract({
+      artifact,
+      invokeTool: async (name) => {
+        if (name === 'ctx_doctor') return { content: [], isError: true };
+        if (name === 'ctx_purge') return mcpText('Purged: project');
+        throw new Error('post-purge probe unavailable');
+      },
+      hashContent: () => 'expected'
+    });
+    assert.equal(postPurgeFailure.reason, 'post_purge_probe_failed');
+    assert.equal(postPurgeFailure.stage_reason, 'ctx_doctor_contract_failed');
+
+    const residualFailure = await runMcpContract({
+      artifact,
+      invokeTool: async (name) => {
+        if (name === 'ctx_doctor') return { content: [], isError: true };
+        if (name === 'ctx_purge') return mcpText('Purged: project');
+        if (name === 'ctx_search') return mcpText('generated-output.txt\nnorth=17');
+        if (name === 'ctx_stats') return mcpText('Indexed artifacts: 1');
+        throw new Error('unexpected tool call');
+      },
+      hashContent: () => 'expected'
+    });
+    assert.equal(residualFailure.reason, 'provider_purge_residual');
+    assert.equal(residualFailure.stage_reason, 'ctx_doctor_contract_failed');
   });
 
   it('binds recursive cleanup to an explicit owner and runs it after PASS, FAIL and timeout', async () => {
