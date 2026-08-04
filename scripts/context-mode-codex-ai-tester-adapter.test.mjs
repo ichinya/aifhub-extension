@@ -362,6 +362,7 @@ describe('context-mode sandbox and lifecycle boundary', () => {
       reason: 'native_codex_executable_required'
     });
     assert.equal(validateNativeCodexExecutable('C:/tools/codex.exe', { platform: 'win32' }).status, 'PASS');
+    assert.equal(validateNativeCodexExecutable('/usr/local/bin/codex', { platform: 'linux' }).status, 'PASS');
 
     const layout = buildSandboxLayout(tempDir);
     const plan = buildActualPluginPlan({

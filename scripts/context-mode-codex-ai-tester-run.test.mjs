@@ -23,6 +23,7 @@ afterEach(async () => {
 
 describe('context-mode dedicated runner', () => {
   it('rejects PATH ambiguity, dirty source and mismatched binary provenance', () => {
+    const executable = path.join(tempDir, 'ai-tester');
     assert.equal(validateRunnerProvenance({
       executable: 'ai-tester',
       source_clean: true,
@@ -32,7 +33,7 @@ describe('context-mode dedicated runner', () => {
       expected_binary_sha256: 'a'
     }).reason, 'explicit_executable_required');
     assert.equal(validateRunnerProvenance({
-      executable: 'C:/tools/ai-tester.exe',
+      executable,
       source_clean: false,
       source_commit: 'expected',
       expected_source_commit: 'expected',
@@ -40,7 +41,7 @@ describe('context-mode dedicated runner', () => {
       expected_binary_sha256: 'a'
     }).reason, 'runner_source_dirty');
     assert.equal(validateRunnerProvenance({
-      executable: 'C:/tools/ai-tester.exe',
+      executable,
       source_clean: true,
       source_commit: 'expected',
       expected_source_commit: 'expected',
@@ -51,15 +52,18 @@ describe('context-mode dedicated runner', () => {
 
   it('runs only missing rows after a mandatory dry-run', () => {
     const rows = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+    const executable = path.join(tempDir, 'ai-tester');
+    const scenarioFile = path.join(tempDir, 'sandbox', 'scenarios', 'a.yaml');
+    const runRoot = path.join(tempDir, 'sandbox', 'runs');
     assert.deepEqual(planMissingRows(rows, new Set(['b'])).map((row) => row.id), ['a', 'c']);
     const invocation = buildRunnerInvocation({
-      executable: 'C:/tools/ai-tester.exe',
-      scenarioFile: 'C:/sandbox/scenarios/a.yaml',
-      runRoot: 'C:/sandbox/runs',
+      executable,
+      scenarioFile,
+      runRoot,
       row: { id: 'a', model: 'gpt-5.6-luna', reasoning: 'low' },
       dryRun: true
     });
-    assert.equal(invocation.command, 'C:/tools/ai-tester.exe');
+    assert.equal(invocation.command, executable);
     assert.ok(invocation.args.includes('--dry-run'));
     assert.ok(invocation.args.includes('gpt-5.6-luna'));
     assert.ok(invocation.args.includes('low'));
@@ -72,8 +76,10 @@ describe('context-mode dedicated runner', () => {
 
   it('does not execute when provenance or low-reasoning proof is unavailable', async () => {
     let calls = 0;
+    const executable = path.join(tempDir, 'ai-tester');
+    const sandboxRoot = path.join(tempDir, 'sandbox');
     const dirty = {
-      executable: 'C:/tools/ai-tester.exe',
+      executable,
       source_clean: false,
       source_commit: 'expected',
       expected_source_commit: 'expected',
@@ -82,15 +88,15 @@ describe('context-mode dedicated runner', () => {
     };
     const result = await runVerifiedMatrix({
       matrix: { rows: [{ id: 'a', model: 'gpt-5.6-luna', reasoning: 'low' }] },
-      sourceRoot: 'C:/tools/source',
+      sourceRoot: path.join(tempDir, 'source'),
       expectedSourceCommit: 'expected',
       expectedBinarySha256: 'a',
       inspectProvenance: async () => dirty,
       profileProof: { status: 'PASS' },
-      sandboxRoot: 'C:/sandbox',
-      scenarioRoot: 'C:/sandbox/scenarios',
-      runRoot: 'C:/sandbox/runs',
-      executable: 'C:/tools/ai-tester.exe',
+      sandboxRoot,
+      scenarioRoot: path.join(sandboxRoot, 'scenarios'),
+      runRoot: path.join(sandboxRoot, 'runs'),
+      executable,
       runProcess: async () => { calls += 1; return { exitCode: 0 }; }
     });
     assert.equal(result.reason, 'runner_source_dirty');

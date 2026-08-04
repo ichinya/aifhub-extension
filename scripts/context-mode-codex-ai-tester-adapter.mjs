@@ -410,10 +410,11 @@ export function parseCodexFeatureList(output) {
 
 export function validateNativeCodexExecutable(command, { platform = process.platform } = {}) {
   const executable = String(command ?? '');
-  if (!path.isAbsolute(executable)) {
+  const pathApi = platform === 'win32' ? path.win32 : path.posix;
+  if (!pathApi.isAbsolute(executable)) {
     return { status: 'NOT_RUN', reason: 'native_codex_executable_required' };
   }
-  const extension = path.extname(executable).toLowerCase();
+  const extension = pathApi.extname(executable).toLowerCase();
   if ((platform === 'win32' && extension !== '.exe') || ['.cmd', '.bat'].includes(extension)) {
     return { status: 'NOT_RUN', reason: 'native_codex_executable_required' };
   }
