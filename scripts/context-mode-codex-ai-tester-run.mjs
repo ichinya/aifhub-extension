@@ -633,7 +633,8 @@ function invalidRawProviderAudit(recordCount) {
     tool_counts: {},
     required_tools_present: false,
     forbidden_tools_absent: false,
-    paths_confined: false
+    paths_confined: false,
+    commands_allowed: false
   };
 }
 

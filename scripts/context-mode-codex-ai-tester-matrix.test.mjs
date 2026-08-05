@@ -302,6 +302,14 @@ describe('context-mode three-way matrix', () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  it('canonicalizes the wrapper directory before excluding it from PATH fallback', () => {
+    const wrapper = buildCodexReasoningWrapper({ realCodex: '__PATH_AFTER_WRAPPER__' });
+    assert.match(
+      wrapper,
+      /const own = path\.resolve\(path\.dirname\(process\.argv\[1\]\)\)\.toLowerCase\(\);/
+    );
+  });
 });
 
 function escapeRegex(value) {

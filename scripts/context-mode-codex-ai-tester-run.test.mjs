@@ -337,6 +337,39 @@ describe('context-mode dedicated runner', () => {
     assert.doesNotMatch(JSON.stringify(result), /provider-pass|rollout\.jsonl|generated-output/);
   });
 
+  it('keeps malformed raw-provider audit results shape-compatible with normal audits', async () => {
+    let calls = 0;
+    const options = await runnerOptions({
+      runProcess: async () => {
+        calls += 1;
+        if (calls === 2) {
+          const tracePath = path.join(tempDir, 'sandbox', 'runs', 'inline', 'provider-malformed.json');
+          const rolloutPath = path.join(tempDir, 'sandbox', 'codex-home', 'sessions', 'run', 'rollout.jsonl');
+          await mkdir(path.dirname(tracePath), { recursive: true });
+          await mkdir(path.dirname(rolloutPath), { recursive: true });
+          await writeFile(tracePath, JSON.stringify(validTrace('row-a')), 'utf8');
+          await writeFile(rolloutPath, '{malformed-json}\n', 'utf8');
+        }
+        return { exitCode: 0 };
+      }
+    });
+    Object.assign(options.matrix.rows[0], {
+      variant: 'mcp_only',
+      execution_gate: { status: 'PASS', reason: 'explicit_isolated_authorization' },
+      raw_provider_policy: {
+        required_tools: ['ctx_search'],
+        allowed_tools: ['ctx_search'],
+        allowed_commands: []
+      }
+    });
+    options.provisionRow = async () => ({ status: 'PASS' });
+
+    const result = await runVerifiedMatrix(options);
+    assert.equal(result.status, 'NOT_RUN');
+    assert.equal(result.statuses[0].reason, 'raw_provider_audit_invalid');
+    assert.equal(result.statuses[0].provider_audit.commands_allowed, false);
+  });
+
   it('audits only records appended by the current provider row', async () => {
     let calls = 0;
     const options = await runnerOptions({

@@ -413,7 +413,7 @@ export function buildCodexReasoningWrapper({ realCodex }) {
     "const result = spawnSync(executable, args, { stdio: 'inherit', env: process.env });",
     "process.exit(result.status ?? 1);",
     "function findRealCodex() {",
-    "  const own = path.dirname(process.argv[1]).toLowerCase();",
+    "  const own = path.resolve(path.dirname(process.argv[1])).toLowerCase();",
     "  const dirs = String(process.env.PATH ?? process.env.Path ?? '').split(path.delimiter).filter((dir) => path.resolve(dir).toLowerCase() !== own);",
     "  for (const suffix of process.platform === 'win32' ? ['codex.exe', 'codex.cmd'] : ['codex']) {",
     "    for (const dir of dirs) { const candidate = path.join(dir, suffix); if (existsSync(candidate)) return candidate; }",

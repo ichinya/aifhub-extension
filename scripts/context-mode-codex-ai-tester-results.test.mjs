@@ -369,6 +369,22 @@ describe('context-mode triad decisions', () => {
     assert.equal(report.plugin_outcome, 'forbid');
   });
 
+  it('avoids a correctness-only failure while reserving forbid for safety vetoes', () => {
+    const report = buildContextModeResults([
+      safeRow('baseline'),
+      safeRow('mcp_only'),
+      {
+        ...safeRow('codex_plugin'),
+        status: 'FAIL',
+        reason: 'assertion_failed',
+        correctness_pass: false
+      }
+    ]);
+
+    assert.equal(report.triads[0].plugin_decision, 'avoid');
+    assert.equal(report.plugin_outcome, 'avoid');
+  });
+
   it('keeps missing actual plugin lifecycle as NOT_RUN rather than simulated evidence', () => {
     const report = buildContextModeResults([
       safeRow('baseline'),

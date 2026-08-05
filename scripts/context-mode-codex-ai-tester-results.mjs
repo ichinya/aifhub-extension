@@ -394,9 +394,15 @@ function decideCandidate(baseline, candidate, { positive, symmetric }) {
   if (!baseline || baseline.status !== 'PASS') return 'NOT_RUN';
   if (!symmetric) return 'avoid';
   if (candidate.status === 'BLOCKED') return 'forbid';
-  if (candidate.status !== 'PASS' || candidate.privacy_pass === false ||
-      candidate.purge_pass === false || candidate.cleanup_pass === false) {
+  if (candidate.privacy_pass === false || candidate.purge_pass === false ||
+      candidate.cleanup_pass === false) {
     return 'forbid';
+  }
+  if (candidate.status !== 'PASS') {
+    const lifecyclePassed = candidate.privacy_pass === true && candidate.purge_pass === true &&
+      candidate.cleanup_pass === true;
+    const qualityFailed = candidate.correctness_pass === false || candidate.continuity_pass === false;
+    return lifecyclePassed && qualityFailed ? 'avoid' : 'forbid';
   }
   if (candidate.correctness_pass !== true || candidate.continuity_pass === false) return 'avoid';
   return positive;
