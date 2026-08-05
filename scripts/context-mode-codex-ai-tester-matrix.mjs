@@ -129,15 +129,18 @@ export function buildContextModeMatrix({
   if (!/^[a-z0-9][a-z0-9-]*$/.test(String(runId ?? ''))) throw matrixError('invalid_run_id');
   const rows = [];
   for (const scenario of catalog.scenarios) {
+    const resumeDriverParity = scenario.resume_driver_parity === true;
     for (let repetition = 1; repetition <= catalog.defaults.repetitions; repetition += 1) {
       const triadId = `${runId}__${scenario.id}__r${String(repetition).padStart(2, '0')}`;
       const settings = {
         fixture_revision: catalog.fixture.revision,
+        fixture_artifact: catalog.fixture.artifact,
         fixture_profile: scenario.fixture_profile ?? 'standard',
         fixture_profile_config: catalog.fixture.profiles[scenario.fixture_profile ?? 'standard'],
         prompts: scenario.prompts,
         assertions: scenario.assertions,
         session_mode: scenario.session_mode ?? 'same_thread',
+        resume_driver_parity: resumeDriverParity,
         lifecycle_assertions: scenario.lifecycle_assertions ?? [],
         timeout_ms: catalog.defaults.timeout_ms,
         runtime: catalog.defaults.runtime,
@@ -171,7 +174,7 @@ export function buildContextModeMatrix({
           prompts: [...scenario.prompts],
           assertions: structuredClone(scenario.assertions),
           session_mode: scenario.session_mode ?? 'same_thread',
-          resume_driver_parity: scenario.resume_driver_parity === true,
+          resume_driver_parity: resumeDriverParity,
           lifecycle_assertions: [...(scenario.lifecycle_assertions ?? [])],
           execution_gate: executionGateForVariant(variant, normalizedAuthorization),
           authorization_class: normalizedAuthorization.class,
@@ -229,6 +232,7 @@ export function renderAiTesterScenario(row) {
     .map((assertion) => `  - id: ${quoteYaml(assertion.id)}\n    type: ${assertion.type}\n    pattern: ${quoteYaml(assertion.pattern)}`)
     .join('\n');
   const systemPrompt = systemPromptForVariant(row.variant, row);
+  const fixtureArtifact = projectFixturePath(row);
   const fixtureLines = ['  files_committed:'];
   if (row.fixture_profile_config?.kind === 'generated_stdout') {
     fixtureLines.push(
@@ -237,7 +241,7 @@ export function renderAiTesterScenario(row) {
     );
   } else {
     fixtureLines.push(
-      '    - path: "project/generated-output.txt"',
+      `    - path: ${quoteYaml(fixtureArtifact)}`,
       `      content: ${quoteYaml(row.fixture_seed)}`
     );
   }
@@ -315,10 +319,11 @@ function systemPromptForVariant(variant, row) {
     'Return only the requested facts in the exact requested format.'
   ];
   const largeOutput = row.scenario_id === 'large_generated_output_retrieval';
+  const fixtureArtifact = projectFixturePath(row);
   if (variant === 'baseline') {
     return [...shared, largeOutput
       ? 'Run node project/emit-large-output.mjs through the shell. Do not inspect the emitter source or use context-mode.'
-      : 'Use rg directly against project/generated-output.txt. Do not use context-mode.'];
+      : `Use rg directly against ${fixtureArtifact}. Do not use context-mode.`];
   }
   if (variant === 'mcp_only') {
     return [
@@ -326,7 +331,7 @@ function systemPromptForVariant(variant, row) {
       largeOutput
         ? 'Use only evaluation-scoped ctx_batch_execute for node project/emit-large-output.mjs, query the indexed output, then purge project scope.'
         : 'Use only the isolated context_mode MCP tools for the generated artifact.',
-      ...(largeOutput ? [] : ['Index only project/generated-output.txt, query it, then purge project scope.'])
+      ...(largeOutput ? [] : [`Index only ${fixtureArtifact}, query it, then purge project scope.`])
     ];
   }
   return [
@@ -524,10 +529,15 @@ function sameArray(actual, expected) {
 
 function isSafeRelativeFile(value) {
   const raw = String(value ?? '');
-  return raw.length > 0 &&
+  return /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(raw) &&
     path.basename(raw) === raw &&
     !path.isAbsolute(raw) &&
     !/^[A-Za-z][A-Za-z0-9+.-]*:/.test(raw);
+}
+
+function projectFixturePath(row) {
+  if (!isSafeRelativeFile(row?.fixture_artifact)) throw matrixError('invalid_fixture_artifact');
+  return path.posix.join('project', row.fixture_artifact);
 }
 
 function looksPrivate(value) {

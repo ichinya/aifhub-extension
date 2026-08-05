@@ -51,10 +51,10 @@ export function normalizeContextModeTrace(record = {}) {
     settings_fingerprint: record.settings_fingerprint,
     correctness_pass: status === 'PASS' && record.scoring?.overall_pass === true && recovered === required,
     fact_coverage: required === null || recovered === null ? null : recovered / required,
-    privacy_pass: record.lifecycle?.privacy === true,
-    purge_pass: record.lifecycle?.purge === true,
-    cleanup_pass: record.lifecycle?.cleanup === true,
-    continuity_pass: record.lifecycle?.continuity === true,
+    privacy_pass: booleanOrNull(record.lifecycle?.privacy),
+    purge_pass: booleanOrNull(record.lifecycle?.purge),
+    cleanup_pass: booleanOrNull(record.lifecycle?.cleanup),
+    continuity_pass: booleanOrNull(record.lifecycle?.continuity),
     evidence_class: record.evidence_class,
     cost,
     tool_calls: turns.reduce(
@@ -86,9 +86,9 @@ export function scanCompleteTrace(record, {
       matchCount += matches.length;
     }
   }
-  const absoluteMatches = scanText.match(
-    /(?:[A-Za-z]:\\(?:Users|projects|Temp)\\|\/(?:Users|home|tmp)\/)[^"'\s]*/gi
-  ) ?? [];
+  const absoluteMatches = [...new Set(
+    collectStringValues(record).flatMap((value) => embeddedAbsolutePaths(value))
+  )];
   const unsafeAbsoluteMatches = absoluteMatches.filter((candidate) =>
     !allowedAbsoluteRoots.some((root) => pathValueStaysConfined(candidate, root))
   );
@@ -240,14 +240,15 @@ function commandValueAllowed(value, allowedCommands) {
   const normalized = typeof value === 'string' ? value : tokens.join(' ');
   if (!allowedCommands.has(normalized)) return false;
   if (/[\r\n;&|<>`$]/.test(normalized)) return false;
-  if (!/^(?:node|node\.exe)$/i.test(tokens[0] ?? '')) return false;
   return tokens.slice(1).every((rawToken) => !/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(rawToken));
 }
 
 function commandPathsStayConfined(value, sandboxRoot) {
   const tokens = normalizeCommandTokens(value);
   if (!tokens) return false;
-  return tokens.slice(1).every((rawToken) => {
+  const [rawExecutable, ...rawArguments] = tokens;
+  if (!executableTokenStaysConfined(rawExecutable, sandboxRoot)) return false;
+  return rawArguments.every((rawToken) => {
     const token = rawToken.replace(/^(?:"([\s\S]*)"|'([\s\S]*)')$/, '$1$2');
     if (!token || token.startsWith('-')) return true;
     if (/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(token)) return false;
@@ -255,6 +256,16 @@ function commandPathsStayConfined(value, sandboxRoot) {
     if (!/[\\/]/.test(token) && !/\.[A-Za-z0-9]+$/.test(token)) return true;
     return pathValueStaysConfined(token, sandboxRoot);
   });
+}
+
+function executableTokenStaysConfined(rawToken, sandboxRoot) {
+  const token = rawToken.replace(/^(?:"([\s\S]*)"|'([\s\S]*)')$/, '$1$2');
+  if (!token || token.startsWith('-') || token === '.' || token === '..' ||
+      /^[A-Za-z_][A-Za-z0-9_]*=/.test(token)) return false;
+  if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(token) && !path.win32.isAbsolute(token)) return false;
+  if (!/[\\/]/.test(token)) return /^[A-Za-z0-9][A-Za-z0-9_.+-]*$/.test(token);
+  if (/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(token)) return false;
+  return pathValueStaysConfined(token, sandboxRoot);
 }
 
 function argumentsHaveValidCommandShapes(value, key = '') {
@@ -285,13 +296,46 @@ function normalizeCommandTokens(value) {
 
 function embeddedAbsolutePaths(value) {
   const matches = [];
-  for (const match of value.matchAll(/[A-Za-z]:[\\/][^\s"'`;,\])}]+/g)) {
-    matches.push(match[0]);
+  for (const match of value.matchAll(/(?:^|[\s"'`=(:,])([A-Za-z]:[\\/](?![\\/])[^\s"'`;,\])}]+)/g)) {
+    matches.push(match[1]);
+  }
+  for (const match of value.matchAll(/(?:^|[\s"'`=(:,])(\\\\\?\\[A-Za-z]:\\[^\s"'`;,\])}]+)/g)) {
+    matches.push(match[1]);
+  }
+  for (const match of value.matchAll(/(?:^|[\s"'`=(:,])(\\\\(?!\?\\)[^\\/\s"'`;,\])}]+[\\/][^\s"'`;,\])}]+)/g)) {
+    matches.push(match[1]);
+  }
+  for (const match of value.matchAll(/\bfile:\/\/[^\s"'`;,\])}]+/gi)) {
+    const filePath = fileUriPath(match[0]);
+    if (filePath) matches.push(filePath);
   }
   for (const match of value.matchAll(/(?:^|[\s"'`=(:,])((?:\/(?!\/)[^\s"'`;,\])}]+)+)/g)) {
     matches.push(match[1]);
   }
   return matches;
+}
+
+function fileUriPath(value) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'file:') return null;
+    const pathname = decodeURIComponent(url.pathname);
+    if (url.hostname) return `\\\\${url.hostname}${pathname.replaceAll('/', '\\')}`;
+    return /^\/[A-Za-z]:\//.test(pathname) ? pathname.slice(1) : pathname;
+  } catch {
+    return null;
+  }
+}
+
+function collectStringValues(value, values = [], seen = new Set()) {
+  if (typeof value === 'string') {
+    values.push(value);
+    return values;
+  }
+  if (!value || typeof value !== 'object' || seen.has(value)) return values;
+  seen.add(value);
+  for (const child of Object.values(value)) collectStringValues(child, values, seen);
+  return values;
 }
 
 function pathValueStaysConfined(value, sandboxRoot) {
@@ -391,7 +435,7 @@ function buildTriad(triadId, rows) {
 }
 
 function decideCandidate(baseline, candidate, { positive, symmetric }) {
-  if (!candidate || candidate.status === 'NOT_RUN') return 'NOT_RUN';
+  if (!candidate) return 'NOT_RUN';
   if (!baseline || baseline.status !== 'PASS') return 'NOT_RUN';
   if (!symmetric) return 'avoid';
   if (candidate.status === 'BLOCKED') return 'forbid';
@@ -399,13 +443,17 @@ function decideCandidate(baseline, candidate, { positive, symmetric }) {
       candidate.cleanup_pass === false) {
     return 'forbid';
   }
-  if (candidate.status !== 'PASS') {
-    const lifecyclePassed = candidate.privacy_pass === true && candidate.purge_pass === true &&
-      candidate.cleanup_pass === true;
-    const qualityFailed = candidate.correctness_pass === false || candidate.continuity_pass === false;
-    return lifecyclePassed && qualityFailed ? 'avoid' : 'forbid';
-  }
-  if (candidate.correctness_pass !== true || candidate.continuity_pass === false) return 'avoid';
+  if (candidate.status === 'NOT_RUN') return 'NOT_RUN';
+  const decisionEvidence = [
+    candidate.correctness_pass,
+    candidate.privacy_pass,
+    candidate.purge_pass,
+    candidate.cleanup_pass,
+    candidate.continuity_pass
+  ];
+  if (decisionEvidence.some((value) => typeof value !== 'boolean')) return 'NOT_RUN';
+  if (candidate.status !== 'PASS') return 'avoid';
+  if (candidate.correctness_pass === false || candidate.continuity_pass === false) return 'avoid';
   return positive;
 }
 
@@ -444,6 +492,10 @@ function sanitizeRow(row) {
 
 function numberOrZero(value) {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+function booleanOrNull(value) {
+  return typeof value === 'boolean' ? value : null;
 }
 
 function finiteNonNegativeOrNull(value) {

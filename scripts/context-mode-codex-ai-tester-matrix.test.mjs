@@ -139,6 +139,34 @@ describe('context-mode three-way matrix', () => {
     assert.doesNotMatch(JSON.stringify(matrix), /scoped_ephemeral|prepared_pinned_snapshot|runtime_dependency_bootstrap/);
   });
 
+  it('fingerprints resume driver parity because it changes row executability', async () => {
+    const catalog = await loadContextModeScenarioCatalog();
+    const changedCatalog = structuredClone(catalog);
+    changedCatalog.scenarios.find((scenario) =>
+      scenario.id === 'decision_and_file_state_continuity'
+    ).resume_driver_parity = true;
+    const base = buildContextModeMatrix({
+      catalog,
+      runId: 'context-mode-134-resume-fingerprint',
+      provenance,
+      generatedAt: '2026-08-05T15:00:00.000Z'
+    });
+    const changed = buildContextModeMatrix({
+      catalog: changedCatalog,
+      runId: 'context-mode-134-resume-fingerprint',
+      provenance,
+      generatedAt: '2026-08-05T15:00:00.000Z'
+    });
+    const selectRow = (matrix) => matrix.rows.find((row) =>
+      row.scenario_id === 'decision_and_file_state_continuity' && row.variant === 'baseline'
+    );
+
+    assert.notEqual(
+      selectRow(base).settings_fingerprint,
+      selectRow(changed).settings_fingerprint
+    );
+  });
+
   it('injects low reasoning before both initial exec and resume', () => {
     const wrapper = buildCodexReasoningWrapper({ realCodex: 'codex-real' });
     assert.match(wrapper, /model_reasoning_effort="low"/);
@@ -284,6 +312,44 @@ describe('context-mode three-way matrix', () => {
     assert.match(rendered, /emit-large-output\.mjs/);
     assert.doesNotMatch(rendered, /project\/generated-output\.txt|north=17|east=29|checksum=46/);
     assert.ok(Buffer.byteLength(JSON.stringify(matrix)) < 250_000);
+  });
+
+  it('renders the validated catalog artifact instead of a hard-coded fixture name', async () => {
+    const catalog = await loadContextModeScenarioCatalog();
+    catalog.fixture.artifact = 'custom-output.txt';
+    const matrix = buildContextModeMatrix({
+      catalog,
+      runId: 'context-mode-134-custom-artifact',
+      provenance,
+      generatedAt: '2026-08-05T15:00:00.000Z'
+    });
+    const standardBaseline = matrix.rows.find((row) =>
+      row.scenario_id === 'decision_and_file_state_continuity' && row.variant === 'baseline'
+    );
+    const standardMcp = matrix.rows.find((row) =>
+      row.scenario_id === 'decision_and_file_state_continuity' && row.variant === 'mcp_only'
+    );
+    const rendered = renderAiTesterScenario(standardBaseline);
+    const renderedMcp = renderAiTesterScenario(standardMcp);
+
+    assert.match(rendered, /project\/custom-output\.txt/);
+    assert.doesNotMatch(rendered, /project\/generated-output\.txt/);
+    assert.match(renderedMcp, /project\/custom-output\.txt/);
+    assert.doesNotMatch(renderedMcp, /project\/generated-output\.txt/);
+  });
+
+  it('rejects unsafe fixture artifact names before rendering them', async () => {
+    const catalog = await loadContextModeScenarioCatalog();
+    for (const artifact of ['.', '..', 'unsafe\nartifact.txt', 'nested/artifact.txt']) {
+      const changedCatalog = structuredClone(catalog);
+      changedCatalog.fixture.artifact = artifact;
+      assert.throws(() => buildContextModeMatrix({
+        catalog: changedCatalog,
+        runId: 'context-mode-134-unsafe-artifact',
+        provenance,
+        generatedAt: '2026-08-05T15:00:00.000Z'
+      }), /invalid_catalog/);
+    }
   });
 
   it('emits sanitized proof events from executable initial and resume wrapper paths', async () => {

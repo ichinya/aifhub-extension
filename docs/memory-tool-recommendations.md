@@ -122,6 +122,7 @@ Decision mapping из matrix:
 | `conditional` | Tool полезен только для конкретного task/profile, например multirepo mapping или docs lookup. |
 | `avoid` | Tool не дает пользы относительно `rg` или добавляет overhead на этом profile. |
 | `forbid` | Tool провалил safety, scope или purge и не должен использоваться. |
+| `NOT_RUN` | Evidence неполна или недоступна; comparison и safety failure не выводятся из отсутствующих данных. |
 
 ## Безопасные Status Probes
 

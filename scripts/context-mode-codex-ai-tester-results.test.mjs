@@ -23,10 +23,10 @@ describe('context-mode complete-record normalization', () => {
     assert.equal(row.status, 'FAIL');
     assert.equal(row.reason, 'incomplete_trace_evidence');
     assert.equal(row.correctness_pass, false);
-    assert.equal(row.privacy_pass, false);
-    assert.equal(row.purge_pass, false);
-    assert.equal(row.cleanup_pass, false);
-    assert.equal(row.continuity_pass, false);
+    assert.equal(row.privacy_pass, null);
+    assert.equal(row.purge_pass, null);
+    assert.equal(row.cleanup_pass, null);
+    assert.equal(row.continuity_pass, null);
     assert.equal(row.cost.input_tokens, null);
     assert.equal(row.cost.output_tokens, null);
     assert.equal(row.cost.input_output_tokens, null);
@@ -145,6 +145,46 @@ describe('context-mode complete-record normalization', () => {
     assert.deepEqual(inside.reason_codes, []);
     assert.equal(outside.safe, false);
     assert.deepEqual(outside.reason_codes, ['absolute_path']);
+
+    const macSandboxRoot = '/var/folders/ab/cd/T/aifhub-context-mode-sandbox';
+    const macInside = scanCompleteTrace({
+      trace_path: `${macSandboxRoot}/runs/trace.json`
+    }, { allowedAbsoluteRoots: [macSandboxRoot] });
+    const macOutside = scanCompleteTrace({
+      trace_path: '/var/folders/ab/cd/T/private/trace.json'
+    }, { allowedAbsoluteRoots: [macSandboxRoot] });
+    const customTmpOutside = scanCompleteTrace({
+      trace_path: '/opt/custom-tmp/private/trace.json'
+    }, { allowedAbsoluteRoots: [macSandboxRoot] });
+    const windowsOutside = scanCompleteTrace({
+      trace_path: 'D:\\work\\private\\trace.json'
+    }, { allowedAbsoluteRoots: ['D:\\work\\sandbox'] });
+    const urlOnly = scanCompleteTrace({
+      documentation_url: 'https://example.test/tmp/trace.json'
+    });
+    const uncOutside = scanCompleteTrace({
+      trace_path: '\\\\server\\share\\trace.json'
+    });
+    const extendedWindowsOutside = scanCompleteTrace({
+      trace_path: '\\\\?\\C:\\private\\trace.json'
+    });
+    const fileUriOutside = scanCompleteTrace({
+      trace_path: 'file:///private/var/folders/trace.json'
+    });
+    assert.equal(macInside.safe, true);
+    assert.deepEqual(macInside.reason_codes, []);
+    assert.equal(macOutside.safe, false);
+    assert.deepEqual(macOutside.reason_codes, ['absolute_path']);
+    assert.equal(customTmpOutside.safe, false);
+    assert.deepEqual(customTmpOutside.reason_codes, ['absolute_path']);
+    assert.equal(windowsOutside.safe, false);
+    assert.deepEqual(windowsOutside.reason_codes, ['absolute_path']);
+    assert.equal(urlOnly.safe, true);
+    assert.deepEqual(urlOnly.reason_codes, []);
+    for (const scan of [uncOutside, extendedWindowsOutside, fileUriOutside]) {
+      assert.equal(scan.safe, false);
+      assert.deepEqual(scan.reason_codes, ['absolute_path']);
+    }
   });
 
   it('deletes an unsafe raw trace after retaining only bounded aggregate reasons', async () => {
@@ -300,6 +340,51 @@ describe('context-mode raw Codex rollout audit', () => {
     assert.doesNotMatch(JSON.stringify(result), /other-safe\.mjs|emit-large-output/);
   });
 
+  it('honors an explicit non-node command allowlist while confining the executable path', () => {
+    const sandboxRoot = path.join(tempDir, 'sandbox');
+    const allowedCommand = 'python project/check.py';
+    const allowed = auditCodexRolloutRecords([rolloutTool('ctx_batch_execute', {
+      cwd: path.join(sandboxRoot, 'fixture'),
+      commands: [{ command: allowedCommand }]
+    })], {
+      sandboxRoot,
+      requiredTools: ['ctx_batch_execute'],
+      allowedTools: ['ctx_batch_execute'],
+      allowedCommands: [allowedCommand]
+    });
+    assert.equal(allowed.status, 'PASS');
+    assert.equal(allowed.reason, 'raw_provider_audit_verified');
+
+    const outsideExecutable = path.resolve(tempDir, '..', 'outside-python.exe');
+    const escapedCommand = [outsideExecutable, 'project/check.py'];
+    const escaped = auditCodexRolloutRecords([rolloutTool('ctx_batch_execute', {
+      cwd: path.join(sandboxRoot, 'fixture'),
+      commands: [{ command: escapedCommand }]
+    })], {
+      sandboxRoot,
+      requiredTools: ['ctx_batch_execute'],
+      allowedTools: ['ctx_batch_execute'],
+      allowedCommands: [escapedCommand.join(' ')]
+    });
+    assert.equal(escaped.status, 'FAIL');
+    assert.equal(escaped.reason, 'raw_provider_path_escape');
+
+    for (const invalidExecutable of ['-x', 'FOO=bar', '.']) {
+      const command = `${invalidExecutable} project/check.py`;
+      const invalid = auditCodexRolloutRecords([rolloutTool('ctx_batch_execute', {
+        cwd: path.join(sandboxRoot, 'fixture'),
+        commands: [{ command }]
+      })], {
+        sandboxRoot,
+        requiredTools: ['ctx_batch_execute'],
+        allowedTools: ['ctx_batch_execute'],
+        allowedCommands: [command]
+      });
+      assert.equal(invalid.status, 'FAIL');
+      assert.equal(invalid.reason, 'raw_provider_path_escape');
+    }
+  });
+
   it('keeps array-form command path confinement independent from the command allowlist', () => {
     const sandboxRoot = path.join(tempDir, 'sandbox');
     const result = auditCodexRolloutRecords([rolloutTool('ctx_batch_execute', {
@@ -414,6 +499,44 @@ describe('context-mode triad decisions', () => {
     assert.equal(report.triads[0].plugin_decision, 'NOT_RUN');
     assert.equal(report.plugin_outcome, 'NOT_RUN');
   });
+
+  it('keeps incomplete lifecycle evidence unknown instead of reporting a safety veto', () => {
+    const report = buildContextModeResults([
+      safeRow('baseline'),
+      safeRow('mcp_only'),
+      {
+        ...safeRow('codex_plugin'),
+        status: 'FAIL',
+        reason: 'incomplete_trace_evidence',
+        privacy_pass: null,
+        purge_pass: null,
+        cleanup_pass: null,
+        continuity_pass: null
+      }
+    ]);
+
+    assert.equal(report.triads[0].plugin_decision, 'NOT_RUN');
+    assert.equal(report.plugin_outcome, 'NOT_RUN');
+  });
+
+  it('keeps an explicit safety failure stronger than otherwise unknown lifecycle evidence', () => {
+    const report = buildContextModeResults([
+      safeRow('baseline'),
+      safeRow('mcp_only'),
+      {
+        ...safeRow('codex_plugin'),
+        status: 'NOT_RUN',
+        reason: 'lifecycle_unavailable',
+        privacy_pass: false,
+        purge_pass: null,
+        cleanup_pass: null,
+        continuity_pass: null
+      }
+    ]);
+
+    assert.equal(report.triads[0].plugin_decision, 'forbid');
+    assert.equal(report.plugin_outcome, 'forbid');
+  });
 });
 
 function completeNormalizationTrace() {
@@ -451,6 +574,7 @@ function safeRow(variant) {
     privacy_pass: true,
     purge_pass: true,
     cleanup_pass: true,
+    continuity_pass: true,
     cost: { input_tokens: 100, output_tokens: 20, input_output_tokens: 120 }
   };
 }

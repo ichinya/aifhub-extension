@@ -147,6 +147,7 @@ Rejected tools (`codex-mem`, `eagle-mem`) не получают positive tool_ru
 | `conditional` | Tool полезен только для broad discovery, docs lookup, continuity или compression. | Оставить conditional recommendation с task/profile filter. |
 | `avoid` | Tool медленнее, дороже, шумнее или хуже `rg` для profile/task. | Добавить в `avoid_tools` или `do_not_recommend_for`. |
 | `forbid` | Tool нарушает safety, scope или purge. | Запретить для соответствующих skills/profiles. |
+| `NOT_RUN` | Evidence неполна или execution недоступен. | Не выводить comparison или safety failure и не продвигать metadata. |
 
 ## Promotion To Metadata
 
