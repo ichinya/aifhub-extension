@@ -419,8 +419,8 @@ export async function buildSelectionResult(options = {}) {
     }
 
     const permission = permissionForTool(metadata, toolId, command);
-    const boundaryReason = selectionBoundaryReason(tool, command) ??
-      commandBoundaryReason(tool, command, permission);
+    const boundaryReason = commandBoundaryReason(tool, command, permission) ??
+      selectionBoundaryReason(tool, command);
     if (boundaryReason) {
       notSelectedTools.push({
         tool_id: toolId,
@@ -1163,11 +1163,13 @@ function normalizeProbeResult(probe) {
   const availability = ['installed', 'not_installed', 'unknown'].includes(probe.availability)
     ? probe.availability
     : 'unknown';
-  return {
-    ...probe,
+  const result = {
     availability,
-    command: probe.command ?? null
+    command: typeof probe.command === 'string' ? probe.command : null
   };
+  if (typeof probe.reason === 'string') result.reason = probe.reason;
+  if (typeof probe.note === 'string') result.note = probe.note;
+  return result;
 }
 
 export async function classifyProjectShape(cwd) {

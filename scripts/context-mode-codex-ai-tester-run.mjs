@@ -150,6 +150,7 @@ export async function executeMissingRows({
   rowEvidence = {},
   privacyScanByRow = {},
   provisionRow,
+  onProviderProvisioningAttempt,
   timeoutMs = 300_000,
   runProcess = runBoundedProcess,
   logger
@@ -210,6 +211,7 @@ export async function executeMissingRows({
       continue;
     }
     if (row.variant !== 'baseline') {
+      onProviderProvisioningAttempt?.({ row });
       let provisioned;
       try {
         provisioned = await provisionRow({ row, env, runRoot, scenarioFile });
@@ -370,10 +372,10 @@ export async function runVerifiedMatrix(options) {
     };
   }
   const pendingRows = planMissingRows(options.matrix.rows, checkpoint.completedRowIds);
-  const providerPurgeRequired = pendingRows.some((row) =>
+  const providerPurgePossible = pendingRows.some((row) =>
     row.variant !== 'baseline' && row.execution_gate?.status === 'PASS'
   );
-  if (providerPurgeRequired && typeof options.purgeProvider !== 'function') {
+  if (providerPurgePossible && typeof options.purgeProvider !== 'function') {
     return {
       schema: CONTEXT_MODE_RUNNER_SCHEMA,
       status: 'NOT_RUN',
@@ -381,13 +383,14 @@ export async function runVerifiedMatrix(options) {
       statuses: []
     };
   }
+  let providerStateTouched = false;
   let lifecycle;
   try {
     lifecycle = await runSandboxLifecycle({
       ownerRoot: options.sandboxOwnerRoot,
       sandboxRoot: options.sandboxRoot,
       purge: options.purgeProvider,
-      purgeRequired: providerPurgeRequired,
+      purgeRequired: () => providerStateTouched,
       logger: options.logger,
       run: async () => {
         try {
@@ -417,7 +420,14 @@ export async function runVerifiedMatrix(options) {
         const executed = await executeMissingRows({
           ...options,
           completedRowIds: checkpoint.completedRowIds,
-          env: boundedEnv
+          env: boundedEnv,
+          onProviderProvisioningAttempt: ({ row }) => {
+            providerStateTouched = true;
+            logFix(options.logger, 'provider_state_touched', {
+              row_id: row.id,
+              variant: row.variant
+            });
+          }
         });
         const statuses = mergeMatrixStatuses(
           options.matrix.rows,

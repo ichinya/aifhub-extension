@@ -464,6 +464,22 @@ describe('recommendation results', () => {
       message: 'context-mode is configured but normal command selection is forbidden; remove it from utilities.context_tools.enabled and use manual guidance only.'
     }]);
     assert.equal(probes, 0);
+
+    const forbiddenCommand = await buildSelectionResult({
+      metadata,
+      projectShape: 'large_framework_app',
+      taskSignals: ['large_command_output_compression'],
+      command: 'aif-plan',
+      config: {
+        source_kind: 'project_config',
+        source_path: null,
+        enabled_tools: ['context-mode'],
+        warnings: []
+      }
+    });
+    assert.deepEqual(forbiddenCommand.selected_tools, []);
+    assert.equal(forbiddenCommand.not_selected_tools[0].reason, 'context-mode is forbidden for aif-plan.');
+    assert.equal(forbiddenCommand.warnings[0].code, 'configured-tool-manual-guidance-only');
   });
 
   it('keeps small microservices on rg baseline and avoids repo graph helpers', async () => {
@@ -1258,6 +1274,34 @@ function makeNegativeProvenLabelMetadataYaml() {
 }
 
 describe('CLI behavior', () => {
+  it('normalizes probe output through an explicit bounded public contract', async () => {
+    const result = await runMemoryToolRecommender([
+      'status',
+      '--metadata',
+      REAL_METADATA,
+      '--json'
+    ], {
+      cwd: tmpDir,
+      stdout: [],
+      stderr: [],
+      exit: false,
+      probeRunner: async () => ({
+        availability: 'unknown',
+        command: 'tool --version',
+        reason: 'probe_reason',
+        note: 'safe note',
+        raw_output: 'must-not-cross-the-status-boundary'
+      })
+    });
+
+    assert.deepEqual(result.body.probes.rg, {
+      availability: 'unknown',
+      command: 'tool --version',
+      reason: 'probe_reason',
+      note: 'safe note'
+    });
+  });
+
   it('does not execute context-mode during installed-facing status', async () => {
     const result = await runMemoryToolRecommender([
       'status',

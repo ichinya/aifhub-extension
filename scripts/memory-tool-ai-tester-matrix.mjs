@@ -1327,7 +1327,13 @@ function findDedicatedHarnessTool(toolIds = []) {
 }
 
 function findDedicatedOnlyCatalogTool(scenarioCatalog, parsed = {}) {
-  if (!scenarioCatalog || asArray(parsed.scenarioIds).length === 0 || asArray(parsed.tools).length > 0) {
+  const hasExplicitCatalogFilter = [
+    parsed.scenarioIds,
+    parsed.runClasses,
+    parsed.skills,
+    parsed.tasks
+  ].some((values) => asArray(values).length > 0);
+  if (!scenarioCatalog || !hasExplicitCatalogFilter || asArray(parsed.tools).length > 0) {
     return null;
   }
   const entries = filterScenarioCatalogEntries(scenarioCatalog, {

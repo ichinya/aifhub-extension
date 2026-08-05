@@ -908,8 +908,19 @@ export async function runSandboxLifecycle({
   } catch (error) {
     runFailure = error?.code ?? 'sandbox_operation_failed';
   }
-  let purgeStatus = purgeRequired ? 'FAIL' : 'NOT_APPLICABLE';
-  if (purgeRequired) {
+  let shouldPurge;
+  let purgeRequirementFailure = null;
+  try {
+    shouldPurge = typeof purgeRequired === 'function'
+      ? Boolean(purgeRequired())
+      : Boolean(purgeRequired);
+  } catch {
+    shouldPurge = true;
+    purgeRequirementFailure = 'purge_requirement_failed';
+  }
+  const operationFailure = runFailure ?? purgeRequirementFailure;
+  let purgeStatus = shouldPurge ? 'FAIL' : 'NOT_APPLICABLE';
+  if (shouldPurge) {
     try {
       purgeStatus = typeof purge === 'function' && (await purge())?.status === 'PASS' ? 'PASS' : 'FAIL';
     } catch {
@@ -920,7 +931,7 @@ export async function runSandboxLifecycle({
   try {
     await removeVerifiedSandbox(lease);
     cleanupStatus = 'PASS';
-    logFix(logger, 'sandbox_cleanup_pass', { outcome: runFailure ?? runResult?.status ?? 'unknown' });
+    logFix(logger, 'sandbox_cleanup_pass', { outcome: operationFailure ?? runResult?.status ?? 'unknown' });
   } catch (error) {
     logFix(logger, 'sandbox_cleanup_failed', { reason: error?.code ?? 'sandbox_cleanup_failed' });
     return {
@@ -932,16 +943,16 @@ export async function runSandboxLifecycle({
       cleanup: 'FAIL'
     };
   }
-  const operationStatus = runFailure ? 'FAIL' : (runResult?.status ?? 'FAIL');
-  const status = purgeRequired && purgeStatus !== 'PASS'
+  const operationStatus = operationFailure ? 'FAIL' : (runResult?.status ?? 'FAIL');
+  const status = shouldPurge && purgeStatus !== 'PASS'
     ? (operationStatus === 'BLOCKED' ? 'BLOCKED' : 'FAIL')
     : operationStatus;
   return {
     ...(runResult ?? {}),
     schema: CONTEXT_MODE_ADAPTER_SCHEMA,
     status,
-    reason: runFailure ?? runResult?.reason ??
-      (purgeRequired && purgeStatus !== 'PASS' ? 'provider_purge_failed' : undefined),
+    reason: operationFailure ?? runResult?.reason ??
+      (shouldPurge && purgeStatus !== 'PASS' ? 'provider_purge_failed' : undefined),
     purge: purgeStatus,
     cleanup: cleanupStatus
   };
@@ -996,13 +1007,21 @@ export async function runBoundedProcess(command, args, {
     });
     let stdout = Buffer.alloc(0);
     let stderr = Buffer.alloc(0);
+    let stdoutTruncated = false;
+    let stderrTruncated = false;
     let settled = false;
-    const append = (current, chunk) => {
+    const append = (current, chunk, markTruncated) => {
       const combined = Buffer.concat([current, Buffer.from(chunk)]);
-      return combined.length > outputCapBytes ? combined.subarray(combined.length - outputCapBytes) : combined;
+      if (combined.length <= outputCapBytes) return combined;
+      markTruncated();
+      return combined.subarray(combined.length - outputCapBytes);
     };
-    child.stdout.on('data', (chunk) => { stdout = append(stdout, chunk); });
-    child.stderr.on('data', (chunk) => { stderr = append(stderr, chunk); });
+    child.stdout.on('data', (chunk) => {
+      stdout = append(stdout, chunk, () => { stdoutTruncated = true; });
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr = append(stderr, chunk, () => { stderrTruncated = true; });
+    });
     const timer = setTimeout(async () => {
       if (settled) return;
       settled = true;
@@ -1024,7 +1043,9 @@ export async function runBoundedProcess(command, args, {
         exitCode,
         signal,
         stdout: decodeUtf8Tail(stdout),
-        stderr: decodeUtf8Tail(stderr)
+        stderr: decodeUtf8Tail(stderr),
+        stdout_truncated: stdoutTruncated,
+        stderr_truncated: stderrTruncated
       });
     });
   });
@@ -1133,7 +1154,8 @@ async function createSandboxLease({ ownerRoot, sandboxRoot }) {
       encoding: 'utf8',
       flag: 'wx'
     });
-  } catch {
+  } catch (error) {
+    if (error?.code === 'EEXIST') throw adapterError('sandbox_lease_exists');
     throw adapterError('sandbox_lease_failed');
   }
   return { ownerRoot: owner, sandboxRoot: target, token };
@@ -1177,7 +1199,7 @@ async function digestPath(target) {
     if (!info.isDirectory()) return `other:${info.size}`;
     const entries = await readdir(target, { withFileTypes: true });
     const parts = [];
-    for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+    for (const entry of entries.sort((a, b) => compareCodeUnitStrings(a.name, b.name))) {
       const child = path.join(target, entry.name);
       const childInfo = await lstat(child);
       if (childInfo.isSymbolicLink()) {
@@ -1193,6 +1215,10 @@ async function digestPath(target) {
     if (error?.code === 'ENOENT') return 'missing';
     throw error;
   }
+}
+
+function compareCodeUnitStrings(left, right) {
+  return left < right ? -1 : (left > right ? 1 : 0);
 }
 
 function sha256(value) {

@@ -124,7 +124,20 @@ describe('context-mode sandbox and lifecycle boundary', () => {
     assert.equal(result.exitCode, 0);
     assert.ok(Buffer.byteLength(result.stdout) <= 8);
     assert.ok(Buffer.byteLength(result.stderr) <= 8);
+    assert.equal(result.stdout_truncated, true);
+    assert.equal(result.stderr_truncated, true);
     assert.doesNotMatch(`${result.stdout}${result.stderr}`, /�/);
+
+    const untruncated = await runBoundedProcess(process.execPath, [
+      '-e',
+      'process.stdout.write("ok"); process.stderr.write("fine");'
+    ], {
+      cwd: tempDir,
+      env: process.env,
+      outputCapBytes: 8
+    });
+    assert.equal(untruncated.stdout_truncated, false);
+    assert.equal(untruncated.stderr_truncated, false);
     await assert.rejects(
       runBoundedProcess(process.execPath, ['--version'], {
         cwd: tempDir,
@@ -222,6 +235,35 @@ describe('context-mode sandbox and lifecycle boundary', () => {
     assert.equal(comparison.status, 'FAIL');
     assert.deepEqual(comparison.changed, ['project_git_config']);
     assert.doesNotMatch(JSON.stringify(comparison), /changed=true/);
+  });
+
+  it('fingerprints directory trees independently of the host locale comparator', async () => {
+    const hostRoot = path.join(tempDir, 'locale-independent-host');
+    const providerHome = path.join(hostRoot, 'provider');
+    await mkdir(path.join(hostRoot, '.git', 'hooks'), { recursive: true });
+    await mkdir(providerHome, { recursive: true });
+    await writeFile(path.join(providerHome, 'a.txt'), 'alpha', 'utf8');
+    await writeFile(path.join(providerHome, 'z.txt'), 'omega', 'utf8');
+    const before = await captureHostManifest({
+      projectRoot: hostRoot,
+      codexHome: path.join(hostRoot, 'codex'),
+      providerHome
+    });
+    const originalLocaleCompare = String.prototype.localeCompare;
+    let after;
+    try {
+      String.prototype.localeCompare = function reverseLocaleCompare(other) {
+        return originalLocaleCompare.call(other, this);
+      };
+      after = await captureHostManifest({
+        projectRoot: hostRoot,
+        codexHome: path.join(hostRoot, 'codex'),
+        providerHome
+      });
+    } finally {
+      String.prototype.localeCompare = originalLocaleCompare;
+    }
+    assert.deepEqual(after, before);
   });
 
   it('runs only the bounded MCP contract and requires confirmed purge', async () => {
@@ -489,6 +531,63 @@ describe('context-mode sandbox and lifecycle boundary', () => {
     assert.equal(called, true);
     assert.equal(result.status, 'PASS');
     assert.equal(result.cleanup, 'PASS');
+    await assert.rejects(readFile(path.join(sandboxRoot, 'state.json'), 'utf8'));
+  });
+
+  it('reports an existing sandbox lease without deleting or reusing it', async () => {
+    const ownerRoot = path.join(tempDir, 'owned-existing-lease');
+    const sandboxRoot = path.join(ownerRoot, 'sandbox');
+    const markerPath = path.join(sandboxRoot, '.aifhub-context-mode-sandbox.json');
+    const sentinelPath = path.join(sandboxRoot, 'keep.txt');
+    await mkdir(sandboxRoot, { recursive: true });
+    await writeFile(markerPath, '{"schema":"stale"}\n', 'utf8');
+    await writeFile(sentinelPath, 'keep', 'utf8');
+    let called = false;
+
+    const result = await runSandboxLifecycle({
+      ownerRoot,
+      sandboxRoot,
+      purgeRequired: false,
+      run: async () => {
+        called = true;
+        return { status: 'PASS' };
+      }
+    });
+
+    assert.equal(called, false);
+    assert.equal(result.status, 'NOT_RUN');
+    assert.equal(result.reason, 'sandbox_lease_exists');
+    assert.equal(await readFile(sentinelPath, 'utf8'), 'keep');
+    assert.match(await readFile(markerPath, 'utf8'), /stale/);
+  });
+
+  it('fails closed with purge and cleanup when a dynamic purge predicate throws', async () => {
+    const ownerRoot = path.join(tempDir, 'owned-purge-predicate');
+    const sandboxRoot = path.join(ownerRoot, 'sandbox');
+    await mkdir(ownerRoot, { recursive: true });
+    let purgeCalls = 0;
+
+    const result = await runSandboxLifecycle({
+      ownerRoot,
+      sandboxRoot,
+      run: async () => {
+        await writeFile(path.join(sandboxRoot, 'state.json'), '{}', 'utf8');
+        return { status: 'PASS' };
+      },
+      purgeRequired: () => {
+        throw new Error('predicate failure');
+      },
+      purge: async () => {
+        purgeCalls += 1;
+        return { status: 'PASS' };
+      }
+    });
+
+    assert.equal(result.status, 'FAIL');
+    assert.equal(result.reason, 'purge_requirement_failed');
+    assert.equal(result.purge, 'PASS');
+    assert.equal(result.cleanup, 'PASS');
+    assert.equal(purgeCalls, 1);
     await assert.rejects(readFile(path.join(sandboxRoot, 'state.json'), 'utf8'));
   });
 

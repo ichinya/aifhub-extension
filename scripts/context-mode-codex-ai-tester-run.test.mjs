@@ -175,6 +175,59 @@ describe('context-mode dedicated runner', () => {
     assert.equal(result.statuses[0].reason, 'resume_driver_parity_unavailable');
   });
 
+  it('does not purge a provider when every eligible provider row skips before provisioning', async () => {
+    let purgeCalls = 0;
+    const options = await runnerOptions({
+      runProcess: async () => ({ exitCode: 0 })
+    });
+    Object.assign(options.matrix.rows[0], {
+      variant: 'mcp_only',
+      execution_gate: { status: 'PASS', reason: 'provider_ready' },
+      session_mode: 'same_thread',
+      prompts: ['first', 'second'],
+      resume_driver_parity: false
+    });
+    options.provisionRow = async () => ({ status: 'PASS' });
+    options.purgeProvider = async () => {
+      purgeCalls += 1;
+      return { status: 'FAIL' };
+    };
+
+    const result = await runVerifiedMatrix(options);
+    assert.equal(result.status, 'NOT_RUN');
+    assert.equal(result.statuses[0].reason, 'resume_driver_parity_unavailable');
+    assert.equal(result.purge, 'NOT_APPLICABLE');
+    assert.equal(purgeCalls, 0);
+  });
+
+  it('purges after a provider provisioning attempt even when provisioning fails', async () => {
+    let purgeCalls = 0;
+    const logs = [];
+    const options = await runnerOptions({
+      runProcess: async () => ({ exitCode: 0 })
+    });
+    Object.assign(options.matrix.rows[0], {
+      variant: 'mcp_only',
+      execution_gate: { status: 'PASS', reason: 'provider_ready' }
+    });
+    options.provisionRow = async () => ({
+      status: 'NOT_RUN',
+      reason: 'provider_provisioning_failed'
+    });
+    options.purgeProvider = async () => {
+      purgeCalls += 1;
+      return { status: 'PASS' };
+    };
+    options.logger = (line) => logs.push(line);
+
+    const result = await runVerifiedMatrix(options);
+    assert.equal(result.status, 'NOT_RUN');
+    assert.equal(result.statuses[0].reason, 'provider_provisioning_failed');
+    assert.equal(result.purge, 'PASS');
+    assert.equal(purgeCalls, 1);
+    assert.match(logs.join('\n'), /\[FIX:134\] provider_state_touched /);
+  });
+
   it('does not execute a provider variant without an explicit provisioning boundary', async () => {
     let calls = 0;
     const options = await runnerOptions({
