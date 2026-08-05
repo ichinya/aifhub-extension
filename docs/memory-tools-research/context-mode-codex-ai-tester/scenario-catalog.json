@@ -1,0 +1,79 @@
+{
+  "schema": "aifhub.context_mode_codex.ai_tester_catalog.v1",
+  "defaults": {
+    "runtime": "codex",
+    "model": "gpt-5.6-luna",
+    "reasoning": "low",
+    "repetitions": 2,
+    "timeout_ms": 300000,
+    "variants": [
+      "baseline",
+      "mcp_only",
+      "codex_plugin"
+    ]
+  },
+  "fixture": {
+    "revision": "context-mode-134-synthetic-v2",
+    "artifact": "generated-output.txt",
+    "content_class": "synthetic_generated_output",
+    "content": "Record D-134 selects the amber deployment lane. File state F-134 is pending review. Error class E-134 is retryable. Required facts: north=17, east=29, checksum=46. Control status: ready.",
+    "profiles": {
+      "standard": {
+        "kind": "file"
+      },
+      "large_stdout_tail": {
+        "kind": "generated_stdout",
+        "line_count": 12009,
+        "filler_width": 80,
+        "minimum_bytes": 1048577,
+        "tail_lines": [
+          "north=731",
+          "east=409",
+          "checksum=1140"
+        ]
+      }
+    }
+  },
+  "scenarios": [
+    {
+      "id": "large_generated_output_retrieval",
+      "session_mode": "single_turn",
+      "fixture_profile": "large_stdout_tail",
+      "prompts": ["Run the required generated-output command through the configured evaluation path, then return exactly three lines in key=value form, ordered north, east, checksum, with no other text."],
+      "assertions": [
+        {
+          "id": "exact-required-facts",
+          "type": "output_contains",
+          "pattern": "(?i)\\A[ \\t]*north[ \\t]*=[ \\t]*731[ \\t]*\\r?\\neast[ \\t]*=[ \\t]*409[ \\t]*\\r?\\nchecksum[ \\t]*=[ \\t]*1140[ \\t]*\\z"
+        }
+      ]
+    },
+    {
+      "id": "decision_and_file_state_continuity",
+      "fixture_profile": "standard",
+      "resume_driver_parity": false,
+      "prompts": ["Read and retain the decision, file state, and error class from the generated artifact without reporting their values yet.", "Resume the same thread and return exactly three lines in key=value form, ordered decision, file_state, error, with no other text."],
+      "assertions": [
+        {
+          "id": "exact-continuity-state",
+          "type": "output_contains",
+          "pattern": "(?i)\\A[ \\t]*decision[ \\t]*=[ \\t]*D-134 selects the amber deployment lane[ \\t]*\\r?\\nfile_state[ \\t]*=[ \\t]*F-134 is pending review[ \\t]*\\r?\\nerror[ \\t]*=[ \\t]*E-134 is retryable[ \\t]*\\z"
+        }
+      ]
+    },
+    {
+      "id": "fresh_session_isolation_and_purge",
+      "session_mode": "external_fresh_pair",
+      "fixture_profile": "standard",
+      "prompts": ["Return the generated artifact's control status as exactly control=VALUE with no other text."],
+      "assertions": [
+        {
+          "id": "fresh-probe-control-fact",
+          "type": "output_contains",
+          "pattern": "(?i)\\A[ \\t]*control[ \\t]*=[ \\t]*ready[ \\t]*\\z"
+        }
+      ],
+      "lifecycle_assertions": ["fresh_session_isolated", "provider_purged", "sandbox_clean"]
+    }
+  ]
+}

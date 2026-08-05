@@ -198,7 +198,7 @@ describe('ai-tester matrix manifest', () => {
       metadata,
       profiles,
       skills: ['aif-explore'],
-      tools: ['codegraph', 'graphify', 'context-mode'],
+      tools: ['codegraph', 'graphify', 'context7'],
       taskScenarios: ['architecture_or_impact_discovery']
     });
 
@@ -220,6 +220,165 @@ describe('ai-tester matrix manifest', () => {
       assert.ok(baseline, `missing rg baseline for ${toolCase.id}`);
       assert.ok(manifest.cases.indexOf(baseline) < manifest.cases.indexOf(toolCase));
     }
+  });
+
+  it('routes context-mode only through its dedicated issue 134 harness', async () => {
+    const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
+    const profile = {
+      id: 'matrix-profile-context-mode',
+      sourceRoot: path.join(tmpDir, 'fixture-project'),
+      project_shape: 'large_framework_app',
+      languages: ['js'],
+      volume: 'large',
+      complexity: 'framework',
+      repo_shape: 'single_repo',
+      artifact_mode: 'openspec_native'
+    };
+    assert.throws(() => buildAiTesterMatrixManifest({
+      metadata,
+      profiles: [profile],
+      skills: ['aif-explore'],
+      tools: ['context-mode'],
+      taskScenarios: ['large_command_output_compression']
+    }), /context_mode_requires_dedicated_harness/);
+    assert.throws(() => renderAiTesterScenario({
+      id: 'generic-context-mode',
+      expectation: 'positive',
+      tool_id: 'context-mode',
+      optional_tool_id: 'context-mode'
+    }), /context_mode_requires_dedicated_harness/);
+
+    for (const flag of ['--tool', '--preinitialize-tool']) {
+      const stdout = [];
+      const outDir = path.join(tmpDir, `forbidden-${flag.slice(2)}`);
+      const result = await runMemoryToolAiTesterMatrix([
+        flag,
+        'context-mode',
+        '--out',
+        outDir,
+        '--dry-run'
+      ], {
+        cwd: tmpDir,
+        stdout,
+        exit: false
+      });
+      assert.equal(result.exitCode, 2);
+      assert.equal(result.body.schema, AI_TESTER_MATRIX_SCHEMA);
+      assert.equal(result.body.status, 'NOT_RUN');
+      assert.equal(result.body.reason, 'context_mode_requires_dedicated_harness');
+      assert.equal(result.body.tool_id, 'context-mode');
+      assert.match(result.body.dedicated_harness, /context-mode-codex-ai-tester-matrix\.mjs$/);
+      assert.doesNotMatch(stdout.join(''), /\bat\s+runMemoryToolAiTesterMatrix\b|Error:/);
+      await assert.rejects(stat(outDir));
+    }
+
+    const mixedStdout = [];
+    const mixedOutDir = path.join(tmpDir, 'forbidden-mixed-explicit-tools');
+    const mixedResult = await runMemoryToolAiTesterMatrix([
+      '--tool',
+      'codegraph',
+      '--tool',
+      'context-mode',
+      '--out',
+      mixedOutDir,
+      '--dry-run'
+    ], {
+      cwd: tmpDir,
+      stdout: mixedStdout,
+      exit: false
+    });
+    assert.equal(mixedResult.exitCode, 2);
+    assert.equal(mixedResult.body.status, 'NOT_RUN');
+    assert.equal(mixedResult.body.reason, 'context_mode_requires_dedicated_harness');
+    assert.equal(mixedResult.body.tool_id, 'context-mode');
+    assert.doesNotMatch(mixedStdout.join(''), /\bat\s+runMemoryToolAiTesterMatrix\b|Error:/);
+    await assert.rejects(stat(mixedOutDir));
+
+    const catalogStdout = [];
+    const catalogOutDir = path.join(tmpDir, 'forbidden-catalog-scenario');
+    const catalogResult = await runMemoryToolAiTesterMatrix([
+      '--roots',
+      tmpDir,
+      '--out',
+      catalogOutDir,
+      '--metadata',
+      REAL_METADATA,
+      '--scenario-catalog',
+      REAL_CATALOG,
+      '--scenario-id',
+      'generated-output-compression',
+      '--max-profiles',
+      '1',
+      '--dry-run'
+    ], {
+      cwd: REPO_ROOT,
+      stdout: catalogStdout,
+      exit: false
+    });
+    assert.equal(catalogResult.exitCode, 2);
+    assert.equal(catalogResult.body.schema, AI_TESTER_MATRIX_SCHEMA);
+    assert.equal(catalogResult.body.status, 'NOT_RUN');
+    assert.equal(catalogResult.body.reason, 'context_mode_requires_dedicated_harness');
+    assert.equal(catalogResult.body.tool_id, 'context-mode');
+    assert.match(catalogResult.body.dedicated_harness, /context-mode-codex-ai-tester-matrix\.mjs$/);
+    assert.doesNotMatch(catalogStdout.join(''), /\bat\s+runMemoryToolAiTesterMatrix\b|Error:/);
+    await assert.rejects(stat(catalogOutDir));
+
+    const filteredCatalogStdout = [];
+    const filteredCatalogOutDir = path.join(tmpDir, 'forbidden-catalog-filters');
+    const filteredCatalogResult = await runMemoryToolAiTesterMatrix([
+      '--roots',
+      tmpDir,
+      '--out',
+      filteredCatalogOutDir,
+      '--metadata',
+      REAL_METADATA,
+      '--scenario-catalog',
+      REAL_CATALOG,
+      '--run-class',
+      'focused',
+      '--task',
+      'large_command_output_compression',
+      '--max-profiles',
+      '1',
+      '--dry-run'
+    ], {
+      cwd: REPO_ROOT,
+      stdout: filteredCatalogStdout,
+      exit: false
+    });
+    assert.equal(filteredCatalogResult.exitCode, 2);
+    assert.equal(filteredCatalogResult.body.status, 'NOT_RUN');
+    assert.equal(filteredCatalogResult.body.reason, 'context_mode_requires_dedicated_harness');
+    assert.equal(filteredCatalogResult.body.tool_id, 'context-mode');
+    assert.doesNotMatch(filteredCatalogStdout.join(''), /\bat\s+runMemoryToolAiTesterMatrix\b|Error:/);
+    await assert.rejects(stat(filteredCatalogOutDir));
+
+    const unfilteredCatalogStdout = [];
+    const unfilteredCatalogOutDir = path.join(tmpDir, 'forbidden-unfiltered-catalog');
+    const unfilteredCatalogResult = await runMemoryToolAiTesterMatrix([
+      '--roots',
+      tmpDir,
+      '--out',
+      unfilteredCatalogOutDir,
+      '--metadata',
+      REAL_METADATA,
+      '--scenario-catalog',
+      REAL_CATALOG,
+      '--max-profiles',
+      '1',
+      '--dry-run'
+    ], {
+      cwd: REPO_ROOT,
+      stdout: unfilteredCatalogStdout,
+      exit: false
+    });
+    assert.equal(unfilteredCatalogResult.exitCode, 2);
+    assert.equal(unfilteredCatalogResult.body.status, 'NOT_RUN');
+    assert.equal(unfilteredCatalogResult.body.reason, 'context_mode_requires_dedicated_harness');
+    assert.equal(unfilteredCatalogResult.body.tool_id, 'context-mode');
+    assert.doesNotMatch(unfilteredCatalogStdout.join(''), /\bat\s+runMemoryToolAiTesterMatrix\b|Error:/);
+    await assert.rejects(stat(unfilteredCatalogOutDir));
   });
 
   it('generates catalog-driven accepted-evidence pairs with scenario metadata', async () => {
@@ -491,7 +650,7 @@ describe('ai-tester matrix manifest', () => {
       expectation: 'positive',
       skill: 'aif-explore',
       tool_id: 'context7',
-      preinitialized_tool_ids: ['graphify', 'context7', 'context-mode'],
+      preinitialized_tool_ids: ['graphify', 'context7'],
       profile_id: 'matrix-profile-04',
       fixture_path: '<sanitized-fixture>',
       task_scenario: 'version_sensitive_library_docs',
@@ -501,8 +660,27 @@ describe('ai-tester matrix manifest', () => {
     assert.match(portableSetupScenario, /py -3 -m venv \.ai-tester-tools\/graphify-venv/);
     assert.match(portableSetupScenario, /\.ai-tester-tools\/graphify-venv\/Scripts\/python\.exe/);
     assert.match(portableSetupScenario, /cmd\.exe \/c \\"cd project && npm install --prefix \.ai-tester-tools\/context7 ctx7\\"/);
-    assert.match(portableSetupScenario, /cmd\.exe \/c \\"cd project && npm install --prefix \.ai-tester-tools\/context-mode context-mode\\"/);
+    assert.doesNotMatch(portableSetupScenario, /npm install --prefix \.ai-tester-tools\/context-mode/);
     assert.doesNotMatch(portableSetupScenario, /\.ai-tester-tools\\/);
+
+    assert.throws(() => renderAiTesterScenario({
+      id: 'case-context-mode-generic-preinitialize',
+      suite: 'positive',
+      expectation: 'positive',
+      skill: 'aif-explore',
+      tool_id: 'context7',
+      preinitialized_tool_ids: ['context7', 'context-mode'],
+      profile_id: 'matrix-profile-04',
+      fixture_path: '<sanitized-fixture>',
+      task_scenario: 'version_sensitive_library_docs',
+      selector_mode: 'source-fallback'
+    }), /context_mode_requires_dedicated_harness/);
+
+    assert.throws(() => buildAiTesterMatrixManifest({
+      metadata: {},
+      profiles: [],
+      preinitializeTools: ['context-mode']
+    }), /context_mode_requires_dedicated_harness/);
 
     const agentmemoryScenario = renderAiTesterScenario({
       id: 'case-agentmemory-isolated',

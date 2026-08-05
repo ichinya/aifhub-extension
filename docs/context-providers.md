@@ -6,6 +6,31 @@ AIFHub может использовать optional provider output как suppo
 
 Provider availability всегда является degraded behavior: отсутствующие tools, reports, MCP servers, API credentials или неподдерживаемые local runtimes сами по себе не должны ломать `/aif-explore`, `/aif-plan`, `/aif-review`, `/aif-implement`, `/aif-verify`, `/aif-done` или любую другую AIFHub command.
 
+## context-mode Codex
+
+`context-mode` остаётся optional user-owned provider с явным opt-in; `rg` — baseline. Historical MCP-only evidence `1.0.151` разрешает только manual temporary indexing уже созданного generated output с purge.
+
+Re-evaluation exact `v1.0.169` разделяет surfaces:
+
+- package snapshot: PASS как `plugin_snapshot_isolated`, но install lifecycle — `NOT_RUN(postinstall_forbidden)`;
+- MCP-only и direct hooks: `BLOCKED(runtime_dependency_self_install)`;
+- actual Codex plugin: `NOT_RUN(auth_isolation_unavailable)`;
+- test-only `direct_hook_contract` не является actual event/compaction evidence.
+
+Authorized live follow-up от `2026-08-03` с class `explicit_isolated_full` добавляет runtime evidence, не переписывая эти исторические gates:
+
+- единственный полезный MCP-only PASS получен на >1 MiB stdout case, где baseline потерял tail facts из-за truncation; MCP использовал `+120.2%` total tokens против уже failed baseline, поэтому token savings не доказаны;
+- на small fixture MCP тоже был корректен, но использовал `+376.8%` tokens и `+50.8%` duration;
+- Codex plugin FAIL на tested nested shell path: `ctx_search` был вызван, но hooks не перехватили output;
+- session continuity остаётся `NOT_RUN(resume_driver_parity_unavailable)`;
+- raw rollout audit подтвердил nested provider calls, confined paths и purge без сохранения raw traces.
+
+Использованный hook trust bypass был явно разрешён только для audited pinned snapshot в disposable test sandbox; это разрешение не распространяется на normal commands или user-owned installs. Текущий replay contract связывает разрешение с exact envelope field `hook_trust_mode: test_only_pinned_snapshot_bypass`; отдельного default или независимого boolean grant нет.
+
+Следовательно, MCP-only допустим лишь как conditional manual helper для большого truncating output, когда correctness важнее token cost. Plugin для этого stack следует избегать. Санитизированный evidence хранится в `docs/memory-tools-research/context-mode-codex-ai-tester/live-authorized-evidence.json`.
+
+Обычные `/aif-plan`, `/aif-implement`, `/aif-verify` и `/aif-done` не auto-install provider, не register MCP, не доверяют hooks и не выбирают plugin. Generic floating routes отключены с `dedicated_harness_required`. Пользовательская установка остаётся вне AIFHub ownership; перед ней нужно отдельно принять version-sensitive install/hook risk.
+
 ## Роли Providers
 
 Graphify - optional provider для repository architecture и relation discovery. Он может помочь найти dependencies, ownership paths и impact areas перед прямой проверкой репозитория.

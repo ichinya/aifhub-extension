@@ -1,0 +1,520 @@
+// context-mode-codex-ai-tester-results.mjs - bounded full-trace normalization for issue #134
+import { lstat, realpath, rm } from 'node:fs/promises';
+import path from 'node:path';
+
+export const CONTEXT_MODE_RESULTS_SCHEMA = 'aifhub.context_mode_codex.ai_tester_results.v1';
+
+export function normalizeContextModeTrace(record = {}) {
+  const costKeys = [
+    'cold_setup_ms',
+    'mcp_startup_ms',
+    'index_ms',
+    'warm_query_ms',
+    'answer_ms',
+    'input_tokens',
+    'output_tokens'
+  ];
+  const cost = Object.fromEntries(costKeys.map((key) => [key, finiteNonNegativeOrNull(record.cost?.[key])]));
+  cost.input_output_tokens = Number.isFinite(cost.input_tokens) && Number.isFinite(cost.output_tokens)
+    ? cost.input_tokens + cost.output_tokens
+    : null;
+  const required = positiveIntegerOrNull(record.scoring?.required_facts);
+  const recovered = nonNegativeIntegerOrNull(record.scoring?.recovered_facts);
+  const turns = Array.isArray(record.turns) ? record.turns : [];
+  const lifecycleComplete = ['privacy', 'purge', 'cleanup', 'continuity']
+    .every((key) => typeof record.lifecycle?.[key] === 'boolean');
+  const scoringComplete = typeof record.scoring?.overall_pass === 'boolean' &&
+    required !== null && recovered !== null && recovered <= required;
+  const turnsComplete = Array.isArray(record.turns) && turns.every((turn) =>
+    typeof turn?.tool_calls === 'number' && Number.isInteger(turn.tool_calls) && turn.tool_calls >= 0
+  );
+  const identityComplete = [record.row_id, record.triad_id, record.variant,
+    record.settings_fingerprint, record.evidence_class]
+    .every((value) => typeof value === 'string' && value.length > 0);
+  const complete = identityComplete && scoringComplete && lifecycleComplete &&
+    costKeys.every((key) => cost[key] !== null) && turnsComplete &&
+    typeof record.final_output === 'string';
+  const requestedStatus = ['PASS', 'FAIL', 'BLOCKED', 'NOT_RUN'].includes(record.status)
+    ? record.status
+    : null;
+  const status = requestedStatus === 'PASS' || requestedStatus === null
+    ? (complete && record.scoring.overall_pass === true ? 'PASS' : 'FAIL')
+    : requestedStatus;
+  const incomplete = (requestedStatus === 'PASS' || requestedStatus === null) && !complete;
+  return {
+    row_id: record.row_id,
+    triad_id: record.triad_id,
+    variant: record.variant,
+    status,
+    reason: incomplete ? 'incomplete_trace_evidence' :
+      (record.reason ?? (status === 'FAIL' && record.scoring?.overall_pass === false ? 'assertions_failed' : undefined)),
+    settings_fingerprint: record.settings_fingerprint,
+    correctness_pass: status === 'PASS' && record.scoring?.overall_pass === true && recovered === required,
+    fact_coverage: required === null || recovered === null ? null : recovered / required,
+    privacy_pass: booleanOrNull(record.lifecycle?.privacy),
+    purge_pass: booleanOrNull(record.lifecycle?.purge),
+    cleanup_pass: booleanOrNull(record.lifecycle?.cleanup),
+    continuity_pass: booleanOrNull(record.lifecycle?.continuity),
+    evidence_class: record.evidence_class,
+    cost,
+    tool_calls: turns.reduce(
+      (total, turn) => total + numberOrZero(turn?.tool_calls),
+      0
+    ),
+    turns: turns.length,
+    final_output_bytes: Buffer.byteLength(String(record.final_output ?? ''))
+  };
+}
+
+export function scanCompleteTrace(record, {
+  canaries = [],
+  contentFingerprints = [],
+  allowedAbsoluteRoots = []
+} = {}) {
+  const serialized = JSON.stringify(record);
+  const scanText = serialized.replaceAll('\\\\', '\\');
+  const reasons = new Set();
+  let matchCount = 0;
+  const patterns = [
+    ['credential_material', /(?:OPENAI_API_KEY|GITHUB_TOKEN|AWS_SECRET_ACCESS_KEY|DATABASE_URL|SSH_AUTH_SOCK|authorization|password|api[_-]?key|token)\s*["']?\s*[:=]\s*["']?[^\s"',}]{4,}/gi],
+    ['private_key_material', /BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY/gi]
+  ];
+  for (const [reason, pattern] of patterns) {
+    const matches = scanText.match(pattern) ?? [];
+    if (matches.length > 0) {
+      reasons.add(reason);
+      matchCount += matches.length;
+    }
+  }
+  const absoluteMatches = [...new Set(
+    collectStringValues(record).flatMap((value) => embeddedAbsolutePaths(value))
+  )];
+  const unsafeAbsoluteMatches = absoluteMatches.filter((candidate) =>
+    !allowedAbsoluteRoots.some((root) => pathValueStaysConfined(candidate, root))
+  );
+  if (unsafeAbsoluteMatches.length > 0) {
+    reasons.add('absolute_path');
+    matchCount += unsafeAbsoluteMatches.length;
+  }
+  for (const canary of canaries) {
+    if (canary && serialized.includes(canary)) {
+      reasons.add('canary_material');
+      matchCount += 1;
+    }
+  }
+  for (const content of contentFingerprints) {
+    if (content && serialized.includes(content)) {
+      reasons.add('indexed_content');
+      matchCount += 1;
+    }
+  }
+  return {
+    safe: reasons.size === 0,
+    reason_codes: [...reasons].sort(),
+    match_count: matchCount
+  };
+}
+
+export function auditCodexRolloutRecords(records = [], {
+  sandboxRoot,
+  requiredTools = [],
+  allowedTools = [],
+  allowedCommands = [],
+  providerServer = 'context-mode',
+  containmentViolation = false
+} = {}) {
+  const calls = [];
+  let invalidArguments = false;
+  for (const record of records) {
+    walkRecord(record, (candidate) => {
+      if (candidate.server !== providerServer || typeof candidate.tool !== 'string' ||
+          !/^ctx_[a-z0-9_]+$/.test(candidate.tool)) return;
+      let args = candidate.arguments ?? {};
+      if (typeof args === 'string') {
+        try {
+          args = JSON.parse(args);
+        } catch {
+          invalidArguments = true;
+          args = {};
+        }
+      }
+      calls.push({ tool: candidate.tool, arguments: args });
+    });
+  }
+  const toolCounts = {};
+  for (const call of calls) toolCounts[call.tool] = (toolCounts[call.tool] ?? 0) + 1;
+  const sortedToolCounts = Object.fromEntries(Object.entries(toolCounts).sort(([left], [right]) =>
+    left.localeCompare(right)
+  ));
+  const requiredPresent = requiredTools.every((tool) => toolCounts[tool] > 0);
+  const allowed = new Set(allowedTools);
+  const commandAllowlist = new Set(allowedCommands);
+  invalidArguments = invalidArguments || calls.some((call) =>
+    !argumentsHaveValidCommandShapes(call.arguments)
+  );
+  const forbiddenAbsent = calls.every((call) => allowed.has(call.tool));
+  const pathsConfined = Boolean(sandboxRoot) && calls.every((call) =>
+    argumentsStayConfined(call.arguments, sandboxRoot)
+  );
+  const commandsAllowed = calls.every((call) => commandValuesAllowed(call.arguments, commandAllowlist));
+  const common = {
+    record_count: records.length,
+    tool_counts: sortedToolCounts,
+    required_tools_present: requiredPresent,
+    forbidden_tools_absent: forbiddenAbsent,
+    paths_confined: pathsConfined,
+    commands_allowed: commandsAllowed
+  };
+  if (containmentViolation) {
+    return { status: 'FAIL', reason: 'raw_provider_rollout_escape', ...common };
+  }
+  if (invalidArguments || !sandboxRoot) {
+    return { status: 'NOT_RUN', reason: 'raw_provider_audit_invalid', ...common };
+  }
+  if (!pathsConfined) {
+    return { status: 'FAIL', reason: 'raw_provider_path_escape', ...common };
+  }
+  if (!forbiddenAbsent) {
+    return { status: 'FAIL', reason: 'raw_provider_tool_forbidden', ...common };
+  }
+  if (!commandsAllowed) {
+    return { status: 'FAIL', reason: 'raw_provider_command_forbidden', ...common };
+  }
+  if (calls.length === 0 || !requiredPresent) {
+    return { status: 'NOT_RUN', reason: 'raw_provider_audit_missing', ...common };
+  }
+  return { status: 'PASS', reason: 'raw_provider_audit_verified', ...common };
+}
+
+function walkRecord(value, visit, seen = new Set()) {
+  if (!value || typeof value !== 'object' || seen.has(value)) return;
+  seen.add(value);
+  visit(value);
+  for (const child of Object.values(value)) {
+    if (Array.isArray(child)) {
+      for (const item of child) walkRecord(item, visit, seen);
+    } else {
+      walkRecord(child, visit, seen);
+    }
+  }
+}
+
+function argumentsStayConfined(value, sandboxRoot, key = '') {
+  if (/^command$/i.test(key)) {
+    return commandPathsStayConfined(value, sandboxRoot);
+  }
+  if (Array.isArray(value)) {
+    return value.every((item) => argumentsStayConfined(item, sandboxRoot, key));
+  }
+  if (value && typeof value === 'object') {
+    return Object.entries(value).every(([childKey, child]) =>
+      argumentsStayConfined(child, sandboxRoot, childKey)
+    );
+  }
+  if (typeof value !== 'string') return true;
+  const pathLikeKey = /^(?:cwd|path|file|filename|directory|dir|root|source)$/i.test(key);
+  const candidates = new Set(embeddedAbsolutePaths(value));
+  if (pathLikeKey) candidates.add(value);
+  if (candidates.size === 0) return true;
+  return [...candidates].every((candidate) => pathValueStaysConfined(candidate, sandboxRoot));
+}
+
+function commandValuesAllowed(value, allowedCommands, key = '') {
+  if (/^command$/i.test(key)) {
+    return commandValueAllowed(value, allowedCommands);
+  }
+  if (Array.isArray(value)) {
+    return value.every((item) => commandValuesAllowed(item, allowedCommands, key));
+  }
+  if (value && typeof value === 'object') {
+    return Object.entries(value).every(([childKey, child]) =>
+      commandValuesAllowed(child, allowedCommands, childKey)
+    );
+  }
+  return true;
+}
+
+function commandValueAllowed(value, allowedCommands) {
+  const tokens = normalizeCommandTokens(value);
+  if (!tokens) return false;
+  const normalized = typeof value === 'string' ? value : tokens.join(' ');
+  if (!allowedCommands.has(normalized)) return false;
+  if (/[\r\n;&|<>`$]/.test(normalized)) return false;
+  return tokens.slice(1).every((rawToken) => !/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(rawToken));
+}
+
+function commandPathsStayConfined(value, sandboxRoot) {
+  const tokens = normalizeCommandTokens(value);
+  if (!tokens) return false;
+  const [rawExecutable, ...rawArguments] = tokens;
+  if (!executableTokenStaysConfined(rawExecutable, sandboxRoot)) return false;
+  return rawArguments.every((rawToken) => {
+    const token = rawToken.replace(/^(?:"([\s\S]*)"|'([\s\S]*)')$/, '$1$2');
+    if (!token || token.startsWith('-')) return true;
+    if (/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(token)) return false;
+    if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(token) && !path.win32.isAbsolute(token)) return false;
+    if (!/[\\/]/.test(token) && !/\.[A-Za-z0-9]+$/.test(token)) return true;
+    return pathValueStaysConfined(token, sandboxRoot);
+  });
+}
+
+function executableTokenStaysConfined(rawToken, sandboxRoot) {
+  const token = rawToken.replace(/^(?:"([\s\S]*)"|'([\s\S]*)')$/, '$1$2');
+  if (!token || token.startsWith('-') || token === '.' || token === '..' ||
+      /^[A-Za-z_][A-Za-z0-9_]*=/.test(token)) return false;
+  if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(token) && !path.win32.isAbsolute(token)) return false;
+  if (!/[\\/]/.test(token)) return /^[A-Za-z0-9][A-Za-z0-9_.+-]*$/.test(token);
+  if (/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(token)) return false;
+  return pathValueStaysConfined(token, sandboxRoot);
+}
+
+function argumentsHaveValidCommandShapes(value, key = '') {
+  if (/^command$/i.test(key)) return normalizeCommandTokens(value) !== null;
+  if (Array.isArray(value)) {
+    return value.every((item) => argumentsHaveValidCommandShapes(item, key));
+  }
+  if (value && typeof value === 'object') {
+    return Object.entries(value).every(([childKey, child]) =>
+      argumentsHaveValidCommandShapes(child, childKey)
+    );
+  }
+  return true;
+}
+
+function normalizeCommandTokens(value) {
+  if (typeof value === 'string') {
+    const tokens = value.trim().split(/\s+/).filter(Boolean);
+    return tokens.length > 0 ? tokens : null;
+  }
+  if (Array.isArray(value) && value.length > 0 && value.every((item) =>
+    typeof item === 'string' && item.length > 0
+  )) {
+    return [...value];
+  }
+  return null;
+}
+
+function embeddedAbsolutePaths(value) {
+  const matches = [];
+  for (const match of value.matchAll(/(?:^|[\s"'`=(:,])([A-Za-z]:[\\/](?![\\/])[^\s"'`;,\])}]+)/g)) {
+    matches.push(match[1]);
+  }
+  for (const match of value.matchAll(/(?:^|[\s"'`=(:,])(\\\\\?\\[A-Za-z]:\\[^\s"'`;,\])}]+)/g)) {
+    matches.push(match[1]);
+  }
+  for (const match of value.matchAll(/(?:^|[\s"'`=(:,])(\\\\(?!\?\\)[^\\/\s"'`;,\])}]+[\\/][^\s"'`;,\])}]+)/g)) {
+    matches.push(match[1]);
+  }
+  for (const match of value.matchAll(/\bfile:\/\/[^\s"'`;,\])}]+/gi)) {
+    const filePath = fileUriPath(match[0]);
+    if (filePath) matches.push(filePath);
+  }
+  for (const match of value.matchAll(/(?:^|[\s"'`=(:,])((?:\/(?!\/)[^\s"'`;,\])}]+)+)/g)) {
+    matches.push(match[1]);
+  }
+  return matches;
+}
+
+function fileUriPath(value) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'file:') return null;
+    const pathname = decodeURIComponent(url.pathname);
+    if (url.hostname) return `\\\\${url.hostname}${pathname.replaceAll('/', '\\')}`;
+    return /^\/[A-Za-z]:\//.test(pathname) ? pathname.slice(1) : pathname;
+  } catch {
+    return null;
+  }
+}
+
+function collectStringValues(value, values = [], seen = new Set()) {
+  if (typeof value === 'string') {
+    values.push(value);
+    return values;
+  }
+  if (!value || typeof value !== 'object' || seen.has(value)) return values;
+  seen.add(value);
+  for (const child of Object.values(value)) collectStringValues(child, values, seen);
+  return values;
+}
+
+function pathValueStaysConfined(value, sandboxRoot) {
+  let pathApi = path;
+  if (path.win32.isAbsolute(value)) {
+    if (!path.win32.isAbsolute(sandboxRoot)) return false;
+    pathApi = path.win32;
+  } else if (path.posix.isAbsolute(value)) {
+    if (!path.posix.isAbsolute(sandboxRoot)) return false;
+    pathApi = path.posix;
+  }
+  const target = pathApi.isAbsolute(value)
+    ? pathApi.resolve(value)
+    : pathApi.resolve(sandboxRoot, value);
+  const relative = pathApi.relative(pathApi.resolve(sandboxRoot), target);
+  return !relative.startsWith('..') && !pathApi.isAbsolute(relative);
+}
+
+export async function sanitizeAndDeleteUnsafeTrace({ tracePath, scan, allowedRoot, logger }) {
+  if (scan?.safe !== false) {
+    return { status: 'PASS', reason_codes: [], match_count: 0, raw_trace_deleted: false };
+  }
+  const blocked = () => {
+    logFix(logger, 'unsafe_trace_delete_blocked', { reason: 'unsafe_trace_delete_target' });
+    return {
+      status: 'BLOCKED',
+      reason_codes: ['unsafe_trace_delete_target'],
+      match_count: numberOrZero(scan.match_count),
+      raw_trace_deleted: false
+    };
+  };
+  if (!allowedRoot || !tracePath) return blocked();
+  try {
+    const resolvedRoot = path.resolve(allowedRoot);
+    if (path.parse(resolvedRoot).root === resolvedRoot) return blocked();
+    const [rootInfo, targetInfo] = await Promise.all([lstat(resolvedRoot), lstat(tracePath)]);
+    if (!rootInfo.isDirectory() || rootInfo.isSymbolicLink() || targetInfo.isSymbolicLink()) return blocked();
+    const [canonicalRoot, canonicalTarget] = await Promise.all([
+      realpath(resolvedRoot),
+      realpath(tracePath)
+    ]);
+    const relative = path.relative(canonicalRoot, canonicalTarget);
+    if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) return blocked();
+  } catch {
+    return blocked();
+  }
+  await rm(tracePath, { force: true });
+  logFix(logger, 'unsafe_trace_deleted', {
+    reason_count: new Set(scan.reason_codes ?? []).size,
+    match_count: numberOrZero(scan.match_count)
+  });
+  return {
+    status: 'FAIL',
+    reason_codes: [...new Set(scan.reason_codes ?? [])].sort(),
+    match_count: numberOrZero(scan.match_count),
+    raw_trace_deleted: true
+  };
+}
+
+export function buildContextModeResults(rows = []) {
+  const triadIds = [...new Set(rows.map((row) => row.triad_id))].sort();
+  const triads = triadIds.map((triadId) => buildTriad(
+    triadId,
+    rows.filter((row) => row.triad_id === triadId)
+  ));
+  return {
+    schema: CONTEXT_MODE_RESULTS_SCHEMA,
+    expected_variants_per_triad: 3,
+    rows: rows.map(sanitizeRow),
+    triads,
+    mcp_outcome: reduceDecision(triads.map((triad) => triad.mcp_decision)),
+    plugin_outcome: reduceDecision(triads.map((triad) => triad.plugin_decision)),
+    gates: {
+      correctness_veto: true,
+      privacy_veto: true,
+      lifecycle_veto: true,
+      purge_veto: true,
+      cleanup_veto: true
+    }
+  };
+}
+
+function buildTriad(triadId, rows) {
+  const variants = Object.fromEntries(rows.map((row) => [row.variant, row]));
+  const complete = ['baseline', 'mcp_only', 'codex_plugin'].every((variant) => variants[variant]);
+  const fingerprints = rows.map((row) => row.settings_fingerprint);
+  const symmetric = complete && rows.length === 3 &&
+    fingerprints.every((value) => typeof value === 'string' && value.length > 0) &&
+    new Set(fingerprints).size === 1;
+  return {
+    triad_id: triadId,
+    complete,
+    symmetric,
+    mcp_decision: decideCandidate(variants.baseline, variants.mcp_only, { positive: 'conditional', symmetric }),
+    plugin_decision: decideCandidate(variants.baseline, variants.codex_plugin, { positive: 'recommend', symmetric }),
+    mcp_token_delta: symmetric ? tokenDelta(variants.baseline, variants.mcp_only) : null,
+    plugin_token_delta: symmetric ? tokenDelta(variants.baseline, variants.codex_plugin) : null
+  };
+}
+
+function decideCandidate(baseline, candidate, { positive, symmetric }) {
+  if (!candidate) return 'NOT_RUN';
+  if (!baseline || baseline.status !== 'PASS') return 'NOT_RUN';
+  if (candidate.status === 'BLOCKED') return 'forbid';
+  if (candidate.privacy_pass === false || candidate.purge_pass === false ||
+      candidate.cleanup_pass === false) {
+    return 'forbid';
+  }
+  if (candidate.status === 'NOT_RUN') return 'NOT_RUN';
+  if (!symmetric) return 'NOT_RUN';
+  const decisionEvidence = [
+    candidate.correctness_pass,
+    candidate.privacy_pass,
+    candidate.purge_pass,
+    candidate.cleanup_pass,
+    candidate.continuity_pass
+  ];
+  if (decisionEvidence.some((value) => typeof value !== 'boolean')) return 'NOT_RUN';
+  if (candidate.status !== 'PASS') return 'avoid';
+  if (candidate.correctness_pass === false || candidate.continuity_pass === false) return 'avoid';
+  return positive;
+}
+
+function tokenDelta(baseline, candidate) {
+  const baselineTokens = baseline?.cost?.input_output_tokens;
+  const candidateTokens = candidate?.cost?.input_output_tokens;
+  if (!Number.isFinite(baselineTokens) || !Number.isFinite(candidateTokens)) return null;
+  return candidateTokens - baselineTokens;
+}
+
+function reduceDecision(decisions) {
+  if (decisions.includes('forbid')) return 'forbid';
+  if (decisions.includes('avoid')) return 'avoid';
+  if (decisions.length === 0 || decisions.includes('NOT_RUN')) return 'NOT_RUN';
+  if (decisions.every((decision) => decision === 'recommend')) return 'recommend';
+  return 'conditional';
+}
+
+function sanitizeRow(row) {
+  return {
+    row_id: row.row_id,
+    triad_id: row.triad_id,
+    variant: row.variant,
+    status: row.status,
+    reason: row.reason,
+    settings_fingerprint: row.settings_fingerprint,
+    correctness_pass: row.correctness_pass,
+    privacy_pass: row.privacy_pass,
+    purge_pass: row.purge_pass,
+    cleanup_pass: row.cleanup_pass,
+    continuity_pass: row.continuity_pass,
+    evidence_class: row.evidence_class,
+    cost: row.cost
+  };
+}
+
+function numberOrZero(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+function booleanOrNull(value) {
+  return typeof value === 'boolean' ? value : null;
+}
+
+function finiteNonNegativeOrNull(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? value
+    : null;
+}
+
+function positiveIntegerOrNull(value) {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : null;
+}
+
+function nonNegativeIntegerOrNull(value) {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+function logFix(logger, event, fields) {
+  if (typeof logger !== 'function') return;
+  logger(`[FIX:134] ${event} ${JSON.stringify(fields)}`);
+}
