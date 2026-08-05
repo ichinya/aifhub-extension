@@ -339,11 +339,13 @@ function systemPromptForVariant(variant, row) {
 
 function toolAssertionLinesForVariant(variant, row) {
   if (variant === 'baseline') {
-    const pattern = row.scenario_id === 'large_generated_output_retrieval'
+    const largeOutput = row.scenario_id === 'large_generated_output_retrieval';
+    const assertionId = largeOutput ? 'baseline-node-called' : 'baseline-rg-called';
+    const pattern = largeOutput
       ? BASELINE_NODE_COMMAND_PATTERN
       : BASELINE_RG_COMMAND_PATTERN;
     return [
-      '  - id: "baseline-rg-called"',
+      `  - id: "${assertionId}"`,
       '    type: tool_called',
       '    tool: "Bash"',
       '    args_match:',

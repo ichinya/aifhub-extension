@@ -32,6 +32,26 @@ describe('context-mode complete-record normalization', () => {
     assert.equal(row.cost.input_output_tokens, null);
   });
 
+  it('fails closed instead of throwing when turns is not an array', () => {
+    const trace = completeNormalizationTrace();
+    trace.turns = { tool_calls: 1 };
+    const row = normalizeContextModeTrace(trace);
+    assert.equal(row.status, 'FAIL');
+    assert.equal(row.reason, 'incomplete_trace_evidence');
+    assert.equal(row.tool_calls, 0);
+    assert.equal(row.turns, 0);
+  });
+
+  it('fails closed instead of throwing when a turn entry is null', () => {
+    const trace = completeNormalizationTrace();
+    trace.turns = [null];
+    const row = normalizeContextModeTrace(trace);
+    assert.equal(row.status, 'FAIL');
+    assert.equal(row.reason, 'incomplete_trace_evidence');
+    assert.equal(row.tool_calls, 0);
+    assert.equal(row.turns, 1);
+  });
+
   it('separates setup, MCP startup/index/query and answer costs', () => {
     const row = normalizeContextModeTrace({
       row_id: 'row',
@@ -395,6 +415,30 @@ describe('context-mode triad decisions', () => {
     assert.equal(report.plugin_outcome, 'NOT_RUN');
   });
 });
+
+function completeNormalizationTrace() {
+  return {
+    row_id: 'row',
+    triad_id: 'triad',
+    variant: 'baseline',
+    status: 'PASS',
+    settings_fingerprint: 'same',
+    scoring: { overall_pass: true, required_facts: 1, recovered_facts: 1 },
+    lifecycle: { privacy: true, purge: true, cleanup: true, continuity: true },
+    evidence_class: 'ai_tester_trace',
+    cost: {
+      cold_setup_ms: 0,
+      mcp_startup_ms: 0,
+      index_ms: 0,
+      warm_query_ms: 0,
+      answer_ms: 1,
+      input_tokens: 1,
+      output_tokens: 1
+    },
+    turns: [{ tool_calls: 0 }],
+    final_output: 'safe'
+  };
+}
 
 function safeRow(variant) {
   return {

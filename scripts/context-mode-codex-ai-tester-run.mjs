@@ -210,13 +210,27 @@ export async function executeMissingRows({
       statuses.push(rowStatus(row, 'NOT_RUN', 'fresh_session_driver_unavailable'));
       continue;
     }
+    let rawBefore = null;
     if (row.variant !== 'baseline') {
+      // Provisioning is setup-only; required provider calls must come from the live model turn.
+      const rawBeforeProvision = await snapshotRolloutFiles(path.join(env.CODEX_HOME, 'sessions'));
       onProviderProvisioningAttempt?.({ row });
       let provisioned;
       try {
         provisioned = await provisionRow({ row, env, runRoot, scenarioFile });
       } catch {
         provisioned = { status: 'NOT_RUN', reason: 'provider_provisioning_failed' };
+      }
+      const rawAfterProvision = await snapshotRolloutFiles(path.join(env.CODEX_HOME, 'sessions'));
+      if (!rolloutSnapshotsEqual(rawBeforeProvision, rawAfterProvision)) {
+        const status = rowStatus(row, 'FAIL', 'provider_provisioning_rollout_forbidden');
+        statuses.push(status);
+        logFix(logger, 'runner_row_checked', {
+          row_id: row.id,
+          status: status.status,
+          reason: status.reason
+        });
+        continue;
       }
       if (provisioned?.status !== 'PASS') {
         statuses.push(rowStatus(
@@ -226,11 +240,9 @@ export async function executeMissingRows({
         ));
         continue;
       }
+      rawBefore = rawAfterProvision;
     }
     const before = await snapshotTraceFiles(runRoot);
-    const rawBefore = row.variant === 'baseline'
-      ? null
-      : await snapshotRolloutFiles(path.join(env.CODEX_HOME, 'sessions'));
     const run = buildRunnerInvocation({ executable, scenarioFile, runRoot, row });
     let result;
     try {
@@ -623,6 +635,15 @@ async function snapshotRolloutFiles(root) {
     }];
   }));
   return new Map(entries);
+}
+
+function rolloutSnapshotsEqual(before, after) {
+  if (before.size !== after.size) return false;
+  return [...before.entries()].every(([file, snapshot]) => {
+    const current = after.get(file);
+    return current?.digest === snapshot.digest && current.size === snapshot.size &&
+      current.ends_with_newline === snapshot.ends_with_newline;
+  });
 }
 
 function invalidRawProviderAudit(recordCount) {

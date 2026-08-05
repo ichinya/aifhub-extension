@@ -235,6 +235,26 @@ describe('context-mode three-way matrix', () => {
     assert.doesNotMatch('myrg --files', matcher);
   });
 
+  it('labels baseline tool assertions after the command they actually match', async () => {
+    const catalog = await loadContextModeScenarioCatalog();
+    const matrix = buildContextModeMatrix({
+      catalog,
+      runId: 'context-mode-134-baseline-assertion-ids',
+      provenance,
+      generatedAt: '2026-08-05T15:00:00.000Z'
+    });
+    const largeOutput = matrix.rows.find((row) =>
+      row.variant === 'baseline' && row.scenario_id === 'large_generated_output_retrieval'
+    );
+    const rgBaseline = matrix.rows.find((row) =>
+      row.variant === 'baseline' && row.scenario_id !== 'large_generated_output_retrieval'
+    );
+
+    assert.match(renderAiTesterScenario(largeOutput), /id: "baseline-node-called"/);
+    assert.doesNotMatch(renderAiTesterScenario(largeOutput), /id: "baseline-rg-called"/);
+    assert.match(renderAiTesterScenario(rgBaseline), /id: "baseline-rg-called"/);
+  });
+
   it('renders the large-output scenario as a compact deterministic emitter whose facts cross 1 MiB', async () => {
     const catalog = await loadContextModeScenarioCatalog();
     const profile = catalog.fixture.profiles.large_stdout_tail;

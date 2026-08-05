@@ -20,11 +20,12 @@ export function normalizeContextModeTrace(record = {}) {
     : null;
   const required = positiveIntegerOrNull(record.scoring?.required_facts);
   const recovered = nonNegativeIntegerOrNull(record.scoring?.recovered_facts);
+  const turns = Array.isArray(record.turns) ? record.turns : [];
   const lifecycleComplete = ['privacy', 'purge', 'cleanup', 'continuity']
     .every((key) => typeof record.lifecycle?.[key] === 'boolean');
   const scoringComplete = typeof record.scoring?.overall_pass === 'boolean' &&
     required !== null && recovered !== null && recovered <= required;
-  const turnsComplete = Array.isArray(record.turns) && record.turns.every((turn) =>
+  const turnsComplete = Array.isArray(record.turns) && turns.every((turn) =>
     typeof turn?.tool_calls === 'number' && Number.isInteger(turn.tool_calls) && turn.tool_calls >= 0
   );
   const identityComplete = [record.row_id, record.triad_id, record.variant,
@@ -56,11 +57,11 @@ export function normalizeContextModeTrace(record = {}) {
     continuity_pass: record.lifecycle?.continuity === true,
     evidence_class: record.evidence_class,
     cost,
-    tool_calls: (record.turns ?? []).reduce(
-      (total, turn) => total + numberOrZero(turn.tool_calls),
+    tool_calls: turns.reduce(
+      (total, turn) => total + numberOrZero(turn?.tool_calls),
       0
     ),
-    turns: Array.isArray(record.turns) ? record.turns.length : 0,
+    turns: turns.length,
     final_output_bytes: Buffer.byteLength(String(record.final_output ?? ''))
   };
 }

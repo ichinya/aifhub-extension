@@ -337,6 +337,58 @@ describe('context-mode dedicated runner', () => {
     assert.doesNotMatch(JSON.stringify(result), /provider-pass|rollout\.jsonl|generated-output/);
   });
 
+  it('rejects provider rollout activity during setup-only provisioning', async () => {
+    let calls = 0;
+    let purgeCalls = 0;
+    const logs = [];
+    const rolloutPath = path.join(tempDir, 'sandbox', 'codex-home', 'sessions', 'run', 'rollout.jsonl');
+    const options = await runnerOptions({
+      runProcess: async () => {
+        calls += 1;
+        if (calls === 2) {
+          const tracePath = path.join(tempDir, 'sandbox', 'runs', 'inline', 'provider-window.json');
+          await mkdir(path.dirname(tracePath), { recursive: true });
+          await writeFile(tracePath, JSON.stringify(validTrace('row-a')), 'utf8');
+          await appendFile(rolloutPath, `${JSON.stringify(rolloutTool('ctx_search', {
+            queries: ['required facts']
+          }))}\n${JSON.stringify(rolloutTool('ctx_purge', { confirm: true, scope: 'project' }))}\n`, 'utf8');
+        }
+        return { exitCode: 0 };
+      }
+    });
+    Object.assign(options.matrix.rows[0], {
+      variant: 'mcp_only',
+      execution_gate: { status: 'PASS', reason: 'explicit_isolated_authorization' },
+      raw_provider_policy: {
+        required_tools: ['ctx_search', 'ctx_purge'],
+        allowed_tools: ['ctx_search', 'ctx_purge']
+      }
+    });
+    await mkdir(path.dirname(rolloutPath), { recursive: true });
+    await writeFile(rolloutPath, `${JSON.stringify(rolloutTool('ctx_search', {
+      queries: ['stale fact']
+    }))}\n`, 'utf8');
+    options.provisionRow = async () => {
+      await appendFile(rolloutPath, `${JSON.stringify(rolloutTool('ctx_stats', {}))}\n`, 'utf8');
+      return { status: 'PASS' };
+    };
+    options.purgeProvider = async () => {
+      purgeCalls += 1;
+      return { status: 'PASS' };
+    };
+    options.logger = (line) => logs.push(line);
+
+    const result = await runVerifiedMatrix(options);
+    assert.equal(result.status, 'FAIL');
+    assert.equal(result.statuses[0].reason, 'provider_provisioning_rollout_forbidden');
+    assert.equal(result.purge, 'PASS');
+    assert.equal(result.cleanup, 'PASS');
+    assert.equal(purgeCalls, 1);
+    assert.equal(calls, 1, 'only the schema dry-run may execute after provisioning writes a rollout');
+    assert.match(logs.join('\n'), /\[FIX:134\] runner_row_checked .*provider_provisioning_rollout_forbidden/);
+    await assert.rejects(access(options.sandboxRoot));
+  });
+
   it('keeps malformed raw-provider audit results shape-compatible with normal audits', async () => {
     let calls = 0;
     const options = await runnerOptions({
