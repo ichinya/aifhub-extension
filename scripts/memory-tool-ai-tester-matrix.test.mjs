@@ -353,6 +353,32 @@ describe('ai-tester matrix manifest', () => {
     assert.equal(filteredCatalogResult.body.tool_id, 'context-mode');
     assert.doesNotMatch(filteredCatalogStdout.join(''), /\bat\s+runMemoryToolAiTesterMatrix\b|Error:/);
     await assert.rejects(stat(filteredCatalogOutDir));
+
+    const unfilteredCatalogStdout = [];
+    const unfilteredCatalogOutDir = path.join(tmpDir, 'forbidden-unfiltered-catalog');
+    const unfilteredCatalogResult = await runMemoryToolAiTesterMatrix([
+      '--roots',
+      tmpDir,
+      '--out',
+      unfilteredCatalogOutDir,
+      '--metadata',
+      REAL_METADATA,
+      '--scenario-catalog',
+      REAL_CATALOG,
+      '--max-profiles',
+      '1',
+      '--dry-run'
+    ], {
+      cwd: REPO_ROOT,
+      stdout: unfilteredCatalogStdout,
+      exit: false
+    });
+    assert.equal(unfilteredCatalogResult.exitCode, 2);
+    assert.equal(unfilteredCatalogResult.body.status, 'NOT_RUN');
+    assert.equal(unfilteredCatalogResult.body.reason, 'context_mode_requires_dedicated_harness');
+    assert.equal(unfilteredCatalogResult.body.tool_id, 'context-mode');
+    assert.doesNotMatch(unfilteredCatalogStdout.join(''), /\bat\s+runMemoryToolAiTesterMatrix\b|Error:/);
+    await assert.rejects(stat(unfilteredCatalogOutDir));
   });
 
   it('generates catalog-driven accepted-evidence pairs with scenario metadata', async () => {

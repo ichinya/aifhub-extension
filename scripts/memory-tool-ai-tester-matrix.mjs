@@ -1327,13 +1327,7 @@ function findDedicatedHarnessTool(toolIds = []) {
 }
 
 function findDedicatedOnlyCatalogTool(scenarioCatalog, parsed = {}) {
-  const hasExplicitCatalogFilter = [
-    parsed.scenarioIds,
-    parsed.runClasses,
-    parsed.skills,
-    parsed.tasks
-  ].some((values) => asArray(values).length > 0);
-  if (!scenarioCatalog || !hasExplicitCatalogFilter || asArray(parsed.tools).length > 0) {
+  if (!scenarioCatalog || asArray(parsed.tools).length > 0) {
     return null;
   }
   const entries = filterScenarioCatalogEntries(scenarioCatalog, {
@@ -1343,10 +1337,7 @@ function findDedicatedOnlyCatalogTool(scenarioCatalog, parsed = {}) {
     taskScenarios: parsed.tasks
   });
   const candidateTools = unique(entries.flatMap((scenario) => asArray(scenario.tools)));
-  if (candidateTools.length === 0 || !candidateTools.every((toolId) => DEDICATED_HARNESS_ONLY_TOOLS.has(toolId))) {
-    return null;
-  }
-  return candidateTools[0];
+  return findDedicatedHarnessTool(candidateTools);
 }
 
 function emitDedicatedHarnessNotRun(toolId, options) {
