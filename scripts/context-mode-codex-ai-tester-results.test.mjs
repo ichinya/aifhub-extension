@@ -537,6 +537,50 @@ describe('context-mode triad decisions', () => {
     assert.equal(report.triads[0].plugin_decision, 'forbid');
     assert.equal(report.plugin_outcome, 'forbid');
   });
+
+  it('does not derive a comparative decision from asymmetric settings', () => {
+    for (const settingsFingerprint of ['different', undefined]) {
+      const report = buildContextModeResults([
+        safeRow('baseline'),
+        safeRow('mcp_only'),
+        { ...safeRow('codex_plugin'), settings_fingerprint: settingsFingerprint }
+      ]);
+
+      assert.equal(report.triads[0].symmetric, false);
+      assert.equal(report.triads[0].mcp_decision, 'NOT_RUN');
+      assert.equal(report.triads[0].plugin_decision, 'NOT_RUN');
+      assert.equal(report.triads[0].mcp_token_delta, null);
+      assert.equal(report.triads[0].plugin_token_delta, null);
+      assert.equal(report.mcp_outcome, 'NOT_RUN');
+      assert.equal(report.plugin_outcome, 'NOT_RUN');
+    }
+
+    const safetyFailure = buildContextModeResults([
+      safeRow('baseline'),
+      safeRow('mcp_only'),
+      {
+        ...safeRow('codex_plugin'),
+        settings_fingerprint: 'different',
+        privacy_pass: false
+      }
+    ]);
+    assert.equal(safetyFailure.triads[0].plugin_decision, 'forbid');
+  });
+
+  it('requires all three variants before deriving pair decisions or deltas', () => {
+    const report = buildContextModeResults([
+      safeRow('baseline'),
+      safeRow('mcp_only'),
+      { ...safeRow('mcp_only'), row_id: 'duplicate-mcp' }
+    ]);
+
+    assert.equal(report.triads[0].complete, false);
+    assert.equal(report.triads[0].symmetric, false);
+    assert.equal(report.triads[0].mcp_decision, 'NOT_RUN');
+    assert.equal(report.triads[0].plugin_decision, 'NOT_RUN');
+    assert.equal(report.triads[0].mcp_token_delta, null);
+    assert.equal(report.triads[0].plugin_token_delta, null);
+  });
 });
 
 function completeNormalizationTrace() {

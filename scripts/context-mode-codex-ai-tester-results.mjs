@@ -420,30 +420,32 @@ export function buildContextModeResults(rows = []) {
 
 function buildTriad(triadId, rows) {
   const variants = Object.fromEntries(rows.map((row) => [row.variant, row]));
-  const fingerprints = new Set(rows.map((row) => row.settings_fingerprint).filter(Boolean));
   const complete = ['baseline', 'mcp_only', 'codex_plugin'].every((variant) => variants[variant]);
-  const symmetric = fingerprints.size === 1 && rows.length === 3;
+  const fingerprints = rows.map((row) => row.settings_fingerprint);
+  const symmetric = complete && rows.length === 3 &&
+    fingerprints.every((value) => typeof value === 'string' && value.length > 0) &&
+    new Set(fingerprints).size === 1;
   return {
     triad_id: triadId,
     complete,
     symmetric,
     mcp_decision: decideCandidate(variants.baseline, variants.mcp_only, { positive: 'conditional', symmetric }),
     plugin_decision: decideCandidate(variants.baseline, variants.codex_plugin, { positive: 'recommend', symmetric }),
-    mcp_token_delta: tokenDelta(variants.baseline, variants.mcp_only),
-    plugin_token_delta: tokenDelta(variants.baseline, variants.codex_plugin)
+    mcp_token_delta: symmetric ? tokenDelta(variants.baseline, variants.mcp_only) : null,
+    plugin_token_delta: symmetric ? tokenDelta(variants.baseline, variants.codex_plugin) : null
   };
 }
 
 function decideCandidate(baseline, candidate, { positive, symmetric }) {
   if (!candidate) return 'NOT_RUN';
   if (!baseline || baseline.status !== 'PASS') return 'NOT_RUN';
-  if (!symmetric) return 'avoid';
   if (candidate.status === 'BLOCKED') return 'forbid';
   if (candidate.privacy_pass === false || candidate.purge_pass === false ||
       candidate.cleanup_pass === false) {
     return 'forbid';
   }
   if (candidate.status === 'NOT_RUN') return 'NOT_RUN';
+  if (!symmetric) return 'NOT_RUN';
   const decisionEvidence = [
     candidate.correctness_pass,
     candidate.privacy_pass,

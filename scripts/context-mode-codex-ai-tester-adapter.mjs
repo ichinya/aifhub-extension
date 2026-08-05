@@ -951,8 +951,8 @@ export async function runSandboxLifecycle({
     ...(runResult ?? {}),
     schema: CONTEXT_MODE_ADAPTER_SCHEMA,
     status,
-    reason: operationFailure ?? runResult?.reason ??
-      (shouldPurge && purgeStatus !== 'PASS' ? 'provider_purge_failed' : undefined),
+    reason: operationFailure ??
+      (shouldPurge && purgeStatus !== 'PASS' ? 'provider_purge_failed' : runResult?.reason),
     purge: purgeStatus,
     cleanup: cleanupStatus
   };

@@ -482,6 +482,41 @@ describe('context-mode sandbox and lifecycle boundary', () => {
     );
   });
 
+  it('reports a required provider purge failure ahead of an earlier success reason', async () => {
+    const ownerRoot = path.join(tempDir, 'owned-purge-reason');
+    const sandboxRoot = path.join(ownerRoot, 'sandbox');
+    await mkdir(sandboxRoot, { recursive: true });
+    await writeFile(path.join(sandboxRoot, 'state.json'), '{}', 'utf8');
+
+    const result = await runSandboxLifecycle({
+      ownerRoot,
+      sandboxRoot,
+      run: async () => ({ status: 'PASS', reason: 'all_rows_passed' }),
+      purge: async () => ({ status: 'FAIL' })
+    });
+
+    assert.equal(result.status, 'FAIL');
+    assert.equal(result.reason, 'provider_purge_failed');
+    assert.equal(result.purge, 'FAIL');
+    assert.equal(result.cleanup, 'PASS');
+
+    const timeoutSandboxRoot = path.join(ownerRoot, 'timeout-sandbox');
+    await mkdir(timeoutSandboxRoot, { recursive: true });
+    const timeoutResult = await runSandboxLifecycle({
+      ownerRoot,
+      sandboxRoot: timeoutSandboxRoot,
+      run: async () => {
+        const error = new Error('process_timeout');
+        error.code = 'process_timeout';
+        throw error;
+      },
+      purge: async () => ({ status: 'FAIL' })
+    });
+    assert.equal(timeoutResult.reason, 'process_timeout');
+    assert.equal(timeoutResult.purge, 'FAIL');
+    assert.equal(timeoutResult.cleanup, 'PASS');
+  });
+
   it('unlinks internal package symlinks during cleanup without touching their targets', async () => {
     const ownerRoot = path.join(tempDir, 'owned-symlink-cleanup');
     const sandboxRoot = path.join(ownerRoot, 'sandbox');

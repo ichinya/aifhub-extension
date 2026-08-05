@@ -59,6 +59,9 @@ export function validateContextModeScenarioCatalog(catalog = {}) {
     errors.push('scenarios');
   }
   if (!isSafeRelativeFile(catalog.fixture?.artifact)) errors.push('fixture.artifact');
+  if (typeof catalog.fixture?.content !== 'string' || catalog.fixture.content.length === 0) {
+    errors.push('fixture.content');
+  }
   const profiles = catalog.fixture?.profiles;
   if (!profiles || profiles.standard?.kind !== 'file' ||
       profiles.large_stdout_tail?.kind !== 'generated_stdout' ||

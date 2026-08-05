@@ -338,7 +338,7 @@ describe('context-mode three-way matrix', () => {
     assert.doesNotMatch(renderedMcp, /project\/generated-output\.txt/);
   });
 
-  it('rejects unsafe fixture artifact names before rendering them', async () => {
+  it('rejects unsafe fixture inputs before rendering them', async () => {
     const catalog = await loadContextModeScenarioCatalog();
     for (const artifact of ['.', '..', 'unsafe\nartifact.txt', 'nested/artifact.txt']) {
       const changedCatalog = structuredClone(catalog);
@@ -349,6 +349,17 @@ describe('context-mode three-way matrix', () => {
         provenance,
         generatedAt: '2026-08-05T15:00:00.000Z'
       }), /invalid_catalog/);
+    }
+
+    for (const content of [undefined, null, '', 42]) {
+      const changedCatalog = structuredClone(catalog);
+      changedCatalog.fixture.content = content;
+      assert.throws(() => buildContextModeMatrix({
+        catalog: changedCatalog,
+        runId: 'context-mode-134-unsafe-fixture-content',
+        provenance,
+        generatedAt: '2026-08-05T15:00:00.000Z'
+      }), /invalid_catalog:fixture\.content/);
     }
   });
 
