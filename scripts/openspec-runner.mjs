@@ -1,5 +1,5 @@
 // openspec-runner.mjs - shared OpenSpec CLI runner and capability detection
-import { execFile } from 'node:child_process';
+import { execFile as execFileCallback } from 'node:child_process';
 import { accessSync, constants } from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -7,26 +7,29 @@ import { promisify } from 'node:util';
 export const OPENSPEC_SUPPORTED_RANGE = '>=1.3.1 <2.0.0';
 export const OPENSPEC_NODE_RANGE = '>=20.19.0';
 
-const execFileAsync = promisify(execFile);
+const execFileAsync = promisify(execFileCallback);
 const OPENSPEC_MIN_VERSION = '1.3.1';
 const OPENSPEC_MAX_VERSION = '2.0.0';
 const NODE_MIN_VERSION = '20.19.0';
 const DEFAULT_MAX_BUFFER = 10 * 1024 * 1024;
 const WINDOWS_SCRIPT_EXTENSIONS = ['.cmd', '.bat'];
+const COMMAND_SOURCES = new Set(['explicit', 'project-local', 'path']);
 
 const ERRORS = {
   invalidJson: {
     code: 'invalid-json',
     message: 'OpenSpec command returned invalid JSON.'
   },
-  missingCli: {
-    code: 'missing-cli',
-    message: 'OpenSpec CLI is not available on PATH.'
+  missingCli(command, commandSource) {
+    return {
+      code: 'missing-cli',
+      message: `Selected OpenSpec CLI '${command}' (${commandSource}) is unavailable.`
+    };
   },
-  nonZeroExit(exitCode) {
+  nonZeroExit(exitCode, command, commandSource) {
     return {
       code: 'non-zero-exit',
-      message: `OpenSpec command failed with exit code ${exitCode}.`
+      message: `OpenSpec command '${command}' (${commandSource}) failed with exit code ${exitCode}.`
     };
   },
   unsupportedNode(nodeVersion) {
@@ -35,44 +38,144 @@ const ERRORS = {
       message: `Node ${nodeVersion} does not satisfy OpenSpec requirement ${OPENSPEC_NODE_RANGE}.`
     };
   },
-  unsupportedVersion(version) {
+  unsupportedVersion(version, command, commandSource) {
     return {
       code: 'unsupported-version',
-      message: `OpenSpec CLI version ${version} is outside supported range ${OPENSPEC_SUPPORTED_RANGE}.`
+      message: `OpenSpec CLI '${command}' (${commandSource}) reported version ${version}, outside supported range ${OPENSPEC_SUPPORTED_RANGE}.`
     };
   },
-  versionDetectionFailed: {
-    code: 'version-detection-failed',
-    message: 'OpenSpec version detection failed.'
+  versionDetectionFailed(command, commandSource) {
+    return {
+      code: 'version-detection-failed',
+      message: `OpenSpec version detection failed for '${command}' (${commandSource}).`
+    };
   }
 };
 
+export function resolveOpenSpecCommand(options = {}) {
+  const cwd = options.cwd ?? process.cwd();
+  const platform = options.platform ?? process.platform;
+  const pathApi = getPlatformPath(platform);
+  const candidateExists = options.candidateExists ?? isAccessibleFile;
+  const explicitCommand = getExplicitCommand(options);
+
+  if (explicitCommand !== null) {
+    return createCommandResolution({
+      executable: explicitCommand,
+      displayCommand: createSafeCommandDisplay(explicitCommand, cwd, pathApi),
+      commandSource: 'explicit'
+    });
+  }
+
+  const resolvedCwd = pathApi.resolve(String(cwd));
+  const localExecutable = pathApi.join(
+    resolvedCwd,
+    'node_modules',
+    '.bin',
+    platform === 'win32' ? 'openspec.cmd' : 'openspec'
+  );
+
+  if (candidateExists(localExecutable)) {
+    return createCommandResolution({
+      executable: localExecutable,
+      displayCommand: toPosix(pathApi.relative(resolvedCwd, localExecutable)),
+      commandSource: 'project-local'
+    });
+  }
+
+  return createCommandResolution({
+    executable: 'openspec',
+    displayCommand: 'openspec',
+    commandSource: 'path'
+  });
+}
+
+function getExplicitCommand(options) {
+  if (!Object.prototype.hasOwnProperty.call(options, 'command') || options.command === undefined) {
+    return null;
+  }
+
+  const command = String(options.command ?? '').trim();
+  return command.length > 0 ? command : null;
+}
+
+function createCommandResolution({ executable, displayCommand, commandSource }) {
+  if (!COMMAND_SOURCES.has(commandSource)) {
+    throw new Error(`Invalid OpenSpec command source: ${commandSource}.`);
+  }
+
+  return {
+    executable,
+    displayCommand: boundCommandDisplay(displayCommand),
+    commandSource
+  };
+}
+
+function createSafeCommandDisplay(command, cwd, pathApi) {
+  const commandText = String(command);
+
+  if (!pathApi.isAbsolute(commandText)) {
+    return toPosix(commandText);
+  }
+
+  const resolvedCwd = pathApi.resolve(String(cwd));
+  const resolvedCommand = pathApi.resolve(commandText);
+  const relative = pathApi.relative(resolvedCwd, resolvedCommand);
+
+  if (isSafeRelativePath(relative, pathApi)) {
+    return toPosix(relative || pathApi.basename(resolvedCommand));
+  }
+
+  return pathApi.basename(resolvedCommand) || 'openspec';
+}
+
+function isSafeRelativePath(relativePath, pathApi) {
+  return relativePath.length === 0
+    || (!relativePath.startsWith('..') && !pathApi.isAbsolute(relativePath));
+}
+
+function boundCommandDisplay(value) {
+  const normalized = String(value ?? 'openspec')
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .trim();
+  const display = normalized.length > 0 ? normalized : 'openspec';
+  return display.length <= 240 ? display : `…${display.slice(-239)}`;
+}
+
+function getPlatformPath(platform) {
+  return platform === 'win32' ? path.win32 : path.posix;
+}
+
+function toPosix(value) {
+  return String(value).replaceAll('\\', '/');
+}
+
 export async function detectOpenSpec(options = {}) {
   const {
-    command = 'openspec',
     cwd = process.cwd(),
     env = process.env,
-    executor = defaultExecutor,
     nodeVersion = process.versions.node
   } = options;
 
   const nodeSupported = satisfiesGte(nodeVersion, NODE_MIN_VERSION);
   const versionResult = await runOpenSpec(['--version'], {
-    command,
+    ...options,
     cwd,
     env,
-    executor,
     expectJson: false
   });
+  const command = versionResult.command;
+  const commandSource = versionResult.commandSource;
 
   if (versionResult.error?.code === 'missing-cli') {
     return createDetectionResult({
       available: false,
       command,
+      commandSource,
       nodeVersion,
       nodeSupported,
       reason: 'missing-cli',
-      errors: [ERRORS.missingCli]
+      errors: [ERRORS.missingCli(command, commandSource)]
     });
   }
 
@@ -80,10 +183,11 @@ export async function detectOpenSpec(options = {}) {
     return createDetectionResult({
       available: true,
       command,
+      commandSource,
       nodeVersion,
       nodeSupported,
       reason: 'version-detection-failed',
-      errors: [ERRORS.versionDetectionFailed]
+      errors: [ERRORS.versionDetectionFailed(command, commandSource)]
     });
   }
 
@@ -93,10 +197,11 @@ export async function detectOpenSpec(options = {}) {
     return createDetectionResult({
       available: true,
       command,
+      commandSource,
       nodeVersion,
       nodeSupported,
       reason: 'version-detection-failed',
-      errors: [ERRORS.versionDetectionFailed]
+      errors: [ERRORS.versionDetectionFailed(command, commandSource)]
     });
   }
 
@@ -108,7 +213,7 @@ export async function detectOpenSpec(options = {}) {
   }
 
   if (!versionSupported) {
-    errors.push(ERRORS.unsupportedVersion(version));
+    errors.push(ERRORS.unsupportedVersion(version, command, commandSource));
   }
 
   const capabilitiesEnabled = errors.length === 0;
@@ -119,6 +224,7 @@ export async function detectOpenSpec(options = {}) {
     canArchive: capabilitiesEnabled,
     version,
     command,
+    commandSource,
     nodeVersion,
     nodeSupported,
     versionSupported,
@@ -129,18 +235,30 @@ export async function detectOpenSpec(options = {}) {
 
 export async function runOpenSpec(args, options = {}) {
   const {
-    command = 'openspec',
     cwd = process.cwd(),
     env = process.env,
-    executor = defaultExecutor,
     expectJson = false
   } = options;
+  const resolution = resolveOpenSpecCommand({
+    command: options.command,
+    cwd,
+    platform: options.platform,
+    candidateExists: options.candidateExists
+  });
+  const executor = options.executor ?? ((call) => executeOpenSpecCommand({
+    ...call,
+    platform: options.platform,
+    execFile: options.execFile,
+    comSpec: options.comSpec,
+    candidateExists: options.candidateExists
+  }));
 
   const normalizedArgs = Array.from(args ?? []);
   const base = {
     ok: false,
     exitCode: null,
-    command,
+    command: resolution.displayCommand,
+    commandSource: resolution.commandSource,
     args: normalizedArgs,
     cwd,
     stdout: '',
@@ -154,7 +272,7 @@ export async function runOpenSpec(args, options = {}) {
 
   try {
     execution = await executor({
-      command,
+      command: resolution.executable,
       args: normalizedArgs,
       cwd,
       env
@@ -162,7 +280,7 @@ export async function runOpenSpec(args, options = {}) {
   } catch (err) {
     return {
       ...base,
-      ...normalizeThrownExecutionError(err)
+      ...normalizeThrownExecutionError(err, resolution)
     };
   }
 
@@ -176,7 +294,11 @@ export async function runOpenSpec(args, options = {}) {
       exitCode,
       stdout,
       stderr,
-      error: ERRORS.nonZeroExit(exitCode)
+      error: ERRORS.nonZeroExit(
+        exitCode,
+        resolution.displayCommand,
+        resolution.commandSource
+      )
     };
   }
 
@@ -302,7 +424,20 @@ export async function archiveOpenSpecChange(changeId, options = {}) {
   });
 }
 
-async function defaultExecutor({ command, args, cwd, env }) {
+export async function executeOpenSpecCommand(options = {}) {
+  const {
+    command,
+    args = [],
+    cwd = process.cwd(),
+    env = process.env
+  } = options;
+  const platform = options.platform ?? process.platform;
+  const execFileImplementation = options.execFile ?? execFileAsync;
+  const candidateExists = options.candidateExists ?? isAccessibleFile;
+  const comSpec = options.comSpec
+    ?? getEnvValue(env, 'ComSpec')
+    ?? process.env.ComSpec
+    ?? 'cmd.exe';
   const execOptions = {
     cwd,
     env,
@@ -310,8 +445,18 @@ async function defaultExecutor({ command, args, cwd, env }) {
     windowsHide: true
   };
 
+  if (platform === 'win32' && isWindowsCommandScript(command)) {
+    return executeWindowsCommandScript({
+      commandPath: command,
+      args,
+      execOptions,
+      execFileImplementation,
+      comSpec
+    });
+  }
+
   try {
-    const { stdout, stderr } = await execFileAsync(command, args, execOptions);
+    const { stdout, stderr } = await execFileImplementation(command, args, execOptions);
 
     return {
       exitCode: 0,
@@ -320,9 +465,19 @@ async function defaultExecutor({ command, args, cwd, env }) {
     };
   } catch (err) {
     if (err.code === 'ENOENT') {
-      const windowsShim = findWindowsCommandScript(command, env);
+      const windowsShim = findWindowsCommandScript(command, env, {
+        platform,
+        candidateExists
+      });
       if (windowsShim !== null) {
-        return executeWindowsCommandScript(windowsShim, args, execOptions, err);
+        return executeWindowsCommandScript({
+          commandPath: windowsShim,
+          args,
+          execOptions,
+          execFileImplementation,
+          comSpec,
+          originalError: err
+        });
       }
 
       throw err;
@@ -342,10 +497,17 @@ async function defaultExecutor({ command, args, cwd, env }) {
   }
 }
 
-async function executeWindowsCommandScript(commandPath, args, execOptions, originalError) {
+async function executeWindowsCommandScript({
+  commandPath,
+  args,
+  execOptions,
+  execFileImplementation,
+  comSpec,
+  originalError = null
+}) {
   try {
-    const { stdout, stderr } = await execFileAsync(
-      process.env.ComSpec ?? 'cmd.exe',
+    const { stdout, stderr } = await execFileImplementation(
+      comSpec,
       ['/d', '/s', '/c', quoteCmdCommand(commandPath, args)],
       {
         ...execOptions,
@@ -369,12 +531,15 @@ async function executeWindowsCommandScript(commandPath, args, execOptions, origi
       };
     }
 
-    throw originalError;
+    throw originalError ?? err;
   }
 }
 
-function findWindowsCommandScript(command, env) {
-  if (process.platform !== 'win32') {
+function findWindowsCommandScript(command, env, options = {}) {
+  const platform = options.platform ?? process.platform;
+  const candidateExists = options.candidateExists ?? isAccessibleFile;
+
+  if (platform !== 'win32') {
     return null;
   }
 
@@ -384,11 +549,11 @@ function findWindowsCommandScript(command, env) {
   }
 
   if (hasPathSeparator(commandText)) {
-    return resolveWindowsScriptCandidate(commandText);
+    return resolveWindowsScriptCandidate(commandText, candidateExists);
   }
 
-  for (const directory of getWindowsPathEntries(env)) {
-    const resolved = resolveWindowsScriptCandidate(path.join(directory, commandText));
+  for (const directory of getWindowsPathEntries(env, platform)) {
+    const resolved = resolveWindowsScriptCandidate(path.win32.join(directory, commandText), candidateExists);
     if (resolved !== null) {
       return resolved;
     }
@@ -397,23 +562,27 @@ function findWindowsCommandScript(command, env) {
   return null;
 }
 
-function resolveWindowsScriptCandidate(candidateBase) {
-  const extension = path.extname(candidateBase).toLowerCase();
+function resolveWindowsScriptCandidate(candidateBase, candidateExists = isAccessibleFile) {
+  const extension = path.win32.extname(candidateBase).toLowerCase();
   const candidates = WINDOWS_SCRIPT_EXTENSIONS.includes(extension)
     ? [candidateBase]
     : WINDOWS_SCRIPT_EXTENSIONS.map((suffix) => `${candidateBase}${suffix}`);
 
-  return candidates.find(isAccessibleFile) ?? null;
+  return candidates.find(candidateExists) ?? null;
 }
 
-function getWindowsPathEntries(env) {
+function isWindowsCommandScript(command) {
+  return WINDOWS_SCRIPT_EXTENSIONS.includes(path.win32.extname(String(command ?? '')).toLowerCase());
+}
+
+function getWindowsPathEntries(env, platform = process.platform) {
   const pathValue = getEnvValue(env, 'PATH');
   if (pathValue === null) {
     return [];
   }
 
   return pathValue
-    .split(path.delimiter)
+    .split(platform === 'win32' ? path.win32.delimiter : path.delimiter)
     .filter((item) => item.trim().length > 0);
 }
 
@@ -474,15 +643,19 @@ function createDetectionResult(overrides = {}) {
     nodeVersion,
     nodeSupported,
     command: overrides.command ?? 'openspec',
+    commandSource: overrides.commandSource ?? 'path',
     reason: overrides.reason ?? null,
     errors: overrides.errors ?? []
   };
 }
 
-function normalizeThrownExecutionError(err) {
+function normalizeThrownExecutionError(err, resolution) {
   if (err?.code === 'ENOENT') {
     return {
-      error: ERRORS.missingCli
+      error: ERRORS.missingCli(
+        resolution.displayCommand,
+        resolution.commandSource
+      )
     };
   }
 

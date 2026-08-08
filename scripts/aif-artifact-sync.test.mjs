@@ -55,11 +55,13 @@ function missingCliDetection() {
     canValidate: false,
     canArchive: false,
     version: null,
+    command: 'openspec',
+    commandSource: 'path',
     reason: 'missing-cli',
     errors: [
       {
         code: 'missing-cli',
-        message: 'OpenSpec CLI is not available on PATH.'
+        message: "Selected OpenSpec CLI 'openspec' (path) is unavailable."
       }
     ]
   };
@@ -71,6 +73,8 @@ function availableCliDetection(overrides = {}) {
     canValidate: true,
     canArchive: true,
     version: '1.3.1',
+    command: overrides.command ?? 'openspec',
+    commandSource: overrides.commandSource ?? 'path',
     nodeVersion: overrides.nodeVersion ?? '20.19.0',
     nodeSupported: overrides.nodeSupported ?? true,
     versionSupported: overrides.versionSupported ?? true,
@@ -633,7 +637,88 @@ describe('artifact sync and export', () => {
     assert.equal(status.generatedRules.state, 'ok');
     assert.equal(result.validation.skipped, true);
     assert.equal(result.validation.reason, 'missing-cli');
+    assert.equal(result.generatedRules.openspecCli.command, 'openspec');
+    assert.equal(result.generatedRules.openspecCli.commandSource, 'path');
+    assert.equal(result.validation.detection.command, 'openspec');
+    assert.equal(result.validation.detection.commandSource, 'path');
+    const report = await readFixture(rootDir, '.ai-factory/state/mode-switches/2026-04-29T00-00-00-000Z-sync-openspec.md');
+    assert.match(report, /OpenSpec command: openspec/);
+    assert.match(report, /OpenSpec command source: path/);
     assert.equal(await pathExists(rootDir, '.ai-factory/state/mode-switches/2026-04-29T00-00-00-000Z-sync-openspec.md'), true);
+  });
+
+  it('propagates one explicit OpenSpec command through compiler detection, show, JSON, and human report', async () => {
+    const rootDir = await createTempRoot();
+    const detectionCalls = [];
+    const showCalls = [];
+    const command = 'custom-openspec';
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      '  openspec:',
+      '    validateOnSync: false',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/config.yaml', 'project: test\n');
+    await writeFixture(rootDir, 'openspec/changes/explicit-cli/proposal.md', '# Proposal\n');
+    await writeFixture(rootDir, 'openspec/changes/explicit-cli/specs/auth/spec.md', [
+      '# Auth',
+      '',
+      '## ADDED Requirements',
+      '',
+      '### Requirement: Explicit CLI',
+      '',
+      'The system MUST preserve explicit CLI selection.',
+      ''
+    ].join('\n'));
+
+    const result = await syncOpenSpecArtifacts({
+      rootDir,
+      changeId: 'explicit-cli',
+      command,
+      detectOpenSpec: async (options) => {
+        detectionCalls.push(options);
+        return availableCliDetection({ command, commandSource: 'explicit' });
+      },
+      showOpenSpecItem: async (itemName, options) => {
+        showCalls.push({ itemName, options });
+        return {
+          ok: true,
+          json: {
+            requirements: [{
+              title: 'Explicit CLI',
+              description: 'The system MUST preserve explicit CLI selection.',
+              scenarios: []
+            }]
+          }
+        };
+      },
+      timestamp: '2026-04-29T00-10-00-000Z'
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(detectionCalls.length, 1);
+    assert.equal(detectionCalls[0].command, command);
+    assert.equal(showCalls.length, 1);
+    assert.equal(showCalls[0].options.command, command);
+    assert.deepEqual(result.generatedRules.openspecCli, {
+      available: true,
+      canValidate: true,
+      canArchive: true,
+      version: '1.3.1',
+      command,
+      commandSource: 'explicit',
+      reason: null
+    });
+    const report = await readFixture(rootDir, '.ai-factory/state/mode-switches/2026-04-29T00-10-00-000Z-sync-openspec.md');
+    assert.match(report, /OpenSpec command: custom-openspec/);
+    assert.match(report, /OpenSpec command source: explicit/);
   });
 
   it('syncs generated rules for all active OpenSpec changes', async () => {

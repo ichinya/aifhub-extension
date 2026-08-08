@@ -66,11 +66,12 @@ function missingCliDetection() {
     nodeVersion: '20.19.0',
     nodeSupported: true,
     command: 'openspec',
+    commandSource: 'path',
     reason: 'missing-cli',
     errors: [
       {
         code: 'missing-cli',
-        message: 'OpenSpec CLI is not available on PATH.'
+        message: "Selected OpenSpec CLI 'openspec' (path) is unavailable."
       }
     ]
   };
@@ -158,6 +159,8 @@ describe('compileOpenSpecRules filesystem fallback', () => {
     assert.equal(result.ok, true);
     assert.equal(result.changeId, 'add-generated-rules');
     assert.equal(result.mode, 'filesystem-fallback');
+    assert.equal(result.openspecCli.command, 'openspec');
+    assert.equal(result.openspecCli.commandSource, 'path');
     assert.deepEqual(result.errors, []);
     assert.equal(result.files.length, 5);
     assert.deepEqual(result.files.map((file) => file.kind), ['base', 'change', 'merged', 'trace', 'index']);
@@ -436,9 +439,14 @@ The fallback parser SHOULD NOT be used when CLI JSON is complete.
 `
     });
     const calls = [];
+    const detectionCalls = [];
+    const explicitCommand = 'custom-openspec';
 
     const result = await compileOpenSpecRules('cli-rules', compilerOptions(rootDir, {
-      detectOpenSpec: async () => ({
+      command: explicitCommand,
+      detectOpenSpec: async (options) => {
+        detectionCalls.push(options);
+        return {
         available: true,
         canValidate: true,
         canArchive: true,
@@ -448,10 +456,12 @@ The fallback parser SHOULD NOT be used when CLI JSON is complete.
         requiresNode: '>=20.19.0',
         nodeVersion: '20.19.0',
         nodeSupported: true,
-        command: 'openspec',
+        command: explicitCommand,
+        commandSource: 'explicit',
         reason: null,
         errors: []
-      }),
+        };
+      },
       showOpenSpecItem: async (itemName, options) => {
         calls.push({ itemName, options });
         return {
@@ -477,10 +487,15 @@ The fallback parser SHOULD NOT be used when CLI JSON is complete.
 
     assert.equal(result.ok, true);
     assert.equal(result.mode, 'cli-json');
+    assert.equal(detectionCalls.length, 1);
+    assert.equal(detectionCalls[0].command, explicitCommand);
+    assert.equal(result.openspecCli.command, explicitCommand);
+    assert.equal(result.openspecCli.commandSource, 'explicit');
     assert.deepEqual(calls.map((call) => [call.itemName, call.options.deltasOnly]), [
       ['billing', false],
       ['auth', true]
     ]);
+    assert.equal(calls.every((call) => call.options.command === explicitCommand), true);
 
     const mergedRules = await readGenerated(rootDir, 'openspec-merged-cli-rules.md');
     assert.match(mergedRules, /Requirement: CLI billing/);

@@ -1,7 +1,7 @@
 // openspec-runner.test.mjs - tests for OpenSpec CLI runner and capability detection
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -10,6 +10,7 @@ import {
   detectOpenSpec,
   getOpenSpecInstructions,
   getOpenSpecStatus,
+  resolveOpenSpecCommand,
   runOpenSpec,
   showOpenSpecItem,
   validateOpenSpecChange
@@ -63,6 +64,7 @@ describe('detectOpenSpec', () => {
     assert.equal(result.nodeVersion, '20.19.0');
     assert.equal(result.nodeSupported, true);
     assert.equal(result.command, 'openspec');
+    assert.equal(result.commandSource, 'path');
     assert.equal(result.reason, null);
     assert.deepEqual(result.errors, []);
   });
@@ -100,7 +102,7 @@ describe('detectOpenSpec', () => {
     assert.deepEqual(result.errors, [
       {
         code: 'missing-cli',
-        message: 'OpenSpec CLI is not available on PATH.'
+        message: "Selected OpenSpec CLI 'openspec' (path) is unavailable."
       }
     ]);
   });
@@ -186,10 +188,147 @@ describe('detectOpenSpec', () => {
       assert.equal(result.canValidate, true);
       assert.equal(result.canArchive, true);
       assert.equal(result.version, '1.3.1');
+      assert.equal(result.command, 'openspec');
+      assert.equal(result.commandSource, 'path');
       assert.equal(result.reason, null);
     } finally {
       await rm(tempDir, { recursive: true, force: true });
     }
+  });
+
+  it('prefers a newer project-local CLI over an older global CLI', async () => {
+    const localCommand = '/workspace/node_modules/.bin/openspec';
+    const calls = [];
+    const result = await detectOpenSpec({
+      cwd: '/workspace',
+      platform: 'linux',
+      candidateExists: (candidate) => candidate === localCommand,
+      executor: async (call) => {
+        calls.push(call);
+        return {
+          exitCode: 0,
+          stdout: call.command === localCommand ? 'openspec 1.4.1' : 'openspec 1.2.0',
+          stderr: ''
+        };
+      },
+      nodeVersion: '20.19.0'
+    });
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].command, localCommand);
+    assert.equal(result.version, '1.4.1');
+    assert.equal(result.command, 'node_modules/.bin/openspec');
+    assert.equal(result.commandSource, 'project-local');
+    assert.equal(result.canValidate, true);
+  });
+
+  it('does not replace an unsupported project-local CLI with a supported global CLI', async () => {
+    const localCommand = '/workspace/node_modules/.bin/openspec';
+    const calls = [];
+    const result = await detectOpenSpec({
+      cwd: '/workspace',
+      platform: 'linux',
+      candidateExists: (candidate) => candidate === localCommand,
+      executor: async (call) => {
+        calls.push(call);
+        return {
+          exitCode: 0,
+          stdout: call.command === localCommand ? 'openspec 1.2.0' : 'openspec 1.4.1',
+          stderr: ''
+        };
+      },
+      nodeVersion: '20.19.0'
+    });
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].command, localCommand);
+    assert.equal(result.version, '1.2.0');
+    assert.equal(result.commandSource, 'project-local');
+    assert.equal(result.reason, 'unsupported-version');
+    assert.match(result.errors[0].message, /node_modules\/\.bin\/openspec.*project-local/);
+  });
+
+  it('uses a project-local Windows shim on the current Windows runtime', { skip: process.platform !== 'win32' }, async () => {
+    const tempDir = await mkdtemp(path.join(tmpdir(), 'openspec-local-shim-'));
+    const binDir = path.join(tempDir, 'node_modules', '.bin');
+
+    try {
+      await mkdir(binDir, { recursive: true });
+      await writeFile(
+        path.join(binDir, 'openspec.cmd'),
+        '@echo off\r\necho 1.4.1\r\n',
+        'utf8'
+      );
+
+      const result = await detectOpenSpec({
+        cwd: tempDir,
+        nodeVersion: '20.19.0'
+      });
+
+      assert.equal(result.available, true);
+      assert.equal(result.version, '1.4.1');
+      assert.equal(result.command, 'node_modules/.bin/openspec.cmd');
+      assert.equal(result.commandSource, 'project-local');
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('resolveOpenSpecCommand', () => {
+  it('selects an explicit command before project-local and PATH candidates', () => {
+    const result = resolveOpenSpecCommand({
+      command: '/workspace/tools/openspec',
+      cwd: '/workspace',
+      platform: 'linux',
+      candidateExists: () => true
+    });
+
+    assert.deepEqual(result, {
+      executable: '/workspace/tools/openspec',
+      displayCommand: 'tools/openspec',
+      commandSource: 'explicit'
+    });
+  });
+
+  it('treats an undefined command as absent and selects project-local', () => {
+    const result = resolveOpenSpecCommand({
+      command: undefined,
+      cwd: '/workspace',
+      platform: 'linux',
+      candidateExists: (candidate) => candidate === '/workspace/node_modules/.bin/openspec'
+    });
+
+    assert.equal(result.executable, '/workspace/node_modules/.bin/openspec');
+    assert.equal(result.displayCommand, 'node_modules/.bin/openspec');
+    assert.equal(result.commandSource, 'project-local');
+  });
+
+  it('uses the global PATH command only when project-local is absent', () => {
+    const result = resolveOpenSpecCommand({
+      cwd: '/workspace',
+      platform: 'linux',
+      candidateExists: () => false
+    });
+
+    assert.deepEqual(result, {
+      executable: 'openspec',
+      displayCommand: 'openspec',
+      commandSource: 'path'
+    });
+  });
+
+  it('bounds an explicit absolute command outside cwd to its basename', () => {
+    const result = resolveOpenSpecCommand({
+      command: '/private/tools/custom-openspec',
+      cwd: '/workspace',
+      platform: 'linux'
+    });
+
+    assert.equal(result.executable, '/private/tools/custom-openspec');
+    assert.equal(result.displayCommand, 'custom-openspec');
+    assert.equal(result.commandSource, 'explicit');
+    assert.doesNotMatch(result.displayCommand, /private|workspace/);
   });
 });
 
@@ -254,7 +393,7 @@ describe('runOpenSpec', () => {
     assert.equal(result.jsonParseError, null);
     assert.deepEqual(result.error, {
       code: 'non-zero-exit',
-      message: 'OpenSpec command failed with exit code 1.'
+      message: "OpenSpec command 'openspec' (path) failed with exit code 1."
     });
   });
 
@@ -273,12 +412,110 @@ describe('runOpenSpec', () => {
     assert.equal(result.jsonParseError, null);
     assert.deepEqual(result.error, {
       code: 'missing-cli',
-      message: 'OpenSpec CLI is not available on PATH.'
+      message: "Selected OpenSpec CLI 'openspec' (path) is unavailable."
     });
+  });
+
+  it('does not fall back after an explicit command is selected and missing', async () => {
+    const calls = [];
+    const result = await runOpenSpec(['--version'], {
+      command: '/workspace/tools/openspec',
+      cwd: '/workspace',
+      platform: 'linux',
+      candidateExists: () => true,
+      executor: async (call) => {
+        calls.push(call);
+        throw missingCliError();
+      }
+    });
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].command, '/workspace/tools/openspec');
+    assert.equal(result.command, 'tools/openspec');
+    assert.equal(result.commandSource, 'explicit');
+    assert.equal(result.error.code, 'missing-cli');
+    assert.match(result.error.message, /tools\/openspec.*explicit/);
+  });
+
+  it('executes a POSIX project-local shim directly with separate argv', async () => {
+    const calls = [];
+    const result = await runOpenSpec(['show', 'item with spaces'], {
+      cwd: '/workspace',
+      platform: 'linux',
+      candidateExists: (candidate) => candidate === '/workspace/node_modules/.bin/openspec',
+      execFile: async (...call) => {
+        calls.push(call);
+        return { stdout: 'ok', stderr: '' };
+      }
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.commandSource, 'project-local');
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0][0], '/workspace/node_modules/.bin/openspec');
+    assert.deepEqual(calls[0][1], ['show', 'item with spaces']);
+    assert.equal(calls[0][2].cwd, '/workspace');
+    assert.equal(calls[0][2].windowsVerbatimArguments, undefined);
+  });
+
+  it('routes a synthetic Windows project-local shim directly through ComSpec', async () => {
+    const calls = [];
+    const cwd = 'C:\\Work Space\\repo';
+    const localCommand = 'C:\\Work Space\\repo\\node_modules\\.bin\\openspec.cmd';
+    const result = await runOpenSpec(['show', 'value & more'], {
+      cwd,
+      platform: 'win32',
+      candidateExists: (candidate) => candidate === localCommand,
+      comSpec: 'C:\\Windows\\System32\\cmd.exe',
+      execFile: async (...call) => {
+        calls.push(call);
+        return { stdout: 'ok', stderr: '' };
+      }
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.command, 'node_modules/.bin/openspec.cmd');
+    assert.equal(result.commandSource, 'project-local');
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0][0], 'C:\\Windows\\System32\\cmd.exe');
+    assert.deepEqual(calls[0][1].slice(0, 3), ['/d', '/s', '/c']);
+    assert.match(calls[0][1][3], /"C:\\Work Space\\repo\\node_modules\\\.bin\\openspec\.cmd"/);
+    assert.match(calls[0][1][3], /"value & more"/);
+    assert.equal(calls[0][2].windowsVerbatimArguments, true);
   });
 });
 
 describe('OpenSpec command wrappers', () => {
+  it('uses the same project-local resolver semantics for every operation', async () => {
+    const localCommand = '/workspace/node_modules/.bin/openspec';
+    const calls = [];
+    const options = {
+      cwd: '/workspace',
+      platform: 'linux',
+      candidateExists: (candidate) => candidate === localCommand,
+      executor: async (call) => {
+        calls.push(call);
+        return {
+          exitCode: 0,
+          stdout: call.args[0] === 'archive' ? 'archived' : '{}',
+          stderr: ''
+        };
+      }
+    };
+
+    const results = await Promise.all([
+      validateOpenSpecChange('add-oauth', options),
+      getOpenSpecStatus('add-oauth', options),
+      showOpenSpecItem('add-oauth', options),
+      getOpenSpecInstructions('apply', { ...options, change: 'add-oauth' }),
+      archiveOpenSpecChange('add-oauth', options)
+    ]);
+
+    assert.deepEqual(calls.map((call) => call.command), Array(5).fill(localCommand));
+    assert.equal(results.every((result) => result.command === 'node_modules/.bin/openspec'), true);
+    assert.equal(results.every((result) => result.commandSource === 'project-local'), true);
+  });
+
   it('validateOpenSpecChange builds the expected args', async () => {
     const { executor, calls } = createRecordingExecutor({
       exitCode: 0,
