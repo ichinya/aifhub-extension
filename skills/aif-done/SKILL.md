@@ -19,7 +19,7 @@ Resolve mode from `.ai-factory/config.yaml`:
 
 ## OpenSpec-native mode
 
-OpenSpec-native mode finalizes the verified change state through `scripts/openspec-done-finalizer.mjs`. It is the only OpenSpec-native archive/finalization step after `/aif-verify` passes.
+OpenSpec-native mode runs verified installed-project finalization through `ai-factory aifhub-done-finalizer --change <change-id> --json`. The wrapper resolves the extension-local `scripts/openspec-done-finalizer.mjs` implementation module; never execute that module from the consumer project root or an internal installed path. This remains the only OpenSpec-native archive/finalization step after `/aif-verify` passes.
 
 ### Preconditions
 
@@ -31,14 +31,14 @@ OpenSpec-native mode finalizes the verified change state through `scripts/opensp
 - Require `.ai-factory/qa/<change-id>/coverage.json` to exist, be current, and have coverage status `pass` or policy-accepted `warn`.
 - Require generated rules and durable rules gate evidence according to `requireGeneratedRulesForDone` and `requireRulesPassForDone`; generated rules readiness does not satisfy rules gate pass.
 - Apply `allowWarnOnDone.rules`, `allowWarnOnDone.coverage`, and `allowWarnOnDone.openspecStatus` before accepting warning-only finalization evidence.
-- Always run the pre-archive readiness gate through `scripts/openspec-done-readiness.mjs` before archive and persist `.ai-factory/qa/<change-id>/done-readiness.json`.
+- The installed finalizer must always run its extension-local `scripts/openspec-done-readiness.mjs` implementation module before archive and persist `.ai-factory/qa/<change-id>/done-readiness.json`; do not invoke that module as an installed-project command.
 - If verification has not run or verdict is `fail`, stop and suggest `/aif-verify` or `/aif-fix`.
 - If the verify gate result is missing, invalid, or `fail`, stop and suggest rerunning `/aif-verify <change-id>` or `/aif-fix <change-id>`.
 - If coverage, generated rules, or rules gate evidence is missing, invalid, stale, failed, or warning-only when policy does not allow the warning, stop on the readiness result and show its `suggested_next.command` and `suggested_next.reason` exactly. For rules gate blockers, the command may be the installed durable evidence writer, not `/aif-rules-check` alone.
 - If readiness reports a blocking failure, refuse archive and show `suggested_next.command` and `suggested_next.reason` exactly.
 - Refuse unverified changes; do not accept `Code verification: PENDING` as final verification.
-- Dirty workspace state is blocking by default before archive. Inspect with `git status --short`; commit or stash unrelated changes, or rerun the public route `/aif-done <change-id> --record-dirty-state` to record dirty state in final QA evidence before archive.
-- For docs/tooling-only changes that also need explicit dirty-state recording, preserve both flags with `/aif-done <change-id> --skip-specs --record-dirty-state`.
+- Dirty workspace state is blocking by default before archive. Inspect with `git status --short`; commit or stash unrelated changes, or rerun `ai-factory aifhub-done-finalizer --change <change-id> --record-dirty-state --json` to record dirty state in final QA evidence before archive.
+- For docs/tooling-only changes that also need explicit dirty-state recording, preserve both flags with `ai-factory aifhub-done-finalizer --change <change-id> --skip-specs --record-dirty-state --json`.
 
 ### Canonical Context
 
@@ -64,9 +64,9 @@ Runtime state and QA evidence live outside canonical changes:
 
 ### Archive Policy
 
-- Archive through `archiveOpenSpecChange(changeId, options)` from `scripts/openspec-runner.mjs`; this corresponds to `openspec archive <change-id> --yes`.
-- Use `archiveOpenSpecChange(changeId)` for normal finalization.
-- Use `archiveOpenSpecChange(changeId, { skipSpecs: true })` for docs/tooling-only finalization; this corresponds to `openspec archive <change-id> --yes --skip-specs --no-color`.
+- Use `ai-factory aifhub-done-finalizer --change <change-id> --json` as the installed executable route. Add `--skip-specs` only for docs/tooling-only finalization and never add `--force`, `--no-validate`, `--skip-archive`, `--dry-run`, or `--summary-only`.
+- Inside the extension implementation only, archive through `archiveOpenSpecChange(changeId, options)` from `scripts/openspec-runner.mjs`; this corresponds to `openspec archive <change-id> --yes`.
+- The extension-local implementation uses `archiveOpenSpecChange(changeId)` for normal finalization and `archiveOpenSpecChange(changeId, { skipSpecs: true })` for docs/tooling-only finalization; the latter corresponds to `openspec archive <change-id> --yes --skip-specs --no-color`.
 - Support the user-facing `--skip-specs` path while still writing final QA evidence and final summaries.
 - If OpenSpec CLI is missing or unsupported and archive is required, fail with an explicit OpenSpec CLI requirement.
 - Do not archive in `/aif-verify`; `/aif-verify` does not archive and only records verification evidence.
@@ -85,6 +85,7 @@ Normal output must report:
 - verification status and refusal reason when unverified;
 - dirty working tree state;
 - archive result;
+- bounded selected OpenSpec command/source from archive or pre-archive context;
 - canonical artifacts inspected;
 - generated rules state when relevant;
 - effective policy summary and policy-derived finalization blockers;
@@ -206,6 +207,8 @@ Legacy AI Factory-only mode preserves the verified plan finalization contract ba
 - In OpenSpec-native mode, never treat generated rules as a substitute for durable `rules` gate evidence.
 - In OpenSpec-native mode, obey `allowWarnOnDone` before accepting warning-only rules, coverage, or OpenSpec status evidence.
 - In OpenSpec-native mode, archive only through `archiveOpenSpecChange`; never use custom OpenSpec archive logic.
+- In installed OpenSpec-native projects, execute finalization only through `ai-factory aifhub-done-finalizer`; treat `scripts/openspec-done-finalizer.mjs`, `scripts/openspec-done-readiness.mjs`, and `scripts/openspec-runner.mjs` as extension-local implementation modules, not project-root commands.
+- Reject `--force`, `--no-validate`, `--skip-archive`, `--dry-run`, `--summary-only`, and unknown finalizer options.
 - In OpenSpec-native mode, never silently archive through legacy `.ai-factory/specs`.
 - Never invent governance changes without evidence from the verified plan.
 - When governance updates belong to another owner, use the owning path or return an exact handoff instead of silently skipping the change.

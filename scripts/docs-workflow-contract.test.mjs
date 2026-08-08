@@ -374,7 +374,11 @@ describe('complete OpenSpec workflow documentation contract', () => {
       ['docs/usage.md', usage],
       ['docs/openspec-validation.md', validation]
     ]) {
-      assertIncludes(source, '/aif-done <change-id> --record-dirty-state', label);
+      assertIncludes(
+        source,
+        'ai-factory aifhub-done-finalizer --change <change-id> --record-dirty-state --json',
+        label
+      );
       assertIncludes(source, 'git status --short', label);
       assertIncludes(source, 'final QA evidence', label);
       assertIncludes(source, 'dirty workspace', label);
@@ -382,7 +386,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
 
     assertIncludes(
       usage,
-      '/aif-done <change-id> --skip-specs --record-dirty-state',
+      'ai-factory aifhub-done-finalizer --change <change-id> --skip-specs --record-dirty-state --json',
       'docs/usage.md'
     );
     assertNotIncludes(
@@ -398,7 +402,13 @@ describe('complete OpenSpec workflow documentation contract', () => {
   });
 
   it('documents installed-project helper execution through AIFHub wrappers', async () => {
+    const readme = await readRepoFile('README.md');
+    const usage = await readRepoFile('docs/usage.md');
     const validation = await readRepoFile('docs/openspec-validation.md');
+    const compatibility = await readRepoFile('docs/openspec-compatibility.md');
+    const codexAgents = await readRepoFile('docs/codex-agents.md');
+    const claudeAgents = await readRepoFile('docs/claude-agents.md');
+    const changelog = await readRepoFile('CHANGELOG.md');
     const handoffProfile = await readRepoFile('docs/handoff-validation-profile.md');
 
     for (const expected of [
@@ -408,6 +418,33 @@ describe('complete OpenSpec workflow documentation contract', () => {
       assertIncludes(validation, expected, 'docs/openspec-validation.md');
     }
 
+    for (const [label, source] of [
+      ['README.md', readme],
+      ['docs/usage.md', usage],
+      ['docs/openspec-validation.md', validation],
+      ['docs/openspec-compatibility.md', compatibility],
+      ['docs/codex-agents.md', codexAgents],
+      ['docs/claude-agents.md', claudeAgents],
+      ['CHANGELOG.md', changelog]
+    ]) {
+      assertIncludes(
+        source,
+        'ai-factory aifhub-done-finalizer --change <change-id> --json',
+        label
+      );
+    }
+
+    for (const expected of [
+      'Explicit non-empty',
+      'project-local',
+      '`PATH`',
+      'auto-install',
+      'commandSource',
+      'Filesystem-based'
+    ]) {
+      assertIncludes(compatibility, expected, 'docs/openspec-compatibility.md');
+    }
+
     assertIncludes(
       handoffProfile,
       'ai-factory aifhub-handoff-gate-summary --change <change-id> --stage review --json',
@@ -415,13 +452,30 @@ describe('complete OpenSpec workflow documentation contract', () => {
     );
 
     for (const [label, source] of [
+      ['README.md', readme],
+      ['docs/usage.md', usage],
       ['docs/openspec-validation.md', validation],
+      ['docs/openspec-compatibility.md', compatibility],
+      ['docs/codex-agents.md', codexAgents],
+      ['docs/claude-agents.md', claudeAgents],
       ['docs/handoff-validation-profile.md', handoffProfile]
     ]) {
       assert.doesNotMatch(
         source,
         /\bnode\s+scripts\/[A-Za-z0-9_.-]+\.mjs\b/,
         `${label} should not expose root scripts as installed-project helper commands`
+      );
+    }
+
+    for (const [label, source] of [
+      ['docs/usage.md', usage],
+      ['docs/openspec-validation.md', validation],
+      ['docs/openspec-compatibility.md', compatibility]
+    ]) {
+      assert.match(
+        source,
+        /scripts\/openspec-[A-Za-z0-9_.-]+\.mjs[^\n]*(?:extension-local|implementation module)|(?:extension-local|implementation module)[^\n]*scripts\/openspec-[A-Za-z0-9_.-]+\.mjs/i,
+        `${label} should identify internal OpenSpec module references as implementation-only`
       );
     }
   });

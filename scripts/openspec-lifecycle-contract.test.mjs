@@ -222,8 +222,10 @@ describe('OpenSpec lifecycle CLI integration contract', () => {
     ]);
 
     for (const expected of [
+      'ai-factory aifhub-done-finalizer --change <change-id> --json',
       'archiveOpenSpecChange(changeId)',
       'scripts/openspec-runner.mjs',
+      'extension-local implementation',
       '--skip-specs',
       'If OpenSpec CLI is missing or unsupported and archive is required, fail',
       '/aif-verify does not archive',
@@ -236,5 +238,24 @@ describe('OpenSpec lifecycle CLI integration contract', () => {
 
     assert.match(done, /\/aif-done.*archive\/finalization|only OpenSpec-native archive\/finalization step/i);
     assertNotIncludes(nonDone, 'archiveOpenSpecChange(changeId)', 'non-done lifecycle assets');
+
+    for (const relativePath of LIFECYCLE_ASSETS.done) {
+      const asset = await readRepoFile(relativePath);
+      assertIncludes(
+        asset,
+        'ai-factory aifhub-done-finalizer --change <change-id> --json',
+        relativePath
+      );
+      assert.match(
+        asset,
+        /scripts\/openspec-(?:done-finalizer|done-readiness|runner)\.mjs[^\n]*(?:extension-local|implementation module)|(?:extension-local|implementation module)[^\n]*scripts\/openspec-(?:done-finalizer|done-readiness|runner)\.mjs/i,
+        `${relativePath} should label source-repository module references as extension-local implementation`
+      );
+      assert.doesNotMatch(
+        asset,
+        /\bnode(?:\.exe)?\s+(?:scripts[\\/]|[^\n]*\.ai-factory[\\/]extensions[\\/][^\n]*scripts[\\/])openspec-(?:done-finalizer|done-readiness|runner)\.mjs\b/i,
+        `${relativePath} should not expose an internal module as an installed-project executable`
+      );
+    }
   });
 });

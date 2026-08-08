@@ -350,6 +350,18 @@ openspec/changes/<change-id>/
 
 It does not create `.ai-factory/plans/<id>.md` or `.ai-factory/plans/<id>/task.md` in OpenSpec-native mode. Missing or unsupported OpenSpec CLI is degraded validation, not planning failure.
 
+## CLI Resolution
+
+Every shared-runner operation resolves one OpenSpec executable with this precedence:
+
+1. Explicit non-empty extension API `options.command`.
+2. Project-local `node_modules/.bin/openspec` (`node_modules/.bin/openspec.cmd` on Windows).
+3. Global `openspec` from `PATH`.
+
+The resolver does not search parent projects, invoke `npx`, download packages, or auto-install OpenSpec. Once an explicit or project-local candidate is selected it is authoritative; unsupported versions and execution failures do not silently fall through to another installation. Windows `.cmd`/`.bat` candidates use the bounded `ComSpec` route, while native POSIX executables use direct execution.
+
+Diagnostics separate the internal executable from a safe display value. Project-local and in-project explicit paths are project-relative; external explicit paths are reduced to a bounded identifier. Neither human nor JSON output exposes `PATH`, environment values, or private absolute project paths.
+
 ## Capability Shape
 
 `scripts/openspec-runner.mjs` exposes capability detection with this stable minimum:
@@ -372,6 +384,7 @@ openspec:
   nodeSupported: boolean
   versionSupported: boolean
   command: string
+  commandSource: "explicit" | "project-local" | "path"
   reason: string | null
   errors:
     - code: string
@@ -390,6 +403,8 @@ When the OpenSpec CLI is missing or unsupported:
 - `/aif-verify` records degraded validation unless strict config requires CLI availability
 - `/aif-done` fails archive-required finalization because archive requires a compatible CLI
 
+Filesystem-based artifact discovery, planning, and context loading continue without installing anything. Degraded mode never simulates CLI validation or archive success.
+
 When Node is below `>=20.19.0`, the CLI is treated as unavailable for validate/archive capabilities even if an `openspec` command exists.
 
 When `detectOpenSpec()` reports `reason: unsupported-version`, update or reinstall OpenSpec CLI to `>=1.3.1 <2.0.0`. This remains degraded capability for bootstrap and planning unless a command-specific policy requires CLI availability.
@@ -402,25 +417,31 @@ Scoped runtime integrations are already documented in the active prompt assets: 
 
 ## Validation and Archive
 
-Validation uses:
+Inside the extension, the shared runner performs validation with:
 
 ```bash
 openspec validate <change-id> --type change --strict --json --no-interactive --no-color
 ```
 
-Status evidence uses:
+Inside the extension, status evidence uses:
 
 ```bash
 openspec status --change <change-id> --json --no-color
 ```
 
-Archive-required finalization uses:
+Installed projects invoke archive-required finalization through:
+
+```bash
+ai-factory aifhub-done-finalizer --change <change-id> --json
+```
+
+The wrapper returns exit `0` for success or policy-accepted warning, `1` for a resolved blocker, and `2` for invalid arguments, unresolved/ambiguous scope, or unexpected command failure. It rejects bypass flags and emits only bounded human/JSON fields. The extension-local runner then uses:
 
 ```bash
 openspec archive <change-id> --yes --no-color
 ```
 
-`/aif-done --skip-specs` may add `--skip-specs` for docs/tooling-only changes.
+`ai-factory aifhub-done-finalizer --change <change-id> --skip-specs --json` adds `--skip-specs` for docs/tooling-only changes. Do not execute `scripts/openspec-done-finalizer.mjs` or other `scripts/openspec-*.mjs` modules from a consumer root or internal installed-extension path; they are extension-local implementation modules.
 
 AIFHub artifact contract validation is a separate read-only layer over the CLI adapter. It checks workflow ownership, runtime evidence placement, generated-rule freshness, and pre-archive verification evidence. See [OpenSpec Artifact Validation](openspec-validation.md).
 

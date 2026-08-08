@@ -392,17 +392,41 @@ describe('AIFHub wrapper guidance contract', () => {
     const expectations = [
       ['README.md', [
         'ai-factory aifhub-migrate-legacy-plans --list',
-        'ai-factory aifhub-migrate-legacy-plans <change-id> --dry-run'
+        'ai-factory aifhub-migrate-legacy-plans <change-id> --dry-run',
+        'ai-factory aifhub-done-finalizer --change <change-id> --json'
       ]],
       ['docs/usage.md', [
         'ai-factory aifhub-write-gate-evidence --change add-oauth-login --gate rules',
         'ai-factory aifhub-migrate-legacy-plans <change-id> --dry-run',
-        'ai-factory aifhub-migrate-legacy-plans --all --dry-run'
+        'ai-factory aifhub-migrate-legacy-plans --all --dry-run',
+        'ai-factory aifhub-done-finalizer --change <change-id> --json'
       ]],
       ['docs/openspec-validation.md', [
         'ai-factory aifhub-write-gate-evidence --change add-oauth-login --gate rules',
         'ai-factory aifhub-done-readiness --change <change-id> --json',
-        'ai-factory aifhub-validate-artifacts --change <change-id> --json'
+        'ai-factory aifhub-validate-artifacts --change <change-id> --json',
+        'ai-factory aifhub-done-finalizer --change <change-id> --json'
+      ]],
+      ['docs/openspec-compatibility.md', [
+        'ai-factory aifhub-done-finalizer --change <change-id> --json'
+      ]],
+      ['docs/codex-agents.md', [
+        'ai-factory aifhub-done-finalizer --change <change-id> --json'
+      ]],
+      ['docs/claude-agents.md', [
+        'ai-factory aifhub-done-finalizer --change <change-id> --json'
+      ]],
+      ['skills/aif-done/SKILL.md', [
+        'ai-factory aifhub-done-finalizer --change <change-id> --json'
+      ]],
+      ['skills/aif-done/references/finalization-contract.md', [
+        'ai-factory aifhub-done-finalizer --change <change-id> --json'
+      ]],
+      ['agent-files/codex/aifhub-done-finalizer.toml', [
+        'ai-factory aifhub-done-finalizer --change <change-id> --json'
+      ]],
+      ['agent-files/claude/aifhub-done-finalizer.md', [
+        'ai-factory aifhub-done-finalizer --change <change-id> --json'
       ]],
       ['docs/spec-coverage.md', [
         'ai-factory aifhub-coverage --change <change-id> --write --json'

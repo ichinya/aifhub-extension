@@ -21,7 +21,7 @@ Reference for the `aif-done` skill and `aifhub-done-finalizer` agents.
 - Missing, invalid, stale, or failed coverage refuses finalization and requires `/aif-verify`.
 - Missing, invalid, stale, failed, or disallowed warning rules gate evidence refuses finalization when policy requires rules pass.
 - `Code verification: PENDING` is ambiguous and must refuse finalization.
-- Dirty workspace state is empty, or explicit dirty-state recording is enabled through `/aif-done <change-id> --record-dirty-state`.
+- Dirty workspace state is empty, or explicit dirty-state recording is enabled through `ai-factory aifhub-done-finalizer --change <change-id> --record-dirty-state --json`.
 
 ### Canonical Context
 
@@ -44,23 +44,23 @@ openspec/changes/<change-id>/specs/**/spec.md
 
 ### Archive Policy
 
-OpenSpec-native `/aif-done` uses `scripts/openspec-done-finalizer.mjs`. Archive lifecycle mutation must happen through `archiveOpenSpecChange(changeId, options)` from `scripts/openspec-runner.mjs` and never through custom folder movement or direct `openspec/specs` edits. Normal archive is `openspec archive <change-id> --yes`.
+The installed executable route is `ai-factory aifhub-done-finalizer --change <change-id> --json`. It resolves the extension-local `scripts/openspec-done-finalizer.mjs` implementation module and must not require a consumer-root copy or an internal installed-path command. Archive lifecycle mutation inside the extension must happen through `archiveOpenSpecChange(changeId, options)` from `scripts/openspec-runner.mjs` and never through custom folder movement or direct `openspec/specs` edits.
 
-Normal archival corresponds to:
+Normal installed finalization:
 
 ```bash
-openspec archive <change-id> --yes
+ai-factory aifhub-done-finalizer --change <change-id> --json
 ```
 
 Docs/tooling-only archival uses `--skip-specs`:
 
 ```bash
-openspec archive <change-id> --yes --skip-specs --no-color
+ai-factory aifhub-done-finalizer --change <change-id> --skip-specs --json
 ```
 
-`--skip-specs` still writes final QA evidence and final summaries. Missing or unsupported OpenSpec CLI fails when archive is required. `/aif-verify` does not archive.
+The extension-local implementation maps those commands to `openspec archive <change-id> --yes` or `openspec archive <change-id> --yes --skip-specs --no-color`. `--skip-specs` still writes final QA evidence and final summaries. Missing or unsupported OpenSpec CLI fails when archive is required. `/aif-verify` does not archive. Public finalization rejects `--force`, `--no-validate`, `--skip-archive`, `--dry-run`, `--summary-only`, and unknown options before calling the finalizer API.
 
-Dirty workspace state is blocking by default. Inspect with `git status --short`; commit or stash unrelated changes, or rerun `/aif-done <change-id> --record-dirty-state` to record dirty state in final QA evidence before archive. For docs/tooling-only changes, combine the public flags as `/aif-done <change-id> --skip-specs --record-dirty-state`.
+Dirty workspace state is blocking by default. Inspect with `git status --short`; commit or stash unrelated changes, or rerun `ai-factory aifhub-done-finalizer --change <change-id> --record-dirty-state --json` to record dirty state in final QA evidence before archive. For docs/tooling-only changes, combine the public flags as `ai-factory aifhub-done-finalizer --change <change-id> --skip-specs --record-dirty-state --json`.
 
 OpenSpec-native mode does not use legacy `.ai-factory/specs` archive.
 
@@ -80,7 +80,9 @@ Do not write runtime-only files into `openspec/changes/<change-id>/`.
 
 ### Output
 
-Report selected `change-id`, effective policy summary, verification status, coverage matrix status, rules gate status, dirty working tree state, QA evidence path, `.ai-factory/qa/<change-id>/` final evidence path, `.ai-factory/state/<change-id>/` final summary path, canonical artifacts inspected, generated rules state, archive result, `--skip-specs` state, commit draft, PR draft, and next steps: `/aif-mode sync`, `/aif-commit`, and optional `/aif-evolve`.
+Report selected `change-id`, effective policy summary, verification status, coverage matrix status, rules gate status, dirty working tree state, QA evidence path, `.ai-factory/qa/<change-id>/` final evidence path, `.ai-factory/state/<change-id>/` final summary path, canonical artifacts inspected, generated rules state, archive result, bounded OpenSpec command/source, `--skip-specs` state, commit draft, PR draft, and next steps: `/aif-mode sync`, `/aif-commit`, and optional `/aif-evolve`.
+
+Command exit codes are `0` for successful or policy-accepted warning finalization, `1` for a resolved blocking failure, and `2` for invalid arguments, unresolved or ambiguous scope, or an unexpected command failure.
 
 After successful finalization:
 

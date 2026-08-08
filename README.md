@@ -106,7 +106,15 @@ OpenSpec validation overlay:
 
 `/aif-done` finalizes the OpenSpec lifecycle. It archives the accepted OpenSpec change through the OpenSpec CLI when archive is required and writes final evidence under `.ai-factory/qa/<change-id>/` plus final summaries under `.ai-factory/state/<change-id>/`.
 
-A dirty workspace is blocking by default before `/aif-done`. Inspect with `git status --short`; commit or stash unrelated changes, or rerun `/aif-done <change-id> --record-dirty-state` when the current dirty state should be recorded in final QA evidence before archive.
+Installed projects can run the same bounded finalizer directly through the stable extension command:
+
+```bash
+ai-factory aifhub-done-finalizer --change <change-id> --json
+```
+
+Add `--skip-specs` only for docs/tooling-only work. The wrapper returns exit `0` after successful or policy-accepted warning finalization, `1` for a resolved readiness/archive blocker, and `2` for invalid arguments, unresolved or ambiguous scope, or an unexpected command failure. Do not run extension-internal `scripts/openspec-done-finalizer.mjs` from the project root or through an installed-extension path.
+
+A dirty workspace is blocking by default before `/aif-done`. Inspect with `git status --short`; commit or stash unrelated changes, or rerun `ai-factory aifhub-done-finalizer --change <change-id> --record-dirty-state --json` when the current dirty state should be recorded in final QA evidence before archive.
 
 It does not replace `/aif-commit`. After `/aif-done`, run `/aif-commit` or your normal git workflow to commit implementation changes, OpenSpec archive/spec changes, QA evidence, and final summaries.
 
@@ -279,6 +287,8 @@ The reviewed OpenSpec baseline is OpenSpec `1.4.1`, while the compatible CLI ran
 
 When the OpenSpec CLI is missing or unsupported, OpenSpec-aware commands report degraded validate/archive capabilities. Planning and filesystem-based context loading can continue, but archive-required `/aif-done` fails until a compatible CLI is available.
 
+For each OpenSpec operation, the shared resolver selects exactly one CLI source in this order: an explicit non-empty extension API `options.command`, project-local `node_modules/.bin/openspec` (`openspec.cmd` on Windows), then `openspec` from `PATH`. An explicit or project-local selection is authoritative: a failure never silently falls through to another installation. AIFHub does not use `npx`, search parent projects, download, or auto-install OpenSpec. Diagnostics expose only the bounded command plus `explicit`, `project-local`, or `path` source.
+
 If the OpenSpec CLI is present but outside `>=1.3.1 <2.0.0`, update or reinstall the CLI before relying on validation/archive. The bootstrap still reports this as degraded capability rather than an install failure.
 
 OpenSpec CLI integration is adapter-only: users keep calling `/aif-plan`, `/aif-improve`, `/aif-implement`, `/aif-verify`, `/aif-done`, and `/aif-mode`; the extension never installs OpenSpec command skills.
@@ -333,7 +343,7 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 | Ambiguous active change | Pass an explicit `<change-id>` or update `.ai-factory/state/current.yaml`. |
 | Missing or stale generated rules | Regenerate derived rules from OpenSpec specs before relying on rules guidance. |
 | Missing or stale coverage | Rerun `/aif-verify <change-id>` to refresh `.ai-factory/qa/<change-id>/coverage.json` before `/aif-done`. |
-| Dirty working tree before `/aif-done` | Inspect with `git status --short`; commit or stash unrelated changes, or rerun `/aif-done <change-id> --record-dirty-state` to record the dirty workspace in final QA evidence before archive. |
+| Dirty working tree before `/aif-done` | Inspect with `git status --short`; commit or stash unrelated changes, or rerun `ai-factory aifhub-done-finalizer --change <change-id> --record-dirty-state --json` to record the dirty workspace in final QA evidence before archive. |
 
 ## Documentation
 
