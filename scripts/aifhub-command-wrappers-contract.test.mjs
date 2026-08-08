@@ -1,14 +1,17 @@
 // aifhub-command-wrappers-contract.test.mjs - installed command wrapper contract tests
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, copyFile, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
+const execFileAsync = promisify(execFile);
 
 const WRAPPER_COMMANDS = [
   {
@@ -45,6 +48,13 @@ const WRAPPER_COMMANDS = [
     module: './commands/aifhub-done-readiness.mjs',
     script: 'openspec-done-readiness.mjs',
     args: ['--change', 'add-oauth', '--json']
+  },
+  {
+    name: 'aifhub-done-finalizer',
+    description: 'Finalize a verified AIFHub OpenSpec change from an installed project.',
+    module: './commands/aifhub-done-finalizer.mjs',
+    script: 'openspec-done-finalizer.mjs',
+    args: ['--change', 'add-oauth', '--skip-specs', '--record-dirty-state', '--json']
   },
   {
     name: 'aifhub-validate-artifacts',
@@ -130,6 +140,76 @@ async function copyInstalledCommandLayout(userProjectDir) {
   }
 
   return extensionDir;
+}
+
+async function copyRealFinalizerLayout(userProjectDir) {
+  const extensionDir = path.join(userProjectDir, '.ai-factory', 'extensions', 'aifhub-extension');
+  await mkdir(path.join(extensionDir, 'commands'), { recursive: true });
+  await copyFile(
+    path.join(REPO_ROOT, 'commands', 'run-installed-script.mjs'),
+    path.join(extensionDir, 'commands', 'run-installed-script.mjs')
+  );
+  await copyFile(
+    path.join(REPO_ROOT, 'commands', 'aifhub-done-finalizer.mjs'),
+    path.join(extensionDir, 'commands', 'aifhub-done-finalizer.mjs')
+  );
+  await cp(
+    path.join(REPO_ROOT, 'scripts'),
+    path.join(extensionDir, 'scripts'),
+    { recursive: true }
+  );
+  return extensionDir;
+}
+
+async function pathExists(targetPath) {
+  try {
+    await access(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function runFinalizerWrapperHarness(userProjectDir, extensionDir) {
+  const harnessPath = path.join(tmpDir, 'run-finalizer-wrapper.mjs');
+  await writeFile(harnessPath, [
+    "import { pathToFileURL } from 'node:url';",
+    'const wrapperPath = process.env.AIFHUB_FINALIZER_WRAPPER_PATH;',
+    'const mod = await import(pathToFileURL(wrapperPath).href);',
+    'let actionHandler = null;',
+    'const chain = {',
+    '  description() { return this; },',
+    '  allowUnknownOption() { return this; },',
+    '  allowExcessArguments() { return this; },',
+    '  argument() { return this; },',
+    '  action(handler) { actionHandler = handler; return this; }',
+    '};',
+    'mod.register({ command() { return chain; } });',
+    'await actionHandler(process.argv.slice(2));'
+  ].join('\n'), 'utf8');
+
+  try {
+    const result = await execFileAsync(process.execPath, [
+      harnessPath,
+      '--change',
+      'missing-change',
+      '--json'
+    ], {
+      cwd: userProjectDir,
+      env: {
+        ...process.env,
+        AIFHUB_FINALIZER_WRAPPER_PATH: path.join(extensionDir, 'commands', 'aifhub-done-finalizer.mjs')
+      },
+      windowsHide: true
+    });
+    return { exitCode: 0, stdout: result.stdout, stderr: result.stderr };
+  } catch (err) {
+    return {
+      exitCode: typeof err?.code === 'number' ? err.code : (err?.status ?? 1),
+      stdout: String(err?.stdout ?? ''),
+      stderr: String(err?.stderr ?? '')
+    };
+  }
 }
 
 function createFakeProgram() {
@@ -240,6 +320,31 @@ describe('AIFHub installed command wrappers', () => {
       restoreEnvValue('AIFHUB_WRAPPER_TEST_MARKER', originalEnv.marker);
       process.exitCode = originalExitCode;
     }
+  });
+
+  it('runs the real installed finalizer graph without project-root helper scripts', async () => {
+    const userProjectDir = path.join(tmpDir, 'installed-finalizer-project');
+    await mkdir(userProjectDir, { recursive: true });
+    const extensionDir = await copyRealFinalizerLayout(userProjectDir);
+
+    assert.equal(
+      await pathExists(path.join(userProjectDir, 'scripts', 'openspec-done-finalizer.mjs')),
+      false,
+      'consumer project must not need a root finalizer script'
+    );
+
+    const command = await runFinalizerWrapperHarness(userProjectDir, extensionDir);
+    const output = JSON.parse(command.stdout);
+
+    assert.equal(command.exitCode, 2, 'unresolved explicit change should propagate command exit 2');
+    assert.equal(command.stderr, '');
+    assert.equal(output.ok, false);
+    assert.equal(output.mode, 'openspec-native');
+    assert.equal(output.change_id, null);
+    assert.equal(output.status, 'FAIL');
+    assert.equal(output.archive.status, 'SKIPPED');
+    assert.equal(output.errors[0].code, 'explicit-change-not-found');
+    assert.equal(Object.hasOwn(output, 'context'), false);
   });
 
   it('runInstalledScript forwards process settings and reports child failures', async () => {

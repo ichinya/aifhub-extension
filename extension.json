@@ -35,6 +35,11 @@
       "module": "./commands/aifhub-done-readiness.mjs"
     },
     {
+      "name": "aifhub-done-finalizer",
+      "description": "Finalize a verified AIFHub OpenSpec change from an installed project.",
+      "module": "./commands/aifhub-done-finalizer.mjs"
+    },
+    {
       "name": "aifhub-validate-artifacts",
       "description": "Run AIFHub OpenSpec artifact contract validation.",
       "module": "./commands/aifhub-validate-artifacts.mjs"

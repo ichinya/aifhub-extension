@@ -375,6 +375,7 @@ async function inspectOpenSpecCapability(rootDir, options) {
       canArchive: Boolean(detection?.canArchive),
       version: detection?.version ?? null,
       command: detection?.command ?? 'openspec',
+      commandSource: detection?.commandSource ?? 'path',
       reason: detection?.reason ?? null,
       errors: detection?.errors ?? []
     };
@@ -385,6 +386,7 @@ async function inspectOpenSpecCapability(rootDir, options) {
       canArchive: false,
       version: null,
       command: 'openspec',
+      commandSource: 'path',
       reason: err?.code ?? 'openspec-detection-failed',
       errors: [{
         code: err?.code ?? 'openspec-detection-failed',
@@ -1016,6 +1018,7 @@ function normalizeCommandResult(result) {
   return {
     ok: Boolean(result?.ok),
     command: result?.command ?? 'openspec',
+    commandSource: result?.commandSource ?? 'path',
     args: Array.from(result?.args ?? []),
     exitCode: result?.exitCode ?? null,
     json: result?.json ?? null,
@@ -1047,7 +1050,11 @@ function createRunOptions(options, rootDir) {
     command: options.command,
     env: options.env,
     executor: options.executor,
-    nodeVersion: options.nodeVersion
+    nodeVersion: options.nodeVersion,
+    platform: options.platform,
+    candidateExists: options.candidateExists,
+    execFile: options.execFile,
+    comSpec: options.comSpec
   };
 
   for (const key of Object.keys(runOptions)) {
