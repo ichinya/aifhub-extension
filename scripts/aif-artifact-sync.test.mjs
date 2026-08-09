@@ -843,6 +843,68 @@ describe('artifact sync and export', () => {
     assert.ok(result.validation.warnings.some((warning) => warning.code === 'no-delta-specs'));
   });
 
+  it('validates native skip_specs changes during all-change sync', async () => {
+    const rootDir = await createTempRoot();
+    const validated = [];
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      '  openspec:',
+      '    compileRulesOnSync: false',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/config.yaml', 'project: test\n');
+    await writeFixture(rootDir, 'openspec/changes/docs-only/proposal.md', '# Proposal\n');
+    await writeFixture(rootDir, 'openspec/changes/docs-only/.openspec.yaml', [
+      'schema: spec-driven',
+      'created: 2026-08-09',
+      'skip_specs: true',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/changes/nested-change/proposal.md', '# Proposal\n');
+    await writeFixture(rootDir, 'openspec/changes/nested-change/specs/area/capability/spec.md', [
+      '## ADDED Requirements',
+      '',
+      '### Requirement: Nested capability',
+      '',
+      'The system SHALL validate nested capability paths.',
+      '',
+      '#### Scenario: nested path is present',
+      '',
+      '- **WHEN** the nested delta is validated',
+      '- **THEN** validation succeeds',
+      ''
+    ].join('\n'));
+
+    const result = await syncOpenSpecArtifacts({
+      rootDir,
+      all: true,
+      detectOpenSpec: async () => availableCliDetection(),
+      validateOpenSpecChange: async (changeId) => {
+        validated.push(changeId);
+        return { ok: true, stdout: '{"valid":true}', stderr: '', json: { valid: true } };
+      },
+      getOpenSpecStatus: async (changeId) => ({
+        ok: true,
+        stdout: JSON.stringify({ changeId }),
+        stderr: '',
+        json: { changeId }
+      }),
+      timestamp: '2026-08-09T00-00-00-000Z'
+    });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(validated, ['docs-only', 'nested-change']);
+    assert.equal(result.validation.skippedChanges.length, 0);
+    assert.ok(!result.validation.warnings.some((warning) => warning.code === 'no-delta-specs'));
+  });
+
   it('treats numeric-leading OpenSpec status rejection as non-blocking during sync', async () => {
     const rootDir = await createTempRoot();
     const changeId = '81-command-wrappers';

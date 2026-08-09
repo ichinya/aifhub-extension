@@ -128,7 +128,11 @@ describe('aif-plan OpenSpec-native planning contract', () => {
       '## ADDED Requirements',
       '## MODIFIED Requirements',
       '## REMOVED Requirements',
-      '#### Scenario: <Scenario name>'
+      '#### Scenario: <Scenario name>',
+      'openspec/changes/<change-id>/.openspec.yaml',
+      'skip_specs: true',
+      '>=1.7.0',
+      'older supported CLI'
     ]) {
       assertIncludes(openspec, expected, 'OpenSpec-native section');
     }

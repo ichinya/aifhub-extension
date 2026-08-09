@@ -61,7 +61,7 @@ The validator checks:
 |---|---|
 | `proposal.md` and `tasks.md` exist | `fail` when missing |
 | `design.md` exists | `warn` when missing, or `fail` when `aifhub.openspec.requireDesign: true` |
-| `specs/**/spec.md` delta exists | `fail` unless `proposal.md` has an explicit docs/tooling-only `skip-specs` reason |
+| `specs/**/spec.md` delta exists | `fail` unless `.openspec.yaml` declares native `skip_specs: true`; an explicit legacy proposal reason remains accepted for compatibility |
 | runtime or evidence files inside `openspec/changes/<change-id>/` | `fail` |
 | `.ai-factory/qa/<change-id>/openspec-validation.json` and `verify.md` | required only with `--require-verification-evidence` |
 | final verify `aif-gate-result` block | `fail` when verification evidence is required and the block is missing, invalid, or failing |
@@ -115,7 +115,7 @@ Run finalization from an installed project through the stable wrapper:
 ai-factory aifhub-done-finalizer --change <change-id> --json
 ```
 
-Docs/tooling-only finalization can use `--skip-specs`; explicit dirty-state evidence can use `--record-dirty-state`:
+New docs/tooling-only changes on OpenSpec `>=1.7.0` should declare `skip_specs: true` in `.openspec.yaml`; older supported CLIs keep the explicit proposal reason. The compatibility finalizer can still use `--skip-specs`, and explicit dirty-state evidence can use `--record-dirty-state`:
 
 ```bash
 ai-factory aifhub-done-finalizer --change <change-id> --skip-specs --record-dirty-state --json

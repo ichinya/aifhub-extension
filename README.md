@@ -283,7 +283,7 @@ OpenSpec is optional for extension install and AI Factory-only workflows.
 | OpenSpec CLI runtime | Node `>=20.19.0` |
 | OpenSpec skills/commands | Not installed by this extension |
 
-The reviewed OpenSpec baseline is OpenSpec `1.6.0`, replayed sequentially from baseline `1.3.1` and including prerelease `1.6.0-beta.1`, while the compatible stable CLI range remains `>=1.3.1 <2.0.0`. See [OpenSpec Compatibility](docs/openspec-compatibility.md) for the reviewed-release ledger and adapter-only ownership notes.
+The reviewed OpenSpec baseline is OpenSpec `1.7.0`, replayed sequentially from baseline `1.3.1` and including prerelease `1.6.0-beta.1`, while the compatible stable CLI range remains `>=1.3.1 <2.0.0`. See [OpenSpec Compatibility](docs/openspec-compatibility.md) for the reviewed-release ledger and adapter-only ownership notes.
 
 When the OpenSpec CLI is missing or unsupported, OpenSpec-aware commands report degraded validate/archive capabilities. Planning and filesystem-based context loading can continue, but archive-required `/aif-done` fails until a compatible CLI is available.
 
@@ -354,7 +354,7 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 | [Context Providers](docs/context-providers.md) | Optional Graphify and Context7 provider guidance, reviewed-note paths, degraded behavior, and user-owned setup boundaries |
 | [Memory Tool Recommendations](docs/memory-tool-recommendations.md) | Local metadata-driven optional memory/context tool recommendations and installed wrapper commands |
 | [Context Loading Policy](docs/context-loading-policy.md) | Consumer context, Optional Project Glossary, optional provider context, GitHub-aware roadmap evidence, command ownership, upstream utility boundaries, and legacy boundaries |
-| [OpenSpec Compatibility](docs/openspec-compatibility.md) | Optional CLI adapter policy, OpenSpec 1.6.0 reviewed baseline from 1.3.1, AI Factory 2.17 planning/fix/QA/MCP/Control Flow adaptations, reviewed no-ops, archive boundary, and capability flags |
+| [OpenSpec Compatibility](docs/openspec-compatibility.md) | Optional CLI adapter policy, OpenSpec 1.7.0 reviewed baseline from 1.3.1, AI Factory 2.17 planning/fix/QA/MCP/Control Flow adaptations, reviewed no-ops, archive boundary, and capability flags |
 | [OpenSpec Artifact Validation](docs/openspec-validation.md) | Read-only AIFHub contract validator for OpenSpec-native artifacts |
 | [OpenSpec Coverage Matrix](docs/spec-coverage.md) | Requirement-to-code coverage artifact and verify/done policy |
 | [Legacy Plan Migration](docs/legacy-plan-migration.md) | Explicit migration from legacy plans to OpenSpec-native changes |

@@ -29,7 +29,7 @@ Use canonical OpenSpec artifacts under `openspec/changes/<change-id>/`:
 
 Do not create legacy `.ai-factory/plans` plan files or companion folders in this mode. Do not write runtime-only files into `openspec/changes/<change-id>/`.
 
-If the task is docs/tooling-only and does not change product or workflow behavior, a delta spec may be omitted only when the plan explicitly explains why no delta spec is needed.
+If the task is docs/tooling-only and does not change product or workflow behavior, a delta spec may be omitted only when the plan explicitly explains why no delta spec is needed. When the selected OpenSpec CLI is `>=1.7.0`, also declare native OpenSpec `skip_specs: true` in `openspec/changes/<change-id>/.openspec.yaml`; preserve the selected `schema` and other existing metadata. For an older supported CLI, preserve the explicit proposal reason and compatibility finalizer path instead of writing metadata that the selected CLI does not understand.
 
 #### Task Intake Normalization
 

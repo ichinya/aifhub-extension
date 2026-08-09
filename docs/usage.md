@@ -312,7 +312,7 @@ Use `--dry-run` for planned switching or sync writes. Use `--all` or `--change <
 
 `/aif-mode sync` without `--change` is recommended after `/aif-done`. After archive, there may be no active change. Sync still refreshes `.ai-factory/rules/generated/openspec-base.md` and `.ai-factory/rules/generated/index.json` from `openspec/specs/**`, skips change-specific generated rules and change validation when no active changes exist, and writes a sync report. OpenSpec skills are not installed.
 
-`/aif-mode sync --all` is a maintenance sweep. It refreshes generated rules for active changes, validates only selected changes that contain `openspec/changes/<change-id>/specs/**/spec.md` delta specs, and reports selected no-delta changes as `no-delta-specs` warnings instead of failing solely because old or docs-only active changes have no delta specs. `/aif-verify <change-id>` remains the stricter verification gate for a specific change.
+`/aif-mode sync --all` is a maintenance sweep. It refreshes generated rules for active changes and validates selected changes that contain `openspec/changes/<change-id>/specs/**/spec.md` delta specs or declare native `skip_specs: true` in `openspec/changes/<change-id>/.openspec.yaml`. It reports older unmarked no-delta changes as `no-delta-specs` warnings. Invalid native markers are validated fail-closed instead of being silently skipped. `/aif-verify <change-id>` remains the stricter verification gate for a specific change.
 
 `/aif-mode doctor --change <change-id>` includes the read-only AIFHub OpenSpec artifact contract check and the latest coverage matrix diagnostic. It reports the full JSON result as `artifactContract`, reports coverage as `coverage`, and treats missing verification evidence as a pre-archive readiness failure. See [OpenSpec Artifact Validation](openspec-validation.md) and [OpenSpec Coverage Matrix](spec-coverage.md).
 
@@ -791,7 +791,7 @@ Does not write:
 - manual file moves from `openspec/changes` to archives
 - legacy `.ai-factory/specs` archives in OpenSpec-native mode
 
-Use `--skip-specs` for docs/tooling-only changes where no accepted spec update is expected. Archive-required finalization needs a compatible OpenSpec CLI when `aifhub.openspec.requireCliForDone` is true. `/aif-done` runs a pre-archive readiness gate and refuses archive on blocking OpenSpec validate, artifact contract, generated rules, rules gate, coverage, verify gate, or dirty workspace failures. The readiness output includes the exact next command to run.
+For newly authored docs/tooling-only changes on OpenSpec `>=1.7.0`, prefer native `.openspec.yaml` metadata with `skip_specs: true`; preserve the schema selected for the change. With an older supported CLI, keep the explicit proposal reason and compatibility finalizer path. The public `--skip-specs` finalizer flag remains supported for explicit compatibility finalization. Archive-required finalization needs a compatible OpenSpec CLI when `aifhub.openspec.requireCliForDone` is true. `/aif-done` runs a pre-archive readiness gate and refuses archive on blocking OpenSpec validate, artifact contract, generated rules, rules gate, coverage, verify gate, or dirty workspace failures. The readiness output includes the exact next command to run.
 
 The stable installed-project executable route is:
 

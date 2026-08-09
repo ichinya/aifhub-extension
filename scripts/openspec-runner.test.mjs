@@ -129,6 +129,21 @@ describe('detectOpenSpec', () => {
     assert.equal(result.reason, null);
   });
 
+  it('returns available capabilities for reviewed version 1.7.0 on supported Node', async () => {
+    const result = await detectOpenSpec({
+      executor: async () => ({ exitCode: 0, stdout: 'openspec 1.7.0\n', stderr: '' }),
+      nodeVersion: '20.19.0'
+    });
+
+    assert.equal(result.available, true);
+    assert.equal(result.canValidate, true);
+    assert.equal(result.canArchive, true);
+    assert.equal(result.version, '1.7.0');
+    assert.equal(result.supportedRange, '>=1.3.1 <2.0.0');
+    assert.equal(result.versionSupported, true);
+    assert.equal(result.reason, null);
+  });
+
   it('returns degraded capabilities when CLI is missing', async () => {
     const result = await detectOpenSpec({
       executor: async () => {
@@ -676,6 +691,29 @@ describe('OpenSpec command wrappers', () => {
     assert.deepEqual(calls[0].args, [
       'instructions',
       'apply',
+      '--change',
+      'add-oauth',
+      '--json',
+      '--no-color'
+    ]);
+  });
+
+  it('getOpenSpecInstructions supports the OpenSpec 1.7 archive artifact', async () => {
+    const { executor, calls } = createRecordingExecutor({
+      exitCode: 0,
+      stdout: '{"changeName":"add-oauth"}',
+      stderr: ''
+    });
+
+    const result = await getOpenSpecInstructions('archive', {
+      change: 'add-oauth',
+      executor
+    });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(calls[0].args, [
+      'instructions',
+      'archive',
       '--change',
       'add-oauth',
       '--json',

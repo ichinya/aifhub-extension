@@ -35,6 +35,9 @@ import {
   summarizeOpenSpecCoverage
 } from './openspec-coverage-matrix.mjs';
 import {
+  readOpenSpecSkipSpecsMarker
+} from './openspec-change-metadata.mjs';
+import {
   readOpenSpecRulesGateEvidence,
   resolveOpenSpecPolicy,
   summarizeOpenSpecPolicy
@@ -977,10 +980,17 @@ async function selectValidatableChanges(rootDir, changeIds) {
   const skippedChanges = [];
 
   for (const changeId of changeIds) {
-    const specRoot = path.join(rootDir, 'openspec', 'changes', changeId, 'specs');
+    const changeDir = path.join(rootDir, 'openspec', 'changes', changeId);
+    const specRoot = path.join(changeDir, 'specs');
     const specFiles = await listSpecFiles(specRoot, rootDir);
 
     if (specFiles.length === 0) {
+      const skipSpecs = await readOpenSpecSkipSpecsMarker(changeDir);
+      if (skipSpecs.declared || !skipSpecs.valid) {
+        validatable.push(changeId);
+        continue;
+      }
+
       skippedChanges.push({
         changeId,
         reason: 'no-delta-specs'
