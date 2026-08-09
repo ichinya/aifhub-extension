@@ -388,6 +388,55 @@ describe('AIFHub installed command wrappers', () => {
 });
 
 describe('AIFHub wrapper guidance contract', () => {
+  it('declares aif-done metadata for installed finalization', async () => {
+    const source = await readRepoFile('skills/aif-done/SKILL.md');
+    const frontmatterMatch = source.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+
+    assert.ok(frontmatterMatch, 'skills/aif-done/SKILL.md should include YAML frontmatter');
+
+    const fields = new Map(frontmatterMatch[1].split(/\r?\n/).map((line) => {
+      const separator = line.indexOf(':');
+      return separator === -1
+        ? [line.trim(), '']
+        : [line.slice(0, separator).trim(), line.slice(separator + 1).trim()];
+    }));
+    const version = fields.get('version') ?? '';
+    const versionParts = version.split('.').map((part) => Number.parseInt(part, 10));
+    const argumentHint = fields.get('argument-hint') ?? '';
+    const allowedTools = fields.get('allowed-tools') ?? '';
+
+    assert.equal(fields.get('name'), 'aif-done');
+    assert.ok(fields.get('description'), 'aif-done description should be non-empty');
+    assert.match(version, /^\d+\.\d+\.\d+$/, 'aif-done version should use X.Y.Z semver');
+    assert.ok(
+      versionParts[0] > 1 || (versionParts[0] === 1 && versionParts[1] >= 3),
+      'aif-done version should be at least 1.3.0 for the installed finalizer capability'
+    );
+    for (const expected of ['change-id', 'plan-id', '--skip-specs', '--record-dirty-state']) {
+      assert.ok(argumentHint.includes(expected), `aif-done argument-hint should include ${expected}`);
+    }
+    for (const expected of [
+      'Read',
+      'Write',
+      'Edit',
+      'Glob',
+      'Grep',
+      'Bash(ai-factory aifhub-done-finalizer *)',
+      'Bash(git status *)',
+      'Bash(git branch --show-current)',
+      'Bash(git diff *)',
+      'Bash(git log *)',
+      'Bash(gh --version)'
+    ]) {
+      assert.ok(allowedTools.includes(expected), `aif-done allowed-tools should include ${expected}`);
+    }
+    assert.doesNotMatch(
+      allowedTools,
+      /(?:^|\s)Bash(?:\s|$)/,
+      'aif-done allowed-tools should not include unrestricted Bash'
+    );
+  });
+
   it('documents installed-project wrapper commands instead of root scripts', async () => {
     const expectations = [
       ['README.md', [

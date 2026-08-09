@@ -1,7 +1,9 @@
 ---
 name: aif-done
 description: Finalize a verified OpenSpec-native change or legacy AI Factory-only plan, prepare commit/PR summaries, and drive evidence-backed follow-ups.
-version: 1.2.0
+argument-hint: "[change-id|plan-id] [--skip-specs] [--record-dirty-state]"
+allowed-tools: Read Write Edit Glob Grep Bash(ai-factory aifhub-done-finalizer *) Bash(git status *) Bash(git branch --show-current) Bash(git diff *) Bash(git log *) Bash(gh --version)
+version: 1.3.0
 author: ichi
 ---
 
