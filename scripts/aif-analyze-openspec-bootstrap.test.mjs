@@ -26,7 +26,83 @@ function assertNotIncludes(source, unexpected, filePath) {
   );
 }
 
+function parseFrontmatter(source, filePath) {
+  const match = source.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+  assert.ok(match, `${filePath} should include YAML frontmatter`);
+
+  return new Map(match[1].split(/\r?\n/).flatMap((line) => {
+    const separator = line.indexOf(':');
+    if (separator <= 0) {
+      return [];
+    }
+
+    return [[line.slice(0, separator).trim(), line.slice(separator + 1).trim()]];
+  }));
+}
+
+function compareSemver(left, right) {
+  const parse = (value) => String(value).replace(/^['"]|['"]$/g, '').split('.').map(Number);
+  const leftParts = parse(left);
+  const rightParts = parse(right);
+
+  for (let index = 0; index < 3; index += 1) {
+    if (leftParts[index] !== rightParts[index]) {
+      return leftParts[index] - rightParts[index];
+    }
+  }
+
+  return 0;
+}
+
 describe('aif-analyze OpenSpec-native bootstrap contract', () => {
+  it('declares bounded metadata for the extension-owned aif-analyze skill', async () => {
+    const filePath = 'skills/aif-analyze/SKILL.md';
+    const frontmatter = parseFrontmatter(await readRepoFile(filePath), filePath);
+
+    for (const required of ['name', 'description', 'allowed-tools']) {
+      assert.ok(frontmatter.get(required), `${filePath} frontmatter should declare ${required}`);
+    }
+
+    assert.equal(frontmatter.get('name'), 'aif-analyze');
+
+    const allowedTools = frontmatter.get('allowed-tools');
+    for (const requiredTool of [
+      'Read',
+      'Write',
+      'Edit',
+      'Glob',
+      'Grep',
+      'Bash(mkdir *)',
+      'Bash(ai-factory aifhub-memory-tools *)',
+      'Bash(ai-factory aifhub-mode status --json)',
+      'Bash(node --input-type=module -e *openspec-runner.mjs*)',
+      'Bash(openspec init --tools none)',
+      'Skill',
+      'AskUserQuestion',
+      'Questions'
+    ]) {
+      assertIncludes(allowedTools, requiredTool, `${filePath} allowed-tools`);
+    }
+
+    assert.doesNotMatch(allowedTools, /(?:^|\s)Bash(?:\s|$)/, 'allowed-tools must not permit unrestricted Bash');
+    for (const overlyBroad of ['Bash(ai-factory *)', 'Bash(npx *)', 'Bash(openspec *)']) {
+      assertNotIncludes(allowedTools, overlyBroad, `${filePath} allowed-tools`);
+    }
+  });
+
+  it('declares the feature-level aif-analyze version freshness bump', async () => {
+    const filePath = 'skills/aif-analyze/SKILL.md';
+    const frontmatter = parseFrontmatter(await readRepoFile(filePath), filePath);
+    const version = frontmatter.get('version');
+
+    assert.ok(version, `${filePath} frontmatter should declare version`);
+    assert.match(version, /^['"]?\d+\.\d+\.\d+['"]?$/);
+    assert.ok(
+      compareSemver(version, '0.10.0') >= 0,
+      `${filePath} should include the feature-level metadata bump introduced with analyze version freshness`
+    );
+  });
+
   it('derives base-rule control flow from evidence without duplicating the generated-rules compiler', async () => {
     const skill = await readRepoFile('skills/aif-analyze/SKILL.md');
     const template = await readRepoFile('skills/aif-analyze/references/rules-base-template.md');
@@ -388,6 +464,33 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
     ]) {
       assertIncludes(skill, expected, 'skills/aif-analyze/SKILL.md');
     }
+  });
+
+  it('recommends a user-owned update for supported but outdated OpenSpec without degrading bootstrap', async () => {
+    const skill = await readRepoFile('skills/aif-analyze/SKILL.md');
+    const compatibility = await readRepoFile('docs/openspec-compatibility.md');
+    const usage = await readRepoFile('docs/usage.md');
+    const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
+    const latestReviewedVersion = metadata.sources.openspec.version;
+    const combined = [skill, compatibility, usage].join('\n');
+
+    for (const expected of [
+      `latestReviewedVersion: "${latestReviewedVersion}"`,
+      'versionOutdated: boolean | null',
+      'compatible but older than the latest reviewed stable version',
+      'non-blocking update recommendation',
+      '`project-local`',
+      '`path`',
+      '`explicit`',
+      'Do not guess a package manager',
+      'Do not install, update, replace, or re-resolve OpenSpec automatically',
+      'do not recommend a downgrade'
+    ]) {
+      assertIncludes(combined, expected, 'OpenSpec analyze version freshness contract');
+    }
+
+    assertIncludes(skill, `latestReviewedVersion: "${latestReviewedVersion}"`, 'skills/aif-analyze/SKILL.md reviewed version');
+    assertIncludes(compatibility, `latestReviewedVersion: "${latestReviewedVersion}"`, 'docs/openspec-compatibility.md reviewed version');
   });
 
   it('documents compatible CLI initialization, manual skeletons, and no skill installation', async () => {

@@ -15,6 +15,7 @@
 
 ### Изменено
 - OpenSpec CLI теперь детерминированно выбирается как explicit non-empty `options.command` -> project-local `node_modules/.bin/openspec(.cmd)` -> `PATH`; selected explicit/local candidate не получает silent fallback, а diagnostics публикуют только safe command/source без auto-install, `npx`, parent-project search или private absolute paths.
+- `/aif-analyze` теперь сравнивает supported selected OpenSpec CLI с последней reviewed stable версией `1.8.0`: устаревшая CLI сохраняет capabilities, но получает неблокирующую рекомендацию обновить user-owned project-local/PATH/explicit installation без automatic install/update или package-manager guessing.
 - Recommendation для `context-mode` уточнена по authorized live evaluation: MCP-only остаётся `manual_helper_only` только для >1 MiB truncating output с mandatory purge и без доказанной экономии tokens; tested Codex plugin nested-shell path получает `avoid`, session continuity — `NOT_RUN(resume_driver_parity_unavailable)`, а normal AIFHub commands по-прежнему не выполняют auto-install, MCP registration или hook trust.
 - Reviewed AI Factory baseline обновлён до `2.17.0` при сохранении compatibility range `>=2.11.0 <3.0.0`; полный `2.15.0 -> 2.16.0 -> 2.17.0` audit включает planning, fix, QA, MCP, Control Flow и reviewed no-op adaptations.
 - OpenSpec-native planning сохраняет immutable `## Original Request`, а revision-bound `## Research Context` предупреждает `WARN [research-drift]` без silent scope rebase.

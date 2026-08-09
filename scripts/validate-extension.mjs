@@ -5,6 +5,8 @@
 import { readFile, stat } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
 
+import { OPENSPEC_LATEST_REVIEWED_VERSION } from './openspec-runner.mjs';
+
 const LOG_LEVEL = process.env.LOG_LEVEL || 'INFO';
 const LEVELS = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 };
 
@@ -474,6 +476,13 @@ function validateOpenSpecReviewMetadata(source) {
       log('ERROR', 'OpenSpec source version must equal the latest reviewed stable version', {
         sourceVersion: source.version,
         latestReviewedVersion: stable.at(-1)
+      });
+      hasErrors = true;
+    }
+    if (source.version && source.version !== OPENSPEC_LATEST_REVIEWED_VERSION) {
+      log('ERROR', 'OpenSpec source version must match the runner reviewed-version diagnostic', {
+        sourceVersion: source.version,
+        runnerReviewedVersion: OPENSPEC_LATEST_REVIEWED_VERSION
       });
       hasErrors = true;
     }

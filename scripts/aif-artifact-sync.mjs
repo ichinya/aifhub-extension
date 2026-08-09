@@ -1851,6 +1851,8 @@ function summarizeOpenSpecDetection(detection) {
     nodeVersion: detection?.nodeVersion ?? null,
     nodeSupported: detection?.nodeSupported ?? null,
     versionSupported: detection?.versionSupported ?? null,
+    latestReviewedVersion: detection?.latestReviewedVersion ?? null,
+    versionOutdated: detection?.versionOutdated ?? null,
     command: detection?.command ?? null,
     commandSource: detection?.commandSource ?? null,
     reason: detection?.reason ?? null,

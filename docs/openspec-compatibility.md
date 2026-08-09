@@ -400,6 +400,8 @@ openspec:
   canArchive: boolean
   version: string | null
   supportedRange: ">=1.3.1 <2.0.0"
+  latestReviewedVersion: "1.8.0"
+  versionOutdated: boolean | null
   requiresNode: ">=20.19.0"
 ```
 
@@ -419,6 +421,12 @@ openspec:
 ```
 
 Commands should treat the stable minimum as the contract and the operational detail fields as diagnostics.
+
+## Version Freshness in `/aif-analyze`
+
+`/aif-analyze` reads the installed-project `openspecCli` result from `ai-factory aifhub-mode status --json`. When a selected CLI is compatible but older than the latest reviewed stable version, bootstrap remains available and the skill emits a non-blocking update recommendation. `versionOutdated` is `null` when the CLI version is missing or unsupported, so freshness never replaces the existing degraded reason.
+
+The recommendation follows the selected user-owned source: update the project dependency for `project-local`, the existing PATH/global installation for `path`, or the caller-owned executable for `explicit`. Do not guess a package manager, and do not install, update, replace, or re-resolve OpenSpec automatically. A supported version equal to or newer than `latestReviewedVersion` does not receive an update or downgrade recommendation.
 
 ## Degraded Mode
 

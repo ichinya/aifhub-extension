@@ -283,7 +283,7 @@ OpenSpec is optional for extension install and AI Factory-only workflows.
 | OpenSpec CLI runtime | Node `>=20.19.0` |
 | OpenSpec skills/commands | Not installed by this extension |
 
-The reviewed OpenSpec baseline is OpenSpec `1.7.0`, replayed sequentially from baseline `1.3.1` and including prerelease `1.6.0-beta.1`, while the compatible stable CLI range remains `>=1.3.1 <2.0.0`. See [OpenSpec Compatibility](docs/openspec-compatibility.md) for the reviewed-release ledger and adapter-only ownership notes.
+The reviewed OpenSpec baseline is OpenSpec `1.8.0`, replayed sequentially from baseline `1.3.1` and including prerelease `1.6.0-beta.1`, while the compatible stable CLI range remains `>=1.3.1 <2.0.0`. See [OpenSpec Compatibility](docs/openspec-compatibility.md) for the reviewed-release ledger and adapter-only ownership notes.
 
 When the OpenSpec CLI is missing or unsupported, OpenSpec-aware commands report degraded validate/archive capabilities. Planning and filesystem-based context loading can continue, but archive-required `/aif-done` fails until a compatible CLI is available.
 

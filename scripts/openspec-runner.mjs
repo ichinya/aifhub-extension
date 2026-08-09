@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 
 export const OPENSPEC_SUPPORTED_RANGE = '>=1.3.1 <2.0.0';
 export const OPENSPEC_NODE_RANGE = '>=20.19.0';
+export const OPENSPEC_LATEST_REVIEWED_VERSION = '1.8.0';
 
 const execFileAsync = promisify(execFileCallback);
 const OPENSPEC_MIN_VERSION = '1.3.1';
@@ -631,6 +632,10 @@ function createDetectionResult(overrides = {}) {
   const versionSupported = overrides.versionSupported ?? false;
   const nodeVersion = overrides.nodeVersion ?? process.versions.node;
   const nodeSupported = overrides.nodeSupported ?? satisfiesGte(nodeVersion, NODE_MIN_VERSION);
+  const reviewedComparison = versionSupported
+    ? compareSemver(version, OPENSPEC_LATEST_REVIEWED_VERSION)
+    : null;
+  const versionOutdated = reviewedComparison === null ? null : reviewedComparison < 0;
 
   return {
     available: overrides.available ?? false,
@@ -639,6 +644,8 @@ function createDetectionResult(overrides = {}) {
     version,
     supportedRange: OPENSPEC_SUPPORTED_RANGE,
     versionSupported,
+    latestReviewedVersion: OPENSPEC_LATEST_REVIEWED_VERSION,
+    versionOutdated,
     requiresNode: OPENSPEC_NODE_RANGE,
     nodeVersion,
     nodeSupported,

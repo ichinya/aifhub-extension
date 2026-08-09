@@ -272,6 +272,16 @@ describe('validate-extension.mjs', () => {
     assert.equal(code, 1);
   });
 
+  it('fails when OpenSpec metadata advances without the runtime reviewed-version diagnostic', async () => {
+    const parsed = JSON.parse(validAifhubMetadata());
+    parsed.sources.openspec.version = '1.9.0';
+    parsed.sources.openspec.reviewedStableVersions.push('1.9.0');
+    await writeValidProject({ metadata: JSON.stringify(parsed) });
+
+    const code = await runValidatorExitCode(tmpDir);
+    assert.equal(code, 1);
+  });
+
   it('fails when an OpenSpec prerelease is listed as reviewed stable', async () => {
     const parsed = JSON.parse(validAifhubMetadata());
     parsed.sources.openspec.reviewedStableVersions.push('1.6.0-beta.1');

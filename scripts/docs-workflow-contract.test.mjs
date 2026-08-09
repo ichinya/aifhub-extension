@@ -779,6 +779,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
     const docsIndex = await readRepoFile('docs/README.md');
     const openspec = metadata.sources.openspec;
     const combinedDocs = [readme, compatibility, docsIndex].join('\n');
+    const readmeCompatibility = extractSection(readme, '## OpenSpec Compatibility');
 
     assert.equal(openspec.version, '1.8.0');
     assert.equal(openspec.baselineVersion, '1.3.1');
@@ -789,7 +790,11 @@ describe('complete OpenSpec workflow documentation contract', () => {
     assertIncludes(openspec.notes, 'upstream OpenSpec 1.3.1 through 1.8.0', 'aifhub-extension.json');
     assertIncludes(openspec.notes, 'adapter-only', 'aifhub-extension.json');
 
-    assertIncludes(readme, 'OpenSpec `1.8.0`', 'README.md');
+    assertIncludes(
+      readmeCompatibility,
+      `The reviewed OpenSpec baseline is OpenSpec \`${openspec.version}\``,
+      'README.md OpenSpec Compatibility reviewed baseline'
+    );
     assertIncludes(docsIndex, 'OpenSpec 1.8.0', 'docs/README.md');
 
     for (const expected of [
