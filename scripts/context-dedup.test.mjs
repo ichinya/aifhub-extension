@@ -1103,18 +1103,28 @@ describe('session summary and purge', () => {
   it('serializes concurrent updates without losing read totals', async () => {
     const policy = await enabledPolicy();
     const content = body('concurrent');
+    const concurrentReads = 200;
 
     const results = await Promise.all(
-      Array.from({ length: 12 }, () =>
+      Array.from({ length: concurrentReads }, () =>
         recordRead({ filePath: 'src/session.ts', content, rootDir, policy, sessionId: 'parallel' }))
     );
     const summary = await summarizeSession({ rootDir, policy, sessionId: 'parallel' });
 
-    assert.equal(summary.reads, 12);
-    assert.equal(summary.dedupHits, 11);
-    assert.equal(results.filter((result) => result.decision === 'full').length, 1);
-    assert.equal(results.filter((result) => result.decision === 'deduplicated').length, 11);
-    assert.ok(results.every((result) => !result.warnings.some((warning) => warning.code === 'context-dedup-ledger-unwritable')));
+    assert.deepEqual({
+      reads: summary.reads,
+      dedupHits: summary.dedupHits,
+      fullReads: results.filter((result) => result.decision === 'full').length,
+      deduplicatedReads: results.filter((result) => result.decision === 'deduplicated').length,
+      unwritableWarnings: results.filter((result) =>
+        result.warnings.some((warning) => warning.code === 'context-dedup-ledger-unwritable')).length
+    }, {
+      reads: concurrentReads,
+      dedupHits: concurrentReads - 1,
+      fullReads: 1,
+      deduplicatedReads: concurrentReads - 1,
+      unwritableWarnings: 0
+    });
   });
 
   it('writes a schema-versioned ledger', async () => {

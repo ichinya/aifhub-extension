@@ -35,6 +35,7 @@ const PURGE_LOCK_ATTEMPTS = Math.ceil((SQZ_TIMEOUT_MS + 5_000) / LOCK_RETRY_MS);
 const SQZ_REFERENCE_PATTERN = /^§ref:[0-9a-f]{8,64}§\s*$/iu;
 const SQZ_DELTA_PATTERN = /^§delta:[0-9a-f]{8,64}§(?:\r?\n|$)/iu;
 const UNSAFE_YAML_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const PROCESS_LEDGER_TRANSACTIONS = new Map();
 
 export function defaultContextDedupPolicy() {
   return {
@@ -265,22 +266,23 @@ export async function recordRead(options = {}) {
   const stateDir = resolveDedupStateDir({ ...options, policy });
   await assertSafeStateDir(rootDir, stateDir);
   const ledgerPath = resolveLedgerPath(sessionId, { ...options, rootDir, policy });
+  const releaseProcessTransaction = await acquireProcessLedgerTransaction(ledgerPath);
   let sessionLock;
   try {
-    sessionLock = await acquireSessionTransactionLock(rootDir, stateDir, ledgerPath);
-  } catch (error) {
-    return {
-      ...decision('full', 'Ledger lock could not be acquired; serving full content.', {
-        relativePath,
-        digest,
-        bytes,
-        content
-      }),
-      warnings: [{ code: 'context-dedup-ledger-unwritable', severity: 'warning', message: error.message }]
-    };
-  }
+    try {
+      sessionLock = await acquireSessionTransactionLock(rootDir, stateDir, ledgerPath);
+    } catch (error) {
+      return {
+        ...decision('full', 'Ledger lock could not be acquired; serving full content.', {
+          relativePath,
+          digest,
+          bytes,
+          content
+        }),
+        warnings: [{ code: 'context-dedup-ledger-unwritable', severity: 'warning', message: error.message }]
+      };
+    }
 
-  try {
     const { ledger, warnings } = await loadLedger({ ...options, rootDir, policy, sessionId });
     const existing = ledger.entries[relativePath] ?? null;
     const now = new Date().toISOString();
@@ -417,6 +419,7 @@ export async function recordRead(options = {}) {
     };
   } finally {
     await releaseLedgerLock(sessionLock);
+    releaseProcessTransaction();
   }
 }
 
@@ -774,12 +777,15 @@ export async function purgeSession(options = {}) {
     rootDir,
     stateDir
   );
-  const sessionLock = await acquireLedgerLock(resolveSessionLockPath(ledgerPath), rootDir);
+  const releaseProcessTransaction = await acquireProcessLedgerTransaction(ledgerPath);
+  let sessionLock;
   try {
+    sessionLock = await acquireLedgerLock(resolveSessionLockPath(ledgerPath), rootDir);
     await rm(sessionDir, { recursive: true, force: true });
     return { all: false, sessionId, removed: [toPosix(path.relative(rootDir, sessionDir))] };
   } finally {
     await releaseLedgerLock(sessionLock);
+    releaseProcessTransaction();
   }
 }
 
@@ -1062,6 +1068,28 @@ function resolveSessionLockPath(ledgerPath) {
   const sessionDir = path.dirname(ledgerPath);
   const dedupDir = path.dirname(sessionDir);
   return path.join(path.dirname(dedupDir), '.context-dedup-locks', `${path.basename(sessionDir)}.lock`);
+}
+
+async function acquireProcessLedgerTransaction(ledgerPath) {
+  const resolvedPath = path.resolve(ledgerPath);
+  const key = process.platform === 'win32' ? resolvedPath.toLowerCase() : resolvedPath;
+  const previous = PROCESS_LEDGER_TRANSACTIONS.get(key) ?? Promise.resolve();
+  let releaseCurrent;
+  const current = new Promise((resolve) => {
+    releaseCurrent = resolve;
+  });
+  PROCESS_LEDGER_TRANSACTIONS.set(key, current);
+  await previous;
+
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    releaseCurrent();
+    if (PROCESS_LEDGER_TRANSACTIONS.get(key) === current) {
+      PROCESS_LEDGER_TRANSACTIONS.delete(key);
+    }
+  };
 }
 
 async function acquireLedgerLock(lockPath, rootDir, options = {}) {
