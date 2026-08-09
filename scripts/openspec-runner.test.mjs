@@ -84,7 +84,7 @@ describe('detectOpenSpec', () => {
     assert.equal(result.reason, null);
   });
 
-  it('returns available capabilities for version 1.4.1 on supported Node', async () => {
+  it('returns available capabilities for reviewed version 1.4.1 on supported Node', async () => {
     const result = await detectOpenSpec({
       executor: async () => ({ exitCode: 0, stdout: 'openspec 1.4.1\n', stderr: '' }),
       nodeVersion: '20.19.0'

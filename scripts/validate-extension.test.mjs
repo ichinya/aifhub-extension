@@ -78,16 +78,16 @@ function validAifhubMetadata(extra = {}) {
       },
       openspec: {
         url: 'https://github.com/Fission-AI/OpenSpec',
-        version: '1.4.0',
+        version: '1.4.1',
         baselineVersion: '1.3.1',
         supportedRange: '>=1.3.1 <2.0.0',
-        reviewedStableVersions: ['1.3.1', '1.4.0'],
+        reviewedStableVersions: ['1.3.1', '1.4.0', '1.4.1'],
         reviewedPrereleaseVersions: [],
         lastSync: '2026-08-09',
         optional: true,
         requiresNode: '>=20.19.0',
         mode: 'optional-cli-adapter',
-        notes: 'Validated against upstream OpenSpec 1.4.0; AIFHub remains adapter-only.'
+        notes: 'Validated against upstream OpenSpec 1.4.1; AIFHub remains adapter-only.'
       }
     },
     ...extra
@@ -265,7 +265,7 @@ describe('validate-extension.mjs', () => {
 
   it('fails when the latest reviewed OpenSpec stable version differs from source version', async () => {
     const parsed = JSON.parse(validAifhubMetadata());
-    parsed.sources.openspec.version = '1.4.1';
+    parsed.sources.openspec.version = '1.5.0';
     await writeValidProject({ metadata: JSON.stringify(parsed) });
 
     const code = await runValidatorExitCode(tmpDir);
