@@ -82,7 +82,7 @@ function validAifhubMetadata(extra = {}) {
         baselineVersion: '1.3.1',
         supportedRange: '>=1.3.1 <2.0.0',
         reviewedStableVersions: ['1.3.1', '1.4.0', '1.4.1', '1.5.0'],
-        reviewedPrereleaseVersions: [],
+        reviewedPrereleaseVersions: ['1.6.0-beta.1'],
         lastSync: '2026-08-09',
         optional: true,
         requiresNode: '>=20.19.0',

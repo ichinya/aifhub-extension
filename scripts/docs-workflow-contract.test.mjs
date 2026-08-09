@@ -772,7 +772,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
     }
   });
 
-  it('documents the OpenSpec 1.5.0 reviewed baseline and adapter-only boundaries', async () => {
+  it('documents the OpenSpec 1.5.0 baseline, reviewed 1.6 beta, and adapter-only boundaries', async () => {
     const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
     const readme = await readRepoFile('README.md');
     const compatibility = await readRepoFile('docs/openspec-compatibility.md');
@@ -784,7 +784,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
     assert.equal(openspec.baselineVersion, '1.3.1');
     assert.equal(openspec.supportedRange, '>=1.3.1 <2.0.0');
     assert.deepEqual(openspec.reviewedStableVersions, ['1.3.1', '1.4.0', '1.4.1', '1.5.0']);
-    assert.deepEqual(openspec.reviewedPrereleaseVersions, []);
+    assert.deepEqual(openspec.reviewedPrereleaseVersions, ['1.6.0-beta.1']);
     assert.equal(openspec.lastSync, '2026-08-09');
     assertIncludes(openspec.notes, 'upstream OpenSpec 1.3.1 through 1.5.0', 'aifhub-extension.json');
     assertIncludes(openspec.notes, 'adapter-only', 'aifhub-extension.json');
@@ -808,6 +808,12 @@ describe('complete OpenSpec workflow documentation contract', () => {
       'config parsing',
       'CRLF',
       'additive `root`',
+      '`1.6.0-beta.1`',
+      'reviewed but unsupported',
+      'archive validation failures return a non-zero exit code',
+      '/opsx:update',
+      'Oh My Pi',
+      'Trae',
       '.openspec-workspace/view.yaml',
       '/opsx:*',
       'adapter-only',
