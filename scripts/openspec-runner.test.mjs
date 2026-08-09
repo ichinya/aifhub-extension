@@ -99,6 +99,21 @@ describe('detectOpenSpec', () => {
     assert.equal(result.reason, null);
   });
 
+  it('returns available capabilities for reviewed version 1.5.0 on supported Node', async () => {
+    const result = await detectOpenSpec({
+      executor: async () => ({ exitCode: 0, stdout: 'openspec 1.5.0\n', stderr: '' }),
+      nodeVersion: '20.19.0'
+    });
+
+    assert.equal(result.available, true);
+    assert.equal(result.canValidate, true);
+    assert.equal(result.canArchive, true);
+    assert.equal(result.version, '1.5.0');
+    assert.equal(result.supportedRange, '>=1.3.1 <2.0.0');
+    assert.equal(result.versionSupported, true);
+    assert.equal(result.reason, null);
+  });
+
   it('returns degraded capabilities when CLI is missing', async () => {
     const result = await detectOpenSpec({
       executor: async () => {
@@ -552,6 +567,24 @@ describe('OpenSpec command wrappers', () => {
       '--no-color'
     ]);
     assert.deepEqual(result.json, { valid: true });
+  });
+
+  it('preserves additive OpenSpec 1.5.0 root diagnostics in parsed JSON', async () => {
+    const { executor } = createRecordingExecutor({
+      exitCode: 0,
+      stdout: '{"items":[],"summary":{"total":0},"version":"1.5.0","root":"C:/repo/openspec"}',
+      stderr: ''
+    });
+
+    const result = await validateOpenSpecChange('add-oauth', { executor });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.json, {
+      items: [],
+      summary: { total: 0 },
+      version: '1.5.0',
+      root: 'C:/repo/openspec'
+    });
   });
 
   it('getOpenSpecStatus builds the expected args', async () => {

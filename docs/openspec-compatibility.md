@@ -26,12 +26,12 @@ AI Factory = execution runtime
 
 AI Factory-only workflows follow AI Factory's runtime support. OpenSpec validation/archive follows the OpenSpec CLI runtime requirement.
 
-## OpenSpec 1.4.1 Reviewed Baseline
+## OpenSpec 1.5.0 Reviewed Baseline
 
-AIFHub metadata records OpenSpec `1.4.1` as the latest reviewed upstream baseline while keeping the supported stable CLI range `>=1.3.1 <2.0.0`.
+AIFHub metadata records OpenSpec `1.5.0` as the latest reviewed upstream baseline while keeping the supported stable CLI range `>=1.3.1 <2.0.0`.
 
 - Baseline `1.3.1` is the first supported and reviewed release.
-- Reviewed stable releases: `1.3.1`, `1.4.0`, `1.4.1`.
+- Reviewed stable releases: `1.3.1`, `1.4.0`, `1.4.1`, `1.5.0`.
 - Reviewed prereleases: none. A prerelease review does not imply production support.
 
 | Release | Channel | Adapter result | Checked AIFHub surfaces | Required adaptation |
@@ -39,14 +39,17 @@ AIFHub metadata records OpenSpec `1.4.1` as the latest reviewed upstream baselin
 | `1.3.1` | stable | supported baseline | version detection and existing validate/archive adapter contract | baseline |
 | `1.4.0` | stable | supported | `--version`, validate JSON, status JSON, spec show JSON, apply instructions JSON, archive flags | reviewed-release metadata and no-op ownership documentation |
 | `1.4.1` | stable | supported | `--version`, validate JSON, status JSON, spec show JSON, apply instructions JSON, archive flags | `openspec update` remains upstream-owned |
+| `1.5.0` | stable | supported | `--version`, validate/status/show/instructions JSON including additive `root`, archive flags, store help | forward-compatible JSON regression and Stores ownership boundary |
 
 Reviewed upstream behavior:
 
+- OpenSpec `1.5.0` introduces Stores in very early beta, fixes config parsing for values wrapped in JSON containers, and escapes carriage returns in generated YAML frontmatter for CRLF-authored values.
+- OpenSpec `1.5.0` adds an additive `root` field to JSON command results. AIFHub parses additive fields without requiring a closed response schema, so no command or prompt rewrite is required.
 - OpenSpec `1.4.1` fixes `openspec update` for projects that already have their own `workspace.yaml`.
 - OpenSpec `1.4.0` includes Kimi CLI support, Mistral Vibe support, sync skills by default through `/opsx:sync`, case-insensitive requirement headers, and clearer validation hints.
 - OpenSpec workspace beta view state is OpenSpec-owned and lives under `.openspec-workspace/view.yaml`.
 
-AIFHub remains adapter-only: it does not install or manage OpenSpec skills, `/opsx:*` commands, Kimi CLI or Mistral Vibe integrations, OpenSpec workspace beta state, or `openspec update`. AIFHub does not install or manage Kimi CLI or Mistral Vibe integrations, does not own OpenSpec workspace beta state, and does not run or manage `openspec update`.
+AIFHub remains adapter-only: it does not install or manage OpenSpec skills, `/opsx:*` commands, Kimi CLI or Mistral Vibe integrations, Stores, OpenSpec workspace beta state, or `openspec update`. Stores registration, config parsing, and generated CRLF YAML frontmatter remain upstream-owned. AIFHub does not install or manage Kimi CLI or Mistral Vibe integrations, does not own OpenSpec workspace beta state, and does not run or manage `openspec update`.
 
 `openspec update` is upstream OpenSpec behavior. `/aif-mode sync` compiles AIFHub generated rules and requests OpenSpec validate/status through the adapter when configured and available.
 
