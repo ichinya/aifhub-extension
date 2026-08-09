@@ -78,13 +78,16 @@ function validAifhubMetadata(extra = {}) {
       },
       openspec: {
         url: 'https://github.com/Fission-AI/OpenSpec',
-        version: '1.4.1',
+        version: '1.4.0',
+        baselineVersion: '1.3.1',
         supportedRange: '>=1.3.1 <2.0.0',
-        lastSync: '2026-06-10',
+        reviewedStableVersions: ['1.3.1', '1.4.0'],
+        reviewedPrereleaseVersions: [],
+        lastSync: '2026-08-09',
         optional: true,
         requiresNode: '>=20.19.0',
         mode: 'optional-cli-adapter',
-        notes: 'Validated against upstream OpenSpec 1.4.1; AIFHub remains adapter-only.'
+        notes: 'Validated against upstream OpenSpec 1.4.0; AIFHub remains adapter-only.'
       }
     },
     ...extra
@@ -254,6 +257,25 @@ describe('validate-extension.mjs', () => {
   it('fails when AIFHub metadata violates the local schema', async () => {
     const parsed = JSON.parse(validAifhubMetadata());
     parsed.sources['ai-factory'].notes = 42;
+    await writeValidProject({ metadata: JSON.stringify(parsed) });
+
+    const code = await runValidatorExitCode(tmpDir);
+    assert.equal(code, 1);
+  });
+
+  it('fails when the latest reviewed OpenSpec stable version differs from source version', async () => {
+    const parsed = JSON.parse(validAifhubMetadata());
+    parsed.sources.openspec.version = '1.4.1';
+    await writeValidProject({ metadata: JSON.stringify(parsed) });
+
+    const code = await runValidatorExitCode(tmpDir);
+    assert.equal(code, 1);
+  });
+
+  it('fails when an OpenSpec prerelease is listed as reviewed stable', async () => {
+    const parsed = JSON.parse(validAifhubMetadata());
+    parsed.sources.openspec.reviewedStableVersions.push('1.6.0-beta.1');
+    parsed.sources.openspec.version = '1.6.0-beta.1';
     await writeValidProject({ metadata: JSON.stringify(parsed) });
 
     const code = await runValidatorExitCode(tmpDir);

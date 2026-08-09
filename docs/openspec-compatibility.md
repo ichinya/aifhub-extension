@@ -26,13 +26,21 @@ AI Factory = execution runtime
 
 AI Factory-only workflows follow AI Factory's runtime support. OpenSpec validation/archive follows the OpenSpec CLI runtime requirement.
 
-## OpenSpec 1.4.1 Reviewed Baseline
+## OpenSpec 1.4.0 Reviewed Baseline
 
-AIFHub metadata records OpenSpec `1.4.1` as the reviewed upstream baseline while keeping the supported CLI range `>=1.3.1 <2.0.0`.
+AIFHub metadata records OpenSpec `1.4.0` as the latest reviewed upstream baseline while keeping the supported stable CLI range `>=1.3.1 <2.0.0`.
+
+- Baseline `1.3.1` is the first supported and reviewed release.
+- Reviewed stable releases: `1.3.1`, `1.4.0`.
+- Reviewed prereleases: none. A prerelease review does not imply production support.
+
+| Release | Channel | Adapter result | Checked AIFHub surfaces | Required adaptation |
+|---|---|---|---|---|
+| `1.3.1` | stable | supported baseline | version detection and existing validate/archive adapter contract | baseline |
+| `1.4.0` | stable | supported | `--version`, validate JSON, status JSON, spec show JSON, apply instructions JSON, archive flags | reviewed-release metadata and no-op ownership documentation |
 
 Reviewed upstream behavior:
 
-- OpenSpec `1.4.1` includes an `openspec update` fix for projects that already have their own `workspace.yaml`.
 - OpenSpec `1.4.0` includes Kimi CLI support, Mistral Vibe support, sync skills by default through `/opsx:sync`, case-insensitive requirement headers, and clearer validation hints.
 - OpenSpec workspace beta view state is OpenSpec-owned and lives under `.openspec-workspace/view.yaml`.
 
