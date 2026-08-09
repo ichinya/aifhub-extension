@@ -206,6 +206,52 @@ describe('OpenSpec verification context API', () => {
     assert.match(verifySummary, /## Coverage/);
   });
 
+  it('preserves bounded project-local command diagnostics in runtime and QA evidence', async () => {
+    const rootDir = await createTempRoot();
+    const command = 'node_modules/.bin/openspec.cmd';
+    const commandSource = 'project-local';
+    await createOpenSpecChange(rootDir);
+    await createGeneratedRules(rootDir);
+
+    const result = await buildVerificationContext({
+      rootDir,
+      changeId: 'add-oauth',
+      detectOpenSpec: async () => ({
+        ...availableCliDetection(),
+        command,
+        commandSource
+      }),
+      validateOpenSpecChange: async () => ({
+        ...validationResult(),
+        command,
+        commandSource
+      }),
+      getOpenSpecStatus: async () => ({
+        ...statusResult(),
+        command,
+        commandSource
+      })
+    });
+
+    assert.equal(result.openspec.command, command);
+    assert.equal(result.openspec.commandSource, commandSource);
+    assert.equal(result.openspec.validation.command, command);
+    assert.equal(result.openspec.validation.commandSource, commandSource);
+    assert.equal(result.openspec.status.command, command);
+    assert.equal(result.openspec.status.commandSource, commandSource);
+
+    const qaPath = path.join(rootDir, '.ai-factory', 'qa', 'add-oauth');
+    const validationEvidence = await readJson(path.join(qaPath, 'openspec-validation.json'));
+    const statusEvidence = await readJson(path.join(qaPath, 'openspec-status.json'));
+
+    assert.equal(validationEvidence.command, command);
+    assert.equal(validationEvidence.commandSource, commandSource);
+    assert.equal(statusEvidence.command, command);
+    assert.equal(statusEvidence.commandSource, commandSource);
+    assert.equal(path.posix.isAbsolute(validationEvidence.command), false);
+    assert.equal(path.win32.isAbsolute(validationEvidence.command), false);
+  });
+
   it('skips OpenSpec status warning for numeric-leading change ids rejected by status CLI', async () => {
     const rootDir = await createTempRoot();
     const changeId = '81-command-wrappers';

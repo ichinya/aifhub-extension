@@ -39,6 +39,7 @@ const GENERATED_RULES_DIR = path.join('.ai-factory', 'rules', 'generated');
 const VALIDATION_FILE = 'openspec-validation.json';
 const STATUS_FILE = 'openspec-status.json';
 const VERIFY_FILE = 'verify.md';
+const COMMAND_SOURCES = new Set(['explicit', 'project-local', 'path']);
 
 export async function buildVerificationContext(options = {}) {
   return runOpenSpecVerification(options.changeId, options);
@@ -723,6 +724,7 @@ function createOpenSpecSummary(detection) {
     canValidate: Boolean(detection?.canValidate),
     version: detection?.version ?? null,
     command: detection?.command ?? 'openspec',
+    commandSource: normalizeCommandSource(detection?.commandSource),
     reason: detection?.reason ?? null,
     errors: detection?.errors ?? []
   };
@@ -754,6 +756,7 @@ function normalizeCommandResult(result, options = {}) {
   return {
     ok,
     command: result?.command ?? null,
+    commandSource: normalizeCommandSource(result?.commandSource),
     args: Array.from(result?.args ?? []),
     exitCode: result?.exitCode ?? null,
     parsedJson: result?.json ?? parsed.parsedJson,
@@ -783,6 +786,7 @@ function normalizeEvidenceCommand({ changeId, result, rootDir, qaPath, stdoutFil
   return {
     changeId,
     command: normalized.command ?? null,
+    commandSource: normalizeCommandSource(normalized.commandSource),
     args: Array.from(normalized.args ?? []),
     exitCode: normalized.exitCode ?? null,
     ok: Boolean(normalized.ok),
@@ -839,6 +843,7 @@ function createSkippedCommand({ ok, reason, message }) {
     reason,
     message,
     command: null,
+    commandSource: null,
     args: [],
     exitCode: null,
     parsedJson: null,
@@ -850,6 +855,10 @@ function createSkippedCommand({ ok, reason, message }) {
       message
     }
   };
+}
+
+function normalizeCommandSource(value) {
+  return COMMAND_SOURCES.has(value) ? value : null;
 }
 
 async function writeRawCommandStreams(command, rawDir) {
