@@ -772,7 +772,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
     }
   });
 
-  it('documents the OpenSpec 1.5.0 baseline, reviewed 1.6 beta, and adapter-only boundaries', async () => {
+  it('documents the OpenSpec 1.6.0 reviewed baseline and adapter-only boundaries', async () => {
     const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
     const readme = await readRepoFile('README.md');
     const compatibility = await readRepoFile('docs/openspec-compatibility.md');
@@ -780,21 +780,21 @@ describe('complete OpenSpec workflow documentation contract', () => {
     const openspec = metadata.sources.openspec;
     const combinedDocs = [readme, compatibility, docsIndex].join('\n');
 
-    assert.equal(openspec.version, '1.5.0');
+    assert.equal(openspec.version, '1.6.0');
     assert.equal(openspec.baselineVersion, '1.3.1');
     assert.equal(openspec.supportedRange, '>=1.3.1 <2.0.0');
-    assert.deepEqual(openspec.reviewedStableVersions, ['1.3.1', '1.4.0', '1.4.1', '1.5.0']);
+    assert.deepEqual(openspec.reviewedStableVersions, ['1.3.1', '1.4.0', '1.4.1', '1.5.0', '1.6.0']);
     assert.deepEqual(openspec.reviewedPrereleaseVersions, ['1.6.0-beta.1']);
     assert.equal(openspec.lastSync, '2026-08-09');
-    assertIncludes(openspec.notes, 'upstream OpenSpec 1.3.1 through 1.5.0', 'aifhub-extension.json');
+    assertIncludes(openspec.notes, 'upstream OpenSpec 1.3.1 through 1.6.0', 'aifhub-extension.json');
     assertIncludes(openspec.notes, 'adapter-only', 'aifhub-extension.json');
 
-    assertIncludes(readme, 'OpenSpec `1.5.0`', 'README.md');
-    assertIncludes(docsIndex, 'OpenSpec 1.5.0', 'docs/README.md');
+    assertIncludes(readme, 'OpenSpec `1.6.0`', 'README.md');
+    assertIncludes(docsIndex, 'OpenSpec 1.6.0', 'docs/README.md');
 
     for (const expected of [
-      'OpenSpec 1.5.0 Reviewed Baseline',
-      'OpenSpec `1.5.0`',
+      'OpenSpec 1.6.0 Reviewed Baseline',
+      'OpenSpec `1.6.0`',
       'Baseline `1.3.1`',
       'Reviewed stable releases',
       'Kimi CLI',
@@ -814,6 +814,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
       '/opsx:update',
       'Oh My Pi',
       'Trae',
+      'nested specs and task files',
       '.openspec-workspace/view.yaml',
       '/opsx:*',
       'adapter-only',

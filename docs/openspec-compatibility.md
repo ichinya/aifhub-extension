@@ -26,12 +26,12 @@ AI Factory = execution runtime
 
 AI Factory-only workflows follow AI Factory's runtime support. OpenSpec validation/archive follows the OpenSpec CLI runtime requirement.
 
-## OpenSpec 1.5.0 Reviewed Baseline
+## OpenSpec 1.6.0 Reviewed Baseline
 
-AIFHub metadata records OpenSpec `1.5.0` as the latest reviewed upstream baseline while keeping the supported stable CLI range `>=1.3.1 <2.0.0`.
+AIFHub metadata records OpenSpec `1.6.0` as the latest reviewed upstream baseline while keeping the supported stable CLI range `>=1.3.1 <2.0.0`.
 
 - Baseline `1.3.1` is the first supported and reviewed release.
-- Reviewed stable releases: `1.3.1`, `1.4.0`, `1.4.1`, `1.5.0`.
+- Reviewed stable releases: `1.3.1`, `1.4.0`, `1.4.1`, `1.5.0`, `1.6.0`.
 - Reviewed prereleases: `1.6.0-beta.1`. A prerelease review does not imply production support; prerelease detection remains unavailable for production capabilities.
 
 | Release | Channel | Adapter result | Checked AIFHub surfaces | Required adaptation |
@@ -41,9 +41,11 @@ AIFHub metadata records OpenSpec `1.5.0` as the latest reviewed upstream baselin
 | `1.4.1` | stable | supported | `--version`, validate JSON, status JSON, spec show JSON, apply instructions JSON, archive flags | `openspec update` remains upstream-owned |
 | `1.5.0` | stable | supported | `--version`, validate/status/show/instructions JSON including additive `root`, archive flags, store help | forward-compatible JSON regression and Stores ownership boundary |
 | `1.6.0-beta.1` | prerelease | reviewed but unsupported | exact CLI validate/status/show/instructions smoke, archive flags, invalid-change archive exit | preserve stable-only production gate; no prerelease support claim |
+| `1.6.0` | stable | supported | exact CLI validate/status/show/instructions JSON, archive flags, invalid-change archive exit | stable ledger advancement; beta-to-stable code diff only changes version/changelog |
 
 Reviewed upstream behavior:
 
+- OpenSpec `1.6.0` promotes the reviewed beta behavior to stable, including consistent resolution and task progress for nested specs and task files. The beta-to-stable source diff contains only release metadata and changelog updates, so no additional AIFHub command rewrite is required.
 - OpenSpec `1.6.0-beta.1` converges validate, view, and archive resolution, and archive validation failures return a non-zero exit code. AIFHub's existing non-zero fail-closed handling remains compatible.
 - The prerelease adds `/opsx:update`, Oh My Pi and Trae adapters, automatic OpenSpec CLI permission in generated skills, unified requirement parsing, archive scenario-drift fixes, and empty Store registration. Those integrations and generated skills remain upstream-owned.
 - OpenSpec `1.5.0` introduces Stores in very early beta, fixes config parsing for values wrapped in JSON containers, and escapes carriage returns in generated YAML frontmatter for CRLF-authored values.
