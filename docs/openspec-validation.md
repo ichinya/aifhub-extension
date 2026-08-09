@@ -68,6 +68,8 @@ The validator checks:
 | generated rules under `.ai-factory/rules/generated/` | `warn` when missing or stale |
 | supplied changed paths under `openspec/specs/**` | `fail` unless direct base spec mutation is explicitly allowed |
 
+OpenSpec `1.8.0` strict validation also reports scenario loss when a `MODIFIED` requirement omits an existing scenario. AIFHub preserves that upstream path and message in validation QA evidence and stops code verification. Capability retirement remains an OpenSpec-owned archive operation and requires explicit `retire_capabilities: true` metadata; AIFHub planning must not infer the marker.
+
 Generated-rule warnings suggest:
 
 ```text
@@ -115,7 +117,7 @@ Run finalization from an installed project through the stable wrapper:
 ai-factory aifhub-done-finalizer --change <change-id> --json
 ```
 
-New docs/tooling-only changes on OpenSpec `>=1.7.0` should declare `skip_specs: true` in `.openspec.yaml`; older supported CLIs keep the explicit proposal reason. The compatibility finalizer can still use `--skip-specs`, and explicit dirty-state evidence can use `--record-dirty-state`:
+New docs/tooling-only changes on OpenSpec `>=1.7.0` should declare `skip_specs: true` in `.openspec.yaml`; older supported CLIs keep the explicit proposal reason. Explicit capability retirement on OpenSpec `>=1.8.0` uses native `retire_capabilities: true` and is never inferred from an empty delta. The compatibility finalizer can still use `--skip-specs`, and explicit dirty-state evidence can use `--record-dirty-state`:
 
 ```bash
 ai-factory aifhub-done-finalizer --change <change-id> --skip-specs --record-dirty-state --json

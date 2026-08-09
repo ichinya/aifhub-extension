@@ -513,6 +513,8 @@ OpenSpec-native planning includes task intake normalization inside `/aif-plan fu
 
 Docs/tooling-only changes may omit delta specs only when the proposal explains why no product or workflow behavior changes.
 
+When an explicitly requested behavior change removes the final requirement of a capability, OpenSpec `>=1.8.0` planning may add `retire_capabilities: true` to `.openspec.yaml`. This destructive intent must come from the user; planning must not infer capability retirement merely because a `REMOVED` delta leaves no requirements. Older supported CLIs require an upgrade before that change can be archived.
+
 When `aifhub.openspec.validateOnPlan` is enabled, planning requests `openspec validate` through the AIFHub OpenSpec runner if a compatible CLI is available. Missing CLI is a degraded warning unless `aifhub.openspec.requireCliForPlan` is true.
 
 ### `/aif-explore`
@@ -791,7 +793,7 @@ Does not write:
 - manual file moves from `openspec/changes` to archives
 - legacy `.ai-factory/specs` archives in OpenSpec-native mode
 
-For newly authored docs/tooling-only changes on OpenSpec `>=1.7.0`, prefer native `.openspec.yaml` metadata with `skip_specs: true`; preserve the schema selected for the change. With an older supported CLI, keep the explicit proposal reason and compatibility finalizer path. The public `--skip-specs` finalizer flag remains supported for explicit compatibility finalization. Archive-required finalization needs a compatible OpenSpec CLI when `aifhub.openspec.requireCliForDone` is true. `/aif-done` runs a pre-archive readiness gate and refuses archive on blocking OpenSpec validate, artifact contract, generated rules, rules gate, coverage, verify gate, or dirty workspace failures. The readiness output includes the exact next command to run.
+For newly authored docs/tooling-only changes on OpenSpec `>=1.7.0`, prefer native `.openspec.yaml` metadata with `skip_specs: true`; preserve the schema selected for the change. With an older supported CLI, keep the explicit proposal reason and compatibility finalizer path. For explicitly authorized capability retirement on OpenSpec `>=1.8.0`, preserve `retire_capabilities: true`; never infer this destructive marker. The public `--skip-specs` finalizer flag remains supported for explicit compatibility finalization. Archive-required finalization needs a compatible OpenSpec CLI when `aifhub.openspec.requireCliForDone` is true. `/aif-done` runs a pre-archive readiness gate and refuses archive on blocking OpenSpec validate, artifact contract, generated rules, rules gate, coverage, verify gate, or dirty workspace failures. The readiness output includes the exact next command to run.
 
 The stable installed-project executable route is:
 

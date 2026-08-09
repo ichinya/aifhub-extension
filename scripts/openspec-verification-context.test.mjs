@@ -452,6 +452,42 @@ describe('OpenSpec verification context API', () => {
     });
   });
 
+  it('preserves OpenSpec 1.8 scenario-loss diagnostics while failing fast', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+    const scenarioLoss = 'MODIFIED "Widget state" omits scenario(s) the current spec still has: "Second scenario".';
+
+    const result = await runOpenSpecVerification('add-oauth', {
+      rootDir,
+      detectOpenSpec: async () => ({ ...availableCliDetection(), version: '1.8.0' }),
+      validateOpenSpecChange: async () => validationResult({
+        ok: false,
+        exitCode: 1,
+        stdout: JSON.stringify({
+          items: [{
+            id: 'add-oauth',
+            valid: false,
+            issues: [{ level: 'ERROR', path: 'widgets/spec.md', message: scenarioLoss }]
+          }]
+        }),
+        stderr: '',
+        json: null,
+        error: {
+          code: 'non-zero-exit',
+          message: 'OpenSpec command failed with exit code 1.'
+        }
+      }),
+      getOpenSpecStatus: async () => statusResult()
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.shouldRunCodeVerification, false);
+    assert.equal(result.openspec.validation.parsedJson.items[0].issues[0].message, scenarioLoss);
+    const evidence = await readJson(path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'openspec-validation.json'));
+    assert.equal(evidence.parsedJson.items[0].issues[0].path, 'widgets/spec.md');
+    assert.equal(evidence.parsedJson.items[0].issues[0].message, scenarioLoss);
+  });
+
   it('uses degraded missing-CLI mode unless strict config requires CLI', async () => {
     const rootDir = await createTempRoot();
     await createOpenSpecChange(rootDir);

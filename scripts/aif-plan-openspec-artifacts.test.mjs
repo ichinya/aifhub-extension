@@ -132,7 +132,10 @@ describe('aif-plan OpenSpec-native planning contract', () => {
       'openspec/changes/<change-id>/.openspec.yaml',
       'skip_specs: true',
       '>=1.7.0',
-      'older supported CLI'
+      'older supported CLI',
+      'retire_capabilities: true',
+      'explicitly authorizes capability retirement',
+      'must not infer retirement'
     ]) {
       assertIncludes(openspec, expected, 'OpenSpec-native section');
     }
