@@ -26,7 +26,7 @@
 - `aifhub-rules-sidecar` keeps the upstream `rules-sidecar` contract instead of replacing it: it uses `aif-rules-check` and reads generated markdown plus trace metadata under `.ai-factory/rules/generated/*` in OpenSpec-native mode.
 - `low-write verifier`: `aifhub-verifier`. Агент может обновлять только verification artifacts, но не implementation files.
 - `bounded worker`: `aifhub-plan-polisher`, `aifhub-implement-worker`, `aifhub-fixer`. Они write-capable, но у каждого есть жёстко ограниченный рабочий scope.
-- `finalization helper`: `aifhub-done-finalizer`. Он завершает verification-passing OpenSpec change through `openspec archive <change-id> --yes` or legacy plan archive work, supports `--skip-specs`, and prepares summary/archive evidence.
+- `finalization helper`: `aifhub-done-finalizer`. Для OpenSpec-native installed project он запускает `ai-factory aifhub-done-finalizer --change <change-id> --json`; extension-local implementation выполняет readiness и `openspec archive <change-id> --yes`. Поддерживаются `--skip-specs` и `--record-dirty-state`, результат остаётся bounded.
 
 ## Как это работает
 
@@ -89,8 +89,12 @@ Verifier writes QA evidence under `.ai-factory/qa/<change-id>/`.
 ### Finalization
 
 - `aifhub-done-finalizer`
+- installed command: `ai-factory aifhub-done-finalizer --change <change-id> --json`
 - requires passing verify gate
 - archives only through OpenSpec CLI
+- returns bounded output and exit `0` for success/accepted warning, `1` for a resolved blocker, or `2` for invalid/unresolved/unexpected command failure
+- rejects unknown options and `--force`, `--no-validate`, `--skip-archive`, `--dry-run`, and `--summary-only`
+- never runs extension-local `scripts/openspec-*.mjs` modules through a consumer-root or installed-internal path
 - writes final evidence/summaries
 - recommends `/aif-mode sync`
 - recommends `/aif-commit`
@@ -111,7 +115,7 @@ Verifier writes QA evidence under `.ai-factory/qa/<change-id>/`.
 - Попросить plan polisher: `Используй aifhub-plan-polisher для точечной полировки текущего OpenSpec change или legacy плана без редактирования source code.`
 - Попросить verifier: `Запусти aifhub-verifier для active OpenSpec change or legacy plan pair и changed files. Обнови только verification artifacts и верни verdict с counts по findings.`
 - Попросить fixer: `Используй aifhub-fixer и исправь только findings B001 и I002, затем верни files modified и re-verify recommendation.`
-- Попросить done finalizer: `Запусти aifhub-done-finalizer для passing OpenSpec change или legacy plan. Для OpenSpec-native scope проверь /aif-verify evidence, archive through openspec archive <change-id> --yes, use --skip-specs for docs/tooling-only work, and report .ai-factory/qa/<change-id>/ plus .ai-factory/state/<change-id>/ outputs. Для legacy scope используй `.ai-factory/specs/<plan-id>/` archive path. Подготовь commit/PR summary draft.`
+- Попросить done finalizer: `Запусти ai-factory aifhub-done-finalizer --change <change-id> --json для passing OpenSpec change. Используй --skip-specs только для docs/tooling-only work, верни bounded status, safe paths, OpenSpec command/source и suggested next; не запускай scripts/openspec-*.mjs из consumer root или installed-internal path. Для legacy scope следуй agent contract. Подготовь commit/PR summary draft.`
 
 Во всех случаях полезно явно задавать scope: какой plan, какие файлы или какой changed range должен анализироваться.
 

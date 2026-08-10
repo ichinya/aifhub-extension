@@ -19,6 +19,9 @@ import {
 import {
   getLatestGateResult
 } from './aif-gate-result.mjs';
+import {
+  readOpenSpecSkipSpecsMarker
+} from './openspec-change-metadata.mjs';
 
 export const ARTIFACT_CONTRACT_SCHEMA_VERSION = 1;
 export const ARTIFACT_CONTRACT_VALIDATOR = 'aifhub-openspec-artifact-contract';
@@ -81,10 +84,11 @@ export async function validateOpenSpecArtifactContract(options = {}) {
     rootDir
   });
   const artifacts = canonical.canonicalArtifacts ?? {};
+  const skipSpecs = await readOpenSpecSkipSpecsMarker(changeDir);
 
   checks.push(...inspectRequiredArtifacts(artifacts));
   checks.push(inspectDesignArtifact(artifacts.design, config.requireDesign));
-  checks.push(inspectDeltaSpecs(artifacts, config));
+  checks.push(inspectDeltaSpecs(artifacts, config, skipSpecs, rootDir));
   checks.push(...await inspectRuntimeFiles(rootDir, changeDir));
   checks.push(...await inspectVerificationEvidence(changeId, {
     ...options,
@@ -225,7 +229,7 @@ function inspectDesignArtifact(design, requireDesign) {
   });
 }
 
-function inspectDeltaSpecs(artifacts, config) {
+function inspectDeltaSpecs(artifacts, config, skipSpecs, rootDir) {
   const deltaSpecs = Array.isArray(artifacts.deltaSpecs) ? artifacts.deltaSpecs : [];
   const proposal = artifacts.proposal;
   const hasSkipReason = proposal?.exists && hasExplicitSkipSpecsReason(proposal.content);
@@ -236,6 +240,24 @@ function inspectDeltaSpecs(artifacts, config) {
       status: 'pass',
       path: deltaSpecs[0].path,
       message: `Found ${deltaSpecs.length} OpenSpec delta spec file(s).`
+    });
+  }
+
+  if (skipSpecs?.declared) {
+    return createCheck({
+      id: 'delta-specs-present',
+      status: 'pass',
+      path: toPosix(path.relative(rootDir, skipSpecs.metadataPath)),
+      message: 'No delta specs are required because .openspec.yaml declares native skip_specs: true.'
+    });
+  }
+
+  if (skipSpecs?.valid === false) {
+    return createCheck({
+      id: 'delta-specs-present',
+      status: 'fail',
+      path: toPosix(path.relative(rootDir, skipSpecs.metadataPath)),
+      message: `OpenSpec skip_specs metadata is invalid: ${skipSpecs.invalidReason}`
     });
   }
 
@@ -252,7 +274,7 @@ function inspectDeltaSpecs(artifacts, config) {
     id: 'delta-specs-present',
     status: config.allowMissingSpecs ? 'warn' : 'fail',
     path: `openspec/changes/${config.changeIdPlaceholder ?? '<change-id>'}/specs/**/spec.md`,
-    message: 'OpenSpec changes must include specs/**/spec.md unless proposal.md has an explicit docs/tooling-only skip-specs reason.'
+    message: 'OpenSpec changes must include specs/**/spec.md unless .openspec.yaml declares skip_specs: true or proposal.md preserves an explicit legacy docs/tooling-only skip-specs reason.'
   });
 }
 
@@ -708,7 +730,7 @@ function chooseSuggestedNext(changeId, checks) {
   if (failing?.id === 'delta-specs-present') {
     return {
       command: `/aif-mode sync --change ${changeId}`,
-      reason: 'add delta specs or document an explicit docs/tooling-only skip-specs reason before syncing again'
+      reason: 'add delta specs or declare native skip_specs: true in .openspec.yaml before syncing again'
     };
   }
 

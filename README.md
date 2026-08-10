@@ -106,7 +106,17 @@ OpenSpec validation overlay:
 
 `/aif-done` finalizes the OpenSpec lifecycle. It archives the accepted OpenSpec change through the OpenSpec CLI when archive is required and writes final evidence under `.ai-factory/qa/<change-id>/` plus final summaries under `.ai-factory/state/<change-id>/`.
 
-A dirty workspace is blocking by default before `/aif-done`. Inspect with `git status --short`; commit or stash unrelated changes, or rerun `/aif-done <change-id> --record-dirty-state` when the current dirty state should be recorded in final QA evidence before archive.
+Installed projects can run the same bounded finalizer directly through the stable extension command:
+
+```bash
+ai-factory aifhub-done-finalizer --change <change-id> --json
+```
+
+Omitting `--change` delegates to the active-change resolver: exactly one resolvable active change may be selected, while missing or ambiguous scope exits with code `2` before finalization. Automation should always pass an explicit `--change <change-id>`.
+
+Add `--skip-specs` only for docs/tooling-only work. The wrapper returns exit `0` after successful or policy-accepted warning finalization, `1` for a resolved readiness/archive blocker, and `2` for invalid arguments, unresolved or ambiguous scope, or an unexpected command failure. Do not run extension-internal `scripts/openspec-done-finalizer.mjs` from the project root or through an installed-extension path.
+
+A dirty workspace is blocking by default before `/aif-done`. Inspect with `git status --short`; commit or stash unrelated changes, or rerun `ai-factory aifhub-done-finalizer --change <change-id> --record-dirty-state --json` when the current dirty state should be recorded in final QA evidence before archive.
 
 It does not replace `/aif-commit`. After `/aif-done`, run `/aif-commit` or your normal git workflow to commit implementation changes, OpenSpec archive/spec changes, QA evidence, and final summaries.
 
@@ -275,9 +285,11 @@ OpenSpec is optional for extension install and AI Factory-only workflows.
 | OpenSpec CLI runtime | Node `>=20.19.0` |
 | OpenSpec skills/commands | Not installed by this extension |
 
-The reviewed OpenSpec baseline is OpenSpec `1.4.1`, while the compatible CLI range remains `>=1.3.1 <2.0.0`. See [OpenSpec Compatibility](docs/openspec-compatibility.md) for the OpenSpec 1.4.1 reviewed baseline, `openspec update` boundary, and adapter-only ownership notes.
+The reviewed OpenSpec baseline is OpenSpec `1.8.0`, replayed sequentially from baseline `1.3.1` and including prerelease `1.6.0-beta.1`, while the compatible stable CLI range remains `>=1.3.1 <2.0.0`. See [OpenSpec Compatibility](docs/openspec-compatibility.md) for the reviewed-release ledger and adapter-only ownership notes.
 
 When the OpenSpec CLI is missing or unsupported, OpenSpec-aware commands report degraded validate/archive capabilities. Planning and filesystem-based context loading can continue, but archive-required `/aif-done` fails until a compatible CLI is available.
+
+For each OpenSpec operation, the shared resolver selects exactly one CLI source in this order: an explicit non-empty extension API `options.command`, project-local `node_modules/.bin/openspec` (`openspec.cmd` on Windows), then `openspec` from `PATH`. An explicit or project-local selection is authoritative: a failure never silently falls through to another installation. AIFHub does not use `npx`, search parent projects, download, or auto-install OpenSpec. Diagnostics expose only the bounded command plus `explicit`, `project-local`, or `path` source.
 
 If the OpenSpec CLI is present but outside `>=1.3.1 <2.0.0`, update or reinstall the CLI before relying on validation/archive. The bootstrap still reports this as degraded capability rather than an install failure.
 
@@ -333,7 +345,7 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 | Ambiguous active change | Pass an explicit `<change-id>` or update `.ai-factory/state/current.yaml`. |
 | Missing or stale generated rules | Regenerate derived rules from OpenSpec specs before relying on rules guidance. |
 | Missing or stale coverage | Rerun `/aif-verify <change-id>` to refresh `.ai-factory/qa/<change-id>/coverage.json` before `/aif-done`. |
-| Dirty working tree before `/aif-done` | Inspect with `git status --short`; commit or stash unrelated changes, or rerun `/aif-done <change-id> --record-dirty-state` to record the dirty workspace in final QA evidence before archive. |
+| Dirty working tree before `/aif-done` | Inspect with `git status --short`; commit or stash unrelated changes, or rerun `ai-factory aifhub-done-finalizer --change <change-id> --record-dirty-state --json` to record the dirty workspace in final QA evidence before archive. |
 
 ## Documentation
 
@@ -344,7 +356,7 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 | [Context Providers](docs/context-providers.md) | Optional Graphify and Context7 provider guidance, reviewed-note paths, degraded behavior, and user-owned setup boundaries |
 | [Memory Tool Recommendations](docs/memory-tool-recommendations.md) | Local metadata-driven optional memory/context tool recommendations and installed wrapper commands |
 | [Context Loading Policy](docs/context-loading-policy.md) | Consumer context, Optional Project Glossary, optional provider context, GitHub-aware roadmap evidence, command ownership, upstream utility boundaries, and legacy boundaries |
-| [OpenSpec Compatibility](docs/openspec-compatibility.md) | Optional CLI adapter policy, OpenSpec 1.4.1 reviewed baseline, AI Factory 2.17 planning/fix/QA/MCP/Control Flow adaptations, reviewed no-ops, archive boundary, and capability flags |
+| [OpenSpec Compatibility](docs/openspec-compatibility.md) | Optional CLI adapter policy, OpenSpec `1.8.0` reviewed baseline from `1.3.1`, AI Factory 2.17 planning/fix/QA/MCP/Control Flow adaptations, reviewed no-ops, archive boundary, and capability flags |
 | [OpenSpec Artifact Validation](docs/openspec-validation.md) | Read-only AIFHub contract validator for OpenSpec-native artifacts |
 | [OpenSpec Coverage Matrix](docs/spec-coverage.md) | Requirement-to-code coverage artifact and verify/done policy |
 | [Legacy Plan Migration](docs/legacy-plan-migration.md) | Explicit migration from legacy plans to OpenSpec-native changes |

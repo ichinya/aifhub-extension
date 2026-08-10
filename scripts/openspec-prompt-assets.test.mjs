@@ -996,7 +996,9 @@ describe('OpenSpec-native prompt asset contract', () => {
       const asset = stripFencedBlocks(await readRepoFile(relativePath));
 
       for (const expected of [
+        'ai-factory aifhub-done-finalizer --change <change-id> --json',
         'scripts/openspec-done-finalizer.mjs',
+        'extension-local',
         'archiveOpenSpecChange',
         '--skip-specs',
         '.ai-factory/qa/<change-id>/',
@@ -1027,6 +1029,11 @@ describe('OpenSpec-native prompt asset contract', () => {
         /archive integration (?:is )?deferred to issue #33|deferred archive status/i,
         `${relativePath} should no longer describe OpenSpec archive integration as deferred`
       );
+      assert.doesNotMatch(
+        asset,
+        /\bnode(?:\.exe)?\s+(?:scripts[\\/]|[^\n]*\.ai-factory[\\/]extensions[\\/][^\n]*scripts[\\/])openspec-(?:done-finalizer|done-readiness|runner)\.mjs\b/i,
+        `${relativePath} should not execute extension-local OpenSpec modules as installed-project commands`
+      );
     }
   });
 
@@ -1036,7 +1043,7 @@ describe('OpenSpec-native prompt asset contract', () => {
 
       for (const expected of [
         '--record-dirty-state',
-        '/aif-done <change-id> --record-dirty-state',
+        'ai-factory aifhub-done-finalizer --change <change-id> --record-dirty-state --json',
         'git status --short'
       ]) {
         assertIncludes(asset, expected, relativePath);

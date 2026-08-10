@@ -35,6 +35,9 @@ import {
   summarizeOpenSpecCoverage
 } from './openspec-coverage-matrix.mjs';
 import {
+  readOpenSpecSkipSpecsMarker
+} from './openspec-change-metadata.mjs';
+import {
   readOpenSpecRulesGateEvidence,
   resolveOpenSpecPolicy,
   summarizeOpenSpecPolicy
@@ -816,6 +819,7 @@ async function syncGeneratedRules(options = {}) {
       dryRun,
       baseOnly: true,
       changeSpecificSkipped: true,
+      openspecCli: result.openspecCli ?? null,
       results: [result],
       files: result.files ?? [],
       warnings: dedupeDiagnostics([
@@ -836,6 +840,7 @@ async function syncGeneratedRules(options = {}) {
   return {
     ok: results.every((result) => result.ok),
     dryRun,
+    openspecCli: results.find((result) => result.openspecCli !== null)?.openspecCli ?? null,
     results,
     files: results.flatMap((result) => result.files ?? []),
     warnings: dedupeDiagnostics(results.flatMap((result) => result.warnings ?? [])),
@@ -975,10 +980,17 @@ async function selectValidatableChanges(rootDir, changeIds) {
   const skippedChanges = [];
 
   for (const changeId of changeIds) {
-    const specRoot = path.join(rootDir, 'openspec', 'changes', changeId, 'specs');
+    const changeDir = path.join(rootDir, 'openspec', 'changes', changeId);
+    const specRoot = path.join(changeDir, 'specs');
     const specFiles = await listSpecFiles(specRoot, rootDir);
 
     if (specFiles.length === 0) {
+      const skipSpecs = await readOpenSpecSkipSpecsMarker(changeDir);
+      if (skipSpecs.declared || !skipSpecs.valid) {
+        validatable.push(changeId);
+        continue;
+      }
+
       skippedChanges.push({
         changeId,
         reason: 'no-delta-specs'
@@ -1839,6 +1851,10 @@ function summarizeOpenSpecDetection(detection) {
     nodeVersion: detection?.nodeVersion ?? null,
     nodeSupported: detection?.nodeSupported ?? null,
     versionSupported: detection?.versionSupported ?? null,
+    latestReviewedVersion: detection?.latestReviewedVersion ?? null,
+    versionOutdated: detection?.versionOutdated ?? null,
+    command: detection?.command ?? null,
+    commandSource: detection?.commandSource ?? null,
     reason: detection?.reason ?? null,
     errors: detection?.errors ?? []
   };
@@ -1867,7 +1883,11 @@ function createRunOptions(rootDir, options = {}) {
     command: options.command,
     env: options.env,
     executor: options.executor,
-    nodeVersion: options.nodeVersion
+    nodeVersion: options.nodeVersion,
+    platform: options.platform,
+    candidateExists: options.candidateExists,
+    execFile: options.execFile,
+    comSpec: options.comSpec
   };
 }
 
@@ -1942,6 +1962,7 @@ function renderSyncSection(sync) {
     '',
     `Generated rules files: ${sync.generatedRules?.files?.length ?? 0}`,
     `Validation skipped: ${sync.validation?.skipped ? 'yes' : 'no'}`,
+    ...renderOpenSpecCommand(sync.generatedRules?.openspecCli ?? sync.validation?.detection),
     ...renderDiagnostics('Warnings', sync.warnings ?? []),
     ...renderDiagnostics('Errors', sync.errors ?? [])
   ].join('\n');
@@ -1975,6 +1996,7 @@ function renderGeneratedRulesSection(generatedRules) {
     `Files: ${generatedRules.files.length}`,
     `Base-only sync: ${generatedRules.baseOnly ? 'yes' : 'no'}`,
     `Change-specific rules skipped: ${generatedRules.changeSpecificSkipped ? 'yes' : 'no'}`,
+    ...renderOpenSpecCommand(generatedRules.openspecCli),
     ...renderDiagnostics('Warnings', generatedRules.warnings),
     ...renderDiagnostics('Errors', generatedRules.errors)
   ].join('\n');
@@ -1987,9 +2009,21 @@ function renderValidationSection(validation) {
     `Skipped: ${validation.skipped ? 'yes' : 'no'}`,
     `Results: ${validation.results.length}`,
     `Skipped changes: ${validation.skippedChanges?.length ?? 0}`,
+    ...renderOpenSpecCommand(validation.detection),
     ...renderDiagnostics('Warnings', validation.warnings),
     ...renderDiagnostics('Errors', validation.errors)
   ].join('\n');
+}
+
+function renderOpenSpecCommand(detection) {
+  if (detection?.command === null || detection?.command === undefined) {
+    return [];
+  }
+
+  return [
+    `OpenSpec command: ${detection.command}`,
+    `OpenSpec command source: ${detection.commandSource ?? 'unknown'}`
+  ];
 }
 
 function renderLegacyDetectionSection(legacy) {
@@ -2163,6 +2197,7 @@ function createSkippedGeneratedRulesSync(dryRun, reason) {
     dryRun,
     skipped: true,
     reason,
+    openspecCli: null,
     results: [],
     files: [],
     warnings: [

@@ -184,6 +184,56 @@ describe('OpenSpec artifact contract validator', () => {
     assert.equal(getCheck(result, 'delta-specs-present').status, 'fail');
   });
 
+  it('accepts native OpenSpec skip_specs metadata when delta specs are intentionally absent', async () => {
+    const rootDir = await createTempRoot();
+    await createValidChange(rootDir);
+    await rm(path.join(rootDir, 'openspec', 'changes', 'add-oauth', 'specs'), {
+      recursive: true,
+      force: true
+    });
+    await writeFixture(rootDir, 'openspec/changes/add-oauth/.openspec.yaml', [
+      'schema: spec-driven',
+      'created: 2026-08-09',
+      'skip_specs: true',
+      ''
+    ].join('\n'));
+
+    const result = await validateOpenSpecArtifactContract({
+      rootDir,
+      changeId: 'add-oauth'
+    });
+
+    assert.notEqual(result.status, 'fail');
+    assert.equal(result.blocking, false);
+    assert.equal(getCheck(result, 'delta-specs-present').status, 'pass');
+    assert.equal(getCheck(result, 'delta-specs-present').path, 'openspec/changes/add-oauth/.openspec.yaml');
+    assert.match(getCheck(result, 'delta-specs-present').message, /skip_specs: true/);
+  });
+
+  it('fails closed when native skip_specs metadata is not boolean', async () => {
+    const rootDir = await createTempRoot();
+    await createValidChange(rootDir);
+    await rm(path.join(rootDir, 'openspec', 'changes', 'add-oauth', 'specs'), {
+      recursive: true,
+      force: true
+    });
+    await writeFixture(rootDir, 'openspec/changes/add-oauth/.openspec.yaml', [
+      'schema: spec-driven',
+      'skip_specs: "true"',
+      ''
+    ].join('\n'));
+
+    const result = await validateOpenSpecArtifactContract({
+      rootDir,
+      changeId: 'add-oauth'
+    });
+
+    assert.equal(result.status, 'fail');
+    assert.equal(result.blocking, true);
+    assert.equal(getCheck(result, 'delta-specs-present').path, 'openspec/changes/add-oauth/.openspec.yaml');
+    assert.match(getCheck(result, 'delta-specs-present').message, /boolean true or false/);
+  });
+
   it('warns when generated rules are stale and suggests sync', async () => {
     const rootDir = await createTempRoot();
     await createValidChange(rootDir);

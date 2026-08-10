@@ -37,7 +37,7 @@ async function createChange(rootDir, changeId = 'add-oauth') {
     '# Tasks',
     '',
     '- [x] 1.1 Implement OAuth login in src/auth/login.ts and src/auth/session.ts.',
-    '- [x] 1.2 Add regression coverage in tests/auth/login.test.ts.',
+    '  - [x] 1.2 Add nested regression coverage in tests/auth/login.test.ts.',
     ''
   ].join('\n'));
   await writeFixture(rootDir, `openspec/changes/${changeId}/specs/auth/spec.md`, [
@@ -117,7 +117,7 @@ afterEach(async () => {
 });
 
 describe('OpenSpec coverage matrix', () => {
-  it('builds requirement-to-task-to-code coverage and writes a stable QA artifact', async () => {
+  it('builds requirement-to-nested-task-to-code coverage and writes a stable QA artifact', async () => {
     const rootDir = await createTempRoot();
     await createChange(rootDir);
     const generatedRules = await createGeneratedRules(rootDir);

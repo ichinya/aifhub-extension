@@ -1,7 +1,8 @@
 ---
 name: aif-analyze
 description: Bootstrap project context. Resolves localization and stack, creates/updates config.yaml and rules/base.md, then checks DESCRIPTION and guides core skill execution.
-version: 0.9.3
+allowed-tools: Read Write Edit Glob Grep Bash(mkdir *) Bash(ai-factory aifhub-memory-tools *) Bash(ai-factory aifhub-mode status --json) Bash(node --input-type=module -e *openspec-runner.mjs*) Bash(rg --version) Bash(uv --version) Bash(graphify --version) Bash(graphify --help) Bash(codex-agent-mem-policy --help) Bash(codex-agent-mem-smoke --help) Bash(codegraph --version) Bash(codegraph --help) Bash(codegraph status) Bash(ctx7 --version) Bash(npx --no-install ctx7 --help) Bash(openspec init --tools none) Skill AskUserQuestion Questions
+version: 0.10.0
 author: ichi
 ---
 
@@ -398,14 +399,22 @@ openspec:
   canArchive: boolean
   version: string | null
   supportedRange: ">=1.3.1 <2.0.0"
+  latestReviewedVersion: "1.8.0"
+  versionOutdated: boolean | null
   requiresNode: ">=20.19.0"
   nodeSupported: boolean
   versionSupported: boolean
 ```
 
-- The runner may also return `nodeVersion`, `command`, `reason`, and `errors`; include those when useful for troubleshooting.
+- The runner may also return `nodeVersion`, `command`, `commandSource`, `reason`, and `errors`; include those when useful for troubleshooting.
 - Do not print raw command output unless troubleshooting requires it.
 - If the OpenSpec CLI is compatible, prefer or recommend `openspec init --tools none`.
+- When `versionSupported: true` and `versionOutdated: true`, the selected CLI is compatible but older than the latest reviewed stable version. Keep `canValidate` and `canArchive` unchanged and emit a non-blocking update recommendation that names the installed version, `latestReviewedVersion`, and safe `commandSource`.
+- Scope the recommendation to the user-owned installation selected by `commandSource`: update the project dependency for `project-local`, the existing PATH/global installation for `path`, or the caller-owned executable for `explicit`.
+- Do not guess a package manager. Recommend using the package manager or install method that already owns the selected CLI and rerunning `ai-factory aifhub-mode status --json` afterward.
+- Do not install, update, replace, or re-resolve OpenSpec automatically. Do not invoke `npx`, a package manager, network access, or `openspec update` from this skill.
+- When `versionOutdated: false`, do not recommend a downgrade, including when the supported selected version is newer than `latestReviewedVersion`.
+- When `versionOutdated: null`, do not invent a freshness verdict; follow the missing, unsupported, or version-detection guidance below.
 - If the OpenSpec CLI is missing or unsupported, continue bootstrap with `canValidate: false` and `canArchive: false`.
 - Missing or unsupported OpenSpec CLI is a degraded capability state, not a bootstrap failure.
 - If `reason` is `unsupported-version`, recommend installing or updating OpenSpec CLI to `>=1.3.1 <2.0.0`.
@@ -484,7 +493,7 @@ openspec init --tools none
 - Report the backward-compatible Graphify utility setting and `uv` availability only as compatibility context. If `utilities.graphify.enabled` is missing or `false`, Graphify may still be recommended only through local metadata; show manual setup commands only as explicit opt-in guidance: `uv --version`, `uv tool install graphifyy`, `graphify install`, and `graphify .`.
 - If autonomous/subagent mode defaulted to legacy `ai-factory` because the artifact protocol question could not be asked, report OpenSpec-native mode selection as an open question/blocker.
 - Report the active path set.
-- In `openspec-native` mode, include the OpenSpec capability object, degraded reason when present, created/preserved skeleton directories, and the statement that OpenSpec skill installation was skipped by design.
+- In `openspec-native` mode, include the OpenSpec capability object, degraded reason when present, version freshness (`version`, `latestReviewedVersion`, and `versionOutdated`), any non-blocking update recommendation, created/preserved skeleton directories, and the statement that OpenSpec skill installation was skipped by design.
 - In `openspec-native` mode, explicitly report whether `.ai-factory/state`, `.ai-factory/qa`, and `.ai-factory/rules/generated` were created or preserved.
 - Report what was invoked automatically versus what remains as manual next command.
 - If DESCRIPTION is missing, first recommended command must use the selected runtime invocation style: `$aif` for `codex-app`, `/aif` for slash-command runtimes.

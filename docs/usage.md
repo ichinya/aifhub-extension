@@ -49,7 +49,9 @@ Upstream project-context utilities such as `/aif-architecture`, `/aif-roadmap`, 
 
 The `aifhub-extension` package repository stays artifact-light: root `openspec/`, `.ai-factory/state/`, `.ai-factory/qa/`, `.ai-factory/plans/`, and `.ai-factory/rules/generated/` are not extension package source. Root `.ai-factory/rules/generated/` is derived in user projects and safe to regenerate. OpenSpec examples may be committed only under fixture paths such as `test/fixtures/` or `scripts/fixtures/`.
 
-AIFHub commands request OpenSpec validation, status, instructions, and archive through `scripts/openspec-runner.mjs` when the CLI is available. Slash-command runtimes should keep using `/aif-*` commands. Codex app uses `$aif-*` skill invocations, as shown in the Recommended Codex App Flow. This extension does not install or rely on OpenSpec slash commands.
+AIFHub commands request OpenSpec validation, status, instructions, and archive through the extension-local `scripts/openspec-runner.mjs` implementation module when the CLI is available. Installed projects must not execute that module from the consumer root or an internal installed path. Slash-command runtimes should keep using `/aif-*` commands. Codex app uses `$aif-*` skill invocations, as shown in the Recommended Codex App Flow. This extension does not install or rely on OpenSpec slash commands.
+
+The shared resolver selects one CLI source per operation in deterministic order: explicit non-empty extension API `options.command`, project-local `node_modules/.bin/openspec` (`openspec.cmd` on Windows), then `openspec` from `PATH`. An explicit or project-local selection is authoritative and never silently falls through after failure. AIFHub does not run `npx`, search parent projects, download, or auto-install OpenSpec. Missing or unsupported CLI remains degraded for filesystem-based planning/context loading; archive-required finalization still refuses until a compatible CLI is available. Human and JSON diagnostics expose only a safe project-relative/bounded command and `explicit`, `project-local`, or `path` source.
 
 ## Optional Project Glossary
 
@@ -310,7 +312,7 @@ Use `--dry-run` for planned switching or sync writes. Use `--all` or `--change <
 
 `/aif-mode sync` without `--change` is recommended after `/aif-done`. After archive, there may be no active change. Sync still refreshes `.ai-factory/rules/generated/openspec-base.md` and `.ai-factory/rules/generated/index.json` from `openspec/specs/**`, skips change-specific generated rules and change validation when no active changes exist, and writes a sync report. OpenSpec skills are not installed.
 
-`/aif-mode sync --all` is a maintenance sweep. It refreshes generated rules for active changes, validates only selected changes that contain `openspec/changes/<change-id>/specs/**/spec.md` delta specs, and reports selected no-delta changes as `no-delta-specs` warnings instead of failing solely because old or docs-only active changes have no delta specs. `/aif-verify <change-id>` remains the stricter verification gate for a specific change.
+`/aif-mode sync --all` is a maintenance sweep. It refreshes generated rules for active changes and validates selected changes that contain `openspec/changes/<change-id>/specs/**/spec.md` delta specs or declare native `skip_specs: true` in `openspec/changes/<change-id>/.openspec.yaml`. It reports older unmarked no-delta changes as `no-delta-specs` warnings. Invalid native markers are validated fail-closed instead of being silently skipped. `/aif-verify <change-id>` remains the stricter verification gate for a specific change.
 
 `/aif-mode doctor --change <change-id>` includes the read-only AIFHub OpenSpec artifact contract check and the latest coverage matrix diagnostic. It reports the full JSON result as `artifactContract`, reports coverage as `coverage`, and treats missing verification evidence as a pre-archive readiness failure. See [OpenSpec Artifact Validation](openspec-validation.md) and [OpenSpec Coverage Matrix](spec-coverage.md).
 
@@ -381,6 +383,8 @@ Existing configs are not prompted again. Codex Default mode asks this as plain t
 If localization questions run first, `/aif-analyze` carries those answers forward and writes them only after the artifact protocol is selected, so language persistence does not accidentally lock in the legacy default.
 
 The selected artifact protocol owns its config profile. Legacy `artifactProtocol: ai-factory` configs do not include `aifhub.openspec` settings or OpenSpec runtime path defaults; OpenSpec-native `artifactProtocol: openspec` configs include those settings and paths explicitly.
+
+In OpenSpec-native mode, `/aif-analyze` also compares the selected compatible CLI with AIFHub's latest reviewed stable version. An older supported CLI remains usable for validation/archive capabilities, but the handoff recommends a user-owned update and identifies whether the selected source is `project-local`, `path`, or `explicit`. The skill never guesses a package manager, installs or updates OpenSpec, or recommends downgrading a supported version that is already equal to or newer than the reviewed baseline.
 
 Shared protocol-neutral settings such as `utilities.context_tools.enabled`, `utilities.graphify.enabled`, and `utilities.codegraph.enabled` may appear in either profile. They record optional tooling preferences and do not make that tool an AIFHub dependency. Optional memory/context tool recommendations are resolved from local installed metadata with `ai-factory aifhub-memory-tools recommend --from-project --json`; runtime tool selection uses `ai-factory aifhub-memory-tools select --from-project --command <skill> --json`. Missing metadata is degraded context and leaves `rg` as the baseline.
 
@@ -510,6 +514,8 @@ OpenSpec-native planning includes task intake normalization inside `/aif-plan fu
 `/aif-plan full` does not create `/aif-task-prepare`, does not create `.ai-factory/specs/<task-id>.md`, and does not create `task-prepare.md`. Raw input trace, normalization confidence, and temporary notes belong only under `.ai-factory/state/<change-id>/` when they are persisted.
 
 Docs/tooling-only changes may omit delta specs only when the proposal explains why no product or workflow behavior changes.
+
+When an explicitly requested behavior change removes the final requirement of a capability, OpenSpec `>=1.8.0` planning may add `retire_capabilities: true` to `.openspec.yaml`. This destructive intent must come from the user; planning must not infer capability retirement merely because a `REMOVED` delta leaves no requirements. Older supported CLIs require an upgrade before that change can be archived.
 
 When `aifhub.openspec.validateOnPlan` is enabled, planning requests `openspec validate` through the AIFHub OpenSpec runner if a compatible CLI is available. Missing CLI is a degraded warning unless `aifhub.openspec.requireCliForPlan` is true.
 
@@ -771,7 +777,7 @@ Reads:
 - current coverage evidence from `.ai-factory/qa/<change-id>/coverage.json`
 - durable rules gate evidence from `.ai-factory/qa/<change-id>/rules.md` when policy requires it
 - the read-only AIFHub OpenSpec artifact contract result
-- the pre-archive readiness result from `scripts/openspec-done-readiness.mjs`
+- the pre-archive readiness result produced by the extension-local `scripts/openspec-done-readiness.mjs` implementation module
 - git working tree state
 
 Writes:
@@ -789,9 +795,21 @@ Does not write:
 - manual file moves from `openspec/changes` to archives
 - legacy `.ai-factory/specs` archives in OpenSpec-native mode
 
-Use `--skip-specs` for docs/tooling-only changes where no accepted spec update is expected. Archive-required finalization needs a compatible OpenSpec CLI when `aifhub.openspec.requireCliForDone` is true. `/aif-done` runs a pre-archive readiness gate and refuses archive on blocking OpenSpec validate, artifact contract, generated rules, rules gate, coverage, verify gate, or dirty workspace failures. The readiness output includes the exact next command to run.
+For newly authored docs/tooling-only changes on OpenSpec `>=1.7.0`, prefer native `.openspec.yaml` metadata with `skip_specs: true`; preserve the schema selected for the change. With an older supported CLI, keep the explicit proposal reason and compatibility finalizer path. For explicitly authorized capability retirement on OpenSpec `>=1.8.0`, preserve `retire_capabilities: true`; never infer this destructive marker. The public `--skip-specs` finalizer flag remains supported for explicit compatibility finalization. Archive-required finalization needs a compatible OpenSpec CLI when `aifhub.openspec.requireCliForDone` is true. `/aif-done` runs a pre-archive readiness gate and refuses archive on blocking OpenSpec validate, artifact contract, generated rules, rules gate, coverage, verify gate, or dirty workspace failures. The readiness output includes the exact next command to run.
 
-A dirty workspace is blocking by default before archive. Inspect with `git status --short`; commit or stash unrelated changes, or rerun `/aif-done <change-id> --record-dirty-state` when the current dirty state should be recorded in final QA evidence before archive. For docs/tooling-only finalization, preserve both public flags with `/aif-done <change-id> --skip-specs --record-dirty-state`.
+The stable installed-project executable route is:
+
+```bash
+ai-factory aifhub-done-finalizer --change <change-id> --json
+```
+
+Omitting `--change` delegates to the active-change resolver: exactly one resolvable active change may be selected, while missing or ambiguous scope exits with code `2` before finalization. Automation should always pass an explicit `--change <change-id>`.
+
+For docs/tooling-only finalization, use `ai-factory aifhub-done-finalizer --change <change-id> --skip-specs --json`. Do not execute `scripts/openspec-done-finalizer.mjs`, `scripts/openspec-done-readiness.mjs`, or `scripts/openspec-runner.mjs` as consumer-project commands. The wrapper rejects unknown options and bypass flags such as `--force`, `--no-validate`, `--skip-archive`, `--dry-run`, and `--summary-only`. Its bounded output omits raw stdout/stderr, environment data, full runtime context, and private absolute paths.
+
+Exit codes are `0` for successful or policy-accepted warning finalization, `1` for a resolved readiness/archive blocker, and `2` for invalid arguments, unresolved or ambiguous scope, or an unexpected command failure.
+
+A dirty workspace is blocking by default before archive. Inspect with `git status --short`; commit or stash unrelated changes, or rerun `ai-factory aifhub-done-finalizer --change <change-id> --record-dirty-state --json` when the current dirty state should be recorded in final QA evidence before archive. For docs/tooling-only finalization, preserve both public flags with `ai-factory aifhub-done-finalizer --change <change-id> --skip-specs --record-dirty-state --json`.
 
 If `requireRulesPassForDone` is true and readiness reports missing rules gate evidence, `suggested_next.command` points to `ai-factory aifhub-write-gate-evidence --change add-oauth-login --gate rules --from <rules-output.md>`. The accompanying reason tells you to rerun `/aif-rules-check` first and persist its final output, or at least the final `aif-gate-result` block, to `.ai-factory/qa/<change-id>/rules.md`.
 
@@ -1031,6 +1049,7 @@ See [Codex Plan Mode](codex-plan-mode.md) for question-format guidance.
 | Problem | Meaning | Action |
 |---|---|---|
 | OpenSpec CLI missing | `openspec` is not available on `PATH`. | Continue degraded planning or install a compatible CLI before validation/archive-required finalization. |
+| OpenSpec CLI supported but outdated | `/aif-analyze` reports `versionOutdated: true` against `latestReviewedVersion`. | Keep working if needed, then update the user-owned project-local, PATH/global, or explicit installation with its existing package manager and rerun `ai-factory aifhub-mode status --json`. |
 | Node too old | OpenSpec validate/archive requires Node `>=20.19.0`. | Use Node `>=20.19.0` for OpenSpec commands. |
 | Invalid delta spec | OpenSpec validation failed for `specs/**/spec.md`. | Fix the delta spec and rerun `/aif-verify <change-id>`. |
 | Ambiguous active change | More than one active change can be selected. | Pass `<change-id>` explicitly or update `.ai-factory/state/current.yaml`. |
@@ -1038,7 +1057,7 @@ See [Codex Plan Mode](codex-plan-mode.md) for question-format guidance.
 | Stale generated rules | Generated rules do not match canonical OpenSpec artifacts. | Regenerate them; do not edit generated rules as source of truth. |
 | Missing or stale coverage | `.ai-factory/qa/<change-id>/coverage.json` is absent or fingerprints no longer match source artifacts. | Rerun `/aif-verify <change-id>` to regenerate coverage before `/aif-done`. |
 | Artifact contract failure | Canonical OpenSpec artifacts, runtime state, QA evidence, or generated rules violate the AIFHub contract. | Fix the reported path or run the suggested command from `artifactContract.suggested_next`. |
-| Dirty working tree before `/aif-done` | Finalization cannot prove archive/summary scope safely. | Inspect with `git status --short`; commit or stash unrelated changes, or rerun `/aif-done <change-id> --record-dirty-state` to record the dirty workspace in final QA evidence before archive. |
+| Dirty working tree before `/aif-done` | Finalization cannot prove archive/summary scope safely. | Inspect with `git status --short`; commit or stash unrelated changes, or rerun `ai-factory aifhub-done-finalizer --change <change-id> --record-dirty-state --json` to record the dirty workspace in final QA evidence before archive. |
 
 ## Release Smoke Checks
 
