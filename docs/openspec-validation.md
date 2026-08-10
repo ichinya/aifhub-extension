@@ -117,6 +117,8 @@ Run finalization from an installed project through the stable wrapper:
 ai-factory aifhub-done-finalizer --change <change-id> --json
 ```
 
+Omitting `--change` delegates to the active-change resolver: exactly one resolvable active change may be selected, while missing or ambiguous scope exits with code `2` before finalization. Automation should always pass an explicit `--change <change-id>`.
+
 New docs/tooling-only changes on OpenSpec `>=1.7.0` should declare `skip_specs: true` in `.openspec.yaml`; older supported CLIs keep the explicit proposal reason. Explicit capability retirement on OpenSpec `>=1.8.0` uses native `retire_capabilities: true` and is never inferred from an empty delta. The compatibility finalizer can still use `--skip-specs`, and explicit dirty-state evidence can use `--record-dirty-state`:
 
 ```bash

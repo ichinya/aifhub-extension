@@ -596,6 +596,30 @@ describe('runOpenSpec', () => {
     assert.equal(calls[0][2].windowsVerbatimArguments, true);
   });
 
+  it('rejects a relative or non-cmd ComSpec before executing Windows shims', async () => {
+    const cwd = 'C:\\workspace';
+    const localCommand = 'C:\\workspace\\node_modules\\.bin\\openspec.cmd';
+
+    for (const comSpec of ['cmd.exe', 'C:\\Windows\\System32\\WindowsPowerShell.exe']) {
+      let calls = 0;
+      const result = await runOpenSpec(['--version'], {
+        cwd,
+        platform: 'win32',
+        candidateExists: (candidate) => candidate === localCommand,
+        comSpec,
+        execFile: async () => {
+          calls += 1;
+          return { stdout: '1.8.0', stderr: '' };
+        }
+      });
+
+      assert.equal(result.ok, false, `${comSpec} must be rejected`);
+      assert.equal(result.error?.code, 'invalid-comspec');
+      assert.match(result.error?.message ?? '', /absolute cmd\.exe path/);
+      assert.equal(calls, 0, 'unsafe ComSpec must not be executed');
+    }
+  });
+
   it('preserves shell metacharacters through a real Windows project-local cmd shim', { skip: process.platform !== 'win32' }, async () => {
     const tempDir = await mkdtemp(path.join(tmpdir(), 'openspec-%PATH%-&-args-'));
     const binDir = path.join(tempDir, 'node_modules', '.bin');

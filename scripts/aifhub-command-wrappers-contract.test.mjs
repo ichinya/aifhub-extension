@@ -385,6 +385,69 @@ describe('AIFHub installed command wrappers', () => {
     assert.deepEqual(calls[0].options.env, processLike.env);
     assert.equal(calls[0].options.stdio, 'inherit');
   });
+
+  it('runInstalledScript bounds a hanging child with TERM and KILL fallback', async () => {
+    const { runInstalledScript } = await import('../commands/run-installed-script.mjs');
+    const moduleUrl = pathToFileURL(path.join(tmpDir, 'installed', 'commands', 'wrapper.mjs')).href;
+    const processLike = {
+      execPath: 'node-bin',
+      env: {},
+      exitCode: undefined,
+      cwd: () => path.join(tmpDir, 'user-project')
+    };
+    const scheduled = [];
+    const cleared = [];
+    const signals = [];
+    let unrefCalls = 0;
+    const child = new EventEmitter();
+    child.kill = (signal) => {
+      signals.push(signal);
+      return true;
+    };
+    child.unref = () => {
+      unrefCalls += 1;
+    };
+    const setTimeoutImplementation = (callback, delay) => {
+      const handle = { callback, delay };
+      scheduled.push(handle);
+      return handle;
+    };
+    const clearTimeoutImplementation = (handle) => {
+      cleared.push(handle);
+    };
+
+    const pending = runInstalledScript('../scripts/example.mjs', [], moduleUrl, {
+      processLike,
+      spawn: () => child,
+      timeout: 100,
+      killTimeout: 25,
+      setTimeout: setTimeoutImplementation,
+      clearTimeout: clearTimeoutImplementation
+    });
+
+    assert.equal(scheduled.length, 1);
+    assert.equal(scheduled[0].delay, 100);
+    scheduled[0].callback();
+    assert.deepEqual(signals, ['SIGTERM']);
+    assert.equal(scheduled.length, 2);
+    assert.equal(scheduled[1].delay, 25);
+    scheduled[1].callback();
+
+    assert.equal(await pending, 124);
+    assert.equal(processLike.exitCode, 124);
+    assert.deepEqual(signals, ['SIGTERM', 'SIGKILL']);
+    assert.equal(unrefCalls, 1);
+    assert.ok(cleared.length >= 1);
+  });
+
+  it('configures a bounded timeout for the installed done finalizer wrapper', async () => {
+    const source = await readRepoFile('commands/aifhub-done-finalizer.mjs');
+
+    assert.match(source, /FINALIZER_TIMEOUT_MS/);
+    assert.match(source, /timeout:\s*FINALIZER_TIMEOUT_MS/);
+    assert.match(source, /killTimeout:\s*FINALIZER_KILL_TIMEOUT_MS/);
+    assert.match(source, /timeoutExitCode:\s*2/);
+  });
 });
 
 describe('AIFHub wrapper guidance contract', () => {
@@ -442,7 +505,8 @@ describe('AIFHub wrapper guidance contract', () => {
       ['README.md', [
         'ai-factory aifhub-migrate-legacy-plans --list',
         'ai-factory aifhub-migrate-legacy-plans <change-id> --dry-run',
-        'ai-factory aifhub-done-finalizer --change <change-id> --json'
+        'ai-factory aifhub-done-finalizer --change <change-id> --json',
+        'Omitting `--change` delegates to the active-change resolver'
       ]],
       ['docs/usage.md', [
         'ai-factory aifhub-write-gate-evidence --change add-oauth-login --gate rules',
@@ -454,7 +518,8 @@ describe('AIFHub wrapper guidance contract', () => {
         'ai-factory aifhub-write-gate-evidence --change add-oauth-login --gate rules',
         'ai-factory aifhub-done-readiness --change <change-id> --json',
         'ai-factory aifhub-validate-artifacts --change <change-id> --json',
-        'ai-factory aifhub-done-finalizer --change <change-id> --json'
+        'ai-factory aifhub-done-finalizer --change <change-id> --json',
+        'Omitting `--change` delegates to the active-change resolver'
       ]],
       ['docs/openspec-compatibility.md', [
         'ai-factory aifhub-done-finalizer --change <change-id> --json'

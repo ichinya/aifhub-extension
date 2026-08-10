@@ -803,6 +803,8 @@ The stable installed-project executable route is:
 ai-factory aifhub-done-finalizer --change <change-id> --json
 ```
 
+Omitting `--change` delegates to the active-change resolver: exactly one resolvable active change may be selected, while missing or ambiguous scope exits with code `2` before finalization. Automation should always pass an explicit `--change <change-id>`.
+
 For docs/tooling-only finalization, use `ai-factory aifhub-done-finalizer --change <change-id> --skip-specs --json`. Do not execute `scripts/openspec-done-finalizer.mjs`, `scripts/openspec-done-readiness.mjs`, or `scripts/openspec-runner.mjs` as consumer-project commands. The wrapper rejects unknown options and bypass flags such as `--force`, `--no-validate`, `--skip-archive`, `--dry-run`, and `--summary-only`. Its bounded output omits raw stdout/stderr, environment data, full runtime context, and private absolute paths.
 
 Exit codes are `0` for successful or policy-accepted warning finalization, `1` for a resolved readiness/archive blocker, and `2` for invalid arguments, unresolved or ambiguous scope, or an unexpected command failure.

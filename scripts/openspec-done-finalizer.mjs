@@ -2151,11 +2151,9 @@ function boundedPublicText(value, maxLength) {
 
 function redactAbsolutePaths(value) {
   return String(value)
-    .replace(/"[A-Za-z]:[\\/][^"]+"/g, '"[path]"')
-    .replace(/'[A-Za-z]:[\\/][^']+'/g, "'[path]'")
-    .replace(/"\/(?:[^"]*\/)+[^"]*"/g, '"[path]"')
-    .replace(/'\/(?:[^']*\/)+[^']*'/g, "'[path]'")
-    .replace(/\\\\[^\\/\s]+[\\/].*$/g, '[path]')
+    .replace(/"(?:[A-Za-z]:[\\/]|\\\\|\/)[^"]*"/g, '"[path]"')
+    .replace(/'(?:[A-Za-z]:[\\/]|\\\\|\/)[^']*'/g, "'[path]'")
+    .replace(/\\\\[^\\/\s"']+(?:[\\/].*)?$/g, '[path]')
     .replace(/[A-Za-z]:[\\/].*$/g, '[path]')
     .replace(/(^|[\s(])\/(?:[^/\s)]+\/).*$/g, '$1[path]');
 }

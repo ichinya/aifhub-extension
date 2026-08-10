@@ -118,6 +118,15 @@ async function writeValidProject({
 }
 
 describe('validate-extension.mjs', () => {
+  it('requires baselineVersion for every source metadata entry in the JSON Schema', async () => {
+    const schema = JSON.parse(await readFile(join(REPO_ROOT, 'schemas/aifhub-extension.schema.json'), 'utf-8'));
+
+    assert.ok(
+      schema.$defs.SourceMetadata.required.includes('baselineVersion'),
+      'SourceMetadata.required should match the validator baselineVersion contract'
+    );
+  });
+
   it('passes with upstream extension manifest, AIFHub metadata, and all files present', async () => {
     await writeValidProject();
 

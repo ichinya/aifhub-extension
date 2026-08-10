@@ -470,6 +470,8 @@ Installed projects invoke archive-required finalization through:
 ai-factory aifhub-done-finalizer --change <change-id> --json
 ```
 
+Omitting `--change` delegates to the active-change resolver: exactly one resolvable active change may be selected, while missing or ambiguous scope exits with code `2` before finalization. Automation should always pass an explicit `--change <change-id>`.
+
 The wrapper returns exit `0` for success or policy-accepted warning, `1` for a resolved blocker, and `2` for invalid arguments, unresolved/ambiguous scope, or unexpected command failure. It rejects bypass flags and emits only bounded human/JSON fields. The extension-local runner then uses:
 
 ```bash

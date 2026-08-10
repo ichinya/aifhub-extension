@@ -46,6 +46,8 @@ openspec/changes/<change-id>/specs/**/spec.md
 
 The installed executable route is `ai-factory aifhub-done-finalizer --change <change-id> --json`. It resolves the extension-local `scripts/openspec-done-finalizer.mjs` implementation module and must not require a consumer-root copy or an internal installed-path command. Archive lifecycle mutation inside the extension must happen through `archiveOpenSpecChange(changeId, options)` from `scripts/openspec-runner.mjs` and never through custom folder movement or direct `openspec/specs` edits.
 
+Omitting `--change` delegates to the active-change resolver: exactly one resolvable active change may be selected, while missing or ambiguous scope exits with code `2` before finalization. Automation must always pass an explicit `--change <change-id>`.
+
 Normal installed finalization:
 
 ```bash

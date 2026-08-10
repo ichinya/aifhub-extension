@@ -42,7 +42,7 @@
     "SourceMetadata": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["url", "version", "lastSync"],
+      "required": ["url", "version", "baselineVersion", "lastSync"],
       "properties": {
         "url": {
           "type": "string",

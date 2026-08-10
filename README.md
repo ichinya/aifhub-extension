@@ -112,6 +112,8 @@ Installed projects can run the same bounded finalizer directly through the stabl
 ai-factory aifhub-done-finalizer --change <change-id> --json
 ```
 
+Omitting `--change` delegates to the active-change resolver: exactly one resolvable active change may be selected, while missing or ambiguous scope exits with code `2` before finalization. Automation should always pass an explicit `--change <change-id>`.
+
 Add `--skip-specs` only for docs/tooling-only work. The wrapper returns exit `0` after successful or policy-accepted warning finalization, `1` for a resolved readiness/archive blocker, and `2` for invalid arguments, unresolved or ambiguous scope, or an unexpected command failure. Do not run extension-internal `scripts/openspec-done-finalizer.mjs` from the project root or through an installed-extension path.
 
 A dirty workspace is blocking by default before `/aif-done`. Inspect with `git status --short`; commit or stash unrelated changes, or rerun `ai-factory aifhub-done-finalizer --change <change-id> --record-dirty-state --json` when the current dirty state should be recorded in final QA evidence before archive.

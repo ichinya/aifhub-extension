@@ -530,6 +530,35 @@ describe('OpenSpec done finalizer command', () => {
     assert.deepEqual(JSON.parse(command.stdout), projection);
   });
 
+  it('redacts quoted root paths and UNC server roots while preserving slash commands', () => {
+    const projection = projectDoneFinalizerResult(finalizerCommandResult({
+      readiness: {
+        status: 'fail',
+        blocking: true,
+        suggested_next: {
+          command: '/aif-fix add-oauth',
+          reason: 'Inspect "/секрет" before retrying.'
+        }
+      },
+      errors: [
+        {
+          code: 'quoted-root',
+          message: 'Inspect "/секрет" before retrying.'
+        },
+        {
+          code: 'unc-root',
+          message: 'Inspect "\\\\сервер" before retrying.'
+        }
+      ]
+    }));
+    const serialized = JSON.stringify(projection);
+
+    assert.equal(projection.readiness.suggested_next.command, '/aif-fix add-oauth');
+    assert.match(serialized, /\[path\]/);
+    assert.equal(serialized.includes('секрет'), false);
+    assert.equal(serialized.includes('сервер'), false);
+  });
+
   it('classifies success, blockers, unresolved scope, and unexpected exceptions', async () => {
     const success = await runDoneFinalizerCommand([], {
       finalizeOpenSpecChange: async () => finalizerCommandResult({ status: 'WARN' })

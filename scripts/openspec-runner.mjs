@@ -507,9 +507,11 @@ async function executeWindowsCommandScript({
   comSpec,
   originalError = null
 }) {
+  const commandInterpreter = validateWindowsCommandInterpreter(comSpec);
+
   try {
     const { stdout, stderr } = await execFileImplementation(
-      comSpec,
+      commandInterpreter,
       ['/d', '/s', '/v:off', '/c', quoteCmdCommand(commandPath, args)],
       {
         ...execOptions,
@@ -535,6 +537,19 @@ async function executeWindowsCommandScript({
 
     throw originalError ?? err;
   }
+}
+
+function validateWindowsCommandInterpreter(value) {
+  const commandInterpreter = String(value ?? '').trim();
+  if (
+    !path.win32.isAbsolute(commandInterpreter)
+    || path.win32.basename(commandInterpreter).toLowerCase() !== 'cmd.exe'
+  ) {
+    const error = new Error('Windows command scripts require ComSpec to be an absolute cmd.exe path.');
+    error.code = 'invalid-comspec';
+    throw error;
+  }
+  return commandInterpreter;
 }
 
 function findWindowsCommandScript(command, env, options = {}) {
