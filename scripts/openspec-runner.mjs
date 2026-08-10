@@ -14,6 +14,7 @@ const OPENSPEC_MAX_VERSION = '2.0.0';
 const NODE_MIN_VERSION = '20.19.0';
 const DEFAULT_MAX_BUFFER = 10 * 1024 * 1024;
 const WINDOWS_SCRIPT_EXTENSIONS = ['.cmd', '.bat'];
+const WINDOWS_CMD_META_CHARACTERS = /([()\][%!^"`<>&|;, *?])/g;
 const COMMAND_SOURCES = new Set(['explicit', 'project-local', 'path']);
 
 const ERRORS = {
@@ -509,7 +510,7 @@ async function executeWindowsCommandScript({
   try {
     const { stdout, stderr } = await execFileImplementation(
       comSpec,
-      ['/d', '/s', '/c', quoteCmdCommand(commandPath, args)],
+      ['/d', '/s', '/v:off', '/c', quoteCmdCommand(commandPath, args)],
       {
         ...execOptions,
         windowsVerbatimArguments: true
@@ -618,13 +619,26 @@ function isAccessibleFile(filePath) {
 }
 
 function quoteCmdCommand(commandPath, args) {
-  return `"${[commandPath, ...Array.from(args ?? [])]
-    .map(quoteCmdArg)
-    .join(' ')}"`;
+  return `"${[
+    escapeCmdMetaCharacters(commandPath),
+    ...Array.from(args ?? [], quoteCmdArg)
+  ].join(' ')}"`;
 }
 
 function quoteCmdArg(value) {
-  return `"${String(value).replaceAll('"', '""')}"`;
+  let argument = String(value);
+
+  argument = argument.replace(/(?=(\\+?)?)\1"/g, '$1$1\\"');
+  argument = argument.replace(/(?=(\\+?)?)\1$/, '$1$1');
+  argument = `"${argument}"`;
+
+  // A command shim parses metacharacters once in cmd.exe and again when the
+  // batch file expands its forwarded arguments, so preserve them through both.
+  return escapeCmdMetaCharacters(escapeCmdMetaCharacters(argument));
+}
+
+function escapeCmdMetaCharacters(value) {
+  return String(value).replace(WINDOWS_CMD_META_CHARACTERS, '^$1');
 }
 
 function createDetectionResult(overrides = {}) {

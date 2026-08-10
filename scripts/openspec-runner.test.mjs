@@ -589,10 +589,67 @@ describe('runOpenSpec', () => {
     assert.equal(result.commandSource, 'project-local');
     assert.equal(calls.length, 1);
     assert.equal(calls[0][0], 'C:\\Windows\\System32\\cmd.exe');
-    assert.deepEqual(calls[0][1].slice(0, 3), ['/d', '/s', '/c']);
-    assert.match(calls[0][1][3], /"C:\\Work Space\\repo\\node_modules\\\.bin\\openspec\.cmd"/);
-    assert.match(calls[0][1][3], /"value & more"/);
+    assert.deepEqual(calls[0][1].slice(0, 4), ['/d', '/s', '/v:off', '/c']);
+    assert.match(calls[0][1][4], /C:\\Work\^ Space\\repo\\node_modules\\\.bin\\openspec\.cmd/);
+    assert.match(calls[0][1][4], /\^\^\^&/);
+    assert.doesNotMatch(calls[0][1][4], /"value & more"/);
     assert.equal(calls[0][2].windowsVerbatimArguments, true);
+  });
+
+  it('preserves shell metacharacters through a real Windows project-local cmd shim', { skip: process.platform !== 'win32' }, async () => {
+    const tempDir = await mkdtemp(path.join(tmpdir(), 'openspec-%PATH%-&-args-'));
+    const binDir = path.join(tempDir, 'node_modules', '.bin');
+    const captureScript = path.join(tempDir, 'capture-args.mjs');
+    const localCommand = path.join(binDir, 'openspec.cmd');
+    const args = [
+      'show',
+      'value & more',
+      'value | more',
+      'value > more',
+      'value < more',
+      'value %PATH% more',
+      'value ^ more',
+      'value !AIFHUB_CMD_TEST! more',
+      'value "quoted" more',
+      'value with trailing slash\\'
+    ];
+
+    try {
+      await mkdir(binDir, { recursive: true });
+      await writeFile(
+        captureScript,
+        'process.stdout.write(JSON.stringify(process.argv.slice(2)));\n',
+        'utf8'
+      );
+      await writeFile(
+        localCommand,
+        `@echo off\r\n"${process.execPath.replaceAll('%', '%%')}" "${captureScript.replaceAll('%', '%%')}" %*\r\n`,
+        'utf8'
+      );
+
+      const result = await runOpenSpec(args, {
+        cwd: tempDir,
+        platform: 'win32',
+        candidateExists: (candidate) => candidate === localCommand,
+        env: {
+          ...process.env,
+          AIFHUB_CMD_TEST: 'expanded-value'
+        }
+      });
+
+      assert.equal(result.ok, true, result.error?.message);
+      const receivedArgs = JSON.parse(result.stdout);
+      assert.equal(receivedArgs.length, args.length, 'cmd shim should preserve the argv length');
+      for (const [index, expected] of args.entries()) {
+        assert.equal(
+          receivedArgs[index] === expected,
+          true,
+          `cmd shim should preserve argv[${index}] without environment expansion`
+        );
+      }
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
   });
 });
 
