@@ -511,6 +511,15 @@ OpenSpec-native planning includes task intake normalization inside `/aif-plan fu
 - `tasks.md`: executable implementation checklist
 - `specs/**/spec.md`: behavior-changing requirements and scenarios
 
+When the request explicitly links an issue, milestone, or roadmap item, `proposal.md` also records the standardized `## Roadmap Linkage` section:
+
+- `Issues`: canonical issue URL or comma-separated URLs
+- `Milestone`: exact GitHub milestone title or explicit `none`
+- `Roadmap item/slice`: exact local roadmap item or explicit `none`
+- `Rationale`: one bounded explanation of the linkage
+
+Planning preserves explicit `none` values and does not infer linkage from a branch name, issue title, label, or unrelated roadmap text. If any linkage field is non-`none`, the planning response returns `/aif-roadmap check`; the roadmap owner may then register the active change as local `planned`. Planning does not claim implementation, verification, finalization, merge, or issue closure.
+
 `/aif-plan full` does not create `/aif-task-prepare`, does not create `.ai-factory/specs/<task-id>.md`, and does not create `task-prepare.md`. Raw input trace, normalization confidence, and temporary notes belong only under `.ai-factory/state/<change-id>/` when they are persisted.
 
 Docs/tooling-only changes may omit delta specs only when the proposal explains why no product or workflow behavior changes.
@@ -572,6 +581,19 @@ Does not write:
 GitHub state is supporting evidence only. Closed issues, completed milestones, and merged PRs are useful signals, but local artifact evidence remains required before marking roadmap items `done`. If GitHub evidence is unavailable, unauthenticated, rate-limited, offline, or partial, `/aif-roadmap` continues from local evidence and summarizes the limitation without writing credentials or private authentication diagnostics.
 
 When GitHub milestones are available, `/aif-roadmap` treats milestones as roadmap phases. Closed milestones produce phase audit sections with linked issues/PRs and local evidence status. Open milestones with `open_issues = 0` produce `phase-completion drift` instead of being treated as closed. Milestone-bound issues/PRs attach to their phase, while unmilestoned issues/PRs remain in `unphased backlog/drift`.
+
+`/aif-roadmap check` independently reconciles canonical local lifecycle and current GitHub state. Active proposals with valid non-`none` `## Roadmap Linkage` become `planned`; archived changes with durable done/archive evidence become or remain `finalized`. Local lifecycle uses only `planned` and `finalized`; GitHub open/closed/merged state stays in the phase audit and never substitutes for local finalization evidence. A post-merge refresh updates issue, PR, and milestone observations while preserving the evidence-backed local row.
+
+The local rows live only inside one managed block:
+
+```markdown
+<!-- aifhub:roadmap-change-lifecycle:start -->
+## OpenSpec Change Lifecycle
+...
+<!-- aifhub:roadmap-change-lifecycle:end -->
+```
+
+`/aif-roadmap` owns the full roadmap and may create or reconcile this block. `/aif-done` co-owns only the marker-bounded transition for one linked change after successful archive. Content outside the markers remains under `/aif-roadmap` ownership and must be preserved. Missing or partial GitHub evidence does not block local reconciliation; output reports lifecycle and GitHub evidence sources separately without credentials or private diagnostics.
 
 ### `/aif-improve`
 
@@ -788,12 +810,14 @@ Writes:
 - `.ai-factory/qa/<change-id>/raw/`
 - `.ai-factory/state/<change-id>/final-summary.md`
 - `openspec/specs/**` only through `openspec archive <change-id> --yes`
+- the linked change row inside the configured roadmap's marker-bounded `OpenSpec Change Lifecycle` block, only after successful OpenSpec archive
 
 Does not write:
 
 - custom manual mutations to `openspec/specs/**`
 - manual file moves from `openspec/changes` to archives
 - legacy `.ai-factory/specs` archives in OpenSpec-native mode
+- arbitrary roadmap content outside the managed lifecycle markers
 
 For newly authored docs/tooling-only changes on OpenSpec `>=1.7.0`, prefer native `.openspec.yaml` metadata with `skip_specs: true`; preserve the schema selected for the change. With an older supported CLI, keep the explicit proposal reason and compatibility finalizer path. For explicitly authorized capability retirement on OpenSpec `>=1.8.0`, preserve `retire_capabilities: true`; never infer this destructive marker. The public `--skip-specs` finalizer flag remains supported for explicit compatibility finalization. Archive-required finalization needs a compatible OpenSpec CLI when `aifhub.openspec.requireCliForDone` is true. `/aif-done` runs a pre-archive readiness gate and refuses archive on blocking OpenSpec validate, artifact contract, generated rules, rules gate, coverage, verify gate, or dirty workspace failures. The readiness output includes the exact next command to run.
 
@@ -812,6 +836,8 @@ Exit codes are `0` for successful or policy-accepted warning finalization, `1` f
 A dirty workspace is blocking by default before archive. Inspect with `git status --short`; commit or stash unrelated changes, or rerun `ai-factory aifhub-done-finalizer --change <change-id> --record-dirty-state --json` when the current dirty state should be recorded in final QA evidence before archive. For docs/tooling-only finalization, preserve both public flags with `ai-factory aifhub-done-finalizer --change <change-id> --skip-specs --record-dirty-state --json`.
 
 If `requireRulesPassForDone` is true and readiness reports missing rules gate evidence, `suggested_next.command` points to `ai-factory aifhub-write-gate-evidence --change add-oauth-login --gate rules --from <rules-output.md>`. The accompanying reason tells you to rerun `/aif-rules-check` first and persist its final output, or at least the final `aif-gate-result` block, to `.ai-factory/qa/<change-id>/rules.md`.
+
+For a linked change, `/aif-done` reads the pre-archive canonical `## Roadmap Linkage` and changes only its managed local row to `finalized` after successful OpenSpec archive. A pre-archive failure leaves the managed lifecycle unchanged. A post-archive roadmap update failure preserves truthful archive and final evidence, returns a bounded `handoff` with `/aif-roadmap check`, and does not roll back archive or fabricate the row. Local finalization does not claim that a GitHub issue is closed or a pull request is merged; GitHub state is reconciled later by `/aif-roadmap check`.
 
 Next steps after `/aif-done`:
 
@@ -846,7 +872,9 @@ Does not write:
 - `.ai-factory/state/<change-id>/`
 - `.ai-factory/rules/generated/**`
 
-In OpenSpec-native mode, `/aif-commit` normally runs after `/aif-done`. It performs a read-only roadmap/GitHub freshness gate before the upstream commit prompt. Stale roadmap findings are warning-first unless strict checking was explicitly requested, and each stale finding should hand off to `/aif-roadmap`. The command still writes only the git commit after user confirmation.
+In OpenSpec-native mode, `/aif-commit` normally runs after `/aif-done`. It performs a read-only roadmap/GitHub freshness gate before the upstream commit prompt. Deterministic local lifecycle drift is an unskippable `ERROR [roadmap-local]` when durable evidence proves successful local finalization, the proposal has non-`none` `## Roadmap Linkage`, and the managed `OpenSpec Change Lifecycle` row is missing or not exactly `finalized`. The command hands off to `/aif-roadmap check`, stops before the commit proposal, and does not create a git commit; user confirmation cannot bypass this error.
+
+Unavailable, partial, or later-changing GitHub evidence is volatile external drift reported as `WARN [roadmap-external]` and remains warning-only by default. In that warning-only case, `/aif-commit` may continue to the upstream confirmation flow and still writes only the git commit after user confirmation. The freshness gate remains read-only: it never updates the configured roadmap artifact, OpenSpec artifacts, QA/runtime evidence, generated rules, or GitHub objects.
 
 Generic `## Commit Plan` grouping is parent-owned in AI Factory 2.13+. AIFHub must not duplicate this grouping logic, and `/aif-commit` remains the only commit owner. The AIFHub `aif-commit` injection is only a read-only roadmap/GitHub freshness overlay.
 

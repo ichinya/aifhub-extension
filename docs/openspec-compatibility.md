@@ -202,11 +202,32 @@ In short: archived legacy plans are excluded from active plan discovery, while O
 | `/aif-implement` | `openspec instructions apply --change <id>` when `useInstructionsApply` is enabled and CLI is available |
 | `/aif-verify` | `openspec validate`, optional `openspec status` evidence, policy-derived diagnostics, coverage, and final `aif-gate-result` with `"gate": "verify"` |
 | `/aif-rules-check` | Upstream rules gate plus AIFHub generated-rules overlay for OpenSpec specs/deltas |
-| `/aif-done` | AIFHub artifact contract check, then `openspec archive <change> --yes` when archive is required |
+| `/aif-roadmap check` | Local lifecycle reconciliation plus optional current GitHub phase evidence; no OpenSpec CLI mutation |
+| `/aif-done` | AIFHub artifact contract check, then `openspec archive <change> --yes` when archive is required, then one bounded linked-roadmap transition |
+| `/aif-commit` | Read-only local lifecycle and optional GitHub freshness gate before the upstream git commit flow |
 | `/aif-mode sync` | generated-rule compile plus validate/status according to sync flags; generated-rule compilation may call `openspec show <item> --json` through `scripts/openspec-rules-compiler.mjs` and `showOpenSpecItem()` |
 | `/aif-mode doctor` | CLI, Node, active change, effective policy, generated rules, latest verify gate, rules gate, coverage, AIFHub artifact contract, and archive readiness diagnostics |
 
 Do not route users to OpenSpec slash commands such as `/opsx:propose`, `/opsx:apply`, or `/opsx:archive`.
+
+## Roadmap Linkage and Lifecycle Compatibility
+
+OpenSpec-native proposals use one standardized `## Roadmap Linkage` section with `Issues`, `Milestone`, `Roadmap item/slice`, and `Rationale`. Values come from explicit user or canonical planning input; unavailable assignments remain explicit `none` and are not inferred from GitHub titles, labels, branches, or unrelated roadmap text. A linked active change is registered as local `planned` by `/aif-roadmap check`.
+
+The configured roadmap may contain one marker-bounded local table:
+
+```markdown
+<!-- aifhub:roadmap-change-lifecycle:start -->
+## OpenSpec Change Lifecycle
+...
+<!-- aifhub:roadmap-change-lifecycle:end -->
+```
+
+The table stores only local `planned` and `finalized` states. `/aif-roadmap` owns the complete roadmap and managed-block reconciliation. `/aif-done` co-owns only one linked transition to `finalized`, and only after successful OpenSpec archive; failed readiness, verification, artifact-contract, dirty-tree, or archive paths do not write the roadmap. If archive succeeds but the marker-bounded update fails, finalization reports archive success plus a roadmap `handoff`, does not roll back archive, and returns `/aif-roadmap check`.
+
+`/aif-commit` reads this local lifecycle state but never writes it. Durable successful finalization with a missing or non-`finalized` linked row is deterministic local drift and blocks commit before the upstream proposal; user confirmation cannot bypass it. Missing, partial, or later-changing GitHub evidence is external drift and remains warning-only by default.
+
+GitHub open/closed/merged state stays outside the managed block. A post-merge `/aif-roadmap check` refreshes current issue, PR, and milestone evidence while retaining the evidence-backed local `finalized` row. Remote merge or closure never becomes local finalization proof, and credentials or private authentication diagnostics are never persisted in roadmap output.
 
 ## AI Factory 2.12 Optional Artifact Audit Bridge
 

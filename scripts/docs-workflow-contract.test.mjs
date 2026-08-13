@@ -317,7 +317,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
       'configured roadmap artifact',
       'optional GitHub issue, PR, milestone',
       'read-only roadmap/GitHub freshness gate',
-      '/aif-roadmap',
+      '/aif-roadmap check',
       'still writes only the git commit after user confirmation',
       '.ai-factory/ROADMAP.md',
       'GitHub issues, milestones, PRs, labels, or linked branches',
@@ -339,12 +339,134 @@ describe('complete OpenSpec workflow documentation contract', () => {
       'the configured roadmap artifact',
       'optional GitHub issue/PR/milestone freshness context',
       'must not mutate OpenSpec lifecycle artifacts, `.ai-factory/ROADMAP.md`, runtime state, QA evidence, generated rules, or GitHub objects manually',
-      '/aif-roadmap',
+      '/aif-roadmap check',
       'still writes only the git commit after user confirmation',
       'Generic `## Commit Plan` grouping is parent-owned in AI Factory 2.13+.',
       'AIFHub adds only roadmap/GitHub freshness findings before the commit proposal.'
     ]) {
       assertIncludes(qualityTail, expected, 'docs/context-loading-policy.md Quality Gates and Finalization Tail');
+    }
+  });
+
+  it('documents blocking local lifecycle drift separately from volatile GitHub drift', async () => {
+    const usage = await readRepoFile('docs/usage.md');
+    const contextPolicy = await readRepoFile('docs/context-loading-policy.md');
+    const usageCommit = extractSection(usage, '### `/aif-commit`');
+    const qualityTail = extractSection(contextPolicy, '## Quality Gates and Finalization Tail');
+
+    for (const [label, section] of [
+      ['docs/usage.md /aif-commit', usageCommit],
+      ['docs/context-loading-policy.md Quality Gates and Finalization Tail', qualityTail]
+    ]) {
+      for (const expected of [
+        'Deterministic local lifecycle drift',
+        'ERROR [roadmap-local]',
+        'successful local finalization',
+        'managed `OpenSpec Change Lifecycle` row',
+        'missing or not exactly `finalized`',
+        '/aif-roadmap check',
+        'user confirmation cannot bypass',
+        'does not create a git commit',
+        'WARN [roadmap-external]',
+        'Unavailable, partial, or later-changing GitHub evidence',
+        'warning-only by default'
+      ]) {
+        assertIncludes(section, expected, label);
+      }
+    }
+  });
+
+  it('documents standardized roadmap linkage and the managed local lifecycle in user workflow docs', async () => {
+    const usage = await readRepoFile('docs/usage.md');
+    const plan = extractSection(usage, '### `/aif-plan full`');
+    const roadmap = extractSection(usage, '### `/aif-roadmap`');
+    const done = extractSection(usage, '### `/aif-done`');
+
+    for (const expected of [
+      '## Roadmap Linkage',
+      '`Issues`',
+      '`Milestone`',
+      '`Roadmap item/slice`',
+      '`Rationale`',
+      'explicit `none`',
+      '/aif-roadmap check',
+      '`planned`'
+    ]) {
+      assertIncludes(plan, expected, 'docs/usage.md /aif-plan full roadmap linkage');
+    }
+
+    for (const expected of [
+      '<!-- aifhub:roadmap-change-lifecycle:start -->',
+      '<!-- aifhub:roadmap-change-lifecycle:end -->',
+      'OpenSpec Change Lifecycle',
+      '`planned` and `finalized`',
+      'local lifecycle',
+      'outside the markers',
+      'post-merge',
+      '/aif-roadmap check'
+    ]) {
+      assertIncludes(roadmap, expected, 'docs/usage.md /aif-roadmap managed lifecycle');
+    }
+
+    for (const expected of [
+      'after successful OpenSpec archive',
+      'pre-archive failure leaves the managed lifecycle unchanged',
+      'post-archive roadmap update failure',
+      'does not roll back archive',
+      '/aif-roadmap check',
+      'does not claim that a GitHub issue is closed or a pull request is merged'
+    ]) {
+      assertIncludes(done, expected, 'docs/usage.md /aif-done roadmap transition');
+    }
+  });
+
+  it('documents roadmap lifecycle co-ownership in context, compatibility, and ADR docs', async () => {
+    const contextPolicy = await readRepoFile('docs/context-loading-policy.md');
+    const compatibility = await readRepoFile('docs/openspec-compatibility.md');
+    const adr = await readRepoFile('docs/adr/0001-openspec-native-artifact-protocol.md');
+
+    for (const [label, source] of [
+      ['docs/context-loading-policy.md', contextPolicy],
+      ['docs/openspec-compatibility.md', compatibility],
+      ['docs/adr/0001-openspec-native-artifact-protocol.md', adr]
+    ]) {
+      for (const expected of [
+        '## Roadmap Linkage',
+        'OpenSpec Change Lifecycle',
+        '`planned`',
+        '`finalized`',
+        'marker-bounded',
+        '/aif-done',
+        '/aif-commit',
+        '/aif-roadmap check',
+        'post-merge',
+        'GitHub open/closed/merged state'
+      ]) {
+        assertIncludes(source, expected, `${label} roadmap lifecycle contract`);
+      }
+    }
+  });
+
+  it('documents the bounded roadmap transition for Codex and Claude finalizer agents', async () => {
+    const codex = extractSection(await readRepoFile('docs/codex-agents.md'), '### Finalization');
+    const claude = extractSection(await readRepoFile('docs/claude-agents.md'), '### Finalization');
+
+    for (const [label, section] of [
+      ['docs/codex-agents.md Finalization', codex],
+      ['docs/claude-agents.md Finalization', claude]
+    ]) {
+      for (const expected of [
+        '## Roadmap Linkage',
+        'after successful OpenSpec archive',
+        'marker-bounded `OpenSpec Change Lifecycle`',
+        '`finalized`',
+        'pre-archive failure leaves the roadmap unchanged',
+        'does not roll back archive',
+        '/aif-roadmap check',
+        'GitHub open/closed/merged state remains separate'
+      ]) {
+        assertIncludes(section, expected, label);
+      }
     }
   });
 

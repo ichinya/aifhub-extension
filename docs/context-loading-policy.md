@@ -195,6 +195,12 @@ This context is supporting evidence only. Closed GitHub issues, completed milest
 
 When GitHub milestones are available, `/aif-roadmap` treats milestones as roadmap phases. Closed milestones produce phase audit sections with linked issues/PRs and local evidence status. Open milestones with `open_issues = 0` produce `phase-completion drift` instead of being treated as closed. Milestone-bound issues/PRs attach to their phase, while unmilestoned issues/PRs remain in `unphased backlog/drift`.
 
+Canonical local linkage comes from the proposal's standardized `## Roadmap Linkage` fields: `Issues`, `Milestone`, `Roadmap item/slice`, and `Rationale`. Explicit `none` values are preserved and no command may infer missing linkage from remote metadata. `/aif-roadmap check` registers a linked active change as local `planned` and preserves or registers `finalized` only when durable done/archive evidence supports that state.
+
+Local state is stored in the marker-bounded `OpenSpec Change Lifecycle` block inside the configured roadmap. `/aif-roadmap` owns the complete artifact and the block's `planned` reconciliation. `/aif-done` is a bounded co-owner of one `finalized` row only after successful OpenSpec archive; it must preserve every byte outside the markers. `/aif-commit` is read-only for both the roadmap and lifecycle block.
+
+Local `planned`/`finalized` state and GitHub open/closed/merged state are independent evidence clocks. During post-merge reconciliation, `/aif-roadmap check` may refresh current issue, PR, and milestone observations without promoting, downgrading, or replacing local finalization evidence. Remote closure or merge is never proof that `/aif-done` completed.
+
 GitHub access is non-blocking. If `gh`, connector data, network access, authentication, or rate limits prevent complete GitHub evidence loading, `/aif-roadmap` should continue from local evidence and summarize whether GitHub evidence was unavailable or partial.
 
 `/aif-roadmap` may update only the configured roadmap artifact. It must not mutate GitHub issues, milestones, PRs, labels, linked branches, canonical OpenSpec artifacts, runtime state, QA evidence, generated rules, or implementation files. It must not write tokens, authorization headers, raw credential helper output, or private authentication diagnostics into roadmap output.
@@ -206,7 +212,7 @@ GitHub access is non-blocking. If `gh`, connector data, network access, authenti
 | `/aif-mode` | skeleton only; never manual `openspec/specs/**` mutations | mode reports, generated rules, optional migration/export outputs |
 | `/aif-analyze` | Optional `openspec/` skeleton only when configured | capability/config setup; optional glossary creation or patch-update only with explicit opt-in |
 | `/aif-architecture` | no | no |
-| `/aif-roadmap` | no | no |
+| `/aif-roadmap` | no | configured roadmap artifact, including managed local lifecycle reconciliation |
 | `/aif-docs` | no | no |
 | `/aif-qa` | no | upstream manual QA artifacts under `paths.qa/<branch-slug>/`; not AIFHub `.ai-factory/qa/<change-id>/` evidence |
 | `/aif-qa-check` | no | branch-scoped `paths.qa/<branch-slug>/qa-check.md`; not AIFHub verify/done evidence |
@@ -219,7 +225,7 @@ GitHub access is non-blocking. If `gh`, connector data, network access, authenti
 | `/aif-rules-check` | no | no |
 | `/aif-review` | no | no |
 | `/aif-security-checklist` | no | no |
-| `/aif-done` | `openspec/specs/**` only through OpenSpec CLI archive | `.ai-factory/qa/<change-id>/`, `.ai-factory/state/<change-id>/final-summary.md` |
+| `/aif-done` | `openspec/specs/**` only through OpenSpec CLI archive | `.ai-factory/qa/<change-id>/`, `.ai-factory/state/<change-id>/final-summary.md`, and one marker-bounded roadmap lifecycle transition after archive |
 | `/aif-archive` | no | `paths.archive/plans/*.md` and `paths.archive/roadmap/*.md` only in legacy AI Factory-only cleanup |
 | `/aif-commit` | no | git commit only |
 | `/aif-distillation` | no | no |
@@ -227,7 +233,7 @@ GitHub access is non-blocking. If `gh`, connector data, network access, authenti
 
 `/aif-architecture` writes only project-level architecture context: resolved `paths.architecture`, an architecture pointer in resolved `paths.description`, and an architecture row in root `AGENTS.md`.
 
-`/aif-roadmap` writes only the configured roadmap artifact, `.ai-factory/ROADMAP.md` by default.
+`/aif-roadmap` writes only the configured roadmap artifact, `.ai-factory/ROADMAP.md` by default. It owns arbitrary roadmap content and reconciliation of the managed lifecycle block. `/aif-done` may change only one linked row inside that block after archive and cannot rewrite content outside the markers.
 
 `/aif-docs` writes documentation output only: root `README.md`, the resolved `paths.docs` directory, optional `docs-html/` output when explicitly requested, and the Documentation section in `AGENTS.md`.
 
@@ -249,12 +255,12 @@ OpenSpec-native quality gates:
 | `/aif-review` | changed files, OpenSpec context, generated rules | none |
 | `/aif-security-checklist` | changed files, OpenSpec context, generated rules | none |
 | `/aif-verify` | canonical OpenSpec artifacts, generated rules, runtime state, gate outputs when available | `.ai-factory/qa/<change-id>/` |
-| `/aif-done` | passing verify evidence, verify gate result, OpenSpec change | final QA/state evidence and OpenSpec archive via CLI |
+| `/aif-done` | passing verify evidence, verify gate result, OpenSpec change | final QA/state evidence, OpenSpec archive via CLI, then one managed `finalized` roadmap row when linked |
 | `/aif-commit` | staged changes, done evidence, final summary, OpenSpec archive/spec changes | git commit |
 | `/aif-distillation` | books, docs, folders, or URLs | generated skill packages in the current agent skills directory |
 | `/aif-evolve` | patches, evidence, skill-context inputs | skill-context/evolution artifacts |
 
-`/aif-done` owns OpenSpec lifecycle finalization. `/aif-commit` owns git commit creation. `/aif-evolve` owns learning/evolution. `/aif-architecture`, `/aif-docs`, and `/aif-qa` are upstream project-context utilities, not OpenSpec-native quality/finalization gates.
+`/aif-done` owns OpenSpec lifecycle finalization. It updates a linked managed row only after successful archive; every pre-archive failure leaves the roadmap unchanged. If archive succeeds but the roadmap transition fails, archive remains successful, no rollback is attempted, and the exact handoff is `/aif-roadmap check`. The result does not claim GitHub open/closed/merged state. `/aif-commit` owns git commit creation. `/aif-evolve` owns learning/evolution. `/aif-architecture`, `/aif-docs`, and `/aif-qa` are upstream project-context utilities, not OpenSpec-native quality/finalization gates.
 
 Adjacent upstream project-context utilities:
 
@@ -267,7 +273,9 @@ Adjacent upstream project-context utilities:
 
 Upstream `/aif-archive` is not part of the OpenSpec-native quality/finalization tail. It owns legacy AI Factory-only cleanup from `paths.plans/*.md` to `paths.archive/plans/*.md` and optional roadmap snapshots under `paths.archive/roadmap/*.md`. It must not write `openspec/changes/**`, `openspec/specs/**`, `.ai-factory/qa/**`, `.ai-factory/state/**`, or `.ai-factory/rules/generated/**`, and it must not run `openspec archive <change-id> --yes`.
 
-After `/aif-done`, `/aif-commit` may read finalization evidence, OpenSpec archive/spec mutations, the configured roadmap artifact, and optional GitHub issue/PR/milestone freshness context. It must not mutate OpenSpec lifecycle artifacts, `.ai-factory/ROADMAP.md`, runtime state, QA evidence, generated rules, or GitHub objects manually. If the roadmap is stale, `/aif-commit` reports a read-only freshness warning and hands off to `/aif-roadmap`; it still writes only the git commit after user confirmation.
+After `/aif-done`, `/aif-commit` may read finalization evidence, OpenSpec archive/spec mutations, the configured roadmap artifact, and optional GitHub issue/PR/milestone freshness context. It must not mutate OpenSpec lifecycle artifacts, `.ai-factory/ROADMAP.md`, runtime state, QA evidence, generated rules, or GitHub objects manually. Deterministic local lifecycle drift is an unskippable `ERROR [roadmap-local]` when durable evidence proves successful local finalization, the proposal has non-`none` `## Roadmap Linkage`, and the managed `OpenSpec Change Lifecycle` row is missing or not exactly `finalized`. The exact handoff is `/aif-roadmap check`; `/aif-commit` stops before its proposal and does not create a git commit, and user confirmation cannot bypass the error.
+
+Unavailable, partial, or later-changing GitHub evidence is volatile external drift reported as `WARN [roadmap-external]` and remains warning-only by default. In that warning-only case, `/aif-commit` may continue and still writes only the git commit after user confirmation. External strict checking may promote external drift, but it cannot suppress the deterministic local gate.
 
 Generic `## Commit Plan` grouping is parent-owned in AI Factory 2.13+. In OpenSpec-native mode, an active `openspec/changes/<change-id>/tasks.md` may provide that `## Commit Plan` source. AIFHub adds only roadmap/GitHub freshness findings before the commit proposal. If no active change/plan resolves, `/aif-commit` keeps upstream staged-diff behavior and preserves upstream grouping options such as `Follow Commit Plan`, `Commit everything together`, and `Adjust grouping`.
 
