@@ -6,7 +6,7 @@ Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing warnings,
 
 ### Goal
 
-Treat `/aif-commit` as the final read-only freshness check before creating a git commit. It must detect stale roadmap and GitHub milestone context, report `WARN`/`ERROR` findings, and preserve the upstream commit message and confirmation flow.
+Treat `/aif-commit` as the final read-only freshness check before creating a git commit. It must classify deterministic local lifecycle drift separately from volatile external drift, report labeled `WARN`/`ERROR` findings, and preserve the upstream commit message and confirmation flow when no blocking local contradiction exists.
 
 ### Required first read
 
@@ -74,10 +74,33 @@ This overlay must not rewrite active plans, must not create commits itself, must
 
 Report context gate findings before proposing the commit message:
 
-- `WARN`: roadmap or GitHub freshness is stale, partial, or unavailable, but `/aif-commit` can continue because no strict mode was requested.
-- `ERROR`: user explicitly requested strict checking and the roadmap is stale or required evidence cannot be checked.
+- `ERROR [roadmap-local]`: deterministic local lifecycle drift proves that successful finalization and the managed roadmap lifecycle state contradict each other.
+- `WARN [roadmap-local]`: a local freshness hint is incomplete or stale but does not satisfy the blocking contradiction below.
+- `WARN [roadmap-external]`: volatile external drift is unavailable, partial, stale, or may have changed after it was read.
+- `ERROR [roadmap-external]`: the user explicitly requested strict external checking and required external evidence cannot be checked or is stale.
 
-`/aif-commit` has no implicit strict mode. The default is warning-first. Continue to the upstream confirmation flow after warnings unless the user requested strict checking or asks to stop.
+#### Blocking deterministic local drift
+
+Emit the unskippable `ERROR [roadmap-local]` only when all of these durable local facts are established for the same change:
+
+1. Local done/archive evidence records successful `/aif-done` or otherwise proves successful local finalization.
+2. The canonical or archived proposal contains `## Roadmap Linkage` with a managed linkage value other than `none`.
+3. The managed `OpenSpec Change Lifecycle` row is missing, malformed, or not exactly `finalized`.
+
+Do not infer successful local finalization from checked tasks, staged path names, implementation evidence, or GitHub issue/PR closure or merge state alone. The local gate does not depend on explicit strict checking and still applies when GitHub evidence is unavailable.
+
+For `ERROR [roadmap-local]`:
+
+- include the exact `/aif-roadmap check` handoff
+- stop before the commit proposal or confirmation flow
+- state that user confirmation MUST NOT bypass the error
+- the overlay and upstream workflow must not create a git commit
+
+#### Volatile external drift
+
+Unavailable, partial, or later-changing GitHub evidence remains warning-only by default and is reported as `WARN [roadmap-external]`. This includes missing, unauthenticated, rate-limited, or offline access and GitHub state changed after the local snapshot, commit, or merge.
+
+`/aif-commit` has no implicit strict mode for volatile external evidence. Continue to the upstream confirmation flow after `WARN [roadmap-external]` unless the user requested strict external checking or asks to stop. Explicit strict external checking may promote that external finding to `ERROR [roadmap-external]`; it never controls or suppresses `ERROR [roadmap-local]`.
 
 Detect stale roadmap state when material:
 
@@ -91,10 +114,10 @@ Detect stale roadmap state when material:
 For every stale roadmap finding, include this exact handoff:
 
 ```text
-/aif-roadmap
+/aif-roadmap check
 ```
 
-If the finding is specific, include the reason next to the handoff, for example: `Run /aif-roadmap to refresh the milestone phase audit before committing.`
+If the finding is specific, include the reason next to the handoff, for example: `Run /aif-roadmap check to refresh the milestone phase audit before committing.`
 
 ### Ownership Boundaries
 
@@ -123,5 +146,5 @@ It must not write tokens, authorization headers, raw credential helper output, o
 - State whether GitHub milestone evidence was used, unavailable, or partial when GitHub context is relevant.
 - Keep warnings in `language.ui`; keep command names and paths in English.
 - Keep the upstream conventional commit message flow unchanged.
-- Do not automatically run `/aif-roadmap`; only report the exact `/aif-roadmap` handoff.
+- Do not automatically run `/aif-roadmap check`; only report the exact `/aif-roadmap check` handoff.
 - Do not add AI co-author trailers.

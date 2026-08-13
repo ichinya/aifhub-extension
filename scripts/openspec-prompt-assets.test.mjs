@@ -1149,6 +1149,47 @@ describe('OpenSpec-native prompt asset contract', () => {
     }
   });
 
+  it('defers roadmap lifecycle completion from OpenSpec implementation', async () => {
+    const relativePath = 'injections/core/aif-implement-plan-folder.md';
+    const asset = stripFencedBlocks(await readRepoFile(relativePath));
+    const label = `${relativePath} roadmap lifecycle deferral contract`;
+
+    for (const expected of [
+      'Roadmap lifecycle deferral',
+      'overrides the upstream roadmap completion step',
+      'must not edit the configured roadmap',
+      'must not mark a milestone, phase, slice, or managed lifecycle row complete',
+      'even when all implementation tasks are checked',
+      'must not claim roadmap completion',
+      '/aif-verify <change-id>',
+      '/aif-done <change-id>'
+    ]) {
+      assertIncludes(asset, expected, label);
+    }
+  });
+
+  it('keeps OpenSpec verification roadmap diagnostics bounded and read-only', async () => {
+    const relativePath = 'injections/core/aif-verify-plan-folder.md';
+    const asset = stripFencedBlocks(await readRepoFile(relativePath));
+    const label = `${relativePath} read-only roadmap validation contract`;
+
+    for (const expected of [
+      'Roadmap linkage validation',
+      'read-only',
+      'WARN [roadmap]',
+      'ERROR [roadmap]',
+      'malformed',
+      'contradictory',
+      '/aif-roadmap check',
+      'must not copy the managed lifecycle block',
+      'Missing linkage alone remains a warning',
+      'canonical requirement makes linkage mandatory',
+      'must not edit the configured roadmap'
+    ]) {
+      assertIncludes(asset, expected, label);
+    }
+  });
+
   it('documents Codex and Claude implement-worker todo hydration behavior', async () => {
     for (const relativePath of [
       'docs/codex-plan-mode.md',
@@ -1210,6 +1251,92 @@ describe('OpenSpec-native prompt asset contract', () => {
     }
   });
 
+  it('registers linked active OpenSpec changes as planned during roadmap check', async () => {
+    for (const relativePath of [ROADMAP_PROMPT_ASSET, ...ROADMAP_REFERENCE_ASSETS]) {
+      const asset = stripFencedBlocks(await readRepoFile(relativePath));
+      const label = `${relativePath} active lifecycle reconciliation contract`;
+
+      for (const expected of [
+        '/aif-roadmap check',
+        'active canonical OpenSpec proposal',
+        '## Roadmap Linkage',
+        'valid non-`none` roadmap linkage',
+        'register one local `planned` row',
+        'must not claim implementation, verification, finalization, merge, or issue closure'
+      ]) {
+        assertIncludes(asset, expected, label);
+      }
+    }
+  });
+
+  it('preserves evidence-backed finalized rows for archived changes', async () => {
+    for (const relativePath of [ROADMAP_PROMPT_ASSET, ...ROADMAP_REFERENCE_ASSETS]) {
+      const asset = stripFencedBlocks(await readRepoFile(relativePath));
+      const label = `${relativePath} archived lifecycle reconciliation contract`;
+
+      for (const expected of [
+        'archived change',
+        'durable local done/archive evidence',
+        'preserve its evidence-backed `finalized` row',
+        'must never downgrade `finalized` to `planned`',
+        'project-relative finalization evidence'
+      ]) {
+        assertIncludes(asset, expected, label);
+      }
+    }
+  });
+
+  it('does not register or infer lifecycle rows for explicitly unlinked changes', async () => {
+    for (const relativePath of [ROADMAP_PROMPT_ASSET, ...ROADMAP_REFERENCE_ASSETS]) {
+      const asset = stripFencedBlocks(await readRepoFile(relativePath));
+      const label = `${relativePath} unlinked lifecycle reconciliation contract`;
+
+      for (const expected of [
+        'explicitly unlinked change',
+        'all linkage values are `none`',
+        'must not create a managed lifecycle row',
+        'must not infer linkage from branch names, GitHub state, labels, or roadmap text'
+      ]) {
+        assertIncludes(asset, expected, label);
+      }
+    }
+  });
+
+  it('keeps local lifecycle reconciliation available when GitHub evidence is missing', async () => {
+    for (const relativePath of [ROADMAP_PROMPT_ASSET, ...ROADMAP_REFERENCE_ASSETS]) {
+      const asset = stripFencedBlocks(await readRepoFile(relativePath));
+      const label = `${relativePath} missing GitHub reconciliation contract`;
+
+      for (const expected of [
+        'GitHub evidence is unavailable, unauthenticated, rate-limited, offline, or partial',
+        'local lifecycle reconciliation continues',
+        'GitHub limitation is non-blocking',
+        'Lifecycle evidence:',
+        'GitHub evidence:',
+        'report lifecycle and GitHub evidence sources separately'
+      ]) {
+        assertIncludes(asset, expected, label);
+      }
+    }
+  });
+
+  it('reconciles post-merge GitHub state without fabricating local finalization', async () => {
+    for (const relativePath of [ROADMAP_PROMPT_ASSET, ...ROADMAP_REFERENCE_ASSETS]) {
+      const asset = stripFencedBlocks(await readRepoFile(relativePath));
+      const label = `${relativePath} post-merge reconciliation contract`;
+
+      for (const expected of [
+        'post-merge reconciliation',
+        'current issue, PR, and milestone state',
+        'managed local lifecycle row remains `finalized`',
+        'remote closure or merge MUST NOT be rewritten as local finalization evidence',
+        'must not promote `planned` to `finalized`'
+      ]) {
+        assertIncludes(asset, expected, label);
+      }
+    }
+  });
+
   it('keeps GitHub-aware roadmap output owner-bounded and credential-safe', async () => {
     const asset = stripFencedBlocks(await readRepoFile(ROADMAP_PROMPT_ASSET));
 
@@ -1258,7 +1385,7 @@ describe('OpenSpec-native prompt asset contract', () => {
       'closed GitHub milestone exists but `.ai-factory/ROADMAP.md` has no matching phase audit',
       'open GitHub milestone has `open_issues = 0` but roadmap lacks `phase-completion drift`',
       'unphased backlog/drift',
-      '/aif-roadmap',
+      '/aif-roadmap check',
       'It must not edit `.ai-factory/ROADMAP.md`',
       '.ai-factory/rules/generated/**',
       'canonical OpenSpec artifacts',
@@ -1266,6 +1393,33 @@ describe('OpenSpec-native prompt asset contract', () => {
       'Keep the upstream conventional commit message flow unchanged'
     ]) {
       assertIncludes(asset, expected, COMMIT_PROMPT_ASSET);
+    }
+  });
+
+  it('blocks deterministic finalized-state drift without promoting volatile GitHub drift', async () => {
+    const asset = stripFencedBlocks(await readRepoFile(COMMIT_PROMPT_ASSET));
+    const label = `${COMMIT_PROMPT_ASSET} finalized-state freshness contract`;
+
+    for (const expected of [
+      'ERROR [roadmap-local]',
+      'deterministic local lifecycle drift',
+      'successful `/aif-done`',
+      '## Roadmap Linkage',
+      'other than `none`',
+      'OpenSpec Change Lifecycle',
+      'missing, malformed, or not exactly `finalized`',
+      'exact `/aif-roadmap check`',
+      'stop before the commit proposal',
+      'user confirmation MUST NOT bypass',
+      'must not create a git commit',
+      'WARN [roadmap-external]',
+      'volatile external drift',
+      'Unavailable, partial, or later-changing GitHub evidence remains warning-only by default',
+      'changed after the local snapshot, commit, or merge',
+      'does not depend on explicit strict checking',
+      'Do not infer successful local finalization from checked tasks'
+    ]) {
+      assertIncludes(asset, expected, label);
     }
   });
 
