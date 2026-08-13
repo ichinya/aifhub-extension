@@ -258,4 +258,47 @@ describe('OpenSpec lifecycle CLI integration contract', () => {
       );
     }
   });
+
+  it('bounds done roadmap lifecycle co-ownership and keeps GitHub state external', async () => {
+    for (const relativePath of LIFECYCLE_ASSETS.done) {
+      const asset = stripFencedBlocks(await readRepoFile(relativePath));
+
+      assert.match(
+        asset,
+        /co-owns only the marker-delimited.*OpenSpec Change Lifecycle.*block/i,
+        `${relativePath} should bound done ownership to the managed lifecycle block`
+      );
+      assert.match(
+        asset,
+        /after successful OpenSpec archive/i,
+        `${relativePath} should place lifecycle mutation after archive success`
+      );
+      assert.match(
+        asset,
+        /readiness, verification, artifact-contract, dirty-tree, or archive failure.*(?:must not|does not|do not).*roadmap/i,
+        `${relativePath} should forbid roadmap mutation on pre-archive failures`
+      );
+      assert.match(
+        asset,
+        /updated.*skipped.*handoff/i,
+        `${relativePath} should expose bounded local roadmap outcomes`
+      );
+      assertIncludes(asset, '/aif-roadmap check', relativePath);
+      assert.match(
+        asset,
+        /(?:must not|do not|never).*roll back.*archive/i,
+        `${relativePath} should preserve successful archive evidence on roadmap handoff`
+      );
+      assert.match(
+        asset,
+        /separately from (?:external )?GitHub.*(?:issue|pull request|PR)/i,
+        `${relativePath} should report local lifecycle separately from GitHub state`
+      );
+      assert.match(
+        asset,
+        /(?:must not|does not|do not|never).*claim.*GitHub issue.*closed.*(?:pull request|PR).*merged/i,
+        `${relativePath} should never infer external closure from local finalization`
+      );
+    }
+  });
 });

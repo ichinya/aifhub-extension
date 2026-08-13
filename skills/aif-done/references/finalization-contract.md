@@ -66,6 +66,15 @@ Dirty workspace state is blocking by default. Inspect with `git status --short`;
 
 OpenSpec-native mode does not use legacy `.ai-factory/specs` archive.
 
+### Roadmap Lifecycle Co-Ownership
+
+- After successful OpenSpec archive, `/aif-done` co-owns only the marker-delimited `OpenSpec Change Lifecycle` block in the configured project-relative roadmap; `/aif-roadmap` remains the owner of the full roadmap audit and reconciliation.
+- The finalizer uses the canonical pre-archive `## Roadmap Linkage` fields and a project-relative final evidence path to insert or update one local `finalized` row. Explicit `none` linkage produces the local outcome `skipped` without changing the roadmap.
+- A readiness, verification, artifact-contract, dirty-tree, or archive failure must not update the roadmap or create a `finalized` row.
+- Normal output reports the local roadmap lifecycle outcome `updated`, `skipped`, or `handoff` separately from external GitHub issue, pull request, and milestone state.
+- Local finalization must not claim that a GitHub issue is closed or a pull request is merged.
+- If a post-archive roadmap update cannot be completed safely, preserve the successful archive and final evidence, return `handoff` with the exact `/aif-roadmap check` guidance, and must not roll back the successful archive or fabricate a `finalized` row.
+
 ### Final Evidence
 
 Write:

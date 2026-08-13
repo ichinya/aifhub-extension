@@ -472,8 +472,8 @@ describe('AIFHub wrapper guidance contract', () => {
     assert.ok(fields.get('description'), 'aif-done description should be non-empty');
     assert.match(version, /^\d+\.\d+\.\d+$/, 'aif-done version should use X.Y.Z semver');
     assert.ok(
-      versionParts[0] > 1 || (versionParts[0] === 1 && versionParts[1] >= 3),
-      'aif-done version should be at least 1.3.0 for the installed finalizer capability'
+      versionParts[0] > 1 || (versionParts[0] === 1 && versionParts[1] >= 4),
+      'aif-done version should be at least 1.4.0 for marker-bounded roadmap lifecycle co-ownership'
     );
     for (const expected of ['change-id', 'plan-id', '--skip-specs', '--record-dirty-state']) {
       assert.ok(argumentHint.includes(expected), `aif-done argument-hint should include ${expected}`);

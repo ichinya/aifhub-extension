@@ -3,7 +3,7 @@ name: aif-done
 description: Finalize a verified OpenSpec-native change or legacy AI Factory-only plan, prepare commit/PR summaries, and drive evidence-backed follow-ups.
 argument-hint: "[change-id|plan-id] [--skip-specs] [--record-dirty-state]"
 allowed-tools: Read Write Edit Glob Grep Bash(ai-factory aifhub-done-finalizer *) Bash(git status *) Bash(git branch --show-current) Bash(git diff *) Bash(git log *) Bash(gh --version)
-version: 1.3.0
+version: 1.4.0
 author: ichi
 ---
 
@@ -96,6 +96,15 @@ Normal output must report:
 - final summaries under `.ai-factory/state/<change-id>/`;
 - commit/PR summary draft;
 - next steps: `/aif-mode sync`, `/aif-commit`, and optional `/aif-evolve`.
+
+### Roadmap Lifecycle Co-Ownership
+
+- After successful OpenSpec archive, `/aif-done` co-owns only the marker-delimited `OpenSpec Change Lifecycle` block in the configured project-relative roadmap; `/aif-roadmap` remains the owner of the full roadmap audit and reconciliation.
+- The finalizer uses the canonical pre-archive `## Roadmap Linkage` fields and a project-relative final evidence path to insert or update one local `finalized` row. Explicit `none` linkage produces the local outcome `skipped` without changing the roadmap.
+- A readiness, verification, artifact-contract, dirty-tree, or archive failure must not update the roadmap or create a `finalized` row.
+- Normal output reports the local roadmap lifecycle outcome `updated`, `skipped`, or `handoff` separately from external GitHub issue, pull request, and milestone state.
+- Local finalization must not claim that a GitHub issue is closed or a pull request is merged.
+- If a post-archive roadmap update cannot be completed safely, preserve the successful archive and final evidence, return `handoff` with the exact `/aif-roadmap check` guidance, and must not roll back the successful archive or fabricate a `finalized` row.
 
 ### Post-Finalization Handoff
 
@@ -197,7 +206,7 @@ Legacy AI Factory-only mode preserves the verified plan finalization contract ba
 | `.ai-factory/specs/index.yaml` | **aif-done** | Updates |
 | `.ai-factory/plans/<plan-id>/status.yaml` | **aif-done** | Updates `status: done` |
 | Commit/PR drafts | **aif-done** | Outputs to user |
-| `.ai-factory/ROADMAP.md` | roadmap owner | Update only with plan-backed evidence; otherwise hand off |
+| `.ai-factory/ROADMAP.md` | roadmap owner; **aif-done** for the managed lifecycle block | Co-owns only the marker-delimited `OpenSpec Change Lifecycle` block after successful OpenSpec archive; otherwise hand off |
 | `.ai-factory/RULES.md` | project rules owner | Update only for durable plan-backed rules; otherwise hand off |
 | `.ai-factory/ARCHITECTURE.md` | architecture owner | Update only with plan-backed evidence; otherwise hand off |
 
@@ -214,6 +223,7 @@ Legacy AI Factory-only mode preserves the verified plan finalization contract ba
 - In OpenSpec-native mode, never silently archive through legacy `.ai-factory/specs`.
 - Never invent governance changes without evidence from the verified plan.
 - When governance updates belong to another owner, use the owning path or return an exact handoff instead of silently skipping the change.
+- Keep `/aif-done` roadmap writes confined to the marker-delimited `OpenSpec Change Lifecycle` block after successful OpenSpec archive; never infer external GitHub closure from local finalization.
 - Never auto-create a PR — always present drafts for user approval.
 - Never create commits from `/aif-done`; hand commit creation to `/aif-commit` or the user's normal git workflow.
 - If `gh` is unavailable, provide manual instructions instead of failing.

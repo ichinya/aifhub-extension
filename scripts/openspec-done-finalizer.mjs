@@ -44,14 +44,21 @@ import {
   summarizeOpenSpecDoneReadiness,
   writeOpenSpecDoneReadiness
 } from './openspec-done-readiness.mjs';
+import {
+  updateRoadmapChangeLifecycle as defaultUpdateRoadmapChangeLifecycle
+} from './roadmap-change-lifecycle.mjs';
 
 const execFileAsync = promisify(execFile);
 const MODE = 'openspec-native';
 const DEFAULT_STATE_DIR = path.join('.ai-factory', 'state');
 const DEFAULT_QA_DIR = path.join('.ai-factory', 'qa');
+const DEFAULT_CONFIG_PATH = path.join('.ai-factory', 'config.yaml');
+const DEFAULT_ROADMAP_PATH = path.join('.ai-factory', 'ROADMAP.md');
 const ARCHIVE_JSON = 'openspec-archive.json';
 const DONE_MARKDOWN = 'done.md';
 const FINAL_SUMMARY_MARKDOWN = 'final-summary.md';
+const ROADMAP_HANDOFF_COMMAND = '/aif-roadmap check';
+const ROADMAP_OUTCOME_STATUSES = new Set(['updated', 'handoff', 'skipped']);
 const PUBLIC_COMMAND_SOURCES = new Set(['explicit', 'project-local', 'path']);
 const FINALIZER_BYPASS_OPTIONS = new Set([
   '--force',
@@ -162,6 +169,9 @@ export function projectDoneFinalizerResult(result) {
   const readiness = result?.readiness ?? null;
   const workingTree = result?.workingTree ?? null;
   const archive = result?.archive ?? null;
+  const roadmap = normalizeRoadmapOutcome(
+    result?.roadmap ?? createSkippedRoadmapOutcome('archive-not-successful')
+  );
 
   return {
     ok: Boolean(result?.ok),
@@ -186,6 +196,18 @@ export function projectDoneFinalizerResult(result) {
       skip_specs: Boolean(archive.skipSpecs),
       command: command.command,
       command_source: command.commandSource
+    },
+    roadmap: {
+      status: roadmap.status,
+      reason: roadmap.reason,
+      path: roadmap.path,
+      changed: roadmap.changed,
+      suggested_next: roadmap.suggestedNext === null
+        ? null
+        : {
+          command: ROADMAP_HANDOFF_COMMAND,
+          reason: roadmap.reason
+        }
     },
     summary_files: normalizePublicPaths(result?.summaryFiles),
     commit_message: boundedPublicText(result?.commitMessage ?? '', 300),
@@ -216,6 +238,7 @@ export async function finalizeOpenSpecChange(options = {}) {
       status: 'FAIL',
       readiness,
       archive,
+      roadmap: createSkippedRoadmapOutcome('archive-not-successful'),
       workingTree: readiness?.context?.workingTree ?? null,
       commitMessage: context.changeId ? createCommitMessage(context.changeId) : '',
       prSummary: context.changeId
@@ -280,6 +303,7 @@ export async function finalizeOpenSpecChange(options = {}) {
     readiness,
     workingTree,
     archive,
+    roadmap: createSkippedRoadmapOutcome('archive-not-successful'),
     commitMessage: createCommitMessage(context.changeId),
     prSummary: createPrSummary({
       changeId: context.changeId,
@@ -301,7 +325,20 @@ export async function finalizeOpenSpecChange(options = {}) {
     return baseResult;
   }
 
-  const summary = await writeDoneSummary(context.changeId, baseResult, {
+  const roadmap = archive.archived
+    ? await updateRoadmapAfterArchive(context, { ...options, rootDir })
+    : createSkippedRoadmapOutcome('archive-not-performed');
+  const finalizedResult = {
+    ...baseResult,
+    status: roadmap.status === 'handoff' ? 'WARN' : baseResult.status,
+    roadmap,
+    warnings: dedupeDiagnostics([
+      ...baseResult.warnings,
+      ...roadmapOutcomeWarnings(roadmap)
+    ])
+  };
+
+  const summary = await writeDoneSummary(context.changeId, finalizedResult, {
     ...options,
     rootDir,
     qaPath: context.paths.qa,
@@ -309,7 +346,7 @@ export async function finalizeOpenSpecChange(options = {}) {
   });
 
   return {
-    ...baseResult,
+    ...finalizedResult,
     summaryFiles: summary.files
   };
 }
@@ -1105,12 +1142,25 @@ export function summarizeDoneResult(result, options = {}) {
   const skipSpecs = result?.archive?.skipSpecs ? 'yes' : 'no';
   const readinessStatus = result?.readiness?.status ? String(result.readiness.status).toUpperCase() : null;
   const command = selectOpenSpecCommandDiagnostic(result);
+  const roadmap = normalizeRoadmapOutcome(
+    result?.roadmap ?? createSkippedRoadmapOutcome('archive-not-successful')
+  );
   const lines = [
     `Finalization status: ${boundedPublicText(status, 40)}`,
     `Change: ${boundedPublicText(changeId, 200)}`,
     `Archived: ${archived}`,
-    `Skip specs: ${skipSpecs}`
+    `Skip specs: ${skipSpecs}`,
+    `Roadmap lifecycle: ${roadmap.status}`,
+    `Roadmap reason: ${roadmap.reason}`
   ];
+
+  if (roadmap.path !== null) {
+    lines.push(`Roadmap path: ${roadmap.path}`);
+  }
+  if (roadmap.suggestedNext !== null) {
+    lines.push(`Suggested next: ${ROADMAP_HANDOFF_COMMAND}`);
+    lines.push(`Reason: ${roadmap.reason}`);
+  }
 
   if (readinessStatus !== null) {
     lines.push(`Done readiness: ${boundedPublicText(readinessStatus, 40)}`);
@@ -1318,6 +1368,240 @@ function createSkippedArchiveSummary(changeId, options, reason) {
   };
 }
 
+async function updateRoadmapAfterArchive(context, options = {}) {
+  const rootDir = resolveRootDir(options);
+  let roadmapPath;
+  try {
+    roadmapPath = await resolveConfiguredRoadmapPath(rootDir, options);
+  } catch {
+    return createRoadmapHandoffOutcome('roadmap-config-unreadable');
+  }
+  if (!roadmapPath.ok) {
+    return createRoadmapHandoffOutcome(roadmapPath.reason);
+  }
+
+  const evidencePath = normalizePublicPath(toPosix(path.relative(
+    rootDir,
+    path.join(context.paths.qa, DONE_MARKDOWN)
+  )));
+  if (evidencePath === null) {
+    return createRoadmapHandoffOutcome('evidence-path-invalid', roadmapPath.path);
+  }
+
+  const updateRoadmapChangeLifecycle = options.updateRoadmapChangeLifecycle
+    ?? defaultUpdateRoadmapChangeLifecycle;
+  let outcome;
+  try {
+    outcome = await updateRoadmapChangeLifecycle({
+      rootDir,
+      roadmapPath: roadmapPath.path,
+      proposalContent: context.canonicalArtifacts?.proposal?.content ?? '',
+      changeId: context.changeId,
+      localState: 'finalized',
+      evidencePath
+    });
+  } catch {
+    return createRoadmapHandoffOutcome('roadmap-update-failed');
+  }
+
+  return normalizeRoadmapOutcome(outcome);
+}
+
+async function resolveConfiguredRoadmapPath(rootDir, options = {}) {
+  if (options.roadmapPath !== undefined) {
+    const explicitPath = normalizePublicPath(options.roadmapPath);
+    return explicitPath === null
+      ? { ok: false, path: null, reason: 'roadmap-path-invalid' }
+      : { ok: true, path: explicitPath, reason: null };
+  }
+
+  const configPath = options.configPath === undefined
+    ? path.join(rootDir, DEFAULT_CONFIG_PATH)
+    : path.resolve(rootDir, options.configPath);
+  assertSafeRuntimePath(rootDir, configPath, 'Project config path');
+
+  let raw;
+  try {
+    raw = await readFile(configPath, 'utf8');
+  } catch (error) {
+    if (error?.code === 'ENOENT') {
+      return {
+        ok: true,
+        path: toPosix(DEFAULT_ROADMAP_PATH),
+        reason: null
+      };
+    }
+    return { ok: false, path: null, reason: 'roadmap-config-unreadable' };
+  }
+
+  const parsed = parseConfiguredRoadmapPath(raw);
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  const roadmapPath = normalizePublicPath(parsed.path ?? toPosix(DEFAULT_ROADMAP_PATH));
+  return roadmapPath === null
+    ? { ok: false, path: null, reason: 'roadmap-path-invalid' }
+    : { ok: true, path: roadmapPath, reason: null };
+}
+
+function parseConfiguredRoadmapPath(raw) {
+  const lines = String(raw ?? '').replace(/^\uFEFF/, '').split(/\r?\n/);
+  let pathsIndent = null;
+  let pathsCount = 0;
+  const values = [];
+
+  for (const rawLine of lines) {
+    const trimmed = rawLine.trim();
+    if (trimmed.length === 0 || trimmed.startsWith('#')) {
+      continue;
+    }
+
+    const indentText = rawLine.match(/^\s*/)?.[0] ?? '';
+    if (indentText.includes('\t')) {
+      return { ok: false, path: null, reason: 'roadmap-config-invalid' };
+    }
+    const indent = indentText.length;
+
+    if (indent === 0) {
+      pathsIndent = null;
+      const topLevel = rawLine.match(/^paths:\s*(?:#.*)?$/);
+      if (topLevel) {
+        pathsCount += 1;
+        pathsIndent = indent;
+        if (pathsCount > 1) {
+          return { ok: false, path: null, reason: 'roadmap-config-invalid' };
+        }
+      }
+      continue;
+    }
+
+    if (pathsIndent === null || indent <= pathsIndent) {
+      continue;
+    }
+
+    const roadmapMatch = rawLine.match(/^\s+roadmap:\s*(.*?)\s*$/);
+    if (!roadmapMatch) {
+      continue;
+    }
+    const value = parseConfiguredString(roadmapMatch[1]);
+    if (value === null) {
+      return { ok: false, path: null, reason: 'roadmap-config-invalid' };
+    }
+    values.push(value);
+  }
+
+  if (values.length > 1) {
+    return { ok: false, path: null, reason: 'roadmap-config-invalid' };
+  }
+
+  return {
+    ok: true,
+    path: values[0] ?? null,
+    reason: null
+  };
+}
+
+function parseConfiguredString(value) {
+  const raw = stripYamlInlineComment(value).trim();
+  if (raw.length === 0) {
+    return null;
+  }
+
+  const first = raw[0];
+  if (first === '"' || first === "'") {
+    if (raw.length < 2 || raw.at(-1) !== first) {
+      return null;
+    }
+    const unquoted = raw.slice(1, -1);
+    return unquoted.length === 0 ? null : unquoted;
+  }
+
+  if (/^(?:null|~|true|false|[-+]?\d+(?:\.\d+)?)$/i.test(raw)) {
+    return null;
+  }
+  return raw;
+}
+
+function stripYamlInlineComment(value) {
+  let quote = null;
+  const raw = String(value ?? '');
+
+  for (let index = 0; index < raw.length; index += 1) {
+    const char = raw[index];
+    if ((char === '"' || char === "'") && (index === 0 || raw[index - 1] !== '\\')) {
+      quote = quote === char ? null : quote ?? char;
+      continue;
+    }
+    if (char === '#' && quote === null && (index === 0 || /\s/.test(raw[index - 1]))) {
+      return raw.slice(0, index);
+    }
+  }
+
+  return raw;
+}
+
+function normalizeRoadmapOutcome(value) {
+  const status = String(value?.status ?? '');
+  if (!ROADMAP_OUTCOME_STATUSES.has(status)) {
+    return createRoadmapHandoffOutcome('roadmap-result-invalid');
+  }
+
+  const rawReason = String(value?.reason ?? '');
+  const reason = /^[a-z0-9][a-z0-9-]{0,99}$/.test(rawReason)
+    ? rawReason
+    : 'roadmap-result-invalid';
+  const pathValue = value?.path === null || value?.path === undefined
+    ? null
+    : normalizePublicPath(value.path);
+
+  if (reason === 'roadmap-result-invalid'
+    || (value?.path !== null && value?.path !== undefined && pathValue === null)
+    || (status === 'updated' && pathValue === null)) {
+    return createRoadmapHandoffOutcome('roadmap-result-invalid');
+  }
+
+  return {
+    status,
+    reason,
+    path: pathValue,
+    changed: status === 'updated',
+    suggestedNext: status === 'handoff' ? ROADMAP_HANDOFF_COMMAND : null
+  };
+}
+
+function createSkippedRoadmapOutcome(reason) {
+  return {
+    status: 'skipped',
+    reason,
+    path: null,
+    changed: false,
+    suggestedNext: null
+  };
+}
+
+function createRoadmapHandoffOutcome(reason, roadmapPath = null) {
+  return {
+    status: 'handoff',
+    reason,
+    path: normalizePublicPath(roadmapPath),
+    changed: false,
+    suggestedNext: ROADMAP_HANDOFF_COMMAND
+  };
+}
+
+function roadmapOutcomeWarnings(roadmap) {
+  if (roadmap?.status !== 'handoff') {
+    return [];
+  }
+
+  return [{
+    code: roadmap.reason,
+    message: `OpenSpec archive succeeded, but roadmap lifecycle reconciliation requires attention. Run ${ROADMAP_HANDOFF_COMMAND}.`,
+    ...(roadmap.path === null ? {} : { path: roadmap.path })
+  }];
+}
+
 async function buildAndWriteDoneReadiness(options = {}) {
   const readiness = await buildOpenSpecDoneReadiness(options);
 
@@ -1373,6 +1657,7 @@ function createFinalizeFailure({ context, readiness, workingTree, archive, error
     readiness,
     workingTree,
     archive,
+    roadmap: createSkippedRoadmapOutcome('archive-not-successful'),
     commitMessage: createCommitMessage(context.changeId),
     prSummary: createPrSummary({
       changeId: context.changeId,
@@ -1766,6 +2051,10 @@ function renderDoneMarkdown(changeId, summary) {
     `Archived: ${archive.archived ? 'yes' : 'no'}`,
     `Skip specs: ${archive.skipSpecs ? 'yes' : 'no'}`,
     '',
+    '## Roadmap lifecycle',
+    '',
+    ...renderRoadmapLifecycle(summary.roadmap),
+    '',
     '## Coverage matrix',
     '',
     ...summarizeOpenSpecCoverage(context.coverage).split('\n'),
@@ -1800,6 +2089,10 @@ function renderFinalSummaryMarkdown(summary) {
   return [
     `# Final Summary: ${summary.changeId}`,
     '',
+    '## Roadmap lifecycle',
+    '',
+    ...renderRoadmapLifecycle(summary.roadmap),
+    '',
     '## Suggested commit message',
     '',
     summary.commitMessage ?? createCommitMessage(summary.changeId),
@@ -1808,6 +2101,26 @@ function renderFinalSummaryMarkdown(summary) {
     '',
     summary.prSummary ?? ''
   ].join('\n');
+}
+
+function renderRoadmapLifecycle(value) {
+  const roadmap = normalizeRoadmapOutcome(
+    value ?? createSkippedRoadmapOutcome('archive-not-successful')
+  );
+  const lines = [
+    `Status: ${roadmap.status}`,
+    `Reason: ${roadmap.reason}`,
+    `Changed: ${roadmap.changed ? 'yes' : 'no'}`
+  ];
+
+  if (roadmap.path !== null) {
+    lines.push(`Path: ${roadmap.path}`);
+  }
+  if (roadmap.suggestedNext !== null) {
+    lines.push(`Suggested next: ${ROADMAP_HANDOFF_COMMAND}`);
+  }
+
+  return lines;
 }
 
 function collectCanonicalArtifactPaths(canonicalArtifacts = {}) {

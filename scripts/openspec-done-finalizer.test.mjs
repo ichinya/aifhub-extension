@@ -26,8 +26,31 @@ import {
 import {
   syncOpenSpecArtifacts
 } from './aif-artifact-sync.mjs';
+import {
+  ROADMAP_LIFECYCLE_START_MARKER
+} from './roadmap-change-lifecycle.mjs';
 
 const tempRoots = [];
+const DEFAULT_ROADMAP_PATH = '.ai-factory/ROADMAP.md';
+const CUSTOM_ROADMAP_PATH = 'docs/project-roadmap.md';
+const LINKED_PROPOSAL = `# Proposal: Add OAuth
+
+## Roadmap Linkage
+
+- Issues: https://github.com/ichinya/aifhub-extension/issues/88
+- Milestone: none
+- Roadmap item/slice: Workflow governance
+- Rationale: Track local finalization independently from GitHub.
+`;
+const UNLINKED_PROPOSAL = `# Proposal: Add OAuth
+
+## Roadmap Linkage
+
+- Issues: none
+- Milestone: none
+- Roadmap item/slice: none
+- Rationale: none
+`;
 
 async function createTempRoot() {
   const rootDir = await mkdtemp(path.join(os.tmpdir(), 'aifhub-openspec-done-'));
@@ -60,6 +83,52 @@ async function createRuntimeEvidence(rootDir, changeId = 'add-oauth') {
     detectOpenSpec: async () => missingCliDetection()
   });
   await writeRulesGateEvidence(rootDir, changeId);
+}
+
+async function createLinkedFinalizationFixture(rootDir, options = {}) {
+  const roadmapPath = options.roadmapPath ?? CUSTOM_ROADMAP_PATH;
+  await createOpenSpecChange(rootDir);
+  await writeFixture(
+    rootDir,
+    'openspec/changes/add-oauth/proposal.md',
+    options.proposalContent ?? LINKED_PROPOSAL
+  );
+  await createRuntimeEvidence(rootDir);
+  await writeFixture(rootDir, '.ai-factory/config.yaml', [
+    'aifhub:',
+    '  artifactProtocol: openspec',
+    'paths:',
+    `  roadmap: ${roadmapPath}`,
+    ''
+  ].join('\n'));
+  if (options.createRoadmap !== false) {
+    await writeFixture(rootDir, roadmapPath, options.roadmapContent ?? '# Project Roadmap\n');
+  }
+  return roadmapPath;
+}
+
+function passingFinalizerOptions(rootDir, overrides = {}) {
+  return {
+    rootDir,
+    changeId: 'add-oauth',
+    detectOpenSpec: async () => availableCliDetection(),
+    validateOpenSpecChange: async () => statusResult(),
+    getOpenSpecStatus: async () => statusResult(),
+    gitStatus: async () => ({ exitCode: 0, stdout: '', stderr: '' }),
+    readLatestVerificationEvidence: async () => verificationEvidence(),
+    readOpenSpecCoverageMatrix: async () => coverageEvidence(),
+    validateOpenSpecArtifactContract: async () => ({
+      schema_version: 1,
+      validator: 'aifhub-openspec-artifact-contract',
+      change_id: 'add-oauth',
+      status: 'pass',
+      blocking: false,
+      checks: [],
+      suggested_next: null
+    }),
+    archiveOpenSpecChange: async () => archiveResult(),
+    ...overrides
+  };
 }
 
 async function writeRulesGateEvidence(rootDir, changeId = 'add-oauth', status = 'pass', qaRoot = '.ai-factory/qa') {
@@ -300,6 +369,13 @@ function finalizerCommandResult(overrides = {}) {
       stdout: 'raw archive output must not escape',
       stderr: 'raw archive error must not escape'
     },
+    roadmap: overrides.roadmap ?? {
+      status: 'updated',
+      reason: 'lifecycle-updated',
+      path: DEFAULT_ROADMAP_PATH,
+      changed: true,
+      suggestedNext: null
+    },
     context: overrides.context ?? {
       openspec: {
         command: 'node_modules/.bin/openspec.cmd',
@@ -497,6 +573,7 @@ describe('OpenSpec done finalizer command', () => {
       'readiness',
       'working_tree',
       'archive',
+      'roadmap',
       'summary_files',
       'commit_message',
       'warnings',
@@ -504,6 +581,13 @@ describe('OpenSpec done finalizer command', () => {
     ]);
     assert.equal(projection.archive.command, 'node_modules/.bin/openspec.cmd');
     assert.equal(projection.archive.command_source, 'project-local');
+    assert.deepEqual(projection.roadmap, {
+      status: 'updated',
+      reason: 'lifecycle-updated',
+      path: DEFAULT_ROADMAP_PATH,
+      changed: true,
+      suggested_next: null
+    });
     assert.equal(projection.working_tree.recorded, true);
     assert.equal(projection.working_tree.entry_count, 1);
     assert.equal(Object.hasOwn(projection.working_tree, 'entries'), false);
@@ -1181,6 +1265,253 @@ describe('OpenSpec done finalizer API', () => {
     assert.match(await readFile(finalSummaryPath, 'utf8'), /## Suggested PR summary/);
     assert.equal(await pathExists(path.join(rootDir, 'openspec', 'changes', 'add-oauth', 'done.md')), false);
     assert.equal(await pathExists(path.join(rootDir, '.ai-factory', 'plans', 'add-oauth')), false);
+  });
+
+  it('updates the configured roadmap after archive and records bounded lifecycle evidence', async () => {
+    const rootDir = await createTempRoot();
+    const roadmapPath = await createLinkedFinalizationFixture(rootDir);
+
+    const result = await finalizeOpenSpecChange(passingFinalizerOptions(rootDir));
+
+    assert.equal(result.ok, true);
+    assert.equal(result.status, 'PASS');
+    assert.equal(result.archive.archived, true);
+    assert.deepEqual(result.roadmap, {
+      status: 'updated',
+      reason: 'lifecycle-updated',
+      path: roadmapPath,
+      changed: true,
+      suggestedNext: null
+    });
+
+    const roadmap = await readFile(path.join(rootDir, ...roadmapPath.split('/')), 'utf8');
+    assert.match(roadmap, /<!-- aifhub:roadmap-change-lifecycle:start -->/);
+    assert.match(
+      roadmap,
+      /\| `add-oauth` \| https:\/\/github\.com\/ichinya\/aifhub-extension\/issues\/88 \| none \| Workflow governance \| finalized \| \.ai-factory\/qa\/add-oauth\/done\.md \|/
+    );
+
+    for (const summaryPath of [
+      '.ai-factory/qa/add-oauth/done.md',
+      '.ai-factory/state/add-oauth/final-summary.md'
+    ]) {
+      const summary = await readFile(path.join(rootDir, ...summaryPath.split('/')), 'utf8');
+      assert.match(summary, /## Roadmap lifecycle/);
+      assert.match(summary, /Status: updated/);
+      assert.match(summary, /Path: docs\/project-roadmap\.md/);
+    }
+
+    assert.deepEqual(projectDoneFinalizerResult(result).roadmap, {
+      status: 'updated',
+      reason: 'lifecycle-updated',
+      path: roadmapPath,
+      changed: true,
+      suggested_next: null
+    });
+  });
+
+  it('preserves archive success and hands off when the configured roadmap is missing', async () => {
+    const rootDir = await createTempRoot();
+    const roadmapPath = await createLinkedFinalizationFixture(rootDir, { createRoadmap: false });
+
+    const result = await finalizeOpenSpecChange(passingFinalizerOptions(rootDir));
+
+    assert.equal(result.ok, true);
+    assert.equal(result.status, 'WARN');
+    assert.equal(result.archive.archived, true);
+    assert.deepEqual(result.roadmap, {
+      status: 'handoff',
+      reason: 'roadmap-missing',
+      path: roadmapPath,
+      changed: false,
+      suggestedNext: '/aif-roadmap check'
+    });
+    assert.equal(await pathExists(path.join(rootDir, ...roadmapPath.split('/'))), false);
+    assert.match(summarizeDoneResult(result), /Roadmap lifecycle: handoff/);
+    assert.match(summarizeDoneResult(result), /Suggested next: \/aif-roadmap check/);
+
+    for (const summaryPath of [
+      '.ai-factory/qa/add-oauth/done.md',
+      '.ai-factory/state/add-oauth/final-summary.md'
+    ]) {
+      const summary = await readFile(path.join(rootDir, ...summaryPath.split('/')), 'utf8');
+      assert.match(summary, /Status: handoff/);
+      assert.match(summary, /\/aif-roadmap check/);
+    }
+  });
+
+  it('skips roadmap mutation for an explicitly unlinked change', async () => {
+    const rootDir = await createTempRoot();
+    const originalRoadmap = '# Project Roadmap\n\nOwned by maintainers.\n';
+    const roadmapPath = await createLinkedFinalizationFixture(rootDir, {
+      proposalContent: UNLINKED_PROPOSAL,
+      roadmapContent: originalRoadmap
+    });
+
+    const result = await finalizeOpenSpecChange(passingFinalizerOptions(rootDir));
+
+    assert.equal(result.ok, true);
+    assert.equal(result.status, 'PASS');
+    assert.deepEqual(result.roadmap, {
+      status: 'skipped',
+      reason: 'roadmap-linkage-none',
+      path: null,
+      changed: false,
+      suggestedNext: null
+    });
+    assert.equal(await readFile(path.join(rootDir, ...roadmapPath.split('/')), 'utf8'), originalRoadmap);
+  });
+
+  it('preserves malformed marker content and returns the exact roadmap handoff', async () => {
+    const rootDir = await createTempRoot();
+    const originalRoadmap = `# Project Roadmap\n\n${ROADMAP_LIFECYCLE_START_MARKER}\nunfinished\n`;
+    const roadmapPath = await createLinkedFinalizationFixture(rootDir, {
+      roadmapContent: originalRoadmap
+    });
+
+    const result = await finalizeOpenSpecChange(passingFinalizerOptions(rootDir));
+
+    assert.equal(result.ok, true);
+    assert.equal(result.status, 'WARN');
+    assert.equal(result.archive.archived, true);
+    assert.equal(result.roadmap.status, 'handoff');
+    assert.equal(result.roadmap.reason, 'roadmap-markers-incomplete');
+    assert.equal(result.roadmap.suggestedNext, '/aif-roadmap check');
+    assert.equal(await readFile(path.join(rootDir, ...roadmapPath.split('/')), 'utf8'), originalRoadmap);
+  });
+
+  it('keeps repeated finalization idempotent after the first roadmap update', async () => {
+    const rootDir = await createTempRoot();
+    const roadmapPath = await createLinkedFinalizationFixture(rootDir);
+
+    const first = await finalizeOpenSpecChange(passingFinalizerOptions(rootDir));
+    const second = await finalizeOpenSpecChange(passingFinalizerOptions(rootDir));
+
+    assert.equal(first.roadmap.status, 'updated');
+    assert.deepEqual(second.roadmap, {
+      status: 'skipped',
+      reason: 'lifecycle-current',
+      path: roadmapPath,
+      changed: false,
+      suggestedNext: null
+    });
+    const roadmap = await readFile(path.join(rootDir, ...roadmapPath.split('/')), 'utf8');
+    assert.equal((roadmap.match(/\| `add-oauth` \|/g) ?? []).length, 1);
+    assert.equal((roadmap.match(/aifhub:roadmap-change-lifecycle:start/g) ?? []).length, 1);
+  });
+
+  it('bounds an unexpected post-archive roadmap failure without rolling archive success back', async () => {
+    const rootDir = await createTempRoot();
+    await createLinkedFinalizationFixture(rootDir);
+
+    const result = await finalizeOpenSpecChange(passingFinalizerOptions(rootDir, {
+      updateRoadmapChangeLifecycle: async () => {
+        throw new Error('C:\\Users\\private\\roadmap-secret');
+      }
+    }));
+    const serialized = JSON.stringify(projectDoneFinalizerResult(result));
+
+    assert.equal(result.ok, true);
+    assert.equal(result.status, 'WARN');
+    assert.equal(result.archive.archived, true);
+    assert.deepEqual(result.roadmap, {
+      status: 'handoff',
+      reason: 'roadmap-update-failed',
+      path: null,
+      changed: false,
+      suggestedNext: '/aif-roadmap check'
+    });
+    assert.match(summarizeDoneResult(result), /Suggested next: \/aif-roadmap check/);
+    assert.doesNotMatch(serialized, /Users|private|secret/);
+    assert.equal(await pathExists(path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'done.md')), true);
+    assert.equal(await pathExists(path.join(rootDir, '.ai-factory', 'state', 'add-oauth', 'final-summary.md')), true);
+  });
+
+  it('never invokes roadmap mutation on any pre-archive failure path', async () => {
+    const cases = [
+      {
+        label: 'verification',
+        overrides: {
+          readLatestVerificationEvidence: async () => verificationEvidence({ gateStatus: 'fail' })
+        }
+      },
+      {
+        label: 'readiness',
+        overrides: {
+          validateOpenSpecChange: async () => statusResult({
+            ok: false,
+            exitCode: 1,
+            error: { code: 'validation-failed', message: 'Validation failed.' }
+          })
+        }
+      },
+      {
+        label: 'artifact contract',
+        overrides: {
+          validateOpenSpecArtifactContract: async () => ({
+            schema_version: 1,
+            validator: 'aifhub-openspec-artifact-contract',
+            change_id: 'add-oauth',
+            status: 'fail',
+            blocking: true,
+            checks: [{ id: 'contract-failed', status: 'fail', message: 'Contract failed.' }],
+            suggested_next: null
+          })
+        }
+      },
+      {
+        label: 'dirty tree',
+        overrides: {
+          gitStatus: async () => ({ exitCode: 0, stdout: ' M README.md\n', stderr: '' })
+        }
+      },
+      {
+        label: 'archive',
+        overrides: {
+          archiveOpenSpecChange: async () => archiveResult({
+            ok: false,
+            status: 'FAIL',
+            archived: false,
+            exitCode: 1,
+            error: { code: 'archive-failed', message: 'Archive failed.' },
+            errors: [{ code: 'archive-failed', message: 'Archive failed.' }]
+          })
+        }
+      }
+    ];
+
+    for (const testCase of cases) {
+      const rootDir = await createTempRoot();
+      const originalRoadmap = `# Project Roadmap\n\n${testCase.label}\n`;
+      const roadmapPath = await createLinkedFinalizationFixture(rootDir, {
+        roadmapContent: originalRoadmap
+      });
+      let roadmapCalls = 0;
+
+      const result = await finalizeOpenSpecChange(passingFinalizerOptions(rootDir, {
+        ...testCase.overrides,
+        updateRoadmapChangeLifecycle: async () => {
+          roadmapCalls += 1;
+          await writeFixture(rootDir, roadmapPath, 'MUTATED\n');
+          return {
+            status: 'updated',
+            reason: 'lifecycle-updated',
+            path: roadmapPath,
+            changed: true,
+            suggestedNext: null
+          };
+        }
+      }));
+
+      assert.equal(result.ok, false, `${testCase.label} should block finalization`);
+      assert.equal(result.archive.archived, false, `${testCase.label} should not report archive success`);
+      assert.equal(roadmapCalls, 0, `${testCase.label} must not call the roadmap helper`);
+      assert.equal(
+        await readFile(path.join(rootDir, ...roadmapPath.split('/')), 'utf8'),
+        originalRoadmap,
+        `${testCase.label} must not mutate the roadmap`
+      );
+    }
   });
 
   it('records dirty state and still writes summaries when explicit recording is requested', async () => {
