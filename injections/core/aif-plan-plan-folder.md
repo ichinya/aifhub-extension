@@ -85,6 +85,26 @@ Source: <resolved paths.research> (Active Summary, Updated: <timestamp>, SHA256:
 - If the live research revision changes while planning is in progress, emit `WARN [research-drift] change-id=<change-id> source=<path> expected=<embedded revision> current=<live revision>` and keep the embedded snapshot authoritative. Do not log or duplicate the full research body, provider output, credentials, or other sensitive content in the warning.
 - Live `## Sessions` may be consulted for rationale, but newer requirements must not silently expand committed scope.
 
+#### Roadmap Linkage
+
+Always include `## Roadmap Linkage` in every canonical OpenSpec proposal so downstream lifecycle commands can consume one stable shape. Use exactly these fields and keep them in this order:
+
+```markdown
+## Roadmap Linkage
+
+- Issues: <comma-separated canonical URL(s)|none>
+- Milestone: <exact title|none>
+- Roadmap item/slice: <exact item or slice|none>
+- Rationale: <one bounded explanation|none>
+```
+
+- Capture only linkage explicitly supplied by the user or already committed in the selected planning source. Normalize an explicit GitHub issue reference to `https://github.com/<owner>/<repo>/issues/<number>` when the repository identity is directly available.
+- For every missing value, write `none`. When the user explicitly supplies `none`, preserve an explicit `none` value verbatim. Do not omit a field whose value is `none`.
+- Planning MUST NOT infer an issue or milestone from an issue title, branch name, repository labels, unrelated roadmap text, or another uncommitted contextual hint.
+- If at least one of `Issues`, `Milestone`, or `Roadmap item/slice` is non-`none` and the configured roadmap should register the new change as `planned`, return the exact owner handoff `/aif-roadmap check`. Planning must not edit the roadmap itself.
+- When all four fields are `none`, preserve the standardized section but do not return `/aif-roadmap check` solely for an all-`none` linkage.
+- In the normal planning response, report only the captured linkage fields and the exact owner handoff when applicable. Do not print or summarize unrelated roadmap content.
+
 #### Enabled optional tool use
 
 - Before using any optional provider, call the installed wrapper when available: `ai-factory aifhub-memory-tools select --from-project --command aif-plan --json`.
@@ -149,6 +169,13 @@ Why this change is needed.
 
 - In scope
 - Out of scope
+
+## Roadmap Linkage
+
+- Issues: <comma-separated canonical URL(s)|none>
+- Milestone: <exact title|none>
+- Roadmap item/slice: <exact item or slice|none>
+- Rationale: <one bounded explanation|none>
 
 ## Approach
 

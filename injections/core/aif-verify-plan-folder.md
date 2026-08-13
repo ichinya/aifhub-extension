@@ -63,6 +63,16 @@ Treat planning source sections as read-only verification context:
 - Compare live `paths.research` only for drift and rationale. If `Updated` or normalized `SHA256` differs, or legacy metadata is incomplete, emit `WARN [research-drift] change-id=<change-id> source=<path> expected=<embedded revision> current=<live revision>` without expanding verification scope.
 - Do not mutate or silently rebase either source section. Keep credentials, raw provider output, and full request/research bodies out of QA diagnostics.
 
+#### Roadmap linkage validation
+
+Roadmap linkage validation is read-only in OpenSpec-native mode.
+
+- Read the canonical proposal's standardized `## Roadmap Linkage` fields and, when present, compare them with bounded managed lifecycle evidence from the configured roadmap.
+- `/aif-verify` must not edit the configured roadmap, create a managed lifecycle row, or change milestone, phase, or slice state.
+- For malformed linkage or lifecycle markers, emit a bounded `WARN [roadmap]` when the condition is non-blocking. Use `ERROR [roadmap]` only when contradictory local evidence or an explicit canonical requirement blocks verification. Include the `change-id`, a bounded reason, and the exact handoff `/aif-roadmap check`.
+- Diagnostics must not copy the managed lifecycle block, full proposal body, unrelated roadmap content, credentials, or private provider output.
+- Missing linkage alone remains a warning unless a canonical requirement makes linkage mandatory; do not invent issue, milestone, or roadmap assignments to remove the warning.
+
 Read generated rules as derived verification guidance when present:
 
 - `.ai-factory/rules/generated/openspec-merged-<change-id>.md`

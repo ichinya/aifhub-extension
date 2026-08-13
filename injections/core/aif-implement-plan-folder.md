@@ -73,6 +73,15 @@ Hydrate runtime todo state from canonical OpenSpec tasks before editing implemen
 - Report missing todo-tool support as a capability fallback, not as an implementation failure.
 - Hydrating runtime todo state does not authorize broad task expansion; `/aif-implement` still executes one task or one tightly coupled task group.
 
+#### Roadmap lifecycle deferral
+
+In OpenSpec-native mode, this section overrides the upstream roadmap completion step.
+
+- `/aif-implement` must not edit the configured roadmap and must not mark a milestone, phase, slice, or managed lifecycle row complete, even when all implementation tasks are checked.
+- It may read `## Roadmap Linkage` from the canonical proposal and report only the detected linkage fields plus the fact that lifecycle ownership is deferred.
+- Implementation output must not claim roadmap completion or copy unrelated roadmap content.
+- Route authoritative validation to `/aif-verify <change-id>`. Only after verification passes may `/aif-done <change-id>` own the successful finalization transition defined by the canonical change.
+
 Read generated rules as derived implementation guidance when present:
 
 - `.ai-factory/rules/generated/openspec-merged-<change-id>.md`

@@ -212,6 +212,63 @@ describe('aif-plan OpenSpec-native planning contract', () => {
     }
   });
 
+  it('records explicit roadmap linkage in the canonical proposal and returns the owner handoff', async () => {
+    const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
+    const openspec = extractSection(injection, 'OpenSpec-native mode');
+    const label = 'aif-plan standardized Roadmap Linkage contract';
+
+    assertOrder(
+      openspec,
+      ['## Scope', '## Roadmap Linkage', '## Approach'],
+      `${label} proposal ordering`
+    );
+
+    for (const expected of [
+      '#### Roadmap Linkage',
+      '- Issues: <comma-separated canonical URL(s)|none>',
+      '- Milestone: <exact title|none>',
+      '- Roadmap item/slice: <exact item or slice|none>',
+      '- Rationale: <one bounded explanation|none>',
+      'https://github.com/<owner>/<repo>/issues/<number>',
+      'report only the captured linkage fields',
+      '/aif-roadmap check'
+    ]) {
+      assertIncludes(openspec, expected, label);
+    }
+  });
+
+  it('preserves explicit none values in every roadmap linkage field', async () => {
+    const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
+    const openspec = extractSection(injection, 'OpenSpec-native mode');
+    const label = 'aif-plan explicit-none Roadmap Linkage contract';
+
+    for (const expected of [
+      'Always include `## Roadmap Linkage`',
+      'preserve an explicit `none` value verbatim',
+      'Do not omit a field whose value is `none`',
+      'all four fields are `none`'
+    ]) {
+      assertIncludes(openspec, expected, label);
+    }
+  });
+
+  it('does not infer roadmap linkage from repository context', async () => {
+    const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
+    const openspec = extractSection(injection, 'OpenSpec-native mode');
+    const label = 'aif-plan no-inference Roadmap Linkage contract';
+
+    for (const expected of [
+      'MUST NOT infer',
+      'issue title',
+      'branch name',
+      'repository labels',
+      'unrelated roadmap text',
+      'do not return `/aif-roadmap check` solely for an all-`none` linkage'
+    ]) {
+      assertIncludes(openspec, expected, label);
+    }
+  });
+
   it('defines safe change IDs, runtime-state boundaries, and validation through the runner', async () => {
     const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
     const openspec = extractSection(injection, 'OpenSpec-native mode');
