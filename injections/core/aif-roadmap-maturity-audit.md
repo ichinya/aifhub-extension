@@ -26,6 +26,7 @@ When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, roa
 - `openspec/changes/<change-id>/design.md`
 - `openspec/changes/<change-id>/tasks.md`
 - `openspec/changes/<change-id>/specs/**/spec.md`
+- `openspec/changes/archive/**`
 - `.ai-factory/rules/generated/openspec-merged-<change-id>.md`
 - `.ai-factory/rules/generated/openspec-change-<change-id>.md`
 - `.ai-factory/rules/generated/openspec-base.md`
@@ -35,6 +36,32 @@ When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, roa
 Use these as evidence only. `/aif-roadmap` must not write runtime state, QA evidence, generated rules, or canonical OpenSpec change artifacts.
 
 When OpenSpec-native evidence is used, summarize the artifact source set in the normal response.
+
+### Managed local lifecycle reconciliation
+
+In check mode, `/aif-roadmap check` owns reconciliation of the configured roadmap's marker-bounded `OpenSpec Change Lifecycle` block. Treat local lifecycle evidence and external GitHub evidence as independent clocks. For local lifecycle reconciliation, mutate only the managed block; the normal roadmap owner may still refresh phase and slice audit content under the existing rules. Preserve evidence-backed state, and do not rewrite canonical OpenSpec, runtime, QA, generated-rules, implementation, or GitHub artifacts.
+
+Apply these local lifecycle rules:
+
+- When an active canonical OpenSpec proposal contains `## Roadmap Linkage` with valid non-`none` roadmap linkage, register one local `planned` row for that change. The row must not claim implementation, verification, finalization, merge, or issue closure.
+- For an archived change with durable local done/archive evidence, register a missing `finalized` row or preserve its evidence-backed `finalized` row and its project-relative finalization evidence. Reconciliation must never downgrade `finalized` to `planned`, even if the same linkage is also visible in an active or historical source.
+- If an archived change has no durable local done/archive evidence and no current evidence-backed `finalized` row, report bounded local drift instead of fabricating finalization.
+- An explicitly unlinked change is one whose standardized section exists and all linkage values are `none`. `/aif-roadmap check` must not create a managed lifecycle row for it and must not infer linkage from branch names, GitHub state, labels, or roadmap text.
+- If an existing managed row conflicts with canonical linkage or durable local evidence, report the contradiction and preserve the higher evidence-backed local state rather than guessing or deleting history.
+- Reject duplicate, reversed, nested, incomplete, or otherwise malformed lifecycle markers without rewriting unrelated roadmap bytes.
+
+### Independent external reconciliation
+
+Use current GitHub evidence for phase audit and post-merge reconciliation only. When a locally finalized change's GitHub state changes after the final local commit, refresh the current issue, PR, and milestone state in the phase or unphased audit while the managed local lifecycle row remains `finalized`. A remote closure or merge MUST NOT be rewritten as local finalization evidence, must not replace the row's project-relative evidence path, and must not promote `planned` to `finalized`.
+
+When GitHub evidence is unavailable, unauthenticated, rate-limited, offline, or partial, local lifecycle reconciliation continues from canonical and durable local evidence. The GitHub limitation is non-blocking by itself; preserve existing evidence-backed `planned` or `finalized` state and do not invent external status.
+
+In normal output and roadmap audit prose, report lifecycle and GitHub evidence sources separately using bounded summaries:
+
+- `Lifecycle evidence:` project-relative canonical proposal, archive, done, final-summary, or managed-row sources used for `planned`/`finalized` decisions.
+- `GitHub evidence:` `used`, `unavailable`, or `partial`, plus public issue/PR/milestone identifiers when available.
+
+Never copy proposal bodies, finalization contents, raw provider output, credentials, or private authentication diagnostics into either source summary.
 
 ### GitHub-aware evidence
 
