@@ -78,6 +78,25 @@ maxTurns: 6
 You are a generic agent.
 `;
 
+const VALID_LEGACY_ULTRA_IMPLEMENTER_MD = `---
+name: aifhub-implement-worker
+description: Contract fixture
+tools: Read, Write
+model: inherit
+maxTurns: 6
+---
+
+## Legacy AI Factory-only mode
+
+Before task discovery or any write, classify the entrypoint marker-first with \`classifyLegacyPlanShape()\`.
+For \`ultra-valid\`, return exactly \`/aif-implement <entrypoint>\` and stop.
+Never write an ultra bundle, companion, status, or QA artifact.
+Fail \`ultra-invalid\` and \`collision\` closed without classic fallback.
+`;
+
+const BROKEN_LEGACY_ULTRA_IMPLEMENTER_MD = VALID_LEGACY_ULTRA_IMPLEMENTER_MD
+  .replace('/aif-implement <entrypoint>', '/aif-implement <plan-id>');
+
 const VALID_EXTENSION_JSON = JSON.stringify({
   agentFiles: [{
     runtime: 'claude',
@@ -127,6 +146,18 @@ describe('validate-claude-agents.mjs', () => {
 
   it('fails for non-namespaced agent frontmatter', async () => {
     await writeFixture(tmpDir, 'agent-files/claude/generic.md', NON_NAMESPACED_MD);
+    const code = await runValidatorExitCode(tmpDir);
+    assert.equal(code, 1);
+  });
+
+  it('passes a complete packaged-agent legacy ultra instruction contract', async () => {
+    await writeFixture(tmpDir, 'agent-files/claude/aifhub-implement-worker.md', VALID_LEGACY_ULTRA_IMPLEMENTER_MD);
+    const code = await runValidatorExitCode(tmpDir);
+    assert.equal(code, 0);
+  });
+
+  it('fails a packaged agent with a non-exact legacy ultra handoff', async () => {
+    await writeFixture(tmpDir, 'agent-files/claude/aifhub-implement-worker.md', BROKEN_LEGACY_ULTRA_IMPLEMENTER_MD);
     const code = await runValidatorExitCode(tmpDir);
     assert.equal(code, 1);
   });

@@ -16,6 +16,41 @@ Before resolving exploration inputs, read `.ai-factory/config.yaml` when it exis
 - Otherwise, use **Legacy AI Factory-only mode**.
 - If the config is missing, continue with Legacy AI Factory-only mode and state that no OpenSpec-native protocol was detected.
 
+### Research profile and AI Factory version gate
+
+Resolve `paths.research` and parse the command-position mode before creating a file or directory. Remove only an explicit leading `ultra` token; preserve every later occurrence of `ultra` in the topic byte-for-byte.
+
+- Regular `/aif-explore <topic>` writes only the resolved `paths.research` file (default `.ai-factory/RESEARCH.md`). It does not create a research bundle or change-scoped runtime note.
+- Explicit `/aif-explore ultra <topic>` must call the shared dependency-free `resolveAiFactoryUltraSupport()` contract from `scripts/ai-factory-version-resolver.mjs` before any write. Use injected test toolchain/version first, then project `.ai-factory.json.version`, then CLI evidence only with proven matching project provenance.
+- Missing, malformed, prerelease, unsupported `<2.18.0`, or CLI/project mismatch is a no-write stop. Recommend regular `/aif-explore <topic>`; do not redirect this failure to `/aif-plan full` and do not silently perform a regular research write.
+- The extension baseline version never enables ultra by itself.
+
+For explicit ultra on stable AI Factory `>=2.18.0`, derive exactly one bundle root without adding a config key:
+
+```text
+research_bundles_dir = <parent directory of resolved paths.research>/research/
+bundle = <research_bundles_dir>/<english-topic-slug>/
+```
+
+- Create or update only one valid marked bundle for the run. Do not write the regular `paths.research` file in the same run.
+- The minimum bundle is `INDEX.md` plus `RESEARCH.md`. `INDEX.md` must contain exactly one standalone `<!-- aif:research-mode:ultra -->`, identify `Status: active`, and link `RESEARCH.md` from `## Artifact Index` with a safe direct relative link.
+- Reuse an exact matching marked slug. If the slug path is an unmarked directory, has a missing/duplicate/code-only marker, contains an unsafe Artifact Index link, or otherwise collides with a different artifact, fail closed without changing either regular research or the directory.
+- Create `C4-CONTEXT.md`, `C4-CONTAINER.md`, `C4-COMPONENT-<scope>.md`, `ADR-NNNN-<slug>.md`, or `DEPENDENCY-GRAPH.md` only when its upstream evidence-based inclusion gate is satisfied. Do not create empty placeholders; link every generated optional artifact from `INDEX.md` exactly once.
+
+Bounded diagnostics may contain only `mode`, resolved version and version `source`, safe project-relative bundle path, created artifact names, and a stable invalid-marker/collision `code`. Never include topic/research bodies, provider output, credentials, raw stdout, raw stderr, or private absolute paths.
+
+### Upstream Research Coherence Gate pass-through
+
+The AIFHub prepend owns only mode, version, path, and write boundaries. Its pass-through runs after every permitted persisted regular or ultra research write or update: continue into the upstream AI Factory 2.18.1 `#### Research Coherence Gate (all persisted modes)` before presenting the saved result or appending the current session. A successful AIFHub write is not a coherence verdict and is not completion of upstream `/aif-explore`.
+
+- Fresh-context `Task` delegation is optional. When that capability is unavailable or fails, use the mandatory direct read-only fallback with the same upstream criteria.
+- AIFHub must never skip, delay, replace, or copy the upstream gate implementation. Do not create a second coherence validator or treat this prepend as the gate owner.
+- Preserve this exact ordering for regular: persisted write -> upstream Research Coherence Gate -> presentation/session append.
+- Preserve this exact ordering for ultra: persisted bundle write -> upstream Research Coherence Gate -> upstream Bundle Integrity Gate -> presentation/session append.
+- A non-`PASS` gate outcome stops presentation and session append and remains inside the upstream correction/re-run flow.
+
+Pass-through diagnostics may contain only `asset`, `runtime`, `case`, bounded gate outcome, and whether direct fallback was used. Never log research bodies, quoted mismatch passages, provider output, credentials, raw stdout/stderr, or private absolute paths.
+
 ### OpenSpec-native mode
 
 When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, `/aif-explore` is research-oriented and must not create canonical OpenSpec change artifacts.
@@ -77,17 +112,17 @@ Canonical OpenSpec change files under an active change are only:
 
 Write boundaries:
 
-- Write research output only to `.ai-factory/RESEARCH.md` or runtime notes under `.ai-factory/state/<change-id>/`.
-- Valid runtime note targets include `.ai-factory/state/<change-id>/explore.md` and `.ai-factory/state/<change-id>/research-notes.md`.
+- In regular mode, write research output only to the resolved `paths.research` file.
+- In explicit stable-2.18 ultra mode, write only the one selected sibling research bundle derived from the parent of `paths.research`; do not also write `paths.research`.
+- Do not write exploration output under `.ai-factory/state/<change-id>/` or `.ai-factory/qa/<change-id>/`.
 - Do not create non-OpenSpec files under `openspec/changes/<change-id>/`.
 - Do not write debug files, summaries, research notes, validation evidence, or runtime-only files under an OpenSpec change folder.
-- If no change ID is known, write only to `.ai-factory/RESEARCH.md` and report that no change-scoped runtime path was selected.
 
 Response and next-step guidance:
 
 - Report where research was written in the normal response.
 - Distinguish research output from canonical OpenSpec artifacts.
-- Report the selected active change and runtime state path when change-scoped research was used.
+- For ultra, report the safe bundle path and created artifact names without copying research content.
 - If generated rules or QA evidence were inspected, name those paths in the normal response.
 - Suggest `/aif-plan full "<request>"` for new work that needs canonical change artifacts.
 - Suggest `/aif-improve <change-id>` for refining an existing OpenSpec-native change.
@@ -101,7 +136,7 @@ When OpenSpec-native mode is not enabled, preserve the extension's companion pla
 
 - Treat `.ai-factory/plans/<plan-id>.md` and `.ai-factory/plans/<plan-id>/` as one active plan pair.
 - If `@path` points to the plan file, the plan folder, or one of its local artifacts (`task.md`, `context.md`, `rules.md`, `verify.md`, `status.yaml`, `explore.md`), resolve the whole pair before continuing.
-- Persist exploration only to `config.paths.research` / `.ai-factory/RESEARCH.md`.
+- Apply the shared regular/ultra research routing above before any plan-pair normalization. Regular mode writes only resolved `paths.research`; explicit stable-2.18 ultra writes only the one marked sibling bundle and never writes plan companions.
 - Do not treat `DESCRIPTION.md`, `ARCHITECTURE.md`, `ROADMAP.md`, or `RULES.md` as writable from explore mode in this extension workflow.
 - For next steps, prefer:
   - `/aif-plan full "<task>"` for new work

@@ -25,9 +25,21 @@ Before resolving verification scope, read `.ai-factory/config.yaml` when it exis
 - Otherwise, use **Legacy AI Factory-only mode**.
 - If the config is missing, continue with Legacy AI Factory-only mode and state that no OpenSpec-native protocol was detected.
 
+### Legacy ultra marker-first boundary
+
+In Legacy AI Factory-only mode, classify the normalized project-relative plan entrypoint with `classifyLegacyPlanShape()` from `scripts/legacy-plan-migration.mjs` before folder-only detection, companion discovery, companion plan-file creation, verification-file selection, or any `status.yaml`/`verify.md` write. Marker validation is first; known companion filenames are considered only after the classifier returns a classic shape.
+
+- For `ultra-valid`, stop all AIFHub companion logic and return the exact upstream handoff `/aif-verify <entrypoint>`. Upstream owns bundle verification atomically. After upstream verification emits its one final validated `aif-gate-result`, pass that exact structured gate outcome and the normalized entrypoint to `writeLegacyUltraVerificationReceipt()` from `scripts/legacy-ultra-verification-receipt.mjs`. Record both `pass` and non-pass outcomes; the helper binds the receipt to the current bundle, source revision, and deterministic worktree and writes only `.ai-factory/state/legacy-ultra-verification/<entrypoint-digest>.json`. A missing or invalid final gate must not create a receipt.
+- The receipt is the only AIFHub write permitted for `ultra-valid`. Do not create or synchronize a sibling `<plan-id>.md`, `task.md`, `context.md`, `rules.md`, `verify.md`, `status.yaml`, `explore.md`, any OpenSpec artifact, QA evidence, or finalization artifact. Never edit the ultra bundle while recording the receipt.
+- For `ultra-invalid` or `collision`, fail closed before any write and report only bounded `shape`, safe `entrypoint`, and classifier `code` values.
+- For `classic-pair` or `classic-folder-only`, continue with the classic companion rules below. An unrelated directory is not a plan.
+- Diagnostics may include only `shape`, safe project-relative `entrypoint`, and `handoff`; never include marker bodies, phase contents, request/research bodies, credentials, raw stdout, or raw stderr.
+
 ### OpenSpec-native mode
 
 When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, `/aif-verify` verifies implementation against the active OpenSpec change.
+
+For plan content, read only the canonical OpenSpec artifacts listed below. Do not inspect or mutate `.ai-factory/plans/**` after an OpenSpec change resolves.
 
 Before running lint, tests, code review, security review, or rules review, resolve the active change, ensure runtime layout, and use `scripts/openspec-verification-context.mjs` with `scripts/openspec-runner.mjs` when available. Request validation through `validateOpenSpecChange(changeId)` and status through `getOpenSpecStatus(changeId)` from the shared runner. Resolve effective policy through `scripts/openspec-policy.mjs`. Fail invalid OpenSpec artifacts before code checks. Treat missing CLI, generated rules, rules gate evidence, and coverage evidence as degraded warnings unless strict config such as `aifhub.openspec.requireCliForVerify` or the matching verify policy flag requires failure. Use `shouldRunCodeVerification` as the handoff signal: `false` blocks code checks and routes to `/aif-fix <change-id>`; `true` allows normal code verification to continue.
 
@@ -60,7 +72,8 @@ Treat planning source sections as read-only verification context:
 
 - Use `## Original Request` as the raw intent anchor, while canonical specs, design, tasks, and implemented behavior remain the verification contract.
 - When `proposal.md` contains `## Research Context`, use the embedded snapshot and source revision as authoritative committed scope.
-- Compare live `paths.research` only for drift and rationale. If `Updated` or normalized `SHA256` differs, or legacy metadata is incomplete, emit `WARN [research-drift] change-id=<change-id> source=<path> expected=<embedded revision> current=<live revision>` without expanding verification scope.
+- For an embedded ultra source, pass its exact project-relative `RESEARCH.md` path to `resolveUltraResearchSource()` from `scripts/ultra-research-resolver.mjs` and consume only its structured `source`, `revision`, and `diagnostic`. This centrally revalidates the sibling marker/index/status/link and normalized Active Summary digest; do not implement local selection or hashing heuristics.
+- Compare the exact regular or ultra source only for drift and rationale. Missing/invalid source, changed `Updated`, or changed normalized `SHA256` emits `WARN [research-drift] change-id=<change-id> source=<path> expected=<embedded revision> current=<live revision>` without expanding verification scope. Recency never selects a replacement source.
 - Do not mutate or silently rebase either source section. Keep credentials, raw provider output, and full request/research bodies out of QA diagnostics.
 
 #### Roadmap linkage validation

@@ -162,6 +162,18 @@ Legacy plan artifacts are not the v1 canonical source of truth once OpenSpec-nat
 
 The implemented migration path preserves source artifacts, writes migrated canonical artifacts under `openspec/changes/<change-id>/`, and preserves runtime/QA material under `.ai-factory/state/<change-id>/` and `.ai-factory/qa/<change-id>/`.
 
+## AI Factory 2.18 profile amendment
+
+AI Factory 2.18 introduces upstream marked ultra plan and research bundles. This does not create a second canonical source of truth for OpenSpec-native work.
+
+- OpenSpec-native regular and `ultra` planning both write the same canonical OpenSpec artifact set. `ultra` is a version-gated depth profile for `design.md`, `tasks.md`, and delta specs; `index.md`, `phase-*`, and the active ultra marker are forbidden inside canonical changes.
+- Legacy classic plan pairs remain migration-compatible. A valid `<!-- aif:plan-mode:ultra -->` bundle remains one atomic upstream-owned directory; AIFHub classifies it before companion discovery and returns exact upstream command handoffs without editing the bundle.
+- Regular research remains the resolved `paths.research` file. Explicit 2.18 ultra research lives under `<parent(paths.research)>/research/<slug>/` as non-canonical supporting context. Its marked `INDEX.md`, `RESEARCH.md`, and evidence-gated C4/ADR/graph files must not be written into `openspec/changes/**` or `openspec/specs/**`.
+- The only AIFHub write after upstream marked-ultra verification is a bounded receipt under `.ai-factory/state/legacy-ultra-verification/<entrypoint-digest>.json`. It binds the exact entrypoint and bundle digest to Git `HEAD` or a manual build id, a deterministic worktree digest, and the final verify gate. Done/finalizer consumers re-evaluate the binding and never create the receipt.
+- In OpenSpec-native mode, plan-mutating `/aif-archive` targets route to `/aif-done <change-id>` before plan discovery. Read-only archive listing and bounded roadmap-only snapshots retain upstream ownership; all legacy archive behavior, including marked ultra, remains upstream-owned in legacy mode.
+
+These rules keep `openspec/changes/<change-id>/` as the sole canonical change ledger while allowing AI Factory 2.18 detail and legacy compatibility without dual-write synchronization.
+
 ## Out of scope
 
 - TOON/context/KB

@@ -1,7 +1,7 @@
 ---
 name: aifhub-rules-sidecar
 description: Read-only sidecar that audits one AIFHub scope against generated, project, base, or legacy plan-local rules.
-tools: Read, Glob, Grep
+tools: Read, Glob, Grep, Bash
 model: inherit
 maxTurns: 6
 permissionMode: dontAsk
@@ -38,7 +38,11 @@ Use this mode when config declares `aifhub.artifactProtocol: openspec`.
 
 Use this mode when OpenSpec-native mode is not enabled.
 
-- Review exactly one active legacy plan pair or one explicitly provided changed scope.
+- Before plan-local rule discovery, normalize an explicit plan entrypoint and classify it marker-first with `classifyLegacyPlanShape()`.
+- For `ultra-valid`, evaluate the current receipt with `evaluateLegacyUltraVerificationReceipt()` from `scripts/legacy-ultra-verification-receipt.mjs`. Recompute bundle, Git `HEAD` or manual build id, and deterministic worktree bindings. Bash is allowed here only for the helper's read-only Git inventory/revision commands.
+- A current exact PASS receipt returns only `/aif-archive <entrypoint>`; every missing, stale, wrong, malformed, or non-pass receipt returns only `/aif-verify <entrypoint>`. Return the handoff only; do not execute it. This terminal routing precedes the normal rules-gate output contract.
+- Do not read plan-local rules from an ultra bundle and do not write bundle, companion, spec, status, QA, finalization, or receipt artifacts. Fail `ultra-invalid` and `collision` closed without classic fallback.
+- Only `classic-pair`, `classic-folder-only`, or an explicitly provided non-plan changed scope continues below. Review exactly one active classic legacy plan pair or one explicitly provided changed scope.
 - Read `.ai-factory/RULES.md`, `.ai-factory/rules/base.md`, the resolved `.ai-factory/plans/<plan-id>/rules.md`, and the current diff or changed files needed to verify compliance.
 - Apply rules in priority order: plan-local rules, then `.ai-factory/RULES.md`, then `.ai-factory/rules/base.md`.
 - Do not edit files.

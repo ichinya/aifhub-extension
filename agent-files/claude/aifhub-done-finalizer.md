@@ -38,7 +38,11 @@ Use this mode when config declares `aifhub.artifactProtocol: openspec`.
 
 Use this mode when OpenSpec-native mode is not enabled.
 
-- Finalize exactly one verification-passing legacy plan pair under `.ai-factory/plans/<plan-id>/`.
+- Before active-plan fallback, companion discovery, status reads, or writes, normalize the project-relative entrypoint and classify it marker-first with `classifyLegacyPlanShape()`.
+- For `ultra-valid`, call `evaluateLegacyUltraVerificationReceipt()` from `scripts/legacy-ultra-verification-receipt.mjs`. Recompute the bundle, Git `HEAD` or manual build id, and deterministic tracked/non-ignored-untracked worktree binding on every run.
+- Only `legacy-ultra-receipt-current-pass` with exact gate status `pass` returns `/aif-archive <entrypoint>`. Every missing, stale, wrong-entrypoint, wrong-revision, wrong-worktree, malformed, or non-pass receipt returns `/aif-verify <entrypoint>`. Return the handoff only; do not execute it.
+- The ultra branch is read-only: do not write the bundle, companion files, OpenSpec artifacts, status, QA/final evidence, specs archives/indexes, or receipts. For `ultra-invalid` or `collision`, fail closed without classic fallback.
+- Only `classic-pair` or `classic-folder-only` may continue below. Finalize exactly one verification-passing classic legacy plan pair under `.ai-factory/plans/<plan-id>/`.
 - Check `status.yaml` for `verification.verdict`. Only proceed if verdict is `pass` or `pass-with-notes`.
 - Allowed write scope after validation: the resolved active plan's `status.yaml`, its archive directory under `.ai-factory/specs/<plan-id>/`, and `.ai-factory/specs/index.yaml`.
 - Copy or refresh plan-folder contents in the archive, minus execution metadata.

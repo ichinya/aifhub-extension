@@ -8,14 +8,14 @@
 
 | `name` | Назначение | `tools` | `permissionMode` | Write boundary |
 |-------|------------|---------|-------------------|----------------|
-| `aifhub-plan-polisher` | Bounded worker для полировки одного активного плана или OpenSpec change artifacts | Read, Write, Edit, Glob, Grep, Bash | `acceptEdits` | Только active OpenSpec change artifacts in OpenSpec-native mode or active plan pair in legacy mode; без правок source code |
-| `aifhub-implement-worker` | Bounded worker для выполнения одной plan task или тесно связанной группы задач; mirrors OpenSpec `tasks.md` into runtime todo state when available | Read, Write, Edit, Glob, Grep, Bash | `acceptEdits` | Только execution scope выбранной задачи and OpenSpec runtime state or legacy task metadata; без commit/push |
+| `aifhub-plan-polisher` | Bounded worker для полировки одного активного плана или OpenSpec change artifacts | Read, Write, Edit, Glob, Grep, Bash | `acceptEdits` | OpenSpec canonical files or classic legacy pair only; marked ultra is read-only routing to exact `/aif-improve <entrypoint>` |
+| `aifhub-implement-worker` | Bounded worker для выполнения одной plan task или тесно связанной группы задач; mirrors OpenSpec `tasks.md` into runtime todo state when available | Read, Write, Edit, Glob, Grep, Bash | `acceptEdits` | Selected OpenSpec/classic execution scope only; marked ultra routes to exact `/aif-implement <entrypoint>`; без commit/push |
 | `aifhub-review-sidecar` | Read-only sidecar для review changed scope с findings-first выводом | Read, Glob, Grep | `dontAsk` | Не пишет файлы |
 | `aifhub-security-sidecar` | Read-only sidecar для security-аудита changed scope | Read, Glob, Grep | `dontAsk` | Не пишет файлы |
-| `aifhub-verifier` | Low-write verifier для OpenSpec change or legacy plan pair и changed scope с gate result | Read, Write, Edit, Glob, Grep, Bash | `acceptEdits` | Только `.ai-factory/qa/<change-id>/` in OpenSpec-native mode or `status.yaml`/`verify.md` for validated legacy plan pair |
-| `aifhub-fixer` | Targeted fixer по выбранным verification/review findings | Read, Write, Edit, Glob, Grep, Bash | `acceptEdits` | Только validated changed scope выбранных findings plus `.ai-factory/state/<change-id>/` in OpenSpec-native mode or `status.yaml`/`fixes/*.md` |
-| `aifhub-rules-sidecar` | Read-only sidecar для проверки generated OpenSpec rules or `.ai-factory/RULES.md`, `.ai-factory/rules/base.md` и plan-local `rules.md` | Read, Glob, Grep | `dontAsk` | Не пишет файлы |
-| `aifhub-done-finalizer` | Finalization helper для OpenSpec CLI archive/final summary или legacy archive/spec summary после passing verification | Read, Write, Edit, Glob, Grep, Bash | `acceptEdits` | OpenSpec-native `.ai-factory/qa/<change-id>/` final evidence, `.ai-factory/state/<change-id>/` summary, and one linked row in the marker-bounded roadmap lifecycle block after archive; legacy `status.yaml`, archive dir в `.ai-factory/specs/` и `.ai-factory/specs/index.yaml`; `--force` запрещён |
+| `aifhub-verifier` | Low-write verifier для OpenSpec change or legacy plan pair и changed scope с gate result | Read, Write, Edit, Glob, Grep, Bash | `acceptEdits` | OpenSpec QA or classic `status.yaml`/`verify.md`; marked ultra delegates exact `/aif-verify <entrypoint>`, and only the command boundary may write its receipt |
+| `aifhub-fixer` | Targeted fixer по выбранным verification/review findings | Read, Write, Edit, Glob, Grep, Bash | `acceptEdits` | Selected OpenSpec/classic finding scope; marked ultra routes to exact `/aif-fix <entrypoint>` |
+| `aifhub-rules-sidecar` | Read-only sidecar для проверки generated OpenSpec rules or legacy rules/receipt state | Read, Glob, Grep | `dontAsk` | Не пишет файлы; marked ultra returns exact verify/archive handoff from current receipt evaluation |
+| `aifhub-done-finalizer` | Finalization helper для OpenSpec CLI archive/final summary или classic legacy archive/spec summary | Read, Write, Edit, Glob, Grep, Bash | `acceptEdits` | OpenSpec final evidence/managed roadmap row or classic legacy finalization; marked ultra is read-only receipt evaluation and writes nothing; `--force` запрещён |
 
 `name` является authoritative spawn-name. Filename нужен только как удобная convention в репозитории и в manifest.
 
@@ -35,6 +35,21 @@
 - Сам факт установки не означает, что Claude Code начнёт вызывать их автоматически.
 - Если нужен subagent, его надо попросить явно: либо прямым пользовательским запросом, либо через orchestrator logic.
 - Bundled agents расширяют доступный toolbox, но не добавляют "магический" auto-spawn behavior.
+
+## AI Factory 2.18 Exact Handoff Matrix
+
+Marker classification runs before classic companion discovery. For a valid legacy `<!-- aif:plan-mode:ultra -->` bundle, agents must return these exact upstream commands and must not edit `index.md`, phase files, or classic companions:
+
+| Agent | Exact handoff |
+|---|---|
+| `aifhub-plan-polisher` | `/aif-improve <entrypoint>` |
+| `aifhub-implement-worker` | `/aif-implement <entrypoint>` |
+| `aifhub-verifier` | `/aif-verify <entrypoint>`; after the one final upstream gate, the command boundary may write the revision-bound receipt |
+| `aifhub-fixer` | `/aif-fix <entrypoint>` |
+| `aifhub-rules-sidecar` | `/aif-archive <entrypoint>` only for current exact `pass`; otherwise `/aif-verify <entrypoint>` |
+| `aifhub-done-finalizer` | `/aif-archive <entrypoint>` only for current exact `pass`; otherwise `/aif-verify <entrypoint>` |
+
+The receipt lives at `.ai-factory/state/legacy-ultra-verification/<entrypoint-digest>.json` and binds the bundle, exact entrypoint, source revision, deterministic worktree, and gate outcome. Rules/done agents are read-only evaluators: they never create or repair it and never execute the returned handoff. OpenSpec-native explicit `ultra` remains the same canonical change with deeper `design.md`/`tasks.md`; this matrix applies only to legacy marked bundles.
 
 ## Handoff integration
 
@@ -104,6 +119,7 @@ Verifier writes QA evidence under `.ai-factory/qa/<change-id>/`.
 - recommends `/aif-mode sync`
 - recommends `/aif-commit`
 - does not create commits or PRs automatically
+- for marked legacy ultra, writes no final evidence or archive state and returns only the current receipt-derived `/aif-verify <entrypoint>` or `/aif-archive <entrypoint>` handoff
 
 ### Optional learning
 

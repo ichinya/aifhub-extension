@@ -39,7 +39,9 @@ Use this mode when config declares aifhub.artifactProtocol: openspec.
 
 Use this mode when OpenSpec-native mode is not enabled.
 
-- Verify exactly one normalized slug plus active legacy plan pair or one explicitly provided plan scope that resolves to the current active plan.
+- Before verification-file/status discovery or any write, classify the normalized project-relative entrypoint marker-first with classifyLegacyPlanShape(). For ultra-valid, return exactly `/aif-verify <entrypoint>` and stop; upstream owns atomic bundle verification.
+- The command boundary records the exact final upstream aif-gate-result with writeLegacyUltraVerificationReceipt(); this agent must not write that receipt itself. Never write an ultra bundle, companion, spec, status, QA, or final artifact. Fail ultra-invalid and collision closed without classic fallback.
+- Only classic-pair or classic-folder-only continues below. Verify exactly one normalized slug plus active classic legacy plan pair or one explicitly provided classic plan scope that resolves to the current active plan.
 - Before any write, resolve one lowercase plan slug, reject unsafe tokens, and stop unless the companion plan file plus matching plan folder already exist under .ai-factory/plans/<plan-id>/.
 - Read task.md, context.md, rules.md, verify.md, status.yaml, optional constraints-*.md, optional explore.md, and the changed implementation scope.
 - Allowed write scope after validation: only the resolved active plan's status.yaml and verify.md.

@@ -10,6 +10,7 @@ import {
   readLatestVerificationEvidence,
   runOpenSpecVerification,
   summarizeOpenSpecValidation,
+  validateAifHubArtifactContract,
   writeVerificationEvidence
 } from './openspec-verification-context.mjs';
 import {
@@ -140,7 +141,8 @@ describe('OpenSpec verification context API', () => {
       runOpenSpecVerification,
       writeVerificationEvidence,
       readLatestVerificationEvidence,
-      summarizeOpenSpecValidation
+      summarizeOpenSpecValidation,
+      validateAifHubArtifactContract
     ]) {
       assert.equal(typeof fn, 'function', 'verification context public API should export functions');
     }
@@ -622,6 +624,68 @@ describe('OpenSpec verification context API', () => {
 
     const verifySummary = await readFile(path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'verify.md'), 'utf8');
     assert.match(verifySummary, /OpenSpec validation: SKIPPED/);
+  });
+
+  it('blocks code verification on leaked ultra artifacts even when OpenSpec validation is disabled', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+    await createGeneratedRules(rootDir);
+    await writeFixture(rootDir, 'openspec/changes/add-oauth/index.md', '# Leaked ultra index\n');
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  openspec:',
+      '    validateOnVerify: false',
+      '    requireCliForVerify: false',
+      ''
+    ].join('\n'));
+    let validateCalls = 0;
+
+    const result = await buildVerificationContext({
+      rootDir,
+      changeId: 'add-oauth',
+      detectOpenSpec: async () => availableCliDetection(),
+      validateOpenSpecChange: async () => {
+        validateCalls += 1;
+        return validationResult();
+      }
+    });
+
+    assert.equal(validateCalls, 0);
+    assert.equal(result.openspec.validation.reason, 'validateOnVerify-disabled');
+    assert.equal(result.artifactContract.status, 'fail');
+    assert.equal(result.ok, false);
+    assert.equal(result.shouldRunCodeVerification, false);
+    assert.ok(result.errors.some((error) =>
+      error.code === 'artifact-contract-fail'
+      && error.details?.rule_code === 'openspec-ultra-index-forbidden'
+    ));
+    const verifySummary = await readFile(path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'verify.md'), 'utf8');
+    const gate = getLatestGateResult(verifySummary, { gate: 'verify' });
+    assert.equal(gate.ok, true);
+    assert.equal(gate.result.status, 'fail');
+    assert.ok(gate.result.blockers.some((blocker) => blocker.id === 'artifact-contract-fail'));
+  });
+
+  it('blocks code verification on leaked ultra artifacts when the OpenSpec CLI is unavailable', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+    await createGeneratedRules(rootDir);
+    await writeFixture(rootDir, 'openspec/changes/add-oauth/notes/phase-01-foundation.md', '# Leaked phase\n');
+
+    const result = await buildVerificationContext({
+      rootDir,
+      changeId: 'add-oauth',
+      detectOpenSpec: async () => missingCliDetection()
+    });
+
+    assert.equal(result.openspec.validation.reason, 'openspec-cli-unavailable');
+    assert.equal(result.artifactContract.status, 'fail');
+    assert.equal(result.ok, false);
+    assert.equal(result.shouldRunCodeVerification, false);
+    assert.ok(result.errors.some((error) =>
+      error.code === 'artifact-contract-fail'
+      && error.details?.rule_code === 'openspec-ultra-phase-forbidden'
+    ));
   });
 
   it('skips status evidence when statusOnVerify is false', async () => {

@@ -240,6 +240,10 @@ Resolve the bootstrap/config mode before creating directories:
 
 - If config.yaml is missing, create it with v1 schema only after bootstrap mode is resolved.
 - If config.yaml exists, preserve existing values and add missing fields.
+- Treat an existing config update as a structural patch, not a full-file re-render. Preserve upstream/core fields such as `config_version`, `language`, `workflow`, `rules`, and `agent_profile`, plus unknown user-authored top-level and nested fields. Change only keys owned by the selected AIFHub bootstrap profile.
+- Keep AIFHub-owned profile keys explicit and namespaced under `aifhub`, including `aifhub.artifactProtocol` and the selected `aifhub.openspec.*` policy keys. Do not infer ownership of unrelated or unknown fields from their location.
+- Do not introduce `research_bundles_dir` or any equivalent config key. Derive the ultra research bundle root at runtime as `<parent(paths.research)>/research/`, preserving the configured `paths.research` file.
+- Config diagnostics may report only sorted changed and preserved key paths plus bounded counts. Never include config values, environment data, credentials, tokens, raw provider output, or private absolute paths.
 - Preserve existing `language.ui`, `language.artifacts`, and `language.technical_terms` values. If `language.technical_terms` is missing, default it to `keep`; accepted values are `keep | translate | mixed`.
 - If localization answers were collected while config was missing, write those pending config values into the selected legacy `ai-factory` or `openspec-native` config shape.
 - Keep schema consistent with nested sections: `language`, `aifhub`, `paths`, `utilities`, `rules`, `workflow`.

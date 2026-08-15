@@ -18,11 +18,12 @@ async function main(argv) {
 
   const options = {
     dryRun: parsed.dryRun,
-    onCollision: parsed.onCollision
+    onCollision: parsed.onCollision,
+    legacyPlanSourceRoot: parsed.legacyPlanSourceRoot
   };
 
   if (parsed.list) {
-    const result = await discoverLegacyPlans();
+    const result = await discoverLegacyPlans(options);
     output(parsed.json, result, renderList(result));
     return result.ok ? 0 : 1;
   }
@@ -46,6 +47,7 @@ function parseArgs(argv) {
     dryRun: false,
     json: false,
     onCollision: 'fail',
+    legacyPlanSourceRoot: null,
     planId: null,
     error: null
   };
@@ -80,6 +82,17 @@ function parseArgs(argv) {
       }
 
       result.onCollision = value;
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--legacy-source') {
+      const value = argv[index + 1];
+      if (value === undefined || value.startsWith('--')) {
+        return invalid('Missing value for --legacy-source.');
+      }
+
+      result.legacyPlanSourceRoot = value;
       index += 1;
       continue;
     }
@@ -141,7 +154,8 @@ function renderList(result) {
 
   return [
     'Legacy plans:',
-    ...result.plans.map((plan) => `- ${plan.id} -> ${plan.targetChangePath}`)
+    `Source root: ${result.legacyPlanSourceRoot}`,
+    ...result.plans.map((plan) => `- ${plan.id} [${plan.shape}] -> ${plan.targetChangePath}`)
   ].join('\n');
 }
 
@@ -180,6 +194,7 @@ function renderAll(result) {
     `${result.dryRun ? 'Dry run' : 'Migration'}: all legacy plans`,
     `Status: ${result.ok ? 'OK' : result.partial ? 'PARTIAL' : 'FAILED'}`,
     `Migrated: ${result.migrated.join(', ') || 'none'}`,
+    `Skipped ultra: ${(result.skipped ?? []).join(', ') || 'none'}`,
     `Failed: ${result.failed.join(', ') || 'none'}`,
     '',
     ...renderDiagnostics('Warnings', result.warnings),

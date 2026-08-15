@@ -1,0 +1,9 @@
+{
+  "extends": "openspec-valid-change",
+  "artifact_contract": {
+    "checks": {
+      "planning-artifacts-outside-change": "pass"
+    },
+    "rule_codes": []
+  }
+}

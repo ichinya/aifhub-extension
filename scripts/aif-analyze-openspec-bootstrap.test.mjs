@@ -153,6 +153,32 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
     assertIncludes(template, 'enabled: false', 'skills/aif-analyze/references/config-template.yaml');
   });
 
+  it('requires patch-preserving config ownership and derives the ultra research root', async () => {
+    const skill = await readRepoFile('skills/aif-analyze/SKILL.md');
+    const template = await readRepoFile('skills/aif-analyze/references/config-template.yaml');
+
+    for (const expected of [
+      'structural patch, not a full-file re-render',
+      '`config_version`, `language`, `workflow`, `rules`, and `agent_profile`',
+      'unknown user-authored top-level and nested fields',
+      'Change only keys owned by the selected AIFHub bootstrap profile',
+      '`aifhub.artifactProtocol`',
+      '`aifhub.openspec.*`',
+      'Do not introduce `research_bundles_dir` or any equivalent config key',
+      '<parent(paths.research)>/research/',
+      'sorted changed and preserved key paths plus bounded counts',
+      'Never include config values, environment data, credentials, tokens, raw provider output, or private absolute paths'
+    ]) {
+      assertIncludes(skill, expected, 'surface=aif-analyze case=config-update-ownership');
+    }
+
+    assertNotIncludes(
+      template,
+      'research_bundles_dir:',
+      'surface=aif-analyze case=no-research-bundles-config-key'
+    );
+  });
+
   it('owns a disabled-by-default context dedup profile without auto-enabling it', async () => {
     const skill = await readRepoFile('skills/aif-analyze/SKILL.md');
     const template = await readRepoFile('skills/aif-analyze/references/config-template.yaml');

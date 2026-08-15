@@ -306,9 +306,9 @@ describe('OpenSpec-native fixture integration', () => {
 
     const verification = await buildVerificationContext({
       rootDir,
-      changeId: 'bad-change',
+      changeId: 'add-oauth',
       detectOpenSpec: async () => availableCliDetection(),
-      validateOpenSpecChange: async () => validationResult('bad-change', {
+      validateOpenSpecChange: async () => validationResult('add-oauth', {
         ok: false,
         stdout: '{"valid":false}',
         json: { valid: false }
@@ -319,25 +319,25 @@ describe('OpenSpec-native fixture integration', () => {
     });
     const finalized = await finalizeOpenSpecChange({
       rootDir,
-      changeId: 'bad-change',
+      changeId: 'add-oauth',
       detectOpenSpec: async () => availableCliDetection(),
       gitStatus: async () => ({ exitCode: 0, stdout: '', stderr: '' }),
       archiveOpenSpecChange: async () => {
         archiveCalls += 1;
-        return archiveResult('bad-change');
+        return archiveResult('add-oauth');
       }
     });
 
     assert.equal(verification.ok, false);
     assert.equal(verification.shouldRunCodeVerification, false);
     assert.equal(verification.errors[0].code, 'openspec-validation-failed');
-    assert.ok(verification.qaEvidence.files.includes('.ai-factory/qa/bad-change/openspec-validation.json'));
-    assert.match(await readText(rootDir, '.ai-factory/qa/bad-change/verify.md'), /Code verification: BLOCKED/);
+    assert.ok(verification.qaEvidence.files.includes('.ai-factory/qa/add-oauth/openspec-validation.json'));
+    assert.match(await readText(rootDir, '.ai-factory/qa/add-oauth/verify.md'), /Code verification: BLOCKED/);
     assert.equal(finalized.ok, false);
     assert.equal(finalized.archive.status, 'SKIPPED');
     assert.equal(archiveCalls, 0);
-    assert.equal(await pathExists(rootDir, 'openspec/changes/bad-change/openspec-validation.json'), false);
-    assert.equal(await pathExists(rootDir, 'openspec/changes/bad-change/openspec-archive.json'), false);
+    assert.equal(await pathExists(rootDir, 'openspec/changes/add-oauth/openspec-validation.json'), false);
+    assert.equal(await pathExists(rootDir, 'openspec/changes/add-oauth/openspec-archive.json'), false);
   });
 });
 

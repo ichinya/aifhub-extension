@@ -72,12 +72,14 @@ describe('parseArgs', () => {
       yes: false,
       current: false,
       exportOpenSpec: false,
+      legacyPlanSourceRoot: null,
       json: true,
       timestamp: undefined
     });
 
     assert.equal(parseArgs(['sync', '--all', '--change', 'add-oauth']).ok, false);
     assert.equal(parseArgs(['doctor', '--dry-run']).ok, false);
+    assert.equal(parseArgs(['status', '--legacy-source', 'custom/plans']).legacyPlanSourceRoot, 'custom/plans');
   });
 });
 
@@ -141,6 +143,50 @@ describe('runModeCommand', () => {
     assert.equal(result.exitCode, 0);
     assert.equal(parsed.mode, 'ai-factory');
     assert.equal(parsed.config.raw, undefined);
+  });
+
+  it('reports changed and preserved config key paths without values or environment data', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: ai-factory',
+      '  customProfile:',
+      '    toggle: keep',
+      'paths:',
+      '  research: docs/research.md',
+      '  plans: .ai-factory/plans',
+      '  specs: .ai-factory/specs',
+      '  rules: .ai-factory/rules',
+      'custom_user:',
+      '  sentinel: PRIVATE-CONFIG-VALUE',
+      ''
+    ].join('\n'));
+
+    const result = await runModeCommand([
+      'openspec',
+      '--json',
+      '--timestamp',
+      '2026-08-14T00-00-00-000Z'
+    ], {
+      rootDir,
+      detectOpenSpec: async () => missingCliDetection()
+    });
+    const parsed = JSON.parse(result.stdout);
+
+    assert.equal(result.exitCode, 0);
+    assert.ok(parsed.config.configKeys.changedKeyPaths.includes('aifhub.artifactProtocol'));
+    assert.ok(parsed.config.configKeys.preservedKeyPaths.includes('aifhub.customProfile.toggle'));
+    assert.ok(parsed.config.configKeys.preservedKeyPaths.includes('custom_user.sentinel'));
+    assert.equal(parsed.config.configKeys.changedKeyCount > 0, true);
+    assert.equal(parsed.config.configKeys.preservedKeyCount > 0, true);
+    assert.doesNotMatch(result.stdout, /PRIVATE-CONFIG-VALUE|docs\/research\.md|process\.env|OPENAI_API_KEY/);
+
+    const report = await readFixture(rootDir, parsed.report.path);
+    assert.match(report, /Changed key paths:/);
+    assert.match(report, /- changed: aifhub\.artifactProtocol/);
+    assert.match(report, /- preserved: custom_user\.sentinel/);
+    assert.doesNotMatch(report, /PRIVATE-CONFIG-VALUE|docs\/research\.md|process\.env|OPENAI_API_KEY/);
+    assert.doesNotMatch(await readFixture(rootDir, '.ai-factory/config.yaml'), /research_bundles_dir:/);
   });
 
   it('includes the OpenSpec artifact contract result in doctor JSON output', async () => {
