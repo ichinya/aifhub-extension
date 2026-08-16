@@ -22,7 +22,8 @@ Resolve `paths.research` and parse the command-position mode before creating a f
 
 - Regular `/aif-explore <topic>` writes only the resolved `paths.research` file (default `.ai-factory/RESEARCH.md`). It does not create a research bundle or change-scoped runtime note.
 - Explicit `/aif-explore ultra <topic>` must call the shared dependency-free `resolveAiFactoryUltraSupport()` contract from `scripts/ai-factory-version-resolver.mjs` before any write. Use injected test toolchain/version first, then project `.ai-factory.json.version`, then CLI evidence only with proven matching project provenance.
-- Missing, malformed, prerelease, unsupported `<2.18.0`, or CLI/project mismatch is a no-write stop. Recommend regular `/aif-explore <topic>`; do not redirect this failure to `/aif-plan full` and do not silently perform a regular research write.
+- When stable project metadata exists, unverified global/PATH-only CLI evidence is ignored with a bounded `ai-factory-cli-provenance-unverified` warning and does not override the project version.
+- Missing, malformed, prerelease, unsupported `<2.18.0`, or provenance-matched CLI/project mismatch is a no-write stop. Recommend regular `/aif-explore <topic>`; do not redirect this failure to `/aif-plan full` and do not silently perform a regular research write.
 - The extension baseline version never enables ultra by itself.
 
 For explicit ultra on stable AI Factory `>=2.18.0`, derive exactly one bundle root without adding a config key:

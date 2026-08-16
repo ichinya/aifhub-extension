@@ -38,8 +38,15 @@ export function normalizeLegacyUltraEntrypoint(input) {
 
   const parts = value.split('/').filter((part) => part !== '' && part !== '.');
   if (parts.some((part) => part === '..') || parts.length < 2) return entrypointFailure();
-  if (parts.at(-1).toLowerCase() !== 'index.md') parts.push('index.md');
-  if (parts.at(-1) !== 'index.md' || parts.length < 3) return entrypointFailure();
+  const lastPart = parts.at(-1);
+  if (lastPart.toLowerCase() === 'index.md' && lastPart !== 'index.md') {
+    return entrypointFailure(
+      'legacy-ultra-entrypoint-noncanonical',
+      'Legacy ultra entrypoint must use the exact lowercase index.md filename.'
+    );
+  }
+  if (lastPart !== 'index.md') parts.push('index.md');
+  if (parts.length < 3) return entrypointFailure();
 
   return {
     ok: true,
@@ -503,7 +510,10 @@ function createBindingFailure(code, message, projectPath = null, details = []) {
   };
 }
 
-function entrypointFailure() {
+function entrypointFailure(
+  code = 'legacy-ultra-entrypoint-unsafe',
+  message = 'Legacy ultra entrypoint must be a safe project-relative bundle directory or index.md path.'
+) {
   return {
     ok: false,
     entrypoint: null,
@@ -511,8 +521,8 @@ function entrypointFailure() {
     planId: null,
     plansRoot: null,
     error: {
-      code: 'legacy-ultra-entrypoint-unsafe',
-      message: 'Legacy ultra entrypoint must be a safe project-relative bundle directory or index.md path.'
+      code,
+      message
     }
   };
 }

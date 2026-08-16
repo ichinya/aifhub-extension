@@ -92,6 +92,7 @@ async function snapshotTree(rootDir) {
 
 async function writeValidUltraPlan(rootDir, planId, options = {}) {
   const plansRoot = options.plansRoot ?? '.ai-factory/plans';
+  const indexFileName = options.indexFileName ?? 'index.md';
   const marker = options.marker ?? '<!-- aif:plan-mode:ultra -->';
   const index = options.index ?? [
     marker,
@@ -107,7 +108,7 @@ async function writeValidUltraPlan(rootDir, planId, options = {}) {
     '- [ ] **Task 1:** Implement the foundation.',
     ''
   ].join('\n');
-  await writeFixture(rootDir, `${plansRoot}/${planId}/index.md`, index);
+  await writeFixture(rootDir, `${plansRoot}/${planId}/${indexFileName}`, index);
   await writeFixture(rootDir, `${plansRoot}/${planId}/phase-01-foundation.md`, options.phase ?? [
     '# Phase 01: Foundation',
     '',
@@ -363,6 +364,11 @@ describe('marker-first legacy plan classification', () => {
         id: 'phase-progress',
         expected: 'ultra-phase-progress-checkbox',
         phase: '# Phase\n\n## Task 1: Work\n\n- [ ] Phase-local progress\n'
+      },
+      {
+        id: 'noncanonical-index-name',
+        expected: 'ultra-index-name-noncanonical',
+        indexFileName: 'Index.md'
       }
     ];
 
@@ -921,6 +927,21 @@ describe('migrate-legacy-plans CLI', () => {
     assert.ok(parsed.operations.some((operation) => operation.target === 'openspec/changes/add-oauth/proposal.md'));
     assert.equal(JSON.stringify(parsed).includes('Add OAuth Authentication'), false);
     assert.equal(await pathExists(rootDir, 'openspec/changes/add-oauth/proposal.md'), false);
+  });
+
+  it('surfaces unrelated directories without treating them as migratable plans', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/plans/notes/notes.md', '# Notes only\n');
+
+    const list = await execFileAsync(process.execPath, [CLI_PATH, '--list'], {
+      cwd: rootDir,
+      windowsHide: true
+    });
+
+    assert.match(list.stdout, /No migratable legacy plans found\./);
+    assert.match(list.stdout, /Ignored non-plan directories:/);
+    assert.match(list.stdout, /- notes \[unrelated-directory\]/);
+    assert.doesNotMatch(list.stdout, /openspec\/changes\/notes/);
   });
 
   it('returns exit code 2 for invalid arguments', async () => {

@@ -9,6 +9,7 @@ import {
   doctorAifMode,
   exportOpenSpecCompatibility,
   getModeStatus,
+  renderConfigForMode,
   switchToAiFactoryMode,
   switchToOpenSpecMode,
   syncOpenSpecArtifacts
@@ -427,6 +428,9 @@ describe('mode switching', () => {
       '    mode: off',
       '  openspec:',
       '    validateOnPlan: false',
+      '    allowWarnOnDone:',
+      '      rules: true',
+      '      customGate: keep',
       '    customPolicy:',
       '      owner: user',
       '  customProfile:',
@@ -463,6 +467,7 @@ describe('mode switching', () => {
       '    mode: off',
       '    customPolicy:',
       '      owner: user',
+      '      customGate: keep',
       '  customProfile:',
       '    toggle: keep',
       '  research: docs/research/current.md',
@@ -482,6 +487,7 @@ describe('mode switching', () => {
     for (const keyPath of [
       'aifhub.contextDedup.mode',
       'aifhub.customProfile.toggle',
+      'aifhub.openspec.allowWarnOnDone.customGate',
       'aifhub.openspec.customPolicy.owner',
       'custom_user.sentinel',
       'language.ui',
@@ -502,11 +508,40 @@ describe('mode switching', () => {
     assert.equal(legacy.ok, true);
     const legacyConfig = await readFixture(rootDir, '.ai-factory/config.yaml');
     assert.match(legacyConfig, /^  artifactProtocol: ai-factory$/m);
+    assert.match(legacyConfig, /^  openspec:$/m);
     assert.match(legacyConfig, /^    customPolicy:$/m);
     assert.match(legacyConfig, /^      owner: user$/m);
+    assert.match(legacyConfig, /^    allowWarnOnDone:$/m);
+    assert.match(legacyConfig, /^      customGate: keep$/m);
+    assert.doesNotMatch(legacyConfig, /^    validateOnPlan:/m);
+    assert.doesNotMatch(legacyConfig, /^      rules:/m);
     assert.match(legacyConfig, /^  customProfile:$/m);
     assert.match(legacyConfig, /^    toggle: keep$/m);
+    assert.match(legacyConfig, /^  custom_cache: cache\/data$/m);
+    for (const openSpecOnlyPath of ['state', 'qa', 'generated_rules']) {
+      assert.doesNotMatch(
+        legacyConfig,
+        new RegExp(`^  ${openSpecOnlyPath}:`, 'm'),
+        `Legacy profile should omit OpenSpec-only paths.${openSpecOnlyPath}`
+      );
+    }
     assert.doesNotMatch(legacyConfig, /research_bundles_dir:/);
+  });
+
+  it('drops the dormant OpenSpec block when it contains only AIFHub-owned settings', () => {
+    const legacyConfig = renderConfigForMode([
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      '  openspec:',
+      '    validateOnPlan: true',
+      '    allowWarnOnDone:',
+      '      rules: false',
+      ''
+    ].join('\n'), 'ai-factory');
+
+    assert.match(legacyConfig, /^  artifactProtocol: ai-factory$/m);
+    assert.doesNotMatch(legacyConfig, /^  openspec:$/m);
+    assert.doesNotMatch(legacyConfig, /validateOnPlan|allowWarnOnDone/);
   });
 
   it('switches to OpenSpec mode with missing CLI as degraded capability', async () => {

@@ -939,7 +939,9 @@ describe('complete OpenSpec workflow documentation contract', () => {
       '| OpenSpec-native | regular/full | `proposal.md`, `design.md`, `tasks.md`, applicable delta specs | canonical OpenSpec workflow |',
       '| OpenSpec-native | explicit `ultra`, stable AI Factory `>=2.18.0` | the same canonical files with a stricter Ultra Detail Gate | no `index.md`, `phase-*`, companion files, or active ultra marker |',
       '| Legacy AI Factory-only | classic | `<id>.md` plus classic companion directory | existing AIFHub classic compatibility workflow |',
-      '| Legacy AI Factory-only | explicit `ultra`, stable AI Factory `>=2.18.0` | `<id>/index.md` plus direct `phase-NN-<slug>.md`, exactly one `<!-- aif:plan-mode:ultra -->`; `index.md` is the only checkbox/progress ledger | marker-first exact upstream handoff; no sibling classic plan or companion synchronization |'
+      '| Legacy AI Factory-only | explicit `ultra`, stable AI Factory `>=2.18.0` | `<id>/index.md` plus direct `phase-NN-<slug>.md`, exactly one `<!-- aif:plan-mode:ultra -->`; `index.md` is the only checkbox/progress ledger | marker-first exact upstream handoff; no sibling classic plan or companion synchronization |',
+      'provenance-matched CLI/project version evidence stops before writes',
+      'unverified global/PATH-only CLI evidence is ignored with a bounded warning'
     ]) {
       assertIncludes(modeMatrix, expected, `docs/usage.md AI Factory 2.18 Artifact Profiles row: ${expected}`);
     }

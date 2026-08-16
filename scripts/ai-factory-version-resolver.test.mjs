@@ -119,7 +119,7 @@ describe('AI Factory version source precedence and provenance', () => {
     assert.equal(untrusted.errors[0].code, 'ai-factory-cli-provenance-unverified');
   });
 
-  it('fails closed when project and supplied CLI versions disagree', async () => {
+  it('ignores an unverified PATH-only CLI even when its version differs', async () => {
     const result = await resolveAiFactoryVersion({
       rootDir: ROOT_DIR,
       readFile: metadataReader('2.18.0'),
@@ -129,12 +129,30 @@ describe('AI Factory version source precedence and provenance', () => {
       }
     });
 
+    assert.equal(result.ok, true);
+    assert.equal(result.source, 'project-metadata');
+    assert.equal(result.version, '2.18.0');
+    assert.deepEqual(result.warnings.map((warning) => warning.code), [
+      'ai-factory-cli-provenance-unverified'
+    ]);
+  });
+
+  it('fails closed when project and provenance-matched CLI versions disagree', async () => {
+    const result = await resolveAiFactoryVersion({
+      rootDir: ROOT_DIR,
+      readFile: metadataReader('2.18.0'),
+      cliEvidence: {
+        version: '2.17.0',
+        commandSource: 'project-local'
+      }
+    });
+
     assert.equal(result.ok, false);
     assert.equal(result.source, 'project-metadata');
     assert.equal(result.errors[0].code, 'ai-factory-version-mismatch');
     assert.equal(result.errors[0].project_version, '2.18.0');
     assert.equal(result.errors[0].cli_version, '2.17.0');
-    assert.equal(result.errors[0].cli_provenance_matched, false);
+    assert.equal(result.errors[0].cli_provenance_matched, true);
   });
 });
 

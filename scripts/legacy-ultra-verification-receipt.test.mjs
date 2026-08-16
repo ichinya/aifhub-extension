@@ -131,6 +131,10 @@ describe('legacy ultra receipt bindings', () => {
     assert.equal(location.receiptPath, `${LEGACY_ULTRA_RECEIPT_ROOT}/${location.entrypointDigest}.json`);
     assert.equal(normalizeLegacyUltraEntrypoint('../outside/index.md').ok, false);
     assert.equal(normalizeLegacyUltraEntrypoint('C:\\outside\\index.md').ok, false);
+    assert.equal(
+      normalizeLegacyUltraEntrypoint('.ai-factory/plans/demo-ultra/Index.md').error.code,
+      'legacy-ultra-entrypoint-noncanonical'
+    );
   });
 
   it('computes separate deterministic bundle and worktree manifests', async () => {

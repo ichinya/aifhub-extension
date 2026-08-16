@@ -156,7 +156,8 @@ describe('aif-explore and aif-improve OpenSpec-native contracts', () => {
       'injected test toolchain/version first',
       'project `.ai-factory.json.version`',
       'CLI evidence only with proven matching project provenance',
-      'Missing, malformed, prerelease, unsupported `<2.18.0`, or CLI/project mismatch is a no-write stop',
+      'unverified global/PATH-only CLI evidence is ignored with a bounded `ai-factory-cli-provenance-unverified` warning',
+      'Missing, malformed, prerelease, unsupported `<2.18.0`, or provenance-matched CLI/project mismatch is a no-write stop',
       'Recommend regular `/aif-explore <topic>`',
       'do not redirect this failure to `/aif-plan full`',
       'do not silently perform a regular research write'

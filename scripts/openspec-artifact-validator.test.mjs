@@ -252,15 +252,50 @@ describe('OpenSpec artifact contract validator', () => {
   it('fails when runtime evidence is placed inside openspec/changes', async () => {
     const rootDir = await createTempRoot();
     await createValidChange(rootDir);
-    await writeFixture(rootDir, 'openspec/changes/add-oauth/openspec-validation.json', '{}\n');
+    await writeFixture(rootDir, 'openspec/changes/add-oauth/state/runtime.json', '{}\n');
+
+    const result = await validateOpenSpecArtifactContract({
+      rootDir,
+      changeId: 'add-oauth'
+    });
+    const failures = result.checks.filter((check) =>
+      check.id === 'runtime-files-outside-change' && check.status === 'fail'
+    );
+
+    assert.equal(result.status, 'fail');
+    assert.deepEqual(failures.map((check) => check.path), [
+      'openspec/changes/add-oauth/state/runtime.json'
+    ]);
+  });
+
+  it('allows capability directories whose names match runtime directory names', async () => {
+    const rootDir = await createTempRoot();
+    await createValidChange(rootDir);
+    await writeFixture(rootDir, 'openspec/changes/add-oauth/specs/state/spec.md', [
+      '# State Delta',
+      '',
+      '## ADDED Requirements',
+      '',
+      '### Requirement: State transition',
+      '',
+      'The system MUST expose a valid state transition.',
+      '',
+      '#### Scenario: transition succeeds',
+      '',
+      '- GIVEN a valid current state',
+      '- WHEN the transition is requested',
+      '- THEN the next state is recorded.',
+      ''
+    ].join('\n'));
+    await compileOpenSpecRules('add-oauth', { rootDir });
 
     const result = await validateOpenSpecArtifactContract({
       rootDir,
       changeId: 'add-oauth'
     });
 
-    assert.equal(result.status, 'fail');
-    assert.ok(result.checks.some((check) => check.id === 'runtime-files-outside-change' && check.status === 'fail'));
+    assert.equal(result.status, 'pass');
+    assert.equal(getCheck(result, 'runtime-files-outside-change').status, 'pass');
   });
 
   it('fails closed on root or nested ultra index, phase, and legacy companion artifacts', async () => {

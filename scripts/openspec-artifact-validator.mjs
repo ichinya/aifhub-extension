@@ -295,7 +295,9 @@ function inspectDeltaSpecs(artifacts, config, skipSpecs, rootDir) {
 
 async function inspectRuntimeFiles(rootDir, changeDir) {
   const files = await collectFiles(rootDir, changeDir);
-  const offenders = files.filter((file) => isRuntimeOrEvidenceFile(file.path));
+  const offenders = files.filter((file) =>
+    file.kind !== 'directory' && isRuntimeOrEvidenceFile(file.path)
+  );
 
   if (offenders.length === 0) {
     return [

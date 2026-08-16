@@ -484,9 +484,11 @@ export async function classifyLegacyPlanShape(planId, options = {}) {
 
   const entries = (await readdir(planDirPath, { withFileTypes: true }))
     .sort((left, right) => left.name.localeCompare(right.name));
-  const indexEntry = entries.find((entry) => entry.name.toLowerCase() === 'index.md');
+  const indexEntries = entries.filter((entry) => entry.name.toLowerCase() === 'index.md');
+  const indexEntry = indexEntries.find((entry) => entry.name === 'index.md');
+  const nonCanonicalIndexEntries = indexEntries.filter((entry) => entry.name !== 'index.md');
   const phaseLikeEntries = entries.filter((entry) => ULTRA_PHASE_LIKE_PATTERN.test(entry.name));
-  const ultraLike = indexEntry !== undefined || phaseLikeEntries.length > 0;
+  const ultraLike = indexEntries.length > 0 || phaseLikeEntries.length > 0;
 
   if (!ultraLike) {
     const files = await discoverCompanionFiles(rootDir, planDirPath);
@@ -502,6 +504,7 @@ export async function classifyLegacyPlanShape(planId, options = {}) {
 
   const validation = await validateUltraPlanBundle(rootDir, planDirPath, {
     indexEntry,
+    nonCanonicalIndexEntries,
     phaseLikeEntries,
     planDir
   });
@@ -544,12 +547,22 @@ async function validateUltraPlanBundle(rootDir, planDirPath, context) {
     .sort();
   let markerCount = 0;
 
-  if (context.indexEntry === undefined) {
+  for (const entry of context.nonCanonicalIndexEntries ?? []) {
     errors.push(planIntegrityDiagnostic(
-      'ultra-index-missing',
-      'Ultra-like plan directory is missing direct index.md.',
-      context.planDir
+      'ultra-index-name-noncanonical',
+      'Ultra plan index file must use the exact lowercase name index.md.',
+      toPosix(path.relative(rootDir, path.join(planDirPath, entry.name)))
     ));
+  }
+
+  if (context.indexEntry === undefined) {
+    if ((context.nonCanonicalIndexEntries ?? []).length === 0) {
+      errors.push(planIntegrityDiagnostic(
+        'ultra-index-missing',
+        'Ultra-like plan directory is missing direct index.md.',
+        context.planDir
+      ));
+    }
     return { ok: false, phaseFiles, markerCount, warnings, errors };
   }
 

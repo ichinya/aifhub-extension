@@ -93,6 +93,10 @@ const DEFAULT_AI_FACTORY_PATHS = {
   specs: '.ai-factory/specs',
   rules: '.ai-factory/rules'
 };
+const OPEN_SPEC_ONLY_PATH_KEYS = new Set(
+  Object.keys(DEFAULT_OPEN_SPEC_PATHS)
+    .filter((key) => !Object.hasOwn(DEFAULT_AI_FACTORY_PATHS, key))
+);
 const DEFAULT_CONTEXT_PATHS = {
   description: '.ai-factory/DESCRIPTION.md',
   architecture: '.ai-factory/ARCHITECTURE.md',
@@ -1954,9 +1958,8 @@ function renderAifhubBlock(mode, blocks) {
   if (mode === MODES.openspec) {
     rendered.push(renderOpenSpecProfileBlock(existingOpenSpec));
   } else if (existingOpenSpec !== '') {
-    // Keep dormant user-authored/unknown OpenSpec fields byte-for-byte. Legacy
-    // mode is selected solely by artifactProtocol and must not erase config.
-    rendered.push(existingOpenSpec.trimEnd());
+    const dormantOpenSpec = renderDormantOpenSpecProfileBlock(existingOpenSpec);
+    if (dormantOpenSpec !== '') rendered.push(dormantOpenSpec);
   }
 
   for (const child of children) {
@@ -1986,6 +1989,36 @@ function renderOpenSpecProfileBlock(existing) {
   }
 
   return rendered.join('\n');
+}
+
+function renderDormantOpenSpecProfileBlock(existing) {
+  const children = parseIndentedBlocks(existing, 4);
+  const knownKeys = new Set(Object.keys(DEFAULT_OPENSPEC_SETTINGS));
+  const rendered = [];
+
+  for (const child of children) {
+    if (child.key === 'allowWarnOnDone') {
+      const dormantAllowWarn = renderDormantAllowWarnOnDoneBlock(child.text);
+      if (dormantAllowWarn !== '') rendered.push(dormantAllowWarn);
+      continue;
+    }
+    if (knownKeys.has(child.key)) continue;
+    rendered.push(child.text.trimEnd());
+  }
+
+  return rendered.length === 0 ? '' : ['  openspec:', ...rendered].join('\n');
+}
+
+function renderDormantAllowWarnOnDoneBlock(existing) {
+  const children = parseIndentedBlocks(existing, 6);
+  const knownKeys = new Set(Object.keys(DEFAULT_OPENSPEC_SETTINGS.allowWarnOnDone));
+  const unknownChildren = children
+    .filter((child) => !knownKeys.has(child.key))
+    .map((child) => child.text.trimEnd());
+
+  return unknownChildren.length === 0
+    ? ''
+    : ['    allowWarnOnDone:', ...unknownChildren].join('\n');
 }
 
 function renderAllowWarnOnDoneBlock(existing) {
@@ -2023,6 +2056,7 @@ function renderPathsBlock(mode, existingPaths) {
     : ['description', 'architecture', 'context', 'roadmap', 'research', 'plans', 'specs', 'rules'];
   const extraKeys = Object.keys(merged)
     .filter((key) => !keys.includes(key))
+    .filter((key) => mode !== MODES.aiFactory || !OPEN_SPEC_ONLY_PATH_KEYS.has(key))
     .sort((left, right) => left.localeCompare(right));
 
   return [

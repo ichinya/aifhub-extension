@@ -116,10 +116,27 @@ export async function resolveAiFactoryVersion(options = {}) {
 
     const suppliedCli = await resolveSuppliedCliEvidence(options);
     if (suppliedCli !== null) {
-      const cliVersion = parseStableAiFactoryVersion(suppliedCli.version);
       const cliMatchesProject = isMatchingProjectCli(suppliedCli, rootDir);
 
-      if (cliVersion.ok && cliVersion.version !== resolved.version) {
+      if (!cliMatchesProject) {
+        resolved.warnings.push({
+          code: 'ai-factory-cli-provenance-unverified',
+          message: 'Supplied CLI version evidence was ignored because it was not proven to match the project installation.'
+        });
+        return resolved;
+      }
+
+      const cliVersion = parseStableAiFactoryVersion(suppliedCli.version);
+      if (!cliVersion.ok) {
+        return createVersionFailure({
+          source: 'project-metadata',
+          provenance: 'conflicting-cli-evidence',
+          resolutionPath: AI_FACTORY_PROJECT_METADATA,
+          errors: [cliVersion.error]
+        });
+      }
+
+      if (cliVersion.version !== resolved.version) {
         return createVersionFailure({
           source: 'project-metadata',
           provenance: 'conflicting-cli-evidence',
@@ -130,24 +147,8 @@ export async function resolveAiFactoryVersion(options = {}) {
             project_version: resolved.version,
             cli_version: cliVersion.version,
             cli_source: suppliedCli.commandSource ?? 'unknown',
-            cli_provenance_matched: cliMatchesProject
+            cli_provenance_matched: true
           }]
-        });
-      }
-
-      if (cliMatchesProject && !cliVersion.ok) {
-        return createVersionFailure({
-          source: 'project-metadata',
-          provenance: 'conflicting-cli-evidence',
-          resolutionPath: AI_FACTORY_PROJECT_METADATA,
-          errors: [cliVersion.error]
-        });
-      }
-
-      if (!cliMatchesProject) {
-        resolved.warnings.push({
-          code: 'ai-factory-cli-provenance-unverified',
-          message: 'Supplied CLI version evidence was ignored because it was not proven to match the project installation.'
         });
       }
     }

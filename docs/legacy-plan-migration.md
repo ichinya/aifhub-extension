@@ -6,7 +6,7 @@ Use legacy migration when a project has classic `.ai-factory/plans` artifacts an
 
 Migration is explicit. It does not run automatically from `/aif-improve`, `/aif-implement`, or `/aif-verify`.
 
-AI Factory 2.18 has two legacy shapes. Classic plans use a sibling `<id>.md` plus optional companion directory. Marked ultra plans use `<id>/index.md`, direct `phase-*.md`, and exactly one standalone `<!-- aif:plan-mode:ultra -->`. AIFHub migrates only classic shapes. A valid marked ultra bundle remains upstream-owned and is reported as `skipped-ultra`; an invalid ultra-like shape or classic/ultra collision fails closed before any write.
+AI Factory 2.18 has two legacy shapes. Classic plans use a sibling `<id>.md` plus optional companion directory. Marked ultra plans use the exact lowercase path `<id>/index.md`, direct `phase-*.md`, and exactly one standalone `<!-- aif:plan-mode:ultra -->`. A case variant such as `Index.md` is `ultra-invalid`, not a classic folder. AIFHub migrates only classic shapes. A valid marked ultra bundle remains upstream-owned and is reported as `skipped-ultra`; an invalid ultra-like shape or classic/ultra collision fails closed before any write.
 
 ## Commands
 
@@ -15,6 +15,8 @@ List discovered legacy plans:
 ```bash
 ai-factory aifhub-migrate-legacy-plans --list
 ```
+
+The human-readable list reports directories classified as `unrelated-directory` under `Ignored non-plan directories` instead of silently treating them as plans. They are never migrated; `--json` exposes the same bounded entries in `ignored` for automation.
 
 Dry-run one migration:
 

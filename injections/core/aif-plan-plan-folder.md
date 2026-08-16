@@ -21,7 +21,8 @@ Resolve the artifact profile and parse the leading planning mode before creating
 - Recognize only a command-position mode token: `fast`, `full`, or `ultra`. Remove that one leading token from the request body; preserve every later occurrence of those words byte-for-byte, including casing, punctuation, internal whitespace, and line breaks.
 - Absence of an explicit `ultra` token keeps the existing default, `fast`, or `full` behavior. Do not enable ultra from extension baseline metadata.
 - For explicit `ultra`, use the dependency-free shared resolver in `scripts/ai-factory-version-resolver.mjs` before any write. Resolution precedence is: injected test toolchain/version, then project-managed `.ai-factory.json.version`, then bounded CLI evidence only when the executable provenance is proven to match the same project installation.
-- A global or PATH-only `ai-factory --version` is not authoritative. Missing, malformed, prerelease, unsupported `<2.18.0`, or CLI/project mismatch results fail closed and create no plan, change, bundle, companion, runtime-state, or research artifact.
+- A global or PATH-only `ai-factory --version` is not authoritative. When stable project metadata exists, unverified global/PATH-only CLI evidence is ignored with a bounded `ai-factory-cli-provenance-unverified` warning and does not override the project version.
+- Missing, malformed, prerelease, unsupported `<2.18.0`, or provenance-matched CLI/project mismatch results fail closed and create no plan, change, bundle, companion, runtime-state, or research artifact.
 - On that failure emit only a bounded diagnostic with `mode`, `profile`, `version`, `source`, and stable `code`, followed by the actionable handoff `/aif-plan full <request>`. Never include the request body, research body, provider output, credentials, raw stdout, or raw stderr in the diagnostic.
 
 For stable AI Factory `>=2.18.0`, route explicit `ultra` by the resolved artifact profile:
