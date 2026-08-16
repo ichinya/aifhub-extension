@@ -34,7 +34,14 @@ const FIXTURES = Object.freeze([
   'openspec-rule-violation',
   'openspec-runtime-state-leak',
   'openspec-coverage-missing',
-  'openspec-docs-only-skip-specs'
+  'openspec-docs-only-skip-specs',
+  'openspec-ultra-index-root',
+  'openspec-ultra-index-nested',
+  'openspec-ultra-phase-root',
+  'openspec-ultra-phase-nested',
+  'openspec-ultra-marker-active',
+  'openspec-ultra-marker-inline',
+  'openspec-ultra-marker-fenced'
 ]);
 
 async function createTempRoot() {
@@ -45,12 +52,53 @@ async function createTempRoot() {
 
 async function copyFixture(fixtureName) {
   const rootDir = await createTempRoot();
-  await cp(path.join(FIXTURE_ROOT, fixtureName), rootDir, { recursive: true });
+  for (const name of await resolveFixtureChain(fixtureName)) {
+    await cp(path.join(FIXTURE_ROOT, name), rootDir, {
+      recursive: true,
+      force: true
+    });
+  }
   return rootDir;
 }
 
 async function readExpected(fixtureName) {
+  const parsed = await readExpectedDocument(fixtureName);
+  if (parsed.extends === undefined) {
+    return parsed;
+  }
+
+  const { extends: baseName, ...overrides } = parsed;
+  return deepMerge(await readExpected(baseName), overrides);
+}
+
+async function readExpectedDocument(fixtureName) {
   return JSON.parse(await readFile(path.join(FIXTURE_ROOT, fixtureName, 'expected.json'), 'utf8'));
+}
+
+async function resolveFixtureChain(fixtureName, seen = new Set()) {
+  assert.equal(seen.has(fixtureName), false, `fixture inheritance cycle: ${fixtureName}`);
+  seen.add(fixtureName);
+  const parsed = await readExpectedDocument(fixtureName);
+  const parents = parsed.extends === undefined
+    ? []
+    : await resolveFixtureChain(parsed.extends, seen);
+  return [...parents, fixtureName];
+}
+
+function deepMerge(base, overrides) {
+  if (!isPlainObject(base) || !isPlainObject(overrides)) {
+    return overrides;
+  }
+
+  const merged = { ...base };
+  for (const [key, value] of Object.entries(overrides)) {
+    merged[key] = key in merged ? deepMerge(merged[key], value) : value;
+  }
+  return merged;
+}
+
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function availableCliDetection() {
@@ -138,12 +186,20 @@ async function prepareGeneratedRules(rootDir, fixtureName, changeId) {
 }
 
 function normalizeArtifactContract(result, expected) {
-  return {
+  const normalized = {
     status: result.status,
     blocking: result.blocking,
     checks: selectCheckStatuses(result.checks, expected.checks),
     suggested_next: result.suggested_next?.command ?? null
   };
+
+  if (Object.hasOwn(expected, 'rule_codes')) {
+    normalized.rule_codes = [...new Set(result.checks
+      .map((check) => check.details?.rule_code)
+      .filter(Boolean))].sort();
+  }
+
+  return normalized;
 }
 
 function normalizeGeneratedRules(result, expected) {

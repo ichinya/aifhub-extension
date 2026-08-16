@@ -191,6 +191,11 @@
       "file": "./injections/core/aif-commit-roadmap-freshness.md"
     },
     {
+      "target": "aif-archive",
+      "position": "prepend",
+      "file": "./injections/core/aif-archive-openspec-boundary.md"
+    },
+    {
       "target": "aif-fix",
       "position": "prepend",
       "file": "./injections/core/aif-fix-plan-folder.md"

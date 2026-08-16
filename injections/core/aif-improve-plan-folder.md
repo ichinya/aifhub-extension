@@ -25,9 +25,20 @@ Before resolving a target, read `.ai-factory/config.yaml` when it exists.
 - Otherwise, use **Legacy AI Factory-only mode**.
 - If the config is missing, continue with Legacy AI Factory-only mode and state that no OpenSpec-native protocol was detected.
 
+### Legacy ultra marker-first boundary
+
+In Legacy AI Factory-only mode, classify the normalized project-relative plan entrypoint with `classifyLegacyPlanShape()` from `scripts/legacy-plan-migration.mjs` before folder-only detection, companion discovery, plan-file creation, refinement, or any `status.yaml` write. Marker validation is first; known companion filenames are considered only after the classifier returns a classic shape.
+
+- For `ultra-valid`, stop all AIFHub companion logic and return the exact upstream handoff `/aif-improve <entrypoint>`. Do not create or synchronize a sibling `<plan-id>.md`, `task.md`, `context.md`, `rules.md`, `verify.md`, `status.yaml`, or `explore.md`; upstream owns the complete marked bundle atomically.
+- For `ultra-invalid` or `collision`, fail closed before any write and report only bounded `shape`, safe `entrypoint`, and classifier `code` values.
+- For `classic-pair` or `classic-folder-only`, continue with the classic companion rules below. An unrelated directory is not a plan.
+- Diagnostics may include only `shape`, safe project-relative `entrypoint`, and `handoff`; never include marker bodies, phase contents, request/research bodies, credentials, raw stdout, or raw stderr.
+
 ### OpenSpec-native mode
 
 When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, `/aif-improve` refines an existing OpenSpec-native change.
+
+For plan content, read only the canonical OpenSpec artifacts listed below. Do not inspect or mutate `.ai-factory/plans/**` after an OpenSpec change resolves.
 
 Use shared vocabulary consistently: `OpenSpec-native mode`, `canonical OpenSpec change`, `active change`, `change-id`, `base specs`, `delta specs`, `generated rules`, `runtime state`, `QA evidence`, and `legacy AI Factory-only mode`.
 
@@ -74,7 +85,9 @@ Preservation rules:
 - Read current artifact content before editing.
 - Treat the complete `## Original Request` heading and body as immutable raw source. Preserve its exact bytes, including line endings, whitespace, punctuation, casing, and line breaks; patch other sections around it instead of reconstructing `proposal.md`.
 - Treat an existing `## Research Context` body and `Source` revision metadata as the committed requirements snapshot. Do not translate, normalize, regenerate, or replace it unless the user explicitly requests a research rebase.
-- When live `paths.research` has a different `Updated` marker or normalized Active Summary `SHA256`, emit `WARN [research-drift] change-id=<change-id> source=<path> expected=<embedded revision> current=<live revision>`. Keep the embedded snapshot authoritative and do not log its full body, credentials, or raw provider output.
+- For an embedded ultra source, pass its exact project-relative `RESEARCH.md` path to `resolveUltraResearchSource()` from `scripts/ultra-research-resolver.mjs`. Consume the structured `source`, `revision`, and `diagnostic` so the sibling marked `INDEX.md`, active status, Artifact Index link, path confinement, and normalized Active Summary digest are all revalidated centrally.
+- For an explicit research rebase, use resolver precedence: safe explicit `RESEARCH.md` path, exact slug, then exactly one caller-reviewed relevant active candidate. Ambiguity stops; recency never chooses a source.
+- When the exact regular or ultra source is missing/invalid, or its `Updated`/normalized `SHA256` differs, emit `WARN [research-drift] change-id=<change-id> source=<path> expected=<embedded revision> current=<live revision>`. Keep the embedded snapshot authoritative and do not log its full body, credentials, raw provider output, or sibling artifact bodies.
 - Live research `## Sessions` may be consulted only for rationale. Do not apply requirements from a newer Active Summary without an explicit user rebase request.
 - On an explicit research rebase, copy the selected current Active Summary, recompute the stable digest, update the `Source` path plus `Updated` and `SHA256` metadata, and report that committed scope changed.
 - Preserve user-written sections unless they are explicitly obsolete or contradict the refined requirement.

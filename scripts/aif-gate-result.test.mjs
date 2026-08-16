@@ -423,8 +423,12 @@ describe('aif-rules-check gate contract', () => {
     );
 
     assert.match(codexAsset, /sandbox_mode = "read-only"/);
-    assert.match(claudeAsset, /tools: Read, Glob, Grep/);
-    assert.doesNotMatch(claudeAsset, /^tools:.*(?:Write|Edit|Bash)/m);
+    assert.match(claudeAsset, /^tools: Read, Glob, Grep, Bash$/m);
+    assert.doesNotMatch(claudeAsset, /^tools:.*(?:Write|Edit)/m);
+    assert.match(
+      claudeAsset,
+      /Bash is allowed here only for the helper's read-only Git inventory\/revision commands\./
+    );
 
     for (const asset of [codexAsset, claudeAsset]) {
       assert.match(asset, /aif-rules-check/);

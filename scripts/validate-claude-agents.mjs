@@ -4,6 +4,7 @@
 
 import { readFile, readdir, lstat } from 'node:fs/promises';
 import { join, extname } from 'node:path';
+import { validateAgentInstructionContract } from './agent-instruction-contract.mjs';
 
 const LOG_LEVEL = process.env.LOG_LEVEL || 'INFO';
 const LEVELS = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 };
@@ -109,6 +110,21 @@ async function validate() {
     const name = frontmatter.name || '';
     if (name && !name.startsWith('aifhub-')) {
       log('ERROR', `Agent name does not use aifhub-* namespace`, { file: relPath, name });
+      hasErrors = true;
+    }
+
+    const instructionContract = validateAgentInstructionContract({
+      runtime: 'claude',
+      name,
+      source: content
+    });
+    for (const contractCase of instructionContract.cases) {
+      if (contractCase.ok) {
+        log('INFO', 'Agent instruction contract OK', contractCase);
+      }
+    }
+    for (const issue of instructionContract.issues) {
+      log('ERROR', issue.message, issue);
       hasErrors = true;
     }
 

@@ -275,11 +275,11 @@ Current QA-check results bind to `tested_revision` plus `worktree_digest` for gi
 
 Branch-scoped `qa-check.md` is not change-scoped AIFHub evidence. It cannot by itself satisfy `/aif-verify`, `/aif-done`, `coverage.json`, rules evidence, `done-readiness.json`, `done.md`, or `openspec-archive.json`; no implicit bridge is registered.
 
-## AI Factory 2.17 Reviewed Baseline
+## AI Factory 2.18 Reviewed Baseline
 
-The reviewed AI Factory `2.17.0` baseline is cumulative: it retains the existing AI Factory `2.13`-`2.15` compatibility facts, including config-aware project-context utilities, and adds a full audit of `2.15.0...2.16.0` (29 commits) and `2.16.0...2.17.0` (14 commits). AIFHub adapts only behavior that crosses its OpenSpec-native ownership boundaries; upstream-owned behavior remains upstream-owned.
+The reviewed AI Factory `2.18.1` baseline is cumulative: it retains the existing AI Factory `2.13`-`2.17` compatibility facts, including config-aware project-context utilities, the full `2.17.0...2.18.0` audit (21 commits, 63 changed files), and the bounded `2.18.0...2.18.1` patch audit (2 commits, 8 changed files). AIFHub adapts only behavior that crosses its OpenSpec-native or legacy compatibility ownership boundaries; upstream-owned behavior remains upstream-owned.
 
-### AI Factory 2.16 and 2.17 audit
+### AI Factory 2.16 and 2.17 cumulative audit
 
 | Upstream change | AIFHub outcome |
 |---|---|
@@ -298,6 +298,45 @@ The reviewed AI Factory `2.17.0` baseline is cumulative: it retains the existing
 | Refined `/aif-architecture` structure | Reviewed no-op: upstream `/aif-architecture` remains the command owner and `injections/core/aif-architecture-context-boundary.md` remains boundary-only. |
 | Generated-rules changes | Reviewed no-op: project-specific Control Flow detection belongs to `aif-analyze`; AIFHub does not duplicate it in the generated-rules compiler. |
 | Community-extension documentation | Reviewed no-op: no AIFHub contract changes, so complete upstream community documentation bodies are not copied. |
+
+### AI Factory 2.18 audit
+
+| Upstream surface | Evidence and AIFHub decision |
+|---|---|
+| Extension schema and loader | Reviewed no-op: the tagged schema, extension loader and extension command blobs are unchanged, so AIFHub adds no manifest or loader adapter. |
+| Injection and MCP runtime | Reviewed no-op: injection loading, MCP core/template behavior and public command wiring are unchanged. |
+| Node, bin and dependencies | Reviewed no-op: Node remains `>=18.0.0`; package bin and runtime dependencies are unchanged. |
+| Ultra planning | Adapter by artifact mode: OpenSpec-native `ultra` raises canonical `design.md`/`tasks.md` detail without `index.md`, phase files or an active marker; legacy marked bundles remain upstream-owned. |
+| Ultra research | Adapter as supporting context: bundles live under the directory derived from `paths.research`; only a revision-bound selected Active Summary may influence a canonical proposal. |
+| Directory archive support | Bounded adapter: OpenSpec-native plan-mutating `/aif-archive` modes stop before plan discovery and route to `/aif-done`; legacy marked ultra archive remains upstream-owned. |
+| Completed-phase `/aif-loop` budget | Reviewed no-op: the upstream loop owns budget accounting, state and stop conditions; AIFHub adds no loop skill, injection or schema. |
+| Privacy-gated `/aif-transfer` | Reviewed no-op: transfer keeps its sanitized in-memory registry, current-project evidence requirement, privacy checks and explicit approval; accepted evolution delegates to upstream `/aif-evolve`. AIFHub adds no transfer skill or injection. |
+| skills.sh installation documentation | Docs-only reviewed no-op: skills-only installation is not documented as providing the CLI, extension loader, MCP auto-configuration, agent files or command wrappers. |
+
+### AI Factory 2.18.1 patch audit
+
+| Upstream surface | Evidence and AIFHub decision |
+|---|---|
+| Package and documentation patch | The reviewed `2.18.0...2.18.1` range contains 2 commits across 8 files. It is prompt/docs-only apart from the package version and ultra-contract test metadata. |
+| Runtime/API/schema/dependencies | Reviewed no-op: extension schema/loader, injection/MCP runtime, Node `>=18`, bin and dependencies are unchanged from the cumulative 2.18.0 audit. |
+| `/aif-explore` Research Coherence Gate | Upstream-owned. AIFHub does not copy or replace its algorithm; the prepend only guarantees a non-bypass pass-through after permitted persisted regular/ultra writes, preserves optional fresh-context `Task` with mandatory direct fallback, and keeps coherence before the ultra Bundle Integrity Gate. |
+| Consumer compatibility evidence | Deterministic and opt-in live orchestration bind exact `2.17.0` and `2.18.1` package/reported versions while retaining `2.18.0` as a separate stable feature boundary and preserving the public `smoke:ai-factory-2-18` command plus existing flags. |
+
+### AI Factory 2.18 consumer ledger
+
+| Consumer | Decision |
+|---|---|
+| `/aif-plan` | `adapter`: version-gated canonical ultra detail in OpenSpec-native mode; marker-first upstream handoff in legacy mode. |
+| `/aif-explore` | `adapter`: regular research remains one resolved file; explicit stable-2.18 ultra research is one marked sibling bundle; on 2.18.1 every permitted persisted write continues into the upstream Research Coherence Gate before presentation/session append. |
+| `/aif-improve`, `/aif-implement`, `/aif-verify`, `/aif-fix` | `adapter`: canonical OpenSpec consumption is unchanged; legacy marked ultra is classified before companion writes and handed to the matching upstream owner. |
+| `/aif-archive` | `adapter`: OpenSpec-native mutation guard; read-only `list`, roadmap-only `--roadmap` and legacy archive retain upstream ownership. |
+| `/aif-rules-check`, `/aif-commit`, `/aif-roadmap` | `retain`: existing AIFHub boundaries remain; no multi-file orchestration is copied. |
+| `aif-analyze` | `retain`: owns AIFHub config/bootstrap only and preserves upstream and unknown user fields. |
+| `aif-mode` | `adapter`: keeps OpenSpec sync ownership and preserves an explicitly captured legacy source root instead of scanning canonical changes. |
+| `aif-done` | `retain`: remains the OpenSpec finalizer; a verified legacy ultra bundle receives only an upstream `/aif-archive <entrypoint>` handoff. |
+| `aif-evolve` | `retain`: remains the downstream owner selected by upstream privacy-gated transfer; no transfer registry is copied. |
+| `/aif-loop`, `/aif-transfer` and packaged upstream coordinators | `no-op`: remain upstream-owned; AIFHub does not export duplicate skills, injections or orchestration. |
+| AIFHub namespaced agents | `adapter`: keep bounded OpenSpec roles and return exact upstream handoffs for legacy marked ultra instead of editing phase bundles. |
 
 The metadata compatibility range remains `>=2.11.0 <3.0.0`. Behaviors introduced by newer upstream runtimes are labeled by version instead of raising the minimum without a proven hard dependency.
 

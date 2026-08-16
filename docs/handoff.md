@@ -45,7 +45,7 @@ aif-explore -> aif-plan -> aif-improve -> aif-implement -> aif-verify -> aif-don
 `/aif-analyze` остаётся bootstrap/setup step перед этим flow. Он готовит context и rules, но не является первым узлом canonical public command sequence.
 `/aif-done` — AIFHub OpenSpec finalization tail после passing verification. Он не заменяет `/aif-verify`, не является upstream legacy alias и не меняет upstream ownership verification loop.
 
-Upstream `/aif-archive` — отдельная AI Factory 2.14+ legacy cleanup команда для completed `paths.plans/*.md` -> `paths.archive/plans/*.md` и optional roadmap snapshots under `paths.archive/roadmap/`. Она не является Handoff Done stage и не владеет OpenSpec-native archive/finalization.
+Upstream `/aif-archive` — отдельная AI Factory 2.14+ legacy cleanup команда для classic plans, а в 2.18 также для atomic marked ultra bundles, плюс optional roadmap snapshots under `paths.archive/roadmap/`. В OpenSpec-native mode plan-mutating targets route to `/aif-done <change-id>` before plan discovery. Команда не является Handoff Done stage и не владеет OpenSpec-native archive/finalization.
 
 ## Названия стадий
 
@@ -82,7 +82,7 @@ fail -> /aif-fix -> /aif-verify -> /aif-done
 Что делает `/aif-done`:
 - Проверяет, что plan прошёл verify (verdict `pass` или `pass-with-notes`).
 - В OpenSpec-native mode архивирует verified change только через OpenSpec CLI (`openspec archive <change-id> --yes`) и пишет final evidence under `.ai-factory/qa/<change-id>/` плюс `.ai-factory/state/<change-id>/`.
-- В legacy AI Factory-only mode может архивировать plan folder и companion plan file в `.ai-factory/specs/<plan-id>/`; это legacy-only path и не описывает OpenSpec-native finalization.
+- В legacy AI Factory-only mode может финализировать только classic plan folder/companion по существующему AIFHub contract. Для marked ultra `/aif-done` ничего не архивирует: он read-only re-evaluates revision-bound receipt и возвращает exact `/aif-archive <entrypoint>` только для current exact `pass`, иначе exact `/aif-verify <entrypoint>`.
 - Готовит commit message и PR summary drafts.
 - Применяет roadmap/architecture/rules follow-ups только при plan-backed evidence; если owning update нельзя выполнить в текущем runtime, возвращает exact handoff вместо silent skip.
 - Запускает или предлагает `/aif-evolve` в зависимости от runtime capability и явного user intent.
@@ -93,12 +93,14 @@ fail -> /aif-fix -> /aif-verify -> /aif-done
 - Не выдумывает governance changes без evidence из плана и не обходит owning path для ROADMAP/RULES/ARCHITECTURE.
 - Не является upstream replacement для `/aif-verify` и не восстанавливает legacy `/aif-done` alias semantics.
 - Не заменяет upstream `/aif-archive`; `/aif-archive` остаётся legacy plan cleanup и не пишет OpenSpec canonical artifacts.
+- Не выполняет verify/archive handoff для marked ultra и не пишет receipt, companion, QA, OpenSpec или spec-index artifacts.
 
 ## Правила интерпретации
 
 - Если handoff говорит `New`, для новой работы используйте `/aif-plan full`.
 - Если handoff говорит `Apply`, ориентируйтесь на `/aif-implement`.
 - Если handoff говорит `Done`, доведите plan до verified state через `/aif-verify`, затем запустите `/aif-done` для AIFHub OpenSpec archive/finalization, commit/PR summaries и evidence-driven final follow-ups. Не используйте `/aif-archive` для OpenSpec-native Done.
+- Если legacy entrypoint является valid `<!-- aif:plan-mode:ultra -->` bundle, используйте marker-first exact commands: `/aif-verify <entrypoint>`; затем `/aif-done <entrypoint>` только оценивает receipt и возвращает `/aif-archive <entrypoint>` либо повторный `/aif-verify <entrypoint>`. AIFHub не редактирует phase bundle и не исполняет handoff автоматически.
 - Если handoff говорит `Explore / New / Apply / Done`, считайте это naming layer, а не списком обязательных slash commands.
 
 ## Stage Mapping (Future Handoff Orchestration)
@@ -112,6 +114,8 @@ fail -> /aif-fix -> /aif-verify -> /aif-done
 | **Implementing** | `/aif-implement`, `/aif-verify --check-only`; if fail: `/aif-fix` -> `/aif-verify --check-only` | — | Если позже понадобится отдельный handoff binding для verify/fix, это должен быть отдельный scope поверх core workflow |
 | **Review** | `/aif-review`, `/aif-security-checklist`, `/aif-rules-check`; if any required gate evidence is missing/invalid, stay in Review and run the owning command; if any completed gate fails, return to Implementing | `aif-review-handoff-gate.md`, `aif-security-checklist-handoff-gate.md`, `aif-rules-check-handoff-gate.md` | Multi-gate aggregation и conditional return |
 | **Done** | `/aif-done` | `aif-done-handoff-finalizer.md` | Explicit finalizer stage binding |
+
+Для legacy marked ultra эта таблица является routing layer, а не write pipeline: verifier command boundary — единственный writer `.ai-factory/state/legacy-ultra-verification/<entrypoint-digest>.json`; done/rules consumers только re-evaluate bundle/revision/worktree/gate binding и возвращают exact upstream command.
 
 ### Что работает сейчас вручную
 

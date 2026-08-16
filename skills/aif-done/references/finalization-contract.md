@@ -106,13 +106,56 @@ After successful finalization:
 
 ## Legacy AI Factory-only mode
 
-## Entry Conditions
+### Marker-first legacy ultra contract
+
+Legacy mode must classify the normalized project-relative entrypoint before classic companion discovery or any write. A valid marker-bearing AI Factory 2.18 ultra plan is one atomic upstream bundle rooted at `<entrypoint>/index.md`; it is not a folder-only classic plan and must not be migrated or paired with `<plan-id>.md`.
+
+For `ultra-valid`, `/aif-verify <entrypoint>` is the only receipt writer. After upstream verification produces exactly one final valid `aif-gate-result`, it writes:
+
+```text
+.ai-factory/state/legacy-ultra-verification/<entrypoint-digest>.json
+```
+
+The receipt schema is:
+
+```json
+{
+  "schemaVersion": 1,
+  "entrypoint": ".ai-factory/plans/<plan-id>/index.md",
+  "entrypointDigest": "<lowercase SHA256>",
+  "bundleDigest": "<lowercase SHA256>",
+  "sourceRevision": { "kind": "git-head", "value": "<HEAD>" },
+  "worktreeDigest": "<lowercase SHA256>",
+  "verifiedAt": "<ISO-8601 timestamp>",
+  "sourceCommand": "/aif-verify .ai-factory/plans/<plan-id>/index.md",
+  "gateOutcome": { "gate": "verify", "status": "pass", "blockers": [], "affected_files": [], "suggested_next": null }
+}
+```
+
+`sourceRevision.kind` is `git-head` in a Git workspace and `manual-build-id` only for a non-Git workspace with an explicit bounded build id. The stored `gateOutcome` is the exact structured final upstream gate and may record `pass`, `warn`, or `fail`; only exact `pass` is finalization-ready.
+
+#### Binding algorithm
+
+- Normalize a directory or `index.md` input to one safe project-relative `<bundle>/index.md`. `entrypointDigest` is SHA256 of that normalized UTF-8 string without an added newline.
+- Build the bundle manifest from `index.md` plus its direct validated `phase-*.md` files, sorted by normalized project-relative path. Each JSONL row is `[path,type,sha]`; files hash current bytes, symlinks hash their link target, and the manifest ends with one newline. `bundleDigest` is SHA256 of the full manifest bytes.
+- In Git, obtain candidates only with `git ls-files --cached --others --exclude-standard -z`, resolve the revision with `git rev-parse --verify HEAD`, normalize and sort paths, and hash the same JSONL row format. A deleted tracked path remains a row `[path,"missing",null]`.
+- Exclude `.git/**`, `.ai-factory/state/**`, `.ai-factory/qa/**`, `.ai-factory/rules/generated/**`, and the ultra bundle itself from the worktree manifest. This prevents the receipt and derived evidence from invalidating themselves while binding all tracked and non-ignored untracked code/content outside the bundle.
+- In a non-Git workspace, deterministically enumerate non-excluded files and bind them to the caller-supplied `manual-build-id`.
+- `worktreeDigest` is SHA256 of the sorted worktree JSONL manifest bytes. Do not use mtimes, directory iteration order, conversational state, or recency.
+
+#### `/aif-done` decision
+
+`/aif-done` calls `evaluateLegacyUltraVerificationReceipt()` and recomputes every binding. A missing/invalid receipt, wrong entrypoint, stale bundle, wrong `HEAD` or manual build id, stale worktree, non-`pass` gate, or any binding failure returns exactly `/aif-verify <entrypoint>`. A current exact PASS receipt returns exactly `/aif-archive <entrypoint>`.
+
+This branch is read-only: `/aif-done` returns the handoff but does not execute it and does not write the bundle, a classic companion, OpenSpec artifacts, `status.yaml`, QA evidence, final summaries, specs archives/indexes, or receipts. `ultra-invalid` and `collision` fail closed without classic fallback.
+
+### Classic entry conditions
 
 - `status.yaml` exists in the active plan folder.
 - `verification.verdict` is `pass` or `pass-with-notes`.
 - No uncommitted changes outside plan scope (user must confirm if present).
 
-## Archival Structure
+### Classic archival structure
 
 ```text
 .ai-factory/specs/<plan-id>/

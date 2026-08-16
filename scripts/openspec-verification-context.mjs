@@ -45,6 +45,43 @@ export async function buildVerificationContext(options = {}) {
   return runOpenSpecVerification(options.changeId, options);
 }
 
+export async function validateAifHubArtifactContract(changeId, options = {}) {
+  let validateOpenSpecArtifactContract = options.validateOpenSpecArtifactContract;
+  if (validateOpenSpecArtifactContract === undefined) {
+    ({ validateOpenSpecArtifactContract } = await import('./openspec-artifact-validator.mjs'));
+  }
+
+  try {
+    return await validateOpenSpecArtifactContract({
+      ...options,
+      changeId,
+      requireVerificationEvidence: false
+    });
+  } catch (err) {
+    return {
+      schema_version: 1,
+      validator: 'aifhub-openspec-artifact-contract',
+      change_id: changeId,
+      status: 'fail',
+      blocking: true,
+      checks: [{
+        id: 'artifact-contract-executed',
+        status: 'fail',
+        path: `openspec/changes/${changeId}`,
+        message: 'AIFHub artifact contract could not be evaluated.',
+        details: {
+          rule_code: 'openspec-artifact-contract-execution-failed',
+          error_code: err?.code ?? 'artifact-contract-error'
+        }
+      }],
+      suggested_next: {
+        command: `/aif-mode doctor --change ${changeId}`,
+        reason: 'artifact contract evaluation failed closed before code verification'
+      }
+    };
+  }
+}
+
 export async function runOpenSpecVerification(changeId, options = {}) {
   const rootDir = resolveRootDir(options);
   const resolveActiveChange = options.resolveActiveChange ?? defaultResolveActiveChange;
@@ -80,6 +117,12 @@ export async function runOpenSpecVerification(changeId, options = {}) {
     ...options,
     rootDir
   });
+  const artifactContract = await validateAifHubArtifactContract(resolverResult.changeId, {
+    ...options,
+    rootDir,
+    resolveActiveChange: async () => resolverResult
+  });
+  const artifactContractPolicy = classifyArtifactContractForVerification(artifactContract);
   const generatedRules = await collectGeneratedRules(resolverResult.changeId, {
     ...options,
     rootDir
@@ -99,12 +142,14 @@ export async function runOpenSpecVerification(changeId, options = {}) {
   const warnings = dedupeDiagnostics([
     ...resolverResult.warnings,
     ...canonical.warnings,
+    ...artifactContractPolicy.warnings,
     ...generatedRulesPolicy.warnings,
     ...rulesGatePolicy.warnings,
     ...openspec.warnings,
     ...(config.diagnostics ?? [])
   ]);
   const errors = [
+    ...artifactContractPolicy.errors,
     ...canonical.errors,
     ...generatedRules.errors,
     ...generatedRulesPolicy.errors,
@@ -126,6 +171,7 @@ export async function runOpenSpecVerification(changeId, options = {}) {
     },
     config,
     canonicalArtifacts: canonical.canonicalArtifacts,
+    artifactContract,
     generatedRules: generatedRules.generatedRules,
     rulesGate,
     openspec: {
@@ -355,6 +401,29 @@ function createVerifyGateResult(changeId, evidence) {
       }
       : null
   });
+}
+
+function classifyArtifactContractForVerification(result) {
+  if (result?.status === 'pass') {
+    return { warnings: [], errors: [] };
+  }
+
+  const failing = (result?.checks ?? []).find((check) => check.status === 'fail')
+    ?? (result?.checks ?? []).find((check) => check.status === 'warn');
+  const diagnostic = {
+    code: result?.status === 'fail' ? 'artifact-contract-fail' : 'artifact-contract-warn',
+    message: failing?.message ?? 'AIFHub artifact contract did not pass.',
+    path: failing?.path,
+    details: {
+      validator: result?.validator ?? 'aifhub-openspec-artifact-contract',
+      check_id: failing?.id ?? null,
+      rule_code: failing?.details?.rule_code ?? null
+    }
+  };
+
+  return result?.status === 'warn'
+    ? { warnings: [diagnostic], errors: [] }
+    : { warnings: [], errors: [diagnostic] };
 }
 
 function classifyGeneratedRulesForPolicy(generatedRules, policy, action) {
@@ -975,6 +1044,7 @@ function createFailureContext({ resolverResult, warnings = [], errors = [] }) {
       requireCliForVerify: false
     },
     canonicalArtifacts: {},
+    artifactContract: null,
     generatedRules: [],
     openspec: {
       available: false,

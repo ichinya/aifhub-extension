@@ -252,15 +252,120 @@ describe('OpenSpec artifact contract validator', () => {
   it('fails when runtime evidence is placed inside openspec/changes', async () => {
     const rootDir = await createTempRoot();
     await createValidChange(rootDir);
-    await writeFixture(rootDir, 'openspec/changes/add-oauth/openspec-validation.json', '{}\n');
+    await writeFixture(rootDir, 'openspec/changes/add-oauth/state/runtime.json', '{}\n');
+
+    const result = await validateOpenSpecArtifactContract({
+      rootDir,
+      changeId: 'add-oauth'
+    });
+    const failures = result.checks.filter((check) =>
+      check.id === 'runtime-files-outside-change' && check.status === 'fail'
+    );
+
+    assert.equal(result.status, 'fail');
+    assert.deepEqual(failures.map((check) => check.path), [
+      'openspec/changes/add-oauth/state/runtime.json'
+    ]);
+  });
+
+  it('allows capability directories whose names match runtime directory names', async () => {
+    const rootDir = await createTempRoot();
+    await createValidChange(rootDir);
+    await writeFixture(rootDir, 'openspec/changes/add-oauth/specs/state/spec.md', [
+      '# State Delta',
+      '',
+      '## ADDED Requirements',
+      '',
+      '### Requirement: State transition',
+      '',
+      'The system MUST expose a valid state transition.',
+      '',
+      '#### Scenario: transition succeeds',
+      '',
+      '- GIVEN a valid current state',
+      '- WHEN the transition is requested',
+      '- THEN the next state is recorded.',
+      ''
+    ].join('\n'));
+    await compileOpenSpecRules('add-oauth', { rootDir });
 
     const result = await validateOpenSpecArtifactContract({
       rootDir,
       changeId: 'add-oauth'
     });
 
-    assert.equal(result.status, 'fail');
-    assert.ok(result.checks.some((check) => check.id === 'runtime-files-outside-change' && check.status === 'fail'));
+    assert.equal(result.status, 'pass');
+    assert.equal(getCheck(result, 'runtime-files-outside-change').status, 'pass');
+  });
+
+  it('fails closed on root or nested ultra index, phase, and legacy companion artifacts', async () => {
+    const cases = [
+      ['index-root', 'openspec/changes/add-oauth/index.md', 'openspec-ultra-index-forbidden'],
+      ['index-nested', 'openspec/changes/add-oauth/notes/index.md', 'openspec-ultra-index-forbidden'],
+      ['phase-root', 'openspec/changes/add-oauth/phase-01-foundation.md', 'openspec-ultra-phase-forbidden'],
+      ['phase-nested', 'openspec/changes/add-oauth/notes/phase-02-integration.md', 'openspec-ultra-phase-forbidden'],
+      ['legacy-context', 'openspec/changes/add-oauth/notes/context.md', 'openspec-legacy-companion-forbidden']
+    ];
+
+    for (const [name, relativePath, ruleCode] of cases) {
+      const rootDir = await createTempRoot();
+      await createValidChange(rootDir);
+      await writeFixture(rootDir, relativePath, `# ${name}\n`);
+
+      const result = await validateOpenSpecArtifactContract({
+        rootDir,
+        changeId: 'add-oauth'
+      });
+      const failure = result.checks.find((check) =>
+        check.id === 'planning-artifacts-outside-change'
+        && check.status === 'fail'
+        && check.details?.rule_code === ruleCode
+      );
+
+      assert.equal(result.status, 'fail', name);
+      assert.equal(failure?.path, relativePath, name);
+      assert.equal(result.suggested_next.command, '/aif-fix add-oauth', name);
+    }
+  });
+
+  it('rejects only an active standalone ultra marker and allows documented inline or fenced literals', async () => {
+    const activeRoot = await createTempRoot();
+    await createValidChange(activeRoot);
+    await writeFixture(activeRoot, 'openspec/changes/add-oauth/proposal.md', [
+      '<!-- aif:plan-mode:ultra -->',
+      '# Proposal',
+      '',
+      '## Why',
+      '',
+      'Describe ultra depth without changing artifact shape.',
+      ''
+    ].join('\n'));
+    const active = await validateOpenSpecArtifactContract({ rootDir: activeRoot, changeId: 'add-oauth' });
+    assert.equal(active.status, 'fail');
+    assert.ok(active.checks.some((check) =>
+      check.id === 'planning-artifacts-outside-change'
+      && check.details?.rule_code === 'openspec-ultra-marker-forbidden'
+    ));
+
+    for (const [name, literal] of [
+      ['inline', 'The documented marker is `<!-- aif:plan-mode:ultra -->`.'],
+      ['fenced', '```md\n<!-- aif:plan-mode:ultra -->\n```']
+    ]) {
+      const rootDir = await createTempRoot();
+      await createValidChange(rootDir);
+      await writeFixture(rootDir, 'openspec/changes/add-oauth/proposal.md', [
+        '# Proposal',
+        '',
+        '## Why',
+        '',
+        literal,
+        ''
+      ].join('\n'));
+
+      const result = await validateOpenSpecArtifactContract({ rootDir, changeId: 'add-oauth' });
+      assert.equal(result.status, 'pass', name);
+      assert.equal(getCheck(result, 'planning-artifacts-outside-change').status, 'pass', name);
+    }
   });
 
   it('fails missing verify gate when verification evidence is required', async () => {

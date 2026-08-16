@@ -43,7 +43,9 @@ Use this mode when config declares `aifhub.artifactProtocol: openspec`.
 
 Use this mode when OpenSpec-native mode is not enabled.
 
-- Apply only explicitly selected verification findings or independently validated review findings for one legacy plan pair.
+- Before finding/status discovery or any write, classify the normalized project-relative entrypoint marker-first with `classifyLegacyPlanShape()`. For `ultra-valid`, return exactly `/aif-fix <entrypoint>` and stop; upstream owns bundle-aware repair.
+- Never write an ultra bundle, companion, spec, status, QA, receipt, or final artifact. Fail `ultra-invalid` and `collision` closed without classic fallback.
+- Only `classic-pair` or `classic-folder-only` continues below. Apply only explicitly selected verification findings or independently validated review findings for one classic legacy plan pair.
 - Before any write, resolve one lowercase plan slug, reject unsafe tokens, and stop unless the companion plan file plus matching plan folder already exist under `.ai-factory/plans/<plan-id>/`.
 - Allowed write scope after validation: files already inside the selected findings' current changed scope, plus the resolved active plan's `status.yaml` and `fixes/` directory.
 - Do not rewrite `task.md`, `context.md`, `rules.md`, `extension.json`, or docs unless a selected finding explicitly targets one of those files.

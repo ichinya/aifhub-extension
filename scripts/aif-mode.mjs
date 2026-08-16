@@ -32,6 +32,7 @@ export async function runModeCommand(argv, options = {}) {
     overwrite: parsed.yes,
     current: parsed.current,
     exportOpenSpec: parsed.exportOpenSpec,
+    legacyPlanSourceRoot: parsed.legacyPlanSourceRoot,
     timestamp: parsed.timestamp
   };
   let result;
@@ -64,7 +65,7 @@ export function parseArgs(argv) {
   const command = args.shift();
 
   if (!COMMANDS.has(command)) {
-    return invalid(`Usage: node scripts/aif-mode.mjs ${[...COMMANDS].join('|')} [--dry-run] [--all] [--change <id>] [--yes] [--export-openspec] [--json]`);
+    return invalid(`Usage: node scripts/aif-mode.mjs ${[...COMMANDS].join('|')} [--dry-run] [--all] [--change <id>] [--legacy-source <dir>] [--yes] [--export-openspec] [--json]`);
   }
 
   const result = {
@@ -76,6 +77,7 @@ export function parseArgs(argv) {
     yes: false,
     current: false,
     exportOpenSpec: false,
+    legacyPlanSourceRoot: null,
     json: false,
     timestamp: undefined
   };
@@ -120,6 +122,17 @@ export function parseArgs(argv) {
       }
 
       result.changeId = value;
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--legacy-source') {
+      const value = args[index + 1];
+      if (value === undefined || value.startsWith('--')) {
+        return invalid('Missing value for --legacy-source.');
+      }
+
+      result.legacyPlanSourceRoot = value;
       index += 1;
       continue;
     }
@@ -196,9 +209,22 @@ function renderAction(command, result) {
     `Dry run: ${result.dryRun ? 'yes' : 'no'}`,
     ...(result.report?.path ? [`Report: ${result.report.path}`] : []),
     ...renderSummaryOperations(result),
+    ...renderConfigKeySummary(result.config?.configKeys),
     ...renderDiagnostics('Warnings', result.warnings),
     ...renderDiagnostics('Errors', result.errors)
   ].join('\n');
+}
+
+function renderConfigKeySummary(configKeys) {
+  if (configKeys === undefined) return [];
+  return [
+    '',
+    `Config changed key paths: ${configKeys.changedKeyCount}`,
+    ...configKeys.changedKeyPaths.map((keyPath) => `- changed: ${keyPath}`),
+    `Config preserved key paths: ${configKeys.preservedKeyCount}`,
+    ...configKeys.preservedKeyPaths.map((keyPath) => `- preserved: ${keyPath}`),
+    ...(configKeys.truncated ? ['- config key path inventory truncated'] : [])
+  ];
 }
 
 function renderSummaryOperations(result) {

@@ -270,6 +270,21 @@ A new bug report starts as planned OpenSpec work:
 
 Extension behavior requirements are validated by prompt contracts and tests, not by root project OpenSpec specs committed into this repository.
 
+## AI Factory 2.18 Artifact Profiles
+
+The resolved artifact mode and the explicit command-position profile token determine ownership. AIFHub never enables `ultra` from extension metadata alone.
+
+| Artifact mode | Planning profile | Authoritative shape | AIFHub behavior |
+|---|---|---|---|
+| OpenSpec-native | regular/full | `proposal.md`, `design.md`, `tasks.md`, applicable delta specs | canonical OpenSpec workflow |
+| OpenSpec-native | explicit `ultra`, stable AI Factory `>=2.18.0` | the same canonical files with a stricter Ultra Detail Gate | no `index.md`, `phase-*`, companion files, or active ultra marker |
+| Legacy AI Factory-only | classic | `<id>.md` plus classic companion directory | existing AIFHub classic compatibility workflow |
+| Legacy AI Factory-only | explicit `ultra`, stable AI Factory `>=2.18.0` | `<id>/index.md` plus direct `phase-NN-<slug>.md`, exactly one `<!-- aif:plan-mode:ultra -->`; `index.md` is the only checkbox/progress ledger | marker-first exact upstream handoff; no sibling classic plan or companion synchronization |
+
+An explicit `ultra` request with missing, malformed, prerelease, unsupported `<2.18.0`, or provenance-matched CLI/project version evidence stops before writes and suggests the regular profile. When stable project metadata exists, different unverified global/PATH-only CLI evidence is ignored with a bounded warning and does not override the project version. A valid legacy ultra bundle is handled atomically; invalid marker/phase shapes and classic/ultra collisions fail closed.
+
+Research is supporting context in both artifact modes. Regular `/aif-explore <topic>` writes only the resolved `paths.research` file. Explicit `/aif-explore ultra <topic>` on stable 2.18 derives `<parent(paths.research)>/research/<english-topic-slug>/` without adding a config key. The minimum bundle is marked `INDEX.md` plus `RESEARCH.md`; C4, ADR, and dependency-graph files are created only when their evidence gates apply. Neither research profile becomes canonical OpenSpec content.
+
 ## Manifest Metadata
 
 `extension.json` follows the upstream AI Factory extension manifest schema and should not contain AIFHub-private fields. Its `$schema` value points at:
@@ -290,6 +305,7 @@ Reads:
 - `openspec/changes/**`
 - `openspec/specs/**`
 - `.ai-factory/plans/**`
+- `.ai-factory/state/legacy-plan-source.json` when unresolved legacy work was captured during mode switching
 - `.ai-factory/rules/generated/**`
 
 Writes by subcommand:
@@ -308,6 +324,8 @@ Does not write:
 
 Use `--dry-run` for planned switching or sync writes. Use `--all` or `--change <id>` to control change selection. Use `--export-openspec` only for compatibility legacy exports from OpenSpec changes. In OpenSpec mode, sync respects `aifhub.openspec.compileRulesOnSync` and `aifhub.openspec.validateOnSync`.
 
+When switching away from a custom legacy `paths.plans` root with unresolved work, `/aif-mode` records that safe project-relative root in `.ai-factory/state/legacy-plan-source.json`. Later OpenSpec-mode status, sync, and migration reuse the captured root instead of scanning `openspec/changes`. `--legacy-source <dir>` is an explicit one-run override. A root that lexically or physically overlaps canonical changes is rejected before writes.
+
 `/aif-mode sync --change <change-id>` is recommended after `/aif-plan full` or `/aif-improve` and whenever canonical specs or tasks changed during implementation or fixes. It ensures OpenSpec skeleton paths, compiles `.ai-factory/rules/generated/openspec-base.md`, `.ai-factory/rules/generated/openspec-change-<change-id>.md`, `.ai-factory/rules/generated/openspec-merged-<change-id>.md`, `.ai-factory/rules/generated/openspec-rules-trace-<change-id>.json`, and `.ai-factory/rules/generated/index.json`, requests OpenSpec validation/status when the CLI is available and `validateOnSync` is enabled, detects legacy plans in OpenSpec mode, and writes a sync report under `.ai-factory/state/mode-switches/`.
 
 `/aif-mode sync` without `--change` is recommended after `/aif-done`. After archive, there may be no active change. Sync still refreshes `.ai-factory/rules/generated/openspec-base.md` and `.ai-factory/rules/generated/index.json` from `openspec/specs/**`, skips change-specific generated rules and change validation when no active changes exist, and writes a sync report. OpenSpec skills are not installed.
@@ -320,11 +338,12 @@ For CLI or IDE runtimes, planning commands may recommend an available planning m
 
 ### `/aif-archive`
 
-`/aif-archive` is an upstream AI Factory 2.14+ legacy plan cleanup command. It is not the OpenSpec-native finalization command.
+`/aif-archive` is an upstream AI Factory 2.14+ legacy plan cleanup command, extended upstream in 2.18 for marked ultra directories. It is not the OpenSpec-native finalization command.
 
-Reads:
+Reads in legacy AI Factory-only mode:
 
 - completed legacy plan files under `paths.plans/*.md`
+- marked ultra bundle directories under `paths.plans/<id>/` in AI Factory 2.18
 - optional roadmap context when `/aif-archive --roadmap` is used
 
 Writes:
@@ -342,7 +361,9 @@ Does not write:
 - `.ai-factory/state/**`
 - `.ai-factory/rules/generated/**`
 
-`/aif-archive` must not run `openspec archive <change-id> --yes`. In OpenSpec-native mode, finalize a verified change with `/aif-done <change-id>` after `/aif-verify <change-id>`.
+In OpenSpec-native mode, AIFHub classifies raw arguments before resolving `paths.plans`. Plan-mutating no-argument, `--all`, and explicit targets stop before plan discovery or archive writes and return the exact owner handoff `/aif-done <change-id>`. Read-only `list` may inspect only archived inventories; roadmap-only `--roadmap` retains its upstream confirmation and bounded roadmap snapshot ownership. Invalid/conflicting arguments stop without discovery.
+
+`/aif-archive` must not run `openspec archive <change-id> --yes`. Finalize a verified OpenSpec change with `/aif-done <change-id>` after `/aif-verify <change-id>`.
 
 ### `/aif-analyze`
 
@@ -383,6 +404,8 @@ Existing configs are not prompted again. Codex Default mode asks this as plain t
 If localization questions run first, `/aif-analyze` carries those answers forward and writes them only after the artifact protocol is selected, so language persistence does not accidentally lock in the legacy default.
 
 The selected artifact protocol owns its config profile. Legacy `artifactProtocol: ai-factory` configs do not include `aifhub.openspec` settings or OpenSpec runtime path defaults; OpenSpec-native `artifactProtocol: openspec` configs include those settings and paths explicitly.
+
+Config creation and mode changes structurally patch only explicit AIFHub-owned keys. They preserve upstream/core fields, unknown top-level fields, unknown nested `aifhub` fields, custom paths, and unknown user-authored fields inside a dormant profile. Known AIFHub-owned `aifhub.openspec` settings are omitted from the legacy profile, including known `allowWarnOnDone` children; the dormant block remains only when unknown fields must survive a later switch back. Diagnostics report bounded changed/preserved key paths and counts only; they do not log values, environment data, provider configuration, or credentials. Ultra research derives its root from `paths.research`; `research_bundles_dir` is not a config key.
 
 In OpenSpec-native mode, `/aif-analyze` also compares the selected compatible CLI with AIFHub's latest reviewed stable version. An older supported CLI remains usable for validation/archive capabilities, but the handoff recommends a user-owned update and identifies whether the selected source is `project-local`, `path`, or `explicit`. The skill never guesses a package manager, installs or updates OpenSpec, or recommends downgrading a supported version that is already equal to or newer than the reviewed baseline.
 
@@ -488,7 +511,7 @@ Reads:
 - `.ai-factory/config.yaml`
 - project context and rules
 - `openspec/specs/**/spec.md`
-- optional `.ai-factory/RESEARCH.md`
+- regular resolved `paths.research` or one exact revision-bound ultra `RESEARCH.md` selected by the shared resolver
 
 Writes in OpenSpec-native mode:
 
@@ -528,6 +551,8 @@ When an explicitly requested behavior change removes the final requirement of a 
 
 When `aifhub.openspec.validateOnPlan` is enabled, planning requests `openspec validate` through the AIFHub OpenSpec runner if a compatible CLI is available. Missing CLI is a degraded warning unless `aifhub.openspec.requireCliForPlan` is true.
 
+Explicit `/aif-plan ultra <request>` first resolves exact AI Factory support. In OpenSpec-native mode on stable `>=2.18.0`, the upstream Ultra Detail Gate enriches exact files/symbols, ordered edits, contracts/data flow, failure handling, bounded logging, tests, rollback, and verification detail inside canonical `design.md` and `tasks.md`. It must not write `index.md`, `phase-NN-*.md`, companion files, or `<!-- aif:plan-mode:ultra -->` under the canonical change. In legacy mode the same token hands creation to upstream before AIFHub classic normalization.
+
 ### `/aif-explore`
 
 Reads:
@@ -537,10 +562,10 @@ Reads:
 - `openspec/specs/**/spec.md`
 - `openspec/changes/<change-id>/**` when exploring an existing change
 
-Writes:
+Writes, exactly one profile per run:
 
-- `.ai-factory/RESEARCH.md`
-- `.ai-factory/state/<change-id>/explore.md` or equivalent runtime notes
+- regular: the resolved `paths.research` file, `.ai-factory/RESEARCH.md` by default
+- explicit stable-2.18 ultra: `<parent(paths.research)>/research/<english-topic-slug>/INDEX.md`, `RESEARCH.md`, and only evidence-gated C4/ADR/dependency artifacts
 
 Does not write:
 
@@ -549,8 +574,13 @@ Does not write:
 - `openspec/changes/<change-id>/tasks.md`
 - `openspec/changes/<change-id>/specs/**/spec.md`
 - legacy `.ai-factory/plans` artifacts in OpenSpec-native mode
+- `.ai-factory/state/<change-id>/explore.md` and `.ai-factory/qa/<change-id>/`
 
 Exploration is research-only until promoted into canonical OpenSpec artifacts by planning or refinement.
+
+Regular and ultra research are mutually exclusive writes for one run. A valid ultra `INDEX.md` contains exactly one standalone `<!-- aif:research-mode:ultra -->`, one supported status, and a safe direct `RESEARCH.md` link in `## Artifact Index`. Selection precedence is an explicit safe `RESEARCH.md` path, an exact slug, then exactly one reviewed materially relevant active bundle. Ambiguity stops with `ultra-research-ambiguous`; recency and fuzzy matching never break the tie. Planning/implementation consumers bind to the selected source path, active summary, revision, and digest; sibling C4/ADR/graph rationale cannot expand scope unless reflected in the active summary.
+
+On AI Factory `2.18.1`, every permitted persisted regular or ultra write continues into the upstream-owned `Research Coherence Gate` before presentation/session append. AIFHub does not copy the gate: optional fresh-context `Task` delegation has the same direct read-only fallback, and ultra coherence must PASS before the Bundle Integrity Gate.
 
 ### `/aif-roadmap`
 
@@ -764,6 +794,8 @@ Does not write:
 
 Invalid OpenSpec validation is a hard stop before code checks. Missing or unsupported CLI, generated rules, rules gate evidence, or coverage evidence is degraded mode unless the matching verify policy flag is true. `openspec-status.json` is written when `aifhub.openspec.statusOnVerify` is enabled. Missing requirement coverage makes verify `fail` in strict mode and `warn` in normal mode.
 
+In legacy mode, marker-first classification happens before classic companion discovery. For a valid marked ultra bundle, AIFHub returns exact `/aif-verify <entrypoint>` and upstream verifies the bundle atomically. Only after one final validated upstream `aif-gate-result` may the verify command boundary write `.ai-factory/state/legacy-ultra-verification/<entrypoint-digest>.json`. The receipt contains bounded schema/entrypoint, bundle digest, Git `HEAD` or explicit manual build id, deterministic worktree digest, timestamp, source command, and structured gate outcome; it never stores phase bodies, raw stdout/stderr, or credentials. No classic companion, QA, OpenSpec, or finalization file is written for this branch.
+
 ### `/aif-fix`
 
 Reads:
@@ -846,6 +878,8 @@ Next steps after `/aif-done`:
 3. Optionally run `/aif-evolve` when the change produced durable workflow or skill learnings.
 
 `/aif-done` finalizes the OpenSpec lifecycle. It does not replace `/aif-commit`.
+
+For a marked legacy ultra entrypoint, `/aif-done` is a read-only receipt evaluator, not a finalizer writer. It recomputes the bundle, exact entrypoint, source revision, and deterministic worktree bindings on every run. Only a current exact `pass` receipt returns `/aif-archive <entrypoint>`; missing, malformed, stale, wrong-entrypoint, wrong-revision/worktree, `warn`, `pass-with-notes`, or `fail` returns `/aif-verify <entrypoint>`. `/aif-done` executes neither handoff and writes no ultra, companion, OpenSpec, QA, spec-index, or receipt artifact.
 
 ### `/aif-commit`
 
@@ -976,6 +1010,17 @@ Legacy planning writes:
   explore.md
 ```
 
+AI Factory 2.18 marked ultra planning is a separate atomic shape:
+
+```text
+.ai-factory/plans/<plan-id>/
+  index.md              # exactly one <!-- aif:plan-mode:ultra --> and the sole progress ledger
+  phase-01-<slug>.md
+  phase-02-<slug>.md
+```
+
+Do not create a sibling `<plan-id>.md` or classic `task.md`, `context.md`, `rules.md`, `verify.md`, `status.yaml`, or `explore.md` for a valid marked ultra bundle. `/aif-improve`, `/aif-implement`, `/aif-verify`, and `/aif-fix` return the matching exact upstream command. After upstream verification, the bounded receipt described above is the only AIFHub write; `/aif-done` routes to upstream archive only for a current exact pass.
+
 Upstream `/aif-archive` may later move completed legacy plan files from `paths.plans/*.md` to `paths.archive/plans/*.md`. The default `paths.archive` root is `.ai-factory/archive/`. Archived legacy plans are excluded from active sequential plan numbering and discovery; this does not affect OpenSpec-native `openspec/changes/<change-id>/` directories.
 
 Use the explicit migration command when existing legacy artifacts need to enter the OpenSpec-native workflow:
@@ -984,6 +1029,8 @@ Use the explicit migration command when existing legacy artifacts need to enter 
 ai-factory aifhub-migrate-legacy-plans <change-id> --dry-run
 ai-factory aifhub-migrate-legacy-plans <change-id>
 ```
+
+Migration is classic-only. It reports valid marked ultra as skipped and blocks malformed ultra-like shapes or classic/ultra collisions. If `/aif-mode` captured a former custom plan root, use the recorded `.ai-factory/state/legacy-plan-source.json` binding or pass `--legacy-source <project-relative-plans-root>` explicitly; canonical `openspec/changes` is never scanned as legacy input.
 
 After migration, run:
 
@@ -1020,6 +1067,12 @@ If legacy plans exist, review migration first:
 ```bash
 ai-factory aifhub-migrate-legacy-plans --all --dry-run
 ai-factory aifhub-migrate-legacy-plans --all
+```
+
+For a custom pre-switch plan root, keep the source explicit in the review command when needed:
+
+```bash
+ai-factory aifhub-migrate-legacy-plans --all --legacy-source <project-relative-plans-root> --dry-run
 ```
 
 Switch to legacy AI Factory-only mode without deleting OpenSpec artifacts:
@@ -1086,51 +1139,40 @@ See [Codex Plan Mode](codex-plan-mode.md) for question-format guidance.
 | Missing or stale coverage | `.ai-factory/qa/<change-id>/coverage.json` is absent or fingerprints no longer match source artifacts. | Rerun `/aif-verify <change-id>` to regenerate coverage before `/aif-done`. |
 | Artifact contract failure | Canonical OpenSpec artifacts, runtime state, QA evidence, or generated rules violate the AIFHub contract. | Fix the reported path or run the suggested command from `artifactContract.suggested_next`. |
 | Dirty working tree before `/aif-done` | Finalization cannot prove archive/summary scope safely. | Inspect with `git status --short`; commit or stash unrelated changes, or rerun `ai-factory aifhub-done-finalizer --change <change-id> --record-dirty-state --json` to record the dirty workspace in final QA evidence before archive. |
+| Explicit ultra rejected | AI Factory version evidence is missing, prerelease, `<2.18.0`, malformed, or conflicts with provenance-matched CLI evidence. | Use the regular plan/research profile or provide a matching stable local 2.18+ project toolchain; no ultra artifact was written. |
+| Unverified AI Factory CLI warning | Stable project metadata exists, but global/PATH-only CLI evidence reports a different version without proven matching project provenance. | Keep the project metadata as authoritative; the unverified CLI evidence is ignored and does not reject ultra by itself. |
+| Legacy ultra asks to verify again | The receipt is missing, non-pass, or stale against bundle/revision/worktree. | Run the exact `/aif-verify <entrypoint>` handoff; do not edit the receipt or create classic companions. |
+| Plan-mutating `/aif-archive` in OpenSpec-native mode | `/aif-done` owns OpenSpec finalization. | Run `/aif-verify <change-id>`, then `/aif-done <change-id>`; archive `list` and roadmap-only modes remain separate upstream submodes. |
 
-## Release Smoke Checks
+## Local Consumer Smoke Checks
 
-1. Check the AI Factory version:
-
-```bash
-ai-factory --version
-```
-
-Expected range:
-
-```text
->=2.11.0 <3.0.0
-```
-
-The supported range is tracked in `aifhub-extension.json -> compat.ai-factory`.
-
-2. Install the extension:
+The checked-in deterministic harness always runs offline through the default test glob:
 
 ```bash
-ai-factory extension add https://github.com/ichinya/aifhub-extension.git
+npm test
 ```
 
-3. Run an OpenSpec-native smoke:
+It injects fake exact `2.17.0`/`2.18.1` executors into the production orchestration layer and covers version/provenance preflight, clean install, global update, dummy-extension isolation, stale managed-agent replacement, injection cardinality, artifact/config/unmanaged preservation, and exact transfer inventory. `2.18.0` remains a separate stable feature boundary for ultra and upstream transfer inventory (`>=2.18.0`).
 
-```text
-/aif-analyze
-/aif-plan full "smoke check feature"
-/aif-improve <change-id>
-/aif-implement <change-id>
-/aif-verify <change-id>
+The live driver is opt-in and non-globbed. It accepts only caller-supplied local command-plus-argv toolchains and package roots:
+
+```bash
+npm run smoke:ai-factory-2-18 -- --v217-command <absolute-executable> --v217-arg <absolute-2.17.0-bin-entrypoint> --v217-root <absolute-2.17.0-package-root> --v218-command <absolute-executable> --v218-arg <absolute-2.18.1-bin-entrypoint> --v218-root <absolute-2.18.1-package-root> --extension-root <absolute-local-extension-root>
 ```
 
-Expected OpenSpec-native artifacts:
+Exact `package.json` provenance and reported `2.17.0`/`2.18.1` are checked before a temporary consumer project is created. The existing `--v217-*` and `--v218-*` flag names are retained. The process boundary uses bounded `execFile` with `shell: false`; Windows `.cmd` uses an explicit existing ComSpec adapter. No toolchain is downloaded or resolved through `npx`. Missing command/package/extension prerequisites are `NOT_RUN`, not PASS. Add `--allow-network` only when the caller intentionally accepts a network-backed upstream update check; transport failure is reported separately from extension contract failure.
 
-```text
-openspec/changes/<change-id>/
-.ai-factory/state/<change-id>/
-.ai-factory/qa/<change-id>/
-.ai-factory/qa/<change-id>/coverage.json
-```
+The live flow runs three separately attributed checks:
 
-Legacy `.ai-factory/plans/` artifacts are expected only when the project is intentionally in legacy AI Factory-only mode.
+1. Clean 2.18.1 all-skills init plus local extension add and OpenSpec mode assertion; exactly one upstream `aif-transfer`, with no AIFHub copy. The installed skill retains exact upstream `aif-explore` bytes, its Research Coherence Gate/`Task` capability, and one AIFHub injection marker.
+2. A 2.17.0 selective project updated by exact `ai-factory update --force`; the current 2.18.1 base is refreshed before injections are reapplied. The flow preserves unknown config, unmanaged agent, classic/OpenSpec/marked-ultra artifact path sets and digests, upstream `aif-explore` bytes, and one-copy injections. Newly available `aif-transfer` is reported from observed inventory rather than claimed automatically.
+3. Only after global result recording, a dummy extension is installed/snapshotted and one managed AIFHub agent is made stale; exact `ai-factory extension update aifhub-extension --force` must restore the source hash while dummy ledger/files remain byte-identical and upstream `aif-explore` bytes remain unchanged.
 
-4. Run local repository checks:
+`ai-factory upgrade` is intentionally absent: it migrates v1 skill names to v2 and is not the 2.17.0-to-2.18.1 update command.
+
+Local deterministic or live PASS proves only the isolated consumer contract. It does not prove package publication, registry availability, deployment, release readiness, or successful end-user migration.
+
+Run repository validation separately:
 
 ```bash
 npm run validate
