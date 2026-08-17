@@ -67,6 +67,13 @@ Runtime state and QA evidence are external context only:
 
 The final response must still follow the upstream rules-check output contract and end with exactly one final machine-readable `aif-gate-result` fenced JSON block. Use `"gate": "rules"` and lowercase JSON `status`: `pass`, `warn`, or `fail`.
 
+Next-step routing is one-way with terminal states and wins over any upstream next-step suggestion that would loop this gate with `/aif-verify`:
+
+- When this gate passes and `/aif-verify <change-id>` has not already passed for the current change state, the suggested next step is `/aif-verify <change-id>`.
+- When this gate passes and `/aif-verify <change-id>` has already passed for the current change state, the suggested next step is `/aif-done <change-id>`; do not suggest another `/aif-verify` run.
+- When this gate fails or generated rules are missing, stale, or invalid, follow the regeneration route above (`/aif-mode sync --change <change-id>`, then rerun `/aif-rules-check`); do not suggest `/aif-verify` as remediation for a failing rules gate.
+- Do not suggest rerunning this gate after it has already passed for the current change state.
+
 ### Legacy AI Factory-only mode
 
 When OpenSpec-native mode is not active, do not add OpenSpec generated-rule requirements. Follow the upstream `/aif-rules-check` behavior for `.ai-factory/RULES.md`, `rules.base`, named `rules.<area>`, optional plan context, changed files, and the final `aif-gate-result` block.

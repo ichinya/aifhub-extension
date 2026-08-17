@@ -117,7 +117,7 @@ Normal verification responses should report:
 - fix guidance `/aif-fix <change-id>` when verification fails;
 - optional finalization guidance `/aif-done <change-id>` when verification passes.
 
-Optional read-only gates before or during verification are `/aif-rules-check`, `/aif-review`, and `/aif-security-checklist`. The authoritative final verification remains `/aif-verify <change-id>`.
+Optional read-only gates are available before verification starts: `/aif-rules-check`, `/aif-review`, and `/aif-security-checklist`. The authoritative final verification remains `/aif-verify <change-id>`. This next-step routing is one-way with terminal states: when verification passes, suggest `/aif-done <change-id>` and do not suggest a rerun of `/aif-rules-check` or `/aif-verify`; when verification fails, route to `/aif-fix <change-id>`; do not suggest `/aif-rules-check` as remediation after verification has already run.
 
 End verification output and `.ai-factory/qa/<change-id>/verify.md` with exactly one final fenced `aif-gate-result` JSON block using `"gate": "verify"` and lowercase JSON `status`: `pass`, `warn`, or `fail`. Use `fail` for blocking OpenSpec validation, coverage, generated-rules, test, lint, build, review, security, or rules failures; use `warn` only for non-blocking notes after verification completes.
 

@@ -1531,6 +1531,46 @@ describe('OpenSpec-native prompt asset contract', () => {
     }
   });
 
+  it('keeps verify and rules-check next-step guidance one-way with terminal states', async () => {
+    for (const relativePath of VERIFY_PROMPT_ASSETS) {
+      const asset = stripFencedBlocks(await readRepoFile(relativePath));
+
+      assert.doesNotMatch(
+        asset,
+        /before or during verification/i,
+        `${relativePath} should not invite a rules gate during or after verification`
+      );
+      for (const expected of [
+        'one-way',
+        'before verification starts',
+        '/aif-done <change-id>',
+        '/aif-fix <change-id>'
+      ]) {
+        assertIncludes(asset, expected, `${relativePath} one-way terminal routing`);
+      }
+    }
+
+    const rulesAsset = await readRepoFile('injections/core/aif-rules-check-openspec-generated-rules.md');
+    const rulesOpenspec = extractMarkdownSection(rulesAsset, 'OpenSpec-native mode');
+
+    for (const expected of [
+      'one-way',
+      'has not already passed',
+      '/aif-verify <change-id>',
+      '/aif-done <change-id>',
+      'do not suggest `/aif-verify` as remediation'
+    ]) {
+      assertIncludes(rulesOpenspec, expected, 'rules-check injection one-way terminal routing');
+    }
+
+    const usage = await readRepoFile('docs/usage.md');
+    assertIncludes(
+      usage,
+      'one-way with terminal states',
+      'docs/usage.md terminal routing statement'
+    );
+  });
+
   it('keeps planning-mode guidance capability-gated across active planning prompts', async () => {
     for (const relativePath of PLANNING_RUNTIME_PROMPT_ASSETS) {
       const asset = stripFencedBlocks(await readRepoFile(relativePath));

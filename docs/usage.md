@@ -693,6 +693,8 @@ After implementation, optional read-only gates are available before final verifi
 
 The authoritative final verification remains `/aif-verify <change-id>`.
 
+Next-step routing between the gates and verification is one-way with terminal states: when `/aif-verify <change-id>` passes, the suggested next step is `/aif-done <change-id>` — a rerun of `/aif-rules-check` or `/aif-verify` is not suggested after a passing verification; when verification fails, the route is `/aif-fix <change-id>`. A passing `/aif-rules-check` suggests `/aif-verify <change-id>` only when verification has not already passed for the current change state; a failing `/aif-rules-check` routes to `/aif-mode sync --change <change-id>` and a rerun, never to `/aif-verify`.
+
 ### `/aif-rules-check`
 
 Reads:
