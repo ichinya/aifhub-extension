@@ -51,7 +51,7 @@ The output shape is stable:
 }
 ```
 
-`status` is `pass`, `warn`, or `fail`. `blocking` is true only for `fail`.
+`status` is `pass`, `warn`, or `fail`. `blocking` is true only for `fail`. Passing results keep `suggested_next` `null`; the same convention applies to `aif-gate-result` blocks, where terminal and forward routing (for example `/aif-done <change-id>` or `/aif-verify <change-id>`) stays prose-only and a non-null `suggested_next` is valid only with an owned remediation command for `warn` or `fail`.
 
 ## Checks
 

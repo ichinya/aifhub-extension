@@ -62,6 +62,7 @@ Output:
 - Use `"gate": "rules"` and lowercase JSON `status` values: `pass`, `warn`, or `fail`.
 - Set `blocking` to `true` only for explicit hard-rule violations that produce `Verdict: FAIL`.
 - Include only hard-rule violations in `blockers` and include inspected paths in `affected_files`.
+- Set `suggested_next` to `null` when `status` is `pass`; report terminal or forward routing in prose only, never inside the gate result block.
 
 ```aif-gate-result
 {

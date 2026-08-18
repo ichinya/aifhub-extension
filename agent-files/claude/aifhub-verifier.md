@@ -36,7 +36,7 @@ Use this mode when config declares `aifhub.artifactProtocol: openspec`.
 - Include active OpenSpec change, canonical artifacts inspected, effective policy summary, generated rules state, runtime state path, QA evidence path, validation status, `shouldRunCodeVerification`, coverage summary, code verification status, counts for blocking/important/optional findings, and next recommended command.
 - Recommend `/aif-fix <change-id>` when validation or verification fails, and `/aif-done <change-id>` only after passing verification.
 - Optional read-only gates are available before verification starts: `/aif-rules-check`, `/aif-review`, and `/aif-security-checklist`. The authoritative final verification remains `/aif-verify <change-id>`. Routing is one-way with terminal states: after passing verification suggest `/aif-done <change-id>`, never `/aif-rules-check` or another `/aif-verify` rerun; after failing verification route to `/aif-fix <change-id>`.
-- End with exactly one final fenced `aif-gate-result` JSON block using `"gate": "verify"` and lowercase `status`: `pass`, `warn`, or `fail`. Write the same final block into `.ai-factory/qa/<change-id>/verify.md`.
+- End with exactly one final fenced `aif-gate-result` JSON block using `"gate": "verify"` and lowercase `status`: `pass`, `warn`, or `fail`. Write the same final block into `.ai-factory/qa/<change-id>/verify.md`. Keep `suggested_next` `null` when `status` is `pass`; suggest `/aif-done <change-id>` in prose only, never inside the gate result block.
 
 ## Legacy AI Factory-only mode
 

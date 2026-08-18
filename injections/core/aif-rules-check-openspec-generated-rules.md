@@ -67,6 +67,8 @@ Runtime state and QA evidence are external context only:
 
 The final response must still follow the upstream rules-check output contract and end with exactly one final machine-readable `aif-gate-result` fenced JSON block. Use `"gate": "rules"` and lowercase JSON `status`: `pass`, `warn`, or `fail`.
 
+The final `aif-gate-result` block keeps `suggested_next` `null` when `status` is `pass`: the next-step routing below is prose guidance and MUST NOT be encoded into the machine-readable `suggested_next` field.
+
 Next-step routing is one-way with terminal states and wins over any upstream next-step suggestion that would loop this gate with `/aif-verify`:
 
 - When this gate passes and `/aif-verify <change-id>` has not already passed for the current change state, the suggested next step is `/aif-verify <change-id>`.

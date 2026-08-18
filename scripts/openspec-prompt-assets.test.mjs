@@ -1548,6 +1548,11 @@ describe('OpenSpec-native prompt asset contract', () => {
       ]) {
         assertIncludes(asset, expected, `${relativePath} one-way terminal routing`);
       }
+      assert.match(
+        asset,
+        /suggested_next.{0,3}null.{0,3}when.{0,3}status.{0,3}is.{0,3}pass/,
+        `${relativePath} null-on-pass machine contract`
+      );
     }
 
     const rulesAsset = await readRepoFile('injections/core/aif-rules-check-openspec-generated-rules.md');
@@ -1562,12 +1567,22 @@ describe('OpenSpec-native prompt asset contract', () => {
     ]) {
       assertIncludes(rulesOpenspec, expected, 'rules-check injection one-way terminal routing');
     }
+    assert.match(
+      rulesOpenspec,
+      /suggested_next.{0,3}null.{0,3}when.{0,3}status.{0,3}is.{0,3}pass/,
+      'rules-check injection null-on-pass machine contract'
+    );
 
     const usage = await readRepoFile('docs/usage.md');
     assertIncludes(
       usage,
       'one-way with terminal states',
       'docs/usage.md terminal routing statement'
+    );
+    assert.match(
+      usage,
+      /suggested_next.{0,3}null.{0,3}when.{0,3}status.{0,3}is.{0,3}pass/,
+      'docs/usage.md null-on-pass machine contract'
     );
   });
 

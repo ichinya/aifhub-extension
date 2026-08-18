@@ -206,7 +206,7 @@ export function validateGateResult(value, options = {}) {
     errors.push(diagnostic('invalid-affected-files', 'affected_files must contain only strings.'));
   }
 
-  errors.push(...validateSuggestedNext(normalized.suggested_next, normalized.gate));
+  errors.push(...validateSuggestedNext(normalized.suggested_next, normalized.gate, normalized.status));
 
   return {
     ok: errors.length === 0,
@@ -314,7 +314,14 @@ function normalizeSuggestedNext(value) {
   };
 }
 
-function validateSuggestedNext(value, gate) {
+function validateSuggestedNext(value, gate, status) {
+  if (status === 'pass' && value !== null) {
+    return [diagnostic(
+      'invalid-suggested-next-on-pass',
+      'suggested_next must be null when status is pass; terminal routing is prose-only.'
+    )];
+  }
+
   if (value === null) {
     return [];
   }

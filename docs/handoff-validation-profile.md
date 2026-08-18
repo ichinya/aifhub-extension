@@ -59,6 +59,8 @@ Handoff should treat these fields as the minimal stable contract:
 
 `diagnostics` and `evidence` are included for debugging and auditability.
 
+This string `suggested_next` is a separate stage-routing contract, distinct from the object-typed `suggested_next` inside `aif-gate-result` blocks: gate results keep `suggested_next` `null` when `status` is `pass` (terminal routing stays prose-only), while the Handoff summary always names the exact next command and expresses the terminal state as `/aif-done <change-id>`.
+
 ## Evidence Inputs
 
 The summary reads existing files only. It does not create runtime directories and does not write QA evidence.
