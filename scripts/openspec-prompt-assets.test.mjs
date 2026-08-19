@@ -1531,6 +1531,71 @@ describe('OpenSpec-native prompt asset contract', () => {
     }
   });
 
+  it('keeps verify and rules-check next-step guidance one-way with terminal states', async () => {
+    for (const relativePath of VERIFY_PROMPT_ASSETS) {
+      const asset = stripFencedBlocks(await readRepoFile(relativePath));
+
+      assert.doesNotMatch(
+        asset,
+        /before or during verification/i,
+        `${relativePath} should not invite a rules gate during or after verification`
+      );
+      for (const expected of [
+        'one-way',
+        'before verification starts',
+        '/aif-done <change-id>',
+        '/aif-fix <change-id>'
+      ]) {
+        assertIncludes(asset, expected, `${relativePath} one-way terminal routing`);
+      }
+      assert.match(
+        asset,
+        /suggested_next.{0,3}null.{0,3}when.{0,3}status.{0,3}is.{0,3}pass/,
+        `${relativePath} null-on-pass machine contract`
+      );
+    }
+
+    for (const relativePath of ['docs/claude-agents.md', 'docs/codex-agents.md']) {
+      const agentDoc = stripFencedBlocks(await readRepoFile(relativePath));
+      assert.doesNotMatch(
+        agentDoc,
+        /before or during verification/i,
+        `${relativePath} should not invite a rules gate during or after verification`
+      );
+      assertIncludes(agentDoc, 'before verification starts', `${relativePath} one-way gate timing`);
+    }
+
+    const rulesAsset = await readRepoFile('injections/core/aif-rules-check-openspec-generated-rules.md');
+    const rulesOpenspec = extractMarkdownSection(rulesAsset, 'OpenSpec-native mode');
+
+    for (const expected of [
+      'one-way',
+      'has not already passed',
+      '/aif-verify <change-id>',
+      '/aif-done <change-id>',
+      'do not suggest `/aif-verify` as remediation'
+    ]) {
+      assertIncludes(rulesOpenspec, expected, 'rules-check injection one-way terminal routing');
+    }
+    assert.match(
+      rulesOpenspec,
+      /suggested_next.{0,3}null.{0,3}when.{0,3}status.{0,3}is.{0,3}pass/,
+      'rules-check injection null-on-pass machine contract'
+    );
+
+    const usage = await readRepoFile('docs/usage.md');
+    assertIncludes(
+      usage,
+      'one-way with terminal states',
+      'docs/usage.md terminal routing statement'
+    );
+    assert.match(
+      usage,
+      /suggested_next.{0,3}null.{0,3}when.{0,3}status.{0,3}is.{0,3}pass/,
+      'docs/usage.md null-on-pass machine contract'
+    );
+  });
+
   it('keeps planning-mode guidance capability-gated across active planning prompts', async () => {
     for (const relativePath of PLANNING_RUNTIME_PROMPT_ASSETS) {
       const asset = stripFencedBlocks(await readRepoFile(relativePath));

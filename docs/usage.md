@@ -693,6 +693,8 @@ After implementation, optional read-only gates are available before final verifi
 
 The authoritative final verification remains `/aif-verify <change-id>`.
 
+Next-step routing between the gates and verification is one-way with terminal states: when `/aif-verify <change-id>` passes, the suggested next step is `/aif-done <change-id>` — a rerun of `/aif-rules-check` or `/aif-verify` is not suggested after a passing verification; when verification fails, the route is `/aif-fix <change-id>` — except when the blocking failure is missing, stale, or invalid durable rules gate evidence, where the recovery step is rerunning `/aif-rules-check <change-id>` and persisting its final gate block through `ai-factory aifhub-write-gate-evidence`. A passing `/aif-rules-check` suggests `/aif-verify <change-id>` only when verification has not already passed for the current change state; a failing `/aif-rules-check` routes to `/aif-mode sync --change <change-id>` and a rerun, never to `/aif-verify`. A passing gate keeps `suggested_next` `null` when `status` is `pass` in its `aif-gate-result` block; terminal and forward routing is prose guidance only, never encoded in the machine-readable field.
+
 ### `/aif-rules-check`
 
 Reads:
@@ -783,7 +785,7 @@ Writes:
 - `.ai-factory/qa/<change-id>/openspec-status.json`
 - `.ai-factory/qa/<change-id>/raw/`
 
-`coverage.json` records OpenSpec requirement coverage as `requirement -> task -> implementation evidence -> tests -> rules gate`. `verify.md` includes the coverage summary and ends with a final fenced `aif-gate-result` JSON block using `"gate": "verify"` and `status` of `pass`, `warn`, or `fail`.
+`coverage.json` records OpenSpec requirement coverage as `requirement -> task -> implementation evidence -> tests -> rules gate`. `verify.md` includes the coverage summary and ends with a final fenced `aif-gate-result` JSON block using `"gate": "verify"` and `status` of `pass`, `warn`, or `fail`. A passing block keeps `suggested_next` `null`.
 
 Does not write:
 

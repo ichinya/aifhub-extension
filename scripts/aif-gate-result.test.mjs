@@ -330,6 +330,50 @@ describe('aif-gate-result helper', () => {
     }
   });
 
+  it('keeps suggested_next null on pass and allows owned remediation commands on warn', () => {
+    const passingVerify = validateGateResult({
+      schema_version: 1,
+      gate: 'verify',
+      status: 'pass',
+      blocking: false,
+      blockers: [],
+      affected_files: [],
+      suggested_next: null
+    });
+    assert.equal(passingVerify.ok, true);
+
+    for (const [gate, command] of [['verify', '/aif-verify'], ['rules', '/aif-verify add-oauth-login']]) {
+      const invalid = validateGateResult({
+        schema_version: 1,
+        gate,
+        status: 'pass',
+        blocking: false,
+        blockers: [],
+        affected_files: [],
+        suggested_next: {
+          command,
+          reason: 'Terminal routing must stay prose-only.'
+        }
+      });
+      assert.equal(invalid.ok, false);
+      assert.equal(invalid.errors[0].code, 'invalid-suggested-next-on-pass');
+    }
+
+    const warnWithCommand = validateGateResult({
+      schema_version: 1,
+      gate: 'review',
+      status: 'warn',
+      blocking: false,
+      blockers: [],
+      affected_files: [],
+      suggested_next: {
+        command: '/aif-review',
+        reason: 'Rerun the review gate after addressing notes.'
+      }
+    });
+    assert.equal(warnWithCommand.ok, true);
+  });
+
   it('preserves blocker provenance and requires provenance for rules failures', () => {
     const result = createGateResult({
       gate: 'rules',
@@ -442,6 +486,7 @@ describe('aif-rules-check gate contract', () => {
       assert.match(asset, /cap .*WARN/i);
       assert.match(asset, /upstream .*rules-sidecar/i);
       assert.match(asset, /Do not edit files/);
+      assert.match(asset, /Set .?suggested_next.? to .?null.? when .?status.? is .?pass/);
     }
   });
 });
@@ -477,6 +522,7 @@ describe('review and security sidecar gate contracts', () => {
     assert.match(asset, /pass`, `warn`, or `fail`|pass, warn, or fail/);
     assert.match(asset, /blocking.*true.*fail|fail.*blocking.*true/i);
     assert.match(asset, /suggested_next\.command.*\/aif-fix|suggested_next.*\/aif-fix/i);
+    assert.match(asset, /Set .?suggested_next.? to .?null.? when .?status.? is .?pass/);
   }
 
   it('keeps review sidecars read-only and aligned with review gate output', async () => {

@@ -91,7 +91,7 @@ After implementation, optional read-only gates are `/aif-rules-check`, `/aif-rev
 
 ### Read-only sidecars
 
-Run after code changes and before or during verification:
+Run after code changes and before verification starts:
 
 - `aifhub-rules-sidecar` -> `gate: "rules"`
 - `aifhub-review-sidecar` -> `gate: "review"`
