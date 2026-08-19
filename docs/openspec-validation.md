@@ -53,6 +53,8 @@ The output shape is stable:
 
 `status` is `pass`, `warn`, or `fail`. `blocking` is true only for `fail`. Passing results keep `suggested_next` `null`; the same convention applies to `aif-gate-result` blocks, where terminal and forward routing (for example `/aif-done <change-id>` or `/aif-verify <change-id>`) stays prose-only and a non-null `suggested_next` is valid only with an owned remediation command for `warn` or `fail`.
 
+Gate receipts written before the null-on-pass contract may record a passing block with a non-null `suggested_next`. Such legacy receipts fail gate-result validation after upgrading, and done readiness reports them with targeted codes instead of a generic invalid-evidence outcome: `verification-gate-legacy-suggested-next` for verify receipts (remediation: rerun `/aif-verify <change-id>` once) and `rules-gate-legacy-suggested-next` for rules receipts (remediation: rerun `/aif-rules-check` and persist the receipt through `ai-factory aifhub-write-gate-evidence`). Receipts that are invalid for any other reason keep the existing generic codes.
+
 ## Checks
 
 The validator checks:
