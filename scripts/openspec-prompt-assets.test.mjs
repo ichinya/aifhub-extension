@@ -1555,6 +1555,16 @@ describe('OpenSpec-native prompt asset contract', () => {
       );
     }
 
+    for (const relativePath of ['docs/claude-agents.md', 'docs/codex-agents.md']) {
+      const agentDoc = stripFencedBlocks(await readRepoFile(relativePath));
+      assert.doesNotMatch(
+        agentDoc,
+        /before or during verification/i,
+        `${relativePath} should not invite a rules gate during or after verification`
+      );
+      assertIncludes(agentDoc, 'before verification starts', `${relativePath} one-way gate timing`);
+    }
+
     const rulesAsset = await readRepoFile('injections/core/aif-rules-check-openspec-generated-rules.md');
     const rulesOpenspec = extractMarkdownSection(rulesAsset, 'OpenSpec-native mode');
 

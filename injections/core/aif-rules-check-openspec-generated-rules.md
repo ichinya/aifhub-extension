@@ -76,6 +76,8 @@ Next-step routing is one-way with terminal states and wins over any upstream nex
 - When this gate fails or generated rules are missing, stale, or invalid, follow the regeneration route above (`/aif-mode sync --change <change-id>`, then rerun `/aif-rules-check`); do not suggest `/aif-verify` as remediation for a failing rules gate.
 - Do not suggest rerunning this gate after it has already passed for the current change state.
 
+Determine whether `/aif-verify <change-id>` has already passed by reading the final `aif-gate-result` block in `.ai-factory/qa/<change-id>/verify.md`: treat verification as already passed only when that receipt records `"status": "pass"` and has not been invalidated by later canonical artifact changes for the current change state; with no such current passing receipt, verification has not already passed.
+
 ### Legacy AI Factory-only mode
 
 When OpenSpec-native mode is not active, do not add OpenSpec generated-rule requirements. Follow the upstream `/aif-rules-check` behavior for `.ai-factory/RULES.md`, `rules.base`, named `rules.<area>`, optional plan context, changed files, and the final `aif-gate-result` block.
