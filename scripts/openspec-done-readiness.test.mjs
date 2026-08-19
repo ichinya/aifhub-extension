@@ -374,10 +374,10 @@ describe('OpenSpec done readiness gate', () => {
     assert.equal(readiness.checks.verify_gate, 'fail');
     const diagnostic = readiness.diagnostics.find((item) => item.check === 'verify_gate');
     assert.equal(diagnostic.code, 'verification-gate-legacy-suggested-next');
-    assert.match(diagnostic.message, /legacy passing gate block/);
+    assert.match(diagnostic.message, /passing gate block with a non-null suggested_next/);
     assert.match(diagnostic.message, /rerun \/aif-verify once/);
     assert.equal(diagnostic.suggested_next.command, '/aif-verify add-oauth');
-    assert.match(diagnostic.suggested_next.reason, /legacy receipt predates/);
+    assert.match(diagnostic.suggested_next.reason, /predates or does not follow/);
     assert.equal(diagnostic.blocking, true);
   });
 

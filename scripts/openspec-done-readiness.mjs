@@ -13,7 +13,8 @@ import {
   resolveActiveChange as defaultResolveActiveChange
 } from './active-change-resolver.mjs';
 import {
-  getLatestGateResult
+  getLatestGateResult,
+  isLegacySuggestedNextOnPassReceipt
 } from './aif-gate-result.mjs';
 import {
   collectGeneratedRules as defaultCollectGeneratedRules
@@ -599,7 +600,7 @@ async function inspectRulesGate(changeId, options) {
     blocking,
     code: legacyReceipt ? 'rules-gate-legacy-suggested-next' : error?.code ?? `rules-gate-${status}`,
     message: legacyReceipt
-      ? 'Rules gate evidence contains a legacy passing gate block with a non-null suggested_next; rerun /aif-rules-check and persist the receipt to rewrite it under the null-on-pass contract.'
+      ? 'Rules gate evidence contains a passing gate block with a non-null suggested_next written before or without following the null-on-pass contract; rerun /aif-rules-check and persist the receipt to rewrite it.'
       : acceptedWarn
         ? 'Rules gate completed with warnings accepted by done policy.'
         : error?.message ?? `Rules gate evidence is ${status}.`,
@@ -731,8 +732,8 @@ async function inspectVerifyGate(changeId, options) {
         changeId,
         evidence,
         'verification-gate-legacy-suggested-next',
-        'Verification evidence contains a legacy passing gate block with a non-null suggested_next; rerun /aif-verify once to rewrite the receipt under the null-on-pass contract.',
-        'legacy receipt predates the null suggested_next on pass contract; a single /aif-verify rerun rewrites it'
+        'Verification evidence contains a passing gate block with a non-null suggested_next written before or without following the null-on-pass contract; rerun /aif-verify once to rewrite the receipt.',
+        'receipt predates or does not follow the null suggested_next on pass contract; a single /aif-verify rerun rewrites it'
       );
     }
     return verifyGateFailure(changeId, evidence, 'verification-gate-invalid', 'Verification evidence contains an invalid final aif-gate-result block for the verify gate.');
@@ -789,12 +790,6 @@ function verifyGateFailure(changeId, evidence, code, message, suggestedReason) {
       reason: suggestedReason ?? 'verification evidence must pass before done finalization'
     }
   });
-}
-
-function isLegacySuggestedNextOnPassReceipt(gate) {
-  return Array.isArray(gate?.errors)
-    && gate.errors.length > 0
-    && gate.errors.every((error) => error?.code === 'invalid-suggested-next-on-pass');
 }
 
 async function inspectDirtyWorkspace(options) {
