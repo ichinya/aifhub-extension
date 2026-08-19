@@ -25,7 +25,8 @@ import {
   collectGeneratedRules
 } from './openspec-execution-context.mjs';
 import {
-  getLatestGateResult
+  getLatestGateResult,
+  isLegacySuggestedNextOnPassReceipt
 } from './aif-gate-result.mjs';
 import {
   validateOpenSpecArtifactContract as defaultValidateOpenSpecArtifactContract
@@ -584,6 +585,14 @@ export async function assertVerificationPassed(changeId, options = {}) {
   }
 
   if (!gate.ok) {
+    if (isLegacySuggestedNextOnPassReceipt(gate)) {
+      return createVerificationFailure({
+        changeId: normalized.changeId,
+        code: 'verification-gate-legacy-suggested-next',
+        message: 'Verification evidence contains a passing gate block with a non-null suggested_next written before or without following the null-on-pass contract; rerun /aif-verify once to rewrite the receipt.',
+        evidence
+      });
+    }
     return createVerificationFailure({
       changeId: normalized.changeId,
       code: 'verification-gate-invalid',
@@ -769,6 +778,7 @@ export async function assertRulesGateAcceptable(changeId, options = {}) {
     };
   }
 
+  const legacyRulesReceipt = rulesGate.status === 'invalid' && isLegacySuggestedNextOnPassReceipt(rulesGate?.gateResult);
   const rulesGatePolicyMessage = requireRulesPass
     ? `Refusing to archive because rules gate evidence is ${rulesGate.status}.`
     : `Rules gate evidence is ${rulesGate.status}; continuing because requireRulesPassForDone is false.`;
@@ -776,8 +786,10 @@ export async function assertRulesGateAcceptable(changeId, options = {}) {
   return createRulesGatePolicyResult({
     blocking: requireRulesPass,
     changeId: normalized.changeId,
-    code: rulesGate.errors?.[0]?.code ?? `rules-gate-${rulesGate.status}`,
-    message: rulesGate.errors?.[0]?.message ?? rulesGatePolicyMessage,
+    code: legacyRulesReceipt ? 'rules-gate-legacy-suggested-next' : rulesGate.errors?.[0]?.code ?? `rules-gate-${rulesGate.status}`,
+    message: legacyRulesReceipt
+      ? 'Rules gate evidence contains a passing gate block with a non-null suggested_next written before or without following the null-on-pass contract; rerun /aif-rules-check and persist the receipt to rewrite it.'
+      : rulesGate.errors?.[0]?.message ?? rulesGatePolicyMessage,
     rulesGate
   });
 }

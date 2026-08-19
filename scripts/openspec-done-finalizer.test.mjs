@@ -901,6 +901,33 @@ describe('OpenSpec done finalizer API', () => {
     assert.equal(invalidGate.ok, false);
     assert.equal(invalidGate.errors[0].code, 'verification-gate-invalid');
 
+    const legacyGate = await assertVerificationPassed('add-oauth', {
+      readLatestVerificationEvidence: async () => verificationEvidence({
+        content: [
+          '# Verify',
+          '',
+          'Verdict: PASS',
+          'Code verification: PASS',
+          '',
+          '```aif-gate-result',
+          JSON.stringify({
+            schema_version: 1,
+            gate: 'verify',
+            status: 'pass',
+            blocking: false,
+            blockers: [],
+            affected_files: [],
+            suggested_next: { command: '/aif-verify add-oauth', reason: 'rerun' }
+          }),
+          '```',
+          ''
+        ].join('\n')
+      })
+    });
+    assert.equal(legacyGate.ok, false);
+    assert.equal(legacyGate.errors[0].code, 'verification-gate-legacy-suggested-next');
+    assert.match(legacyGate.errors[0].message, /rerun \/aif-verify once/);
+
     const failedGate = await assertVerificationPassed('add-oauth', {
       readLatestVerificationEvidence: async () => verificationEvidence({
         gateStatus: 'fail'
@@ -996,6 +1023,25 @@ describe('OpenSpec done finalizer API', () => {
     await writeRulesGateEvidence(rootDir, 'add-oauth', 'pass');
     const passed = await assertRulesGateAcceptable('add-oauth', { rootDir });
     assert.equal(passed.ok, true);
+
+    const legacy = await assertRulesGateAcceptable('add-oauth', {
+      rootDir,
+      rulesGateEvidence: {
+        exists: true,
+        path: '.ai-factory/qa/add-oauth/rules.md',
+        gateResult: {
+          ok: false,
+          result: null,
+          errors: [{
+            code: 'invalid-suggested-next-on-pass',
+            message: 'suggested_next must be null when status is pass; terminal routing is prose-only.'
+          }]
+        }
+      }
+    });
+    assert.equal(legacy.ok, false);
+    assert.equal(legacy.errors[0].code, 'rules-gate-legacy-suggested-next');
+    assert.match(legacy.errors[0].message, /rerun \/aif-rules-check/);
   });
 
   it('allows non-pass rules gate results when done policy does not require pass', async () => {
@@ -1044,6 +1090,25 @@ describe('OpenSpec done finalizer API', () => {
     assert.equal(invalid.ok, true);
     assert.equal(invalid.rulesGate.status, 'invalid');
     assert.equal(invalid.warnings.at(-1).code, 'rules-gate-result-invalid');
+
+    const relaxedLegacy = await assertRulesGateAcceptable('add-oauth', {
+      rootDir,
+      policy: relaxedPolicy,
+      rulesGateEvidence: {
+        exists: true,
+        path: '.ai-factory/qa/add-oauth/rules.md',
+        gateResult: {
+          ok: false,
+          result: null,
+          errors: [{
+            code: 'invalid-suggested-next-on-pass',
+            message: 'suggested_next must be null when status is pass; terminal routing is prose-only.'
+          }]
+        }
+      }
+    });
+    assert.equal(relaxedLegacy.ok, true);
+    assert.equal(relaxedLegacy.warnings.at(-1).code, 'rules-gate-legacy-suggested-next');
   });
 
   it('detects dirty working tree state and records it only when explicit', async () => {

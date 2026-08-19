@@ -12,6 +12,7 @@ import {
   createGateResult,
   extractGateResultBlocks,
   getLatestGateResult,
+  isLegacySuggestedNextOnPassReceipt,
   renderGateResultBlock,
   validateGateResult
 } from './aif-gate-result.mjs';
@@ -120,6 +121,26 @@ describe('aif-gate-result helper', () => {
     assert.equal(blocks[1].startLine, 11);
     assert.equal(blocks[1].endLine, 13);
     assert.equal(blocks[1].errors[0].code, 'invalid-json');
+  });
+
+  it('detects legacy pass receipts by invalid-suggested-next-on-pass errors only', () => {
+    assert.equal(
+      isLegacySuggestedNextOnPassReceipt({ ok: false, errors: [{ code: 'invalid-suggested-next-on-pass' }] }),
+      true
+    );
+    assert.equal(isLegacySuggestedNextOnPassReceipt({ ok: false, errors: [] }), false);
+    assert.equal(
+      isLegacySuggestedNextOnPassReceipt({ ok: false, errors: [{ code: 'invalid-schema-version' }] }),
+      false
+    );
+    assert.equal(isLegacySuggestedNextOnPassReceipt({
+      ok: false,
+      errors: [
+        { code: 'invalid-suggested-next-on-pass' },
+        { code: 'invalid-schema-version' }
+      ]
+    }), false, 'mixed errors must not be classified as a legacy receipt');
+    assert.equal(isLegacySuggestedNextOnPassReceipt(null), false);
   });
 
   it('returns the latest gate result, optionally filtered by gate', () => {
