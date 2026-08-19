@@ -4,20 +4,23 @@
 
 Формат основан на [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [В разработке]
+## [1.4.0] - 2026-08-19
 
 ### Добавлено
 - Marker-first AI Factory 2.18 classic/ultra classifiers, version и ultra-research resolvers, revision-bound legacy-ultra verification receipts и OpenSpec-native `/aif-archive` boundary без второго canonical source of truth.
-- Offline deterministic consumer smoke в default `npm test` и отдельный non-globbed `npm run smoke:ai-factory-2-18` driver для явно переданных local `2.17.0`/`2.18.1` command-plus-argv toolchains при сохранённых `--v217-*`/`--v218-*` flags. Driver проверяет exact version/provenance до project mutation, использует bounded `execFile`/`shell: false` boundary с Windows ComSpec adapter, возвращает `NOT_RUN` для missing prerequisites и не скачивает packages; stable `2.18.0` остаётся отдельной feature boundary.
+- Offline deterministic consumer smoke в default `npm test` и отдельный non-globbed `npm run smoke:ai-factory-2-18` driver для явно переданных local `2.17.0`/`2.18.1` command-plus-argv toolchains при сохранённых `--v217-*`/`--v218-*` flags. Driver проверяет exact version/provenance до project mutation, использует bounded `execFile`/`shell: false` boundary с Windows ConSpec adapter, возвращает `NOT_RUN` для missing prerequisites и не скачивает packages; stable `2.18.0` остаётся отдельной feature boundary.
 
 ### Изменено
 - Reviewed AI Factory baseline обновлён до `2.18.1` при неизменном compatibility range `>=2.11.0 <3.0.0`: cumulative `2.18.0` ledger сохранён, OpenSpec-native `ultra` остаётся canonical-depth profile, legacy marked ultra остаётся atomic upstream bundle, а regular/ultra research остаётся supporting runtime context.
+- Машинный контракт `aif-gate-result` ужесточён: `suggested_next` обязан быть `null` при `status: "pass"` (диагностика `invalid-suggested-next-on-pass`), а терминальная и прямая next-step маршрутизация (`/aif-done <change-id>` после пройденного verify, `/aif-verify <change-id>` после пройденного rules gate) остаётся prose-only и никогда не кодируется в машинном блоке.
 - Новый upstream-owned `/aif-explore` Research Coherence Gate получает только non-bypass pass-through после разрешённой persisted записи: optional fresh-context `Task` имеет mandatory direct fallback, а в ultra coherence выполняется до Bundle Integrity Gate.
 - `/aif-analyze` и mode sync структурно patch-ят только AIFHub-owned config keys, сохраняют unknown/core nested fields и выводят diagnostics только по key paths/counts без values, environment или credentials.
 - Namespaced Codex/Claude agents используют общий parity contract: для marked legacy ultra возвращают exact upstream command handoff; verifier receipt пишет только command boundary, done/rules evaluators остаются read-only.
 - Для exact `2.17.0`→`2.18.1` документирован `ai-factory update --force`; `upgrade` остаётся только v1-to-v2 migration command. Targeted extension refresh документирован отдельно как `ai-factory extension update aifhub-extension --force`.
 
 ### Исправлено
+- Устранён цикл next-step рекомендаций между `/aif-rules-check` и `/aif-verify` (issue #155): маршрутизация стала однонаправленной с терминальными состояниями — verify PASS → `/aif-done`, verify FAIL → `/aif-fix`, rules-check PASS → `/aif-verify` (или `/aif-done`, если verify уже пройден по актуальному реквизиту), rules-check FAIL/missing/stale → `/aif-mode sync --change` + rerun; зеркала claude/codex, injections и docs синхронизированы, контракт закреплён phrase-тестами prompt-ассетов.
+- Квитанции, написанные до null-on-pass контракта, получают адресные коды диагностики вместо безликих invalid-evidence исходов: `verification-gate-legacy-suggested-next` (remediation — один повторный `/aif-verify`) и `rules-gate-legacy-suggested-next` (перезапуск `/aif-rules-check` и персист через `ai-factory aifhub-write-gate-evidence`) в done readiness и параллельных проверках done finalizer; severity, blocking и recovery-команды не изменены.
 - Valid marked ultra bundles больше не определяются как folder-only classic plans и не мигрируются автоматически; malformed marker/phase shapes и classic/ultra collisions блокируются до записей.
 - Canonical OpenSpec changes fail-closed при попадании active ultra marker, `index.md`, direct/nested `phase-*` или runtime companion artifacts независимо от optional CLI policy.
 - Clean/global/targeted update evidence теперь доказывает сохранность exact upstream `aif-explore` bytes с Research Coherence Gate и one-copy AIFHub marker; targeted flow дополнительно доказывает замену stale managed AIFHub agent до extension-source hash, byte-identical dummy extension ledger/files, сохранность unknown config/unmanaged agents, injection cardinality и artifact digests.
