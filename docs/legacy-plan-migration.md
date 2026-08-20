@@ -2,9 +2,11 @@
 
 # Legacy Plan Migration
 
-Use legacy migration when a project has `.ai-factory/plans` artifacts and the active workflow expects OpenSpec-native changes.
+Use legacy migration when a project has classic `.ai-factory/plans` artifacts and the active workflow expects OpenSpec-native changes.
 
 Migration is explicit. It does not run automatically from `/aif-improve`, `/aif-implement`, or `/aif-verify`.
+
+AI Factory 2.18 has two legacy shapes. Classic plans use a sibling `<id>.md` plus optional companion directory. Marked ultra plans use the exact lowercase path `<id>/index.md`, direct `phase-*.md`, and exactly one standalone `<!-- aif:plan-mode:ultra -->`. A case variant such as `Index.md` is `ultra-invalid`, not a classic folder. AIFHub migrates only classic shapes. A valid marked ultra bundle remains upstream-owned and is reported as `skipped-ultra`; an invalid ultra-like shape or classic/ultra collision fails closed before any write.
 
 ## Commands
 
@@ -13,6 +15,8 @@ List discovered legacy plans:
 ```bash
 ai-factory aifhub-migrate-legacy-plans --list
 ```
+
+The human-readable list reports directories classified as `unrelated-directory` under `Ignored non-plan directories` instead of silently treating them as plans. They are never migrated; `--json` exposes the same bounded entries in `ignored` for automation.
 
 Dry-run one migration:
 
@@ -50,13 +54,30 @@ Use JSON output for automation:
 ai-factory aifhub-migrate-legacy-plans <change-id> --json
 ```
 
+## Captured Legacy Source Root
+
+Before switching from legacy to OpenSpec-native mode, `/aif-mode` resolves the current project-relative `paths.plans`. If unresolved legacy work remains after the switch or migration is declined/incomplete, it records that root in:
+
+```text
+.ai-factory/state/legacy-plan-source.json
+```
+
+Later OpenSpec-mode discovery uses this captured root instead of scanning canonical `openspec/changes`. A caller may override it explicitly for one command:
+
+```bash
+ai-factory aifhub-migrate-legacy-plans --list --legacy-source <project-relative-plans-root>
+ai-factory aifhub-migrate-legacy-plans <change-id> --legacy-source <project-relative-plans-root> --dry-run
+```
+
+The root must be a safe project-relative directory. Lexical or resolved overlap with `openspec/changes` is rejected. Diagnostics may report the safe relative root and source kind (`explicit`, `recorded`, or `default`) but must not expose private absolute paths or plan bodies.
+
 ## Upstream Archive Is Not Migration
 
-AI Factory 2.14+ `/aif-archive` is legacy plan cleanup, not OpenSpec migration.
+AI Factory 2.14+ `/aif-archive` is legacy plan cleanup, not OpenSpec migration. AI Factory 2.18 also lets that upstream command archive a marked ultra bundle atomically in legacy mode.
 
 It may move completed legacy `paths.plans/*.md` files into `paths.archive/plans/*.md`, where `paths.archive` defaults to `.ai-factory/archive/`. With `workflow.plan_id_format: sequential`, archived legacy plans are excluded from active plan discovery and from the next sequential number calculation. With `/aif-archive --roadmap`, upstream AI Factory may snapshot closed roadmap milestones under `paths.archive/roadmap/`.
 
-Use `ai-factory aifhub-migrate-legacy-plans ...` when legacy plan content must become canonical OpenSpec-native artifacts under `openspec/changes/<change-id>/`. Use upstream `/aif-archive` only when completed legacy plans should be cleaned out of the active legacy plan set. `/aif-archive` must not modify `openspec/changes/**`, `openspec/specs/**`, `.ai-factory/qa/**`, `.ai-factory/state/**`, or `.ai-factory/rules/generated/**`.
+Use `ai-factory aifhub-migrate-legacy-plans ...` when classic legacy plan content must become canonical OpenSpec-native artifacts under `openspec/changes/<change-id>/`. Use upstream `/aif-archive` only for completed legacy classic/marked-ultra artifacts. In OpenSpec-native mode, plan-mutating `/aif-archive` targets stop before plan discovery and return `/aif-done <change-id>`; `/aif-archive` must not modify `openspec/changes/**`, `openspec/specs/**`, `.ai-factory/qa/**`, `.ai-factory/state/**`, or `.ai-factory/rules/generated/**`.
 
 ## Collision Behavior
 
@@ -106,6 +127,8 @@ Canonical and preservation mapping:
 | `.ai-factory/plans/<id>/status.yaml` | `.ai-factory/state/<id>/legacy-status.yaml` |
 | `.ai-factory/plans/<id>/explore.md` | `.ai-factory/state/<id>/legacy-explore.md` |
 
+Marked ultra `index.md` and direct `phase-*.md` files have no migration mapping. They remain one upstream-owned atomic bundle and must not be flattened into `proposal.md`, `tasks.md`, or classic companion files by this command.
+
 When clear behavioral requirements are extractable, migration may create:
 
 ```text
@@ -117,6 +140,8 @@ Review migrated delta specs before treating them as product requirements.
 ## Safety Behavior
 
 Migration never silently deletes legacy source files.
+
+Migration classifies markers and ultra phase/index integrity before classic folder-only discovery. It does not create a sibling classic `<id>.md`, `task.md`, `status.yaml`, or OpenSpec change for a valid marked ultra bundle.
 
 Migration must not write migrated output under:
 

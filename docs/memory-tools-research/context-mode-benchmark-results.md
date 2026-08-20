@@ -133,6 +133,74 @@ Project id: `project-8d97432e6d7a`. Labels: `framework`, `js`, `large_framework_
 
 Tool-run rows did not produce a valid useful `context-mode` data call: one run stopped at `context-mode --help`, the other did not call `context-mode`. This focused scenario remains manual-helper evidence only and is not eligible for `proven_label_evidence`.
 
+## Codex Plugin Re-evaluation v1.0.169 — 2026-07-28
+
+Run id: `context-mode-134-luna-low-20260728`. Exact identity: tag `v1.0.169`, commit `589d8214d56740a28b5f7bf63167743d586b0b40`, npm shasum `d5aa9acc648ed420c5dd32ee5f15aa5608f09fea`, package integrity `sha512-94JIaFuLjF9SO2BsGTrbGtyT44K95+9OC8BdbaL/UT76xOkanJLfUR5CzmNw+GELXZQqH4nBrKg9wjBnSFkVnQ==`.
+
+| Evidence class | Rows / probes | Status | Reason |
+|---|---:|---|---|
+| `plugin_snapshot_isolated` | 1 | PASS | Exact tag/commit/package/manifests/license/Node floor and tarball shasum matched. |
+| install lifecycle | 0 | `NOT_RUN(postinstall_forbidden)` | Upstream package declares mutating `postinstall`; lifecycle scripts were never executed. |
+| `ai-tester` dry-run | 18/18 | PASS | Three scenarios × baseline/MCP-only/plugin × two repetitions; `codex`, `gpt-5.6-luna`, `low`. |
+| baseline model rows | 0/6 | `NOT_RUN(isolated_codex_execution_unavailable)` | Isolated `CODEX_HOME` probe failed before a trace; no real auth/config was copied. |
+| MCP-only rows | 0/6 | `BLOCKED(runtime_dependency_self_install)` | Hook/server bootstrap can run `npm install` and shell at runtime. |
+| Codex plugin rows | 0/6 | `NOT_RUN(auth_isolation_unavailable)` | No credential-safe isolated auth mechanism was available. |
+| direct hook runtime | 0 | `BLOCKED(runtime_dependency_self_install)` | Static safety veto ran before provider code. |
+| `direct_hook_contract` | focused adapter tests | PASS | Test-only event/redaction/isolation contract; not actual Codex event delivery. |
+| host manifests / sandbox cleanup | 1 | PASS | Project Git, Codex plugin/cache and provider-home fingerprints were unchanged; disposable package/runtime roots were removed. |
+
+Token, duration and quality deltas are not reported: there are no complete executed triads. Resource savings cannot be inferred from dry-run or direct adapter tests. Actual compaction remains `NOT_RUN(compaction_control_unavailable)`.
+
+Current decision is split:
+
+- historical MCP-only `1.0.151` manual-helper evidence is preserved without rewriting;
+- current `v1.0.169` MCP/runtime path is blocked pending removal or containment of runtime self-install;
+- Codex plugin is deferred and remains user-owned; no auto-install, registration, hook trust or normal-command selection is authorized.
+
+## Authorized Live Follow-up v1.0.169 — 2026-08-03
+
+Этот append-only follow-up не меняет исторические статусы выше. Он использовал отдельную test-only authorization class `explicit_isolated_full`, disposable homes, scoped ephemeral auth copy и native Codex executable. Host auth/manifests остались неизменными, auth copies были удалены; package install lifecycle не исполнялся и остаётся `NOT_RUN(postinstall_forbidden)`.
+
+Exact runtime identity: `context-mode 1.0.169` / commit `589d8214d56740a28b5f7bf63167743d586b0b40`, Codex `0.144.6`, `ai-tester 1.1.0` / commit `98dd5afb3fe9b9b7593d21dc93bcbc6d98c2cca9`, model `gpt-5.6-luna`, reasoning `low`. Санитизированный artifact: [live-authorized-evidence.json](context-mode-codex-ai-tester/live-authorized-evidence.json).
+
+Lifecycle/provenance gates:
+
+| Gate | Status |
+|---|---|
+| exact package/binary identity | PASS |
+| marketplace prepare/add, plugin add, Codex exec | PASS |
+| provider purge and sandbox cleanup | PASS |
+| host manifests/auth unchanged, auth copies remaining | PASS / `0` |
+| package install lifecycle | `NOT_RUN(postinstall_forbidden)` |
+| generated `ai-tester` matrix dry-run | 18/18 parsed, 0 invalid |
+
+Small fixture (`north=17`, `east=29`, checksum `46`):
+
+| Variant | Correctness | Input | Output | Total | Duration | Delta vs baseline |
+|---|---|---:|---:|---:|---:|---|
+| baseline | PASS | 89,462 | 347 | 89,809 | 28,240 ms | — |
+| MCP-only | PASS | 427,326 | 895 | 428,221 | 42,592 ms | `+376.8%` tokens, `+50.8%` duration |
+| plugin | excluded | — | — | — | — | probe output crossed the privacy boundary; not accepted evidence |
+
+Large deterministic stdout fixture contained `12,009` lines and exceeded `1 MiB`; required facts were at the tail (`north=731`, `east=409`, checksum `1140`):
+
+| Variant | Correctness | Input | Output | Total | Duration | Delta vs failed baseline |
+|---|---|---:|---:|---:|---:|---|
+| baseline | FAIL | 31,371 | 677 | 32,048 | 26,233 ms | tool result stopped at 1,048,576 bytes; tail facts absent |
+| MCP-only | PASS | 69,924 | 655 | 70,579 | 22,775 ms | `+120.2%` tokens, `-13.2%` duration |
+| Codex plugin | FAIL | 93,875 | 582 | 94,457 | 39,833 ms | `+194.7%` tokens, `+51.8%` duration |
+
+Raw rollout audit verified real nested MCP calls and confined path arguments: the useful large MCP row called `ctx_batch_execute` plus `ctx_purge`; the plugin probe called `ctx_search`, but its knowledge base was empty and the nested shell output remained truncated. Provider rows cannot PASS without both outer correctness evidence and sanitized raw rollout call/path evidence.
+
+Session continuity is not promoted. The first MCP turn recovered the facts, but the resume answer was incorrect; the reproducible matrix therefore records `NOT_RUN(resume_driver_parity_unavailable)` until its resume driver has execution parity.
+
+Live conclusion:
+
+- MCP-only improves correctness only in the tested large-output truncation case; it does **not** demonstrate billed-token savings.
+- On the small fixture it was both slower and `+376.8%` more token-expensive.
+- The Codex plugin should be avoided for the tested nested shell stack because hooks did not intercept that output path.
+- This remains `manual_helper_only`, explicit user opt-in, temporary scope plus mandatory purge. Normal AIFHub commands keep no-auto-install/no-registration/no-hook-trust behavior.
+
 ## Когда Использовать
 
 Лучшие signals:
@@ -166,4 +234,4 @@ Tool-run rows did not produce a valid useful `context-mode` data call: one run s
 
 ## Итог
 
-`context-mode` может быть полезен только как manual temporary index для уже большого generated output. Текущий ai-tester pilot на mini fixture не дал valid useful row и показал огромный overhead.
+`context-mode` может быть полезен только как manual temporary index для уже большого generated output. Live follow-up подтвердил один correctness benefit при >1 MiB truncation, но не token savings; small fixture показал большой overhead, а tested Codex plugin path не сработал.

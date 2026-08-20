@@ -1,0 +1,217 @@
+{
+  "schema": "aifhub.roadmap_lifecycle.ai_tester_catalog.v1",
+  "baseline": {
+    "source_commit": "fa52b474925a5cc41a97b13bddc2a04b09f503d1",
+    "description": "Historical pre-lifecycle behavior reduced to the relevant public workflow rules."
+  },
+  "defaults": {
+    "runtime": "codex",
+    "model": "gpt-5.6-luna",
+    "reasoning": "low",
+    "conditions": [
+      "baseline",
+      "refined"
+    ],
+    "max_turns": 2,
+    "timeout_seconds": 240
+  },
+  "runner": {
+    "source_commit": "98dd5afb3fe9b9b7593d21dc93bcbc6d98c2cca9",
+    "version": "ai-tester 1.1.0",
+    "binary_sha256": "5e99619cc5fc6734d17a6c08d94520355abf444626c5a68591c3608423f9924d",
+    "reasoning_enforcement": "codex_wrapper_model_reasoning_effort_low"
+  },
+  "scenarios": [
+    {
+      "id": "issue-linked-planning",
+      "source": "injections/core/aif-plan-plan-folder.md",
+      "user_prompt": "Synthetic state: a new canonical OpenSpec change was requested with an explicit link to GitHub issue #88 in example/repo. No milestone or roadmap slice was supplied and the managed roadmap has no row yet. State the prescribed proposal linkage, whether planning writes the roadmap, and the next owner handoff. Use the requested response labels.",
+      "response_labels": [
+        "roadmap_linkage",
+        "roadmap_write",
+        "handoff"
+      ],
+      "policies": {
+        "baseline": "After planning, route the next step to /aif-improve. Planning uses canonical OpenSpec artifacts and does not create a separate roadmap artifact. The historical policy has no standardized Roadmap Linkage section and no mandatory roadmap-owner handoff for a linked plan.",
+        "refined": "Every canonical proposal must include a ## Roadmap Linkage section with fields Issues, Milestone, Roadmap item/slice, and Rationale in that order. Capture only explicit linkage, normalize the explicit issue as https://github.com/example/repo/issues/88, and preserve explicit none values for unavailable milestone and slice. Planning must not edit the roadmap. Because at least one linkage field is non-none and the change should be registered as planned, return the exact owner handoff /aif-roadmap check."
+      },
+      "assertions": [
+        {
+          "id": "standard-linkage",
+          "type": "output_contains",
+          "pattern": "(?i)Roadmap Linkage"
+        },
+        {
+          "id": "issue-link",
+          "type": "output_contains",
+          "pattern": "https://github\\.com/example/repo/issues/88"
+        },
+        {
+          "id": "explicit-none-values",
+          "type": "output_contains",
+          "pattern": "(?is)Milestone\\s*:\\s*none.*Roadmap item/slice\\s*:\\s*none"
+        },
+        {
+          "id": "roadmap-owner-handoff",
+          "type": "output_contains",
+          "pattern": "/aif-roadmap check"
+        }
+      ]
+    },
+    {
+      "id": "successful-done",
+      "source": "skills/aif-done/SKILL.md",
+      "user_prompt": "Synthetic state: verification and readiness passed, the linked OpenSpec change archived successfully, the configured roadmap path is safe, and its managed lifecycle markers are valid. State the local roadmap outcome, lifecycle state, write boundary, and what may be claimed about GitHub. Use the requested response labels.",
+      "response_labels": [
+        "roadmap_outcome",
+        "lifecycle_state",
+        "write_boundary",
+        "github_state"
+      ],
+      "policies": {
+        "baseline": "After successful finalization, recommend /aif-mode sync and /aif-commit. Roadmap updates belong to the roadmap owner; update through that owner or return an exact /aif-roadmap handoff. The historical done policy does not co-own a managed lifecycle block.",
+        "refined": "After successful OpenSpec archive, /aif-done co-owns only the marker-delimited OpenSpec Change Lifecycle block. It uses the canonical pre-archive Roadmap Linkage and project-relative final evidence to insert or update one local finalized row. With valid linked input the local roadmap outcome is updated. Report local lifecycle separately from GitHub and never claim issue closure or PR merge from local finalization."
+      },
+      "assertions": [
+        {
+          "id": "updated-outcome",
+          "type": "output_contains",
+          "pattern": "(?i)roadmap_outcome\\s*:\\s*updated"
+        },
+        {
+          "id": "finalized-state",
+          "type": "output_contains",
+          "pattern": "(?i)lifecycle_state\\s*:\\s*finalized"
+        },
+        {
+          "id": "managed-block-boundary",
+          "type": "output_contains",
+          "pattern": "(?is)write_boundary\\s*:.*(?:marker-delimited|managed).*?(?:OpenSpec Change Lifecycle|lifecycle block)"
+        },
+        {
+          "id": "no-github-claim",
+          "type": "output_contains",
+          "pattern": "(?is)github_state\\s*:.*(?:not inferred|unchanged|not claimed|separate|does not claim|no (?:issue )?closure|no (?:PR )?merge)"
+        }
+      ]
+    },
+    {
+      "id": "failed-done-no-roadmap-write",
+      "source": "skills/aif-done/SKILL.md",
+      "user_prompt": "Synthetic state: /aif-done resolves a linked change, but readiness fails before archive. The roadmap exists and its managed markers are valid. State the archive result, roadmap write result, lifecycle state, and next action. Use the requested response labels.",
+      "response_labels": [
+        "archive",
+        "roadmap_write",
+        "lifecycle_state",
+        "next_action"
+      ],
+      "policies": {
+        "baseline": "A blocking readiness failure refuses archive and shows the readiness suggested next command and reason. Roadmap updates belong to the roadmap owner. The historical policy does not define a done-owned lifecycle write result for this path.",
+        "refined": "A readiness, verification, artifact-contract, dirty-tree, or archive failure must not update the roadmap and must not create a finalized row. Refuse archive, leave the managed lifecycle state unchanged, and show the readiness suggested next command and reason exactly."
+      },
+      "assertions": [
+        {
+          "id": "archive-blocked",
+          "type": "output_contains",
+          "pattern": "(?i)archive\\s*:.*(?:blocked|refused|not run)"
+        },
+        {
+          "id": "no-roadmap-write",
+          "type": "output_contains",
+          "pattern": "(?i)roadmap_write\\s*:.*(?:none|no write|skipped|not updated|unchanged|forbidden|must not|does not update|no update)"
+        },
+        {
+          "id": "lifecycle-unchanged",
+          "type": "output_contains",
+          "pattern": "(?i)lifecycle_state\\s*:.*(?:unchanged|not finalized|no finalized|remains)"
+        }
+      ]
+    },
+    {
+      "id": "finalized-state-commit-blocking",
+      "source": "injections/core/aif-commit-roadmap-freshness.md",
+      "user_prompt": "Synthetic state: durable local evidence proves successful finalization of a linked change, but the managed lifecycle row is still planned. GitHub evidence is unavailable and the user did not request strict external checking. State the finding, commit decision, owner handoff, bypass rule, and GitHub classification. Use the requested response labels.",
+      "response_labels": [
+        "finding",
+        "commit",
+        "handoff",
+        "bypass",
+        "github"
+      ],
+      "policies": {
+        "baseline": "Roadmap or GitHub freshness is WARN by default. ERROR applies only when the user explicitly requested strict checking. Continue to the upstream confirmation flow after warnings and return /aif-roadmap for stale roadmap findings. GitHub unavailability is non-blocking.",
+        "refined": "Successful local finalization plus non-none canonical linkage plus a missing, malformed, or non-finalized managed row is an unskippable ERROR [roadmap-local]. It blocks before commit, uses the exact /aif-roadmap check handoff, and user confirmation must not bypass it. GitHub unavailability remains WARN [roadmap-external] and does not suppress the local error."
+      },
+      "assertions": [
+        {
+          "id": "local-error",
+          "type": "output_contains",
+          "pattern": "(?is)finding\\s*:.*ERROR\\s*\\[roadmap-local\\]"
+        },
+        {
+          "id": "commit-blocked",
+          "type": "output_contains",
+          "pattern": "(?i)commit\\s*:.*blocked"
+        },
+        {
+          "id": "check-handoff",
+          "type": "output_contains",
+          "pattern": "/aif-roadmap check"
+        },
+        {
+          "id": "not-bypassable",
+          "type": "output_contains",
+          "pattern": "(?i)bypass\\s*:.*(?:not allowed|no|forbidden|cannot|must not)"
+        },
+        {
+          "id": "external-warning",
+          "type": "output_contains",
+          "pattern": "(?is)github\\s*:.*WARN\\s*\\[roadmap-external\\]"
+        }
+      ]
+    },
+    {
+      "id": "post-merge-github-reconciliation",
+      "source": "injections/core/aif-roadmap-maturity-audit.md",
+      "user_prompt": "Synthetic state: the managed local lifecycle row is finalized with durable local evidence. After the final local commit, its pull request became merged and its issue became closed. State the preserved local lifecycle, refreshed GitHub state, reconciliation owner/action including the exact command when the policy supplies one, proof boundary, and evidence-source treatment. Use the requested response labels.",
+      "response_labels": [
+        "local_lifecycle",
+        "github_state",
+        "reconciliation",
+        "proof_boundary",
+        "evidence_sources"
+      ],
+      "policies": {
+        "baseline": "GitHub state is supporting evidence only and never sole local proof. Report drift when a merged PR is not reflected in local evidence. The historical roadmap policy has no managed local lifecycle reconciliation contract or explicit independent-clock rule.",
+        "refined": "In /aif-roadmap check, treat local lifecycle and GitHub evidence as independent clocks. Preserve the evidence-backed finalized row and its project-relative evidence, refresh the current PR as merged and issue as closed in the phase or unphased audit, and never use remote state to replace local finalization proof or promote planned to finalized. The reconciliation owner/action is the exact command /aif-roadmap check. Report Lifecycle evidence and GitHub evidence separately."
+      },
+      "assertions": [
+        {
+          "id": "local-finalized-preserved",
+          "type": "output_contains",
+          "pattern": "(?is)local_lifecycle\\s*:.*(?:finalized.*preserv|preserv.*finalized)"
+        },
+        {
+          "id": "remote-state-refreshed",
+          "type": "output_contains",
+          "pattern": "(?is)github_state\\s*:.*(?:PR.*merged.*issue.*closed|issue.*closed.*PR.*merged)"
+        },
+        {
+          "id": "check-reconciliation",
+          "type": "output_contains",
+          "pattern": "(?is)reconciliation\\s*:.*(?:/aif-roadmap check|roadmap check)"
+        },
+        {
+          "id": "remote-not-local-proof",
+          "type": "output_contains",
+          "pattern": "(?is)proof_boundary\\s*:.*(?:does not|must not|never|cannot).*?(?:replace )?local finalization proof"
+        },
+        {
+          "id": "separate-evidence-sources",
+          "type": "output_contains",
+          "pattern": "(?is)evidence_sources\\s*:.*Lifecycle evidence.*GitHub evidence"
+        }
+      ]
+    }
+  ]
+}

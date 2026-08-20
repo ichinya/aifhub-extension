@@ -1,7 +1,8 @@
 ---
 name: aif-analyze
 description: Bootstrap project context. Resolves localization and stack, creates/updates config.yaml and rules/base.md, then checks DESCRIPTION and guides core skill execution.
-version: 0.8.0
+allowed-tools: Read Write Edit Glob Grep Bash(mkdir *) Bash(ai-factory aifhub-analyze-config-diff *) Bash(ai-factory aifhub-memory-tools *) Bash(ai-factory aifhub-mode status --json) Bash(node --input-type=module -e *openspec-runner.mjs*) Bash(rg --version) Bash(uv --version) Bash(graphify --version) Bash(graphify --help) Bash(codex-agent-mem-policy --help) Bash(codex-agent-mem-smoke --help) Bash(codegraph --version) Bash(codegraph --help) Bash(codegraph status) Bash(ctx7 --version) Bash(npx --no-install ctx7 --help) Bash(openspec init --tools none) Skill AskUserQuestion Questions
+version: 0.11.0
 author: ichi
 ---
 
@@ -159,8 +160,10 @@ Recommendation rules:
 - Recommend only tools allowed by local metadata.
 - Prefer installed/local tools in recommendations; non-installed tools may be described as optional manual install only when metadata allows.
 - Include enriched recommendation details when metadata provides them: allowed command scopes, forbidden command scopes, command-specific permission, execution guidance, privacy caveat, read scope, purge path, availability, and explicit opt-in install policy.
-- The final analysis response must include a concise optional tool block with `Project labels`, `Recommended tools`, and `Do not use` sections. `Project labels` must include languages, volume, complexity, repo shape, artifact mode, project shape, task signals, and matched dimension signals when present.
-- Ask the user which recommended tools to enable. Write only accepted tool ids to `utilities.context_tools.enabled`; do not enable a tool just because it was recommended.
+- The final analysis response must include a concise optional tool block with `Project labels`, `Recommended tools`, `Manual guidance`, and `Do not use` sections. `Project labels` must include languages, volume, complexity, repo shape, artifact mode, project shape, task signals, and matched dimension signals when present.
+- Ask the user which entries from `recommendations` to enable. Write only accepted tool ids from that array to `utilities.context_tools.enabled`; do not enable a tool just because it was recommended.
+- Treat `manual_guidance` entries with `normal_command_selection: forbidden` and `configuration_policy: do_not_enable` as recommendation-only manual guidance. Do not probe them, offer them for enablement, or write them to `utilities.context_tools.enabled`.
+- Surface `configured-tool-manual-guidance-only` selector warnings to the user. Ask them to remove the legacy tool id from `utilities.context_tools.enabled`; do not rewrite config without approval.
 - After config is updated, follow-on skills should call `ai-factory aifhub-memory-tools select --from-project --command <skill> --json` and use only `selected_tools`. Do not hard-code provider-specific tool lists into follow-on skills.
 - Never auto-install, run setup, start MCP, register MCP, index source, sync memory, install hooks, start background daemons, or persist provider output.
 - Provider output is supporting context only, never canonical OpenSpec evidence.
@@ -189,13 +192,14 @@ graphify --version
 graphify --help
 codex-agent-mem-policy --help
 codex-agent-mem-smoke --help
-context-mode doctor
 codegraph --version
 codegraph --help
 codegraph status
 ctx7 --version
 npx --no-install ctx7 --help
 ```
+
+`context-mode` has no normal status probe. Metadata and runtime selection return `dedicated_harness_required`; use it only through the pinned, isolated issue `#134` evaluation harness.
 
 Run the Context7 probes only when a docs-provider check is explicitly requested. Do not run `ctx7 setup`.
 
@@ -236,9 +240,31 @@ Resolve the bootstrap/config mode before creating directories:
 
 - If config.yaml is missing, create it with v1 schema only after bootstrap mode is resolved.
 - If config.yaml exists, preserve existing values and add missing fields.
+- Before patching an existing config, run the deterministic required-keys diff instead of LLM-based key comparison: `ai-factory aifhub-analyze-config-diff --json`. The command is read-only and compares the config against `skills/aif-analyze/references/config-keys.json` plus this skill's frontmatter version.
+- When the diff reports `missing` entries or `version_drift`, present each missing key to the user with its manifest `purpose` text before writing it, then apply the additions through the structural patch below. When the diff reports `up_to_date: true`, take the fast path: skip config re-analysis and re-patching entirely.
+- After a successful config create/update, ensure the config records `analyze.skill_version` equal to this skill's frontmatter `version`. The config patcher preserves an existing value; update it explicitly when the skill version changed.
+- Treat an existing config update as a structural patch, not a full-file re-render. Preserve upstream/core fields such as `config_version`, `language`, `workflow`, `rules`, and `agent_profile`, plus unknown user-authored top-level and nested fields. Change only keys owned by the selected AIFHub bootstrap profile.
+- Keep AIFHub-owned profile keys explicit and namespaced under `aifhub`, including `aifhub.artifactProtocol` and the selected `aifhub.openspec.*` policy keys. Do not infer ownership of unrelated or unknown fields from their location.
+- Do not introduce `research_bundles_dir` or any equivalent config key. Derive the ultra research bundle root at runtime as `<parent(paths.research)>/research/`, preserving the configured `paths.research` file.
+- Config diagnostics may report only sorted changed and preserved key paths plus bounded counts. Never include config values, environment data, credentials, tokens, raw provider output, or private absolute paths.
 - Preserve existing `language.ui`, `language.artifacts`, and `language.technical_terms` values. If `language.technical_terms` is missing, default it to `keep`; accepted values are `keep | translate | mixed`.
 - If localization answers were collected while config was missing, write those pending config values into the selected legacy `ai-factory` or `openspec-native` config shape.
 - Keep schema consistent with nested sections: `language`, `aifhub`, `paths`, `utilities`, `rules`, `workflow`.
+- Preserve existing `aifhub.contextDedup` values, add only missing keys, and never enable context dedup automatically. The optional profile is protocol-neutral and disabled by default. `enabled: false|true` remains a legacy read-compatible alias for `mode: off|aifhub`, but new config MUST use the type-stable mode enum:
+
+```yaml
+aifhub:
+  contextDedup:
+    mode: "off" # off | aifhub | sqz
+    minBytes: 2048
+    maxEntries: 500
+    protectedPatterns: []
+    sqz:
+      command: sqz
+```
+
+- `protectedPatterns` contains only additional project patterns. Built-in protection for canonical plans, specs, QA, generated rules, coverage, gate, and done-readiness artifacts remains non-removable.
+- If the user explicitly selects `sqz`, disclose before activation that it is a new third-party user-owned executable, name the tested `ojuschugh1/sqz` v1.3.0 source and Elastic License 2.0, explain the cross-session cache/reference risk and that the CLI may keep user-owned statistics under `~/.sqz`, and require explicit confirmation before any install action. This skill MUST NOT download `sqz`, run `sqz init`, install hooks, register MCP, mutate agent config, start a daemon, or claim ownership of SQZ user state. Write `mode: sqz` only after the user accepts the external-tool requirement; manual config edits are handled later by bounded runtime readiness diagnostics.
 - Ensure the shared optional utility config is present in both legacy `ai-factory` and `openspec-native` modes, preserving existing user values. `utilities.context_tools.enabled` is the stable user-accepted tool id list. `utilities.graphify.enabled` and `utilities.codegraph.enabled` are backward-compatible preference shims. New optional memory/context recommendations come from local `recommendation-metadata.yaml`, not from a generic provider config abstraction:
 
 ```yaml
@@ -268,6 +294,13 @@ utilities:
 ```yaml
 aifhub:
   artifactProtocol: ai-factory
+  contextDedup:
+    mode: "off"
+    minBytes: 2048
+    maxEntries: 500
+    protectedPatterns: []
+    sqz:
+      command: sqz
 ```
 
   - Preserve the existing AI Factory-only path defaults.
@@ -281,6 +314,13 @@ aifhub:
 ```yaml
 aifhub:
   artifactProtocol: openspec
+  contextDedup:
+    mode: "off"
+    minBytes: 2048
+    maxEntries: 500
+    protectedPatterns: []
+    sqz:
+      command: sqz
   openspec:
     root: openspec
     installSkills: false
@@ -366,14 +406,22 @@ openspec:
   canArchive: boolean
   version: string | null
   supportedRange: ">=1.3.1 <2.0.0"
+  latestReviewedVersion: "1.8.0"
+  versionOutdated: boolean | null
   requiresNode: ">=20.19.0"
   nodeSupported: boolean
   versionSupported: boolean
 ```
 
-- The runner may also return `nodeVersion`, `command`, `reason`, and `errors`; include those when useful for troubleshooting.
+- The runner may also return `nodeVersion`, `command`, `commandSource`, `reason`, and `errors`; include those when useful for troubleshooting.
 - Do not print raw command output unless troubleshooting requires it.
 - If the OpenSpec CLI is compatible, prefer or recommend `openspec init --tools none`.
+- When `versionSupported: true` and `versionOutdated: true`, the selected CLI is compatible but older than the latest reviewed stable version. Keep `canValidate` and `canArchive` unchanged and emit a non-blocking update recommendation that names the installed version, `latestReviewedVersion`, and safe `commandSource`.
+- Scope the recommendation to the user-owned installation selected by `commandSource`: update the project dependency for `project-local`, the existing PATH/global installation for `path`, or the caller-owned executable for `explicit`.
+- Do not guess a package manager. Recommend using the package manager or install method that already owns the selected CLI and rerunning `ai-factory aifhub-mode status --json` afterward.
+- Do not install, update, replace, or re-resolve OpenSpec automatically. Do not invoke `npx`, a package manager, network access, or `openspec update` from this skill.
+- When `versionOutdated: false`, do not recommend a downgrade, including when the supported selected version is newer than `latestReviewedVersion`.
+- When `versionOutdated: null`, do not invent a freshness verdict; follow the missing, unsupported, or version-detection guidance below.
 - If the OpenSpec CLI is missing or unsupported, continue bootstrap with `canValidate: false` and `canArchive: false`.
 - Missing or unsupported OpenSpec CLI is a degraded capability state, not a bootstrap failure.
 - If `reason` is `unsupported-version`, recommend installing or updating OpenSpec CLI to `>=1.3.1 <2.0.0`.
@@ -446,13 +494,13 @@ openspec init --tools none
 - Report whether config values were created or preserved.
 - Report the optional glossary status as `created`, `updated`, `preserved`, or `skipped` plus its project-relative path; never report glossary contents.
 - Report project labels from `ai-factory aifhub-memory-tools labels --from-project --json` first: languages, volume, complexity, repo shape, artifact mode, project shape, task signals, matched dimension signals, and short evidence for the labels that affected recommendations.
-- Report optional local tool recommendations from explicit-label `ai-factory aifhub-memory-tools recommend --command aif-analyze ... --json` output when the installed wrapper is available, or from source-tree metadata only when running inside the AIFHub extension repository. Include baseline `rg`, recommended tools with availability/read scope/purge path/skill usefulness, and not-recommended tools with label-based reasons such as `codex-mem`, `eagle-mem`, tools forbidden for the skill, or tools without exact skill+label evidence. Ask which recommendations to enable and write accepted tool ids to `utilities.context_tools.enabled`. If metadata is unavailable, report a degraded note and continue.
+- Report optional local tool recommendations from explicit-label `ai-factory aifhub-memory-tools recommend --command aif-analyze ... --json` output when the installed wrapper is available, or from source-tree metadata only when running inside the AIFHub extension repository. Include baseline `rg`, enablement-eligible `recommendations` with availability/read scope/purge path/skill usefulness, separate non-configurable `manual_guidance`, and not-recommended tools with label-based reasons such as `codex-mem`, `eagle-mem`, tools forbidden for the skill, or tools without exact skill+label evidence. Ask which entries from `recommendations` to enable and write only those accepted tool ids to `utilities.context_tools.enabled`; never enable `manual_guidance`. If metadata is unavailable, report a degraded note and continue.
 - Report that follow-on skills select their own usable subset with `ai-factory aifhub-memory-tools select --from-project --command <skill> --json`; enabled config entries are not permission to use a tool unless they appear in `selected_tools`.
 - When the recommender output includes enriched fields, include allowed command scopes, forbidden command scopes, command-specific permission, execution guidance, privacy caveat, and protected validation artifacts in the concise recommendation summary when relevant.
 - Report the backward-compatible Graphify utility setting and `uv` availability only as compatibility context. If `utilities.graphify.enabled` is missing or `false`, Graphify may still be recommended only through local metadata; show manual setup commands only as explicit opt-in guidance: `uv --version`, `uv tool install graphifyy`, `graphify install`, and `graphify .`.
 - If autonomous/subagent mode defaulted to legacy `ai-factory` because the artifact protocol question could not be asked, report OpenSpec-native mode selection as an open question/blocker.
 - Report the active path set.
-- In `openspec-native` mode, include the OpenSpec capability object, degraded reason when present, created/preserved skeleton directories, and the statement that OpenSpec skill installation was skipped by design.
+- In `openspec-native` mode, include the OpenSpec capability object, degraded reason when present, version freshness (`version`, `latestReviewedVersion`, and `versionOutdated`), any non-blocking update recommendation, created/preserved skeleton directories, and the statement that OpenSpec skill installation was skipped by design.
 - In `openspec-native` mode, explicitly report whether `.ai-factory/state`, `.ai-factory/qa`, and `.ai-factory/rules/generated` were created or preserved.
 - Report what was invoked automatically versus what remains as manual next command.
 - If DESCRIPTION is missing, first recommended command must use the selected runtime invocation style: `$aif` for `codex-app`, `/aif` for slash-command runtimes.

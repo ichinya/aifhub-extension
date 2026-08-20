@@ -25,9 +25,20 @@ Before resolving an implementation target, read `.ai-factory/config.yaml` when i
 - Otherwise, use **Legacy AI Factory-only mode**.
 - If the config is missing, continue with Legacy AI Factory-only mode and state that no OpenSpec-native protocol was detected.
 
+### Legacy ultra marker-first boundary
+
+In Legacy AI Factory-only mode, classify the normalized project-relative plan entrypoint with `classifyLegacyPlanShape()` from `scripts/legacy-plan-migration.mjs` before folder-only detection, companion discovery, companion plan-file creation, execution metadata hydration, or any `status.yaml` write. Marker validation is first; known companion filenames are considered only after the classifier returns a classic shape.
+
+- For `ultra-valid`, stop all AIFHub companion logic and return the exact upstream handoff `/aif-implement <entrypoint>`. Do not create or synchronize a sibling `<plan-id>.md`, `task.md`, `context.md`, `rules.md`, `verify.md`, `status.yaml`, `explore.md`, or AIFHub task state; upstream owns the complete marked bundle atomically.
+- For `ultra-invalid` or `collision`, fail closed before any write and report only bounded `shape`, safe `entrypoint`, and classifier `code` values.
+- For `classic-pair` or `classic-folder-only`, continue with the classic companion rules below. An unrelated directory is not a plan.
+- Diagnostics may include only `shape`, safe project-relative `entrypoint`, and `handoff`; never include marker bodies, phase contents, request/research bodies, credentials, raw stdout, or raw stderr.
+
 ### OpenSpec-native mode
 
 When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, `/aif-implement` executes implementation tasks for the active OpenSpec change.
+
+For plan content, read only the canonical OpenSpec artifacts listed below. Do not inspect or mutate `.ai-factory/plans/**` after an OpenSpec change resolves.
 
 Use `buildImplementationContext(options)` from `scripts/openspec-execution-context.mjs` when available before editing implementation files. Treat the returned resolver diagnostics, canonical artifacts, generated rules, OpenSpec apply instructions, runtime paths, warnings, and errors as the machine-readable implementation context. If the helper is unavailable, fall back to the explicit filesystem reads and runtime boundaries in this section.
 
@@ -60,7 +71,8 @@ Treat planning source sections as read-only implementation context:
 
 - Use `## Original Request` as the raw intent anchor that explains why the change exists. Do not translate, normalize, rewrite, or use it instead of the executable `tasks.md`, design decisions, or requirements.
 - When `proposal.md` contains `## Research Context`, use its embedded Active Summary and source revision as the authoritative committed scope.
-- Compare live `paths.research` only for revision drift and optional rationale. If `Updated` or normalized `SHA256` differs, or legacy source metadata is incomplete, emit `WARN [research-drift] change-id=<change-id> source=<path> expected=<embedded revision> current=<live revision>` and continue from the embedded snapshot.
+- For an embedded ultra source, pass its exact project-relative `RESEARCH.md` path to `resolveUltraResearchSource()` from `scripts/ultra-research-resolver.mjs` and consume only its structured `source`, `revision`, and `diagnostic`. This centrally revalidates the sibling marker/index/status/link and normalized Active Summary digest; do not implement local selection or hashing heuristics.
+- Compare the exact regular or ultra source only for revision drift and optional rationale. Missing/invalid source, changed `Updated`, or changed normalized `SHA256` emits `WARN [research-drift] change-id=<change-id> source=<path> expected=<embedded revision> current=<live revision>` and continues from the embedded snapshot. Recency never selects a replacement source.
 - Do not silently apply requirements from newer research, expand task scope, or mutate `## Original Request` or `## Research Context` during implementation.
 - Keep credentials, raw provider output, and the full request/research bodies out of drift diagnostics and execution traces.
 
@@ -72,6 +84,15 @@ Hydrate runtime todo state from canonical OpenSpec tasks before editing implemen
 - If no todo or plan tool is available, report a concise task snapshot in the normal response and continue from canonical `tasks.md`.
 - Report missing todo-tool support as a capability fallback, not as an implementation failure.
 - Hydrating runtime todo state does not authorize broad task expansion; `/aif-implement` still executes one task or one tightly coupled task group.
+
+#### Roadmap lifecycle deferral
+
+In OpenSpec-native mode, this section overrides the upstream roadmap completion step.
+
+- `/aif-implement` must not edit the configured roadmap and must not mark a milestone, phase, slice, or managed lifecycle row complete, even when all implementation tasks are checked.
+- It may read `## Roadmap Linkage` from the canonical proposal and report only the detected linkage fields plus the fact that lifecycle ownership is deferred.
+- Implementation output must not claim roadmap completion or copy unrelated roadmap content.
+- Route authoritative validation to `/aif-verify <change-id>`. Only after verification passes may `/aif-done <change-id>` own the successful finalization transition defined by the canonical change.
 
 Read generated rules as derived implementation guidance when present:
 

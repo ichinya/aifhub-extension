@@ -73,6 +73,18 @@ function extractSection(markdown, heading) {
   return lines.slice(start, end).join('\n');
 }
 
+function extractFencedBlockAfter(markdown, anchor) {
+  const anchorIndex = markdown.indexOf(anchor);
+  assert.notEqual(anchorIndex, -1, `Expected fenced-block anchor: ${anchor}`);
+
+  const fenceStart = markdown.indexOf('```markdown\n', anchorIndex);
+  assert.notEqual(fenceStart, -1, `Expected markdown fence after: ${anchor}`);
+  const bodyStart = fenceStart + '```markdown\n'.length;
+  const fenceEnd = markdown.indexOf('\n```', bodyStart);
+  assert.notEqual(fenceEnd, -1, `Expected closing markdown fence after: ${anchor}`);
+  return markdown.slice(bodyStart, fenceEnd);
+}
+
 describe('aif-plan OpenSpec-native planning contract', () => {
   it('defines mode-gated OpenSpec-native and legacy sections', async () => {
     const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
@@ -84,6 +96,67 @@ describe('aif-plan OpenSpec-native planning contract', () => {
     assertIncludes(legacy, 'When OpenSpec-native mode is not enabled', 'Legacy section');
     assertIncludes(legacy, '.ai-factory/plans/<plan-id>.md', 'Legacy section');
     assertIncludes(legacy, '.ai-factory/plans/<plan-id>/task.md', 'Legacy section');
+  });
+
+  it('resolves the explicit ultra profile through the shared version gate before writes', async () => {
+    const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
+    const gate = extractSection(injection, 'Planning profile and AI Factory version gate');
+
+    assertOrder(
+      injection,
+      [
+        '### Planning profile and AI Factory version gate',
+        '### OpenSpec-native mode',
+        '### Legacy AI Factory-only mode'
+      ],
+      'aif-plan profile routing'
+    );
+
+    for (const expected of [
+      'scripts/ai-factory-version-resolver.mjs',
+      'injected test toolchain/version',
+      'project-managed `.ai-factory.json.version`',
+      'only when the executable provenance is proven to match the same project installation',
+      'unverified global/PATH-only CLI evidence is ignored with a bounded `ai-factory-cli-provenance-unverified` warning',
+      'Missing, malformed, prerelease, unsupported `<2.18.0`, or provenance-matched CLI/project mismatch',
+      'fail closed and create no plan, change, bundle, companion, runtime-state, or research artifact',
+      '`mode`, `profile`, `version`, `source`, and stable `code`',
+      '/aif-plan full <request>',
+      'Never include the request body, research body, provider output, credentials, raw stdout, or raw stderr'
+    ]) {
+      assertIncludes(gate, expected, 'aif-plan ultra version gate');
+    }
+  });
+
+  it('maps OpenSpec ultra to canonical detail and leaves legacy ultra upstream-owned', async () => {
+    const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
+    const gate = extractSection(injection, 'Planning profile and AI Factory version gate');
+    const legacy = extractSection(injection, 'Legacy AI Factory-only mode');
+
+    for (const expected of [
+      'OpenSpec-native mode, `ultra` is a depth profile over the canonical OpenSpec change',
+      'upstream Ultra Detail Gate',
+      'exact files and symbols',
+      'ordered edits',
+      'failure handling',
+      'acceptance criteria',
+      'rollback',
+      'verification detail',
+      'MUST NOT create `index.md`, `phase-NN-*.md`, companion files, or an active standalone `<!-- aif:plan-mode:ultra -->`'
+    ]) {
+      assertIncludes(gate, expected, 'OpenSpec ultra depth profile');
+    }
+
+    for (const expected of [
+      'explicit `/aif-plan ultra`',
+      'leave creation and orchestration to the upstream skill',
+      '`<paths.plans>/<plan-id>/index.md` plus direct `phase-NN-<slug>.md` files',
+      '`index.md` is its sole progress ledger',
+      'Do not create a sibling `<plan-id>.md`',
+      'do not create or synchronize `task.md`, `context.md`, `rules.md`, `verify.md`, `status.yaml`, or `explore.md`'
+    ]) {
+      assertIncludes(legacy, expected, 'legacy ultra ownership');
+    }
   });
 
   it('requires canonical OpenSpec change artifacts without legacy plan companion files', async () => {
@@ -116,11 +189,12 @@ describe('aif-plan OpenSpec-native planning contract', () => {
     const openspec = extractSection(injection, 'OpenSpec-native mode');
 
     for (const expected of [
-      '# Proposal: <Title>',
-      '## Intent',
-      '## Scope',
-      '## Approach',
-      '## Risks / Open Questions',
+      '## Why',
+      '## What Changes',
+      '## Capabilities',
+      '### New Capabilities',
+      '### Modified Capabilities',
+      '## Impact',
       '# Design: <Title>',
       '## Technical Approach',
       '## Data / Artifact Model',
@@ -128,10 +202,44 @@ describe('aif-plan OpenSpec-native planning contract', () => {
       '## ADDED Requirements',
       '## MODIFIED Requirements',
       '## REMOVED Requirements',
-      '#### Scenario: <Scenario name>'
+      '#### Scenario: <Scenario name>',
+      'openspec/changes/<change-id>/.openspec.yaml',
+      'skip_specs: true',
+      '>=1.7.0',
+      'older supported CLI',
+      'retire_capabilities: true',
+      'explicitly authorizes capability retirement',
+      'must not infer retirement'
     ]) {
       assertIncludes(openspec, expected, 'OpenSpec-native section');
     }
+  });
+
+  it('keeps the proposal source-template headings exact and ordered', async () => {
+    const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
+    const openspec = extractSection(injection, 'OpenSpec-native mode');
+    const proposalTemplate = extractFencedBlockAfter(openspec, '`proposal.md` should use:');
+    const sourceHeadings = [
+      '## Why',
+      '## What Changes',
+      '## Capabilities',
+      '### New Capabilities',
+      '### Modified Capabilities',
+      '## Impact'
+    ];
+    const actualSourceHeadings = proposalTemplate
+      .split(/\r?\n/)
+      .filter((line) => sourceHeadings.includes(line));
+
+    assert.deepEqual(actualSourceHeadings, sourceHeadings);
+    for (const staleHeading of ['## Intent', '## Scope', '## Approach', '## Risks / Open Questions']) {
+      assertNotIncludes(proposalTemplate, staleHeading, 'OpenSpec proposal source template');
+    }
+    assertOrder(
+      proposalTemplate,
+      ['## Original Request', '## Roadmap Linkage', '## Why', '## What Changes', '## Capabilities', '## Impact'],
+      'OpenSpec proposal template'
+    );
   });
 
   it('requires task intake normalization before writing OpenSpec artifacts', async () => {
@@ -158,7 +266,7 @@ describe('aif-plan OpenSpec-native planning contract', () => {
       'acceptance criteria',
       'open questions',
       'suggested next command',
-      '`proposal.md` for intent, scope, non-goals, approach, assumptions, risks, and open questions',
+      '`proposal.md` for the exact OpenSpec source-template headings `## Why`, `## What Changes`, `## Capabilities`, and `## Impact`',
       '`design.md` for technical approach, C4 impact, ADR candidates, dependency graph, integration points, alternatives, and risks',
       '`tasks.md` for an executable implementation checklist',
       '`specs/**/spec.md` for behavior-changing requirements and scenarios',
@@ -185,21 +293,97 @@ describe('aif-plan OpenSpec-native planning contract', () => {
     const openspec = extractSection(injection, 'OpenSpec-native mode');
     const label = 'injections/core/aif-plan-plan-folder.md Original Request and Research Context contract';
 
-    assertOrder(openspec, ['## Original Request', '## Intent'], `${label} section ordering`);
+    assertOrder(openspec, ['## Original Request', '## Why'], `${label} section ordering`);
 
     for (const expected of [
       'recognized invocation tokens that occur in command positions',
-      'Do not remove words such as `full`, `fast`, `--list`, or `--parallel` when they occur inside the actual request text',
+      'Do not remove words such as `full`, `fast`, `ultra`, `--list`, or `--parallel` when they occur inside the actual request text',
       'request wording, casing, punctuation, internal whitespace, and line breaks exactly',
       'If planning starts only from the resolved research artifact and no explicit request exists, omit `## Original Request`',
       'keep both `## Original Request` and `## Research Context`',
-      'Source: <resolved paths.research> (Active Summary, Updated: <timestamp>, SHA256: <digest>)',
+      'Source: <exact selected RESEARCH.md source> (Active Summary, Updated: <timestamp>, SHA256: <digest>)',
       'normalizing line endings to LF',
       'ending the digest input with exactly one newline',
       'WARN [research-drift]',
       'expected=<embedded revision>',
       'current=<live revision>',
       'unless the user explicitly requests a research rebase'
+    ]) {
+      assertIncludes(openspec, expected, label);
+    }
+  });
+
+  it('uses the shared ultra research resolver with deterministic selection and bounded ambiguity', async () => {
+    const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
+    const openspec = extractSection(injection, 'OpenSpec-native mode');
+    const label = 'aif-plan ultra research resolver contract';
+
+    for (const expected of [
+      'resolveUltraResearchSource()',
+      'scripts/ultra-research-resolver.mjs',
+      'structured `source`, `revision`, `content`, and `diagnostic`',
+      'safe explicit project-relative `RESEARCH.md` path',
+      'exact bundle slug',
+      'exactly one caller-reviewed materially relevant active candidate',
+      '`ultra-research-ambiguous`',
+      'recency, fuzzy matching, and a newer `Updated` value never break the tie',
+      'Missing, unmarked, inactive, unsafe, symlinked, or invalid explicit sources stop Research Context creation',
+      'use only `content.activeSummary` from the selected exact `source.path`',
+      'sibling C4, ADR, and dependency artifacts are rationale and cannot expand scope'
+    ]) {
+      assertIncludes(openspec, expected, label);
+    }
+  });
+
+  it('records explicit roadmap linkage in the canonical proposal and returns the owner handoff', async () => {
+    const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
+    const openspec = extractSection(injection, 'OpenSpec-native mode');
+    const label = 'aif-plan standardized Roadmap Linkage contract';
+
+    const proposalTemplate = extractFencedBlockAfter(openspec, '`proposal.md` should use:');
+    assertOrder(proposalTemplate, ['## Original Request', '## Roadmap Linkage', '## Why'], `${label} proposal ordering`);
+
+    for (const expected of [
+      '#### Roadmap Linkage',
+      '- Issues: <comma-separated canonical URL(s)|none>',
+      '- Milestone: <exact title|none>',
+      '- Roadmap item/slice: <exact item or slice|none>',
+      '- Rationale: <one bounded explanation|none>',
+      'https://github.com/<owner>/<repo>/issues/<number>',
+      'report only the captured linkage fields',
+      '/aif-roadmap check'
+    ]) {
+      assertIncludes(openspec, expected, label);
+    }
+  });
+
+  it('preserves explicit none values in every roadmap linkage field', async () => {
+    const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
+    const openspec = extractSection(injection, 'OpenSpec-native mode');
+    const label = 'aif-plan explicit-none Roadmap Linkage contract';
+
+    for (const expected of [
+      'Always include `## Roadmap Linkage`',
+      'preserve an explicit `none` value verbatim',
+      'Do not omit a field whose value is `none`',
+      'all four fields are `none`'
+    ]) {
+      assertIncludes(openspec, expected, label);
+    }
+  });
+
+  it('does not infer roadmap linkage from repository context', async () => {
+    const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
+    const openspec = extractSection(injection, 'OpenSpec-native mode');
+    const label = 'aif-plan no-inference Roadmap Linkage contract';
+
+    for (const expected of [
+      'MUST NOT infer',
+      'issue title',
+      'branch name',
+      'repository labels',
+      'unrelated roadmap text',
+      'do not return `/aif-roadmap check` solely for an all-`none` linkage'
     ]) {
       assertIncludes(openspec, expected, label);
     }

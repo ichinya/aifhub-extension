@@ -344,6 +344,146 @@ describe('OpenSpec done readiness gate', () => {
     assert.match(readiness.suggested_next.reason, /\/aif-rules-check/);
   });
 
+  it('names legacy verify receipts with a targeted rerun hint', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+    const legacyBlock = [
+      '```aif-gate-result',
+      JSON.stringify({
+        schema_version: 1,
+        gate: 'verify',
+        status: 'pass',
+        blocking: false,
+        blockers: [],
+        affected_files: [],
+        suggested_next: { command: '/aif-verify add-oauth', reason: 'rerun' }
+      }, null, 2),
+      '```'
+    ].join('\n');
+
+    const readiness = await buildOpenSpecDoneReadiness({
+      rootDir,
+      changeId: 'add-oauth',
+      ...passingOptions({
+        readLatestVerificationEvidence: async () => verificationEvidence({
+          content: `# Verify: add-oauth\n\nVerdict: PASS\n\n${legacyBlock}\n`
+        })
+      })
+    });
+
+    assert.equal(readiness.checks.verify_gate, 'fail');
+    const diagnostic = readiness.diagnostics.find((item) => item.check === 'verify_gate');
+    assert.equal(diagnostic.code, 'verification-gate-legacy-suggested-next');
+    assert.match(diagnostic.message, /passing gate block with a non-null suggested_next/);
+    assert.match(diagnostic.message, /rerun \/aif-verify once/);
+    assert.equal(diagnostic.suggested_next.command, '/aif-verify add-oauth');
+    assert.match(diagnostic.suggested_next.reason, /predates or does not follow/);
+    assert.equal(diagnostic.blocking, true);
+  });
+
+  it('keeps generic verify diagnostics when a receipt fails other validations too', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+    const invalidBlock = [
+      '```aif-gate-result',
+      JSON.stringify({
+        schema_version: 2,
+        gate: 'verify',
+        status: 'pass',
+        blocking: false,
+        blockers: [],
+        affected_files: [],
+        suggested_next: null
+      }, null, 2),
+      '```'
+    ].join('\n');
+
+    const readiness = await buildOpenSpecDoneReadiness({
+      rootDir,
+      changeId: 'add-oauth',
+      ...passingOptions({
+        readLatestVerificationEvidence: async () => verificationEvidence({
+          content: `# Verify: add-oauth\n\nVerdict: PASS\n\n${invalidBlock}\n`
+        })
+      })
+    });
+
+    assert.equal(readiness.checks.verify_gate, 'fail');
+    const diagnostic = readiness.diagnostics.find((item) => item.check === 'verify_gate');
+    assert.equal(diagnostic.code, 'verification-gate-invalid');
+  });
+
+  it('names legacy rules receipts with a targeted rewrite hint', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+
+    const readiness = await buildOpenSpecDoneReadiness({
+      rootDir,
+      changeId: 'add-oauth',
+      ...passingOptions({
+        readOpenSpecRulesGateEvidence: async () => ({
+          exists: true,
+          ok: false,
+          status: 'invalid',
+          path: '.ai-factory/qa/add-oauth/rules.md',
+          gateResult: {
+            ok: false,
+            result: null,
+            errors: [{
+              code: 'invalid-suggested-next-on-pass',
+              message: 'suggested_next must be null when status is pass; terminal routing is prose-only.'
+            }]
+          },
+          warnings: [],
+          errors: [{
+            code: 'rules-gate-result-invalid',
+            message: 'Rules gate evidence contains an invalid aif-gate-result block for the rules gate.',
+            path: '.ai-factory/qa/add-oauth/rules.md'
+          }]
+        })
+      })
+    });
+
+    assert.equal(readiness.checks.rules_gate, 'fail');
+    const diagnostic = readiness.diagnostics.find((item) => item.check === 'rules_gate');
+    assert.equal(diagnostic.code, 'rules-gate-legacy-suggested-next');
+    assert.match(diagnostic.message, /rerun \/aif-rules-check/);
+    assert.match(diagnostic.message, /null-on-pass contract/);
+    assert.match(diagnostic.suggested_next.command, /aifhub-write-gate-evidence/);
+  });
+
+  it('keeps generic rules diagnostics when a receipt fails other validations too', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+
+    const readiness = await buildOpenSpecDoneReadiness({
+      rootDir,
+      changeId: 'add-oauth',
+      ...passingOptions({
+        readOpenSpecRulesGateEvidence: async () => ({
+          exists: true,
+          ok: false,
+          status: 'invalid',
+          path: '.ai-factory/qa/add-oauth/rules.md',
+          gateResult: {
+            ok: false,
+            result: null,
+            errors: [{ code: 'invalid-schema-version', message: 'schema_version must be 1.' }]
+          },
+          warnings: [],
+          errors: [{
+            code: 'rules-gate-result-invalid',
+            message: 'Rules gate evidence contains an invalid aif-gate-result block for the rules gate.',
+            path: '.ai-factory/qa/add-oauth/rules.md'
+          }]
+        })
+      })
+    });
+
+    const diagnostic = readiness.diagnostics.find((item) => item.check === 'rules_gate');
+    assert.equal(diagnostic.code, 'rules-gate-result-invalid');
+  });
+
   it('renders rules_gate write-gate-evidence remediation in human output', async () => {
     const rootDir = await createTempRoot();
     await createOpenSpecChange(rootDir);

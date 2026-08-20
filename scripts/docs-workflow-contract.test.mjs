@@ -317,7 +317,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
       'configured roadmap artifact',
       'optional GitHub issue, PR, milestone',
       'read-only roadmap/GitHub freshness gate',
-      '/aif-roadmap',
+      '/aif-roadmap check',
       'still writes only the git commit after user confirmation',
       '.ai-factory/ROADMAP.md',
       'GitHub issues, milestones, PRs, labels, or linked branches',
@@ -339,12 +339,134 @@ describe('complete OpenSpec workflow documentation contract', () => {
       'the configured roadmap artifact',
       'optional GitHub issue/PR/milestone freshness context',
       'must not mutate OpenSpec lifecycle artifacts, `.ai-factory/ROADMAP.md`, runtime state, QA evidence, generated rules, or GitHub objects manually',
-      '/aif-roadmap',
+      '/aif-roadmap check',
       'still writes only the git commit after user confirmation',
       'Generic `## Commit Plan` grouping is parent-owned in AI Factory 2.13+.',
       'AIFHub adds only roadmap/GitHub freshness findings before the commit proposal.'
     ]) {
       assertIncludes(qualityTail, expected, 'docs/context-loading-policy.md Quality Gates and Finalization Tail');
+    }
+  });
+
+  it('documents blocking local lifecycle drift separately from volatile GitHub drift', async () => {
+    const usage = await readRepoFile('docs/usage.md');
+    const contextPolicy = await readRepoFile('docs/context-loading-policy.md');
+    const usageCommit = extractSection(usage, '### `/aif-commit`');
+    const qualityTail = extractSection(contextPolicy, '## Quality Gates and Finalization Tail');
+
+    for (const [label, section] of [
+      ['docs/usage.md /aif-commit', usageCommit],
+      ['docs/context-loading-policy.md Quality Gates and Finalization Tail', qualityTail]
+    ]) {
+      for (const expected of [
+        'Deterministic local lifecycle drift',
+        'ERROR [roadmap-local]',
+        'successful local finalization',
+        'managed `OpenSpec Change Lifecycle` row',
+        'missing or not exactly `finalized`',
+        '/aif-roadmap check',
+        'user confirmation cannot bypass',
+        'does not create a git commit',
+        'WARN [roadmap-external]',
+        'Unavailable, partial, or later-changing GitHub evidence',
+        'warning-only by default'
+      ]) {
+        assertIncludes(section, expected, label);
+      }
+    }
+  });
+
+  it('documents standardized roadmap linkage and the managed local lifecycle in user workflow docs', async () => {
+    const usage = await readRepoFile('docs/usage.md');
+    const plan = extractSection(usage, '### `/aif-plan full`');
+    const roadmap = extractSection(usage, '### `/aif-roadmap`');
+    const done = extractSection(usage, '### `/aif-done`');
+
+    for (const expected of [
+      '## Roadmap Linkage',
+      '`Issues`',
+      '`Milestone`',
+      '`Roadmap item/slice`',
+      '`Rationale`',
+      'explicit `none`',
+      '/aif-roadmap check',
+      '`planned`'
+    ]) {
+      assertIncludes(plan, expected, 'docs/usage.md /aif-plan full roadmap linkage');
+    }
+
+    for (const expected of [
+      '<!-- aifhub:roadmap-change-lifecycle:start -->',
+      '<!-- aifhub:roadmap-change-lifecycle:end -->',
+      'OpenSpec Change Lifecycle',
+      '`planned` and `finalized`',
+      'local lifecycle',
+      'outside the markers',
+      'post-merge',
+      '/aif-roadmap check'
+    ]) {
+      assertIncludes(roadmap, expected, 'docs/usage.md /aif-roadmap managed lifecycle');
+    }
+
+    for (const expected of [
+      'after successful OpenSpec archive',
+      'pre-archive failure leaves the managed lifecycle unchanged',
+      'post-archive roadmap update failure',
+      'does not roll back archive',
+      '/aif-roadmap check',
+      'does not claim that a GitHub issue is closed or a pull request is merged'
+    ]) {
+      assertIncludes(done, expected, 'docs/usage.md /aif-done roadmap transition');
+    }
+  });
+
+  it('documents roadmap lifecycle co-ownership in context, compatibility, and ADR docs', async () => {
+    const contextPolicy = await readRepoFile('docs/context-loading-policy.md');
+    const compatibility = await readRepoFile('docs/openspec-compatibility.md');
+    const adr = await readRepoFile('docs/adr/0001-openspec-native-artifact-protocol.md');
+
+    for (const [label, source] of [
+      ['docs/context-loading-policy.md', contextPolicy],
+      ['docs/openspec-compatibility.md', compatibility],
+      ['docs/adr/0001-openspec-native-artifact-protocol.md', adr]
+    ]) {
+      for (const expected of [
+        '## Roadmap Linkage',
+        'OpenSpec Change Lifecycle',
+        '`planned`',
+        '`finalized`',
+        'marker-bounded',
+        '/aif-done',
+        '/aif-commit',
+        '/aif-roadmap check',
+        'post-merge',
+        'GitHub open/closed/merged state'
+      ]) {
+        assertIncludes(source, expected, `${label} roadmap lifecycle contract`);
+      }
+    }
+  });
+
+  it('documents the bounded roadmap transition for Codex and Claude finalizer agents', async () => {
+    const codex = extractSection(await readRepoFile('docs/codex-agents.md'), '### Finalization');
+    const claude = extractSection(await readRepoFile('docs/claude-agents.md'), '### Finalization');
+
+    for (const [label, section] of [
+      ['docs/codex-agents.md Finalization', codex],
+      ['docs/claude-agents.md Finalization', claude]
+    ]) {
+      for (const expected of [
+        '## Roadmap Linkage',
+        'after successful OpenSpec archive',
+        'marker-bounded `OpenSpec Change Lifecycle`',
+        '`finalized`',
+        'pre-archive failure leaves the roadmap unchanged',
+        'does not roll back archive',
+        '/aif-roadmap check',
+        'GitHub open/closed/merged state remains separate'
+      ]) {
+        assertIncludes(section, expected, label);
+      }
     }
   });
 
@@ -374,7 +496,11 @@ describe('complete OpenSpec workflow documentation contract', () => {
       ['docs/usage.md', usage],
       ['docs/openspec-validation.md', validation]
     ]) {
-      assertIncludes(source, '/aif-done <change-id> --record-dirty-state', label);
+      assertIncludes(
+        source,
+        'ai-factory aifhub-done-finalizer --change <change-id> --record-dirty-state --json',
+        label
+      );
       assertIncludes(source, 'git status --short', label);
       assertIncludes(source, 'final QA evidence', label);
       assertIncludes(source, 'dirty workspace', label);
@@ -382,7 +508,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
 
     assertIncludes(
       usage,
-      '/aif-done <change-id> --skip-specs --record-dirty-state',
+      'ai-factory aifhub-done-finalizer --change <change-id> --skip-specs --record-dirty-state --json',
       'docs/usage.md'
     );
     assertNotIncludes(
@@ -398,7 +524,13 @@ describe('complete OpenSpec workflow documentation contract', () => {
   });
 
   it('documents installed-project helper execution through AIFHub wrappers', async () => {
+    const readme = await readRepoFile('README.md');
+    const usage = await readRepoFile('docs/usage.md');
     const validation = await readRepoFile('docs/openspec-validation.md');
+    const compatibility = await readRepoFile('docs/openspec-compatibility.md');
+    const codexAgents = await readRepoFile('docs/codex-agents.md');
+    const claudeAgents = await readRepoFile('docs/claude-agents.md');
+    const changelog = await readRepoFile('CHANGELOG.md');
     const handoffProfile = await readRepoFile('docs/handoff-validation-profile.md');
 
     for (const expected of [
@@ -408,6 +540,33 @@ describe('complete OpenSpec workflow documentation contract', () => {
       assertIncludes(validation, expected, 'docs/openspec-validation.md');
     }
 
+    for (const [label, source] of [
+      ['README.md', readme],
+      ['docs/usage.md', usage],
+      ['docs/openspec-validation.md', validation],
+      ['docs/openspec-compatibility.md', compatibility],
+      ['docs/codex-agents.md', codexAgents],
+      ['docs/claude-agents.md', claudeAgents],
+      ['CHANGELOG.md', changelog]
+    ]) {
+      assertIncludes(
+        source,
+        'ai-factory aifhub-done-finalizer --change <change-id> --json',
+        label
+      );
+    }
+
+    for (const expected of [
+      'Explicit non-empty',
+      'project-local',
+      '`PATH`',
+      'auto-install',
+      'commandSource',
+      'Filesystem-based'
+    ]) {
+      assertIncludes(compatibility, expected, 'docs/openspec-compatibility.md');
+    }
+
     assertIncludes(
       handoffProfile,
       'ai-factory aifhub-handoff-gate-summary --change <change-id> --stage review --json',
@@ -415,13 +574,30 @@ describe('complete OpenSpec workflow documentation contract', () => {
     );
 
     for (const [label, source] of [
+      ['README.md', readme],
+      ['docs/usage.md', usage],
       ['docs/openspec-validation.md', validation],
+      ['docs/openspec-compatibility.md', compatibility],
+      ['docs/codex-agents.md', codexAgents],
+      ['docs/claude-agents.md', claudeAgents],
       ['docs/handoff-validation-profile.md', handoffProfile]
     ]) {
       assert.doesNotMatch(
         source,
         /\bnode\s+scripts\/[A-Za-z0-9_.-]+\.mjs\b/,
         `${label} should not expose root scripts as installed-project helper commands`
+      );
+    }
+
+    for (const [label, source] of [
+      ['docs/usage.md', usage],
+      ['docs/openspec-validation.md', validation],
+      ['docs/openspec-compatibility.md', compatibility]
+    ]) {
+      assert.match(
+        source,
+        /scripts\/openspec-[A-Za-z0-9_.-]+\.mjs[^\n]*(?:extension-local|implementation module)|(?:extension-local|implementation module)[^\n]*scripts\/openspec-[A-Za-z0-9_.-]+\.mjs/i,
+        `${label} should identify internal OpenSpec module references as implementation-only`
       );
     }
   });
@@ -516,7 +692,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
     }
   });
 
-  it('documents the AI Factory 2.17.0 baseline, archive boundary, distillation utility, and Codex runtime split', async () => {
+  it('documents the cumulative AI Factory 2.18.1 baseline, archive boundary, distillation utility, and Codex runtime split', async () => {
     const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
     const manifest = JSON.parse(await readRepoFile('extension.json'));
     const readme = await readRepoFile('README.md');
@@ -531,10 +707,13 @@ describe('complete OpenSpec workflow documentation contract', () => {
     const combinedDocs = [readme, changelog, usage, compatibility, docsIndex, contextPolicy, mcpDocs, handoff].join('\n');
 
     assert.equal(metadata.compat['ai-factory'], '>=2.11.0 <3.0.0', 'aifhub-extension.json compat.ai-factory');
-    assert.equal(metadata.sources['ai-factory'].version, '2.17.0', 'aifhub-extension.json sources.ai-factory.version');
-    assert.equal(metadata.sources['ai-factory'].baselineVersion, '2.17.0', 'aifhub-extension.json sources.ai-factory.baselineVersion');
-    assert.equal(metadata.sources['ai-factory'].lastSync, '2026-07-09', 'aifhub-extension.json sources.ai-factory.lastSync');
-    assertIncludes(metadata.sources['ai-factory'].notes, 'upstream 2.17.0', 'aifhub-extension.json sources.ai-factory.notes');
+    assert.equal(metadata.sources['ai-factory'].version, '2.18.1', 'aifhub-extension.json sources.ai-factory.version');
+    assert.equal(metadata.sources['ai-factory'].baselineVersion, '2.18.1', 'aifhub-extension.json sources.ai-factory.baselineVersion');
+    assert.equal(metadata.sources['ai-factory'].lastSync, '2026-08-14', 'aifhub-extension.json sources.ai-factory.lastSync');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'upstream 2.18.1', 'aifhub-extension.json sources.ai-factory.notes');
+    assertIncludes(metadata.sources['ai-factory'].notes, '2.18.0...2.18.1', '2.18.1 baseline: patch comparison');
+    assertIncludes(metadata.sources['ai-factory'].notes, '2 commits across 8 files', '2.18.1 baseline: reviewed patch size');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'Research Coherence Gate', '2.18.1 baseline: upstream explore gate');
     assertIncludes(metadata.sources['ai-factory'].notes, 'Commit Plan grouping', 'aifhub-extension.json sources.ai-factory.notes');
     assertIncludes(metadata.sources['ai-factory'].notes, '/aif-distillation', 'aifhub-extension.json sources.ai-factory.notes');
     assertIncludes(metadata.sources['ai-factory'].notes, '/aif-archive', 'aifhub-extension.json sources.ai-factory.notes');
@@ -546,9 +725,17 @@ describe('complete OpenSpec workflow documentation contract', () => {
     assertIncludes(metadata.sources['ai-factory'].notes, 'config-aware project utilities', 'aifhub-extension.json sources.ai-factory.notes');
     assertIncludes(metadata.sources['ai-factory'].notes, 'managed agent config preservation', 'aifhub-extension.json sources.ai-factory.notes');
     assertIncludes(metadata.sources['ai-factory'].notes, 'Agent Skills', 'aifhub-extension.json sources.ai-factory.notes');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'extension schema/loader', '2.18 baseline: extension schema and loader no-op');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'injection and MCP contracts', '2.18 baseline: injection and MCP no-op');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'Node >=18', '2.18 baseline: Node contract');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'ultra planning', '2.18 baseline: ultra planning adapter');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'ultra research', '2.18 baseline: ultra research adapter');
+    assertIncludes(metadata.sources['ai-factory'].notes, '/aif-loop', '2.18 baseline: loop reviewed no-op');
+    assertIncludes(metadata.sources['ai-factory'].notes, '/aif-transfer', '2.18 baseline: transfer reviewed no-op');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'skills.sh', '2.18 baseline: skills.sh docs no-op');
 
     for (const [source, expected, label] of [
-      [readme, '### AI Factory 2.17 Reviewed Baseline', '2.17 baseline: README.md heading'],
+      [readme, '### AI Factory 2.18 Reviewed Baseline', 'README.md AI Factory 2.18 reviewed-baseline heading'],
       [readme, 'immutable `## Original Request`', 'original-request: README.md immutable source'],
       [readme, '`WARN [research-drift]`', 'research-drift: README.md warning'],
       [readme, 'same targeted regression check before and after the edit', 'fix-regression: README.md pre/post contract'],
@@ -557,13 +744,29 @@ describe('complete OpenSpec workflow documentation contract', () => {
       [mcpDocs, 'Universal / Other (`.mcp.json`)', 'universal-mcp: docs/aifhub-mcp.md runtime and path'],
       [mcpDocs, '`mcpServers`', 'universal-mcp: docs/aifhub-mcp.md standard key'],
       [readme, 'project-specific `Control Flow` base rule only when repository evidence supports it', 'control-flow: README.md evidence gate'],
-      [changelog, 'Reviewed AI Factory baseline обновлён до `2.17.0`', '2.17 baseline: CHANGELOG.md'],
-      [docsIndex, 'AI Factory 2.17 baseline compatibility', '2.17 baseline: docs/README.md index']
+      [readme, 'reviewed against AI Factory `2.18.1`', 'README.md AI Factory 2.18.1 reviewed baseline'],
+      [readme, 'upstream-owned Research Coherence Gate', 'README.md upstream explore gate ownership'],
+      [changelog, 'Reviewed AI Factory baseline обновлён до `2.18.1`', 'CHANGELOG.md Unreleased AI Factory reviewed-baseline version'],
+      [docsIndex, 'AI Factory 2.18.1 reviewed baseline', 'docs/README.md AI Factory reviewed-baseline index entry']
     ]) {
       assertIncludes(source, expected, label);
     }
 
     for (const [expected, label] of [
+      ['AI Factory 2.18 Reviewed Baseline', '2.18 baseline: docs/openspec-compatibility.md heading'],
+      ['AI Factory 2.18 audit', '2.18 baseline: compatibility audit table'],
+      ['AI Factory 2.18.1 patch audit', '2.18.1 baseline: compatibility patch audit'],
+      ['AI Factory 2.18 consumer ledger', '2.18 baseline: consumer ledger'],
+      ['Extension schema and loader', '2.18 no-op: extension schema and loader'],
+      ['Injection and MCP runtime', '2.18 no-op: injection and MCP runtime'],
+      ['Node, bin and dependencies', '2.18 no-op: Node and dependencies'],
+      ['Ultra planning', '2.18 adapter: ultra planning'],
+      ['Ultra research', '2.18 adapter: ultra research'],
+      ['Completed-phase `/aif-loop` budget', '2.18 no-op: loop budget'],
+      ['Privacy-gated `/aif-transfer`', '2.18 no-op: transfer'],
+      ['skills.sh installation documentation', '2.18 no-op: skills.sh docs'],
+      ['Research Coherence Gate', '2.18.1 adapter: upstream explore gate'],
+      ['prompt/docs-only', '2.18.1 no-op: runtime/API patch surface'],
       ['Custom fix-plan preservation', 'fix-plan no-op: docs/openspec-compatibility.md'],
       ['AIFHub adds no delete implementation', 'fix-plan no-op ownership: docs/openspec-compatibility.md'],
       ['Refined `/aif-architecture` structure', 'architecture no-op: docs/openspec-compatibility.md'],
@@ -599,8 +802,8 @@ describe('complete OpenSpec workflow documentation contract', () => {
       'docs/openspec-compatibility.md'
     );
     for (const expected of [
-      'AI Factory 2.17 Reviewed Baseline',
-      'AI Factory `2.17.0`',
+      'AI Factory 2.18 Reviewed Baseline',
+      'AI Factory `2.18.1`',
       'config-aware project-context utilities',
       'project-context utilities',
       '/aif-architecture',
@@ -619,9 +822,9 @@ describe('complete OpenSpec workflow documentation contract', () => {
       '.ai-factory/archive/',
       'paths.archive/plans/*.md',
       'paths.archive/roadmap/',
-      'archive-aware sequential plan behavior',
+      'Archived legacy plans are excluded from active sequential plan numbering and discovery',
       'archived legacy plans are excluded from active plan discovery',
-      'archived plans are excluded from active sequential plan numbering and discovery',
+      'archived legacy plans are excluded from active sequential plan discovery and numbering',
       'must not run `openspec archive <change-id> --yes`',
       'must not write `openspec/changes/**`',
       'must not write `openspec/specs/**`',
@@ -647,7 +850,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
       '/aif-distillation docs/memory-tools-research --name aifhub-memory-tool-selection',
       '/aif-distillation docs/context-providers.md --name aifhub-context-providers'
     ]) {
-      assertIncludes(combinedDocs, expected, '2.17.0 docs sync');
+      assertIncludes(combinedDocs, expected, `AI Factory 2.18 cumulative docs contract: ${expected}`);
     }
     for (const forbiddenClaim of [
       '`/aif-done` creates commits',
@@ -690,8 +893,8 @@ describe('complete OpenSpec workflow documentation contract', () => {
     assertIncludes(contextPolicy, '| `/aif-docs` | no | no |', 'docs/context-loading-policy.md Command Ownership');
     assertIncludes(contextPolicy, '| `/aif-qa` | no | upstream manual QA artifacts under `paths.qa/<branch-slug>/`; not AIFHub `.ai-factory/qa/<change-id>/` evidence |', 'docs/context-loading-policy.md Command Ownership');
     assertIncludes(contextPolicy, 'Adjacent upstream project-context utilities:', 'docs/context-loading-policy.md Quality Gates and Finalization Tail');
-    assertIncludes(contextPolicy, '| `/aif-archive` | no | `paths.archive/plans/*.md` and `paths.archive/roadmap/*.md` only in legacy AI Factory-only cleanup |', 'docs/context-loading-policy.md Command Ownership');
-    assertIncludes(handoff, 'legacy-only path и не описывает OpenSpec-native finalization', 'docs/handoff.md');
+    assertIncludes(contextPolicy, '| `/aif-archive` | no | legacy classic/marked-ultra archive plus `paths.archive/roadmap/*.md`; OpenSpec-native plan-mutating targets stop before discovery |', 'docs/context-loading-policy.md Command Ownership aif-archive boundary');
+    assertIncludes(handoff, 'не является Handoff Done stage и не владеет OpenSpec-native archive/finalization', 'docs/handoff.md aif-archive ownership boundary');
     assertIncludes(handoff, 'Не используйте `/aif-archive` для OpenSpec-native Done.', 'docs/handoff.md');
 
     assertIncludes(readme, 'Codex CLI and Claude agent files', 'README.md');
@@ -718,32 +921,190 @@ describe('complete OpenSpec workflow documentation contract', () => {
     }
   });
 
-  it('documents the OpenSpec 1.4.1 reviewed baseline and adapter-only boundaries', async () => {
+  it('documents AI Factory 2.18 mode, marker, archive, ownership, update, and language-policy boundaries', async () => {
+    const manifest = JSON.parse(await readRepoFile('extension.json'));
+    const packageJson = JSON.parse(await readRepoFile('package.json'));
+    const readme = await readRepoFile('README.md');
+    const usage = await readRepoFile('docs/usage.md');
+    const contextPolicy = await readRepoFile('docs/context-loading-policy.md');
+    const migration = await readRepoFile('docs/legacy-plan-migration.md');
+    const adr = await readRepoFile('docs/adr/0001-openspec-native-artifact-protocol.md');
+    const archiveInjection = await readRepoFile('injections/core/aif-archive-openspec-boundary.md');
+    const modeMatrix = extractSection(usage, '## AI Factory 2.18 Artifact Profiles');
+    const updateBehavior = extractSection(readme, '## Update Behavior');
+    const consumerSmoke = extractSection(usage, '## Local Consumer Smoke Checks');
+    const combinedBoundaries = [readme, usage, contextPolicy, migration, adr].join('\n');
+
+    for (const expected of [
+      '| OpenSpec-native | regular/full | `proposal.md`, `design.md`, `tasks.md`, applicable delta specs | canonical OpenSpec workflow |',
+      '| OpenSpec-native | explicit `ultra`, stable AI Factory `>=2.18.0` | the same canonical files with a stricter Ultra Detail Gate | no `index.md`, `phase-*`, companion files, or active ultra marker |',
+      '| Legacy AI Factory-only | classic | `<id>.md` plus classic companion directory | existing AIFHub classic compatibility workflow |',
+      '| Legacy AI Factory-only | explicit `ultra`, stable AI Factory `>=2.18.0` | `<id>/index.md` plus direct `phase-NN-<slug>.md`, exactly one `<!-- aif:plan-mode:ultra -->`; `index.md` is the only checkbox/progress ledger | marker-first exact upstream handoff; no sibling classic plan or companion synchronization |',
+      'provenance-matched CLI/project version evidence stops before writes',
+      'unverified global/PATH-only CLI evidence is ignored with a bounded warning'
+    ]) {
+      assertIncludes(modeMatrix, expected, `docs/usage.md AI Factory 2.18 Artifact Profiles row: ${expected}`);
+    }
+
+    for (const [source, expected, label] of [
+      [migration, 'AIFHub migrates only classic shapes.', 'docs/legacy-plan-migration.md classic-only migration boundary'],
+      [migration, 'reported as `skipped-ultra`', 'docs/legacy-plan-migration.md valid marked-ultra outcome'],
+      [migration, '.ai-factory/state/legacy-plan-source.json', 'docs/legacy-plan-migration.md captured legacy source binding'],
+      [migration, '--legacy-source <project-relative-plans-root>', 'docs/legacy-plan-migration.md explicit legacy source override'],
+      [contextPolicy, '<parent(paths.research)>/research/<slug>/', 'docs/context-loading-policy.md ultra-research supporting-context root'],
+      [contextPolicy, 'upstream-owned `Research Coherence Gate`', 'docs/context-loading-policy.md upstream coherence ownership'],
+      [contextPolicy, 'before the Bundle Integrity Gate', 'docs/context-loading-policy.md ultra coherence ordering'],
+      [contextPolicy, '.ai-factory/state/legacy-ultra-verification/', 'docs/context-loading-policy.md revision-bound ultra receipt root'],
+      [contextPolicy, 'plan-mutating targets return `/aif-done <change-id>` before resolving `paths.plans`', 'docs/context-loading-policy.md OpenSpec archive owner handoff'],
+      [contextPolicy, 'marked-ultra archive', 'docs/context-loading-policy.md legacy marked-ultra archive ownership'],
+      [adr, 'sole canonical change ledger', 'docs/adr/0001 OpenSpec single-source invariant'],
+      [readme, 'AIFHub ships no duplicate loop/transfer skill or injection.', 'README.md upstream aif-loop/aif-transfer no-op ownership']
+    ]) {
+      assertIncludes(source, expected, label);
+    }
+
+    for (const forbiddenClaim of [
+      'OpenSpec-native ultra writes `index.md`',
+      'OpenSpec-native ultra writes `phase-',
+      'AIFHub automatically migrates marked ultra',
+      'AIFHub synchronizes marked ultra into OpenSpec',
+      '`/aif-done` writes the legacy ultra verification receipt',
+      '`/aif-archive` finalizes OpenSpec-native changes'
+    ]) {
+      assertNotIncludes(combinedBoundaries, forbiddenClaim, `AI Factory 2.18 docs forbidden ownership claim: ${forbiddenClaim}`);
+    }
+
+    for (const ownedRuntimeName of ['aif-loop', 'aif-transfer']) {
+      assert.equal(
+        manifest.skills.some((entry) => entry.replaceAll('\\', '/').split('/').at(-1) === ownedRuntimeName),
+        false,
+        `extension.json skills must not duplicate upstream ${ownedRuntimeName}`
+      );
+      assert.equal(
+        manifest.injections.some((entry) => entry.target === ownedRuntimeName),
+        false,
+        `extension.json injections must not duplicate upstream ${ownedRuntimeName}`
+      );
+    }
+
+    const archiveInjections = manifest.injections.filter((entry) => entry.target === 'aif-archive');
+    assert.equal(archiveInjections.length, 1, 'extension.json injections must contain exactly one aif-archive boundary');
+    assert.equal(archiveInjections[0].position, 'prepend', 'extension.json aif-archive injection position');
+    assert.equal(
+      archiveInjections[0].file,
+      './injections/core/aif-archive-openspec-boundary.md',
+      'extension.json aif-archive injection file'
+    );
+    assertIncludes(
+      archiveInjection,
+      'Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses.',
+      'injections/core/aif-archive-openspec-boundary.md language-policy coverage'
+    );
+    assertIncludes(
+      archiveInjection,
+      'This prepend boundary performs classification and routing only.',
+      'injections/core/aif-archive-openspec-boundary.md classification-only ownership'
+    );
+    assertNotIncludes(
+      archiveInjection,
+      '/aif-transfer',
+      'injections/core/aif-archive-openspec-boundary.md must not invoke upstream transfer'
+    );
+
+    for (const expected of [
+      'ai-factory update --force',
+      'ai-factory extension update aifhub-extension --force',
+      '`ai-factory upgrade` is the v1-to-v2 skill-name migration command',
+      'missing prerequisites are `NOT_RUN`',
+      'never downloads a toolchain',
+      'not release, deployment, registry, or end-user migration proof'
+    ]) {
+      assertIncludes(updateBehavior, expected, `README.md Update Behavior contract: ${expected}`);
+    }
+    for (const expected of [
+      'ai-factory update --force',
+      'ai-factory extension update aifhub-extension --force',
+      'No toolchain is downloaded or resolved through `npx`.',
+      'Missing command/package/extension prerequisites are `NOT_RUN`, not PASS.',
+      '`ai-factory upgrade` is intentionally absent'
+    ]) {
+      assertIncludes(consumerSmoke, expected, `docs/usage.md Local Consumer Smoke Checks contract: ${expected}`);
+    }
+    for (const expected of [
+      'exact `2.17.0`/`2.18.1`',
+      '`2.18.0` remains a separate stable feature boundary',
+      'upstream `aif-explore` bytes',
+      'Research Coherence Gate'
+    ]) {
+      assertIncludes(consumerSmoke, expected, `docs/usage.md AI Factory 2.18.1 smoke contract: ${expected}`);
+    }
+    assert.equal(
+      packageJson.scripts['smoke:ai-factory-2-18'],
+      'node scripts/ai-factory-2-18-live-smoke.mjs',
+      'package.json scripts.smoke:ai-factory-2-18 must be non-globbed opt-in live driver'
+    );
+  });
+
+  it('documents the OpenSpec 1.8.0 reviewed baseline and safe lifecycle metadata', async () => {
     const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
     const readme = await readRepoFile('README.md');
     const compatibility = await readRepoFile('docs/openspec-compatibility.md');
     const docsIndex = await readRepoFile('docs/README.md');
     const openspec = metadata.sources.openspec;
     const combinedDocs = [readme, compatibility, docsIndex].join('\n');
+    const readmeCompatibility = extractSection(readme, '## OpenSpec Compatibility');
 
-    assert.equal(openspec.version, '1.4.1');
+    assert.equal(openspec.version, '1.8.0');
+    assert.equal(openspec.baselineVersion, '1.3.1');
     assert.equal(openspec.supportedRange, '>=1.3.1 <2.0.0');
-    assert.equal(openspec.lastSync, '2026-06-10');
-    assertIncludes(openspec.notes, 'upstream OpenSpec 1.4.1', 'aifhub-extension.json');
+    assert.deepEqual(openspec.reviewedStableVersions, ['1.3.1', '1.4.0', '1.4.1', '1.5.0', '1.6.0', '1.7.0', '1.8.0']);
+    assert.deepEqual(openspec.reviewedPrereleaseVersions, ['1.6.0-beta.1']);
+    assert.equal(openspec.lastSync, '2026-08-09');
+    assertIncludes(openspec.notes, 'upstream OpenSpec 1.3.1 through 1.8.0', 'aifhub-extension.json');
     assertIncludes(openspec.notes, 'adapter-only', 'aifhub-extension.json');
 
-    assertIncludes(readme, 'OpenSpec 1.4.1', 'README.md');
-    assertIncludes(docsIndex, 'OpenSpec 1.4.1', 'docs/README.md');
+    assertIncludes(
+      readmeCompatibility,
+      `The reviewed OpenSpec baseline is OpenSpec \`${openspec.version}\``,
+      'README.md OpenSpec Compatibility reviewed baseline'
+    );
+    assertIncludes(docsIndex, 'OpenSpec 1.8.0', 'docs/README.md');
 
     for (const expected of [
-      'OpenSpec 1.4.1 Reviewed Baseline',
-      'OpenSpec `1.4.1`',
-      '`openspec update`',
+      'OpenSpec 1.8.0 Reviewed Baseline',
+      'OpenSpec `1.8.0`',
+      'Baseline `1.3.1`',
+      'Reviewed stable releases',
       'Kimi CLI',
       'Mistral Vibe',
       'sync skills',
       'case-insensitive requirement headers',
       'clearer validation hints',
+      '`workspace.yaml`',
+      '`openspec update`',
+      'Stores',
+      'config parsing',
+      'CRLF',
+      'additive `root`',
+      '`1.6.0-beta.1`',
+      'reviewed but unsupported',
+      'archive validation failures return a non-zero exit code',
+      '/opsx:update',
+      'Oh My Pi',
+      'Trae',
+      'nested specs and task files',
+      '.openspec.yaml',
+      '`skip_specs: true`',
+      '`openspec instructions archive --change <id> --json`',
+      'leading digits',
+      'nested spec folders',
+      'UTF-8 BOM',
+      '`retire_capabilities: true`',
+      'scenario loss',
+      'nested task progress',
+      'agents target',
+      'MiniMax Code',
+      'Rovo Dev CLI',
       '.openspec-workspace/view.yaml',
       '/opsx:*',
       'adapter-only',
@@ -755,7 +1116,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
       '`openspec update` is upstream OpenSpec behavior',
       '`/aif-mode sync` compiles AIFHub generated rules'
     ]) {
-      assertIncludes(combinedDocs, expected, 'OpenSpec 1.4.1 docs baseline');
+      assertIncludes(combinedDocs, expected, 'OpenSpec 1.8.0 docs baseline');
     }
 
     for (const forbiddenClaim of [
@@ -766,7 +1127,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
       'AIFHub owns workspace beta state',
       'AIFHub runs openspec update'
     ]) {
-      assertNotIncludes(combinedDocs, forbiddenClaim, 'OpenSpec 1.4.1 docs ownership boundaries');
+      assertNotIncludes(combinedDocs, forbiddenClaim, 'OpenSpec 1.8.0 docs ownership boundaries');
     }
   });
 

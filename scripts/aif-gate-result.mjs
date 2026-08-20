@@ -145,6 +145,12 @@ export function getLatestGateResult(markdown, options = {}) {
   return blocks.at(-1) ?? null;
 }
 
+export function isLegacySuggestedNextOnPassReceipt(gate) {
+  return Array.isArray(gate?.errors)
+    && gate.errors.length > 0
+    && gate.errors.every((error) => error?.code === 'invalid-suggested-next-on-pass');
+}
+
 export async function readLatestGateResultFile(filePath, options = {}) {
   const content = await readFile(filePath, 'utf8');
   return getLatestGateResult(content, options);
@@ -206,7 +212,7 @@ export function validateGateResult(value, options = {}) {
     errors.push(diagnostic('invalid-affected-files', 'affected_files must contain only strings.'));
   }
 
-  errors.push(...validateSuggestedNext(normalized.suggested_next, normalized.gate));
+  errors.push(...validateSuggestedNext(normalized.suggested_next, normalized.gate, normalized.status));
 
   return {
     ok: errors.length === 0,
@@ -314,7 +320,14 @@ function normalizeSuggestedNext(value) {
   };
 }
 
-function validateSuggestedNext(value, gate) {
+function validateSuggestedNext(value, gate, status) {
+  if (status === 'pass' && value !== null) {
+    return [diagnostic(
+      'invalid-suggested-next-on-pass',
+      'suggested_next must be null when status is pass; terminal routing is prose-only.'
+    )];
+  }
+
   if (value === null) {
     return [];
   }

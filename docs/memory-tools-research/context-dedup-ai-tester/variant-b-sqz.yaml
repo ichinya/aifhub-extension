@@ -1,0 +1,77 @@
+scenario: context-dedup-variant-b-sqz-repeat-source
+description: "issue=133 arm=sqz case=repeat-source sqz=1.3.0 model=gpt-5.6-luna reasoning=low"
+system_prompt: |
+  You are an AI coding agent evaluating a pre-staged, user-owned sqz adapter. Stay inside the sandbox project directory.
+user_prompt: |
+  Run this exact command twice as two separate reads:
+  node project/scripts/read-context.mjs src/auth/session.ts
+  Use only those two command outputs as file content evidence.
+  Report the exact values of RETRY_WINDOW_MS and REPEAT_SENTINEL.
+  End with evaluation_complete.
+runner:
+  runtime: codex
+  model: gpt-5.6-luna
+  reasoning: low
+  permission_mode: bypassPermissions
+fixtures:
+  # Before the run, place both verified binaries under ./pre-staged/sqz/bin.
+  # AI Tester copies that explicit user-owned source into each fresh sandbox.
+  copy_trees:
+    - from: "./pre-staged/sqz"
+      to: .
+  setup_commands:
+    - "powershell -NoProfile -Command \"$h=(Get-FileHash -Algorithm SHA256 bin/sqz.exe).Hash; if ($h -ne '0C21ADFA0C67B6EB61EDD2B8B87C836AC2757A58D0D68D93376606E6CC75E76B') { throw 'official sqz checksum mismatch' }\""
+    - "powershell -NoProfile -Command \"$h=(Get-FileHash -Algorithm SHA256 bin/sqz-isolated-adapter.exe).Hash; if ($h -ne '36318B6299026A3CFCF8D0E2D76EFF9FE7060889C72E0FA9B735F7C2918E0607') { throw 'sqz adapter checksum mismatch' }\""
+  files_committed:
+    - path: project/scripts/read-context.mjs
+      content: |
+        import { spawnSync } from 'node:child_process';
+        import { mkdir, readFile } from 'node:fs/promises';
+        import path from 'node:path';
+        const relative = process.argv[2];
+        const content = await readFile(path.join(process.cwd(), 'project', relative), 'utf8');
+        const storeDir = path.join(process.cwd(), 'project', '.sqz-fixture');
+        await mkdir(storeDir, { recursive: true });
+        const child = spawnSync(
+          path.join(process.cwd(), 'bin', 'sqz-isolated-adapter.exe'),
+          ['--store', path.join(storeDir, 'sessions.db')],
+          {
+            cwd: path.join(process.cwd(), 'project'),
+            input: content,
+            encoding: 'utf8',
+            env: {
+              PATH: process.env.PATH,
+              SystemRoot: process.env.SystemRoot,
+              HOME: path.join(process.cwd(), 'project', '.sqz-home'),
+              USERPROFILE: path.join(process.cwd(), 'project', '.sqz-home'),
+              TEMP: path.join(process.cwd(), 'project', '.sqz-tmp'),
+              TMP: path.join(process.cwd(), 'project', '.sqz-tmp')
+            },
+            shell: false,
+            windowsHide: true,
+            timeout: 30000,
+            maxBuffer: 8 * 1024 * 1024
+          }
+        );
+        if (child.error) throw child.error;
+        if (child.status !== 0) throw new Error(child.stderr || 'sqz adapter failed');
+        process.stdout.write(child.stdout);
+    - path: project/src/auth/session.ts
+      content: |
+        export const RETRY_WINDOW_MS = 45000;
+        export const REPEAT_SENTINEL = "amber-orbit";
+assertions:
+  - id: stay-in-sandbox
+    type: no_path_escape
+  - id: bounded-turns
+    type: turn_count_at_most
+    max: 8
+  - id: completed-output
+    type: output_contains
+    pattern: "evaluation_complete"
+  - id: retry-window
+    type: output_contains
+    pattern: "RETRY_WINDOW_MS[^\\n]{0,24}45000"
+  - id: repeat-sentinel
+    type: output_contains
+    pattern: "REPEAT_SENTINEL[^\\n]{0,24}amber-orbit"

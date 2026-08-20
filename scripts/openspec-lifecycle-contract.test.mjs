@@ -222,8 +222,10 @@ describe('OpenSpec lifecycle CLI integration contract', () => {
     ]);
 
     for (const expected of [
+      'ai-factory aifhub-done-finalizer --change <change-id> --json',
       'archiveOpenSpecChange(changeId)',
       'scripts/openspec-runner.mjs',
+      'extension-local implementation',
       '--skip-specs',
       'If OpenSpec CLI is missing or unsupported and archive is required, fail',
       '/aif-verify does not archive',
@@ -236,5 +238,67 @@ describe('OpenSpec lifecycle CLI integration contract', () => {
 
     assert.match(done, /\/aif-done.*archive\/finalization|only OpenSpec-native archive\/finalization step/i);
     assertNotIncludes(nonDone, 'archiveOpenSpecChange(changeId)', 'non-done lifecycle assets');
+
+    for (const relativePath of LIFECYCLE_ASSETS.done) {
+      const asset = await readRepoFile(relativePath);
+      assertIncludes(
+        asset,
+        'ai-factory aifhub-done-finalizer --change <change-id> --json',
+        relativePath
+      );
+      assert.match(
+        asset,
+        /scripts\/openspec-(?:done-finalizer|done-readiness|runner)\.mjs[^\n]*(?:extension-local|implementation module)|(?:extension-local|implementation module)[^\n]*scripts\/openspec-(?:done-finalizer|done-readiness|runner)\.mjs/i,
+        `${relativePath} should label source-repository module references as extension-local implementation`
+      );
+      assert.doesNotMatch(
+        asset,
+        /\bnode(?:\.exe)?\s+(?:scripts[\\/]|[^\n]*\.ai-factory[\\/]extensions[\\/][^\n]*scripts[\\/])openspec-(?:done-finalizer|done-readiness|runner)\.mjs\b/i,
+        `${relativePath} should not expose an internal module as an installed-project executable`
+      );
+    }
+  });
+
+  it('bounds done roadmap lifecycle co-ownership and keeps GitHub state external', async () => {
+    for (const relativePath of LIFECYCLE_ASSETS.done) {
+      const asset = stripFencedBlocks(await readRepoFile(relativePath));
+
+      assert.match(
+        asset,
+        /co-owns only the marker-delimited.*OpenSpec Change Lifecycle.*block/i,
+        `${relativePath} should bound done ownership to the managed lifecycle block`
+      );
+      assert.match(
+        asset,
+        /after successful OpenSpec archive/i,
+        `${relativePath} should place lifecycle mutation after archive success`
+      );
+      assert.match(
+        asset,
+        /readiness, verification, artifact-contract, dirty-tree, or archive failure.*(?:must not|does not|do not).*roadmap/i,
+        `${relativePath} should forbid roadmap mutation on pre-archive failures`
+      );
+      assert.match(
+        asset,
+        /updated.*skipped.*handoff/i,
+        `${relativePath} should expose bounded local roadmap outcomes`
+      );
+      assertIncludes(asset, '/aif-roadmap check', relativePath);
+      assert.match(
+        asset,
+        /(?:must not|do not|never).*roll back.*archive/i,
+        `${relativePath} should preserve successful archive evidence on roadmap handoff`
+      );
+      assert.match(
+        asset,
+        /separately from (?:external )?GitHub.*(?:issue|pull request|PR)/i,
+        `${relativePath} should report local lifecycle separately from GitHub state`
+      );
+      assert.match(
+        asset,
+        /(?:must not|does not|do not|never).*claim.*GitHub issue.*closed.*(?:pull request|PR).*merged/i,
+        `${relativePath} should never infer external closure from local finalization`
+      );
+    }
   });
 });

@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/lee-to/ai-factory/2.x/schemas/extension.schema.json",
   "name": "aifhub-extension",
-  "version": "1.2.6",
+  "version": "1.4.0",
   "description": "Upstream-first extension for AI Factory 2.11+: bootstrap remains extension-owned; `aif-plan`, `aif-implement`, `aif-verify`, and `aif-fix` connect through injections; upstream `aif-rules-check` is augmented by the AIFHub OpenSpec generated-rules injection; `aif-done` and `aif-mode` remain extension-owned finalizers/orchestrators; Codex and Claude runtime files publish through top-level `agentFiles`.",
   "commands": [
     {
@@ -35,6 +35,11 @@
       "module": "./commands/aifhub-done-readiness.mjs"
     },
     {
+      "name": "aifhub-done-finalizer",
+      "description": "Finalize a verified AIFHub OpenSpec change from an installed project.",
+      "module": "./commands/aifhub-done-finalizer.mjs"
+    },
+    {
       "name": "aifhub-validate-artifacts",
       "description": "Run AIFHub OpenSpec artifact contract validation.",
       "module": "./commands/aifhub-validate-artifacts.mjs"
@@ -48,6 +53,16 @@
       "name": "aifhub-memory-tools",
       "description": "Run AIFHub optional memory and context tool recommendation diagnostics.",
       "module": "./commands/aifhub-memory-tools.mjs"
+    },
+    {
+      "name": "aifhub-analyze-config-diff",
+      "description": "Run the read-only AIFHub analyze config required-keys diff.",
+      "module": "./commands/aifhub-analyze-config-diff.mjs"
+    },
+    {
+      "name": "aifhub-context-dedup",
+      "description": "Run AIFHub session context dedup checks, status, and purge.",
+      "module": "./commands/aifhub-context-dedup.mjs"
     }
   ],
   "skills": [
@@ -179,6 +194,11 @@
       "target": "aif-commit",
       "position": "prepend",
       "file": "./injections/core/aif-commit-roadmap-freshness.md"
+    },
+    {
+      "target": "aif-archive",
+      "position": "prepend",
+      "file": "./injections/core/aif-archive-openspec-boundary.md"
     },
     {
       "target": "aif-fix",

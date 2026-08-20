@@ -19,6 +19,13 @@ import {
 import {
   getLatestGateResult
 } from './aif-gate-result.mjs';
+import {
+  readOpenSpecSkipSpecsMarker
+} from './openspec-change-metadata.mjs';
+import {
+  hasActiveStandaloneMarker,
+  ULTRA_PLAN_MARKER
+} from './markdown-structural-markers.mjs';
 
 export const ARTIFACT_CONTRACT_SCHEMA_VERSION = 1;
 export const ARTIFACT_CONTRACT_VALIDATOR = 'aifhub-openspec-artifact-contract';
@@ -49,6 +56,16 @@ const RUNTIME_DIR_NAMES = new Set([
   'raw',
   'generated',
   'reports'
+]);
+const LEGACY_COMPANION_FILE_NAMES = new Set([
+  'task.md',
+  'task-prepare.md',
+  'context.md',
+  'rules.md',
+  'verify.md',
+  'status.yaml',
+  'status.yml',
+  'explore.md'
 ]);
 
 export async function validateOpenSpecArtifactContract(options = {}) {
@@ -81,10 +98,12 @@ export async function validateOpenSpecArtifactContract(options = {}) {
     rootDir
   });
   const artifacts = canonical.canonicalArtifacts ?? {};
+  const skipSpecs = await readOpenSpecSkipSpecsMarker(changeDir);
 
   checks.push(...inspectRequiredArtifacts(artifacts));
   checks.push(inspectDesignArtifact(artifacts.design, config.requireDesign));
-  checks.push(inspectDeltaSpecs(artifacts, config));
+  checks.push(inspectDeltaSpecs(artifacts, config, skipSpecs, rootDir));
+  checks.push(...await inspectPlanningArtifacts(rootDir, changeDir));
   checks.push(...await inspectRuntimeFiles(rootDir, changeDir));
   checks.push(...await inspectVerificationEvidence(changeId, {
     ...options,
@@ -225,7 +244,7 @@ function inspectDesignArtifact(design, requireDesign) {
   });
 }
 
-function inspectDeltaSpecs(artifacts, config) {
+function inspectDeltaSpecs(artifacts, config, skipSpecs, rootDir) {
   const deltaSpecs = Array.isArray(artifacts.deltaSpecs) ? artifacts.deltaSpecs : [];
   const proposal = artifacts.proposal;
   const hasSkipReason = proposal?.exists && hasExplicitSkipSpecsReason(proposal.content);
@@ -236,6 +255,24 @@ function inspectDeltaSpecs(artifacts, config) {
       status: 'pass',
       path: deltaSpecs[0].path,
       message: `Found ${deltaSpecs.length} OpenSpec delta spec file(s).`
+    });
+  }
+
+  if (skipSpecs?.declared) {
+    return createCheck({
+      id: 'delta-specs-present',
+      status: 'pass',
+      path: toPosix(path.relative(rootDir, skipSpecs.metadataPath)),
+      message: 'No delta specs are required because .openspec.yaml declares native skip_specs: true.'
+    });
+  }
+
+  if (skipSpecs?.valid === false) {
+    return createCheck({
+      id: 'delta-specs-present',
+      status: 'fail',
+      path: toPosix(path.relative(rootDir, skipSpecs.metadataPath)),
+      message: `OpenSpec skip_specs metadata is invalid: ${skipSpecs.invalidReason}`
     });
   }
 
@@ -252,13 +289,15 @@ function inspectDeltaSpecs(artifacts, config) {
     id: 'delta-specs-present',
     status: config.allowMissingSpecs ? 'warn' : 'fail',
     path: `openspec/changes/${config.changeIdPlaceholder ?? '<change-id>'}/specs/**/spec.md`,
-    message: 'OpenSpec changes must include specs/**/spec.md unless proposal.md has an explicit docs/tooling-only skip-specs reason.'
+    message: 'OpenSpec changes must include specs/**/spec.md unless .openspec.yaml declares skip_specs: true or proposal.md preserves an explicit legacy docs/tooling-only skip-specs reason.'
   });
 }
 
 async function inspectRuntimeFiles(rootDir, changeDir) {
   const files = await collectFiles(rootDir, changeDir);
-  const offenders = files.filter((file) => isRuntimeOrEvidenceFile(file.path));
+  const offenders = files.filter((file) =>
+    file.kind !== 'directory' && isRuntimeOrEvidenceFile(file.path)
+  );
 
   if (offenders.length === 0) {
     return [
@@ -277,6 +316,72 @@ async function inspectRuntimeFiles(rootDir, changeDir) {
     path: file.repoPath,
     message: 'Runtime state, QA evidence, and generated files must stay outside openspec/changes/<change-id>.'
   }));
+}
+
+async function inspectPlanningArtifacts(rootDir, changeDir) {
+  const files = await collectFiles(rootDir, changeDir);
+  const violations = [];
+
+  for (const file of files) {
+    const fileName = path.posix.basename(file.path).toLowerCase();
+    if (fileName === 'index.md') {
+      violations.push(createPlanningArtifactViolation(
+        file.repoPath,
+        'openspec-ultra-index-forbidden',
+        'Ultra plan index.md is forbidden inside a canonical OpenSpec change.'
+      ));
+    }
+
+    if (/^phase-\d{2}-.+/i.test(fileName)) {
+      violations.push(createPlanningArtifactViolation(
+        file.repoPath,
+        'openspec-ultra-phase-forbidden',
+        'Ultra phase artifacts are forbidden inside a canonical OpenSpec change.'
+      ));
+    }
+
+    if (LEGACY_COMPANION_FILE_NAMES.has(fileName)) {
+      violations.push(createPlanningArtifactViolation(
+        file.repoPath,
+        'openspec-legacy-companion-forbidden',
+        'Legacy companion plan artifacts are forbidden inside a canonical OpenSpec change.'
+      ));
+    }
+
+    if (file.kind === 'file' && fileName.endsWith('.md')) {
+      const content = await readFile(file.absolutePath, 'utf8');
+      if (hasActiveStandaloneMarker(content, ULTRA_PLAN_MARKER)) {
+        violations.push(createPlanningArtifactViolation(
+          file.repoPath,
+          'openspec-ultra-marker-forbidden',
+          'Active standalone ultra plan markers are forbidden inside canonical OpenSpec files.'
+        ));
+      }
+    }
+  }
+
+  if (violations.length > 0) {
+    return violations;
+  }
+
+  return [createCheck({
+    id: 'planning-artifacts-outside-change',
+    status: 'pass',
+    path: toPosix(path.relative(rootDir, changeDir)),
+    message: 'No legacy or ultra planning artifacts were found inside the canonical change folder.'
+  })];
+}
+
+function createPlanningArtifactViolation(checkPath, ruleCode, message) {
+  return createCheck({
+    id: 'planning-artifacts-outside-change',
+    status: 'fail',
+    path: checkPath,
+    message,
+    details: {
+      rule_code: ruleCode
+    }
+  });
 }
 
 async function inspectVerificationEvidence(changeId, options) {
@@ -623,6 +728,12 @@ async function collectFilesRecursive(rootDir, basePath, directoryPath, results) 
     const childPath = path.join(directoryPath, entry.name);
 
     if (entry.isDirectory()) {
+      results.push({
+        path: toPosix(path.relative(basePath, childPath)),
+        repoPath: toPosix(path.relative(rootDir, childPath)),
+        absolutePath: childPath,
+        kind: 'directory'
+      });
       await collectFilesRecursive(rootDir, basePath, childPath, results);
       continue;
     }
@@ -630,7 +741,19 @@ async function collectFilesRecursive(rootDir, basePath, directoryPath, results) 
     if (entry.isFile()) {
       results.push({
         path: toPosix(path.relative(basePath, childPath)),
-        repoPath: toPosix(path.relative(rootDir, childPath))
+        repoPath: toPosix(path.relative(rootDir, childPath)),
+        absolutePath: childPath,
+        kind: 'file'
+      });
+      continue;
+    }
+
+    if (entry.isSymbolicLink()) {
+      results.push({
+        path: toPosix(path.relative(basePath, childPath)),
+        repoPath: toPosix(path.relative(rootDir, childPath)),
+        absolutePath: childPath,
+        kind: 'symlink'
       });
     }
   }
@@ -708,7 +831,7 @@ function chooseSuggestedNext(changeId, checks) {
   if (failing?.id === 'delta-specs-present') {
     return {
       command: `/aif-mode sync --change ${changeId}`,
-      reason: 'add delta specs or document an explicit docs/tooling-only skip-specs reason before syncing again'
+      reason: 'add delta specs or declare native skip_specs: true in .openspec.yaml before syncing again'
     };
   }
 
@@ -716,6 +839,13 @@ function chooseSuggestedNext(changeId, checks) {
     return {
       command: `/aif-mode sync --change ${changeId}`,
       reason: 'move runtime evidence out of openspec/changes before continuing'
+    };
+  }
+
+  if (failing?.id === 'planning-artifacts-outside-change') {
+    return {
+      command: `/aif-fix ${changeId}`,
+      reason: 'remove legacy or ultra planning artifacts from the canonical OpenSpec change'
     };
   }
 

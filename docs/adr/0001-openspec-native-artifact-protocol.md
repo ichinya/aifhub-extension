@@ -46,6 +46,8 @@ Runtime AI Factory artifacts:
 
 These files store execution progress, working notes, QA evidence, verifier findings, and implementation state. They can be deleted or regenerated unless a future ADR or file-local metadata explicitly documents stronger retention semantics.
 
+The configured roadmap, `.ai-factory/ROADMAP.md` by default, is a project context artifact with bounded shared lifecycle ownership. `/aif-roadmap` owns the complete document. `/aif-done` may update only one linked row inside the marker-bounded `OpenSpec Change Lifecycle` block after successful archive; it does not own arbitrary roadmap content.
+
 Generated AI Factory artifacts:
 
 ```text
@@ -74,14 +76,46 @@ These paths are reserved names only in v1. Their detailed behavior is out of sco
 | Command | Canonical reads | Canonical writes | Runtime writes | Notes |
 |---|---|---|---|---|
 | `/aif-analyze` | project metadata, existing config | optional `openspec/` skeleton only when configured | capability/config reports | Must not install OpenSpec skills |
-| `/aif-plan` | `openspec/specs`, project context | `openspec/changes/<id>/*` | optional `.ai-factory/state/<id>/*` | Creates OpenSpec-native change in v1 |
+| `/aif-plan` | `openspec/specs`, project context | `openspec/changes/<id>/*` | optional `.ai-factory/state/<id>/*` | Creates OpenSpec-native change and records explicit roadmap linkage in v1 |
 | `/aif-explore` | project context, optional `openspec/specs` | none by default | `.ai-factory/state/<id>/explore.md` or equivalent | Research is not canonical unless promoted into OpenSpec artifacts |
 | `/aif-improve` | `openspec/changes/<id>/*`, `openspec/specs` | `openspec/changes/<id>/*` | patch summary if needed | Must preserve user edits |
 | `/aif-implement` | `openspec/specs`, `openspec/changes/<id>/*`, generated rules, optional OpenSpec `instructions apply` | none | `.ai-factory/state/<id>/implementation/*` | Execution traces are runtime-only and do not require legacy `.ai-factory/plans/<id>/task.md` |
 | `/aif-fix` | same as implement plus QA reports from `.ai-factory/qa/<id>/*` | none | `.ai-factory/state/<id>/fixes/*` | Fixes implementation, not specs unless explicitly requested; does not require legacy `.ai-factory/plans/<id>/task.md` |
 | `/aif-verify` | `openspec/*`, generated rules | none | `.ai-factory/qa/<id>/*` | Validates OpenSpec before code checks; must not archive |
 | `/aif-rules-check` | `openspec/specs`, `openspec/changes/<id>/specs` | none | none | Reads generated rules as derived guidance; never regenerates them |
-| `/aif-done` | `openspec/changes/<id>/*`, QA state | `openspec/specs/*` only through OpenSpec CLI archive | `.ai-factory/qa/<id>/done.md`, archive evidence, `.ai-factory/state/<id>/final-summary.md` | Requires passing `/aif-verify`; supports `--skip-specs`; never custom-mutates OpenSpec specs |
+| `/aif-roadmap` | active/archived OpenSpec linkage plus local and optional GitHub evidence | none | configured roadmap artifact | Owns full audit and managed `planned` reconciliation |
+| `/aif-done` | `openspec/changes/<id>/*`, QA state | `openspec/specs/*` only through OpenSpec CLI archive | `.ai-factory/qa/<id>/done.md`, archive evidence, `.ai-factory/state/<id>/final-summary.md`, then one managed `finalized` roadmap row | Requires passing `/aif-verify`; supports `--skip-specs`; never custom-mutates OpenSpec specs or arbitrary roadmap content |
+| `/aif-commit` | staged diff, finalization evidence, configured roadmap, optional GitHub evidence | none | git commit only | Blocks deterministic local lifecycle drift; never writes roadmap or GitHub state |
+
+## Roadmap lifecycle co-ownership
+
+Canonical planning linkage lives in `openspec/changes/<change-id>/proposal.md`:
+
+```markdown
+## Roadmap Linkage
+
+- Issues: <canonical URL(s)|none>
+- Milestone: <exact title|none>
+- Roadmap item/slice: <exact item|none>
+- Rationale: <bounded explanation>
+```
+
+Explicit `none` values prevent later commands from inventing issue, milestone, or slice ownership. `/aif-roadmap check` turns a valid linked active change into local `planned`; canonical planning and implementation do not claim completion.
+
+The configured roadmap may contain one marker-bounded block:
+
+```markdown
+<!-- aifhub:roadmap-change-lifecycle:start -->
+## OpenSpec Change Lifecycle
+...
+<!-- aifhub:roadmap-change-lifecycle:end -->
+```
+
+Only local `planned` and `finalized` state belongs inside the block. `/aif-roadmap` owns the document and may reconcile active or archived changes. `/aif-done` co-owns one linked transition to `finalized` only after successful OpenSpec archive. Pre-archive failure leaves the roadmap unchanged; a post-archive roadmap failure preserves truthful archive evidence, does not roll back archive, and returns `/aif-roadmap check`.
+
+`/aif-commit` consumes the lifecycle block read-only. Successful durable finalization plus a missing or non-`finalized` linked row is deterministic local drift and blocks the commit before proposal without a confirmation bypass. Missing or later-changing external evidence remains warning-only by default.
+
+GitHub open/closed/merged state remains a separate evidence clock. A post-merge `/aif-roadmap check` refreshes issue, PR, and milestone observations without using remote state as local finalization proof or rewriting the evidence-backed `finalized` row.
 
 ## Generated rules policy
 
@@ -127,6 +161,18 @@ Legacy `.ai-factory/plans` artifacts are pre-migration planning and execution re
 Legacy plan artifacts are not the v1 canonical source of truth once OpenSpec-native artifacts exist for the same change. Any future migration must preserve user edits and avoid silently overwriting canonical OpenSpec artifacts.
 
 The implemented migration path preserves source artifacts, writes migrated canonical artifacts under `openspec/changes/<change-id>/`, and preserves runtime/QA material under `.ai-factory/state/<change-id>/` and `.ai-factory/qa/<change-id>/`.
+
+## AI Factory 2.18 profile amendment
+
+AI Factory 2.18 introduces upstream marked ultra plan and research bundles. This does not create a second canonical source of truth for OpenSpec-native work.
+
+- OpenSpec-native regular and `ultra` planning both write the same canonical OpenSpec artifact set. `ultra` is a version-gated depth profile for `design.md`, `tasks.md`, and delta specs; `index.md`, `phase-*`, and the active ultra marker are forbidden inside canonical changes.
+- Legacy classic plan pairs remain migration-compatible. A valid `<!-- aif:plan-mode:ultra -->` bundle remains one atomic upstream-owned directory; AIFHub classifies it before companion discovery and returns exact upstream command handoffs without editing the bundle.
+- Regular research remains the resolved `paths.research` file. Explicit 2.18 ultra research lives under `<parent(paths.research)>/research/<slug>/` as non-canonical supporting context. Its marked `INDEX.md`, `RESEARCH.md`, and evidence-gated C4/ADR/graph files must not be written into `openspec/changes/**` or `openspec/specs/**`.
+- The only AIFHub write after upstream marked-ultra verification is a bounded receipt under `.ai-factory/state/legacy-ultra-verification/<entrypoint-digest>.json`. It binds the exact entrypoint and bundle digest to Git `HEAD` or a manual build id, a deterministic worktree digest, and the final verify gate. Done/finalizer consumers re-evaluate the binding and never create the receipt.
+- In OpenSpec-native mode, plan-mutating `/aif-archive` targets route to `/aif-done <change-id>` before plan discovery. Read-only archive listing and bounded roadmap-only snapshots retain upstream ownership; all legacy archive behavior, including marked ultra, remains upstream-owned in legacy mode.
+
+These rules keep `openspec/changes/<change-id>/` as the sole canonical change ledger while allowing AI Factory 2.18 detail and legacy compatibility without dual-write synchronization.
 
 ## Out of scope
 

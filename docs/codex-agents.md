@@ -19,14 +19,14 @@ The `aifhub-*` Codex agents are extension helpers for bounded planning, implemen
 
 | `name` | Назначение | `sandbox_mode` | Write boundary |
 |-------|------------|----------------|----------------|
-| `aifhub-plan-polisher` | Bounded worker для полировки одного активного плана или OpenSpec change artifacts | `workspace-write` | Только active OpenSpec change artifacts in OpenSpec-native mode or active plan pair in legacy mode; без правок source code |
-| `aifhub-implement-worker` | Bounded worker для выполнения одной plan task или тесно связанной группы задач; mirrors OpenSpec `tasks.md` into runtime todo state when available | `workspace-write` | Только execution scope выбранной задачи and OpenSpec runtime state or legacy task metadata; без commit/push |
+| `aifhub-plan-polisher` | Bounded worker для полировки одного активного плана или OpenSpec change artifacts | `workspace-write` | OpenSpec canonical files or classic legacy pair only; marked ultra is read-only routing to exact `/aif-improve <entrypoint>` |
+| `aifhub-implement-worker` | Bounded worker для выполнения одной plan task или тесно связанной группы задач; mirrors OpenSpec `tasks.md` into runtime todo state when available | `workspace-write` | Selected OpenSpec/classic execution scope only; marked ultra routes to exact `/aif-implement <entrypoint>`; без commit/push |
 | `aifhub-review-sidecar` | Read-only sidecar для review changed scope с findings-first выводом | `read-only` | Не пишет файлы |
 | `aifhub-security-sidecar` | Read-only sidecar для security-аудита changed scope | `read-only` | Не пишет файлы |
-| `aifhub-verifier` | Low-write verifier для OpenSpec change or legacy plan pair и changed scope с gate result | `workspace-write` | Только `.ai-factory/qa/<change-id>/` in OpenSpec-native mode or `status.yaml`/`verify.md` for validated legacy plan pair |
-| `aifhub-fixer` | Targeted fixer по выбранным verification/review findings | `workspace-write` | Только validated changed scope выбранных findings plus `.ai-factory/state/<change-id>/` in OpenSpec-native mode or `status.yaml`/`fixes/*.md` for legacy plan pair; allowlist может только сузить уже подтверждённый scope |
-| `aifhub-rules-sidecar` | Read-only sidecar для проверки generated OpenSpec rules or `.ai-factory/RULES.md`, `.ai-factory/rules/base.md` и plan-local `rules.md` | `read-only` | Не пишет файлы |
-| `aifhub-done-finalizer` | Finalization helper для OpenSpec CLI archive/final summary или legacy archive/spec summary после passing verification | `workspace-write` | OpenSpec-native `.ai-factory/qa/<change-id>/` final evidence and `.ai-factory/state/<change-id>/` summary, with archive only through OpenSpec CLI; legacy `status.yaml`, archive dir в `.ai-factory/specs/` и `.ai-factory/specs/index.yaml`; `--force` запрещён |
+| `aifhub-verifier` | Low-write verifier для OpenSpec change or legacy plan pair и changed scope с gate result | `workspace-write` | OpenSpec QA or classic `status.yaml`/`verify.md`; marked ultra delegates exact `/aif-verify <entrypoint>`, and only the command boundary may write its receipt |
+| `aifhub-fixer` | Targeted fixer по выбранным verification/review findings | `workspace-write` | Selected OpenSpec/classic finding scope; marked ultra routes to exact `/aif-fix <entrypoint>`; allowlist only narrows scope |
+| `aifhub-rules-sidecar` | Read-only sidecar для проверки generated OpenSpec rules or legacy rules/receipt state | `read-only` | Не пишет файлы; marked ultra returns exact verify/archive handoff from current receipt evaluation |
+| `aifhub-done-finalizer` | Finalization helper для OpenSpec CLI archive/final summary или classic legacy archive/spec summary | `workspace-write` | OpenSpec final evidence/managed roadmap row or classic legacy finalization; marked ultra is read-only receipt evaluation and writes nothing; `--force` запрещён |
 
 `name` является authoritative spawn-name. Filename нужен только как удобная convention в репозитории и в manifest.
 
@@ -37,7 +37,7 @@ The `aifhub-*` Codex agents are extension helpers for bounded planning, implemen
 - `aifhub-rules-sidecar` keeps the upstream `rules-sidecar` contract instead of replacing it: it is namespaced for AIFHub and reads generated markdown plus trace metadata under `.ai-factory/rules/generated/*` in OpenSpec-native mode.
 - `low-write verifier`: `aifhub-verifier`. Агент может обновлять только verification artifacts, но не implementation files.
 - `bounded worker`: `aifhub-plan-polisher`, `aifhub-implement-worker`, `aifhub-fixer`. Они write-capable, но у каждого есть жёстко ограниченный рабочий scope.
-- `finalization helper`: `aifhub-done-finalizer`. Он завершает verification-passing OpenSpec change through `openspec archive <change-id> --yes` or legacy plan archive work, supports `--skip-specs`, prepares summary/archive evidence, and does not bypass owner boundaries для `.ai-factory/ROADMAP.md`, `.ai-factory/RULES.md` и `.ai-factory/ARCHITECTURE.md`.
+- `finalization helper`: `aifhub-done-finalizer`. Для OpenSpec-native installed project он запускает `ai-factory aifhub-done-finalizer --change <change-id> --json`; extension-local implementation выполняет readiness и `openspec archive <change-id> --yes`. Поддерживаются `--skip-specs` и `--record-dirty-state`. Агент co-owns только одну linked row внутри marker-bounded lifecycle block; arbitrary `.ai-factory/ROADMAP.md` content и owner boundaries для `.ai-factory/RULES.md` и `.ai-factory/ARCHITECTURE.md` не обходятся.
 
 ## Как это работает
 
@@ -45,6 +45,21 @@ The `aifhub-*` Codex agents are extension helpers for bounded planning, implemen
 - Сам факт установки не означает, что Codex начнёт вызывать их автоматически.
 - Если нужен subagent, его надо попросить явно: либо прямым пользовательским запросом, либо через orchestrator logic в уже выбранном workflow.
 - Поэтому bundled agents расширяют доступный toolbox, но не добавляют "магический" auto-spawn behavior.
+
+## AI Factory 2.18 Exact Handoff Matrix
+
+Marker classification runs before classic companion discovery. For a valid legacy `<!-- aif:plan-mode:ultra -->` bundle, agents must return these exact upstream commands and must not edit `index.md`, phase files, or classic companions:
+
+| Agent | Exact handoff |
+|---|---|
+| `aifhub-plan-polisher` | `/aif-improve <entrypoint>` |
+| `aifhub-implement-worker` | `/aif-implement <entrypoint>` |
+| `aifhub-verifier` | `/aif-verify <entrypoint>`; after the one final upstream gate, the command boundary may write the revision-bound receipt |
+| `aifhub-fixer` | `/aif-fix <entrypoint>` |
+| `aifhub-rules-sidecar` | `/aif-archive <entrypoint>` only for current exact `pass`; otherwise `/aif-verify <entrypoint>` |
+| `aifhub-done-finalizer` | `/aif-archive <entrypoint>` only for current exact `pass`; otherwise `/aif-verify <entrypoint>` |
+
+The receipt lives at `.ai-factory/state/legacy-ultra-verification/<entrypoint-digest>.json` and binds the bundle, exact entrypoint, source revision, deterministic worktree, and gate outcome. Rules/done agents are read-only evaluators: they never create or repair it and never execute the returned handoff. OpenSpec-native explicit `ultra` remains the same canonical change with deeper `design.md`/`tasks.md`; this matrix applies only to legacy marked bundles.
 
 ## Почему имена namespaced как `aifhub-*`
 
@@ -76,7 +91,7 @@ After implementation, optional read-only gates are `/aif-rules-check`, `/aif-rev
 
 ### Read-only sidecars
 
-Run after code changes and before or during verification:
+Run after code changes and before verification starts:
 
 - `aifhub-rules-sidecar` -> `gate: "rules"`
 - `aifhub-review-sidecar` -> `gate: "review"`
@@ -95,12 +110,22 @@ Verifier writes QA evidence under `.ai-factory/qa/<change-id>/`.
 ### Finalization
 
 - `aifhub-done-finalizer`
+- installed command: `ai-factory aifhub-done-finalizer --change <change-id> --json`
 - requires passing verify gate
 - archives only through OpenSpec CLI
+- returns bounded output and exit `0` for success/accepted warning, `1` for a resolved blocker, or `2` for invalid/unresolved/unexpected command failure
+- rejects unknown options and `--force`, `--no-validate`, `--skip-archive`, `--dry-run`, and `--summary-only`
+- never runs extension-local `scripts/openspec-*.mjs` modules through a consumer-root or installed-internal path
 - writes final evidence/summaries
+- reads canonical `## Roadmap Linkage` before archive
+- after successful OpenSpec archive, updates only the linked row in the marker-bounded `OpenSpec Change Lifecycle` block to `finalized`
+- a pre-archive failure leaves the roadmap unchanged
+- a post-archive roadmap update failure preserves truthful archive evidence, does not roll back archive, and returns `/aif-roadmap check`
+- GitHub open/closed/merged state remains separate and is reconciled later by `/aif-roadmap check`
 - recommends `/aif-mode sync`
 - recommends `/aif-commit`
 - does not create commits or PRs automatically
+- for marked legacy ultra, writes no final evidence or archive state and returns only the current receipt-derived `/aif-verify <entrypoint>` or `/aif-archive <entrypoint>` handoff
 
 ### Optional learning
 
@@ -117,7 +142,7 @@ Verifier writes QA evidence under `.ai-factory/qa/<change-id>/`.
 - Попросить plan polisher: `Используй aifhub-plan-polisher для точечной полировки текущего OpenSpec change или legacy плана без редактирования source code.`
 - Попросить verifier: `Запусти aifhub-verifier для active OpenSpec change or legacy plan pair и changed files. Обнови только verification artifacts и верни verdict с counts по findings.`
 - Попросить fixer: `Используй aifhub-fixer и исправь только findings B001 и I002, затем верни files modified и re-verify recommendation.`
-- Попросить done finalizer: `Запусти aifhub-done-finalizer для passing OpenSpec change или legacy plan. Для OpenSpec-native scope проверь /aif-verify evidence, archive through openspec archive <change-id> --yes, use --skip-specs for docs/tooling-only work, and report .ai-factory/qa/<change-id>/ plus .ai-factory/state/<change-id>/ outputs. Для legacy scope используй `.ai-factory/specs/<plan-id>/` archive path. Подготовь commit/PR summary draft.`
+- Попросить done finalizer: `Запусти ai-factory aifhub-done-finalizer --change <change-id> --json для passing OpenSpec change. Используй --skip-specs только для docs/tooling-only work, верни bounded status, safe paths, OpenSpec command/source и suggested next; не запускай scripts/openspec-*.mjs из consumer root или installed-internal path. Для legacy scope следуй agent contract. Подготовь commit/PR summary draft.`
 
 Во всех случаях полезно явно задавать scope: какой plan, какие файлы или какой changed range должен анализироваться.
 
@@ -126,7 +151,7 @@ Verifier writes QA evidence under `.ai-factory/qa/<change-id>/`.
 - `aifhub-review-sidecar`, `aifhub-security-sidecar` и `aifhub-rules-sidecar` намеренно read-only; они не должны выполнять edits.
 - `aifhub-verifier` не должен писать code; даже при `sandbox_mode = "workspace-write"` его write scope ограничен QA/verification artifacts.
 - `aifhub-fixer` не должен делать unrelated refactor и не должен переписывать canonical OpenSpec artifacts or legacy plan artifacts вне выбранного finding scope.
-- `aifhub-done-finalizer` не должен custom-mutating `openspec/specs`, manually moving OpenSpec change folders, archiving unverified changes, or using legacy `.ai-factory/specs` archive in OpenSpec-native mode; он также не должен напрямую обходить owner boundaries для `.ai-factory/ROADMAP.md`, `.ai-factory/RULES.md` и `.ai-factory/ARCHITECTURE.md`.
+- `aifhub-done-finalizer` не должен custom-mutating `openspec/specs`, manually moving OpenSpec change folders, archiving unverified changes, or using legacy `.ai-factory/specs` archive in OpenSpec-native mode; в roadmap он может менять только одну linked row внутри managed markers после archive и не должен обходить ownership остального `.ai-factory/ROADMAP.md`, `.ai-factory/RULES.md` или `.ai-factory/ARCHITECTURE.md`.
 - `aifhub-plan-polisher` и `aifhub-implement-worker` write-capable, но их write scope всё равно ограничен инструкциями конкретного агента.
 - Эта страница не вводит новый runtime behavior; она документирует уже опубликованные `agentFiles`, naming contract и expected sandbox policy.
 

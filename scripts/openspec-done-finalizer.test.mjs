@@ -13,6 +13,9 @@ import {
   buildDoneContext,
   detectWorkingTreeState,
   finalizeOpenSpecChange,
+  parseDoneFinalizerArgs,
+  projectDoneFinalizerResult,
+  runDoneFinalizerCommand,
   summarizeDoneResult,
   writeDoneSummary
 } from './openspec-done-finalizer.mjs';
@@ -23,8 +26,31 @@ import {
 import {
   syncOpenSpecArtifacts
 } from './aif-artifact-sync.mjs';
+import {
+  ROADMAP_LIFECYCLE_START_MARKER
+} from './roadmap-change-lifecycle.mjs';
 
 const tempRoots = [];
+const DEFAULT_ROADMAP_PATH = '.ai-factory/ROADMAP.md';
+const CUSTOM_ROADMAP_PATH = 'docs/project-roadmap.md';
+const LINKED_PROPOSAL = `# Proposal: Add OAuth
+
+## Roadmap Linkage
+
+- Issues: https://github.com/ichinya/aifhub-extension/issues/88
+- Milestone: none
+- Roadmap item/slice: Workflow governance
+- Rationale: Track local finalization independently from GitHub.
+`;
+const UNLINKED_PROPOSAL = `# Proposal: Add OAuth
+
+## Roadmap Linkage
+
+- Issues: none
+- Milestone: none
+- Roadmap item/slice: none
+- Rationale: none
+`;
 
 async function createTempRoot() {
   const rootDir = await mkdtemp(path.join(os.tmpdir(), 'aifhub-openspec-done-'));
@@ -57,6 +83,52 @@ async function createRuntimeEvidence(rootDir, changeId = 'add-oauth') {
     detectOpenSpec: async () => missingCliDetection()
   });
   await writeRulesGateEvidence(rootDir, changeId);
+}
+
+async function createLinkedFinalizationFixture(rootDir, options = {}) {
+  const roadmapPath = options.roadmapPath ?? CUSTOM_ROADMAP_PATH;
+  await createOpenSpecChange(rootDir);
+  await writeFixture(
+    rootDir,
+    'openspec/changes/add-oauth/proposal.md',
+    options.proposalContent ?? LINKED_PROPOSAL
+  );
+  await createRuntimeEvidence(rootDir);
+  await writeFixture(rootDir, '.ai-factory/config.yaml', [
+    'aifhub:',
+    '  artifactProtocol: openspec',
+    'paths:',
+    `  roadmap: ${roadmapPath}`,
+    ''
+  ].join('\n'));
+  if (options.createRoadmap !== false) {
+    await writeFixture(rootDir, roadmapPath, options.roadmapContent ?? '# Project Roadmap\n');
+  }
+  return roadmapPath;
+}
+
+function passingFinalizerOptions(rootDir, overrides = {}) {
+  return {
+    rootDir,
+    changeId: 'add-oauth',
+    detectOpenSpec: async () => availableCliDetection(),
+    validateOpenSpecChange: async () => statusResult(),
+    getOpenSpecStatus: async () => statusResult(),
+    gitStatus: async () => ({ exitCode: 0, stdout: '', stderr: '' }),
+    readLatestVerificationEvidence: async () => verificationEvidence(),
+    readOpenSpecCoverageMatrix: async () => coverageEvidence(),
+    validateOpenSpecArtifactContract: async () => ({
+      schema_version: 1,
+      validator: 'aifhub-openspec-artifact-contract',
+      change_id: 'add-oauth',
+      status: 'pass',
+      blocking: false,
+      checks: [],
+      suggested_next: null
+    }),
+    archiveOpenSpecChange: async () => archiveResult(),
+    ...overrides
+  };
 }
 
 async function writeRulesGateEvidence(rootDir, changeId = 'add-oauth', status = 'pass', qaRoot = '.ai-factory/qa') {
@@ -109,6 +181,7 @@ function availableCliDetection() {
     canValidate: true,
     version: '1.3.1',
     command: 'openspec',
+    commandSource: 'path',
     reason: null,
     errors: []
   };
@@ -121,6 +194,7 @@ function missingCliDetection() {
     canValidate: false,
     version: null,
     command: 'openspec',
+    commandSource: 'path',
     reason: 'missing-cli',
     errors: [
       {
@@ -135,6 +209,7 @@ function archiveResult(overrides = {}) {
   return {
     ok: overrides.ok ?? true,
     command: 'openspec',
+    commandSource: overrides.commandSource ?? 'path',
     args: overrides.args ?? ['archive', 'add-oauth', '--yes', '--no-color'],
     exitCode: overrides.exitCode ?? 0,
     stdout: overrides.stdout ?? 'Archived add-oauth\n',
@@ -149,6 +224,7 @@ function statusResult(overrides = {}) {
   return {
     ok: overrides.ok ?? true,
     command: 'openspec',
+    commandSource: overrides.commandSource ?? 'path',
     args: ['status', '--change', 'add-oauth', '--json', '--no-color'],
     exitCode: overrides.exitCode ?? 0,
     stdout: overrides.stdout ?? '{"change":"add-oauth"}',
@@ -259,11 +335,337 @@ function coverageEvidence(overrides = {}) {
   };
 }
 
+function finalizerCommandResult(overrides = {}) {
+  return {
+    ok: overrides.ok ?? true,
+    mode: 'openspec-native',
+    changeId: Object.prototype.hasOwnProperty.call(overrides, 'changeId')
+      ? overrides.changeId
+      : 'add-oauth',
+    status: overrides.status ?? (overrides.ok === false ? 'FAIL' : 'PASS'),
+    readiness: overrides.readiness ?? {
+      status: 'pass',
+      blocking: false,
+      suggested_next: null,
+      context: {
+        private: 'verification contents must not escape'
+      }
+    },
+    workingTree: overrides.workingTree ?? {
+      ok: true,
+      isGitRepo: true,
+      dirty: false,
+      entries: [],
+      warnings: [],
+      errors: []
+    },
+    archive: overrides.archive ?? {
+      ok: true,
+      status: 'PASS',
+      archived: true,
+      skipSpecs: false,
+      command: 'node_modules/.bin/openspec.cmd',
+      commandSource: 'project-local',
+      stdout: 'raw archive output must not escape',
+      stderr: 'raw archive error must not escape'
+    },
+    roadmap: overrides.roadmap ?? {
+      status: 'updated',
+      reason: 'lifecycle-updated',
+      path: DEFAULT_ROADMAP_PATH,
+      changed: true,
+      suggestedNext: null
+    },
+    context: overrides.context ?? {
+      openspec: {
+        command: 'node_modules/.bin/openspec.cmd',
+        commandSource: 'project-local'
+      },
+      verification: {
+        content: 'verification contents must not escape'
+      },
+      runtimeTraces: [{ content: 'runtime contents must not escape' }]
+    },
+    verification: {
+      content: 'verification contents must not escape'
+    },
+    summaryFiles: overrides.summaryFiles ?? [
+      '.ai-factory/qa/add-oauth/done.md',
+      '.ai-factory/state/add-oauth/final-summary.md'
+    ],
+    commitMessage: overrides.commitMessage ?? 'feat: finalize add-oauth',
+    warnings: overrides.warnings ?? [],
+    errors: overrides.errors ?? []
+  };
+}
+
 afterEach(async () => {
   await Promise.all(tempRoots.splice(0).map((rootDir) => rm(rootDir, {
     recursive: true,
     force: true
   })));
+});
+
+describe('OpenSpec done finalizer command', () => {
+  it('parses only the public finalizer flags', () => {
+    assert.deepEqual(
+      parseDoneFinalizerArgs([
+        '--change',
+        'add-oauth',
+        '--skip-specs',
+        '--record-dirty-state',
+        '--json'
+      ]),
+      {
+        ok: true,
+        changeId: 'add-oauth',
+        skipSpecs: true,
+        recordDirtyState: true,
+        json: true
+      }
+    );
+  });
+
+  it('rejects missing, unknown, and bypass flags before calling the finalizer API', async () => {
+    const invalidArgv = [
+      ['--change'],
+      ['--unknown'],
+      ['--force'],
+      ['--no-validate'],
+      ['--skip-archive'],
+      ['--dry-run'],
+      ['--summary-only']
+    ];
+
+    for (const argv of invalidArgv) {
+      let calls = 0;
+      const command = await runDoneFinalizerCommand(argv, {
+        finalizeOpenSpecChange: async () => {
+          calls += 1;
+          return finalizerCommandResult();
+        }
+      });
+
+      assert.equal(command.exitCode, 2, `${argv.join(' ')} should be a command error`);
+      assert.equal(command.stdout, '');
+      assert.match(command.stderr, /Missing value|Unknown option|Unsupported finalizer option/);
+      assert.equal(calls, 0, `${argv.join(' ')} must not call finalizer API`);
+    }
+  });
+
+  it('maps public flags and strips internal bypass options from the API call', async () => {
+    const calls = [];
+    const command = await runDoneFinalizerCommand([
+      '--change',
+      'add-oauth',
+      '--skip-specs',
+      '--record-dirty-state'
+    ], {
+      noValidate: true,
+      skipArchive: true,
+      dryRun: true,
+      summaryOnly: true,
+      finalizeOpenSpecChange: async (options) => {
+        calls.push(options);
+        return finalizerCommandResult();
+      }
+    });
+
+    assert.equal(command.exitCode, 0);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].changeId, 'add-oauth');
+    assert.equal(calls[0].skipSpecs, true);
+    assert.equal(calls[0].recordDirtyState, true);
+    for (const key of ['noValidate', 'skipArchive', 'dryRun', 'summaryOnly']) {
+      assert.equal(Object.hasOwn(calls[0], key), false, `${key} must not reach public finalizer execution`);
+    }
+  });
+
+  it('renders bounded human output with pre-archive command diagnostics and errors', async () => {
+    const command = await runDoneFinalizerCommand([], {
+      finalizeOpenSpecChange: async () => finalizerCommandResult({
+        ok: false,
+        readiness: {
+          status: 'fail',
+          blocking: true,
+          suggested_next: {
+            command: '/aif-fix add-oauth',
+            reason: 'fix the blocking gate'
+          }
+        },
+        archive: {
+          status: 'SKIPPED',
+          archived: false,
+          skipSpecs: false,
+          command: null,
+          commandSource: null,
+          stdout: 'raw archive output must not escape'
+        },
+        errors: [{
+          code: 'verification-failed',
+          message: 'Verification failed at C:\\Users\\private name\\verify.md before archive.',
+          detail: 'raw detail must not escape'
+        }]
+      })
+    });
+
+    assert.equal(command.exitCode, 1);
+    assert.match(command.stdout, /Finalization status: FAIL/);
+    assert.match(command.stdout, /OpenSpec command: node_modules\/\.bin\/openspec\.cmd \(project-local\)/);
+    assert.match(command.stdout, /Suggested next: \/aif-fix add-oauth/);
+    assert.match(command.stdout, /verification-failed:/);
+    assert.doesNotMatch(command.stdout, /Users|private name|raw archive|raw detail|verification contents/);
+  });
+
+  it('projects JSON through an allowlist and uses pre-archive command context', async () => {
+    const result = finalizerCommandResult({
+      ok: false,
+      readiness: {
+        status: 'fail',
+        blocking: true,
+        suggested_next: {
+          command: '/aif-fix add-oauth',
+          reason: 'fix the blocking gate'
+        }
+      },
+      workingTree: {
+        ok: true,
+        isGitRepo: true,
+        dirty: true,
+        entries: [' M private-file.md'],
+        warnings: [{ code: 'dirty-working-tree-recorded', message: 'recorded' }],
+        errors: []
+      },
+      archive: {
+        status: 'SKIPPED',
+        archived: false,
+        skipSpecs: true,
+        command: null,
+        commandSource: null,
+        stdout: 'raw archive output must not escape',
+        stderr: 'raw archive error must not escape'
+      },
+      summaryFiles: [
+        '.ai-factory/qa/add-oauth/done.md',
+        'C:\\Users\\private\\secret.md'
+      ],
+      warnings: [{
+        code: 'safe-warning',
+        message: 'Inspect C:\\Users\\private name\\warning.txt before retrying.',
+        path: '.ai-factory/qa/add-oauth/done.md',
+        detail: 'raw warning detail must not escape'
+      }],
+      errors: [{
+        code: 'safe-error',
+        message: 'Finalization blocked.',
+        path: 'C:\\Users\\private\\error.txt',
+        detail: 'raw error detail must not escape'
+      }]
+    });
+    const projection = projectDoneFinalizerResult(result);
+    const serialized = JSON.stringify(projection);
+
+    assert.deepEqual(Object.keys(projection), [
+      'ok',
+      'mode',
+      'change_id',
+      'status',
+      'readiness',
+      'working_tree',
+      'archive',
+      'roadmap',
+      'summary_files',
+      'commit_message',
+      'warnings',
+      'errors'
+    ]);
+    assert.equal(projection.archive.command, 'node_modules/.bin/openspec.cmd');
+    assert.equal(projection.archive.command_source, 'project-local');
+    assert.deepEqual(projection.roadmap, {
+      status: 'updated',
+      reason: 'lifecycle-updated',
+      path: DEFAULT_ROADMAP_PATH,
+      changed: true,
+      suggested_next: null
+    });
+    assert.equal(projection.working_tree.recorded, true);
+    assert.equal(projection.working_tree.entry_count, 1);
+    assert.equal(Object.hasOwn(projection.working_tree, 'entries'), false);
+    assert.deepEqual(projection.summary_files, ['.ai-factory/qa/add-oauth/done.md']);
+    assert.equal(projection.warnings[0].path, '.ai-factory/qa/add-oauth/done.md');
+    assert.equal(Object.hasOwn(projection.errors[0], 'path'), false);
+    for (const forbidden of [
+      'context',
+      'verification contents',
+      'runtime contents',
+      'raw archive',
+      'raw warning detail',
+      'raw error detail',
+      'C:\\\\Users',
+      'private-file.md'
+    ]) {
+      assert.equal(serialized.includes(forbidden), false, `JSON projection must omit ${forbidden}`);
+    }
+
+    const command = await runDoneFinalizerCommand(['--json'], {
+      finalizeOpenSpecChange: async () => result
+    });
+    assert.equal(command.exitCode, 1);
+    assert.deepEqual(JSON.parse(command.stdout), projection);
+  });
+
+  it('redacts quoted root paths and UNC server roots while preserving slash commands', () => {
+    const projection = projectDoneFinalizerResult(finalizerCommandResult({
+      readiness: {
+        status: 'fail',
+        blocking: true,
+        suggested_next: {
+          command: '/aif-fix add-oauth',
+          reason: 'Inspect "/секрет" before retrying.'
+        }
+      },
+      errors: [
+        {
+          code: 'quoted-root',
+          message: 'Inspect "/секрет" before retrying.'
+        },
+        {
+          code: 'unc-root',
+          message: 'Inspect "\\\\сервер" before retrying.'
+        }
+      ]
+    }));
+    const serialized = JSON.stringify(projection);
+
+    assert.equal(projection.readiness.suggested_next.command, '/aif-fix add-oauth');
+    assert.match(serialized, /\[path\]/);
+    assert.equal(serialized.includes('секрет'), false);
+    assert.equal(serialized.includes('сервер'), false);
+  });
+
+  it('classifies success, blockers, unresolved scope, and unexpected exceptions', async () => {
+    const success = await runDoneFinalizerCommand([], {
+      finalizeOpenSpecChange: async () => finalizerCommandResult({ status: 'WARN' })
+    });
+    const blocker = await runDoneFinalizerCommand([], {
+      finalizeOpenSpecChange: async () => finalizerCommandResult({ ok: false })
+    });
+    const unresolved = await runDoneFinalizerCommand([], {
+      finalizeOpenSpecChange: async () => finalizerCommandResult({ ok: false, changeId: null })
+    });
+    const unexpected = await runDoneFinalizerCommand([], {
+      finalizeOpenSpecChange: async () => {
+        throw new Error('C:\\Users\\private\\secret');
+      }
+    });
+
+    assert.equal(success.exitCode, 0);
+    assert.equal(blocker.exitCode, 1);
+    assert.equal(unresolved.exitCode, 2);
+    assert.equal(unexpected.exitCode, 2);
+    assert.equal(unexpected.stdout, '');
+    assert.equal(unexpected.stderr, 'Done finalizer command failed unexpectedly.\n');
+  });
 });
 
 describe('OpenSpec done finalizer API', () => {
@@ -277,6 +679,9 @@ describe('OpenSpec done finalizer API', () => {
       archiveChangeWithOpenSpec,
       writeDoneSummary,
       detectWorkingTreeState,
+      parseDoneFinalizerArgs,
+      projectDoneFinalizerResult,
+      runDoneFinalizerCommand,
       summarizeDoneResult
     ]) {
       assert.equal(typeof fn, 'function', 'done finalizer public API should export functions');
@@ -496,6 +901,33 @@ describe('OpenSpec done finalizer API', () => {
     assert.equal(invalidGate.ok, false);
     assert.equal(invalidGate.errors[0].code, 'verification-gate-invalid');
 
+    const legacyGate = await assertVerificationPassed('add-oauth', {
+      readLatestVerificationEvidence: async () => verificationEvidence({
+        content: [
+          '# Verify',
+          '',
+          'Verdict: PASS',
+          'Code verification: PASS',
+          '',
+          '```aif-gate-result',
+          JSON.stringify({
+            schema_version: 1,
+            gate: 'verify',
+            status: 'pass',
+            blocking: false,
+            blockers: [],
+            affected_files: [],
+            suggested_next: { command: '/aif-verify add-oauth', reason: 'rerun' }
+          }),
+          '```',
+          ''
+        ].join('\n')
+      })
+    });
+    assert.equal(legacyGate.ok, false);
+    assert.equal(legacyGate.errors[0].code, 'verification-gate-legacy-suggested-next');
+    assert.match(legacyGate.errors[0].message, /rerun \/aif-verify once/);
+
     const failedGate = await assertVerificationPassed('add-oauth', {
       readLatestVerificationEvidence: async () => verificationEvidence({
         gateStatus: 'fail'
@@ -591,6 +1023,25 @@ describe('OpenSpec done finalizer API', () => {
     await writeRulesGateEvidence(rootDir, 'add-oauth', 'pass');
     const passed = await assertRulesGateAcceptable('add-oauth', { rootDir });
     assert.equal(passed.ok, true);
+
+    const legacy = await assertRulesGateAcceptable('add-oauth', {
+      rootDir,
+      rulesGateEvidence: {
+        exists: true,
+        path: '.ai-factory/qa/add-oauth/rules.md',
+        gateResult: {
+          ok: false,
+          result: null,
+          errors: [{
+            code: 'invalid-suggested-next-on-pass',
+            message: 'suggested_next must be null when status is pass; terminal routing is prose-only.'
+          }]
+        }
+      }
+    });
+    assert.equal(legacy.ok, false);
+    assert.equal(legacy.errors[0].code, 'rules-gate-legacy-suggested-next');
+    assert.match(legacy.errors[0].message, /rerun \/aif-rules-check/);
   });
 
   it('allows non-pass rules gate results when done policy does not require pass', async () => {
@@ -639,6 +1090,25 @@ describe('OpenSpec done finalizer API', () => {
     assert.equal(invalid.ok, true);
     assert.equal(invalid.rulesGate.status, 'invalid');
     assert.equal(invalid.warnings.at(-1).code, 'rules-gate-result-invalid');
+
+    const relaxedLegacy = await assertRulesGateAcceptable('add-oauth', {
+      rootDir,
+      policy: relaxedPolicy,
+      rulesGateEvidence: {
+        exists: true,
+        path: '.ai-factory/qa/add-oauth/rules.md',
+        gateResult: {
+          ok: false,
+          result: null,
+          errors: [{
+            code: 'invalid-suggested-next-on-pass',
+            message: 'suggested_next must be null when status is pass; terminal routing is prose-only.'
+          }]
+        }
+      }
+    });
+    assert.equal(relaxedLegacy.ok, true);
+    assert.equal(relaxedLegacy.warnings.at(-1).code, 'rules-gate-legacy-suggested-next');
   });
 
   it('detects dirty working tree state and records it only when explicit', async () => {
@@ -860,6 +1330,253 @@ describe('OpenSpec done finalizer API', () => {
     assert.match(await readFile(finalSummaryPath, 'utf8'), /## Suggested PR summary/);
     assert.equal(await pathExists(path.join(rootDir, 'openspec', 'changes', 'add-oauth', 'done.md')), false);
     assert.equal(await pathExists(path.join(rootDir, '.ai-factory', 'plans', 'add-oauth')), false);
+  });
+
+  it('updates the configured roadmap after archive and records bounded lifecycle evidence', async () => {
+    const rootDir = await createTempRoot();
+    const roadmapPath = await createLinkedFinalizationFixture(rootDir);
+
+    const result = await finalizeOpenSpecChange(passingFinalizerOptions(rootDir));
+
+    assert.equal(result.ok, true);
+    assert.equal(result.status, 'PASS');
+    assert.equal(result.archive.archived, true);
+    assert.deepEqual(result.roadmap, {
+      status: 'updated',
+      reason: 'lifecycle-updated',
+      path: roadmapPath,
+      changed: true,
+      suggestedNext: null
+    });
+
+    const roadmap = await readFile(path.join(rootDir, ...roadmapPath.split('/')), 'utf8');
+    assert.match(roadmap, /<!-- aifhub:roadmap-change-lifecycle:start -->/);
+    assert.match(
+      roadmap,
+      /\| `add-oauth` \| https:\/\/github\.com\/ichinya\/aifhub-extension\/issues\/88 \| none \| Workflow governance \| finalized \| \.ai-factory\/qa\/add-oauth\/done\.md \|/
+    );
+
+    for (const summaryPath of [
+      '.ai-factory/qa/add-oauth/done.md',
+      '.ai-factory/state/add-oauth/final-summary.md'
+    ]) {
+      const summary = await readFile(path.join(rootDir, ...summaryPath.split('/')), 'utf8');
+      assert.match(summary, /## Roadmap lifecycle/);
+      assert.match(summary, /Status: updated/);
+      assert.match(summary, /Path: docs\/project-roadmap\.md/);
+    }
+
+    assert.deepEqual(projectDoneFinalizerResult(result).roadmap, {
+      status: 'updated',
+      reason: 'lifecycle-updated',
+      path: roadmapPath,
+      changed: true,
+      suggested_next: null
+    });
+  });
+
+  it('preserves archive success and hands off when the configured roadmap is missing', async () => {
+    const rootDir = await createTempRoot();
+    const roadmapPath = await createLinkedFinalizationFixture(rootDir, { createRoadmap: false });
+
+    const result = await finalizeOpenSpecChange(passingFinalizerOptions(rootDir));
+
+    assert.equal(result.ok, true);
+    assert.equal(result.status, 'WARN');
+    assert.equal(result.archive.archived, true);
+    assert.deepEqual(result.roadmap, {
+      status: 'handoff',
+      reason: 'roadmap-missing',
+      path: roadmapPath,
+      changed: false,
+      suggestedNext: '/aif-roadmap check'
+    });
+    assert.equal(await pathExists(path.join(rootDir, ...roadmapPath.split('/'))), false);
+    assert.match(summarizeDoneResult(result), /Roadmap lifecycle: handoff/);
+    assert.match(summarizeDoneResult(result), /Suggested next: \/aif-roadmap check/);
+
+    for (const summaryPath of [
+      '.ai-factory/qa/add-oauth/done.md',
+      '.ai-factory/state/add-oauth/final-summary.md'
+    ]) {
+      const summary = await readFile(path.join(rootDir, ...summaryPath.split('/')), 'utf8');
+      assert.match(summary, /Status: handoff/);
+      assert.match(summary, /\/aif-roadmap check/);
+    }
+  });
+
+  it('skips roadmap mutation for an explicitly unlinked change', async () => {
+    const rootDir = await createTempRoot();
+    const originalRoadmap = '# Project Roadmap\n\nOwned by maintainers.\n';
+    const roadmapPath = await createLinkedFinalizationFixture(rootDir, {
+      proposalContent: UNLINKED_PROPOSAL,
+      roadmapContent: originalRoadmap
+    });
+
+    const result = await finalizeOpenSpecChange(passingFinalizerOptions(rootDir));
+
+    assert.equal(result.ok, true);
+    assert.equal(result.status, 'PASS');
+    assert.deepEqual(result.roadmap, {
+      status: 'skipped',
+      reason: 'roadmap-linkage-none',
+      path: null,
+      changed: false,
+      suggestedNext: null
+    });
+    assert.equal(await readFile(path.join(rootDir, ...roadmapPath.split('/')), 'utf8'), originalRoadmap);
+  });
+
+  it('preserves malformed marker content and returns the exact roadmap handoff', async () => {
+    const rootDir = await createTempRoot();
+    const originalRoadmap = `# Project Roadmap\n\n${ROADMAP_LIFECYCLE_START_MARKER}\nunfinished\n`;
+    const roadmapPath = await createLinkedFinalizationFixture(rootDir, {
+      roadmapContent: originalRoadmap
+    });
+
+    const result = await finalizeOpenSpecChange(passingFinalizerOptions(rootDir));
+
+    assert.equal(result.ok, true);
+    assert.equal(result.status, 'WARN');
+    assert.equal(result.archive.archived, true);
+    assert.equal(result.roadmap.status, 'handoff');
+    assert.equal(result.roadmap.reason, 'roadmap-markers-incomplete');
+    assert.equal(result.roadmap.suggestedNext, '/aif-roadmap check');
+    assert.equal(await readFile(path.join(rootDir, ...roadmapPath.split('/')), 'utf8'), originalRoadmap);
+  });
+
+  it('keeps repeated finalization idempotent after the first roadmap update', async () => {
+    const rootDir = await createTempRoot();
+    const roadmapPath = await createLinkedFinalizationFixture(rootDir);
+
+    const first = await finalizeOpenSpecChange(passingFinalizerOptions(rootDir));
+    const second = await finalizeOpenSpecChange(passingFinalizerOptions(rootDir));
+
+    assert.equal(first.roadmap.status, 'updated');
+    assert.deepEqual(second.roadmap, {
+      status: 'skipped',
+      reason: 'lifecycle-current',
+      path: roadmapPath,
+      changed: false,
+      suggestedNext: null
+    });
+    const roadmap = await readFile(path.join(rootDir, ...roadmapPath.split('/')), 'utf8');
+    assert.equal((roadmap.match(/\| `add-oauth` \|/g) ?? []).length, 1);
+    assert.equal((roadmap.match(/aifhub:roadmap-change-lifecycle:start/g) ?? []).length, 1);
+  });
+
+  it('bounds an unexpected post-archive roadmap failure without rolling archive success back', async () => {
+    const rootDir = await createTempRoot();
+    await createLinkedFinalizationFixture(rootDir);
+
+    const result = await finalizeOpenSpecChange(passingFinalizerOptions(rootDir, {
+      updateRoadmapChangeLifecycle: async () => {
+        throw new Error('C:\\Users\\private\\roadmap-secret');
+      }
+    }));
+    const serialized = JSON.stringify(projectDoneFinalizerResult(result));
+
+    assert.equal(result.ok, true);
+    assert.equal(result.status, 'WARN');
+    assert.equal(result.archive.archived, true);
+    assert.deepEqual(result.roadmap, {
+      status: 'handoff',
+      reason: 'roadmap-update-failed',
+      path: null,
+      changed: false,
+      suggestedNext: '/aif-roadmap check'
+    });
+    assert.match(summarizeDoneResult(result), /Suggested next: \/aif-roadmap check/);
+    assert.doesNotMatch(serialized, /Users|private|secret/);
+    assert.equal(await pathExists(path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'done.md')), true);
+    assert.equal(await pathExists(path.join(rootDir, '.ai-factory', 'state', 'add-oauth', 'final-summary.md')), true);
+  });
+
+  it('never invokes roadmap mutation on any pre-archive failure path', async () => {
+    const cases = [
+      {
+        label: 'verification',
+        overrides: {
+          readLatestVerificationEvidence: async () => verificationEvidence({ gateStatus: 'fail' })
+        }
+      },
+      {
+        label: 'readiness',
+        overrides: {
+          validateOpenSpecChange: async () => statusResult({
+            ok: false,
+            exitCode: 1,
+            error: { code: 'validation-failed', message: 'Validation failed.' }
+          })
+        }
+      },
+      {
+        label: 'artifact contract',
+        overrides: {
+          validateOpenSpecArtifactContract: async () => ({
+            schema_version: 1,
+            validator: 'aifhub-openspec-artifact-contract',
+            change_id: 'add-oauth',
+            status: 'fail',
+            blocking: true,
+            checks: [{ id: 'contract-failed', status: 'fail', message: 'Contract failed.' }],
+            suggested_next: null
+          })
+        }
+      },
+      {
+        label: 'dirty tree',
+        overrides: {
+          gitStatus: async () => ({ exitCode: 0, stdout: ' M README.md\n', stderr: '' })
+        }
+      },
+      {
+        label: 'archive',
+        overrides: {
+          archiveOpenSpecChange: async () => archiveResult({
+            ok: false,
+            status: 'FAIL',
+            archived: false,
+            exitCode: 1,
+            error: { code: 'archive-failed', message: 'Archive failed.' },
+            errors: [{ code: 'archive-failed', message: 'Archive failed.' }]
+          })
+        }
+      }
+    ];
+
+    for (const testCase of cases) {
+      const rootDir = await createTempRoot();
+      const originalRoadmap = `# Project Roadmap\n\n${testCase.label}\n`;
+      const roadmapPath = await createLinkedFinalizationFixture(rootDir, {
+        roadmapContent: originalRoadmap
+      });
+      let roadmapCalls = 0;
+
+      const result = await finalizeOpenSpecChange(passingFinalizerOptions(rootDir, {
+        ...testCase.overrides,
+        updateRoadmapChangeLifecycle: async () => {
+          roadmapCalls += 1;
+          await writeFixture(rootDir, roadmapPath, 'MUTATED\n');
+          return {
+            status: 'updated',
+            reason: 'lifecycle-updated',
+            path: roadmapPath,
+            changed: true,
+            suggestedNext: null
+          };
+        }
+      }));
+
+      assert.equal(result.ok, false, `${testCase.label} should block finalization`);
+      assert.equal(result.archive.archived, false, `${testCase.label} should not report archive success`);
+      assert.equal(roadmapCalls, 0, `${testCase.label} must not call the roadmap helper`);
+      assert.equal(
+        await readFile(path.join(rootDir, ...roadmapPath.split('/')), 'utf8'),
+        originalRoadmap,
+        `${testCase.label} must not mutate the roadmap`
+      );
+    }
   });
 
   it('records dirty state and still writes summaries when explicit recording is requested', async () => {

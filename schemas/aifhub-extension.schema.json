@@ -42,7 +42,7 @@
     "SourceMetadata": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["url", "version", "lastSync"],
+      "required": ["url", "version", "baselineVersion", "lastSync"],
       "properties": {
         "url": {
           "type": "string",
@@ -56,6 +56,23 @@
         },
         "supportedRange": {
           "type": "string"
+        },
+        "reviewedStableVersions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "reviewedPrereleaseVersions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+-[0-9A-Za-z.-]+$"
+          },
+          "uniqueItems": true
         },
         "lastSync": {
           "type": "string",

@@ -4,6 +4,7 @@
 
 import { readFile, readdir, lstat } from 'node:fs/promises';
 import { join, extname } from 'node:path';
+import { validateAgentInstructionContract } from './agent-instruction-contract.mjs';
 
 const LOG_LEVEL = process.env.LOG_LEVEL || 'INFO';
 const LEVELS = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 };
@@ -58,6 +59,12 @@ function parseTomlKeys(content) {
   }
 
   return keys;
+}
+
+function parseTomlString(content, field) {
+  const escapedField = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = content.match(new RegExp(`^\\s*${escapedField}\\s*=\\s*(["'])(.*?)\\1\\s*$`, 'm'));
+  return match?.[2] ?? '';
 }
 
 async function findTomlFiles(dir) {
@@ -129,6 +136,22 @@ async function validate() {
     // Check sandbox_mode
     if (!keys.has('sandbox_mode')) {
       log('ERROR', `Missing required field`, { file: relPath, field: 'sandbox_mode' });
+      hasErrors = true;
+    }
+
+    const agentName = parseTomlString(content, 'name');
+    const instructionContract = validateAgentInstructionContract({
+      runtime: 'codex',
+      name: agentName,
+      source: content
+    });
+    for (const contractCase of instructionContract.cases) {
+      if (contractCase.ok) {
+        log('INFO', 'Agent instruction contract OK', contractCase);
+      }
+    }
+    for (const issue of instructionContract.issues) {
+      log('ERROR', issue.message, issue);
       hasErrors = true;
     }
 

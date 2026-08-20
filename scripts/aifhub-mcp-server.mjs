@@ -1,13 +1,24 @@
 // aifhub-mcp-server.mjs - dependency-free stdio MCP server for AIFHub skill workflows
 import { spawn } from 'node:child_process';
-import { access, readFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { access, open, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import readline from 'node:readline';
 
+import {
+  purgeSession,
+  readContextDedupPolicy,
+  recordRead,
+  resolveCanonicalTarget,
+  summarizeSession
+} from './context-dedup.mjs';
+
 const SERVER_VERSION = '0.1.0';
 const PROTOCOL_VERSION = '2024-11-05';
 const DEFAULT_TIMEOUT_MS = 120000;
+const MCP_READ_LIMIT_BYTES = 1024 * 1024;
+const DEFAULT_MCP_SESSION_ID = `mcp-${randomUUID()}`;
 
 const TOOL_DEFINITIONS = [
   {
@@ -68,6 +79,39 @@ const TOOL_DEFINITIONS = [
         evidence: { type: 'string', description: 'Optional supporting evidence.' }
       }
     }
+  },
+  {
+    name: 'read_file_deduplicated',
+    description: 'Read a project file through the configured off, AIFHub, or user-owned SQZ context mode. Protected validation artifacts are always returned in full.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['path'],
+      properties: {
+        path: { type: 'string', description: 'Project-relative file path.' },
+        force: { type: 'boolean', description: 'When true, return full content even if the digest is unchanged.' }
+      }
+    }
+  },
+  {
+    name: 'context_dedup_status',
+    description: 'Report effective mode and session totals: reads, dedup hits, observed/served/saved bytes and estimated saved tokens.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {}
+    }
+  },
+  {
+    name: 'context_dedup_purge',
+    description: 'Preview deletion of this MCP connection ledger. Set confirm to true to delete it.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        confirm: { type: 'boolean', description: 'Omitted or false previews; true deletes only this MCP session ledger.' }
+      }
+    }
   }
 ];
 
@@ -95,6 +139,68 @@ function textResult(text) {
   return {
     content: [{ type: 'text', text }]
   };
+}
+
+function textResultWithDiagnostics(text, diagnostics) {
+  const result = textResult(text);
+  if (diagnostics.length > 0) {
+    result.content.push({
+      type: 'text',
+      text: diagnostics.map((entry) => `[${entry.code}] ${entry.message}`).join('\n')
+    });
+  }
+  return result;
+}
+
+function sanitizeDiagnostics(diagnostics) {
+  return diagnostics
+    .filter((entry) => entry && typeof entry.code === 'string' && typeof entry.message === 'string')
+    .map((entry) => {
+      if (entry.code === 'context-dedup-config-unreadable') {
+        return { code: entry.code, message: 'Context dedup config could not be read; defaults were used.' };
+      }
+      if (entry.code === 'context-dedup-ledger-unreadable' || entry.code === 'context-dedup-ledger-unwritable') {
+        return { code: entry.code, message: 'Context dedup ledger was unavailable; full content was served.' };
+      }
+      return {
+        code: entry.code,
+        message: entry.message
+          .replace(/[A-Za-z]:[\\/][^\s]*/g, '<project-path>')
+          .replace(/\\\\[^\s]+/g, '<project-path>')
+          .replace(/(^|[\s"'(=:])\/(?!\/)[^\s"'`)]+/g, '$1<project-path>')
+      };
+    });
+}
+
+function assertAllowedKeys(args, allowed) {
+  const unknown = Object.keys(args ?? {}).filter((key) => !allowed.includes(key));
+  if (unknown.length > 0) {
+    throw new Error(`Unknown argument${unknown.length === 1 ? '' : 's'}: ${unknown.join(', ')}`);
+  }
+}
+
+async function readCappedText(absolutePath, limitBytes, openFile) {
+  const handle = await openFile(absolutePath, 'r');
+  try {
+    const buffer = Buffer.alloc(limitBytes + 1);
+    let totalBytes = 0;
+    while (totalBytes < buffer.length) {
+      const { bytesRead } = await handle.read(
+        buffer,
+        totalBytes,
+        buffer.length - totalBytes,
+        totalBytes
+      );
+      if (bytesRead === 0) break;
+      totalBytes += bytesRead;
+    }
+    if (totalBytes > limitBytes) {
+      throw new Error('read_file_deduplicated is limited to 1 MiB; use a bounded or native file reader for larger files.');
+    }
+    return buffer.subarray(0, totalBytes).toString('utf8');
+  } finally {
+    await handle.close();
+  }
 }
 
 function jsonText(value) {
@@ -162,7 +268,10 @@ async function searchSkills(args, options = {}) {
   const query = assertString(args.query, 'query');
   const limit = Number.isInteger(args.limit) ? args.limit : 10;
   const runner = options.runner || runCommand;
-  const result = await runner(commandName('npx'), ['-y', 'skills', 'search', query], { timeoutMs: DEFAULT_TIMEOUT_MS });
+  const result = await runner(commandName('npx'), ['-y', 'skills', 'search', query], {
+    cwd: options.cwd ?? process.cwd(),
+    timeoutMs: DEFAULT_TIMEOUT_MS
+  });
 
   return textResult(jsonText({
     query,
@@ -192,7 +301,10 @@ async function installSkill(args, options = {}) {
   }
 
   const runner = options.runner || runCommand;
-  const result = await runner(commandName('npx'), commandArgs, { timeoutMs: DEFAULT_TIMEOUT_MS });
+  const result = await runner(commandName('npx'), commandArgs, {
+    cwd: options.cwd ?? process.cwd(),
+    timeoutMs: DEFAULT_TIMEOUT_MS
+  });
   return textResult(jsonText({
     dryRun: false,
     skill,
@@ -229,7 +341,10 @@ async function resolveTestCommand(skillPath, args) {
 }
 
 async function runSkillTests(args, options = {}) {
-  const skillPath = path.resolve(process.cwd(), typeof args.skillPath === 'string' && args.skillPath ? args.skillPath : '.');
+  const skillPath = path.resolve(
+    options.cwd ?? process.cwd(),
+    typeof args.skillPath === 'string' && args.skillPath ? args.skillPath : '.'
+  );
   const testCommand = await resolveTestCommand(skillPath, args);
   const runner = options.runner || runCommand;
   const result = await runner(testCommand.command, testCommand.args, {
@@ -269,11 +384,83 @@ Next step:
 Review the proposal, then apply it through the normal repository workflow with tests.`);
 }
 
+async function readFileDeduplicated(args, options = {}) {
+  assertAllowedKeys(args, ['path', 'force']);
+  const filePath = assertString(args.path, 'path');
+  const dedup = options.contextDedup ?? { recordRead, summarizeSession, purgeSession };
+  const rootDir = options.cwd ?? process.cwd();
+  const policy = await readContextDedupPolicy({ rootDir });
+  const target = await resolveCanonicalTarget(rootDir, filePath);
+  const content = await readCappedText(target.absolutePath, MCP_READ_LIMIT_BYTES, options.openFile ?? open);
+  const result = await dedup.recordRead({
+    filePath,
+    content,
+    policy,
+    sessionId: options.mcpSessionId ?? DEFAULT_MCP_SESSION_ID,
+    force: args.force === true,
+    rootDir,
+    sqzRunner: options.sqzRunner,
+    sqzTimeoutMs: options.sqzTimeoutMs,
+    sqzMaxOutputBytes: options.sqzMaxOutputBytes,
+    env: options.env
+  });
+
+  const diagnostics = sanitizeDiagnostics([...(policy.diagnostics ?? []), ...(result.warnings ?? [])]);
+  if (result.decision === 'deduplicated') {
+    return textResultWithDiagnostics(result.replay?.text ?? result.content ?? '', diagnostics);
+  }
+
+  return textResultWithDiagnostics(result.content ?? '', diagnostics);
+}
+
+async function contextDedupStatus(args, options = {}) {
+  assertAllowedKeys(args, []);
+  const dedup = options.contextDedup ?? { recordRead, summarizeSession, purgeSession };
+  const rootDir = options.cwd ?? process.cwd();
+  const policy = await readContextDedupPolicy({ rootDir });
+  const summary = await dedup.summarizeSession({
+    sessionId: options.mcpSessionId ?? DEFAULT_MCP_SESSION_ID,
+    policy,
+    rootDir
+  });
+
+  const { sessionId, ledgerPath, warnings, ...publicSummary } = summary;
+  return textResultWithDiagnostics(
+    jsonText(publicSummary),
+    sanitizeDiagnostics([...(policy.diagnostics ?? []), ...(warnings ?? [])])
+  );
+}
+
+async function contextDedupPurge(args, options = {}) {
+  assertAllowedKeys(args, ['confirm']);
+  if (args.confirm !== true) {
+    return textResult(jsonText({
+      dryRun: true,
+      scope: 'current-mcp-session',
+      requiresConfirmation: true
+    }));
+  }
+
+  const dedup = options.contextDedup ?? { recordRead, summarizeSession, purgeSession };
+  const rootDir = options.cwd ?? process.cwd();
+  const policy = await readContextDedupPolicy({ rootDir });
+  await dedup.purgeSession({
+    sessionId: options.mcpSessionId ?? DEFAULT_MCP_SESSION_ID,
+    policy,
+    rootDir
+  });
+
+  return textResult(jsonText({ dryRun: false, scope: 'current-mcp-session', removed: true }));
+}
+
 const TOOL_HANDLERS = {
   search_skills: searchSkills,
   install_skill: installSkill,
   run_skill_tests: runSkillTests,
-  propose_skill_improvement: proposeSkillImprovement
+  propose_skill_improvement: proposeSkillImprovement,
+  read_file_deduplicated: readFileDeduplicated,
+  context_dedup_status: contextDedupStatus,
+  context_dedup_purge: contextDedupPurge
 };
 
 function success(id, result) {
@@ -334,8 +521,20 @@ export async function handleMcpMessage(message, options = {}) {
   return failure(id, -32601, `Method not found: ${method}`);
 }
 
-export async function startMcpServer({ input = process.stdin, output = process.stdout } = {}) {
+export async function startMcpServer({
+  input = process.stdin,
+  output = process.stdout,
+  projectRoot,
+  cwd,
+  env = process.env,
+  runner
+} = {}) {
   const rl = readline.createInterface({ input, crlfDelay: Infinity });
+  const mcpSessionId = `mcp-${randomUUID()}`;
+  const configuredRoot = typeof env?.AIFHUB_PROJECT_ROOT === 'string'
+    ? env.AIFHUB_PROJECT_ROOT.trim()
+    : '';
+  const resolvedProjectRoot = path.resolve(projectRoot ?? cwd ?? (configuredRoot || process.cwd()));
   for await (const line of rl) {
     if (!line.trim()) continue;
     let message;
@@ -346,7 +545,12 @@ export async function startMcpServer({ input = process.stdin, output = process.s
       continue;
     }
 
-    const response = await handleMcpMessage(message);
+    const response = await handleMcpMessage(message, {
+      mcpSessionId,
+      cwd: resolvedProjectRoot,
+      env,
+      runner
+    });
     if (response) {
       output.write(`${JSON.stringify(response)}\n`);
     }
@@ -354,5 +558,7 @@ export async function startMcpServer({ input = process.stdin, output = process.s
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  await startMcpServer();
+  await startMcpServer({
+    projectRoot: process.env.AIFHUB_PROJECT_ROOT?.trim() || process.cwd()
+  });
 }

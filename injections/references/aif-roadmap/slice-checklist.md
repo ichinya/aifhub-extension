@@ -84,6 +84,16 @@ Mark a slice `done` only when the repository shows comprehensive evidence. When 
 - Do not include tokens, authorization headers, raw credential helper output, or private authentication diagnostics.
 - If a slice is unclear, explain what is missing instead of guessing.
 
+## OpenSpec Lifecycle Reconciliation
+
+- During `/aif-roadmap check`, each active canonical OpenSpec proposal with `## Roadmap Linkage` and valid non-`none` roadmap linkage must register one local `planned` row, which must not claim implementation, verification, finalization, merge, or issue closure.
+- For an archived change with durable local done/archive evidence, register a missing `finalized` row or preserve its evidence-backed `finalized` row and project-relative finalization evidence. Reconciliation must never downgrade `finalized` to `planned`.
+- For an explicitly unlinked change where all linkage values are `none`, `/aif-roadmap check` must not create a managed lifecycle row and must not infer linkage from branch names, GitHub state, labels, or roadmap text.
+- If GitHub evidence is unavailable, unauthenticated, rate-limited, offline, or partial, local lifecycle reconciliation continues. The GitHub limitation is non-blocking; preserve evidence-backed local lifecycle state and do not guess external status.
+- During post-merge reconciliation, refresh the current issue, PR, and milestone state while the managed local lifecycle row remains `finalized`. A remote closure or merge MUST NOT be rewritten as local finalization evidence and must not promote `planned` to `finalized`.
+- In output, report lifecycle and GitHub evidence sources separately. Use `Lifecycle evidence:` for bounded project-relative local sources and `GitHub evidence:` for `used`, `unavailable`, or `partial` plus public identifiers.
+- Keep source summaries free of proposal bodies, raw provider output, credentials, authorization headers, credential-helper output, and private authentication diagnostics.
+
 ## Milestone Phase Notes
 
 - Treat GitHub milestones as roadmap phases when milestone evidence is available.

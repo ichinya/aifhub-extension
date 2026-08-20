@@ -1,0 +1,179 @@
+{
+  "schema": "aifhub.context_mode_codex.live_evaluation.v1",
+  "artifact_class": "sanitized_public_evaluation_evidence",
+  "change_id": "persist-context-mode-live-evaluation-issue-134",
+  "issue": 134,
+  "recorded_date": "2026-08-03",
+  "historical_change_preserved": true,
+  "authorization": {
+    "class": "explicit_isolated_full",
+    "scope": "isolated_evaluation",
+    "purpose": "test_only",
+    "auth_mode": "scoped_ephemeral",
+    "auth_copy_disposition": "deleted",
+    "host_auth_unchanged": true,
+    "remaining_auth_copies": 0,
+    "hook_trust_bypass": "approved_test_only_for_pinned_snapshot",
+    "normal_command_authorized": false
+  },
+  "provenance": {
+    "context_mode": {
+      "version": "1.0.169",
+      "commit": "589d8214d56740a28b5f7bf63167743d586b0b40",
+      "npm_shasum": "d5aa9acc648ed420c5dd32ee5f15aa5608f09fea",
+      "npm_integrity": "sha512-94JIaFuLjF9SO2BsGTrbGtyT44K95+9OC8BdbaL/UT76xOkanJLfUR5CzmNw+GELXZQqH4nBrKg9wjBnSFkVnQ=="
+    },
+    "codex": {
+      "version": "0.144.6",
+      "model": "gpt-5.6-luna",
+      "reasoning_effort": "low"
+    },
+    "ai_tester": {
+      "version": "1.1.0",
+      "commit": "98dd5afb3fe9b9b7593d21dc93bcbc6d98c2cca9",
+      "sha256": "5e99619cc5fc6734d17a6c08d94520355abf444626c5a68591c3608423f9924d"
+    }
+  },
+  "lifecycle": {
+    "package_snapshot": "PASS",
+    "marketplace_prepare": "PASS",
+    "marketplace_add": "PASS",
+    "plugin_add": "PASS",
+    "codex_exec": "PASS",
+    "provider_purge": "PASS",
+    "sandbox_cleanup": "PASS",
+    "host_manifest_unchanged": true,
+    "install_lifecycle": "NOT_RUN(postinstall_forbidden)"
+  },
+  "matrix": {
+    "fixture_revision": "context-mode-134-synthetic-v2",
+    "planned_rows": 18,
+    "dry_run_rows": 18,
+    "invalid_rows": 0,
+    "execution_note": "Authorized live follow-up used dedicated isolated probes; the generated matrix remained the reproducibility and dry-run contract."
+  },
+  "scenarios": {
+    "legacy_small_fixture": {
+      "facts": {
+        "north": 17,
+        "east": 29,
+        "checksum": 46
+      },
+      "baseline": {
+        "status": "PASS",
+        "input_tokens": 89462,
+        "output_tokens": 347,
+        "total_tokens": 89809,
+        "duration_ms": 28240
+      },
+      "mcp_only": {
+        "status": "PASS",
+        "input_tokens": 427326,
+        "output_tokens": 895,
+        "total_tokens": 428221,
+        "duration_ms": 42592,
+        "delta_total_tokens_percent": 376.8,
+        "delta_duration_percent": 50.8,
+        "raw_rollout_audit": {
+          "status": "PASS",
+          "reason": "raw_provider_audit_verified",
+          "tool_counts": {
+            "ctx_index": 1,
+            "ctx_search": 1,
+            "ctx_purge": 1
+          },
+          "paths_confined": true
+        }
+      },
+      "plugin": {
+        "status": "EXCLUDED",
+        "reason": "privacy_boundary_violation_in_probe_output"
+      },
+      "conclusion": "MCP-only was correct but substantially more expensive and slower than the baseline on the small fixture."
+    },
+    "large_stdout_truncation": {
+      "fixture": {
+        "line_count": 12009,
+        "minimum_bytes": 1048577,
+        "facts": {
+          "north": 731,
+          "east": 409,
+          "checksum": 1140
+        }
+      },
+      "baseline": {
+        "status": "FAIL",
+        "reason": "stdout_truncated_before_required_facts",
+        "observed_tool_result_bytes": 1048576,
+        "input_tokens": 31371,
+        "output_tokens": 677,
+        "total_tokens": 32048,
+        "duration_ms": 26233
+      },
+      "mcp_only": {
+        "status": "PASS",
+        "input_tokens": 69924,
+        "output_tokens": 655,
+        "total_tokens": 70579,
+        "duration_ms": 22775,
+        "delta_total_tokens_percent_vs_failed_baseline": 120.2,
+        "delta_duration_percent_vs_failed_baseline": -13.2,
+        "raw_rollout_audit": {
+          "status": "PASS",
+          "reason": "raw_provider_audit_verified",
+          "record_count": 26,
+          "tool_counts": {
+            "ctx_batch_execute": 1,
+            "ctx_purge": 1
+          },
+          "paths_confined": true
+        }
+      },
+      "plugin": {
+        "status": "FAIL",
+        "reason": "nested_shell_output_not_intercepted",
+        "observed_tool_result_bytes": 1048576,
+        "input_tokens": 93875,
+        "output_tokens": 582,
+        "total_tokens": 94457,
+        "duration_ms": 39833,
+        "delta_total_tokens_percent_vs_failed_baseline": 194.7,
+        "delta_duration_percent_vs_failed_baseline": 51.8,
+        "raw_rollout_audit": {
+          "status": "PASS",
+          "reason": "raw_provider_audit_verified",
+          "record_count": 30,
+          "tool_counts": {
+            "ctx_search": 1
+          },
+          "paths_confined": true
+        }
+      },
+      "conclusion": "MCP-only recovered correctness after baseline stdout truncation, but did not reduce billed model tokens. The plugin did not intercept the tested nested shell path."
+    },
+    "session_continuity": {
+      "status": "NOT_RUN(resume_driver_parity_unavailable)",
+      "first_turn_provider_result": "PASS",
+      "resume_result": "FAIL",
+      "conclusion": "Cross-turn continuity is not proven and is not eligible for recommendation."
+    }
+  },
+  "decision": {
+    "mcp_only": "conditional_large_truncating_output_only",
+    "codex_plugin": "avoid_for_tested_nested_shell_stack",
+    "session_continuity": "not_proven",
+    "token_savings": "not_demonstrated",
+    "baseline": "rg_and_direct_shell",
+    "normal_aifhub_behavior": "no_auto_install_no_registration_no_hook_trust",
+    "recommendation": "Keep manual_helper_only. Offer only as explicit user-owned temporary indexing when correctness is otherwise lost to large-output truncation, with mandatory purge."
+  },
+  "privacy": {
+    "tracked_raw_traces": 0,
+    "tracked_raw_rollout_records": 0,
+    "tracked_raw_content": 0,
+    "tracked_absolute_paths": 0,
+    "tracked_environment_values": 0,
+    "tracked_credentials": 0,
+    "tracked_auth_fingerprints": 0
+  }
+}

@@ -5,6 +5,8 @@
 import { readFile, stat } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
 
+import { OPENSPEC_LATEST_REVIEWED_VERSION } from './openspec-runner.mjs';
+
 const LOG_LEVEL = process.env.LOG_LEVEL || 'INFO';
 const LEVELS = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 };
 
@@ -33,6 +35,8 @@ const SOURCE_METADATA_KEYS = new Set([
   'version',
   'baselineVersion',
   'supportedRange',
+  'reviewedStableVersions',
+  'reviewedPrereleaseVersions',
   'lastSync',
   'optional',
   'requiresNode',
@@ -420,9 +424,98 @@ async function validateAifhubMetadata(metadata, repoRoot) {
       log('ERROR', 'Source metadata optional must be boolean', { source: sourceName });
       hasErrors = true;
     }
+
+    if (sourceName === 'openspec' && validateOpenSpecReviewMetadata(source)) {
+      hasErrors = true;
+    }
   }
 
   return hasErrors;
+}
+
+function validateOpenSpecReviewMetadata(source) {
+  let hasErrors = false;
+  const stable = source.reviewedStableVersions;
+  const prerelease = source.reviewedPrereleaseVersions;
+
+  if (typeof source.baselineVersion !== 'string' || !source.baselineVersion) {
+    log('ERROR', 'OpenSpec source metadata requires baselineVersion');
+    hasErrors = true;
+  }
+
+  if (!Array.isArray(stable) || stable.length === 0) {
+    log('ERROR', 'OpenSpec source metadata requires reviewedStableVersions');
+    hasErrors = true;
+  } else {
+    const invalid = stable.find((version) => !/^\d+\.\d+\.\d+$/.test(version));
+    const duplicate = stable.find((version, index) => stable.indexOf(version) !== index);
+    const outOfOrder = stable.find((version, index) => (
+      index > 0 && compareStableVersions(stable[index - 1], version) >= 0
+    ));
+
+    if (invalid) {
+      log('ERROR', 'OpenSpec reviewed stable version must be stable semver', { version: invalid });
+      hasErrors = true;
+    }
+    if (duplicate) {
+      log('ERROR', 'OpenSpec reviewed stable versions must be unique', { version: duplicate });
+      hasErrors = true;
+    }
+    if (outOfOrder) {
+      log('ERROR', 'OpenSpec reviewed stable versions must be strictly increasing', { version: outOfOrder });
+      hasErrors = true;
+    }
+    if (source.baselineVersion && stable[0] !== source.baselineVersion) {
+      log('ERROR', 'OpenSpec reviewed stable versions must start with baselineVersion', {
+        baselineVersion: source.baselineVersion,
+        firstReviewedVersion: stable[0]
+      });
+      hasErrors = true;
+    }
+    if (source.version && stable.at(-1) !== source.version) {
+      log('ERROR', 'OpenSpec source version must equal the latest reviewed stable version', {
+        sourceVersion: source.version,
+        latestReviewedVersion: stable.at(-1)
+      });
+      hasErrors = true;
+    }
+    if (source.version && source.version !== OPENSPEC_LATEST_REVIEWED_VERSION) {
+      log('ERROR', 'OpenSpec source version must match the runner reviewed-version diagnostic', {
+        sourceVersion: source.version,
+        runnerReviewedVersion: OPENSPEC_LATEST_REVIEWED_VERSION
+      });
+      hasErrors = true;
+    }
+  }
+
+  if (!Array.isArray(prerelease)) {
+    log('ERROR', 'OpenSpec source metadata requires reviewedPrereleaseVersions');
+    hasErrors = true;
+  } else {
+    const invalid = prerelease.find((version) => !/^\d+\.\d+\.\d+-[0-9A-Za-z.-]+$/.test(version));
+    const duplicate = prerelease.find((version, index) => prerelease.indexOf(version) !== index);
+    if (invalid) {
+      log('ERROR', 'OpenSpec reviewed prerelease version must be prerelease semver', { version: invalid });
+      hasErrors = true;
+    }
+    if (duplicate) {
+      log('ERROR', 'OpenSpec reviewed prerelease versions must be unique', { version: duplicate });
+      hasErrors = true;
+    }
+  }
+
+  return hasErrors;
+}
+
+function compareStableVersions(left, right) {
+  const leftParts = String(left).split('.').map(Number);
+  const rightParts = String(right).split('.').map(Number);
+  for (let index = 0; index < 3; index += 1) {
+    if (leftParts[index] !== rightParts[index]) {
+      return leftParts[index] - rightParts[index];
+    }
+  }
+  return 0;
 }
 
 async function validateManifestPaths(manifest, repoRoot) {

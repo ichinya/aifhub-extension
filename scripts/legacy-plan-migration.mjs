@@ -1,5 +1,5 @@
 // legacy-plan-migration.mjs - explicit migration from legacy AI Factory plans to OpenSpec changes
-import { access, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { access, mkdir, readdir, readFile, realpath, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -11,11 +11,20 @@ import {
   detectOpenSpec as defaultDetectOpenSpec,
   validateOpenSpecChange as defaultValidateOpenSpecChange
 } from './openspec-runner.mjs';
+import {
+  countActiveStandaloneMarker,
+  maskMarkdownCode,
+  ULTRA_PLAN_MARKER
+} from './markdown-structural-markers.mjs';
 
 const DEFAULT_PLANS_DIR = path.join('.ai-factory', 'plans');
 const DEFAULT_CHANGES_DIR = path.join('openspec', 'changes');
 const DEFAULT_STATE_DIR = path.join('.ai-factory', 'state');
 const DEFAULT_QA_DIR = path.join('.ai-factory', 'qa');
+const LEGACY_PLAN_SOURCE_STATE_PATH = path.join(DEFAULT_STATE_DIR, 'legacy-plan-source.json');
+const LEGACY_PLAN_SOURCE_STATE_SCHEMA_VERSION = 1;
+const ULTRA_PHASE_FILE_PATTERN = /^phase-(\d{2})-([a-z0-9][a-z0-9-]*)\.md$/i;
+const ULTRA_PHASE_LIKE_PATTERN = /^phase-\d{2}-.+/i;
 const KNOWN_PLAN_FILES = {
   task: 'task.md',
   context: 'context.md',
@@ -52,11 +61,270 @@ export function normalizeLegacyPlanId(input) {
   };
 }
 
+export function normalizeLegacyPlanSourceRoot(input, options = {}) {
+  const value = String(input ?? '').trim().replaceAll('\\', '/');
+  const normalized = path.posix.normalize(value);
+
+  if (
+    value.length === 0
+    || normalized === '.'
+    || path.isAbsolute(value)
+    || /^[a-z][a-z0-9+.-]*:/i.test(value)
+    || value.startsWith('//')
+    || normalized === '..'
+    || normalized.startsWith('../')
+  ) {
+    return {
+      ok: false,
+      legacyPlanSourceRoot: null,
+      error: {
+        code: 'invalid-legacy-plan-source-root',
+        message: `Legacy plan source root must be a safe project-relative directory: ${JSON.stringify(input)}.`
+      }
+    };
+  }
+
+  const changesDir = String(options.changesDir ?? DEFAULT_CHANGES_DIR).replaceAll('\\', '/');
+  const normalizedChanges = path.posix.normalize(changesDir);
+  if (pathsOverlap(normalized, normalizedChanges)) {
+    return {
+      ok: false,
+      legacyPlanSourceRoot: null,
+      error: {
+        code: 'legacy-plan-source-overlaps-canonical-changes',
+        message: `Legacy plan source root must not overlap canonical OpenSpec changes: ${normalized}.`,
+        path: normalized
+      }
+    };
+  }
+
+  return {
+    ok: true,
+    legacyPlanSourceRoot: normalized,
+    error: null
+  };
+}
+
+export async function readLegacyPlanSourceState(options = {}) {
+  const rootDir = resolveRootDir(options);
+  const statePath = resolveFromRoot(rootDir, LEGACY_PLAN_SOURCE_STATE_PATH);
+  const relativeStatePath = toPosix(path.relative(rootDir, statePath));
+  let raw;
+
+  try {
+    raw = await readFile(statePath, 'utf8');
+  } catch (err) {
+    if (err?.code === 'ENOENT') {
+      return {
+        ok: true,
+        exists: false,
+        path: relativeStatePath,
+        legacyPlanSourceRoot: null,
+        warnings: [],
+        errors: []
+      };
+    }
+
+    return {
+      ok: false,
+      exists: false,
+      path: relativeStatePath,
+      legacyPlanSourceRoot: null,
+      warnings: [],
+      errors: [{
+        code: 'legacy-plan-source-state-read-failed',
+        message: `Unable to read legacy plan source state: ${relativeStatePath}.`,
+        path: relativeStatePath
+      }]
+    };
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return invalidLegacyPlanSourceState(relativeStatePath, 'invalid-json');
+  }
+
+  if (
+    parsed?.schema_version !== LEGACY_PLAN_SOURCE_STATE_SCHEMA_VERSION
+    || parsed?.kind !== 'aifhub-legacy-plan-source'
+  ) {
+    return invalidLegacyPlanSourceState(relativeStatePath, 'invalid-schema');
+  }
+
+  const normalized = normalizeLegacyPlanSourceRoot(parsed.legacyPlanSourceRoot, options);
+  if (!normalized.ok) {
+    return {
+      ok: false,
+      exists: true,
+      path: relativeStatePath,
+      legacyPlanSourceRoot: null,
+      warnings: [],
+      errors: [normalized.error]
+    };
+  }
+
+  return {
+    ok: true,
+    exists: true,
+    path: relativeStatePath,
+    legacyPlanSourceRoot: normalized.legacyPlanSourceRoot,
+    reason: parsed.reason ?? null,
+    warnings: [],
+    errors: []
+  };
+}
+
+export async function resolveLegacyPlanSourceRoot(options = {}) {
+  const rootDir = resolveRootDir(options);
+  const explicitValue = options.legacyPlanSourceRoot ?? options.plansDir;
+  let source = 'default';
+  let candidate = DEFAULT_PLANS_DIR;
+  let state = null;
+
+  if (explicitValue !== undefined && explicitValue !== null) {
+    source = 'explicit';
+    candidate = explicitValue;
+  } else if (options.useRecordedLegacyPlanSource !== false) {
+    state = await readLegacyPlanSourceState({ ...options, rootDir });
+    if (!state.ok) {
+      return {
+        ok: false,
+        source: 'recorded',
+        legacyPlanSourceRoot: null,
+        state,
+        warnings: state.warnings,
+        errors: state.errors
+      };
+    }
+
+    if (state.exists) {
+      source = 'recorded';
+      candidate = state.legacyPlanSourceRoot;
+    }
+  }
+
+  const normalized = normalizeLegacyPlanSourceRoot(candidate, options);
+  if (!normalized.ok) {
+    return {
+      ok: false,
+      source,
+      legacyPlanSourceRoot: null,
+      state,
+      warnings: [],
+      errors: [normalized.error]
+    };
+  }
+
+  const sourcePath = resolveFromRoot(rootDir, normalized.legacyPlanSourceRoot);
+  const changesPath = resolveFromRoot(rootDir, options.changesDir ?? DEFAULT_CHANGES_DIR);
+  const actualSource = await realpathIfPresent(sourcePath);
+  const actualChanges = await realpathIfPresent(changesPath);
+  if (pathsOverlap(toPosix(actualSource), toPosix(actualChanges))) {
+    return {
+      ok: false,
+      source,
+      legacyPlanSourceRoot: null,
+      state,
+      warnings: [],
+      errors: [{
+        code: 'legacy-plan-source-overlaps-canonical-changes',
+        message: `Legacy plan source root must not overlap canonical OpenSpec changes: ${normalized.legacyPlanSourceRoot}.`,
+        path: normalized.legacyPlanSourceRoot
+      }]
+    };
+  }
+
+  return {
+    ok: true,
+    source,
+    legacyPlanSourceRoot: normalized.legacyPlanSourceRoot,
+    state,
+    warnings: [],
+    errors: []
+  };
+}
+
+export async function writeLegacyPlanSourceState(legacyPlanSourceRoot, options = {}) {
+  const rootDir = resolveRootDir(options);
+  const normalized = normalizeLegacyPlanSourceRoot(legacyPlanSourceRoot, options);
+  const dryRun = Boolean(options.dryRun);
+  const relativeStatePath = toPosix(LEGACY_PLAN_SOURCE_STATE_PATH);
+
+  if (!normalized.ok) {
+    return {
+      ok: false,
+      dryRun,
+      persisted: false,
+      wouldPersist: null,
+      path: relativeStatePath,
+      operations: [],
+      warnings: [],
+      errors: [normalized.error]
+    };
+  }
+
+  const operation = {
+    action: dryRun ? 'would-write' : 'write',
+    target: relativeStatePath
+  };
+  if (dryRun) {
+    return {
+      ok: true,
+      dryRun: true,
+      persisted: false,
+      wouldPersist: normalized.legacyPlanSourceRoot,
+      path: relativeStatePath,
+      operations: [operation],
+      warnings: [],
+      errors: []
+    };
+  }
+
+  const statePath = resolveFromRoot(rootDir, relativeStatePath);
+  const content = `${JSON.stringify({
+    schema_version: LEGACY_PLAN_SOURCE_STATE_SCHEMA_VERSION,
+    kind: 'aifhub-legacy-plan-source',
+    legacyPlanSourceRoot: normalized.legacyPlanSourceRoot,
+    reason: options.reason ?? 'migration-incomplete',
+    recorded_at: options.timestamp ?? new Date().toISOString()
+  }, null, 2)}\n`;
+  await mkdir(path.dirname(statePath), { recursive: true });
+  await writeFile(statePath, content, 'utf8');
+
+  return {
+    ok: true,
+    dryRun: false,
+    persisted: true,
+    wouldPersist: null,
+    legacyPlanSourceRoot: normalized.legacyPlanSourceRoot,
+    path: relativeStatePath,
+    operations: [operation],
+    warnings: [],
+    errors: []
+  };
+}
+
 export async function discoverLegacyPlans(options = {}) {
   const rootDir = resolveRootDir(options);
-  const plansRoot = resolveFromRoot(rootDir, options.plansDir ?? DEFAULT_PLANS_DIR);
+  const source = await resolveLegacyPlanSourceRoot({ ...options, rootDir });
+  if (!source.ok) {
+    return {
+      ok: false,
+      legacyPlanSourceRoot: null,
+      legacyPlanSource: source,
+      plans: [],
+      ignored: [],
+      warnings: source.warnings,
+      errors: source.errors
+    };
+  }
+
+  const plansRoot = resolveFromRoot(rootDir, source.legacyPlanSourceRoot);
   const changesRoot = resolveFromRoot(rootDir, options.changesDir ?? DEFAULT_CHANGES_DIR);
-  const plansById = new Map();
+  const planFilesById = new Map();
+  const planDirsById = new Map();
   const warnings = [];
 
   let entries;
@@ -66,7 +334,10 @@ export async function discoverLegacyPlans(options = {}) {
     if (err?.code === 'ENOENT') {
       return {
         ok: true,
+        legacyPlanSourceRoot: source.legacyPlanSourceRoot,
+        legacyPlanSource: source,
         plans: [],
+        ignored: [],
         warnings: [],
         errors: []
       };
@@ -74,7 +345,10 @@ export async function discoverLegacyPlans(options = {}) {
 
     return {
       ok: false,
+      legacyPlanSourceRoot: source.legacyPlanSourceRoot,
+      legacyPlanSource: source,
       plans: [],
+      ignored: [],
       warnings: [],
       errors: [
         {
@@ -103,8 +377,7 @@ export async function discoverLegacyPlans(options = {}) {
         continue;
       }
 
-      const plan = ensureDiscoveredPlan(plansById, normalized.planId, rootDir, changesRoot);
-      plan.planFile = toPosix(path.relative(rootDir, path.join(plansRoot, entry.name)));
+      planFilesById.set(normalized.planId, toPosix(path.relative(rootDir, path.join(plansRoot, entry.name))));
       continue;
     }
 
@@ -118,20 +391,37 @@ export async function discoverLegacyPlans(options = {}) {
       continue;
     }
 
-    const planDirPath = path.join(plansRoot, entry.name);
-    const plan = ensureDiscoveredPlan(plansById, normalized.planId, rootDir, changesRoot);
-    plan.planDir = toPosix(path.relative(rootDir, planDirPath));
-
-    for (const [key, fileName] of Object.entries(KNOWN_PLAN_FILES)) {
-      const filePath = path.join(planDirPath, fileName);
-      if (await isFile(filePath)) {
-        plan.files[key] = toPosix(path.relative(rootDir, filePath));
-      }
-    }
+    planDirsById.set(normalized.planId, path.join(plansRoot, entry.name));
   }
 
   const plans = [];
-  for (const plan of [...plansById.values()].sort((left, right) => left.id.localeCompare(right.id))) {
+  const ignored = [];
+  const ids = [...new Set([...planFilesById.keys(), ...planDirsById.keys()])].sort();
+  for (const id of ids) {
+    const planFile = planFilesById.get(id) ?? null;
+    const planDirPath = planDirsById.get(id) ?? null;
+    const classification = await classifyLegacyPlanShape(id, {
+      ...options,
+      rootDir,
+      legacyPlanSourceRoot: source.legacyPlanSourceRoot,
+      planFile,
+      planDirPath
+    });
+
+    if (classification.shape === 'unrelated-directory' && planFile === null) {
+      ignored.push(classification);
+      continue;
+    }
+
+    const plan = ensureDiscoveredPlan(new Map(), id, rootDir, changesRoot);
+    plan.shape = classification.shape;
+    plan.planFile = planFile;
+    plan.planDir = classification.planDir;
+    plan.files = classification.files;
+    plan.phaseFiles = classification.phaseFiles;
+    plan.markerCount = classification.markerCount;
+    plan.warnings = classification.warnings;
+    plan.errors = classification.errors;
     plan.hasCanonicalTarget = await isDirectory(path.join(changesRoot, plan.id));
 
     if (options.includeContent) {
@@ -143,10 +433,505 @@ export async function discoverLegacyPlans(options = {}) {
 
   return {
     ok: true,
+    legacyPlanSourceRoot: source.legacyPlanSourceRoot,
+    legacyPlanSource: source,
     plans,
+    ignored,
     warnings,
     errors: []
   };
+}
+
+export async function classifyLegacyPlanShape(planId, options = {}) {
+  const rootDir = resolveRootDir(options);
+  const normalizedId = normalizeLegacyPlanId(planId);
+  if (!normalizedId.ok) {
+    return createPlanClassification({
+      id: null,
+      shape: 'unrelated-directory',
+      errors: [normalizedId.error]
+    });
+  }
+
+  const source = await resolveLegacyPlanSourceRoot({ ...options, rootDir });
+  if (!source.ok) {
+    return createPlanClassification({
+      id: normalizedId.planId,
+      shape: 'unrelated-directory',
+      errors: source.errors
+    });
+  }
+
+  const planFile = options.planFile ?? await relativeFileIfPresent(
+    rootDir,
+    resolveFromRoot(rootDir, path.join(source.legacyPlanSourceRoot, `${normalizedId.planId}.md`))
+  );
+  const planDirPath = options.planDirPath ?? resolveFromRoot(
+    rootDir,
+    path.join(source.legacyPlanSourceRoot, normalizedId.planId)
+  );
+  const planDirExists = await isDirectory(planDirPath);
+  const planDir = planDirExists ? toPosix(path.relative(rootDir, planDirPath)) : null;
+
+  if (!planDirExists) {
+    return createPlanClassification({
+      id: normalizedId.planId,
+      shape: planFile === null ? 'unrelated-directory' : 'classic-pair',
+      planFile,
+      planDir: null
+    });
+  }
+
+  const entries = (await readdir(planDirPath, { withFileTypes: true }))
+    .sort((left, right) => left.name.localeCompare(right.name));
+  const indexEntries = entries.filter((entry) => entry.name.toLowerCase() === 'index.md');
+  const indexEntry = indexEntries.find((entry) => entry.name === 'index.md');
+  const nonCanonicalIndexEntries = indexEntries.filter((entry) => entry.name !== 'index.md');
+  const phaseLikeEntries = entries.filter((entry) => ULTRA_PHASE_LIKE_PATTERN.test(entry.name));
+  const ultraLike = indexEntries.length > 0 || phaseLikeEntries.length > 0;
+
+  if (!ultraLike) {
+    const files = await discoverCompanionFiles(rootDir, planDirPath);
+    const hasCompanions = Object.keys(files).length > 0;
+    return createPlanClassification({
+      id: normalizedId.planId,
+      shape: planFile !== null ? 'classic-pair' : hasCompanions ? 'classic-folder-only' : 'unrelated-directory',
+      planFile,
+      planDir: hasCompanions ? planDir : null,
+      files
+    });
+  }
+
+  const validation = await validateUltraPlanBundle(rootDir, planDirPath, {
+    indexEntry,
+    nonCanonicalIndexEntries,
+    phaseLikeEntries,
+    planDir
+  });
+  if (planFile !== null) {
+    return createPlanClassification({
+      id: normalizedId.planId,
+      shape: 'collision',
+      planFile,
+      planDir,
+      phaseFiles: validation.phaseFiles,
+      markerCount: validation.markerCount,
+      warnings: validation.warnings,
+      errors: [
+        {
+          code: 'classic-ultra-plan-collision',
+          message: `Classic plan file and ultra-like directory share plan id '${normalizedId.planId}'.`,
+          path: planDir
+        },
+        ...validation.errors
+      ]
+    });
+  }
+
+  return createPlanClassification({
+    id: normalizedId.planId,
+    shape: validation.ok ? 'ultra-valid' : 'ultra-invalid',
+    planDir,
+    phaseFiles: validation.phaseFiles,
+    markerCount: validation.markerCount,
+    warnings: validation.warnings,
+    errors: validation.errors
+  });
+}
+
+async function validateUltraPlanBundle(rootDir, planDirPath, context) {
+  const errors = [];
+  const warnings = [];
+  const phaseFiles = context.phaseLikeEntries
+    .map((entry) => toPosix(path.relative(rootDir, path.join(planDirPath, entry.name))))
+    .sort();
+  let markerCount = 0;
+
+  for (const entry of context.nonCanonicalIndexEntries ?? []) {
+    errors.push(planIntegrityDiagnostic(
+      'ultra-index-name-noncanonical',
+      'Ultra plan index file must use the exact lowercase name index.md.',
+      toPosix(path.relative(rootDir, path.join(planDirPath, entry.name)))
+    ));
+  }
+
+  if (context.indexEntry === undefined) {
+    if ((context.nonCanonicalIndexEntries ?? []).length === 0) {
+      errors.push(planIntegrityDiagnostic(
+        'ultra-index-missing',
+        'Ultra-like plan directory is missing direct index.md.',
+        context.planDir
+      ));
+    }
+    return { ok: false, phaseFiles, markerCount, warnings, errors };
+  }
+
+  const indexPath = path.join(planDirPath, context.indexEntry.name);
+  const relativeIndexPath = toPosix(path.relative(rootDir, indexPath));
+  if (!context.indexEntry.isFile()) {
+    errors.push(planIntegrityDiagnostic(
+      'ultra-index-not-file',
+      'Ultra plan index.md must be a direct regular file.',
+      relativeIndexPath
+    ));
+    return { ok: false, phaseFiles, markerCount, warnings, errors };
+  }
+
+  const indexContent = await readFile(indexPath, 'utf8');
+  const maskedIndex = maskMarkdownCode(indexContent);
+  markerCount = countActiveStandaloneMarker(indexContent, ULTRA_PLAN_MARKER);
+  const rawMarkerCount = countLiteral(indexContent, ULTRA_PLAN_MARKER);
+
+  if (markerCount === 0) {
+    errors.push(planIntegrityDiagnostic(
+      rawMarkerCount > 0 ? 'ultra-marker-code-only' : 'ultra-marker-missing',
+      rawMarkerCount > 0
+        ? 'Ultra plan marker appears only inside Markdown code.'
+        : 'Ultra plan index.md is missing its active standalone marker.',
+      relativeIndexPath
+    ));
+  } else if (markerCount > 1) {
+    errors.push(planIntegrityDiagnostic(
+      'ultra-marker-duplicate',
+      `Ultra plan index.md contains ${markerCount} active standalone markers; exactly one is required.`,
+      relativeIndexPath
+    ));
+  } else if (!hasValidUltraMarkerPosition(maskedIndex)) {
+    errors.push(planIntegrityDiagnostic(
+      'ultra-marker-position-invalid',
+      'Ultra plan marker must be the first line or immediately follow one Handoff annotation.',
+      relativeIndexPath
+    ));
+  }
+
+  const phaseIndex = extractMarkdownSection(maskedIndex, 'Phase Index');
+  if (phaseIndex.matches === 0) {
+    errors.push(planIntegrityDiagnostic(
+      'ultra-phase-index-missing',
+      'Ultra plan index.md is missing exact heading ## Phase Index.',
+      relativeIndexPath
+    ));
+  } else if (phaseIndex.matches > 1) {
+    errors.push(planIntegrityDiagnostic(
+      'ultra-phase-index-duplicate',
+      'Ultra plan index.md contains more than one ## Phase Index section.',
+      relativeIndexPath
+    ));
+  }
+
+  const linkedTargets = [];
+  if (phaseIndex.matches === 1) {
+    const nonEmptyLines = phaseIndex.content.split(/\r?\n/).filter((line) => line.trim().length > 0);
+    for (const line of nonEmptyLines) {
+      const links = [...line.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)];
+      if (links.length !== 1 || !/^\s*(?:[-*]|\d+\.)\s+/.test(line)) {
+        errors.push(planIntegrityDiagnostic(
+          'ultra-phase-index-malformed',
+          'Each non-empty Phase Index row must be one Markdown list item with one direct phase link.',
+          relativeIndexPath
+        ));
+        continue;
+      }
+
+      const target = links[0][1].trim();
+      if (!isSafeDirectPhaseLink(target)) {
+        errors.push(planIntegrityDiagnostic(
+          'ultra-phase-link-unsafe',
+          `Phase Index link must name one direct phase file: ${safeDiagnosticValue(target)}.`,
+          relativeIndexPath
+        ));
+        continue;
+      }
+
+      if (linkedTargets.includes(target)) {
+        errors.push(planIntegrityDiagnostic(
+          'ultra-phase-link-duplicate',
+          `Phase Index links the same phase more than once: ${target}.`,
+          relativeIndexPath
+        ));
+        continue;
+      }
+
+      linkedTargets.push(target);
+    }
+
+    if (linkedTargets.length === 0) {
+      errors.push(planIntegrityDiagnostic(
+        'ultra-phase-index-empty',
+        'Ultra plan Phase Index must link at least one direct phase file.',
+        relativeIndexPath
+      ));
+    }
+  }
+
+  const directPhaseNames = context.phaseLikeEntries.map((entry) => entry.name).sort();
+  const unexpectedEntries = (await readdir(planDirPath, { withFileTypes: true }))
+    .filter((entry) => entry.name.toLowerCase() !== 'index.md' && !ULTRA_PHASE_LIKE_PATTERN.test(entry.name));
+  for (const entry of unexpectedEntries) {
+    errors.push(planIntegrityDiagnostic(
+      'ultra-bundle-entry-unexpected',
+      'Ultra plan bundles may contain only index.md and direct phase-NN-<slug>.md files.',
+      toPosix(path.relative(rootDir, path.join(planDirPath, entry.name)))
+    ));
+  }
+
+  for (const entry of context.phaseLikeEntries) {
+    const relativePhasePath = toPosix(path.relative(rootDir, path.join(planDirPath, entry.name)));
+    if (!entry.isFile() || !ULTRA_PHASE_FILE_PATTERN.test(entry.name)) {
+      errors.push(planIntegrityDiagnostic(
+        'ultra-phase-file-invalid',
+        'Ultra phase must be a direct regular file named phase-NN-<slug>.md.',
+        relativePhasePath
+      ));
+    }
+  }
+
+  const linkedSet = new Set(linkedTargets);
+  for (const phaseName of directPhaseNames) {
+    if (!linkedSet.has(phaseName)) {
+      errors.push(planIntegrityDiagnostic(
+        'ultra-phase-file-orphan',
+        `Direct phase file is not linked from Phase Index: ${phaseName}.`,
+        toPosix(path.relative(rootDir, path.join(planDirPath, phaseName)))
+      ));
+    }
+  }
+
+  const directSet = new Set(directPhaseNames);
+  for (const target of linkedTargets) {
+    const phasePath = path.join(planDirPath, target);
+    if (!directSet.has(target) || !await isFile(phasePath)) {
+      errors.push(planIntegrityDiagnostic(
+        'ultra-phase-file-missing',
+        `Phase Index target is missing as a direct regular file: ${target}.`,
+        toPosix(path.relative(rootDir, phasePath))
+      ));
+    }
+  }
+
+  if (!hasSequentialPhaseOrder(linkedTargets)) {
+    errors.push(planIntegrityDiagnostic(
+      'ultra-phase-order-invalid',
+      'Phase Index links must use ordered contiguous phase numbers starting at 01.',
+      relativeIndexPath
+    ));
+  }
+
+  const indexTasks = collectIndexTaskIds(maskedIndex);
+  if (indexTasks.length === 0) {
+    errors.push(planIntegrityDiagnostic(
+      'ultra-index-tasks-missing',
+      'Ultra plan index.md must contain progress tasks identified as Task N.',
+      relativeIndexPath
+    ));
+  }
+  for (const duplicate of findDuplicates(indexTasks)) {
+    errors.push(planIntegrityDiagnostic(
+      'ultra-index-task-duplicate',
+      `Ultra plan index contains duplicate Task ${duplicate}.`,
+      relativeIndexPath
+    ));
+  }
+
+  const phaseTaskCounts = new Map();
+  for (const target of linkedTargets) {
+    const phasePath = path.join(planDirPath, target);
+    if (!await isFile(phasePath)) {
+      continue;
+    }
+
+    const phaseContent = maskMarkdownCode(await readFile(phasePath, 'utf8'));
+    const relativePhasePath = toPosix(path.relative(rootDir, phasePath));
+    if (/^\s*[-*]\s+\[[ xX]\]\s+/m.test(phaseContent)) {
+      errors.push(planIntegrityDiagnostic(
+        'ultra-phase-progress-checkbox',
+        'Ultra phase files must not contain task progress checkboxes; index.md is the sole progress ledger.',
+        relativePhasePath
+      ));
+    }
+
+    for (const taskId of collectPhaseTaskIds(phaseContent)) {
+      const occurrences = phaseTaskCounts.get(taskId) ?? [];
+      occurrences.push(relativePhasePath);
+      phaseTaskCounts.set(taskId, occurrences);
+    }
+  }
+
+  for (const taskId of new Set(indexTasks)) {
+    const occurrences = phaseTaskCounts.get(taskId) ?? [];
+    if (occurrences.length === 0) {
+      errors.push(planIntegrityDiagnostic(
+        'ultra-task-mapping-missing',
+        `Index Task ${taskId} has no matching phase heading ## Task ${taskId}:.`,
+        relativeIndexPath
+      ));
+    } else if (occurrences.length > 1) {
+      errors.push(planIntegrityDiagnostic(
+        'ultra-task-mapping-duplicate',
+        `Index Task ${taskId} maps to more than one phase heading.`,
+        occurrences[0]
+      ));
+    }
+  }
+
+  const indexTaskSet = new Set(indexTasks);
+  for (const [taskId, occurrences] of phaseTaskCounts) {
+    if (!indexTaskSet.has(taskId)) {
+      errors.push(planIntegrityDiagnostic(
+        'ultra-task-mapping-orphan',
+        `Phase heading Task ${taskId} has no matching index progress task.`,
+        occurrences[0]
+      ));
+    }
+  }
+
+  return {
+    ok: errors.length === 0,
+    phaseFiles,
+    markerCount,
+    warnings,
+    errors: dedupeDiagnostics(errors)
+  };
+}
+
+function createPlanClassification({
+  id,
+  shape,
+  planFile = null,
+  planDir = null,
+  files = {},
+  phaseFiles = [],
+  markerCount = 0,
+  warnings = [],
+  errors = []
+}) {
+  return {
+    ok: errors.length === 0,
+    id,
+    shape,
+    planFile,
+    planDir,
+    files,
+    phaseFiles,
+    markerCount,
+    warnings,
+    errors
+  };
+}
+
+async function discoverCompanionFiles(rootDir, planDirPath) {
+  const files = {};
+  for (const [key, fileName] of Object.entries(KNOWN_PLAN_FILES)) {
+    const filePath = path.join(planDirPath, fileName);
+    if (await isFile(filePath)) {
+      files[key] = toPosix(path.relative(rootDir, filePath));
+    }
+  }
+  return files;
+}
+
+function planIntegrityDiagnostic(code, message, diagnosticPath) {
+  return {
+    code,
+    message,
+    ...(diagnosticPath ? { path: diagnosticPath } : {})
+  };
+}
+
+function hasValidUltraMarkerPosition(content) {
+  const lines = String(content ?? '').split(/\r?\n/);
+  const markerIndex = lines.findIndex((line) => line.trim() === ULTRA_PLAN_MARKER);
+  if (markerIndex === 0) {
+    return true;
+  }
+
+  return markerIndex === 1
+    && /^<!-- handoff:task:[^>]+ -->$/.test(lines[0].trim());
+}
+
+function countLiteral(content, literal) {
+  return String(content ?? '').split(literal).length - 1;
+}
+
+function extractMarkdownSection(content, heading) {
+  const lines = String(content ?? '').split(/\r?\n/);
+  const indexes = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    if (lines[index].trim() === `## ${heading}`) {
+      indexes.push(index);
+    }
+  }
+
+  if (indexes.length !== 1) {
+    return { matches: indexes.length, content: '' };
+  }
+
+  const body = [];
+  for (let index = indexes[0] + 1; index < lines.length; index += 1) {
+    if (/^##\s+/.test(lines[index])) {
+      break;
+    }
+    body.push(lines[index]);
+  }
+
+  return { matches: 1, content: body.join('\n') };
+}
+
+function isSafeDirectPhaseLink(target) {
+  return target.length > 0
+    && !target.includes('\\')
+    && !target.includes('/')
+    && !target.includes('?')
+    && !target.includes('#')
+    && !target.includes('%')
+    && !/^[a-z][a-z0-9+.-]*:/i.test(target)
+    && ULTRA_PHASE_FILE_PATTERN.test(target);
+}
+
+function hasSequentialPhaseOrder(targets) {
+  if (targets.length === 0) {
+    return true;
+  }
+
+  return targets.every((target, index) => {
+    const match = target.match(ULTRA_PHASE_FILE_PATTERN);
+    return match !== null && Number.parseInt(match[1], 10) === index + 1;
+  });
+}
+
+function collectIndexTaskIds(content) {
+  const ids = [];
+  const pattern = /^\s*[-*]\s+\[[ xX]\]\s+(?:\*\*)?Task\s+(\d+)\s*:/gm;
+  for (const match of String(content ?? '').matchAll(pattern)) {
+    ids.push(Number.parseInt(match[1], 10));
+  }
+  return ids;
+}
+
+function collectPhaseTaskIds(content) {
+  const ids = [];
+  const pattern = /^## Task\s+(\d+)\s*:/gm;
+  for (const match of String(content ?? '').matchAll(pattern)) {
+    ids.push(Number.parseInt(match[1], 10));
+  }
+  return ids;
+}
+
+function findDuplicates(values) {
+  const seen = new Set();
+  const duplicates = new Set();
+  for (const value of values) {
+    if (seen.has(value)) {
+      duplicates.add(value);
+    }
+    seen.add(value);
+  }
+  return [...duplicates].sort((left, right) => left - right);
+}
+
+function safeDiagnosticValue(value) {
+  const normalized = String(value ?? '').replace(/[\r\n\t]/g, ' ').slice(0, 160);
+  return JSON.stringify(normalized);
 }
 
 export function mapLegacyPlanToOpenSpecArtifacts(legacyPlan, options = {}) {
@@ -309,7 +1094,7 @@ export async function migrateLegacyPlan(planId, options = {}) {
   const normalized = normalizeLegacyPlanId(planId);
   const dryRun = Boolean(options.dryRun);
   const onCollision = options.onCollision ?? 'fail';
-  const paths = getMigrationPathConfig(options);
+  let paths = getMigrationPathConfig(options);
 
   if (!normalized.ok) {
     return createMigrationFailure({
@@ -345,6 +1130,12 @@ export async function migrateLegacyPlan(planId, options = {}) {
     });
   }
 
+  const migrationOptions = {
+    ...options,
+    legacyPlanSourceRoot: discovery.legacyPlanSourceRoot
+  };
+  paths = getMigrationPathConfig(migrationOptions);
+
   const legacyPlan = discovery.plans.find((plan) => plan.id === normalized.planId);
   if (legacyPlan === undefined) {
     return createMigrationFailure({
@@ -360,7 +1151,50 @@ export async function migrateLegacyPlan(planId, options = {}) {
     });
   }
 
-  const collision = await resolveCollisionTarget(normalized.planId, { ...options, rootDir, onCollision });
+  if (legacyPlan.shape === 'ultra-valid') {
+    return {
+      ok: true,
+      outcome: 'skipped-ultra',
+      skipped: true,
+      dryRun,
+      planId: normalized.planId,
+      changeId: null,
+      shape: legacyPlan.shape,
+      targetChangePath: null,
+      operations: [],
+      validation: createValidationSummary('SKIPPED', false, null),
+      reportPath: null,
+      warnings: dedupeDiagnostics([
+        ...discovery.warnings,
+        ...(legacyPlan.warnings ?? []),
+        {
+          code: 'ultra-plan-not-migrated',
+          message: `Marked ultra plan remains upstream-owned: ${legacyPlan.planDir}.`,
+          path: legacyPlan.planDir
+        }
+      ]),
+      errors: []
+    };
+  }
+
+  if (legacyPlan.shape === 'ultra-invalid' || legacyPlan.shape === 'collision') {
+    return createMigrationFailure({
+      dryRun,
+      planId: normalized.planId,
+      changeId: null,
+      shape: legacyPlan.shape,
+      warnings: legacyPlan.warnings,
+      errors: legacyPlan.errors.length > 0
+        ? legacyPlan.errors
+        : [{
+            code: 'legacy-plan-shape-invalid',
+            message: `Legacy plan shape cannot be migrated: ${legacyPlan.shape}.`,
+            path: legacyPlan.planDir ?? legacyPlan.planFile
+          }]
+    });
+  }
+
+  const collision = await resolveCollisionTarget(normalized.planId, { ...migrationOptions, rootDir, onCollision });
   if (!collision.ok) {
     return createMigrationFailure({
       dryRun,
@@ -458,9 +1292,12 @@ export async function migrateLegacyPlan(planId, options = {}) {
 
   const baseResult = {
     ok: true,
+    outcome: 'migrated',
+    skipped: false,
     dryRun,
     planId: normalized.planId,
     changeId: collision.changeId,
+    shape: legacyPlan.shape,
     targetChangePath: toPosix(path.join(paths.changesDir, collision.changeId)),
     operations,
     validation: createValidationSummary('SKIPPED', false, null),
@@ -493,6 +1330,7 @@ export async function migrateLegacyPlan(planId, options = {}) {
   const result = {
     ...baseResult,
     ok: validation.status !== 'FAIL',
+    outcome: validation.status === 'FAIL' ? 'failed' : 'migrated',
     validation,
     errors: validation.status === 'FAIL'
       ? [
@@ -514,7 +1352,7 @@ export async function migrateLegacyPlan(planId, options = {}) {
     ],
     manualFollowUps: mapped.manualFollowUps
   }, {
-    ...options,
+    ...migrationOptions,
     rootDir,
     changeId: collision.changeId,
     reportPath
@@ -535,28 +1373,68 @@ export async function migrateAllLegacyPlans(options = {}) {
       ok: false,
       partial: false,
       dryRun: Boolean(options.dryRun),
+      preflightFailed: true,
       results: [],
       migrated: [],
+      wouldMigrate: [],
+      skipped: [],
       failed: [],
       warnings: discovery.warnings,
       errors: discovery.errors
     };
   }
 
-  const results = [];
+  const preflightResults = [];
   for (const plan of discovery.plans) {
-    results.push(await migrateLegacyPlan(plan.id, { ...options, rootDir }));
+    preflightResults.push(await migrateLegacyPlan(plan.id, {
+      ...options,
+      rootDir,
+      dryRun: true
+    }));
   }
 
-  const migrated = results.filter((result) => result.ok).map((result) => result.planId);
-  const failed = results.filter((result) => !result.ok).map((result) => result.planId);
+  const preflightFailed = preflightResults.some((result) => result.outcome === 'failed');
+  const dryRun = Boolean(options.dryRun);
+  let results = preflightResults;
+
+  if (!dryRun && !preflightFailed) {
+    results = [];
+    for (const result of preflightResults) {
+      if (result.outcome === 'skipped-ultra') {
+        results.push({ ...result, dryRun: false });
+        continue;
+      }
+
+      results.push(await migrateLegacyPlan(result.planId, {
+        ...options,
+        rootDir,
+        dryRun: false
+      }));
+    }
+  }
+
+  const migrated = preflightFailed && !dryRun
+    ? []
+    : results.filter((result) => result.outcome === 'migrated').map((result) => result.planId);
+  const wouldMigrate = preflightResults
+    .filter((result) => result.outcome === 'migrated')
+    .map((result) => result.planId);
+  const skipped = results
+    .filter((result) => result.outcome === 'skipped-ultra')
+    .map((result) => result.planId);
+  const failed = results
+    .filter((result) => result.outcome === 'failed')
+    .map((result) => result.planId);
 
   return {
     ok: failed.length === 0,
-    partial: migrated.length > 0 && failed.length > 0,
-    dryRun: Boolean(options.dryRun),
+    partial: !preflightFailed && migrated.length > 0 && failed.length > 0,
+    dryRun,
+    preflightFailed,
     results,
     migrated,
+    wouldMigrate,
+    skipped,
     failed,
     warnings: dedupeDiagnostics([
       ...discovery.warnings,
@@ -628,10 +1506,21 @@ export async function detectMigrationNeed(options = {}) {
   const changeExists = await pathExists(changePath);
   const discovery = await discoverLegacyPlans({ ...options, rootDir });
   const legacyPlan = discovery.plans.find((plan) => plan.id === normalized.planId) ?? null;
-  const migrationSuggested = !changeExists && legacyPlan !== null;
+  const classicShape = legacyPlan?.shape === 'classic-pair' || legacyPlan?.shape === 'classic-folder-only';
+  const migrationSuggested = !changeExists && classicShape;
+  const shapeErrors = legacyPlan?.shape === 'ultra-invalid' || legacyPlan?.shape === 'collision'
+    ? legacyPlan.errors
+    : [];
+  const ultraWarnings = legacyPlan?.shape === 'ultra-valid'
+    ? [{
+        code: 'ultra-plan-not-migrated',
+        message: `Marked ultra plan remains upstream-owned: ${legacyPlan.planDir}.`,
+        path: legacyPlan.planDir
+      }]
+    : [];
 
   return {
-    ok: discovery.ok,
+    ok: discovery.ok && shapeErrors.length === 0,
     migrationSuggested,
     changeId: normalized.planId,
     changeExists,
@@ -642,8 +1531,8 @@ export async function detectMigrationNeed(options = {}) {
           `ai-factory aifhub-migrate-legacy-plans ${normalized.planId}`
         ]
       : [],
-    warnings: discovery.warnings,
-    errors: discovery.errors
+    warnings: dedupeDiagnostics([...discovery.warnings, ...ultraWarnings]),
+    errors: [...discovery.errors, ...shapeErrors]
   };
 }
 
@@ -767,12 +1656,15 @@ function createRunOptions(options) {
   };
 }
 
-function createMigrationFailure({ dryRun, planId, changeId, targetChangePath = null, operations = [], warnings = [], errors = [] }) {
+function createMigrationFailure({ dryRun, planId, changeId, shape = null, targetChangePath = null, operations = [], warnings = [], errors = [] }) {
   return {
     ok: false,
+    outcome: 'failed',
+    skipped: false,
     dryRun,
     planId,
     changeId,
+    shape,
     targetChangePath,
     operations,
     validation: createValidationSummary('SKIPPED', false, null),
@@ -799,7 +1691,7 @@ function ensureDiscoveredPlan(plansById, id, rootDir, changesRoot) {
 
 function getMigrationPathConfig(options = {}) {
   return {
-    plansDir: options.plansDir ?? DEFAULT_PLANS_DIR,
+    plansDir: options.legacyPlanSourceRoot ?? options.plansDir ?? DEFAULT_PLANS_DIR,
     changesDir: options.changesDir ?? DEFAULT_CHANGES_DIR,
     stateDir: options.stateDir ?? DEFAULT_STATE_DIR,
     qaDir: options.qaDir ?? DEFAULT_QA_DIR
@@ -1230,6 +2122,42 @@ function resolveRootDir(options = {}) {
 
 function resolveFromRoot(rootDir, value) {
   return path.resolve(rootDir, value);
+}
+
+function pathsOverlap(left, right) {
+  const normalizedLeft = path.resolve(String(left));
+  const normalizedRight = path.resolve(String(right));
+  return isWithinDirectory(normalizedLeft, normalizedRight)
+    || isWithinDirectory(normalizedRight, normalizedLeft);
+}
+
+async function realpathIfPresent(targetPath) {
+  try {
+    return await realpath(targetPath);
+  } catch {
+    return path.resolve(targetPath);
+  }
+}
+
+async function relativeFileIfPresent(rootDir, targetPath) {
+  return await isFile(targetPath)
+    ? toPosix(path.relative(rootDir, targetPath))
+    : null;
+}
+
+function invalidLegacyPlanSourceState(relativeStatePath, reason) {
+  return {
+    ok: false,
+    exists: true,
+    path: relativeStatePath,
+    legacyPlanSourceRoot: null,
+    warnings: [],
+    errors: [{
+      code: 'legacy-plan-source-state-invalid',
+      message: `Legacy plan source state is invalid (${reason}): ${relativeStatePath}.`,
+      path: relativeStatePath
+    }]
+  };
 }
 
 function toPosix(value) {

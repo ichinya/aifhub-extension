@@ -2,6 +2,7 @@
 import { access, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 
 import {
   normalizeChangeId,
@@ -22,7 +23,9 @@ import {
 } from './openspec-execution-context.mjs';
 import {
   discoverLegacyPlans,
-  migrateAllLegacyPlans
+  migrateAllLegacyPlans,
+  resolveLegacyPlanSourceRoot,
+  writeLegacyPlanSourceState
 } from './legacy-plan-migration.mjs';
 import {
   getLatestGateResult
@@ -34,6 +37,9 @@ import {
   readOpenSpecCoverageMatrix,
   summarizeOpenSpecCoverage
 } from './openspec-coverage-matrix.mjs';
+import {
+  readOpenSpecSkipSpecsMarker
+} from './openspec-change-metadata.mjs';
 import {
   readOpenSpecRulesGateEvidence,
   resolveOpenSpecPolicy,
@@ -88,6 +94,10 @@ const DEFAULT_AI_FACTORY_PATHS = {
   specs: '.ai-factory/specs',
   rules: '.ai-factory/rules'
 };
+const OPEN_SPEC_ONLY_PATH_KEYS = new Set(
+  Object.keys(DEFAULT_OPEN_SPEC_PATHS)
+    .filter((key) => !Object.hasOwn(DEFAULT_AI_FACTORY_PATHS, key))
+);
 const DEFAULT_CONTEXT_PATHS = {
   description: '.ai-factory/DESCRIPTION.md',
   architecture: '.ai-factory/ARCHITECTURE.md',
@@ -105,7 +115,7 @@ export async function getModeStatus(options = {}) {
   const mode = resolveMode(config);
   const detection = await detectOpenSpecCapability(rootDir, options);
   const openSpecChanges = await listOpenSpecChanges({ rootDir });
-  const legacy = await discoverLegacyPlans({ rootDir });
+  const legacy = await discoverLegacyPlansForMode(config, mode, { ...options, rootDir });
   const activeChange = await inspectActiveChange({
     ...options,
     rootDir,
@@ -130,6 +140,8 @@ export async function getModeStatus(options = {}) {
     configExists: config.exists,
     openspecCli: summarizeOpenSpecDetection(detection),
     openSpecChanges,
+    legacyPlanSourceRoot: legacy.legacyPlanSourceRoot ?? null,
+    legacyPlanSource: legacy.legacyPlanSource ?? null,
     legacyPlans: legacy.ok ? legacy.plans : [],
     legacyPlanErrors: legacy.errors ?? [],
     generatedRules,
@@ -148,17 +160,47 @@ export async function getModeStatus(options = {}) {
 export async function switchToOpenSpecMode(options = {}) {
   const rootDir = resolveRootDir(options);
   const dryRun = Boolean(options.dryRun);
+  const preSwitchConfig = await readProjectConfig(rootDir);
+  const preSwitchMode = resolveMode(preSwitchConfig);
+  const capturedSource = await resolveLegacyPlanSourceRoot({
+    ...options,
+    rootDir,
+    legacyPlanSourceRoot: options.legacyPlanSourceRoot
+      ?? (preSwitchMode === MODES.openspec ? undefined : preSwitchConfig.paths.plans),
+    useRecordedLegacyPlanSource: preSwitchMode === MODES.openspec
+  });
+  const legacy = capturedSource.ok
+    ? await discoverLegacyPlans({
+        ...options,
+        rootDir,
+        legacyPlanSourceRoot: capturedSource.legacyPlanSourceRoot
+      })
+    : createLegacyDiscoveryFailure(capturedSource);
+
+  if (!legacy.ok) {
+    return createOpenSpecSwitchPreflightFailure({ dryRun, preSwitchConfig, legacy });
+  }
+
   const config = await writeModeConfig(MODES.openspec, { ...options, rootDir });
   const skeleton = await ensureOpenSpecSkeleton({ ...options, rootDir });
-  const legacy = await discoverLegacyPlans({ rootDir });
   const migration = await maybeMigrateLegacyPlans({
     ...options,
     rootDir,
+    legacyPlanSourceRoot: capturedSource.legacyPlanSourceRoot,
     legacyPlans: legacy.ok ? legacy.plans : []
+  });
+  const legacyPlanSourceState = await maybePersistLegacyPlanSource({
+    ...options,
+    rootDir,
+    dryRun,
+    legacyPlanSourceRoot: capturedSource.legacyPlanSourceRoot,
+    legacyPlans: legacy.plans,
+    migration
   });
   const sync = await syncOpenSpecArtifacts({
     ...options,
     rootDir,
+    legacyPlanSourceRoot: capturedSource.legacyPlanSourceRoot,
     all: options.all || options.changeId === undefined,
     writeReport: false
   });
@@ -177,12 +219,15 @@ export async function switchToOpenSpecMode(options = {}) {
   });
 
   return {
-    ok: config.ok && skeleton.ok && migration.ok && sync.ok,
+    ok: config.ok && skeleton.ok && migration.ok && legacyPlanSourceState.ok && sync.ok,
     dryRun,
     mode: MODES.openspec,
     config,
     skeleton,
     legacy,
+    legacyPlanSourceRoot: capturedSource.legacyPlanSourceRoot,
+    legacyPlanSource: capturedSource,
+    legacyPlanSourceState,
     migration,
     sync,
     report,
@@ -191,6 +236,7 @@ export async function switchToOpenSpecMode(options = {}) {
       ...skeleton.warnings,
       ...(legacy.warnings ?? []),
       ...migration.warnings,
+      ...legacyPlanSourceState.warnings,
       ...sync.warnings
     ]),
     errors: [
@@ -198,6 +244,7 @@ export async function switchToOpenSpecMode(options = {}) {
       ...skeleton.errors,
       ...(legacy.errors ?? []),
       ...migration.errors,
+      ...legacyPlanSourceState.errors,
       ...sync.errors
     ]
   };
@@ -295,7 +342,11 @@ export async function syncOpenSpecArtifacts(options = {}) {
       skipNoDeltaChanges: Boolean(options.all)
     })
     : createSkippedValidationSync('validateOnSync-disabled');
-  const legacy = await discoverLegacyPlans({ rootDir });
+  const legacy = await discoverLegacyPlans({
+    ...options,
+    rootDir,
+    legacyPlanSourceRoot: options.legacyPlanSourceRoot
+  });
   const pointer = await maybeUpdateCurrentPointer({
     ...options,
     rootDir,
@@ -600,11 +651,42 @@ function getOpenSpecSettings(config) {
   return resolveOpenSpecPolicy(config ?? { aifhub: { openspec: DEFAULT_OPENSPEC_SETTINGS } });
 }
 
+export async function readAnalyzeSkillVersion(options = {}) {
+  const skillUrl = options.analyzeSkillUrl ?? new URL('../skills/aif-analyze/SKILL.md', import.meta.url);
+  try {
+    const raw = await readFile(fileURLToPath(skillUrl), 'utf8');
+    const frontmatter = raw.split(/^---\s*$/m)[1] ?? '';
+    const match = frontmatter.match(/^version:\s*(\S+)\s*$/m);
+    if (!match) {
+      return {
+        ok: false,
+        version: null,
+        error: {
+          code: 'analyze-skill-version-missing',
+          message: 'skills/aif-analyze/SKILL.md frontmatter has no version key.'
+        }
+      };
+    }
+    return { ok: true, version: match[1], error: null };
+  } catch (err) {
+    return {
+      ok: false,
+      version: null,
+      error: {
+        code: 'analyze-skill-unreadable',
+        message: `Could not read skills/aif-analyze/SKILL.md: ${err?.code ?? err?.message ?? 'unknown error'}`
+      }
+    };
+  }
+}
+
 export async function writeModeConfig(mode, options = {}) {
   const rootDir = resolveRootDir(options);
   const dryRun = Boolean(options.dryRun);
   const config = await readProjectConfig(rootDir);
-  const content = renderConfigForMode(config.raw, mode);
+  const skill = await readAnalyzeSkillVersion(options.analyzeSkillUrl ? { analyzeSkillUrl: options.analyzeSkillUrl } : {});
+  const content = renderConfigForMode(config.raw, mode, skill.ok ? { analyzeSkillVersion: skill.version } : {});
+  const configKeys = summarizeConfigKeyOwnership(config.raw, content);
   const target = path.join(rootDir, DEFAULT_CONFIG_PATH);
   const operation = {
     action: config.exists ? 'update' : 'create',
@@ -621,16 +703,17 @@ export async function writeModeConfig(mode, options = {}) {
     dryRun,
     mode,
     operations: [operation],
-    warnings: [],
+    configKeys,
+    warnings: skill.ok ? [] : [skill.error],
     errors: []
   };
 }
 
-export function renderConfigForMode(existingRaw, mode) {
+export function renderConfigForMode(existingRaw, mode, options = {}) {
   const parsed = parseSimpleYaml(existingRaw);
   const paths = parsed.paths ?? {};
   const blocks = parseTopLevelBlocks(existingRaw);
-  const used = new Set(['config_version', 'language', 'aifhub', 'paths', 'utilities']);
+  const used = new Set(['config_version', 'language', 'aifhub', 'paths', 'utilities', 'analyze']);
   const rendered = [];
 
   rendered.push(renderScalarOrDefault(blocks, 'config_version', 'config_version: 1'));
@@ -640,9 +723,14 @@ export function renderConfigForMode(existingRaw, mode) {
     '  artifacts: en',
     '  technical_terms: keep'
   ].join('\n')));
-  rendered.push(renderAifhubBlock(mode));
+  rendered.push(renderAifhubBlock(mode, blocks));
   rendered.push(renderPathsBlock(mode, paths));
   rendered.push(renderUtilitiesBlock(blocks));
+
+  const analyzeBlock = renderAnalyzeBlock(blocks, options.analyzeSkillVersion);
+  if (analyzeBlock !== null) {
+    rendered.push(analyzeBlock);
+  }
 
   for (const block of blocks) {
     if (!used.has(block.key)) {
@@ -816,6 +904,7 @@ async function syncGeneratedRules(options = {}) {
       dryRun,
       baseOnly: true,
       changeSpecificSkipped: true,
+      openspecCli: result.openspecCli ?? null,
       results: [result],
       files: result.files ?? [],
       warnings: dedupeDiagnostics([
@@ -836,6 +925,7 @@ async function syncGeneratedRules(options = {}) {
   return {
     ok: results.every((result) => result.ok),
     dryRun,
+    openspecCli: results.find((result) => result.openspecCli !== null)?.openspecCli ?? null,
     results,
     files: results.flatMap((result) => result.files ?? []),
     warnings: dedupeDiagnostics(results.flatMap((result) => result.warnings ?? [])),
@@ -975,10 +1065,17 @@ async function selectValidatableChanges(rootDir, changeIds) {
   const skippedChanges = [];
 
   for (const changeId of changeIds) {
-    const specRoot = path.join(rootDir, 'openspec', 'changes', changeId, 'specs');
+    const changeDir = path.join(rootDir, 'openspec', 'changes', changeId);
+    const specRoot = path.join(changeDir, 'specs');
     const specFiles = await listSpecFiles(specRoot, rootDir);
 
     if (specFiles.length === 0) {
+      const skipSpecs = await readOpenSpecSkipSpecsMarker(changeDir);
+      if (skipSpecs.declared || !skipSpecs.valid) {
+        validatable.push(changeId);
+        continue;
+      }
+
       skippedChanges.push({
         changeId,
         reason: 'no-delta-specs'
@@ -1243,6 +1340,90 @@ function renderCompatibilityContext({ changeId, proposal, design, specs }) {
   ].join('\n');
 }
 
+async function discoverLegacyPlansForMode(config, mode, options = {}) {
+  const explicitRoot = options.legacyPlanSourceRoot
+    ?? (mode === MODES.aiFactory ? config.paths.plans ?? DEFAULT_AI_FACTORY_PATHS.plans : undefined);
+
+  return discoverLegacyPlans({
+    ...options,
+    rootDir: resolveRootDir(options),
+    legacyPlanSourceRoot: explicitRoot,
+    useRecordedLegacyPlanSource: mode === MODES.openspec
+  });
+}
+
+function createLegacyDiscoveryFailure(source) {
+  return {
+    ok: false,
+    legacyPlanSourceRoot: null,
+    legacyPlanSource: source,
+    plans: [],
+    ignored: [],
+    warnings: source.warnings ?? [],
+    errors: source.errors ?? []
+  };
+}
+
+function createOpenSpecSwitchPreflightFailure({ dryRun, preSwitchConfig, legacy }) {
+  const skipped = createSkippedResult('legacy plan source preflight failed');
+  return {
+    ok: false,
+    dryRun,
+    mode: MODES.openspec,
+    config: skipped,
+    skeleton: skipped,
+    legacy,
+    legacyPlanSourceRoot: null,
+    legacyPlanSource: legacy.legacyPlanSource,
+    legacyPlanSourceState: skipped,
+    migration: skipped,
+    sync: skipped,
+    report: skipped,
+    previousConfig: {
+      exists: preSwitchConfig.exists,
+      marker: preSwitchConfig.marker
+    },
+    warnings: legacy.warnings ?? [],
+    errors: legacy.errors ?? []
+  };
+}
+
+async function maybePersistLegacyPlanSource(options = {}) {
+  const plans = options.legacyPlans ?? [];
+  if (plans.length === 0) {
+    return createSkippedResult('no unresolved legacy plan source');
+  }
+
+  if (options.dryRun) {
+    return writeLegacyPlanSourceState(options.legacyPlanSourceRoot, {
+      ...options,
+      dryRun: true,
+      reason: 'mode-switch-dry-run'
+    });
+  }
+
+  const migrationResult = options.migration?.result;
+  const migrationIncomplete = Boolean(
+    options.migration?.skipped
+    || !options.migration?.ok
+    || migrationResult?.preflightFailed
+    || (migrationResult?.failed?.length ?? 0) > 0
+    || (migrationResult?.skipped?.length ?? 0) > 0
+  );
+  if (!migrationIncomplete) {
+    return createSkippedResult('legacy migration completed');
+  }
+
+  const reason = options.migration?.skipped
+    ? 'migration-declined'
+    : 'migration-incomplete';
+  return writeLegacyPlanSourceState(options.legacyPlanSourceRoot, {
+    ...options,
+    dryRun: false,
+    reason
+  });
+}
+
 async function maybeMigrateLegacyPlans(options = {}) {
   const dryRun = Boolean(options.dryRun);
   const plans = options.legacyPlans ?? [];
@@ -1251,9 +1432,13 @@ async function maybeMigrateLegacyPlans(options = {}) {
     return createSkippedResult('no legacy plans detected');
   }
 
+  const sourceFlag = options.legacyPlanSourceRoot
+    && options.legacyPlanSourceRoot !== DEFAULT_AI_FACTORY_PATHS.plans
+    ? ` --legacy-source ${options.legacyPlanSourceRoot}`
+    : '';
   const commands = [
-    'ai-factory aifhub-migrate-legacy-plans --all --dry-run',
-    'ai-factory aifhub-migrate-legacy-plans --all'
+    `ai-factory aifhub-migrate-legacy-plans --all${sourceFlag} --dry-run`,
+    `ai-factory aifhub-migrate-legacy-plans --all${sourceFlag}`
   ];
 
   if (!options.yes) {
@@ -1275,6 +1460,7 @@ async function maybeMigrateLegacyPlans(options = {}) {
   const result = await migrateAllLegacyPlans({
     ...options,
     rootDir: resolveRootDir(options),
+    legacyPlanSourceRoot: options.legacyPlanSourceRoot,
     dryRun
   });
 
@@ -1572,7 +1758,7 @@ function resolveMode(config) {
   return MODES.unknown;
 }
 
-function parseSimpleYaml(raw) {
+export function parseSimpleYaml(raw) {
   const root = {};
   const stack = [{ indent: -1, value: root }];
 
@@ -1625,7 +1811,7 @@ function parseScalar(value) {
   return trimmed.replace(/^["']|["']$/g, '');
 }
 
-function parseTopLevelBlocks(raw) {
+export function parseTopLevelBlocks(raw) {
   const lines = String(raw ?? '').replace(/\r\n/g, '\n').split('\n');
   const starts = [];
 
@@ -1645,8 +1831,83 @@ function parseTopLevelBlocks(raw) {
   });
 }
 
+function parseIndentedBlocks(raw, indent) {
+  const lines = String(raw ?? '').replace(/\r\n/g, '\n').split('\n');
+  const starts = [];
+  const prefix = ' '.repeat(indent);
+  const pattern = new RegExp(`^${prefix}([A-Za-z0-9_-]+):`);
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = lines[index].match(pattern);
+    if (match) starts.push({ key: match[1], index });
+  }
+
+  return starts.map((start, index) => {
+    const end = starts[index + 1]?.index ?? lines.length;
+    return {
+      key: start.key,
+      text: lines.slice(start.index, end).join('\n').trimEnd()
+    };
+  });
+}
+
+function summarizeConfigKeyOwnership(beforeRaw, afterRaw) {
+  const before = flattenConfigKeyPaths(parseSimpleYaml(beforeRaw));
+  const after = flattenConfigKeyPaths(parseSimpleYaml(afterRaw));
+  const changed = new Set();
+  const preserved = [];
+
+  for (const [keyPath, value] of after) {
+    if (!before.has(keyPath) || before.get(keyPath) !== value) changed.add(keyPath);
+    else preserved.push(keyPath);
+  }
+  for (const keyPath of before.keys()) {
+    if (!after.has(keyPath)) changed.add(keyPath);
+  }
+
+  const changedKeyPaths = [...changed].sort((left, right) => left.localeCompare(right));
+  const preservedKeyPaths = preserved.sort((left, right) => left.localeCompare(right));
+  const limit = 200;
+  return {
+    changedKeyCount: changedKeyPaths.length,
+    preservedKeyCount: preservedKeyPaths.length,
+    changedKeyPaths: changedKeyPaths.slice(0, limit),
+    preservedKeyPaths: preservedKeyPaths.slice(0, limit),
+    truncated: changedKeyPaths.length > limit || preservedKeyPaths.length > limit
+  };
+}
+
+export function flattenConfigKeyPaths(value, prefix = '', output = new Map()) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    if (prefix !== '') output.set(prefix, JSON.stringify(value));
+    return output;
+  }
+
+  const entries = Object.entries(value);
+  if (entries.length === 0 && prefix !== '') output.set(prefix, '{}');
+  for (const [key, child] of entries) {
+    const keyPath = prefix === '' ? key : `${prefix}.${key}`;
+    flattenConfigKeyPaths(child, keyPath, output);
+  }
+  return output;
+}
+
 function renderScalarOrDefault(blocks, key, fallback) {
   return blocks.find((block) => block.key === key)?.text.trimEnd() || fallback;
+}
+
+function renderAnalyzeBlock(blocks, skillVersion) {
+  const existing = blocks.find((block) => block.key === 'analyze')?.text.trimEnd();
+  if (existing) {
+    if (/^\s*skill_version:/m.test(existing) || skillVersion === undefined) {
+      return existing;
+    }
+    return `${existing}\n  skill_version: ${skillVersion}`;
+  }
+  if (skillVersion === undefined) {
+    return null;
+  }
+  return `analyze:\n  skill_version: ${skillVersion}`;
 }
 
 function renderBlockOrDefault(blocks, key, fallback) {
@@ -1735,47 +1996,99 @@ function hasTopLevelScalarValue(blockText, key) {
   return value.length > 0;
 }
 
-function renderAifhubBlock(mode) {
+function renderAifhubBlock(mode, blocks) {
+  const existing = blocks.find((block) => block.key === 'aifhub')?.text.trimEnd() ?? '';
+  const children = parseIndentedBlocks(existing, 2);
+  const rendered = [
+    'aifhub:',
+    `  artifactProtocol: ${mode}`
+  ];
+  const existingOpenSpec = children.find((block) => block.key === 'openspec')?.text ?? '';
+
   if (mode === MODES.openspec) {
-    return [
-      'aifhub:',
-      '  artifactProtocol: openspec',
-      '  openspec:',
-      '    root: openspec',
-      '    installSkills: false',
-      '    validateOnPlan: true',
-      '    validateOnImprove: true',
-      '    validateOnVerify: true',
-      '    statusOnVerify: true',
-      '    archiveOnDone: true',
-      '    useInstructionsApply: true',
-      '    compileRulesOnSync: true',
-      '    validateOnSync: true',
-      '    requireCliForPlan: false',
-      '    requireCliForImprove: false',
-      '    requireCliForVerify: false',
-      '    requireCliForDone: true',
-      '',
-      '    requireGeneratedRulesForVerify: false',
-      '    requireGeneratedRulesForDone: true',
-      '',
-      '    requireRulesPassForVerify: false',
-      '    requireRulesPassForDone: true',
-      '',
-      '    requireSpecCoverageForVerify: false',
-      '    requireSpecCoverageForDone: true',
-      '',
-      '    allowWarnOnDone:',
-      '      rules: false',
-      '      coverage: false',
-      '      openspecStatus: true'
-    ].join('\n');
+    rendered.push(renderOpenSpecProfileBlock(existingOpenSpec));
+  } else if (existingOpenSpec !== '') {
+    const dormantOpenSpec = renderDormantOpenSpecProfileBlock(existingOpenSpec);
+    if (dormantOpenSpec !== '') rendered.push(dormantOpenSpec);
   }
 
-  return [
-    'aifhub:',
-    '  artifactProtocol: ai-factory'
-  ].join('\n');
+  for (const child of children) {
+    if (child.key === 'artifactProtocol' || child.key === 'openspec') continue;
+    rendered.push(child.text.trimEnd());
+  }
+
+  return rendered.join('\n');
+}
+
+function renderOpenSpecProfileBlock(existing) {
+  const children = parseIndentedBlocks(existing, 4);
+  const knownKeys = new Set(Object.keys(DEFAULT_OPENSPEC_SETTINGS));
+  const rendered = ['  openspec:'];
+
+  for (const [key, value] of Object.entries(DEFAULT_OPENSPEC_SETTINGS)) {
+    if (key === 'allowWarnOnDone') continue;
+    rendered.push(`    ${key}: ${renderYamlScalar(value)}`);
+  }
+
+  const existingAllowWarn = children.find((block) => block.key === 'allowWarnOnDone')?.text ?? '';
+  rendered.push(renderAllowWarnOnDoneBlock(existingAllowWarn));
+
+  for (const child of children) {
+    if (knownKeys.has(child.key)) continue;
+    rendered.push(child.text.trimEnd());
+  }
+
+  return rendered.join('\n');
+}
+
+function renderDormantOpenSpecProfileBlock(existing) {
+  const children = parseIndentedBlocks(existing, 4);
+  const knownKeys = new Set(Object.keys(DEFAULT_OPENSPEC_SETTINGS));
+  const rendered = [];
+
+  for (const child of children) {
+    if (child.key === 'allowWarnOnDone') {
+      const dormantAllowWarn = renderDormantAllowWarnOnDoneBlock(child.text);
+      if (dormantAllowWarn !== '') rendered.push(dormantAllowWarn);
+      continue;
+    }
+    if (knownKeys.has(child.key)) continue;
+    rendered.push(child.text.trimEnd());
+  }
+
+  return rendered.length === 0 ? '' : ['  openspec:', ...rendered].join('\n');
+}
+
+function renderDormantAllowWarnOnDoneBlock(existing) {
+  const children = parseIndentedBlocks(existing, 6);
+  const knownKeys = new Set(Object.keys(DEFAULT_OPENSPEC_SETTINGS.allowWarnOnDone));
+  const unknownChildren = children
+    .filter((child) => !knownKeys.has(child.key))
+    .map((child) => child.text.trimEnd());
+
+  return unknownChildren.length === 0
+    ? ''
+    : ['    allowWarnOnDone:', ...unknownChildren].join('\n');
+}
+
+function renderAllowWarnOnDoneBlock(existing) {
+  const children = parseIndentedBlocks(existing, 6);
+  const settings = DEFAULT_OPENSPEC_SETTINGS.allowWarnOnDone;
+  const rendered = ['    allowWarnOnDone:'];
+
+  for (const [key, value] of Object.entries(settings)) {
+    rendered.push(`      ${key}: ${renderYamlScalar(value)}`);
+  }
+  for (const child of children) {
+    if (Object.hasOwn(settings, child.key)) continue;
+    rendered.push(child.text.trimEnd());
+  }
+  return rendered.join('\n');
+}
+
+function renderYamlScalar(value) {
+  if (typeof value === 'boolean' || typeof value === 'number') return String(value);
+  return String(value);
 }
 
 function renderPathsBlock(mode, existingPaths) {
@@ -1793,6 +2106,7 @@ function renderPathsBlock(mode, existingPaths) {
     : ['description', 'architecture', 'context', 'roadmap', 'research', 'plans', 'specs', 'rules'];
   const extraKeys = Object.keys(merged)
     .filter((key) => !keys.includes(key))
+    .filter((key) => mode !== MODES.aiFactory || !OPEN_SPEC_ONLY_PATH_KEYS.has(key))
     .sort((left, right) => left.localeCompare(right));
 
   return [
@@ -1839,6 +2153,10 @@ function summarizeOpenSpecDetection(detection) {
     nodeVersion: detection?.nodeVersion ?? null,
     nodeSupported: detection?.nodeSupported ?? null,
     versionSupported: detection?.versionSupported ?? null,
+    latestReviewedVersion: detection?.latestReviewedVersion ?? null,
+    versionOutdated: detection?.versionOutdated ?? null,
+    command: detection?.command ?? null,
+    commandSource: detection?.commandSource ?? null,
     reason: detection?.reason ?? null,
     errors: detection?.errors ?? []
   };
@@ -1867,7 +2185,11 @@ function createRunOptions(rootDir, options = {}) {
     command: options.command,
     env: options.env,
     executor: options.executor,
-    nodeVersion: options.nodeVersion
+    nodeVersion: options.nodeVersion,
+    platform: options.platform,
+    candidateExists: options.candidateExists,
+    execFile: options.execFile,
+    comSpec: options.comSpec
   };
 }
 
@@ -1909,10 +2231,23 @@ function assertSafeCompatibilityTarget(rootDir, changeId, relativePath) {
 }
 
 function renderConfigSection(config) {
+  const keys = config.configKeys ?? {
+    changedKeyCount: 0,
+    preservedKeyCount: 0,
+    changedKeyPaths: [],
+    preservedKeyPaths: [],
+    truncated: false
+  };
   return [
     '## Config',
     '',
-    ...renderOperations(config.operations)
+    ...renderOperations(config.operations),
+    '',
+    `Changed key paths: ${keys.changedKeyCount}`,
+    ...keys.changedKeyPaths.map((keyPath) => `- changed: ${keyPath}`),
+    `Preserved key paths: ${keys.preservedKeyCount}`,
+    ...keys.preservedKeyPaths.map((keyPath) => `- preserved: ${keyPath}`),
+    ...(keys.truncated ? ['- config key path inventory truncated'] : [])
   ].join('\n');
 }
 
@@ -1942,6 +2277,7 @@ function renderSyncSection(sync) {
     '',
     `Generated rules files: ${sync.generatedRules?.files?.length ?? 0}`,
     `Validation skipped: ${sync.validation?.skipped ? 'yes' : 'no'}`,
+    ...renderOpenSpecCommand(sync.generatedRules?.openspecCli ?? sync.validation?.detection),
     ...renderDiagnostics('Warnings', sync.warnings ?? []),
     ...renderDiagnostics('Errors', sync.errors ?? [])
   ].join('\n');
@@ -1975,6 +2311,7 @@ function renderGeneratedRulesSection(generatedRules) {
     `Files: ${generatedRules.files.length}`,
     `Base-only sync: ${generatedRules.baseOnly ? 'yes' : 'no'}`,
     `Change-specific rules skipped: ${generatedRules.changeSpecificSkipped ? 'yes' : 'no'}`,
+    ...renderOpenSpecCommand(generatedRules.openspecCli),
     ...renderDiagnostics('Warnings', generatedRules.warnings),
     ...renderDiagnostics('Errors', generatedRules.errors)
   ].join('\n');
@@ -1987,9 +2324,21 @@ function renderValidationSection(validation) {
     `Skipped: ${validation.skipped ? 'yes' : 'no'}`,
     `Results: ${validation.results.length}`,
     `Skipped changes: ${validation.skippedChanges?.length ?? 0}`,
+    ...renderOpenSpecCommand(validation.detection),
     ...renderDiagnostics('Warnings', validation.warnings),
     ...renderDiagnostics('Errors', validation.errors)
   ].join('\n');
+}
+
+function renderOpenSpecCommand(detection) {
+  if (detection?.command === null || detection?.command === undefined) {
+    return [];
+  }
+
+  return [
+    `OpenSpec command: ${detection.command}`,
+    `OpenSpec command source: ${detection.commandSource ?? 'unknown'}`
+  ];
 }
 
 function renderLegacyDetectionSection(legacy) {
@@ -2163,6 +2512,7 @@ function createSkippedGeneratedRulesSync(dryRun, reason) {
     dryRun,
     skipped: true,
     reason,
+    openspecCli: null,
     results: [],
     files: [],
     warnings: [

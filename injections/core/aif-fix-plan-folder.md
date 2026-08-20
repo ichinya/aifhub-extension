@@ -25,9 +25,20 @@ Before resolving fix findings, read `.ai-factory/config.yaml` when it exists.
 - Otherwise, use **Legacy AI Factory-only mode**.
 - If the config is missing, continue with Legacy AI Factory-only mode and state that no OpenSpec-native protocol was detected.
 
+### Legacy ultra marker-first boundary
+
+In Legacy AI Factory-only mode, classify the normalized project-relative plan entrypoint with `classifyLegacyPlanShape()` from `scripts/legacy-plan-migration.mjs` before companion discovery, verification-source selection, fix-plan creation, or any `status.yaml`/`fixes/*.md` write. Marker validation is first; known companion filenames are considered only after the classifier returns a classic shape.
+
+- For `ultra-valid`, stop all AIFHub companion logic and return the exact upstream handoff `/aif-fix <entrypoint>`. Do not create or synchronize a sibling `<plan-id>.md`, `task.md`, `context.md`, `rules.md`, `verify.md`, `status.yaml`, `explore.md`, or AIFHub fix artifact; upstream owns the complete marked bundle atomically.
+- For `ultra-invalid` or `collision`, fail closed before any write and report only bounded `shape`, safe `entrypoint`, and classifier `code` values.
+- For `classic-pair` or `classic-folder-only`, continue with the classic companion rules below. An unrelated directory is not a plan.
+- Diagnostics may include only `shape`, safe project-relative `entrypoint`, and `handoff`; never include marker bodies, phase contents, request/research bodies, credentials, raw stdout, or raw stderr.
+
 ### OpenSpec-native mode
 
 When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, `/aif-fix` applies selected QA findings for the active OpenSpec change.
+
+For plan content, read only the canonical OpenSpec artifacts listed below. Do not inspect or mutate `.ai-factory/plans/**` after an OpenSpec change resolves.
 
 Use `buildFixContext(options)` from `scripts/openspec-execution-context.mjs` when available before editing implementation files. Treat the returned resolver diagnostics, canonical artifacts, QA evidence, generated rules, OpenSpec apply instructions, runtime paths, warnings, and errors as the machine-readable fix context. If the helper is unavailable, fall back to the explicit filesystem reads and runtime boundaries in this section.
 
@@ -73,7 +84,8 @@ Treat planning source sections as read-only fix context:
 
 - Use `## Original Request` as the raw intent anchor for the selected QA finding; do not rewrite it or treat it as permission to widen the fix.
 - When `proposal.md` contains `## Research Context`, use the embedded snapshot and source revision as authoritative committed scope.
-- Compare live `paths.research` only for drift and rationale. If `Updated` or normalized `SHA256` differs, or legacy metadata is incomplete, emit `WARN [research-drift] change-id=<change-id> source=<path> expected=<embedded revision> current=<live revision>` and keep the fix bounded to existing QA evidence and committed scope.
+- For an embedded ultra source, pass its exact project-relative `RESEARCH.md` path to `resolveUltraResearchSource()` from `scripts/ultra-research-resolver.mjs` and consume only its structured `source`, `revision`, and `diagnostic`. This centrally revalidates the sibling marker/index/status/link and normalized Active Summary digest; do not implement local selection or hashing heuristics.
+- Compare the exact regular or ultra source only for drift and rationale. Missing/invalid source, changed `Updated`, or changed normalized `SHA256` emits `WARN [research-drift] change-id=<change-id> source=<path> expected=<embedded revision> current=<live revision>` and keeps the fix bounded to existing QA evidence and committed scope. Recency never selects a replacement source.
 - Do not mutate or silently rebase either source section. Keep credentials, raw provider output, and full request/research bodies out of fix messages and traces.
 
 Read generated rules as derived fix guidance when present:

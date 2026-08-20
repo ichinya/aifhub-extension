@@ -1,0 +1,25 @@
+{
+  "extends": "openspec-valid-change",
+  "artifact_contract": {
+    "status": "fail",
+    "blocking": true,
+    "checks": {
+      "planning-artifacts-outside-change": "fail"
+    },
+    "suggested_next": "/aif-fix fixture-change",
+    "rule_codes": [
+      "openspec-ultra-marker-forbidden"
+    ]
+  },
+  "done_readiness": {
+    "status": "fail",
+    "blocking": true,
+    "checks": {
+      "artifact_contract": "fail"
+    },
+    "diagnostic_codes": [
+      "artifact-contract-fail"
+    ],
+    "suggested_next": "/aif-fix fixture-change"
+  }
+}

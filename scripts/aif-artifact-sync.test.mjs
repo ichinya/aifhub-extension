@@ -9,6 +9,7 @@ import {
   doctorAifMode,
   exportOpenSpecCompatibility,
   getModeStatus,
+  renderConfigForMode,
   switchToAiFactoryMode,
   switchToOpenSpecMode,
   syncOpenSpecArtifacts
@@ -49,28 +50,46 @@ async function pathExists(rootDir, relativePath) {
   }
 }
 
+async function snapshotSelectedPaths(rootDir, relativePaths) {
+  return Promise.all(relativePaths.map(async (relativePath) => {
+    if (!await pathExists(rootDir, relativePath)) {
+      return [relativePath, null];
+    }
+    return [relativePath, await readFixture(rootDir, relativePath)];
+  }));
+}
+
 function missingCliDetection() {
   return {
     available: false,
     canValidate: false,
     canArchive: false,
     version: null,
+    latestReviewedVersion: '1.8.0',
+    versionOutdated: null,
+    command: 'openspec',
+    commandSource: 'path',
     reason: 'missing-cli',
     errors: [
       {
         code: 'missing-cli',
-        message: 'OpenSpec CLI is not available on PATH.'
+        message: "Selected OpenSpec CLI 'openspec' (path) is unavailable."
       }
     ]
   };
 }
 
 function availableCliDetection(overrides = {}) {
+  const version = overrides.version ?? '1.3.1';
   return {
     available: true,
     canValidate: true,
     canArchive: true,
-    version: '1.3.1',
+    version,
+    latestReviewedVersion: '1.8.0',
+    versionOutdated: overrides.versionOutdated ?? version.localeCompare('1.8.0', 'en', { numeric: true }) < 0,
+    command: overrides.command ?? 'openspec',
+    commandSource: overrides.commandSource ?? 'path',
     nodeVersion: overrides.nodeVersion ?? '20.19.0',
     nodeSupported: overrides.nodeSupported ?? true,
     versionSupported: overrides.versionSupported ?? true,
@@ -87,6 +106,30 @@ afterEach(async () => {
 });
 
 describe('mode status', () => {
+  it('surfaces reviewed-version freshness for a supported old CLI', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      ''
+    ].join('\n'));
+
+    const status = await getModeStatus({
+      rootDir,
+      detectOpenSpec: async () => availableCliDetection({
+        version: '1.4.0',
+        versionOutdated: true
+      })
+    });
+
+    assert.equal(status.openspecCli.state, 'available');
+    assert.equal(status.openspecCli.version, '1.4.0');
+    assert.equal(status.openspecCli.latestReviewedVersion, '1.8.0');
+    assert.equal(status.openspecCli.versionOutdated, true);
+    assert.equal(status.openspecCli.canValidate, true);
+    assert.equal(status.openspecCli.canArchive, true);
+  });
+
   it('reports OpenSpec mode and drift fields', async () => {
     const rootDir = await createTempRoot();
     await writeFixture(rootDir, '.ai-factory/config.yaml', [
@@ -372,6 +415,135 @@ describe('mode switching', () => {
     );
   });
 
+  it('patch-preserves core and unknown config fields while reporting key paths only', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'config_version: 1',
+      'language:',
+      '  ui: ru',
+      '  artifacts: ru',
+      'aifhub:',
+      '  artifactProtocol: ai-factory',
+      '  contextDedup:',
+      '    mode: off',
+      '  openspec:',
+      '    validateOnPlan: false',
+      '    allowWarnOnDone:',
+      '      rules: true',
+      '      customGate: keep',
+      '    customPolicy:',
+      '      owner: user',
+      '  customProfile:',
+      '    toggle: keep',
+      'paths:',
+      '  research: docs/research/current.md',
+      '  plans: .ai-factory/plans',
+      '  specs: .ai-factory/specs',
+      '  rules: .ai-factory/rules',
+      '  custom_cache: cache/data',
+      'workflow:',
+      '  custom_step: keep',
+      'rules:',
+      '  custom_rule: rules/custom.md',
+      'agent_profile: precise',
+      'upstream_core:',
+      '  feature_flag: keep',
+      'custom_user:',
+      '  sentinel: PRIVATE-CONFIG-VALUE',
+      ''
+    ].join('\n'));
+
+    const openspec = await switchToOpenSpecMode({
+      rootDir,
+      detectOpenSpec: async () => missingCliDetection(),
+      timestamp: '2026-08-14T00-00-00-000Z'
+    });
+    assert.equal(openspec.ok, true);
+    const openspecConfig = await readFixture(rootDir, '.ai-factory/config.yaml');
+    for (const expected of [
+      'config_version: 1',
+      '  ui: ru',
+      '  artifacts: ru',
+      '    mode: off',
+      '    customPolicy:',
+      '      owner: user',
+      '      customGate: keep',
+      '  customProfile:',
+      '    toggle: keep',
+      '  research: docs/research/current.md',
+      '  custom_cache: cache/data',
+      '  custom_step: keep',
+      '  custom_rule: rules/custom.md',
+      'agent_profile: precise',
+      '  feature_flag: keep',
+      '  sentinel: PRIVATE-CONFIG-VALUE'
+    ]) {
+      assert.match(openspecConfig, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    }
+    assert.match(openspecConfig, /^  artifactProtocol: openspec$/m);
+    assert.match(openspecConfig, /^    validateOnPlan: true$/m);
+    assert.doesNotMatch(openspecConfig, /research_bundles_dir:/);
+
+    for (const keyPath of [
+      'aifhub.contextDedup.mode',
+      'aifhub.customProfile.toggle',
+      'aifhub.openspec.allowWarnOnDone.customGate',
+      'aifhub.openspec.customPolicy.owner',
+      'custom_user.sentinel',
+      'language.ui',
+      'paths.research',
+      'upstream_core.feature_flag',
+      'workflow.custom_step'
+    ]) {
+      assert.ok(openspec.config.configKeys.preservedKeyPaths.includes(keyPath), `preserved key path: ${keyPath}`);
+    }
+    assert.ok(openspec.config.configKeys.changedKeyPaths.includes('aifhub.artifactProtocol'));
+    assert.ok(openspec.config.configKeys.changedKeyPaths.includes('aifhub.openspec.validateOnPlan'));
+    assert.doesNotMatch(JSON.stringify(openspec.config.configKeys), /PRIVATE-CONFIG-VALUE|cache\/data|docs\/research/);
+
+    const legacy = await switchToAiFactoryMode({
+      rootDir,
+      timestamp: '2026-08-14T00-00-01-000Z'
+    });
+    assert.equal(legacy.ok, true);
+    const legacyConfig = await readFixture(rootDir, '.ai-factory/config.yaml');
+    assert.match(legacyConfig, /^  artifactProtocol: ai-factory$/m);
+    assert.match(legacyConfig, /^  openspec:$/m);
+    assert.match(legacyConfig, /^    customPolicy:$/m);
+    assert.match(legacyConfig, /^      owner: user$/m);
+    assert.match(legacyConfig, /^    allowWarnOnDone:$/m);
+    assert.match(legacyConfig, /^      customGate: keep$/m);
+    assert.doesNotMatch(legacyConfig, /^    validateOnPlan:/m);
+    assert.doesNotMatch(legacyConfig, /^      rules:/m);
+    assert.match(legacyConfig, /^  customProfile:$/m);
+    assert.match(legacyConfig, /^    toggle: keep$/m);
+    assert.match(legacyConfig, /^  custom_cache: cache\/data$/m);
+    for (const openSpecOnlyPath of ['state', 'qa', 'generated_rules']) {
+      assert.doesNotMatch(
+        legacyConfig,
+        new RegExp(`^  ${openSpecOnlyPath}:`, 'm'),
+        `Legacy profile should omit OpenSpec-only paths.${openSpecOnlyPath}`
+      );
+    }
+    assert.doesNotMatch(legacyConfig, /research_bundles_dir:/);
+  });
+
+  it('drops the dormant OpenSpec block when it contains only AIFHub-owned settings', () => {
+    const legacyConfig = renderConfigForMode([
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      '  openspec:',
+      '    validateOnPlan: true',
+      '    allowWarnOnDone:',
+      '      rules: false',
+      ''
+    ].join('\n'), 'ai-factory');
+
+    assert.match(legacyConfig, /^  artifactProtocol: ai-factory$/m);
+    assert.doesNotMatch(legacyConfig, /^  openspec:$/m);
+    assert.doesNotMatch(legacyConfig, /validateOnPlan|allowWarnOnDone/);
+  });
+
   it('switches to OpenSpec mode with missing CLI as degraded capability', async () => {
     const rootDir = await createTempRoot();
 
@@ -445,6 +617,139 @@ describe('mode switching', () => {
       'ai-factory aifhub-migrate-legacy-plans --all'
     ]);
     assert.equal(await pathExists(rootDir, 'openspec/changes/add-oauth/proposal.md'), false);
+  });
+
+  it('captures a custom pre-switch legacy root for later status and sync without scanning decoys', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: ai-factory',
+      'paths:',
+      '  plans: custom/legacy-plans',
+      '  specs: .ai-factory/specs',
+      '  rules: .ai-factory/rules',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'custom/legacy-plans/custom-plan.md', '# Custom plan\n');
+    await writeFixture(rootDir, '.ai-factory/plans/default-decoy.md', '# Default decoy\n');
+    await writeFixture(rootDir, 'openspec/changes/canonical-decoy/proposal.md', '# Canonical decoy\n');
+
+    const switched = await switchToOpenSpecMode({
+      rootDir,
+      detectOpenSpec: async () => missingCliDetection(),
+      timestamp: '2026-08-14T00-00-00-000Z'
+    });
+
+    assert.equal(switched.ok, true);
+    assert.equal(switched.legacyPlanSourceRoot, 'custom/legacy-plans');
+    assert.deepEqual(switched.legacy.plans.map((plan) => plan.id), ['custom-plan']);
+    assert.equal(switched.legacyPlanSourceState.persisted, true);
+    assert.deepEqual(await readJsonFixture(rootDir, '.ai-factory/state/legacy-plan-source.json'), {
+      schema_version: 1,
+      kind: 'aifhub-legacy-plan-source',
+      legacyPlanSourceRoot: 'custom/legacy-plans',
+      reason: 'migration-declined',
+      recorded_at: '2026-08-14T00-00-00-000Z'
+    });
+
+    const status = await getModeStatus({
+      rootDir,
+      detectOpenSpec: async () => missingCliDetection(),
+      getCurrentBranch: async () => 'main'
+    });
+    assert.equal(status.mode, 'openspec');
+    assert.equal(status.legacyPlanSourceRoot, 'custom/legacy-plans');
+    assert.equal(status.legacyPlanSource.source, 'recorded');
+    assert.deepEqual(status.legacyPlans.map((plan) => plan.id), ['custom-plan']);
+
+    const sync = await syncOpenSpecArtifacts({
+      rootDir,
+      all: true,
+      detectOpenSpec: async () => missingCliDetection(),
+      timestamp: '2026-08-14T00-00-01-000Z'
+    });
+    assert.equal(sync.legacy.legacyPlanSourceRoot, 'custom/legacy-plans');
+    assert.deepEqual(sync.legacy.plans.map((plan) => plan.id), ['custom-plan']);
+    assert.equal(await pathExists(rootDir, 'openspec/changes/custom-plan/proposal.md'), false);
+    assert.equal(await pathExists(rootDir, '.ai-factory/plans/default-decoy.md'), true);
+    assert.equal(await pathExists(rootDir, 'openspec/changes/canonical-decoy/proposal.md'), true);
+  });
+
+  it('gives an explicit legacy root precedence over recorded and default roots', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      'paths:',
+      '  plans: openspec/changes',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, '.ai-factory/state/legacy-plan-source.json', `${JSON.stringify({
+      schema_version: 1,
+      kind: 'aifhub-legacy-plan-source',
+      legacyPlanSourceRoot: 'recorded/plans',
+      reason: 'migration-declined',
+      recorded_at: '2026-08-14T00:00:00.000Z'
+    }, null, 2)}\n`);
+    await writeFixture(rootDir, 'recorded/plans/recorded.md', '# Recorded\n');
+    await writeFixture(rootDir, 'explicit/plans/explicit.md', '# Explicit\n');
+    await writeFixture(rootDir, '.ai-factory/plans/default-decoy.md', '# Default\n');
+    await writeFixture(rootDir, 'openspec/changes/canonical-decoy/proposal.md', '# Canonical\n');
+
+    const status = await getModeStatus({
+      rootDir,
+      legacyPlanSourceRoot: 'explicit/plans',
+      detectOpenSpec: async () => missingCliDetection(),
+      getCurrentBranch: async () => 'main'
+    });
+    assert.equal(status.legacyPlanSource.source, 'explicit');
+    assert.deepEqual(status.legacyPlans.map((plan) => plan.id), ['explicit']);
+
+    const sync = await syncOpenSpecArtifacts({
+      rootDir,
+      legacyPlanSourceRoot: 'explicit/plans',
+      all: true,
+      detectOpenSpec: async () => missingCliDetection(),
+      timestamp: '2026-08-14T00-00-02-000Z'
+    });
+    assert.deepEqual(sync.legacy.plans.map((plan) => plan.id), ['explicit']);
+    assert.equal(await pathExists(rootDir, 'openspec/changes/explicit/proposal.md'), false);
+  });
+
+  it('reports wouldPersist during dry-run and leaves config, state, sources, and destinations byte-identical', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: ai-factory',
+      'paths:',
+      '  plans: custom/legacy-plans',
+      '  specs: .ai-factory/specs',
+      '  rules: .ai-factory/rules',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'custom/legacy-plans/custom-plan.md', '# Custom plan\n');
+    await writeFixture(rootDir, '.ai-factory/plans/default-decoy.md', '# Default decoy\n');
+    const observed = [
+      '.ai-factory/config.yaml',
+      '.ai-factory/state/legacy-plan-source.json',
+      'custom/legacy-plans/custom-plan.md',
+      '.ai-factory/plans/default-decoy.md',
+      'openspec/changes/custom-plan/proposal.md',
+      'openspec/config.yaml'
+    ];
+    const before = await snapshotSelectedPaths(rootDir, observed);
+
+    const result = await switchToOpenSpecMode({
+      rootDir,
+      dryRun: true,
+      detectOpenSpec: async () => missingCliDetection(),
+      timestamp: '2026-08-14T00-00-03-000Z'
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.legacyPlanSourceState.persisted, false);
+    assert.equal(result.legacyPlanSourceState.wouldPersist, 'custom/legacy-plans');
+    assert.deepEqual(await snapshotSelectedPaths(rootDir, observed), before);
   });
 
   it('preserves existing utility settings while adding Graphify defaults', async () => {
@@ -633,7 +938,88 @@ describe('artifact sync and export', () => {
     assert.equal(status.generatedRules.state, 'ok');
     assert.equal(result.validation.skipped, true);
     assert.equal(result.validation.reason, 'missing-cli');
+    assert.equal(result.generatedRules.openspecCli.command, 'openspec');
+    assert.equal(result.generatedRules.openspecCli.commandSource, 'path');
+    assert.equal(result.validation.detection.command, 'openspec');
+    assert.equal(result.validation.detection.commandSource, 'path');
+    const report = await readFixture(rootDir, '.ai-factory/state/mode-switches/2026-04-29T00-00-00-000Z-sync-openspec.md');
+    assert.match(report, /OpenSpec command: openspec/);
+    assert.match(report, /OpenSpec command source: path/);
     assert.equal(await pathExists(rootDir, '.ai-factory/state/mode-switches/2026-04-29T00-00-00-000Z-sync-openspec.md'), true);
+  });
+
+  it('propagates one explicit OpenSpec command through compiler detection, show, JSON, and human report', async () => {
+    const rootDir = await createTempRoot();
+    const detectionCalls = [];
+    const showCalls = [];
+    const command = 'custom-openspec';
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      '  openspec:',
+      '    validateOnSync: false',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/config.yaml', 'project: test\n');
+    await writeFixture(rootDir, 'openspec/changes/explicit-cli/proposal.md', '# Proposal\n');
+    await writeFixture(rootDir, 'openspec/changes/explicit-cli/specs/auth/spec.md', [
+      '# Auth',
+      '',
+      '## ADDED Requirements',
+      '',
+      '### Requirement: Explicit CLI',
+      '',
+      'The system MUST preserve explicit CLI selection.',
+      ''
+    ].join('\n'));
+
+    const result = await syncOpenSpecArtifacts({
+      rootDir,
+      changeId: 'explicit-cli',
+      command,
+      detectOpenSpec: async (options) => {
+        detectionCalls.push(options);
+        return availableCliDetection({ command, commandSource: 'explicit' });
+      },
+      showOpenSpecItem: async (itemName, options) => {
+        showCalls.push({ itemName, options });
+        return {
+          ok: true,
+          json: {
+            requirements: [{
+              title: 'Explicit CLI',
+              description: 'The system MUST preserve explicit CLI selection.',
+              scenarios: []
+            }]
+          }
+        };
+      },
+      timestamp: '2026-04-29T00-10-00-000Z'
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(detectionCalls.length, 1);
+    assert.equal(detectionCalls[0].command, command);
+    assert.equal(showCalls.length, 1);
+    assert.equal(showCalls[0].options.command, command);
+    assert.deepEqual(result.generatedRules.openspecCli, {
+      available: true,
+      canValidate: true,
+      canArchive: true,
+      version: '1.3.1',
+      command,
+      commandSource: 'explicit',
+      reason: null
+    });
+    const report = await readFixture(rootDir, '.ai-factory/state/mode-switches/2026-04-29T00-10-00-000Z-sync-openspec.md');
+    assert.match(report, /OpenSpec command: custom-openspec/);
+    assert.match(report, /OpenSpec command source: explicit/);
   });
 
   it('syncs generated rules for all active OpenSpec changes', async () => {
@@ -756,6 +1142,68 @@ describe('artifact sync and export', () => {
     assert.equal(result.validation.skippedChanges.length, 1);
     assert.equal(result.validation.skippedChanges[0].changeId, 'docs-only');
     assert.ok(result.validation.warnings.some((warning) => warning.code === 'no-delta-specs'));
+  });
+
+  it('validates native skip_specs changes during all-change sync', async () => {
+    const rootDir = await createTempRoot();
+    const validated = [];
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      '  openspec:',
+      '    compileRulesOnSync: false',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/config.yaml', 'project: test\n');
+    await writeFixture(rootDir, 'openspec/changes/docs-only/proposal.md', '# Proposal\n');
+    await writeFixture(rootDir, 'openspec/changes/docs-only/.openspec.yaml', [
+      'schema: spec-driven',
+      'created: 2026-08-09',
+      'skip_specs: true',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/changes/nested-change/proposal.md', '# Proposal\n');
+    await writeFixture(rootDir, 'openspec/changes/nested-change/specs/area/capability/spec.md', [
+      '## ADDED Requirements',
+      '',
+      '### Requirement: Nested capability',
+      '',
+      'The system SHALL validate nested capability paths.',
+      '',
+      '#### Scenario: nested path is present',
+      '',
+      '- **WHEN** the nested delta is validated',
+      '- **THEN** validation succeeds',
+      ''
+    ].join('\n'));
+
+    const result = await syncOpenSpecArtifacts({
+      rootDir,
+      all: true,
+      detectOpenSpec: async () => availableCliDetection(),
+      validateOpenSpecChange: async (changeId) => {
+        validated.push(changeId);
+        return { ok: true, stdout: '{"valid":true}', stderr: '', json: { valid: true } };
+      },
+      getOpenSpecStatus: async (changeId) => ({
+        ok: true,
+        stdout: JSON.stringify({ changeId }),
+        stderr: '',
+        json: { changeId }
+      }),
+      timestamp: '2026-08-09T00-00-00-000Z'
+    });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(validated, ['docs-only', 'nested-change']);
+    assert.equal(result.validation.skippedChanges.length, 0);
+    assert.ok(!result.validation.warnings.some((warning) => warning.code === 'no-delta-specs'));
   });
 
   it('treats numeric-leading OpenSpec status rejection as non-blocking during sync', async () => {

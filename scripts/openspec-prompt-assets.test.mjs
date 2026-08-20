@@ -5,6 +5,10 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  LEGACY_ULTRA_AGENT_CONTRACTS,
+  validateAgentInstructionContract
+} from './agent-instruction-contract.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
@@ -77,6 +81,145 @@ const SIDECAR_PROMPT_ASSETS = [
 const ROADMAP_PROMPT_ASSET = 'injections/core/aif-roadmap-maturity-audit.md';
 const ARCHITECTURE_PROMPT_ASSET = 'injections/core/aif-architecture-context-boundary.md';
 const COMMIT_PROMPT_ASSET = 'injections/core/aif-commit-roadmap-freshness.md';
+
+const LEGACY_ULTRA_CONSUMER_ASSETS = [
+  {
+    command: 'aif-improve',
+    asset: 'injections/core/aif-improve-plan-folder.md',
+    decision: 'adapter',
+    outcome: 'fail-closed-stop',
+    handoff: '/aif-improve <entrypoint>'
+  },
+  {
+    command: 'aif-implement',
+    asset: 'injections/core/aif-implement-plan-folder.md',
+    decision: 'adapter',
+    outcome: 'fail-closed-stop',
+    handoff: '/aif-implement <entrypoint>'
+  },
+  {
+    command: 'aif-verify',
+    asset: 'injections/core/aif-verify-plan-folder.md',
+    decision: 'adapter',
+    outcome: 'fail-closed-stop',
+    handoff: '/aif-verify <entrypoint>'
+  },
+  {
+    command: 'aif-fix',
+    asset: 'injections/core/aif-fix-plan-folder.md',
+    decision: 'adapter',
+    outcome: 'fail-closed-stop',
+    handoff: '/aif-fix <entrypoint>'
+  },
+  {
+    command: 'aif-rules-check',
+    asset: 'injections/core/aif-rules-check-openspec-generated-rules.md',
+    decision: 'reviewed-no-op',
+    outcome: 'reviewed-no-op',
+    handoff: '/aif-rules-check',
+    evidence: ['read-only', 'This gate must not regenerate or edit generated rules.']
+  },
+  {
+    command: 'aif-commit',
+    asset: 'injections/core/aif-commit-roadmap-freshness.md',
+    decision: 'reviewed-no-op',
+    outcome: 'reviewed-no-op',
+    handoff: '/aif-commit',
+    evidence: ['This overlay is read-only except for the git commit', 'It must not write:']
+  },
+  {
+    command: 'aif-roadmap',
+    asset: 'injections/core/aif-roadmap-maturity-audit.md',
+    decision: 'reviewed-no-op',
+    outcome: 'reviewed-no-op',
+    handoff: '/aif-roadmap',
+    evidence: ['may be used as historical roadmap evidence', 'must also not write runtime state, QA evidence, generated rules, canonical OpenSpec artifacts, or implementation files']
+  }
+];
+
+const LEGACY_ULTRA_AGENT_FILES = Object.freeze({
+  'aifhub-plan-polisher': Object.freeze({
+    codex: 'agent-files/codex/aifhub-plan-polisher.toml',
+    claude: 'agent-files/claude/aifhub-plan-polisher.md'
+  }),
+  'aifhub-implement-worker': Object.freeze({
+    codex: 'agent-files/codex/aifhub-implement-worker.toml',
+    claude: 'agent-files/claude/aifhub-implement-worker.md'
+  }),
+  'aifhub-verifier': Object.freeze({
+    codex: 'agent-files/codex/aifhub-verifier.toml',
+    claude: 'agent-files/claude/aifhub-verifier.md'
+  }),
+  'aifhub-fixer': Object.freeze({
+    codex: 'agent-files/codex/aifhub-fixer.toml',
+    claude: 'agent-files/claude/aifhub-fixer.md'
+  }),
+  'aifhub-done-finalizer': Object.freeze({
+    codex: 'agent-files/codex/aifhub-done-finalizer.toml',
+    claude: 'agent-files/claude/aifhub-done-finalizer.md'
+  }),
+  'aifhub-rules-sidecar': Object.freeze({
+    codex: 'agent-files/codex/aifhub-rules-sidecar.toml',
+    claude: 'agent-files/claude/aifhub-rules-sidecar.md'
+  })
+});
+
+const ULTRA_RESEARCH_DRIFT_ASSETS = [
+  'injections/core/aif-improve-plan-folder.md',
+  'injections/core/aif-implement-plan-folder.md',
+  'injections/core/aif-verify-plan-folder.md',
+  'injections/core/aif-fix-plan-folder.md'
+];
+
+const AI_FACTORY_218_OWNERSHIP_AUDIT = Object.freeze([
+  Object.freeze({
+    surface: 'aif-analyze',
+    decision: 'retain',
+    manifestKind: 'skill',
+    ledgerConsumer: 'aif-analyze',
+    asset: 'skills/aif-analyze/SKILL.md',
+    evidence: Object.freeze([
+      'aifhub.artifactProtocol: openspec',
+      'Preserve existing config values. Add only missing keys required by the resolved mode.'
+    ])
+  }),
+  Object.freeze({
+    surface: 'aif-mode',
+    decision: 'adapter',
+    manifestKind: 'skill',
+    ledgerConsumer: 'aif-mode',
+    asset: 'skills/aif-mode/SKILL.md',
+    evidence: Object.freeze(['ai-factory aifhub-mode', '.ai-factory/state/mode-switches/'])
+  }),
+  Object.freeze({
+    surface: 'aif-done',
+    decision: 'retain',
+    manifestKind: 'skill',
+    ledgerConsumer: 'aif-done',
+    asset: 'skills/aif-done/SKILL.md',
+    evidence: Object.freeze(['evaluateLegacyUltraVerificationReceipt()', 'ai-factory aifhub-done-finalizer'])
+  }),
+  Object.freeze({
+    surface: 'aif-evolve',
+    decision: 'retain',
+    manifestKind: 'injection',
+    ledgerConsumer: 'aif-evolve',
+    asset: 'injections/core/aif-evolve-plan-evidence.md',
+    evidence: Object.freeze(['plan-aware evolution', '### OpenSpec-native evidence'])
+  }),
+  Object.freeze({
+    surface: 'aif-transfer',
+    decision: 'no-op',
+    manifestKind: 'upstream-only',
+    ledgerConsumer: '/aif-loop, /aif-transfer and packaged upstream coordinators'
+  }),
+  Object.freeze({
+    surface: 'aif-loop',
+    decision: 'no-op',
+    manifestKind: 'upstream-only',
+    ledgerConsumer: '/aif-loop, /aif-transfer and packaged upstream coordinators'
+  })
+]);
 
 const GRAPHIFY_CONTEXT_DOC_ASSETS = [
   'docs/context-loading-policy.md',
@@ -247,12 +390,36 @@ function extractMarkdownSection(markdown, heading) {
   return lines.slice(start, end).join('\n');
 }
 
+function parseTwoColumnMarkdownTable(section) {
+  const rows = new Map();
+  for (const line of section.split(/\r?\n/)) {
+    if (!line.trim().startsWith('|') || /^\s*\|\s*-+\s*\|/.test(line)) continue;
+    const cells = line
+      .split('|')
+      .slice(1, -1)
+      .map((cell) => cell.trim().replaceAll('`', ''));
+    if (cells.length !== 2 || cells[0] === 'Consumer') continue;
+    rows.set(cells[0], cells[1]);
+  }
+  return rows;
+}
+
 function assertIncludes(source, expected, label) {
   assert.ok(source.includes(expected), `${label} should include ${JSON.stringify(expected)}`);
 }
 
 function assertNotIncludes(source, unexpected, label) {
   assert.ok(!source.includes(unexpected), `${label} should not include ${JSON.stringify(unexpected)}`);
+}
+
+function assertOrder(source, orderedFragments, label) {
+  let cursor = -1;
+  for (const fragment of orderedFragments) {
+    const index = source.indexOf(fragment, cursor + 1);
+    assert.notEqual(index, -1, `${label} should include ${JSON.stringify(fragment)} after index ${cursor}`);
+    assert.ok(index > cursor, `${label} should order ${JSON.stringify(fragment)} after the previous fragment`);
+    cursor = index;
+  }
 }
 
 function assertNoInstallGuidance(source, label) {
@@ -414,6 +581,96 @@ describe('OpenSpec-native prompt asset contract', () => {
       assert.ok(!asset.startsWith('injections/handoff/'), `active discovery should exclude dormant handoff stub ${asset}`);
       assert.ok(!asset.startsWith('.ai-factory/extensions/'), `active discovery should exclude installed snapshot ${asset}`);
       assert.ok(!asset.startsWith('skills/aif-rules-check/'), `active discovery should exclude retired fallback ${asset}`);
+    }
+  });
+
+  it('records the AI Factory 2.18 extension-owned and upstream-only ownership audit', async (t) => {
+    const manifest = await loadManifest();
+    const skillNames = (manifest.skills ?? [])
+      .map(normalizeManifestPath)
+      .map((skillPath) => skillPath.split('/').at(-1));
+    const injectionTargets = (manifest.injections ?? []).map(({ target }) => target);
+    const compatibility = await readRepoFile('docs/openspec-compatibility.md');
+    const ledger = parseTwoColumnMarkdownTable(
+      extractMarkdownSection(compatibility, 'AI Factory 2.18 consumer ledger')
+    );
+
+    for (const audit of AI_FACTORY_218_OWNERSHIP_AUDIT) {
+      await t.test(`surface=${audit.surface} decision=${audit.decision}`, async () => {
+        assert.ok(
+          ['adapter', 'retain', 'no-op'].includes(audit.decision),
+          `surface=${audit.surface} case=decision-vocabulary`
+        );
+        const ledgerDecision = ledger.get(audit.ledgerConsumer);
+        assert.match(
+          ledgerDecision ?? '',
+          new RegExp(`^${audit.decision}:`),
+          `surface=${audit.surface} case=consumer-ledger`
+        );
+
+        const skillCount = skillNames.filter((name) => name === audit.surface).length;
+        const injectionCount = injectionTargets.filter((target) => target === audit.surface).length;
+        if (audit.manifestKind === 'skill') {
+          assert.equal(skillCount, 1, `surface=${audit.surface} case=single-owned-skill`);
+          assert.equal(injectionCount, 0, `surface=${audit.surface} case=no-duplicate-injection`);
+        } else if (audit.manifestKind === 'injection') {
+          assert.equal(skillCount, 0, `surface=${audit.surface} case=no-copied-upstream-skill`);
+          assert.equal(injectionCount, 1, `surface=${audit.surface} case=single-bounded-injection`);
+        } else {
+          assert.equal(skillCount, 0, `surface=${audit.surface} case=reviewed-no-op-skill`);
+          assert.equal(injectionCount, 0, `surface=${audit.surface} case=reviewed-no-op-injection`);
+        }
+
+        if (audit.asset !== undefined) {
+          const source = await readRepoFile(audit.asset);
+          for (const expected of audit.evidence) {
+            assertIncludes(source, expected, `surface=${audit.surface} case=unique-aifhub-boundary`);
+          }
+        }
+      });
+    }
+  });
+
+  it('keeps transfer privacy upstream-owned and preserves the mandatory done boundary', async () => {
+    const manifest = await loadManifest();
+    const compatibility = await readRepoFile('docs/openspec-compatibility.md');
+    const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
+    const evolve = await readRepoFile('injections/core/aif-evolve-plan-evidence.md');
+    const done = await readRepoFile('skills/aif-done/SKILL.md');
+    const manifestAssets = [
+      ...(manifest.skills ?? []),
+      ...(manifest.injections ?? []).map(({ file }) => file),
+      ...(manifest.agentFiles ?? []).map(({ source }) => source)
+    ].map(normalizeManifestPath);
+
+    assert.match(
+      compatibility,
+      /Privacy-gated `\/aif-transfer`[^\n]*sanitized in-memory registry[^\n]*current-project evidence[^\n]*privacy checks[^\n]*explicit approval[^\n]*delegates to upstream `\/aif-evolve`/,
+      'surface=aif-transfer case=privacy-gated-delegation'
+    );
+    assert.match(
+      metadata.sources['ai-factory'].notes,
+      /privacy-gated \/aif-transfer[^.]*upstream-owned[^.]*delegates accepted project evidence to \/aif-evolve without an AIFHub copy/i,
+      'surface=aif-transfer case=metadata-reviewed-no-op'
+    );
+    assert.equal(
+      manifestAssets.some((asset) => /(?:^|\/)aif-(?:transfer|loop)(?:\/|\.|$)/.test(asset)),
+      false,
+      'surface=aif-transfer,aif-loop case=no-duplicate-assets'
+    );
+    assert.doesNotMatch(
+      evolve,
+      /experience-NNN|source[- ]project|prevention registry|transfer registry/i,
+      'surface=aif-evolve case=no-transfer-registry-copy'
+    );
+
+    for (const expected of [
+      'evaluateLegacyUltraVerificationReceipt()',
+      '/aif-verify <entrypoint>',
+      '/aif-archive <entrypoint>',
+      'Do not execute the archive from `/aif-done`'
+    ]) {
+      assertIncludes(done, expected, `surface=aif-done case=mandatory-finalization-boundary`);
     }
   });
 
@@ -621,6 +878,31 @@ describe('OpenSpec-native prompt asset contract', () => {
     }
   });
 
+  it('binds implement, verify, and fix injections to the shared ultra research resolver', async () => {
+    for (const relativePath of [
+      'injections/core/aif-implement-plan-folder.md',
+      'injections/core/aif-verify-plan-folder.md',
+      'injections/core/aif-fix-plan-folder.md'
+    ]) {
+      const asset = await readRepoFile(relativePath);
+      const openspec = extractMarkdownSection(asset, 'OpenSpec-native mode');
+      for (const expected of [
+        'resolveUltraResearchSource()',
+        'scripts/ultra-research-resolver.mjs',
+        'exact project-relative `RESEARCH.md` path',
+        'structured `source`, `revision`, and `diagnostic`',
+        'sibling marker/index/status/link',
+        'normalized Active Summary digest',
+        'do not implement local selection or hashing heuristics',
+        'Missing/invalid source',
+        'Recency never selects a replacement source',
+        'embedded snapshot'
+      ]) {
+        assertIncludes(openspec, expected, `${relativePath} ultra research resolver`);
+      }
+    }
+  });
+
   it('defines OpenSpec-native and legacy sections for remaining mode-gated prompts', async () => {
     for (const relativePath of MODE_GATED_PROMPTS) {
       const asset = await readRepoFile(relativePath);
@@ -628,6 +910,138 @@ describe('OpenSpec-native prompt asset contract', () => {
       assertIncludes(asset, 'OpenSpec-native mode', relativePath);
       assertIncludes(asset, 'Legacy AI Factory-only mode', relativePath);
     }
+  });
+
+  it('routes mutating legacy ultra consumers marker-first to exact upstream owners', async () => {
+    const adapters = LEGACY_ULTRA_CONSUMER_ASSETS.filter(({ decision }) => decision === 'adapter');
+    assert.deepEqual(adapters.map(({ command }) => command), [
+      'aif-improve',
+      'aif-implement',
+      'aif-verify',
+      'aif-fix'
+    ]);
+
+    for (const { asset: relativePath, handoff, outcome } of adapters) {
+      assert.equal(outcome, 'fail-closed-stop', `runtime=injection asset=${relativePath} case=fail-closed-stop`);
+      const asset = await readRepoFile(relativePath);
+      const guard = extractMarkdownSection(asset, 'Legacy ultra marker-first boundary');
+      const openspec = extractMarkdownSection(asset, 'OpenSpec-native mode');
+
+      assertOrder(
+        asset,
+        ['### Legacy ultra marker-first boundary', '### OpenSpec-native mode', '### Legacy AI Factory-only mode'],
+        `${relativePath} mode routing`
+      );
+      assertOrder(
+        guard,
+        ['classifyLegacyPlanShape()', 'Marker validation is first', '`ultra-valid`', handoff],
+        `runtime=injection asset=${relativePath} case=marker-first-routing`
+      );
+
+      for (const expected of [
+        'scripts/legacy-plan-migration.mjs',
+        'before any write',
+        '`ultra-invalid` or `collision`',
+        '`classic-pair` or `classic-folder-only`',
+        'Do not create or synchronize a sibling `<plan-id>.md`',
+        '`task.md`',
+        '`context.md`',
+        '`rules.md`',
+        '`verify.md`',
+        '`status.yaml`',
+        '`explore.md`',
+        '`shape`, safe project-relative `entrypoint`, and `handoff`',
+        'never include marker bodies, phase contents, request/research bodies, credentials, raw stdout, or raw stderr'
+      ]) {
+        assertIncludes(guard, expected, `runtime=injection asset=${relativePath} case=fail-closed-stop`);
+      }
+
+      assertIncludes(openspec, 'For plan content, read only the canonical OpenSpec artifacts listed below.', `${relativePath} canonical plan source`);
+      assertIncludes(openspec, 'Do not inspect or mutate `.ai-factory/plans/**` after an OpenSpec change resolves.', `${relativePath} canonical plan source`);
+    }
+  });
+
+  it('records rules-check, commit, and roadmap as reviewed-no-op legacy ultra consumers', async () => {
+    const reviewedNoOps = LEGACY_ULTRA_CONSUMER_ASSETS.filter(({ decision }) => decision === 'reviewed-no-op');
+    assert.deepEqual(reviewedNoOps.map(({ command }) => command), [
+      'aif-rules-check',
+      'aif-commit',
+      'aif-roadmap'
+    ]);
+
+    for (const { asset: relativePath, handoff, decision, outcome, evidence } of reviewedNoOps) {
+      assert.equal(decision, 'reviewed-no-op', `runtime=injection asset=${relativePath} case=reviewed-no-op`);
+      assert.equal(outcome, 'reviewed-no-op', `runtime=injection asset=${relativePath} case=reviewed-no-op`);
+      const asset = await readRepoFile(relativePath);
+      assertIncludes(asset, handoff, `runtime=injection asset=${relativePath} case=reviewed-no-op-handoff`);
+      for (const expected of evidence) {
+        assertIncludes(asset, expected, `runtime=injection asset=${relativePath} case=reviewed-no-op-evidence`);
+      }
+      assert.doesNotMatch(
+        asset,
+        /\b(?:create|synchroniz(?:e|ing)|update|write|migrat(?:e|ing))\b[^\n]{0,160}\.ai-factory\/plans\//i,
+        `${relativePath} reviewed-no-op must not mutate legacy plan artifacts`
+      );
+    }
+  });
+
+  it('keeps Codex and Claude legacy-ultra agent instructions on one parity contract', async () => {
+    assert.deepEqual(
+      Object.keys(LEGACY_ULTRA_AGENT_FILES).sort(),
+      Object.keys(LEGACY_ULTRA_AGENT_CONTRACTS).sort()
+    );
+
+    for (const [name, runtimeFiles] of Object.entries(LEGACY_ULTRA_AGENT_FILES)) {
+      const runtimeCases = new Map();
+      for (const [runtime, relativePath] of Object.entries(runtimeFiles)) {
+        const source = await readRepoFile(relativePath);
+        const result = validateAgentInstructionContract({ runtime, name, source });
+        assert.equal(result.applicable, true, `runtime=${runtime} agent=${name} case=contract-selected`);
+        for (const contractCase of result.cases) {
+          assert.equal(
+            contractCase.ok,
+            true,
+            `runtime=${runtime} agent=${name} case=${contractCase.case}`
+          );
+        }
+        assert.deepEqual(
+          result.issues,
+          [],
+          `runtime=${runtime} agent=${name} case=instruction-contract issues=${JSON.stringify(result.issues)}`
+        );
+        runtimeCases.set(runtime, result.cases.map(({ case: caseName }) => caseName).sort());
+      }
+      assert.deepEqual(
+        runtimeCases.get('codex'),
+        runtimeCases.get('claude'),
+        `agent=${name} case=codex-claude-instruction-parity`
+      );
+    }
+  });
+
+  it('distinguishes research warnings from legacy fail-closed stops and reviewed no-ops', async () => {
+    const warningTemplate = 'WARN [research-drift] change-id=<change-id> source=<path> expected=<embedded revision> current=<live revision>';
+    for (const relativePath of ULTRA_RESEARCH_DRIFT_ASSETS) {
+      const source = await readRepoFile(relativePath);
+      const openspec = extractMarkdownSection(source, 'OpenSpec-native mode');
+      assertIncludes(openspec, warningTemplate, `runtime=injection asset=${relativePath} case=warning`);
+      assert.match(
+        openspec,
+        /embedded (?:snapshot|Active Summary)[^\n]*(?:authoritative|committed scope)|continues from the embedded snapshot|without expanding verification scope|keeps the fix bounded/i,
+        `runtime=injection asset=${relativePath} case=warning-continues-from-committed-source`
+      );
+    }
+
+    assert.equal(
+      LEGACY_ULTRA_CONSUMER_ASSETS.filter(({ outcome }) => outcome === 'fail-closed-stop').length,
+      4,
+      'runtime=injection case=fail-closed-stop inventory'
+    );
+    assert.equal(
+      LEGACY_ULTRA_CONSUMER_ASSETS.filter(({ outcome }) => outcome === 'reviewed-no-op').length,
+      3,
+      'runtime=injection case=reviewed-no-op inventory'
+    );
   });
 
   it('keeps OpenSpec-native sections on canonical artifacts and outside legacy plan folders', async () => {
@@ -996,7 +1410,9 @@ describe('OpenSpec-native prompt asset contract', () => {
       const asset = stripFencedBlocks(await readRepoFile(relativePath));
 
       for (const expected of [
+        'ai-factory aifhub-done-finalizer --change <change-id> --json',
         'scripts/openspec-done-finalizer.mjs',
+        'extension-local',
         'archiveOpenSpecChange',
         '--skip-specs',
         '.ai-factory/qa/<change-id>/',
@@ -1027,6 +1443,11 @@ describe('OpenSpec-native prompt asset contract', () => {
         /archive integration (?:is )?deferred to issue #33|deferred archive status/i,
         `${relativePath} should no longer describe OpenSpec archive integration as deferred`
       );
+      assert.doesNotMatch(
+        asset,
+        /\bnode(?:\.exe)?\s+(?:scripts[\\/]|[^\n]*\.ai-factory[\\/]extensions[\\/][^\n]*scripts[\\/])openspec-(?:done-finalizer|done-readiness|runner)\.mjs\b/i,
+        `${relativePath} should not execute extension-local OpenSpec modules as installed-project commands`
+      );
     }
   });
 
@@ -1036,7 +1457,7 @@ describe('OpenSpec-native prompt asset contract', () => {
 
       for (const expected of [
         '--record-dirty-state',
-        '/aif-done <change-id> --record-dirty-state',
+        'ai-factory aifhub-done-finalizer --change <change-id> --record-dirty-state --json',
         'git status --short'
       ]) {
         assertIncludes(asset, expected, relativePath);
@@ -1110,6 +1531,71 @@ describe('OpenSpec-native prompt asset contract', () => {
     }
   });
 
+  it('keeps verify and rules-check next-step guidance one-way with terminal states', async () => {
+    for (const relativePath of VERIFY_PROMPT_ASSETS) {
+      const asset = stripFencedBlocks(await readRepoFile(relativePath));
+
+      assert.doesNotMatch(
+        asset,
+        /before or during verification/i,
+        `${relativePath} should not invite a rules gate during or after verification`
+      );
+      for (const expected of [
+        'one-way',
+        'before verification starts',
+        '/aif-done <change-id>',
+        '/aif-fix <change-id>'
+      ]) {
+        assertIncludes(asset, expected, `${relativePath} one-way terminal routing`);
+      }
+      assert.match(
+        asset,
+        /suggested_next.{0,3}null.{0,3}when.{0,3}status.{0,3}is.{0,3}pass/,
+        `${relativePath} null-on-pass machine contract`
+      );
+    }
+
+    for (const relativePath of ['docs/claude-agents.md', 'docs/codex-agents.md']) {
+      const agentDoc = stripFencedBlocks(await readRepoFile(relativePath));
+      assert.doesNotMatch(
+        agentDoc,
+        /before or during verification/i,
+        `${relativePath} should not invite a rules gate during or after verification`
+      );
+      assertIncludes(agentDoc, 'before verification starts', `${relativePath} one-way gate timing`);
+    }
+
+    const rulesAsset = await readRepoFile('injections/core/aif-rules-check-openspec-generated-rules.md');
+    const rulesOpenspec = extractMarkdownSection(rulesAsset, 'OpenSpec-native mode');
+
+    for (const expected of [
+      'one-way',
+      'has not already passed',
+      '/aif-verify <change-id>',
+      '/aif-done <change-id>',
+      'do not suggest `/aif-verify` as remediation'
+    ]) {
+      assertIncludes(rulesOpenspec, expected, 'rules-check injection one-way terminal routing');
+    }
+    assert.match(
+      rulesOpenspec,
+      /suggested_next.{0,3}null.{0,3}when.{0,3}status.{0,3}is.{0,3}pass/,
+      'rules-check injection null-on-pass machine contract'
+    );
+
+    const usage = await readRepoFile('docs/usage.md');
+    assertIncludes(
+      usage,
+      'one-way with terminal states',
+      'docs/usage.md terminal routing statement'
+    );
+    assert.match(
+      usage,
+      /suggested_next.{0,3}null.{0,3}when.{0,3}status.{0,3}is.{0,3}pass/,
+      'docs/usage.md null-on-pass machine contract'
+    );
+  });
+
   it('keeps planning-mode guidance capability-gated across active planning prompts', async () => {
     for (const relativePath of PLANNING_RUNTIME_PROMPT_ASSETS) {
       const asset = stripFencedBlocks(await readRepoFile(relativePath));
@@ -1139,6 +1625,47 @@ describe('OpenSpec-native prompt asset contract', () => {
       ]) {
         assertIncludes(asset, expected, relativePath);
       }
+    }
+  });
+
+  it('defers roadmap lifecycle completion from OpenSpec implementation', async () => {
+    const relativePath = 'injections/core/aif-implement-plan-folder.md';
+    const asset = stripFencedBlocks(await readRepoFile(relativePath));
+    const label = `${relativePath} roadmap lifecycle deferral contract`;
+
+    for (const expected of [
+      'Roadmap lifecycle deferral',
+      'overrides the upstream roadmap completion step',
+      'must not edit the configured roadmap',
+      'must not mark a milestone, phase, slice, or managed lifecycle row complete',
+      'even when all implementation tasks are checked',
+      'must not claim roadmap completion',
+      '/aif-verify <change-id>',
+      '/aif-done <change-id>'
+    ]) {
+      assertIncludes(asset, expected, label);
+    }
+  });
+
+  it('keeps OpenSpec verification roadmap diagnostics bounded and read-only', async () => {
+    const relativePath = 'injections/core/aif-verify-plan-folder.md';
+    const asset = stripFencedBlocks(await readRepoFile(relativePath));
+    const label = `${relativePath} read-only roadmap validation contract`;
+
+    for (const expected of [
+      'Roadmap linkage validation',
+      'read-only',
+      'WARN [roadmap]',
+      'ERROR [roadmap]',
+      'malformed',
+      'contradictory',
+      '/aif-roadmap check',
+      'must not copy the managed lifecycle block',
+      'Missing linkage alone remains a warning',
+      'canonical requirement makes linkage mandatory',
+      'must not edit the configured roadmap'
+    ]) {
+      assertIncludes(asset, expected, label);
     }
   });
 
@@ -1203,6 +1730,92 @@ describe('OpenSpec-native prompt asset contract', () => {
     }
   });
 
+  it('registers linked active OpenSpec changes as planned during roadmap check', async () => {
+    for (const relativePath of [ROADMAP_PROMPT_ASSET, ...ROADMAP_REFERENCE_ASSETS]) {
+      const asset = stripFencedBlocks(await readRepoFile(relativePath));
+      const label = `${relativePath} active lifecycle reconciliation contract`;
+
+      for (const expected of [
+        '/aif-roadmap check',
+        'active canonical OpenSpec proposal',
+        '## Roadmap Linkage',
+        'valid non-`none` roadmap linkage',
+        'register one local `planned` row',
+        'must not claim implementation, verification, finalization, merge, or issue closure'
+      ]) {
+        assertIncludes(asset, expected, label);
+      }
+    }
+  });
+
+  it('preserves evidence-backed finalized rows for archived changes', async () => {
+    for (const relativePath of [ROADMAP_PROMPT_ASSET, ...ROADMAP_REFERENCE_ASSETS]) {
+      const asset = stripFencedBlocks(await readRepoFile(relativePath));
+      const label = `${relativePath} archived lifecycle reconciliation contract`;
+
+      for (const expected of [
+        'archived change',
+        'durable local done/archive evidence',
+        'preserve its evidence-backed `finalized` row',
+        'must never downgrade `finalized` to `planned`',
+        'project-relative finalization evidence'
+      ]) {
+        assertIncludes(asset, expected, label);
+      }
+    }
+  });
+
+  it('does not register or infer lifecycle rows for explicitly unlinked changes', async () => {
+    for (const relativePath of [ROADMAP_PROMPT_ASSET, ...ROADMAP_REFERENCE_ASSETS]) {
+      const asset = stripFencedBlocks(await readRepoFile(relativePath));
+      const label = `${relativePath} unlinked lifecycle reconciliation contract`;
+
+      for (const expected of [
+        'explicitly unlinked change',
+        'all linkage values are `none`',
+        'must not create a managed lifecycle row',
+        'must not infer linkage from branch names, GitHub state, labels, or roadmap text'
+      ]) {
+        assertIncludes(asset, expected, label);
+      }
+    }
+  });
+
+  it('keeps local lifecycle reconciliation available when GitHub evidence is missing', async () => {
+    for (const relativePath of [ROADMAP_PROMPT_ASSET, ...ROADMAP_REFERENCE_ASSETS]) {
+      const asset = stripFencedBlocks(await readRepoFile(relativePath));
+      const label = `${relativePath} missing GitHub reconciliation contract`;
+
+      for (const expected of [
+        'GitHub evidence is unavailable, unauthenticated, rate-limited, offline, or partial',
+        'local lifecycle reconciliation continues',
+        'GitHub limitation is non-blocking',
+        'Lifecycle evidence:',
+        'GitHub evidence:',
+        'report lifecycle and GitHub evidence sources separately'
+      ]) {
+        assertIncludes(asset, expected, label);
+      }
+    }
+  });
+
+  it('reconciles post-merge GitHub state without fabricating local finalization', async () => {
+    for (const relativePath of [ROADMAP_PROMPT_ASSET, ...ROADMAP_REFERENCE_ASSETS]) {
+      const asset = stripFencedBlocks(await readRepoFile(relativePath));
+      const label = `${relativePath} post-merge reconciliation contract`;
+
+      for (const expected of [
+        'post-merge reconciliation',
+        'current issue, PR, and milestone state',
+        'managed local lifecycle row remains `finalized`',
+        'remote closure or merge MUST NOT be rewritten as local finalization evidence',
+        'must not promote `planned` to `finalized`'
+      ]) {
+        assertIncludes(asset, expected, label);
+      }
+    }
+  });
+
   it('keeps GitHub-aware roadmap output owner-bounded and credential-safe', async () => {
     const asset = stripFencedBlocks(await readRepoFile(ROADMAP_PROMPT_ASSET));
 
@@ -1251,7 +1864,7 @@ describe('OpenSpec-native prompt asset contract', () => {
       'closed GitHub milestone exists but `.ai-factory/ROADMAP.md` has no matching phase audit',
       'open GitHub milestone has `open_issues = 0` but roadmap lacks `phase-completion drift`',
       'unphased backlog/drift',
-      '/aif-roadmap',
+      '/aif-roadmap check',
       'It must not edit `.ai-factory/ROADMAP.md`',
       '.ai-factory/rules/generated/**',
       'canonical OpenSpec artifacts',
@@ -1259,6 +1872,33 @@ describe('OpenSpec-native prompt asset contract', () => {
       'Keep the upstream conventional commit message flow unchanged'
     ]) {
       assertIncludes(asset, expected, COMMIT_PROMPT_ASSET);
+    }
+  });
+
+  it('blocks deterministic finalized-state drift without promoting volatile GitHub drift', async () => {
+    const asset = stripFencedBlocks(await readRepoFile(COMMIT_PROMPT_ASSET));
+    const label = `${COMMIT_PROMPT_ASSET} finalized-state freshness contract`;
+
+    for (const expected of [
+      'ERROR [roadmap-local]',
+      'deterministic local lifecycle drift',
+      'successful `/aif-done`',
+      '## Roadmap Linkage',
+      'other than `none`',
+      'OpenSpec Change Lifecycle',
+      'missing, malformed, or not exactly `finalized`',
+      'exact `/aif-roadmap check`',
+      'stop before the commit proposal',
+      'user confirmation MUST NOT bypass',
+      'must not create a git commit',
+      'WARN [roadmap-external]',
+      'volatile external drift',
+      'Unavailable, partial, or later-changing GitHub evidence remains warning-only by default',
+      'changed after the local snapshot, commit, or merge',
+      'does not depend on explicit strict checking',
+      'Do not infer successful local finalization from checked tasks'
+    ]) {
+      assertIncludes(asset, expected, label);
     }
   });
 

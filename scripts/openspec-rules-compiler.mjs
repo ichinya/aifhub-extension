@@ -47,7 +47,8 @@ export async function compileOpenSpecRules(changeId, options = {}) {
       mode: collected.mode,
       warnings: [...resolverResult.warnings, ...collected.warnings],
       errors: collected.errors,
-      sources: collected.sources
+      sources: collected.sources,
+      openspecCli: collected.openspecCli
     });
   }
 
@@ -68,7 +69,8 @@ export async function compileOpenSpecRules(changeId, options = {}) {
       warnings: [...resolverResult.warnings, ...collected.warnings, ...rendered.warnings, ...written.warnings],
       errors: written.errors,
       sources: collected.sources,
-      files: written.files
+      files: written.files,
+      openspecCli: collected.openspecCli
     });
   }
 
@@ -79,7 +81,8 @@ export async function compileOpenSpecRules(changeId, options = {}) {
     warnings: [...resolverResult.warnings, ...collected.warnings, ...rendered.warnings, ...written.warnings],
     errors: [],
     sources: collected.sources,
-    files: written.files
+    files: written.files,
+    openspecCli: collected.openspecCli
   });
 }
 
@@ -149,7 +152,8 @@ export async function collectOpenSpecRuleSources(changeId, options = {}) {
     ok: true,
     mode,
     warnings: dedupeDiagnostics(warnings),
-    sources: sortSources(sources)
+    sources: sortSources(sources),
+    openspecCli: summarizeOpenSpecDetection(cli.detection)
   });
 }
 
@@ -167,7 +171,8 @@ export async function compileOpenSpecBaseRules(options = {}) {
       mode: collected.mode,
       warnings: collected.warnings,
       errors: collected.errors,
-      sources: collected.sources
+      sources: collected.sources,
+      openspecCli: collected.openspecCli
     });
   }
 
@@ -193,7 +198,8 @@ export async function compileOpenSpecBaseRules(options = {}) {
       warnings: [...collected.warnings, ...written.warnings],
       errors: written.errors,
       sources: collected.sources,
-      files: written.files
+      files: written.files,
+      openspecCli: collected.openspecCli
     });
   }
 
@@ -204,7 +210,8 @@ export async function compileOpenSpecBaseRules(options = {}) {
     warnings: [...collected.warnings, ...written.warnings],
     errors: [],
     sources: collected.sources,
-    files: written.files
+    files: written.files,
+    openspecCli: collected.openspecCli
   });
 }
 
@@ -234,7 +241,8 @@ async function collectOpenSpecBaseRuleSources(options = {}) {
     ok: true,
     mode: chooseMode(sources, cli),
     warnings: dedupeDiagnostics(warnings),
-    sources: sortSources(sources)
+    sources: sortSources(sources),
+    openspecCli: summarizeOpenSpecDetection(cli.detection)
   });
 }
 
@@ -808,9 +816,14 @@ async function detectOpenSpecCapability(rootDir, options) {
   try {
     const detection = await detectOpenSpec({
       cwd: rootDir,
+      command: options.command,
       env: options.env,
       executor: options.executor,
-      nodeVersion: options.nodeVersion
+      nodeVersion: options.nodeVersion,
+      platform: options.platform,
+      candidateExists: options.candidateExists,
+      execFile: options.execFile,
+      comSpec: options.comSpec
     });
     const warnings = [];
 
@@ -825,7 +838,11 @@ async function detectOpenSpecCapability(rootDir, options) {
       runOptions: {
         command: options.command,
         env: options.env,
-        executor: options.executor
+        executor: options.executor,
+        platform: options.platform,
+        candidateExists: options.candidateExists,
+        execFile: options.execFile,
+        comSpec: options.comSpec
       },
       warnings
     };
@@ -837,7 +854,11 @@ async function detectOpenSpecCapability(rootDir, options) {
       runOptions: {
         command: options.command,
         env: options.env,
-        executor: options.executor
+        executor: options.executor,
+        platform: options.platform,
+        candidateExists: options.candidateExists,
+        execFile: options.execFile,
+        comSpec: options.comSpec
       },
       warnings: [
         {
@@ -1336,6 +1357,22 @@ function normalizeDetectionWarnings(detection) {
   ];
 }
 
+function summarizeOpenSpecDetection(detection) {
+  if (detection === null || detection === undefined) {
+    return null;
+  }
+
+  return {
+    available: Boolean(detection.available),
+    canValidate: Boolean(detection.canValidate),
+    canArchive: Boolean(detection.canArchive),
+    version: detection.version ?? null,
+    command: detection.command ?? null,
+    commandSource: detection.commandSource ?? null,
+    reason: detection.reason ?? null
+  };
+}
+
 function resolveGeneratedAt(options = {}) {
   if (typeof options.generatedAt === 'string' && options.generatedAt.trim().length > 0) {
     return options.generatedAt;
@@ -1355,7 +1392,8 @@ function createCompilerResult(overrides = {}) {
     warnings: dedupeDiagnostics(overrides.warnings ?? []),
     errors: overrides.errors ?? [],
     sources: overrides.sources ?? [],
-    files: overrides.files ?? []
+    files: overrides.files ?? [],
+    openspecCli: overrides.openspecCli ?? null
   };
 }
 
@@ -1365,7 +1403,8 @@ function createSourceResult(overrides = {}) {
     mode: overrides.mode ?? 'failed',
     warnings: dedupeDiagnostics(overrides.warnings ?? []),
     errors: overrides.errors ?? [],
-    sources: overrides.sources ?? []
+    sources: overrides.sources ?? [],
+    openspecCli: overrides.openspecCli ?? null
   };
 }
 

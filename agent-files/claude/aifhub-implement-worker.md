@@ -35,7 +35,9 @@ Use this mode when config declares `aifhub.artifactProtocol: openspec`.
 
 Use this mode when OpenSpec-native mode is not enabled.
 
-- Execute exactly one plan task or one tightly coupled task group.
+- Before task/status discovery or any write, classify the normalized project-relative entrypoint marker-first with `classifyLegacyPlanShape()`. For `ultra-valid`, return exactly `/aif-implement <entrypoint>` and stop; upstream owns the bundle and its index ledger atomically.
+- Never write an ultra bundle, companion, spec, status, QA, receipt, or final artifact. Fail `ultra-invalid` and `collision` closed without classic fallback.
+- Only `classic-pair` or `classic-folder-only` continues below. Execute exactly one classic plan task or one tightly coupled task group.
 - Respect the active legacy plan pair under `.ai-factory/plans/<plan-id>/`.
 - Follow `status.yaml` task progress rules from the legacy workflow.
 - Report changed files, verification evidence, blockers, and the next recommended task.

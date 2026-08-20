@@ -40,7 +40,6 @@ node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --tool cod
 node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --tool codegraph --skill aif-explore --task architecture_or_impact_discovery --preinitialize-tool codegraph --json
 node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --tool graphify --skill aif-explore --task explicit_graph_quality_experiment --preinitialize-tool graphify --json
 node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --tool context7 --skill aif-rules-check --task version_sensitive_library_docs --preinitialize-tool context7 --json
-node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --tool context-mode --skill aif-explore --task large_command_output_compression --preinitialize-tool context-mode --json
 ```
 
 Catalog-driven matrix:
@@ -55,7 +54,6 @@ Reduced cross examples:
 ```bash
 node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --exclude-root <excluded-root> --out <run-dir> --tool graphify --skill aif-analyze --skill aif-explore --skill aif-plan --skill aif-review --task explicit_graph_quality_experiment --max-profiles 4 --stratified --preinitialize-tool graphify --scenario-prefix cross-graphify --json
 node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --exclude-root <excluded-root> --out <run-dir> --tool context7 --skill aif-plan --skill aif-rules-check --task version_sensitive_library_docs --max-profiles 4 --stratified --preinitialize-tool context7 --scenario-prefix cross-context7 --json
-node scripts/memory-tool-ai-tester-matrix.mjs --roots <projects-root> --exclude-root <excluded-root> --out <run-dir> --tool context-mode --skill aif-analyze --skill aif-explore --task large_command_output_compression --max-profiles 4 --stratified --preinitialize-tool context-mode --scenario-prefix cross-context-mode --json
 ```
 
 `--roots` может указывать на один проект или каталог с проектами. Durable docs не должны содержать этот путь; public output хранит только anonymous profile ids.
@@ -124,7 +122,8 @@ Windows note: runner должен уметь выполнять `fixtures.setup_
 |---|---|---|
 | `graphify` | Python venv под `project/.ai-tester-tools/graphify-venv`, install `graphifyy` | prepend venv `Scripts` to PATH, then call `graphify update/query/benchmark` |
 | `context7` | npm prefix под `project/.ai-tester-tools/context7`, install `ctx7` | prepend `.bin` to PATH, then call `ctx7` |
-| `context-mode` | npm prefix под `project/.ai-tester-tools/context-mode`, install `context-mode` | prepend `.bin` to PATH, then call `context-mode` or MCP-backed helper |
+
+`context-mode` не входит в generic memory-tool matrix и не поддерживает `--preinitialize-tool`: любая explicit `--tool`/`--preinitialize-tool` list с `context-mode`, а также catalog selection с `context-mode` (включая unfiltered catalog run), атомарно отклоняется до создания output directory и возвращает structured JSON с `status: NOT_RUN`, `reason: context_mode_requires_dedicated_harness`, `tool_id: context-mode` и путём dedicated harness. Generic tools из такой mixed selection намеренно не запускаются, чтобы request не превращался в silent partial success. Для issue `#134` используйте только pinned isolated `scripts/context-mode-codex-ai-tester-{matrix,adapter,run,results}.mjs` harness.
 
 Rejected tools (`codex-mem`, `eagle-mem`) не получают positive tool_run setup; для них допустимы только negative/forbidden ai-tester scenarios. Safety/smoke runs не считаются benchmark.
 
@@ -148,6 +147,7 @@ Rejected tools (`codex-mem`, `eagle-mem`) не получают positive tool_ru
 | `conditional` | Tool полезен только для broad discovery, docs lookup, continuity или compression. | Оставить conditional recommendation с task/profile filter. |
 | `avoid` | Tool медленнее, дороже, шумнее или хуже `rg` для profile/task. | Добавить в `avoid_tools` или `do_not_recommend_for`. |
 | `forbid` | Tool нарушает safety, scope или purge. | Запретить для соответствующих skills/profiles. |
+| `NOT_RUN` | Evidence неполна или execution недоступен. | Не выводить comparison или safety failure и не продвигать metadata. |
 
 ## Promotion To Metadata
 

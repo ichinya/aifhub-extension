@@ -73,6 +73,22 @@ Do things.
 \"\"\"
 `;
 
+const VALID_LEGACY_ULTRA_FIXER_TOML = `name = "aifhub-fixer"
+description = "Contract fixture"
+sandbox_mode = "workspace-write"
+developer_instructions = """
+## Legacy AI Factory-only mode
+
+Before finding discovery or any write, classify the entrypoint marker-first with classifyLegacyPlanShape().
+For ultra-valid, return exactly \`/aif-fix <entrypoint>\` and stop.
+Never write an ultra bundle, companion, status, or QA artifact.
+Fail ultra-invalid and collision closed without classic fallback.
+"""
+`;
+
+const BROKEN_LEGACY_ULTRA_FIXER_TOML = VALID_LEGACY_ULTRA_FIXER_TOML
+  .replace('/aif-fix <entrypoint>', '/aif-fix <plan-id>');
+
 async function writeFixture(dir, relPath, content) {
   const fullPath = join(dir, relPath);
   await mkdir(join(fullPath, '..'), { recursive: true });
@@ -106,6 +122,18 @@ describe('validate-codex-agents.mjs', () => {
 
   it('fails when sandbox_mode is missing', async () => {
     await writeFixture(tmpDir, 'agent-files/codex/no-sandbox.toml', MISSING_SANDBOX_TOML);
+    const code = await runValidatorExitCode(tmpDir);
+    assert.equal(code, 1);
+  });
+
+  it('passes a complete packaged-agent legacy ultra instruction contract', async () => {
+    await writeFixture(tmpDir, 'agent-files/codex/aifhub-fixer.toml', VALID_LEGACY_ULTRA_FIXER_TOML);
+    const code = await runValidatorExitCode(tmpDir);
+    assert.equal(code, 0);
+  });
+
+  it('fails a packaged agent with a non-exact legacy ultra handoff', async () => {
+    await writeFixture(tmpDir, 'agent-files/codex/aifhub-fixer.toml', BROKEN_LEGACY_ULTRA_FIXER_TOML);
     const code = await runValidatorExitCode(tmpDir);
     assert.equal(code, 1);
   });

@@ -111,6 +111,16 @@ describe('recommendation metadata parsing', () => {
     assert.ok(metadata.evidence_runs.some((run) => run.id === 'targeted-graphify-context7-ai-tester-2026-05-28'));
     assert.equal(metadata.tools['codex-agent-mem'].read_scope, 'explicit_sqlite_db_path');
     assert.equal(metadata.tools['context-mode'].decision, 'manual_helper_only');
+    assert.equal(metadata.tools['context-mode'].mcp_only_status, 'conditional_large_truncating_output_only');
+    assert.equal(metadata.tools['context-mode'].codex_plugin_status, 'avoid_tested_nested_shell_stack');
+    assert.equal(metadata.tools['context-mode'].authorized_live_followup.token_savings, 'not_demonstrated');
+    assert.equal(
+      metadata.tools['context-mode'].authorized_live_followup.session_continuity,
+      'not_run_resume_driver_parity_unavailable'
+    );
+    assert.equal(metadata.tools['context-mode'].normal_command_selection, 'forbidden');
+    assert.equal(metadata.tools['context-mode'].auto_register_hooks, false);
+    assert.deepEqual(metadata.availability_probes['context-mode'], []);
     assert.equal(metadata.tools['codex-mem'].decision, 'reject_default');
     assert.equal(metadata.tools['eagle-mem'].decision, 'reject_defer');
     assert.equal(metadata.tools.context7.decision, 'optional');
@@ -320,6 +330,16 @@ describe('recommendation results', () => {
     assert.ok(
       result.body.tools['rohitg00-agentmemory'].forbidden_operations.includes('auto_register_mcp')
     );
+    assert.equal(result.body.tools['context-mode'].codex_plugin_status, 'avoid_tested_nested_shell_stack');
+    assert.equal(result.body.tools['context-mode'].mcp_only_status, 'conditional_large_truncating_output_only');
+    assert.equal(result.body.tools['context-mode'].authorized_live_followup.token_savings, 'not_demonstrated');
+    assert.equal(
+      result.body.tools['context-mode'].authorized_live_followup.session_continuity,
+      'not_run_resume_driver_parity_unavailable'
+    );
+    assert.equal(result.body.tools['context-mode'].normal_command_selection, 'forbidden');
+    assert.equal(result.body.tools['context-mode'].auto_register_hooks, false);
+    assert.deepEqual(result.body.availability_probes['context-mode'], []);
   });
 
   it('allows CodeGraph only as scoped manual CLI for analyze recommendations and enabled explore use', async () => {
@@ -399,20 +419,86 @@ describe('recommendation results', () => {
     assert.match(continuity.next_step, /explicit DB path/i);
   });
 
-  it('recommends context-mode only for large temporary output compression', async () => {
+  it('keeps context-mode as non-configurable manual guidance for large temporary output compression', async () => {
     const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
+    let probes = 0;
     const result = await buildRecommendationResult({
       metadata,
       projectShape: 'large_framework_app',
       taskSignals: ['large_command_output_compression'],
-      probeRunner: async () => ({ availability: 'unknown' })
+      probeRunner: async () => {
+        probes += 1;
+        return { availability: 'installed' };
+      }
     });
 
-    const contextMode = result.recommendations.find((item) => item.tool_id === 'context-mode');
+    const contextMode = result.manual_guidance.find((item) => item.tool_id === 'context-mode');
     assert.ok(contextMode);
+    assert.equal(result.recommendations.some((item) => item.tool_id === 'context-mode'), false);
     assert.equal(contextMode.status, 'manual_helper_only');
     assert.equal(contextMode.read_scope, 'explicit_indexed_content');
-    assert.match(contextMode.next_step, /manual temporary/i);
+    assert.equal(contextMode.normal_command_selection, 'forbidden');
+    assert.equal(contextMode.selection_policy, 'recommendation_only');
+    assert.equal(contextMode.configuration_policy, 'do_not_enable');
+    assert.match(contextMode.next_step, /manual user-owned MCP-only.*purge/i);
+    assert.equal(probes, 0);
+  });
+
+  it('does not pass duplicate command fields to recommendation builders', async () => {
+    const source = await readFile(path.join(REPO_ROOT, 'scripts', 'memory-tool-recommender.mjs'), 'utf8');
+    const builderContexts = [...source.matchAll(/buildRecommendation\(toolId, tool, \{([\s\S]*?)\}\)/g)]
+      .map((match) => match[1]);
+
+    assert.ok(builderContexts.length >= 3);
+    for (const context of builderContexts) {
+      assert.doesNotMatch(context, /^\s*command(?:\s*:|,)/m);
+    }
+  });
+
+  it('keeps context-mode recommendation-only even when project config enables it', async () => {
+    const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
+    let probes = 0;
+    const result = await buildSelectionResult({
+      metadata,
+      projectShape: 'large_framework_app',
+      taskSignals: ['large_command_output_compression'],
+      command: 'aif-analyze',
+      config: {
+        source_kind: 'project_config',
+        source_path: null,
+        enabled_tools: ['context-mode'],
+        warnings: []
+      },
+      probeRunner: async () => {
+        probes += 1;
+        return { availability: 'installed', command: 'context-mode doctor' };
+      }
+    });
+    assert.deepEqual(result.selected_tools, []);
+    assert.equal(result.not_selected_tools[0].tool_id, 'context-mode');
+    assert.match(result.not_selected_tools[0].reason, /normal command selection is forbidden/i);
+    assert.deepEqual(result.warnings, [{
+      code: 'configured-tool-manual-guidance-only',
+      tool_id: 'context-mode',
+      message: 'context-mode is configured but normal command selection is forbidden; remove it from utilities.context_tools.enabled and use manual guidance only.'
+    }]);
+    assert.equal(probes, 0);
+
+    const forbiddenCommand = await buildSelectionResult({
+      metadata,
+      projectShape: 'large_framework_app',
+      taskSignals: ['large_command_output_compression'],
+      command: 'aif-plan',
+      config: {
+        source_kind: 'project_config',
+        source_path: null,
+        enabled_tools: ['context-mode'],
+        warnings: []
+      }
+    });
+    assert.deepEqual(forbiddenCommand.selected_tools, []);
+    assert.equal(forbiddenCommand.not_selected_tools[0].reason, 'context-mode is forbidden for aif-plan.');
+    assert.equal(forbiddenCommand.warnings[0].code, 'configured-tool-manual-guidance-only');
   });
 
   it('keeps small microservices on rg baseline and avoids repo graph helpers', async () => {
@@ -855,6 +941,14 @@ describe('recommendation results', () => {
     assert.deepEqual(selectedIds, ['context7']);
     assert.equal(result.body.selected_tools[0].permission, 'read_existing_reviewed_output');
     assert.equal(result.body.selected_tools.some((item) => item.permission === 'forbidden'), false);
+    assert.deepEqual(
+      result.body.warnings.filter((warning) => warning.code === 'configured-tool-manual-guidance-only'),
+      [{
+        code: 'configured-tool-manual-guidance-only',
+        tool_id: 'context-mode',
+        message: 'context-mode is configured but normal command selection is forbidden; remove it from utilities.context_tools.enabled and use manual guidance only.'
+      }]
+    );
 
     for (const toolId of ['codegraph', 'codex-agent-mem', 'context-mode']) {
       assert.equal(
@@ -1244,6 +1338,55 @@ function makeNegativeProvenLabelMetadataYaml() {
 }
 
 describe('CLI behavior', () => {
+  it('normalizes probe output through an explicit bounded public contract', async () => {
+    const result = await runMemoryToolRecommender([
+      'status',
+      '--metadata',
+      REAL_METADATA,
+      '--json'
+    ], {
+      cwd: tmpDir,
+      stdout: [],
+      stderr: [],
+      exit: false,
+      probeRunner: async () => ({
+        availability: 'unknown',
+        command: 'tool --version',
+        reason: 'probe_reason',
+        note: 'safe note',
+        raw_output: 'must-not-cross-the-status-boundary'
+      })
+    });
+
+    assert.deepEqual(result.body.probes.rg, {
+      availability: 'unknown',
+      command: 'tool --version',
+      reason: 'probe_reason',
+      note: 'safe note'
+    });
+  });
+
+  it('does not execute context-mode during installed-facing status', async () => {
+    const result = await runMemoryToolRecommender([
+      'status',
+      '--metadata',
+      REAL_METADATA,
+      '--json'
+    ], {
+      cwd: tmpDir,
+      stdout: [],
+      stderr: [],
+      exit: false
+    });
+    assert.equal(result.exitCode, 0);
+    assert.deepEqual(result.body.probes['context-mode'], {
+      availability: 'unknown',
+      command: null,
+      reason: 'dedicated_harness_required',
+      note: 'Automatic context-mode probes are disabled because the current runtime lifecycle is not eligible.'
+    });
+  });
+
   it('uses the production-default no-probe path for rohitg00-agentmemory status', async () => {
     const metadataPath = path.join(tmpDir, 'minimal-rejected-metadata.yaml');
     await writeFile(metadataPath, [

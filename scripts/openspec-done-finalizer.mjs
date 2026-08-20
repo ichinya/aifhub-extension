@@ -1,8 +1,10 @@
+#!/usr/bin/env node
 // openspec-done-finalizer.mjs - shared OpenSpec done/finalization runtime helpers
 import { execFile } from 'node:child_process';
 import { access, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 import {
@@ -23,7 +25,8 @@ import {
   collectGeneratedRules
 } from './openspec-execution-context.mjs';
 import {
-  getLatestGateResult
+  getLatestGateResult,
+  isLegacySuggestedNextOnPassReceipt
 } from './aif-gate-result.mjs';
 import {
   validateOpenSpecArtifactContract as defaultValidateOpenSpecArtifactContract
@@ -42,14 +45,177 @@ import {
   summarizeOpenSpecDoneReadiness,
   writeOpenSpecDoneReadiness
 } from './openspec-done-readiness.mjs';
+import {
+  updateRoadmapChangeLifecycle as defaultUpdateRoadmapChangeLifecycle
+} from './roadmap-change-lifecycle.mjs';
 
 const execFileAsync = promisify(execFile);
 const MODE = 'openspec-native';
 const DEFAULT_STATE_DIR = path.join('.ai-factory', 'state');
 const DEFAULT_QA_DIR = path.join('.ai-factory', 'qa');
+const DEFAULT_CONFIG_PATH = path.join('.ai-factory', 'config.yaml');
+const DEFAULT_ROADMAP_PATH = path.join('.ai-factory', 'ROADMAP.md');
 const ARCHIVE_JSON = 'openspec-archive.json';
 const DONE_MARKDOWN = 'done.md';
 const FINAL_SUMMARY_MARKDOWN = 'final-summary.md';
+const ROADMAP_HANDOFF_COMMAND = '/aif-roadmap check';
+const ROADMAP_OUTCOME_STATUSES = new Set(['updated', 'handoff', 'skipped']);
+const PUBLIC_COMMAND_SOURCES = new Set(['explicit', 'project-local', 'path']);
+const FINALIZER_BYPASS_OPTIONS = new Set([
+  '--force',
+  '--no-validate',
+  '--skip-archive',
+  '--dry-run',
+  '--summary-only'
+]);
+const MAX_PUBLIC_DIAGNOSTICS = 50;
+
+export function parseDoneFinalizerArgs(argv) {
+  const args = Array.from(argv ?? []);
+  const parsed = {
+    ok: true,
+    changeId: null,
+    skipSpecs: false,
+    recordDirtyState: false,
+    json: false
+  };
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+
+    if (arg === '--change') {
+      const value = args[index + 1];
+      if (value === undefined || String(value).trim().length === 0 || String(value).startsWith('--')) {
+        return invalidFinalizerArgs('Missing value for --change.');
+      }
+      parsed.changeId = String(value);
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--skip-specs') {
+      parsed.skipSpecs = true;
+      continue;
+    }
+
+    if (arg === '--record-dirty-state') {
+      parsed.recordDirtyState = true;
+      continue;
+    }
+
+    if (arg === '--json') {
+      parsed.json = true;
+      continue;
+    }
+
+    if (FINALIZER_BYPASS_OPTIONS.has(arg)) {
+      return invalidFinalizerArgs(`Unsupported finalizer option: ${arg}.`);
+    }
+
+    return invalidFinalizerArgs(`Unknown option: ${arg}.`);
+  }
+
+  return parsed;
+}
+
+export async function runDoneFinalizerCommand(argv, options = {}) {
+  const parsed = parseDoneFinalizerArgs(argv);
+  if (!parsed.ok) {
+    return {
+      exitCode: 2,
+      stdout: '',
+      stderr: `${parsed.error}\n`
+    };
+  }
+
+  const finalize = options.finalizeOpenSpecChange ?? finalizeOpenSpecChange;
+  const finalizerOptions = {
+    ...options,
+    changeId: parsed.changeId ?? options.changeId,
+    skipSpecs: parsed.skipSpecs || Boolean(options.skipSpecs),
+    recordDirtyState: parsed.recordDirtyState || Boolean(options.recordDirtyState)
+  };
+  delete finalizerOptions.finalizeOpenSpecChange;
+  delete finalizerOptions.force;
+  delete finalizerOptions.noValidate;
+  delete finalizerOptions.skipArchive;
+  delete finalizerOptions.dryRun;
+  delete finalizerOptions.summaryOnly;
+
+  let result;
+  try {
+    result = await finalize(finalizerOptions);
+  } catch {
+    return {
+      exitCode: 2,
+      stdout: '',
+      stderr: 'Done finalizer command failed unexpectedly.\n'
+    };
+  }
+
+  const unresolved = result?.changeId === null || result?.changeId === undefined;
+  const stdout = parsed.json
+    ? `${JSON.stringify(projectDoneFinalizerResult(result), null, 2)}\n`
+    : `${summarizeDoneResult(result, { includeErrors: !result?.ok })}\n`;
+
+  return {
+    exitCode: unresolved ? 2 : result?.ok ? 0 : 1,
+    stdout,
+    stderr: ''
+  };
+}
+
+export function projectDoneFinalizerResult(result) {
+  const command = selectOpenSpecCommandDiagnostic(result);
+  const readiness = result?.readiness ?? null;
+  const workingTree = result?.workingTree ?? null;
+  const archive = result?.archive ?? null;
+  const roadmap = normalizeRoadmapOutcome(
+    result?.roadmap ?? createSkippedRoadmapOutcome('archive-not-successful')
+  );
+
+  return {
+    ok: Boolean(result?.ok),
+    mode: boundedPublicText(result?.mode ?? MODE, 80),
+    change_id: normalizePublicChangeId(result?.changeId),
+    status: boundedPublicText(result?.status ?? (result?.ok ? 'PASS' : 'FAIL'), 40),
+    readiness: readiness === null ? null : {
+      status: boundedPublicText(readiness.status ?? 'unknown', 40),
+      blocking: Boolean(readiness.blocking),
+      suggested_next: normalizeSuggestedNext(readiness.suggested_next)
+    },
+    working_tree: workingTree === null ? null : {
+      ok: Boolean(workingTree.ok),
+      is_git_repo: Boolean(workingTree.isGitRepo),
+      dirty: Boolean(workingTree.dirty),
+      recorded: isDirtyStateRecorded(workingTree),
+      entry_count: Math.min(Array.isArray(workingTree.entries) ? workingTree.entries.length : 0, 1000000)
+    },
+    archive: archive === null ? null : {
+      status: boundedPublicText(archive.status ?? 'unknown', 40),
+      archived: Boolean(archive.archived),
+      skip_specs: Boolean(archive.skipSpecs),
+      command: command.command,
+      command_source: command.commandSource
+    },
+    roadmap: {
+      status: roadmap.status,
+      reason: roadmap.reason,
+      path: roadmap.path,
+      changed: roadmap.changed,
+      suggested_next: roadmap.suggestedNext === null
+        ? null
+        : {
+          command: ROADMAP_HANDOFF_COMMAND,
+          reason: roadmap.reason
+        }
+    },
+    summary_files: normalizePublicPaths(result?.summaryFiles),
+    commit_message: boundedPublicText(result?.commitMessage ?? '', 300),
+    warnings: normalizePublicDiagnostics(result?.warnings),
+    errors: normalizePublicDiagnostics(result?.errors)
+  };
+}
 
 export async function finalizeOpenSpecChange(options = {}) {
   const rootDir = resolveRootDir(options);
@@ -73,6 +239,7 @@ export async function finalizeOpenSpecChange(options = {}) {
       status: 'FAIL',
       readiness,
       archive,
+      roadmap: createSkippedRoadmapOutcome('archive-not-successful'),
       workingTree: readiness?.context?.workingTree ?? null,
       commitMessage: context.changeId ? createCommitMessage(context.changeId) : '',
       prSummary: context.changeId
@@ -137,6 +304,7 @@ export async function finalizeOpenSpecChange(options = {}) {
     readiness,
     workingTree,
     archive,
+    roadmap: createSkippedRoadmapOutcome('archive-not-successful'),
     commitMessage: createCommitMessage(context.changeId),
     prSummary: createPrSummary({
       changeId: context.changeId,
@@ -158,7 +326,20 @@ export async function finalizeOpenSpecChange(options = {}) {
     return baseResult;
   }
 
-  const summary = await writeDoneSummary(context.changeId, baseResult, {
+  const roadmap = archive.archived
+    ? await updateRoadmapAfterArchive(context, { ...options, rootDir })
+    : createSkippedRoadmapOutcome('archive-not-performed');
+  const finalizedResult = {
+    ...baseResult,
+    status: roadmap.status === 'handoff' ? 'WARN' : baseResult.status,
+    roadmap,
+    warnings: dedupeDiagnostics([
+      ...baseResult.warnings,
+      ...roadmapOutcomeWarnings(roadmap)
+    ])
+  };
+
+  const summary = await writeDoneSummary(context.changeId, finalizedResult, {
     ...options,
     rootDir,
     qaPath: context.paths.qa,
@@ -166,7 +347,7 @@ export async function finalizeOpenSpecChange(options = {}) {
   });
 
   return {
-    ...baseResult,
+    ...finalizedResult,
     summaryFiles: summary.files
   };
 }
@@ -404,6 +585,14 @@ export async function assertVerificationPassed(changeId, options = {}) {
   }
 
   if (!gate.ok) {
+    if (isLegacySuggestedNextOnPassReceipt(gate)) {
+      return createVerificationFailure({
+        changeId: normalized.changeId,
+        code: 'verification-gate-legacy-suggested-next',
+        message: 'Verification evidence contains a passing gate block with a non-null suggested_next written before or without following the null-on-pass contract; rerun /aif-verify once to rewrite the receipt.',
+        evidence
+      });
+    }
     return createVerificationFailure({
       changeId: normalized.changeId,
       code: 'verification-gate-invalid',
@@ -589,6 +778,7 @@ export async function assertRulesGateAcceptable(changeId, options = {}) {
     };
   }
 
+  const legacyRulesReceipt = rulesGate.status === 'invalid' && isLegacySuggestedNextOnPassReceipt(rulesGate?.gateResult);
   const rulesGatePolicyMessage = requireRulesPass
     ? `Refusing to archive because rules gate evidence is ${rulesGate.status}.`
     : `Rules gate evidence is ${rulesGate.status}; continuing because requireRulesPassForDone is false.`;
@@ -596,8 +786,10 @@ export async function assertRulesGateAcceptable(changeId, options = {}) {
   return createRulesGatePolicyResult({
     blocking: requireRulesPass,
     changeId: normalized.changeId,
-    code: rulesGate.errors?.[0]?.code ?? `rules-gate-${rulesGate.status}`,
-    message: rulesGate.errors?.[0]?.message ?? rulesGatePolicyMessage,
+    code: legacyRulesReceipt ? 'rules-gate-legacy-suggested-next' : rulesGate.errors?.[0]?.code ?? `rules-gate-${rulesGate.status}`,
+    message: legacyRulesReceipt
+      ? 'Rules gate evidence contains a passing gate block with a non-null suggested_next written before or without following the null-on-pass contract; rerun /aif-rules-check and persist the receipt to rewrite it.'
+      : rulesGate.errors?.[0]?.message ?? rulesGatePolicyMessage,
     rulesGate
   });
 }
@@ -756,6 +948,7 @@ export async function archiveChangeWithOpenSpec(changeId, options = {}) {
       archived: false,
       skipSpecs,
       command: null,
+      commandSource: null,
       args: [],
       exitCode: null,
       rawStdoutPath: null,
@@ -960,30 +1153,56 @@ export function summarizeDoneResult(result, options = {}) {
   const archived = result?.archive?.archived ? 'yes' : 'no';
   const skipSpecs = result?.archive?.skipSpecs ? 'yes' : 'no';
   const readinessStatus = result?.readiness?.status ? String(result.readiness.status).toUpperCase() : null;
+  const command = selectOpenSpecCommandDiagnostic(result);
+  const roadmap = normalizeRoadmapOutcome(
+    result?.roadmap ?? createSkippedRoadmapOutcome('archive-not-successful')
+  );
   const lines = [
-    `Finalization status: ${status}`,
-    `Change: ${changeId}`,
+    `Finalization status: ${boundedPublicText(status, 40)}`,
+    `Change: ${boundedPublicText(changeId, 200)}`,
     `Archived: ${archived}`,
-    `Skip specs: ${skipSpecs}`
+    `Skip specs: ${skipSpecs}`,
+    `Roadmap lifecycle: ${roadmap.status}`,
+    `Roadmap reason: ${roadmap.reason}`
   ];
 
+  if (roadmap.path !== null) {
+    lines.push(`Roadmap path: ${roadmap.path}`);
+  }
+  if (roadmap.suggestedNext !== null) {
+    lines.push(`Suggested next: ${ROADMAP_HANDOFF_COMMAND}`);
+    lines.push(`Reason: ${roadmap.reason}`);
+  }
+
   if (readinessStatus !== null) {
-    lines.push(`Done readiness: ${readinessStatus}`);
+    lines.push(`Done readiness: ${boundedPublicText(readinessStatus, 40)}`);
+  }
+
+  if (command.command !== null) {
+    const source = command.commandSource === null ? '' : ` (${command.commandSource})`;
+    lines.push(`OpenSpec command: ${command.command}${source}`);
   }
 
   if (Array.isArray(result?.summaryFiles) && result.summaryFiles.length > 0) {
-    lines.push('Summary files:');
-    lines.push(...result.summaryFiles.map((file) => `- ${file}`));
+    const summaryFiles = normalizePublicPaths(result.summaryFiles);
+    if (summaryFiles.length > 0) {
+      lines.push('Summary files:');
+      lines.push(...summaryFiles.map((file) => `- ${file}`));
+    }
   }
 
   if (result?.readiness?.suggested_next) {
-    lines.push(`Suggested next: ${result.readiness.suggested_next.command}`);
-    lines.push(`Reason: ${result.readiness.suggested_next.reason}`);
+    const suggestedNext = normalizeSuggestedNext(result.readiness.suggested_next);
+    if (suggestedNext !== null) {
+      lines.push(`Suggested next: ${suggestedNext.command}`);
+      lines.push(`Reason: ${suggestedNext.reason}`);
+    }
   }
 
   if (options.includeErrors && Array.isArray(result?.errors) && result.errors.length > 0) {
+    const errors = normalizePublicDiagnostics(result.errors);
     lines.push('Errors:');
-    lines.push(...result.errors.map((error) => `- ${error.code}: ${error.message}`));
+    lines.push(...errors.map((error) => `- ${error.code}: ${error.message}`));
   }
 
   return lines.join('\n');
@@ -1019,6 +1238,7 @@ async function writeArchiveEvidence(changeId, archive, options = {}) {
     archived: Boolean(archive.archived),
     skipSpecs: Boolean(archive.skipSpecs),
     command: archive.command,
+    commandSource: archive.commandSource ?? null,
     args: Array.from(archive.args ?? []),
     exitCode: archive.exitCode ?? null,
     ok: Boolean(archive.ok),
@@ -1050,6 +1270,7 @@ async function readPreArchiveStatus(changeId, options, rootDir) {
     return {
       ok: Boolean(status?.ok),
       command: status?.command ?? null,
+      commandSource: normalizeCommandSource(status?.commandSource),
       args: Array.from(status?.args ?? []),
       exitCode: status?.exitCode ?? null,
       json: status?.json ?? null,
@@ -1061,6 +1282,7 @@ async function readPreArchiveStatus(changeId, options, rootDir) {
     return {
       ok: false,
       command: 'openspec',
+      commandSource: 'path',
       args: ['status', '--change', changeId, '--json', '--no-color'],
       exitCode: null,
       json: null,
@@ -1094,6 +1316,7 @@ function normalizeArchiveResult(changeId, result, { skipSpecs, preArchiveStatus 
     archived: ok,
     skipSpecs,
     command: result?.command ?? 'openspec',
+    commandSource: normalizeCommandSource(result?.commandSource) ?? 'path',
     args: Array.from(result?.args ?? []),
     exitCode: result?.exitCode ?? null,
     stdout: normalizeOutput(result?.stdout),
@@ -1120,6 +1343,7 @@ function createArchiveFailure({ changeId, skipSpecs, error }) {
     archived: false,
     skipSpecs,
     command: null,
+    commandSource: null,
     args: [],
     exitCode: null,
     stdout: '',
@@ -1141,6 +1365,7 @@ function createSkippedArchiveSummary(changeId, options, reason) {
     archived: false,
     skipSpecs: Boolean(options?.skipSpecs),
     command: null,
+    commandSource: null,
     args: [],
     exitCode: null,
     rawStdoutPath: null,
@@ -1153,6 +1378,240 @@ function createSkippedArchiveSummary(changeId, options, reason) {
     ],
     errors: []
   };
+}
+
+async function updateRoadmapAfterArchive(context, options = {}) {
+  const rootDir = resolveRootDir(options);
+  let roadmapPath;
+  try {
+    roadmapPath = await resolveConfiguredRoadmapPath(rootDir, options);
+  } catch {
+    return createRoadmapHandoffOutcome('roadmap-config-unreadable');
+  }
+  if (!roadmapPath.ok) {
+    return createRoadmapHandoffOutcome(roadmapPath.reason);
+  }
+
+  const evidencePath = normalizePublicPath(toPosix(path.relative(
+    rootDir,
+    path.join(context.paths.qa, DONE_MARKDOWN)
+  )));
+  if (evidencePath === null) {
+    return createRoadmapHandoffOutcome('evidence-path-invalid', roadmapPath.path);
+  }
+
+  const updateRoadmapChangeLifecycle = options.updateRoadmapChangeLifecycle
+    ?? defaultUpdateRoadmapChangeLifecycle;
+  let outcome;
+  try {
+    outcome = await updateRoadmapChangeLifecycle({
+      rootDir,
+      roadmapPath: roadmapPath.path,
+      proposalContent: context.canonicalArtifacts?.proposal?.content ?? '',
+      changeId: context.changeId,
+      localState: 'finalized',
+      evidencePath
+    });
+  } catch {
+    return createRoadmapHandoffOutcome('roadmap-update-failed');
+  }
+
+  return normalizeRoadmapOutcome(outcome);
+}
+
+async function resolveConfiguredRoadmapPath(rootDir, options = {}) {
+  if (options.roadmapPath !== undefined) {
+    const explicitPath = normalizePublicPath(options.roadmapPath);
+    return explicitPath === null
+      ? { ok: false, path: null, reason: 'roadmap-path-invalid' }
+      : { ok: true, path: explicitPath, reason: null };
+  }
+
+  const configPath = options.configPath === undefined
+    ? path.join(rootDir, DEFAULT_CONFIG_PATH)
+    : path.resolve(rootDir, options.configPath);
+  assertSafeRuntimePath(rootDir, configPath, 'Project config path');
+
+  let raw;
+  try {
+    raw = await readFile(configPath, 'utf8');
+  } catch (error) {
+    if (error?.code === 'ENOENT') {
+      return {
+        ok: true,
+        path: toPosix(DEFAULT_ROADMAP_PATH),
+        reason: null
+      };
+    }
+    return { ok: false, path: null, reason: 'roadmap-config-unreadable' };
+  }
+
+  const parsed = parseConfiguredRoadmapPath(raw);
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  const roadmapPath = normalizePublicPath(parsed.path ?? toPosix(DEFAULT_ROADMAP_PATH));
+  return roadmapPath === null
+    ? { ok: false, path: null, reason: 'roadmap-path-invalid' }
+    : { ok: true, path: roadmapPath, reason: null };
+}
+
+function parseConfiguredRoadmapPath(raw) {
+  const lines = String(raw ?? '').replace(/^\uFEFF/, '').split(/\r?\n/);
+  let pathsIndent = null;
+  let pathsCount = 0;
+  const values = [];
+
+  for (const rawLine of lines) {
+    const trimmed = rawLine.trim();
+    if (trimmed.length === 0 || trimmed.startsWith('#')) {
+      continue;
+    }
+
+    const indentText = rawLine.match(/^\s*/)?.[0] ?? '';
+    if (indentText.includes('\t')) {
+      return { ok: false, path: null, reason: 'roadmap-config-invalid' };
+    }
+    const indent = indentText.length;
+
+    if (indent === 0) {
+      pathsIndent = null;
+      const topLevel = rawLine.match(/^paths:\s*(?:#.*)?$/);
+      if (topLevel) {
+        pathsCount += 1;
+        pathsIndent = indent;
+        if (pathsCount > 1) {
+          return { ok: false, path: null, reason: 'roadmap-config-invalid' };
+        }
+      }
+      continue;
+    }
+
+    if (pathsIndent === null || indent <= pathsIndent) {
+      continue;
+    }
+
+    const roadmapMatch = rawLine.match(/^\s+roadmap:\s*(.*?)\s*$/);
+    if (!roadmapMatch) {
+      continue;
+    }
+    const value = parseConfiguredString(roadmapMatch[1]);
+    if (value === null) {
+      return { ok: false, path: null, reason: 'roadmap-config-invalid' };
+    }
+    values.push(value);
+  }
+
+  if (values.length > 1) {
+    return { ok: false, path: null, reason: 'roadmap-config-invalid' };
+  }
+
+  return {
+    ok: true,
+    path: values[0] ?? null,
+    reason: null
+  };
+}
+
+function parseConfiguredString(value) {
+  const raw = stripYamlInlineComment(value).trim();
+  if (raw.length === 0) {
+    return null;
+  }
+
+  const first = raw[0];
+  if (first === '"' || first === "'") {
+    if (raw.length < 2 || raw.at(-1) !== first) {
+      return null;
+    }
+    const unquoted = raw.slice(1, -1);
+    return unquoted.length === 0 ? null : unquoted;
+  }
+
+  if (/^(?:null|~|true|false|[-+]?\d+(?:\.\d+)?)$/i.test(raw)) {
+    return null;
+  }
+  return raw;
+}
+
+function stripYamlInlineComment(value) {
+  let quote = null;
+  const raw = String(value ?? '');
+
+  for (let index = 0; index < raw.length; index += 1) {
+    const char = raw[index];
+    if ((char === '"' || char === "'") && (index === 0 || raw[index - 1] !== '\\')) {
+      quote = quote === char ? null : quote ?? char;
+      continue;
+    }
+    if (char === '#' && quote === null && (index === 0 || /\s/.test(raw[index - 1]))) {
+      return raw.slice(0, index);
+    }
+  }
+
+  return raw;
+}
+
+function normalizeRoadmapOutcome(value) {
+  const status = String(value?.status ?? '');
+  if (!ROADMAP_OUTCOME_STATUSES.has(status)) {
+    return createRoadmapHandoffOutcome('roadmap-result-invalid');
+  }
+
+  const rawReason = String(value?.reason ?? '');
+  const reason = /^[a-z0-9][a-z0-9-]{0,99}$/.test(rawReason)
+    ? rawReason
+    : 'roadmap-result-invalid';
+  const pathValue = value?.path === null || value?.path === undefined
+    ? null
+    : normalizePublicPath(value.path);
+
+  if (reason === 'roadmap-result-invalid'
+    || (value?.path !== null && value?.path !== undefined && pathValue === null)
+    || (status === 'updated' && pathValue === null)) {
+    return createRoadmapHandoffOutcome('roadmap-result-invalid');
+  }
+
+  return {
+    status,
+    reason,
+    path: pathValue,
+    changed: status === 'updated',
+    suggestedNext: status === 'handoff' ? ROADMAP_HANDOFF_COMMAND : null
+  };
+}
+
+function createSkippedRoadmapOutcome(reason) {
+  return {
+    status: 'skipped',
+    reason,
+    path: null,
+    changed: false,
+    suggestedNext: null
+  };
+}
+
+function createRoadmapHandoffOutcome(reason, roadmapPath = null) {
+  return {
+    status: 'handoff',
+    reason,
+    path: normalizePublicPath(roadmapPath),
+    changed: false,
+    suggestedNext: ROADMAP_HANDOFF_COMMAND
+  };
+}
+
+function roadmapOutcomeWarnings(roadmap) {
+  if (roadmap?.status !== 'handoff') {
+    return [];
+  }
+
+  return [{
+    code: roadmap.reason,
+    message: `OpenSpec archive succeeded, but roadmap lifecycle reconciliation requires attention. Run ${ROADMAP_HANDOFF_COMMAND}.`,
+    ...(roadmap.path === null ? {} : { path: roadmap.path })
+  }];
 }
 
 async function buildAndWriteDoneReadiness(options = {}) {
@@ -1210,6 +1669,7 @@ function createFinalizeFailure({ context, readiness, workingTree, archive, error
     readiness,
     workingTree,
     archive,
+    roadmap: createSkippedRoadmapOutcome('archive-not-successful'),
     commitMessage: createCommitMessage(context.changeId),
     prSummary: createPrSummary({
       changeId: context.changeId,
@@ -1308,6 +1768,7 @@ async function detectOpenSpecCapability(options, rootDir) {
         canValidate: Boolean(detection?.canValidate),
         version: detection?.version ?? null,
         command: detection?.command ?? 'openspec',
+        commandSource: normalizeCommandSource(detection?.commandSource) ?? 'path',
         reason: detection?.reason ?? null,
         errors: detection?.errors ?? []
       },
@@ -1322,6 +1783,7 @@ async function detectOpenSpecCapability(options, rootDir) {
         canValidate: false,
         version: null,
         command: 'openspec',
+        commandSource: 'path',
         reason: 'detection-failed',
         errors: [
           {
@@ -1601,6 +2063,10 @@ function renderDoneMarkdown(changeId, summary) {
     `Archived: ${archive.archived ? 'yes' : 'no'}`,
     `Skip specs: ${archive.skipSpecs ? 'yes' : 'no'}`,
     '',
+    '## Roadmap lifecycle',
+    '',
+    ...renderRoadmapLifecycle(summary.roadmap),
+    '',
     '## Coverage matrix',
     '',
     ...summarizeOpenSpecCoverage(context.coverage).split('\n'),
@@ -1635,6 +2101,10 @@ function renderFinalSummaryMarkdown(summary) {
   return [
     `# Final Summary: ${summary.changeId}`,
     '',
+    '## Roadmap lifecycle',
+    '',
+    ...renderRoadmapLifecycle(summary.roadmap),
+    '',
     '## Suggested commit message',
     '',
     summary.commitMessage ?? createCommitMessage(summary.changeId),
@@ -1643,6 +2113,26 @@ function renderFinalSummaryMarkdown(summary) {
     '',
     summary.prSummary ?? ''
   ].join('\n');
+}
+
+function renderRoadmapLifecycle(value) {
+  const roadmap = normalizeRoadmapOutcome(
+    value ?? createSkippedRoadmapOutcome('archive-not-successful')
+  );
+  const lines = [
+    `Status: ${roadmap.status}`,
+    `Reason: ${roadmap.reason}`,
+    `Changed: ${roadmap.changed ? 'yes' : 'no'}`
+  ];
+
+  if (roadmap.path !== null) {
+    lines.push(`Path: ${roadmap.path}`);
+  }
+  if (roadmap.suggestedNext !== null) {
+    lines.push(`Suggested next: ${ROADMAP_HANDOFF_COMMAND}`);
+  }
+
+  return lines;
 }
 
 function collectCanonicalArtifactPaths(canonicalArtifacts = {}) {
@@ -1716,7 +2206,11 @@ function createRunOptions(options, rootDir) {
     command: options.command,
     env: options.env,
     executor: options.executor,
-    nodeVersion: options.nodeVersion
+    nodeVersion: options.nodeVersion,
+    platform: options.platform,
+    candidateExists: options.candidateExists,
+    execFile: options.execFile,
+    comSpec: options.comSpec
   };
 
   for (const key of Object.keys(runOptions)) {
@@ -1846,4 +2340,180 @@ function dedupeDiagnostics(diagnostics) {
   }
 
   return result;
+}
+
+function selectOpenSpecCommandDiagnostic(result) {
+  const preArchive = result?.context?.openspec
+    ?? result?.openspec
+    ?? result?.readiness?.context?.openspec
+    ?? null;
+  const archiveCommand = normalizePublicCommand(result?.archive?.command);
+
+  if (archiveCommand !== null) {
+    return {
+      command: archiveCommand,
+      commandSource: normalizeCommandSource(result?.archive?.commandSource)
+        ?? normalizeCommandSource(preArchive?.commandSource)
+    };
+  }
+
+  return {
+    command: normalizePublicCommand(preArchive?.command),
+    commandSource: normalizeCommandSource(preArchive?.commandSource)
+  };
+}
+
+function normalizeCommandSource(value) {
+  const source = String(value ?? '');
+  return PUBLIC_COMMAND_SOURCES.has(source) ? source : null;
+}
+
+function normalizePublicCommand(value) {
+  if (value === undefined || value === null || String(value).trim().length === 0) {
+    return null;
+  }
+
+  const command = String(value).trim();
+  if (path.win32.isAbsolute(command)) {
+    return boundedPublicText(path.win32.basename(command), 240);
+  }
+  if (path.posix.isAbsolute(command)) {
+    return boundedPublicText(path.posix.basename(command), 240);
+  }
+
+  return boundedPublicText(command.replaceAll('\\', '/'), 240);
+}
+
+function normalizePublicChangeId(value) {
+  const normalized = normalizeChangeId(value);
+  return normalized.ok ? normalized.changeId : null;
+}
+
+function normalizePublicPaths(values) {
+  const result = [];
+  const seen = new Set();
+
+  for (const value of Array.isArray(values) ? values.slice(0, 100) : []) {
+    const normalized = normalizePublicPath(value);
+    if (normalized !== null && !seen.has(normalized)) {
+      seen.add(normalized);
+      result.push(normalized);
+    }
+  }
+
+  return result;
+}
+
+function normalizePublicPath(value) {
+  const normalized = String(value ?? '')
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .replaceAll('\\', '/')
+    .trim();
+
+  if (normalized.length === 0
+    || normalized.length > 512
+    || path.posix.isAbsolute(normalized)
+    || path.win32.isAbsolute(normalized)
+    || normalized.split('/').includes('..')) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function normalizeSuggestedNext(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const command = boundedPublicText(value.command ?? '', 500);
+  if (command.length === 0) {
+    return null;
+  }
+
+  return {
+    command,
+    reason: boundedPublicText(value.reason ?? '', 500)
+  };
+}
+
+function normalizePublicDiagnostics(values) {
+  return (Array.isArray(values) ? values : [])
+    .slice(0, MAX_PUBLIC_DIAGNOSTICS)
+    .map((diagnostic) => {
+      const rawCode = boundedPublicText(diagnostic?.code ?? '', 100);
+      const code = /^[A-Za-z0-9][A-Za-z0-9_.:-]*$/.test(rawCode)
+        ? rawCode
+        : 'finalization-diagnostic';
+      const result = {
+        code,
+        message: boundedPublicText(
+          diagnostic?.message ?? 'Done finalization reported a diagnostic.',
+          500
+        )
+      };
+      const diagnosticPath = normalizePublicPath(diagnostic?.path);
+
+      if (diagnosticPath !== null) {
+        result.path = diagnosticPath;
+      }
+
+      return result;
+    });
+}
+
+function boundedPublicText(value, maxLength) {
+  const normalized = redactAbsolutePaths(
+    String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ')
+  )
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return normalized.length <= maxLength
+    ? normalized
+    : `${normalized.slice(0, Math.max(0, maxLength - 1))}…`;
+}
+
+function redactAbsolutePaths(value) {
+  return String(value)
+    .replace(/"(?:[A-Za-z]:[\\/]|\\\\|\/)[^"]*"/g, '"[path]"')
+    .replace(/'(?:[A-Za-z]:[\\/]|\\\\|\/)[^']*'/g, "'[path]'")
+    .replace(/\\\\[^\\/\s"']+(?:[\\/].*)?$/g, '[path]')
+    .replace(/[A-Za-z]:[\\/].*$/g, '[path]')
+    .replace(/(^|[\s(])\/(?:[^/\s)]+\/).*$/g, '$1[path]');
+}
+
+function isDirtyStateRecorded(workingTree) {
+  return Boolean(workingTree?.recorded)
+    || (Boolean(workingTree?.dirty)
+      && Boolean(workingTree?.ok)
+      && (workingTree?.warnings ?? []).some((warning) => warning?.code === 'dirty-working-tree-recorded'));
+}
+
+function invalidFinalizerArgs(error) {
+  return {
+    ok: false,
+    error
+  };
+}
+
+async function main() {
+  const result = await runDoneFinalizerCommand(process.argv.slice(2));
+  if (result.stdout) {
+    process.stdout.write(result.stdout);
+  }
+  if (result.stderr) {
+    process.stderr.write(result.stderr);
+  }
+  process.exitCode = result.exitCode;
+}
+
+const isDirect = process.argv[1] !== undefined
+  && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
+
+if (isDirect) {
+  main().catch(() => {
+    process.stderr.write('Done finalizer command failed unexpectedly.\n');
+    process.exitCode = 2;
+  });
 }

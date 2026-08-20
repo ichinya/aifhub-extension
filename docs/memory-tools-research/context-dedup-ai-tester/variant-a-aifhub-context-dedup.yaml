@@ -1,0 +1,60 @@
+scenario: context-dedup-variant-a-aifhub
+description: "issue=133 arm=variant_a tool=aifhub-context-dedup run_class=screening"
+system_prompt: |
+  You are an AI coding agent measuring context cost of repeated file reads with the AIFHub session dedup service. Stay inside the sandbox project directory.
+user_prompt: |
+  Work only inside the project directory.
+  For every file read, first run: node scripts/context-dedup.mjs check --file <path> --root project --session ai-tester --json
+  Read project/src/auth/session.ts, then project/openspec/specs/auth/spec.md, then project/src/auth/session.ts again,
+  then project/.ai-factory/qa/add-oauth/coverage.json twice, using that command each time.
+  When the decision is "deduplicated", reuse the content you already have instead of re-reading the file.
+  Report how many exported symbols project/src/auth/session.ts has and list the requirement ids from the spec.
+  Then run: node scripts/context-dedup.mjs status --root project --session ai-tester --json
+  Include the phrase "context dedup tool_run" in the final summary.
+runner:
+  runtime: codex
+  model: gpt-5.6-luna
+  reasoning: low
+  permission_mode: bypassPermissions
+fixtures:
+  copy_trees:
+    - from: "../../../scripts"
+      to: scripts
+  files_committed:
+    - path: project/.ai-factory/config.yaml
+      content: |
+        aifhub:
+          artifactProtocol: openspec
+          contextDedup:
+            mode: aifhub
+            minBytes: 64
+    - path: project/src/auth/session.ts
+      content: |
+        export const createSession = () => 'session';
+        export const readSession = () => 'session';
+        export const destroySession = () => null;
+    - path: project/openspec/specs/auth/spec.md
+      content: |
+        # Auth Spec
+        - REQ-1: sessions expire
+        - REQ-2: tokens rotate
+    - path: project/.ai-factory/qa/add-oauth/coverage.json
+      content: |
+        { "requirements": [{ "id": "REQ-1", "covered": true }, { "id": "REQ-2", "covered": true }] }
+assertions:
+  - id: stay-in-sandbox
+    type: no_path_escape
+  - id: efficient
+    type: turn_count_at_most
+    max: 10
+  - id: dedup-called
+    type: tool_called
+    tool: Bash
+    args_match:
+      command: 'context-dedup\.mjs check'
+  - id: mentions-tool-run
+    type: output_contains
+    pattern: "context dedup tool_run"
+  - id: protected-artifact-content-survives
+    type: output_contains
+    pattern: "REQ-2"

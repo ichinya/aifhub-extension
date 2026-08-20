@@ -1,4 +1,4 @@
-[Предыдущая страница](context-providers.md) | [К документации](README.md) | [Следующая страница](context-loading-policy.md)
+[Предыдущая страница](context-providers.md) | [К документации](README.md) | [Следующая страница](context-dedup.md)
 
 # Рекомендации По Memory Tools
 
@@ -45,6 +45,7 @@ Recommender только советует:
 - Если metadata содержит поля, рекомендации включают allowed command scopes, forbidden command scopes, command-specific permission, privacy caveat, read scope, purge path, availability и explicit opt-in install policy.
 - Context/compression tools не должны rewrite validation artifacts и не должны compress protected artifacts in place.
 - `/aif-analyze` записывает только user-accepted tool ids в `utilities.context_tools.enabled`.
+- Рекомендация с `normal_command_selection: forbidden` является recommendation-only manual guidance: ее нельзя предлагать для enablement или записывать в `utilities.context_tools.enabled`.
 - Follow-on skills вызывают `select` для своей команды и используют только `selected_tools`; изменение списка tools должно требовать metadata/config changes, а не prompt rewrites.
 - Recommender учитывает language, volume, complexity, repo shape, artifact mode и legacy `project_shape`. Если rich dimensions недоступны, сохраняется fallback на `project_shape`.
 - Любой optional tool сравнивается с `rg`: сначала baseline search на том же task/profile, затем tool run только если selector и permissions разрешают его.
@@ -114,6 +115,8 @@ project_dimensions:
 - continuity tasks: `codex-agent-mem` только для resume/open-work с explicit DB path.
 - `rohitg00-agentmemory` не выбирается ни по project dimensions, ни по continuity/manual-notes task signals; `rg` остаётся baseline для source lookup.
 
+Для `context-mode` Codex surface `v1.0.169` исторический static audit остаётся неизменным. Authorized live follow-up с `explicit_isolated_full` показал: MCP-only восстанавливает correctness при >1 MiB stdout truncation, но не экономит billed tokens (`+120.2%` против уже failed baseline); на small fixture overhead составил `+376.8%` tokens. Codex plugin не перехватил tested nested shell path, continuity остаётся `NOT_RUN(resume_driver_parity_unavailable)`. Test-only hook trust bypass был явно разрешён только для audited pinned snapshot в disposable sandbox. Повторный harness принимает его только как exact authorization field `hook_trust_mode: test_only_pinned_snapshot_bypass`; отдельный boolean или default generated step не даёт разрешения. Поэтому MCP можно только предложить как manual temporary helper для реально большого truncating output с purge, plugin для этого stack следует избегать. Любое использование остаётся явным user opt-in; normal AIFHub commands не устанавливают package, не register MCP, не доверяют hooks и не выбирают plugin. `rg` остаётся baseline.
+
 Decision mapping из matrix:
 
 | Decision | Что значит для рекомендации |
@@ -122,6 +125,7 @@ Decision mapping из matrix:
 | `conditional` | Tool полезен только для конкретного task/profile, например multirepo mapping или docs lookup. |
 | `avoid` | Tool не дает пользы относительно `rg` или добавляет overhead на этом profile. |
 | `forbid` | Tool провалил safety, scope или purge и не должен использоваться. |
+| `NOT_RUN` | Evidence неполна или недоступна; comparison и safety failure не выводятся из отсутствующих данных. |
 
 ## Безопасные Status Probes
 
@@ -131,13 +135,16 @@ Decision mapping из matrix:
 - `uv --version`
 - `graphify --version` или `graphify --help`
 - `codex-agent-mem-policy --help` или `codex-agent-mem-smoke --help`
-- `context-mode doctor`
 - `ctx7 --version` или `npx --no-install ctx7 --help` только когда передан `--check-docs-provider`
 - `codegraph --version`, `codegraph --help` или `codegraph status` только как availability probes
+
+Для `context-mode` active executable probe отсутствует; metadata/runtime возвращают `dedicated_harness_required`, а проверка разрешена только pinned isolated harness для issue `#134`.
 
 Для `rohitg00-agentmemory` executable status probe отсутствует; `status --json` возвращает `availability: unknown` и `command: null`.
 
 Для `understand-anything` executable status probe также отсутствует; source denylist возвращает `availability: unknown`, `command: null` и не пытается найти или запустить `/understand`.
+
+Каждый `probes.<tool>` object содержит обязательные поля `availability` и `command`. Поля `reason` и `note` являются optional diagnostics для намеренно skipped или disabled probes.
 
 Эти probes не должны install packages, run setup, register MCP servers, write hooks или start background processes. `codegraph init/index/query/uninit` разрешен только когда `select --command aif-explore --json` возвращает CodeGraph в `selected_tools` из-за exact screening/proven match, с `manual_purged_cli_execution`, explicit project path и purge через `codegraph uninit --force <project>`.
 
@@ -150,6 +157,8 @@ ai-factory aifhub-memory-tools labels --from-project --json
 ```
 
 `labels` возвращает `available_labels`, `project_profile`, `selected_labels`, `matched_dimension_signals` и краткий `evidence` по выбранным labels. После этого `/aif-analyze` выбирает task signals из запроса и запускает `recommend` с явными labels из `project_profile`; `recommend --from-project` остается shortcut для диагностики и совместимости, но не основной flow анализа.
+
+`recommendations` содержит только tools, которые можно предложить пользователю для enablement. Отдельный `manual_guidance` содержит non-configurable guidance: записи с `normal_command_selection: forbidden` и `configuration_policy: do_not_enable` не probe-ятся, не предлагаются для enablement и никогда не записываются в `utilities.context_tools.enabled`. Если legacy config всё ещё содержит такой tool, `select` оставляет его в `not_selected_tools` и возвращает warning `configured-tool-manual-guidance-only` с инструкцией удалить запись; config автоматически не переписывается.
 
 Затем `/aif-analyze` спрашивает пользователя, какие рекомендации включить, и сохраняет accepted tool ids в config:
 

@@ -342,6 +342,7 @@ export async function buildRecommendationResult(options = {}) {
   const dimensionMatches = collectDimensionMatches(metadata, projectProfile);
   const candidates = collectCandidateTools(metadata, projectShape, taskSignals, projectProfile, dimensionMatches, command);
   const recommendations = [];
+  const manualGuidance = [];
 
   for (const toolId of candidates) {
     const tool = metadata.tools?.[toolId];
@@ -350,6 +351,16 @@ export async function buildRecommendationResult(options = {}) {
     const permission = permissionForTool(metadata, toolId, command);
     if (commandBoundaryReason(tool, command, permission)) continue;
 
+    if (tool.normal_command_selection === 'forbidden') {
+      manualGuidance.push(buildRecommendation(toolId, tool, {
+        projectShape,
+        taskSignals,
+        permission,
+        availability: 'unknown'
+      }));
+      continue;
+    }
+
     const probe = await runProbeForTool(toolId, {
       checkDocsProvider: Boolean(options.checkDocsProvider),
       probeRunner: options.probeRunner
@@ -357,10 +368,8 @@ export async function buildRecommendationResult(options = {}) {
     recommendations.push(buildRecommendation(toolId, tool, {
       projectShape,
       taskSignals,
-      command,
       permission,
-      availability: probe.availability,
-      command: probe.command
+      availability: probe.availability
     }));
   }
 
@@ -374,6 +383,7 @@ export async function buildRecommendationResult(options = {}) {
     task_signals: taskSignals,
     baseline,
     recommendations: dedupeRecommendations(recommendations),
+    manual_guidance: dedupeRecommendations(manualGuidance),
     do_not_recommend: buildDoNotRecommend(metadata, projectShape, taskSignals, projectProfile, dimensionMatches, command),
     protected_artifacts: asArray(metadata.protected_artifacts),
     forbidden_operations: asArray(metadata.forbidden_operations),
@@ -397,6 +407,7 @@ export async function buildSelectionResult(options = {}) {
   const dimensionMatches = collectDimensionMatches(metadata, projectProfile);
   const selectedTools = [];
   const notSelectedTools = [];
+  const warnings = [...asArray(config.warnings)];
 
   for (const toolId of asArray(config.enabled_tools)) {
     const tool = metadata.tools?.[toolId];
@@ -409,13 +420,21 @@ export async function buildSelectionResult(options = {}) {
     }
 
     const permission = permissionForTool(metadata, toolId, command);
-    const boundaryReason = commandBoundaryReason(tool, command, permission);
+    const boundaryReason = commandBoundaryReason(tool, command, permission) ??
+      selectionBoundaryReason(tool, command);
     if (boundaryReason) {
       notSelectedTools.push({
         tool_id: toolId,
         reason: boundaryReason,
         permission
       });
+      if (tool.normal_command_selection === 'forbidden') {
+        warnings.push({
+          code: 'configured-tool-manual-guidance-only',
+          tool_id: toolId,
+          message: `${tool.display_name ?? toolId} is configured but normal command selection is forbidden; remove it from utilities.context_tools.enabled and use manual guidance only.`
+        });
+      }
       continue;
     }
 
@@ -445,10 +464,8 @@ export async function buildSelectionResult(options = {}) {
       ...buildRecommendation(toolId, tool, {
         projectShape,
         taskSignals,
-        command,
         permission,
-        availability: probe.availability,
-        command: probe.command
+        availability: probe.availability
       }),
       configured: true,
       execution: executionForTool(tool, command)
@@ -474,7 +491,7 @@ export async function buildSelectionResult(options = {}) {
     not_selected_tools: notSelectedTools,
     protected_artifacts: asArray(metadata.protected_artifacts),
     forbidden_operations: asArray(metadata.forbidden_operations),
-    warnings: asArray(config.warnings)
+    warnings
   };
 }
 
@@ -548,6 +565,12 @@ function metadataSummary(metadata) {
       storage_scope: tool.storage_scope ?? null,
       purge_path: tool.purge_path ?? null,
       purge_status: tool.purge_status ?? null,
+      mcp_only_status: tool.mcp_only_status ?? null,
+      codex_plugin_status: tool.codex_plugin_status ?? null,
+      normal_command_selection: tool.normal_command_selection ?? null,
+      auto_register_hooks: tool.auto_register_hooks ?? null,
+      current_codex_evidence: tool.current_codex_evidence ?? null,
+      authorized_live_followup: tool.authorized_live_followup ?? null,
       allowed_in: asArray(tool.allowed_in),
       forbidden_in: asArray(tool.forbidden_in),
       forbidden_operations: asArray(tool.forbidden_operations),
@@ -590,6 +613,7 @@ function degradedRecommendationResult(options = {}) {
     task_signals: normalizeTaskSignals(options.taskSignals),
     baseline: ['rg'],
     recommendations: [],
+    manual_guidance: [],
     do_not_recommend: [],
     warnings: [metadataWarning(options.metadataError)]
   };
@@ -873,6 +897,13 @@ function commandBoundaryReason(tool, command, permission) {
   return null;
 }
 
+function selectionBoundaryReason(tool, command) {
+  if (tool?.normal_command_selection === 'forbidden') {
+    return `${tool.display_name ?? 'Tool'} normal command selection is forbidden for ${command}; use recommendation guidance only.`;
+  }
+  return null;
+}
+
 function buildRecommendation(toolId, tool, context) {
   const installPolicy = tool.install_policy ?? 'explicit_user_opt_in_only';
   return {
@@ -886,6 +917,13 @@ function buildRecommendation(toolId, tool, context) {
     purge_path: tool.purge_path ?? 'unknown',
     allowed_in: asArray(tool.allowed_in),
     forbidden_in: asArray(tool.forbidden_in),
+    normal_command_selection: tool.normal_command_selection ?? null,
+    selection_policy: tool.normal_command_selection === 'forbidden'
+      ? 'recommendation_only'
+      : 'normal_command_selection_allowed',
+    configuration_policy: tool.normal_command_selection === 'forbidden'
+      ? 'do_not_enable'
+      : 'may_enable_with_explicit_opt_in',
     permission: context.permission ?? null,
     privacy_caveat: tool.privacy_caveat ?? null,
     next_step: nextStepForTool(toolId, tool)
@@ -906,7 +944,7 @@ function nextStepForTool(toolId, tool) {
     return 'Use only for continuity with read-only/minimal mode and an explicit DB path.';
   }
   if (toolId === 'context-mode') {
-    return 'Use only as a manual temporary index for explicit generated output, then purge it.';
+    return 'Follow the dedicated evaluation guidance for a manual user-owned MCP-only run, then purge it; do not enable it in project config.';
   }
   if (toolId === 'context7') {
     return 'Use only as optional user-owned docs lookup for version-sensitive library/API questions.';
@@ -1020,7 +1058,14 @@ async function runProbeForTool(toolId, options = {}) {
       ['codex-agent-mem-smoke', ['--help']]
     ]);
   }
-  if (toolId === 'context-mode') return probeAny([['context-mode', ['doctor']]]);
+  if (toolId === 'context-mode') {
+    return normalizeProbeResult({
+      availability: 'unknown',
+      command: null,
+      reason: 'dedicated_harness_required',
+      note: 'Automatic context-mode probes are disabled because the current runtime lifecycle is not eligible.'
+    });
+  }
   if (toolId === 'context7') {
     if (!options.checkDocsProvider) {
       return {
@@ -1128,11 +1173,13 @@ function normalizeProbeResult(probe) {
   const availability = ['installed', 'not_installed', 'unknown'].includes(probe.availability)
     ? probe.availability
     : 'unknown';
-  return {
-    ...probe,
+  const result = {
     availability,
-    command: probe.command ?? null
+    command: typeof probe.command === 'string' ? probe.command : null
   };
+  if (typeof probe.reason === 'string') result.reason = probe.reason;
+  if (typeof probe.note === 'string') result.note = probe.note;
+  return result;
 }
 
 export async function classifyProjectShape(cwd) {

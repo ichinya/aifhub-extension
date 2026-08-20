@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 3,
+  "runDate": "2026-07-26",
+  "runnerRepository": "C:\\projects\\ai-tester",
+  "runnerCommit": "98dd5afb3fe9b9b7593d21dc93bcbc6d98c2cca9",
+  "model": "gpt-5.6-luna",
+  "reasoning": "low",
+  "implementation": {
+    "contextDedupSha256": "4A0E61F5F4130026E6C89B9F02050FFD92CB9C8AB5EDCF132C228DA13A35AFE1",
+    "activeChangeResolverSha256": "ACB4B388927870EF23BE8E1BEB4AE90BCA71552C4C3B708FD25080E0B2D05998",
+    "generatorSha256": "AAC453C0B9966D73D0841BE3CCE0EACE3A035D4B90EDD09E6522D589AF66843F",
+    "summarizerSha256": "DB92F51098AAF100AC7F544E9F5A4D4E9321E9AE7EA76C9EBB038D2240418F46"
+  },
+  "sqz": {
+    "repository": "https://github.com/ojuschugh1/sqz",
+    "version": "1.3.0",
+    "sourceCommit": "d024b6b6bec152dfa7a63e2316054b1bb33a8110",
+    "archiveSha256": "8243989670198FC0251404A330D843224D896FC6AAB1DE8233D73A0C1AA04158",
+    "officialBinarySha256": "0C21ADFA0C67B6EB61EDD2B8B87C836AC2757A58D0D68D93376606E6CC75E76B",
+    "runtime": "official-cli-through-aifhub-mode"
+  },
+  "arms": [
+    "baseline",
+    "aifhub",
+    "sqz"
+  ],
+  "cases": [
+    "repeat-source",
+    "changed-source",
+    "protected-openspec",
+    "fresh-session-preseeded-cache"
+  ],
+  "totalScenarios": 12,
+  "lastObserved": {
+    "snapshot": ".ai-factory/state/context-dedup-issue-133/ai-tester/sqz-luna-low-20260726-r4",
+    "startedAfter": "2026-07-26T18:05:54.5038488Z",
+    "aggregates": [
+      {
+        "arm": "baseline",
+        "passed": 4,
+        "total": 4,
+        "inputBytes": 105260,
+        "outputBytes": 105260
+      },
+      {
+        "arm": "aifhub",
+        "passed": 4,
+        "total": 4,
+        "inputBytes": 105260,
+        "outputBytes": 91099
+      },
+      {
+        "arm": "sqz",
+        "passed": 4,
+        "total": 4,
+        "inputBytes": 105260,
+        "outputBytes": 54081
+      }
+    ]
+  }
+}

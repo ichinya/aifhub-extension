@@ -6,20 +6,33 @@
   "sources": {
     "ai-factory": {
       "url": "https://github.com/lee-to/ai-factory",
-      "version": "2.17.0",
-      "baselineVersion": "2.17.0",
-      "lastSync": "2026-07-09",
-      "notes": "Validated against upstream 2.17.0 on the 2.x branch. The cumulative reviewed baseline preserves AI Factory 2.13.x plan-aware /aif-commit Commit Plan grouping and /aif-distillation for reusable Agent Skills, AI Factory 2.14 /aif-archive with paths.archive and archive-aware sequential plan behavior, config-aware project utilities /aif-architecture, /aif-docs, and /aif-qa as upstream-owned context outputs, and AI Factory 2.15 managed agent config preservation plus interactive newly available built-in skill update behavior. Headline 2.16-2.17 changes cover revision-bound research context, branch-scoped /aif-qa-check, regression-first /aif-fix evidence, and verbatim Original Request preservation. Direct follow-ups cover QA execution surfaces, collision-resistant branch identity, revision/worktree/source/case freshness, reusable non-sensitive QA memory, authorization and redaction, custom fix-plan preservation, plan/improve Original Request clarifications, Universal / Other MCP through .mcp.json, and project-evidence-backed Control Flow rules. Reviewed no-ops keep /aif-architecture structure upstream-owned, avoid duplicate generated-rules compiler logic, and do not copy community-extension documentation bodies."
+      "version": "2.18.1",
+      "baselineVersion": "2.18.1",
+      "lastSync": "2026-08-14",
+      "notes": "Validated against upstream 2.18.1 on the 2.x branch. The cumulative reviewed baseline preserves AI Factory 2.13.x plan-aware /aif-commit Commit Plan grouping and /aif-distillation for reusable Agent Skills, AI Factory 2.14 /aif-archive with paths.archive and archive-aware sequential plan behavior, config-aware project utilities /aif-architecture, /aif-docs, and /aif-qa as upstream-owned context outputs, and AI Factory 2.15 managed agent config preservation plus interactive newly available built-in skill update behavior. Headline 2.16-2.17 changes cover revision-bound research context, branch-scoped /aif-qa-check, regression-first /aif-fix evidence, and verbatim Original Request preservation. Direct follow-ups cover QA execution surfaces, collision-resistant branch identity, revision/worktree/source/case freshness, reusable non-sensitive QA memory, authorization and redaction, custom fix-plan preservation, plan/improve Original Request clarifications, Universal / Other MCP through .mcp.json, and project-evidence-backed Control Flow rules. The reviewed 2.17.0...2.18.0 comparison keeps extension schema/loader, injection and MCP contracts, Node >=18, bin and dependencies unchanged; AIFHub therefore adds no speculative runtime adapter. The reviewed 2.18.0...2.18.1 patch contains 2 commits across 8 files and is prompt/docs-only apart from package/test metadata: runtime APIs, extension schema/loader, injection/MCP contracts, Node, bin and dependencies remain unchanged. Its /aif-explore Research Coherence Gate stays upstream-owned; AIFHub supplies only a non-bypass pass-through after permitted persisted writes, with direct fallback when optional Task delegation is unavailable and coherence before the ultra Bundle Integrity Gate. AI Factory 2.18 ultra planning maps to canonical OpenSpec detail in OpenSpec-native mode and remains an upstream-owned marked bundle in legacy mode; ultra research remains revision-bound supporting context. Completed-phase /aif-loop budgeting and skills.sh documentation are reviewed no-ops. The privacy-gated /aif-transfer skill stays upstream-owned and delegates accepted project evidence to /aif-evolve without an AIFHub copy. Plan, explore, improve, implement, verify, fix, archive, rules, commit, roadmap and namespaced-agent consumers retain only their bounded AIFHub/OpenSpec adapters. Reviewed no-ops keep /aif-architecture structure upstream-owned, avoid duplicate generated-rules compiler logic, and do not copy community-extension documentation bodies."
     },
     "openspec": {
       "url": "https://github.com/Fission-AI/OpenSpec",
-      "version": "1.4.1",
+      "version": "1.8.0",
+      "baselineVersion": "1.3.1",
       "supportedRange": ">=1.3.1 <2.0.0",
-      "lastSync": "2026-06-10",
+      "reviewedStableVersions": [
+        "1.3.1",
+        "1.4.0",
+        "1.4.1",
+        "1.5.0",
+        "1.6.0",
+        "1.7.0",
+        "1.8.0"
+      ],
+      "reviewedPrereleaseVersions": [
+        "1.6.0-beta.1"
+      ],
+      "lastSync": "2026-08-09",
       "optional": true,
       "requiresNode": ">=20.19.0",
       "mode": "optional-cli-adapter",
-      "notes": "Validated against upstream OpenSpec 1.4.1 while keeping the supported CLI range >=1.3.1 <2.0.0. Reviewed baseline includes the 1.4.1 openspec update workspace.yaml fix and the 1.4.0 Kimi CLI, Mistral Vibe, default sync skills, case-insensitive requirement headers, and clearer validation hints. AIFHub remains adapter-only and does not install or manage OpenSpec skills, /opsx:* commands, Kimi/Mistral integrations, workspace beta state, or openspec update."
+      "notes": "Validated sequentially from upstream OpenSpec 1.3.1 through 1.8.0, including reviewed prerelease 1.6.0-beta.1, while keeping the supported stable CLI range >=1.3.1 <2.0.0; prereleases remain unsupported for production capabilities. OpenSpec 1.8.0 adds explicit retire_capabilities metadata, scenario-loss validation, nested task progress, non-TTY archive guidance, and new agent targets. AIFHub version-gates retirement metadata in its planning prompt, preserves fail-closed validation diagnostics, already counts nested task checkboxes, and leaves agent generation upstream-owned. OpenSpec 1.7.0 adds native skip_specs metadata, apply/archive instructions, numeric-leading change IDs, nested spec folders, UTF-8 BOM handling, a default Store, new tool adapters, and a self-upgrading openspec update. AIFHub honors native .openspec.yaml skip_specs during artifact validation and all-change sync, keeps recursive nested-spec discovery, supports archive instructions through the shared runner, and preserves the older numeric-ID status fallback for pre-1.7 CLIs. OpenSpec 1.6.0 unifies validate/view/archive resolution, makes archive validation failures exit non-zero, handles nested specs and task files, adds /opsx:update, Oh My Pi and Trae support, and fixes requirement parsing, archive drift, skill permissions, and fresh Store registration. OpenSpec 1.5.0 introduces Stores in very early beta, fixes config parsing and CRLF YAML frontmatter generation, and adds an additive root field to command JSON. AIFHub remains adapter-only and does not install or manage OpenSpec skills, /opsx:* commands, tool integrations, Stores, workspace beta state, agent targets, or openspec update."
     }
   }
 }

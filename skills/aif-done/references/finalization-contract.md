@@ -21,7 +21,7 @@ Reference for the `aif-done` skill and `aifhub-done-finalizer` agents.
 - Missing, invalid, stale, or failed coverage refuses finalization and requires `/aif-verify`.
 - Missing, invalid, stale, failed, or disallowed warning rules gate evidence refuses finalization when policy requires rules pass.
 - `Code verification: PENDING` is ambiguous and must refuse finalization.
-- Dirty workspace state is empty, or explicit dirty-state recording is enabled through `/aif-done <change-id> --record-dirty-state`.
+- Dirty workspace state is empty, or explicit dirty-state recording is enabled through `ai-factory aifhub-done-finalizer --change <change-id> --record-dirty-state --json`.
 
 ### Canonical Context
 
@@ -44,25 +44,36 @@ openspec/changes/<change-id>/specs/**/spec.md
 
 ### Archive Policy
 
-OpenSpec-native `/aif-done` uses `scripts/openspec-done-finalizer.mjs`. Archive lifecycle mutation must happen through `archiveOpenSpecChange(changeId, options)` from `scripts/openspec-runner.mjs` and never through custom folder movement or direct `openspec/specs` edits. Normal archive is `openspec archive <change-id> --yes`.
+The installed executable route is `ai-factory aifhub-done-finalizer --change <change-id> --json`. It resolves the extension-local `scripts/openspec-done-finalizer.mjs` implementation module and must not require a consumer-root copy or an internal installed-path command. Archive lifecycle mutation inside the extension must happen through `archiveOpenSpecChange(changeId, options)` from `scripts/openspec-runner.mjs` and never through custom folder movement or direct `openspec/specs` edits.
 
-Normal archival corresponds to:
+Omitting `--change` delegates to the active-change resolver: exactly one resolvable active change may be selected, while missing or ambiguous scope exits with code `2` before finalization. Automation must always pass an explicit `--change <change-id>`.
+
+Normal installed finalization:
 
 ```bash
-openspec archive <change-id> --yes
+ai-factory aifhub-done-finalizer --change <change-id> --json
 ```
 
 Docs/tooling-only archival uses `--skip-specs`:
 
 ```bash
-openspec archive <change-id> --yes --skip-specs --no-color
+ai-factory aifhub-done-finalizer --change <change-id> --skip-specs --json
 ```
 
-`--skip-specs` still writes final QA evidence and final summaries. Missing or unsupported OpenSpec CLI fails when archive is required. `/aif-verify` does not archive.
+The extension-local implementation maps those commands to `openspec archive <change-id> --yes` or `openspec archive <change-id> --yes --skip-specs --no-color`. `--skip-specs` still writes final QA evidence and final summaries. Missing or unsupported OpenSpec CLI fails when archive is required. `/aif-verify` does not archive. Public finalization rejects `--force`, `--no-validate`, `--skip-archive`, `--dry-run`, `--summary-only`, and unknown options before calling the finalizer API.
 
-Dirty workspace state is blocking by default. Inspect with `git status --short`; commit or stash unrelated changes, or rerun `/aif-done <change-id> --record-dirty-state` to record dirty state in final QA evidence before archive. For docs/tooling-only changes, combine the public flags as `/aif-done <change-id> --skip-specs --record-dirty-state`.
+Dirty workspace state is blocking by default. Inspect with `git status --short`; commit or stash unrelated changes, or rerun `ai-factory aifhub-done-finalizer --change <change-id> --record-dirty-state --json` to record dirty state in final QA evidence before archive. For docs/tooling-only changes, combine the public flags as `ai-factory aifhub-done-finalizer --change <change-id> --skip-specs --record-dirty-state --json`.
 
 OpenSpec-native mode does not use legacy `.ai-factory/specs` archive.
+
+### Roadmap Lifecycle Co-Ownership
+
+- After successful OpenSpec archive, `/aif-done` co-owns only the marker-delimited `OpenSpec Change Lifecycle` block in the configured project-relative roadmap; `/aif-roadmap` remains the owner of the full roadmap audit and reconciliation.
+- The finalizer uses the canonical pre-archive `## Roadmap Linkage` fields and a project-relative final evidence path to insert or update one local `finalized` row. Explicit `none` linkage produces the local outcome `skipped` without changing the roadmap.
+- A readiness, verification, artifact-contract, dirty-tree, or archive failure must not update the roadmap or create a `finalized` row.
+- Normal output reports the local roadmap lifecycle outcome `updated`, `skipped`, or `handoff` separately from external GitHub issue, pull request, and milestone state.
+- Local finalization must not claim that a GitHub issue is closed or a pull request is merged.
+- If a post-archive roadmap update cannot be completed safely, preserve the successful archive and final evidence, return `handoff` with the exact `/aif-roadmap check` guidance, and must not roll back the successful archive or fabricate a `finalized` row.
 
 ### Final Evidence
 
@@ -80,7 +91,9 @@ Do not write runtime-only files into `openspec/changes/<change-id>/`.
 
 ### Output
 
-Report selected `change-id`, effective policy summary, verification status, coverage matrix status, rules gate status, dirty working tree state, QA evidence path, `.ai-factory/qa/<change-id>/` final evidence path, `.ai-factory/state/<change-id>/` final summary path, canonical artifacts inspected, generated rules state, archive result, `--skip-specs` state, commit draft, PR draft, and next steps: `/aif-mode sync`, `/aif-commit`, and optional `/aif-evolve`.
+Report selected `change-id`, effective policy summary, verification status, coverage matrix status, rules gate status, dirty working tree state, QA evidence path, `.ai-factory/qa/<change-id>/` final evidence path, `.ai-factory/state/<change-id>/` final summary path, canonical artifacts inspected, generated rules state, archive result, bounded OpenSpec command/source, `--skip-specs` state, commit draft, PR draft, and next steps: `/aif-mode sync`, `/aif-commit`, and optional `/aif-evolve`.
+
+Command exit codes are `0` for successful or policy-accepted warning finalization, `1` for a resolved blocking failure, and `2` for invalid arguments, unresolved or ambiguous scope, or an unexpected command failure.
 
 After successful finalization:
 
@@ -93,13 +106,56 @@ After successful finalization:
 
 ## Legacy AI Factory-only mode
 
-## Entry Conditions
+### Marker-first legacy ultra contract
+
+Legacy mode must classify the normalized project-relative entrypoint before classic companion discovery or any write. A valid marker-bearing AI Factory 2.18 ultra plan is one atomic upstream bundle rooted at `<entrypoint>/index.md`; it is not a folder-only classic plan and must not be migrated or paired with `<plan-id>.md`.
+
+For `ultra-valid`, `/aif-verify <entrypoint>` is the only receipt writer. After upstream verification produces exactly one final valid `aif-gate-result`, it writes:
+
+```text
+.ai-factory/state/legacy-ultra-verification/<entrypoint-digest>.json
+```
+
+The receipt schema is:
+
+```json
+{
+  "schemaVersion": 1,
+  "entrypoint": ".ai-factory/plans/<plan-id>/index.md",
+  "entrypointDigest": "<lowercase SHA256>",
+  "bundleDigest": "<lowercase SHA256>",
+  "sourceRevision": { "kind": "git-head", "value": "<HEAD>" },
+  "worktreeDigest": "<lowercase SHA256>",
+  "verifiedAt": "<ISO-8601 timestamp>",
+  "sourceCommand": "/aif-verify .ai-factory/plans/<plan-id>/index.md",
+  "gateOutcome": { "gate": "verify", "status": "pass", "blockers": [], "affected_files": [], "suggested_next": null }
+}
+```
+
+`sourceRevision.kind` is `git-head` in a Git workspace and `manual-build-id` only for a non-Git workspace with an explicit bounded build id. The stored `gateOutcome` is the exact structured final upstream gate and may record `pass`, `warn`, or `fail`; only exact `pass` is finalization-ready.
+
+#### Binding algorithm
+
+- Normalize a directory or `index.md` input to one safe project-relative `<bundle>/index.md`. `entrypointDigest` is SHA256 of that normalized UTF-8 string without an added newline.
+- Build the bundle manifest from `index.md` plus its direct validated `phase-*.md` files, sorted by normalized project-relative path. Each JSONL row is `[path,type,sha]`; files hash current bytes, symlinks hash their link target, and the manifest ends with one newline. `bundleDigest` is SHA256 of the full manifest bytes.
+- In Git, obtain candidates only with `git ls-files --cached --others --exclude-standard -z`, resolve the revision with `git rev-parse --verify HEAD`, normalize and sort paths, and hash the same JSONL row format. A deleted tracked path remains a row `[path,"missing",null]`.
+- Exclude `.git/**`, `.ai-factory/state/**`, `.ai-factory/qa/**`, `.ai-factory/rules/generated/**`, and the ultra bundle itself from the worktree manifest. This prevents the receipt and derived evidence from invalidating themselves while binding all tracked and non-ignored untracked code/content outside the bundle.
+- In a non-Git workspace, deterministically enumerate non-excluded files and bind them to the caller-supplied `manual-build-id`.
+- `worktreeDigest` is SHA256 of the sorted worktree JSONL manifest bytes. Do not use mtimes, directory iteration order, conversational state, or recency.
+
+#### `/aif-done` decision
+
+`/aif-done` calls `evaluateLegacyUltraVerificationReceipt()` and recomputes every binding. A missing/invalid receipt, wrong entrypoint, stale bundle, wrong `HEAD` or manual build id, stale worktree, non-`pass` gate, or any binding failure returns exactly `/aif-verify <entrypoint>`. A current exact PASS receipt returns exactly `/aif-archive <entrypoint>`.
+
+This branch is read-only: `/aif-done` returns the handoff but does not execute it and does not write the bundle, a classic companion, OpenSpec artifacts, `status.yaml`, QA evidence, final summaries, specs archives/indexes, or receipts. `ultra-invalid` and `collision` fail closed without classic fallback.
+
+### Classic entry conditions
 
 - `status.yaml` exists in the active plan folder.
 - `verification.verdict` is `pass` or `pass-with-notes`.
 - No uncommitted changes outside plan scope (user must confirm if present).
 
-## Archival Structure
+### Classic archival structure
 
 ```text
 .ai-factory/specs/<plan-id>/

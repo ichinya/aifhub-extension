@@ -1,0 +1,11 @@
+[package]
+name = "sqz-isolated-adapter"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Expected reproduction layout:
+#   upstream/sqz-v1.3.0/        pinned ojuschugh1/sqz checkout
+#   sqz-isolated-adapter/       this directory
+[dependencies]
+sqz-engine = { path = "../upstream/sqz-v1.3.0/sqz_engine" }

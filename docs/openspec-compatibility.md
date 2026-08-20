@@ -26,17 +26,44 @@ AI Factory = execution runtime
 
 AI Factory-only workflows follow AI Factory's runtime support. OpenSpec validation/archive follows the OpenSpec CLI runtime requirement.
 
-## OpenSpec 1.4.1 Reviewed Baseline
+## OpenSpec 1.8.0 Reviewed Baseline
 
-AIFHub metadata records OpenSpec `1.4.1` as the reviewed upstream baseline while keeping the supported CLI range `>=1.3.1 <2.0.0`.
+AIFHub metadata records OpenSpec `1.8.0` as the latest reviewed upstream baseline while keeping the supported stable CLI range `>=1.3.1 <2.0.0`.
+
+- Baseline `1.3.1` is the first supported and reviewed release.
+- Reviewed stable releases: `1.3.1`, `1.4.0`, `1.4.1`, `1.5.0`, `1.6.0`, `1.7.0`, `1.8.0`.
+- Reviewed prereleases: `1.6.0-beta.1`. A prerelease review does not imply production support; prerelease detection remains unavailable for production capabilities.
+
+| Release | Channel | Adapter result | Checked AIFHub surfaces | Required adaptation |
+|---|---|---|---|---|
+| `1.3.1` | stable | supported baseline | version detection and existing validate/archive adapter contract | baseline |
+| `1.4.0` | stable | supported | `--version`, validate JSON, status JSON, spec show JSON, apply instructions JSON, archive flags | reviewed-release metadata and no-op ownership documentation |
+| `1.4.1` | stable | supported | `--version`, validate JSON, status JSON, spec show JSON, apply instructions JSON, archive flags | `openspec update` remains upstream-owned |
+| `1.5.0` | stable | supported | `--version`, validate/status/show/instructions JSON including additive `root`, archive flags, store help | forward-compatible JSON regression and Stores ownership boundary |
+| `1.6.0-beta.1` | prerelease | reviewed but unsupported | exact CLI validate/status/show/instructions smoke, archive flags, invalid-change archive exit | preserve stable-only production gate; no prerelease support claim |
+| `1.6.0` | stable | supported | exact CLI validate/status/show/instructions JSON, archive flags, invalid-change archive exit | stable ledger advancement; beta-to-stable code diff only changes version/changelog |
+| `1.7.0` | stable | supported | exact CLI native `skip_specs: true`, `openspec instructions archive --change <id> --json`, leading-digit IDs, nested spec folders, standard command smoke | native metadata reader for artifact/sync gates plus focused no-op regressions for already-compatible surfaces |
+| `1.8.0` | stable | supported | exact CLI capability retirement, scenario-loss validation, nested task progress, non-TTY archive guidance, and standard command smoke | version-gated retirement planning plus fail-closed and nested-task regressions; agent targets remain upstream-owned |
 
 Reviewed upstream behavior:
 
-- OpenSpec `1.4.1` includes an `openspec update` fix for projects that already have their own `workspace.yaml`.
+- OpenSpec `1.8.0` allows explicitly destructive capability retirement through `retire_capabilities: true`. AIFHub planning writes this native marker only when the selected CLI is `>=1.8.0` and the user explicitly authorizes retirement; it must not infer retirement merely from an empty resulting capability.
+- OpenSpec `1.8.0` moves scenario loss detection into validation and names omitted scenarios. AIFHub already fails closed on non-zero validation and now has a regression that preserves the upstream path and diagnostic in QA evidence.
+- OpenSpec `1.8.0` counts nested task progress. AIFHub's recursive task-line parser already counts indented checkboxes, with a focused regression covering that no-op compatibility result.
+- The vendor-neutral agents target (`agents`), MiniMax Code, Rovo Dev CLI, opt-in Copilot cloud-agent files, and generated agent assets remain OpenSpec-owned. AIFHub does not generate or manage those targets.
+- OpenSpec `1.7.0` makes `.openspec.yaml` with `skip_specs: true` the native declaration for changes without spec deltas. AIFHub honors it in the artifact contract and in `/aif-mode sync --all`; an invalid marker is sent through validation instead of being silently skipped. The older proposal reason remains the compatibility path for pre-1.7 CLIs and already-authored plans.
+- OpenSpec `1.7.0` adds project context to `instructions apply|archive`; the shared runner now has an explicit regression for `openspec instructions archive --change <id> --json` while final archive mutation remains owned by the installed AIFHub finalizer wrapper.
+- Change IDs with leading digits, nested spec folders, and UTF-8 BOM input are supported upstream. AIFHub's resolver already accepts numeric-leading IDs, recursive spec discovery already handles nested folders, and the pre-1.7 status rejection remains a bounded compatibility fallback only when status actually fails.
+- OpenSpec `1.6.0` promotes the reviewed beta behavior to stable, including consistent resolution and task progress for nested specs and task files. The beta-to-stable source diff contains only release metadata and changelog updates, so no additional AIFHub command rewrite is required.
+- OpenSpec `1.6.0-beta.1` converges validate, view, and archive resolution, and archive validation failures return a non-zero exit code. AIFHub's existing non-zero fail-closed handling remains compatible.
+- The prerelease adds `/opsx:update`, Oh My Pi and Trae adapters, automatic OpenSpec CLI permission in generated skills, unified requirement parsing, archive scenario-drift fixes, and empty Store registration. Those integrations and generated skills remain upstream-owned.
+- OpenSpec `1.5.0` introduces Stores in very early beta, fixes config parsing for values wrapped in JSON containers, and escapes carriage returns in generated YAML frontmatter for CRLF-authored values.
+- OpenSpec `1.5.0` adds an additive `root` field to JSON command results. AIFHub parses additive fields without requiring a closed response schema, so no command or prompt rewrite is required.
+- OpenSpec `1.4.1` fixes `openspec update` for projects that already have their own `workspace.yaml`.
 - OpenSpec `1.4.0` includes Kimi CLI support, Mistral Vibe support, sync skills by default through `/opsx:sync`, case-insensitive requirement headers, and clearer validation hints.
 - OpenSpec workspace beta view state is OpenSpec-owned and lives under `.openspec-workspace/view.yaml`.
 
-AIFHub remains adapter-only: it does not install or manage OpenSpec skills, `/opsx:*` commands, Kimi CLI or Mistral Vibe integrations, OpenSpec workspace beta state, or `openspec update`. AIFHub does not install or manage Kimi CLI or Mistral Vibe integrations, does not own OpenSpec workspace beta state, and does not run or manage `openspec update`.
+AIFHub remains adapter-only: it does not install or manage OpenSpec skills, `/opsx:*` commands, tool integrations, agent targets, Stores, OpenSpec workspace beta state, or `openspec update`. In particular, it does not install or manage Kimi CLI or Mistral Vibe integrations. It also does not install or manage MiniMax Code or Rovo Dev CLI integrations. The default Store, self-upgrade flow, tool command names, config parsing, and generated command/frontmatter content remain upstream-owned. AIFHub does not own OpenSpec workspace beta state and does not run or manage `openspec update`.
 
 `openspec update` is upstream OpenSpec behavior. `/aif-mode sync` compiles AIFHub generated rules and requests OpenSpec validate/status through the adapter when configured and available.
 
@@ -175,11 +202,32 @@ In short: archived legacy plans are excluded from active plan discovery, while O
 | `/aif-implement` | `openspec instructions apply --change <id>` when `useInstructionsApply` is enabled and CLI is available |
 | `/aif-verify` | `openspec validate`, optional `openspec status` evidence, policy-derived diagnostics, coverage, and final `aif-gate-result` with `"gate": "verify"` |
 | `/aif-rules-check` | Upstream rules gate plus AIFHub generated-rules overlay for OpenSpec specs/deltas |
-| `/aif-done` | AIFHub artifact contract check, then `openspec archive <change> --yes` when archive is required |
+| `/aif-roadmap check` | Local lifecycle reconciliation plus optional current GitHub phase evidence; no OpenSpec CLI mutation |
+| `/aif-done` | AIFHub artifact contract check, then `openspec archive <change> --yes` when archive is required, then one bounded linked-roadmap transition |
+| `/aif-commit` | Read-only local lifecycle and optional GitHub freshness gate before the upstream git commit flow |
 | `/aif-mode sync` | generated-rule compile plus validate/status according to sync flags; generated-rule compilation may call `openspec show <item> --json` through `scripts/openspec-rules-compiler.mjs` and `showOpenSpecItem()` |
 | `/aif-mode doctor` | CLI, Node, active change, effective policy, generated rules, latest verify gate, rules gate, coverage, AIFHub artifact contract, and archive readiness diagnostics |
 
 Do not route users to OpenSpec slash commands such as `/opsx:propose`, `/opsx:apply`, or `/opsx:archive`.
+
+## Roadmap Linkage and Lifecycle Compatibility
+
+OpenSpec-native proposals use one standardized `## Roadmap Linkage` section with `Issues`, `Milestone`, `Roadmap item/slice`, and `Rationale`. Values come from explicit user or canonical planning input; unavailable assignments remain explicit `none` and are not inferred from GitHub titles, labels, branches, or unrelated roadmap text. A linked active change is registered as local `planned` by `/aif-roadmap check`.
+
+The configured roadmap may contain one marker-bounded local table:
+
+```markdown
+<!-- aifhub:roadmap-change-lifecycle:start -->
+## OpenSpec Change Lifecycle
+...
+<!-- aifhub:roadmap-change-lifecycle:end -->
+```
+
+The table stores only local `planned` and `finalized` states. `/aif-roadmap` owns the complete roadmap and managed-block reconciliation. `/aif-done` co-owns only one linked transition to `finalized`, and only after successful OpenSpec archive; failed readiness, verification, artifact-contract, dirty-tree, or archive paths do not write the roadmap. If archive succeeds but the marker-bounded update fails, finalization reports archive success plus a roadmap `handoff`, does not roll back archive, and returns `/aif-roadmap check`.
+
+`/aif-commit` reads this local lifecycle state but never writes it. Durable successful finalization with a missing or non-`finalized` linked row is deterministic local drift and blocks commit before the upstream proposal; user confirmation cannot bypass it. Missing, partial, or later-changing GitHub evidence is external drift and remains warning-only by default.
+
+GitHub open/closed/merged state stays outside the managed block. A post-merge `/aif-roadmap check` refreshes current issue, PR, and milestone evidence while retaining the evidence-backed local `finalized` row. Remote merge or closure never becomes local finalization proof, and credentials or private authentication diagnostics are never persisted in roadmap output.
 
 ## AI Factory 2.12 Optional Artifact Audit Bridge
 
@@ -227,11 +275,11 @@ Current QA-check results bind to `tested_revision` plus `worktree_digest` for gi
 
 Branch-scoped `qa-check.md` is not change-scoped AIFHub evidence. It cannot by itself satisfy `/aif-verify`, `/aif-done`, `coverage.json`, rules evidence, `done-readiness.json`, `done.md`, or `openspec-archive.json`; no implicit bridge is registered.
 
-## AI Factory 2.17 Reviewed Baseline
+## AI Factory 2.18 Reviewed Baseline
 
-The reviewed AI Factory `2.17.0` baseline is cumulative: it retains the existing AI Factory `2.13`-`2.15` compatibility facts, including config-aware project-context utilities, and adds a full audit of `2.15.0...2.16.0` (29 commits) and `2.16.0...2.17.0` (14 commits). AIFHub adapts only behavior that crosses its OpenSpec-native ownership boundaries; upstream-owned behavior remains upstream-owned.
+The reviewed AI Factory `2.18.1` baseline is cumulative: it retains the existing AI Factory `2.13`-`2.17` compatibility facts, including config-aware project-context utilities, the full `2.17.0...2.18.0` audit (21 commits, 63 changed files), and the bounded `2.18.0...2.18.1` patch audit (2 commits, 8 changed files). AIFHub adapts only behavior that crosses its OpenSpec-native or legacy compatibility ownership boundaries; upstream-owned behavior remains upstream-owned.
 
-### AI Factory 2.16 and 2.17 audit
+### AI Factory 2.16 and 2.17 cumulative audit
 
 | Upstream change | AIFHub outcome |
 |---|---|
@@ -250,6 +298,45 @@ The reviewed AI Factory `2.17.0` baseline is cumulative: it retains the existing
 | Refined `/aif-architecture` structure | Reviewed no-op: upstream `/aif-architecture` remains the command owner and `injections/core/aif-architecture-context-boundary.md` remains boundary-only. |
 | Generated-rules changes | Reviewed no-op: project-specific Control Flow detection belongs to `aif-analyze`; AIFHub does not duplicate it in the generated-rules compiler. |
 | Community-extension documentation | Reviewed no-op: no AIFHub contract changes, so complete upstream community documentation bodies are not copied. |
+
+### AI Factory 2.18 audit
+
+| Upstream surface | Evidence and AIFHub decision |
+|---|---|
+| Extension schema and loader | Reviewed no-op: the tagged schema, extension loader and extension command blobs are unchanged, so AIFHub adds no manifest or loader adapter. |
+| Injection and MCP runtime | Reviewed no-op: injection loading, MCP core/template behavior and public command wiring are unchanged. |
+| Node, bin and dependencies | Reviewed no-op: Node remains `>=18.0.0`; package bin and runtime dependencies are unchanged. |
+| Ultra planning | Adapter by artifact mode: OpenSpec-native `ultra` raises canonical `design.md`/`tasks.md` detail without `index.md`, phase files or an active marker; legacy marked bundles remain upstream-owned. |
+| Ultra research | Adapter as supporting context: bundles live under the directory derived from `paths.research`; only a revision-bound selected Active Summary may influence a canonical proposal. |
+| Directory archive support | Bounded adapter: OpenSpec-native plan-mutating `/aif-archive` modes stop before plan discovery and route to `/aif-done`; legacy marked ultra archive remains upstream-owned. |
+| Completed-phase `/aif-loop` budget | Reviewed no-op: the upstream loop owns budget accounting, state and stop conditions; AIFHub adds no loop skill, injection or schema. |
+| Privacy-gated `/aif-transfer` | Reviewed no-op: transfer keeps its sanitized in-memory registry, current-project evidence requirement, privacy checks and explicit approval; accepted evolution delegates to upstream `/aif-evolve`. AIFHub adds no transfer skill or injection. |
+| skills.sh installation documentation | Docs-only reviewed no-op: skills-only installation is not documented as providing the CLI, extension loader, MCP auto-configuration, agent files or command wrappers. |
+
+### AI Factory 2.18.1 patch audit
+
+| Upstream surface | Evidence and AIFHub decision |
+|---|---|
+| Package and documentation patch | The reviewed `2.18.0...2.18.1` range contains 2 commits across 8 files. It is prompt/docs-only apart from the package version and ultra-contract test metadata. |
+| Runtime/API/schema/dependencies | Reviewed no-op: extension schema/loader, injection/MCP runtime, Node `>=18`, bin and dependencies are unchanged from the cumulative 2.18.0 audit. |
+| `/aif-explore` Research Coherence Gate | Upstream-owned. AIFHub does not copy or replace its algorithm; the prepend only guarantees a non-bypass pass-through after permitted persisted regular/ultra writes, preserves optional fresh-context `Task` with mandatory direct fallback, and keeps coherence before the ultra Bundle Integrity Gate. |
+| Consumer compatibility evidence | Deterministic and opt-in live orchestration bind exact `2.17.0` and `2.18.1` package/reported versions while retaining `2.18.0` as a separate stable feature boundary and preserving the public `smoke:ai-factory-2-18` command plus existing flags. |
+
+### AI Factory 2.18 consumer ledger
+
+| Consumer | Decision |
+|---|---|
+| `/aif-plan` | `adapter`: version-gated canonical ultra detail in OpenSpec-native mode; marker-first upstream handoff in legacy mode. |
+| `/aif-explore` | `adapter`: regular research remains one resolved file; explicit stable-2.18 ultra research is one marked sibling bundle; on 2.18.1 every permitted persisted write continues into the upstream Research Coherence Gate before presentation/session append. |
+| `/aif-improve`, `/aif-implement`, `/aif-verify`, `/aif-fix` | `adapter`: canonical OpenSpec consumption is unchanged; legacy marked ultra is classified before companion writes and handed to the matching upstream owner. |
+| `/aif-archive` | `adapter`: OpenSpec-native mutation guard; read-only `list`, roadmap-only `--roadmap` and legacy archive retain upstream ownership. |
+| `/aif-rules-check`, `/aif-commit`, `/aif-roadmap` | `retain`: existing AIFHub boundaries remain; no multi-file orchestration is copied. |
+| `aif-analyze` | `retain`: owns AIFHub config/bootstrap only and preserves upstream and unknown user fields. |
+| `aif-mode` | `adapter`: keeps OpenSpec sync ownership and preserves an explicitly captured legacy source root instead of scanning canonical changes. |
+| `aif-done` | `retain`: remains the OpenSpec finalizer; a verified legacy ultra bundle receives only an upstream `/aif-archive <entrypoint>` handoff. |
+| `aif-evolve` | `retain`: remains the downstream owner selected by upstream privacy-gated transfer; no transfer registry is copied. |
+| `/aif-loop`, `/aif-transfer` and packaged upstream coordinators | `no-op`: remain upstream-owned; AIFHub does not export duplicate skills, injections or orchestration. |
+| AIFHub namespaced agents | `adapter`: keep bounded OpenSpec roles and return exact upstream handoffs for legacy marked ultra instead of editing phase bundles. |
 
 The metadata compatibility range remains `>=2.11.0 <3.0.0`. Behaviors introduced by newer upstream runtimes are labeled by version instead of raising the minimum without a proven hard dependency.
 
@@ -350,6 +437,18 @@ openspec/changes/<change-id>/
 
 It does not create `.ai-factory/plans/<id>.md` or `.ai-factory/plans/<id>/task.md` in OpenSpec-native mode. Missing or unsupported OpenSpec CLI is degraded validation, not planning failure.
 
+## CLI Resolution
+
+Every shared-runner operation resolves one OpenSpec executable with this precedence:
+
+1. Explicit non-empty extension API `options.command`.
+2. Project-local `node_modules/.bin/openspec` (`node_modules/.bin/openspec.cmd` on Windows).
+3. Global `openspec` from `PATH`.
+
+The resolver does not search parent projects, invoke `npx`, download packages, or auto-install OpenSpec. Once an explicit or project-local candidate is selected it is authoritative; unsupported versions and execution failures do not silently fall through to another installation. Windows `.cmd`/`.bat` candidates use the bounded `ComSpec` route, while native POSIX executables use direct execution.
+
+Diagnostics separate the internal executable from a safe display value. Project-local and in-project explicit paths are project-relative; external explicit paths are reduced to a bounded identifier. Neither human nor JSON output exposes `PATH`, environment values, or private absolute project paths.
+
 ## Capability Shape
 
 `scripts/openspec-runner.mjs` exposes capability detection with this stable minimum:
@@ -361,6 +460,8 @@ openspec:
   canArchive: boolean
   version: string | null
   supportedRange: ">=1.3.1 <2.0.0"
+  latestReviewedVersion: "1.8.0"
+  versionOutdated: boolean | null
   requiresNode: ">=20.19.0"
 ```
 
@@ -372,6 +473,7 @@ openspec:
   nodeSupported: boolean
   versionSupported: boolean
   command: string
+  commandSource: "explicit" | "project-local" | "path"
   reason: string | null
   errors:
     - code: string
@@ -379,6 +481,12 @@ openspec:
 ```
 
 Commands should treat the stable minimum as the contract and the operational detail fields as diagnostics.
+
+## Version Freshness in `/aif-analyze`
+
+`/aif-analyze` reads the installed-project `openspecCli` result from `ai-factory aifhub-mode status --json`. When a selected CLI is compatible but older than the latest reviewed stable version, bootstrap remains available and the skill emits a non-blocking update recommendation. `versionOutdated` is `null` when the CLI version is missing or unsupported, so freshness never replaces the existing degraded reason.
+
+The recommendation follows the selected user-owned source: update the project dependency for `project-local`, the existing PATH/global installation for `path`, or the caller-owned executable for `explicit`. Do not guess a package manager, and do not install, update, replace, or re-resolve OpenSpec automatically. A supported version equal to or newer than `latestReviewedVersion` does not receive an update or downgrade recommendation.
 
 ## Degraded Mode
 
@@ -389,6 +497,8 @@ When the OpenSpec CLI is missing or unsupported:
 - generated-rules and execution context may continue from filesystem artifacts
 - `/aif-verify` records degraded validation unless strict config requires CLI availability
 - `/aif-done` fails archive-required finalization because archive requires a compatible CLI
+
+Filesystem-based artifact discovery, planning, and context loading continue without installing anything. Degraded mode never simulates CLI validation or archive success.
 
 When Node is below `>=20.19.0`, the CLI is treated as unavailable for validate/archive capabilities even if an `openspec` command exists.
 
@@ -402,25 +512,33 @@ Scoped runtime integrations are already documented in the active prompt assets: 
 
 ## Validation and Archive
 
-Validation uses:
+Inside the extension, the shared runner performs validation with:
 
 ```bash
 openspec validate <change-id> --type change --strict --json --no-interactive --no-color
 ```
 
-Status evidence uses:
+Inside the extension, status evidence uses:
 
 ```bash
 openspec status --change <change-id> --json --no-color
 ```
 
-Archive-required finalization uses:
+Installed projects invoke archive-required finalization through:
+
+```bash
+ai-factory aifhub-done-finalizer --change <change-id> --json
+```
+
+Omitting `--change` delegates to the active-change resolver: exactly one resolvable active change may be selected, while missing or ambiguous scope exits with code `2` before finalization. Automation should always pass an explicit `--change <change-id>`.
+
+The wrapper returns exit `0` for success or policy-accepted warning, `1` for a resolved blocker, and `2` for invalid arguments, unresolved/ambiguous scope, or unexpected command failure. It rejects bypass flags and emits only bounded human/JSON fields. The extension-local runner then uses:
 
 ```bash
 openspec archive <change-id> --yes --no-color
 ```
 
-`/aif-done --skip-specs` may add `--skip-specs` for docs/tooling-only changes.
+`ai-factory aifhub-done-finalizer --change <change-id> --skip-specs --json` adds `--skip-specs` for docs/tooling-only changes. Do not execute `scripts/openspec-done-finalizer.mjs` or other `scripts/openspec-*.mjs` modules from a consumer root or internal installed-extension path; they are extension-local implementation modules.
 
 AIFHub artifact contract validation is a separate read-only layer over the CLI adapter. It checks workflow ownership, runtime evidence placement, generated-rule freshness, and pre-archive verification evidence. See [OpenSpec Artifact Validation](openspec-validation.md).
 

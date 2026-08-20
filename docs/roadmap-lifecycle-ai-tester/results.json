@@ -1,0 +1,337 @@
+{
+  "schema": "aifhub.roadmap_lifecycle.ai_tester_results.v1",
+  "generated_at": "2026-08-12T15:58:36.104Z",
+  "run_id": "issue-88-luna-low-20260812-r3",
+  "baseline_source_commit": "fa52b474925a5cc41a97b13bddc2a04b09f503d1",
+  "runtime": "codex",
+  "model": "gpt-5.6-luna",
+  "reasoning": "low",
+  "reasoning_enforcement": {
+    "status": "PASS",
+    "reason": "low_profile_proven_for_every_run"
+  },
+  "provenance": {
+    "ai_tester_source_commit": "98dd5afb3fe9b9b7593d21dc93bcbc6d98c2cca9",
+    "ai_tester_binary_sha256": "5e99619cc5fc6734d17a6c08d94520355abf444626c5a68591c3608423f9924d",
+    "ai_tester_version": "ai-tester 1.1.0",
+    "codex_version": "codex-cli 0.144.6",
+    "reasoning_enforcement": "codex_wrapper_model_reasoning_effort_low"
+  },
+  "summary": {
+    "scenarios": 5,
+    "runs": 10,
+    "by_condition": {
+      "baseline": {
+        "pass": 0,
+        "fail": 5,
+        "not_run": 0
+      },
+      "refined": {
+        "pass": 3,
+        "fail": 2,
+        "not_run": 0
+      }
+    },
+    "pair_deltas": {
+      "improved": 3,
+      "regressed": 0,
+      "unchanged": 2
+    },
+    "tokens": {
+      "baseline": {
+        "input": 103631,
+        "output": 763,
+        "cache_creation": 0,
+        "cache_read": 5888,
+        "total": 110282
+      },
+      "refined": {
+        "input": 103789,
+        "output": 506,
+        "cache_creation": 0,
+        "cache_read": 19200,
+        "total": 123495
+      }
+    }
+  },
+  "results": [
+    {
+      "scenario_id": "issue-linked-planning",
+      "condition": "baseline",
+      "scenario_fingerprint": "65a8600c9cb59de32898c27c022888c345594325f667eb2fa556d1f25ca0fadf",
+      "settings_fingerprint": "7b9011de2442eb5ef0918941cabfa3d1513a291e618cd9d8a4e21e289ebf596f",
+      "model": "gpt-5.6-luna",
+      "reasoning": "low",
+      "reasoning_proof": "PASS",
+      "assertions": {
+        "passed": 5,
+        "total": 9
+      },
+      "failed_assertion_ids": [
+        "explicit-none-values",
+        "issue-link",
+        "roadmap-owner-handoff",
+        "standard-linkage"
+      ],
+      "turns": 1,
+      "tokens": {
+        "input": 20729,
+        "output": 152,
+        "cache_creation": 0,
+        "cache_read": 5888,
+        "total": 26769
+      },
+      "status": "FAIL",
+      "reason": "assertion_failure"
+    },
+    {
+      "scenario_id": "issue-linked-planning",
+      "condition": "refined",
+      "scenario_fingerprint": "2963ad1fe6ef5d755004cbfe04c7979909ae5a50dc93667272900454068a0179",
+      "settings_fingerprint": "7b9011de2442eb5ef0918941cabfa3d1513a291e618cd9d8a4e21e289ebf596f",
+      "model": "gpt-5.6-luna",
+      "reasoning": "low",
+      "reasoning_proof": "PASS",
+      "assertions": {
+        "passed": 8,
+        "total": 9
+      },
+      "failed_assertion_ids": [
+        "standard-linkage"
+      ],
+      "turns": 1,
+      "tokens": {
+        "input": 20777,
+        "output": 83,
+        "cache_creation": 0,
+        "cache_read": 0,
+        "total": 20860
+      },
+      "status": "FAIL",
+      "reason": "assertion_failure"
+    },
+    {
+      "scenario_id": "successful-done",
+      "condition": "baseline",
+      "scenario_fingerprint": "c93f6c7139a88b56b47db6ea83a9d182da79f0078e532d9f2462a17f3a598a95",
+      "settings_fingerprint": "fcd926ddf7b1fb86eb231b4e9a08b5bca5225994d076a8d982ee0ac6f8881dc2",
+      "model": "gpt-5.6-luna",
+      "reasoning": "low",
+      "reasoning_proof": "PASS",
+      "assertions": {
+        "passed": 5,
+        "total": 9
+      },
+      "failed_assertion_ids": [
+        "finalized-state",
+        "managed-block-boundary",
+        "no-github-claim",
+        "updated-outcome"
+      ],
+      "turns": 1,
+      "tokens": {
+        "input": 20733,
+        "output": 179,
+        "cache_creation": 0,
+        "cache_read": 0,
+        "total": 20912
+      },
+      "status": "FAIL",
+      "reason": "assertion_failure"
+    },
+    {
+      "scenario_id": "successful-done",
+      "condition": "refined",
+      "scenario_fingerprint": "f5cb9d71ecbf0093f4000206979a7d9743c990d8950ab82bc3bb1c0222f3bf33",
+      "settings_fingerprint": "fcd926ddf7b1fb86eb231b4e9a08b5bca5225994d076a8d982ee0ac6f8881dc2",
+      "model": "gpt-5.6-luna",
+      "reasoning": "low",
+      "reasoning_proof": "PASS",
+      "assertions": {
+        "passed": 9,
+        "total": 9
+      },
+      "failed_assertion_ids": [],
+      "turns": 1,
+      "tokens": {
+        "input": 20757,
+        "output": 100,
+        "cache_creation": 0,
+        "cache_read": 0,
+        "total": 20857
+      },
+      "status": "PASS",
+      "reason": "all_assertions_passed"
+    },
+    {
+      "scenario_id": "failed-done-no-roadmap-write",
+      "condition": "baseline",
+      "scenario_fingerprint": "079e3901324f5e794b0ea962f30469916196c5c841232a557fccd019a7259b9e",
+      "settings_fingerprint": "e61aab41b9120c8848c00e6d5a2b2f3acdb7be80b7435f02ac84bf247e54010c",
+      "model": "gpt-5.6-luna",
+      "reasoning": "low",
+      "reasoning_proof": "PASS",
+      "assertions": {
+        "passed": 7,
+        "total": 8
+      },
+      "failed_assertion_ids": [
+        "lifecycle-unchanged"
+      ],
+      "turns": 1,
+      "tokens": {
+        "input": 20703,
+        "output": 123,
+        "cache_creation": 0,
+        "cache_read": 0,
+        "total": 20826
+      },
+      "status": "FAIL",
+      "reason": "assertion_failure"
+    },
+    {
+      "scenario_id": "failed-done-no-roadmap-write",
+      "condition": "refined",
+      "scenario_fingerprint": "f9d11bab97f07bc23cd7635e346c64e1b294457dec9e6a3e7d43205a77645fe9",
+      "settings_fingerprint": "e61aab41b9120c8848c00e6d5a2b2f3acdb7be80b7435f02ac84bf247e54010c",
+      "model": "gpt-5.6-luna",
+      "reasoning": "low",
+      "reasoning_proof": "PASS",
+      "assertions": {
+        "passed": 8,
+        "total": 8
+      },
+      "failed_assertion_ids": [],
+      "turns": 1,
+      "tokens": {
+        "input": 20714,
+        "output": 136,
+        "cache_creation": 0,
+        "cache_read": 0,
+        "total": 20850
+      },
+      "status": "PASS",
+      "reason": "all_assertions_passed"
+    },
+    {
+      "scenario_id": "finalized-state-commit-blocking",
+      "condition": "baseline",
+      "scenario_fingerprint": "d6085e27a2df0f1319d725987d42b17e3632a7bd625a681091648b999553f09f",
+      "settings_fingerprint": "c3ff8f53645c4c563540a84c2cddc31e316bae974e068109112b2f58e5d44d3a",
+      "model": "gpt-5.6-luna",
+      "reasoning": "low",
+      "reasoning_proof": "PASS",
+      "assertions": {
+        "passed": 6,
+        "total": 10
+      },
+      "failed_assertion_ids": [
+        "check-handoff",
+        "commit-blocked",
+        "external-warning",
+        "local-error"
+      ],
+      "turns": 1,
+      "tokens": {
+        "input": 20731,
+        "output": 153,
+        "cache_creation": 0,
+        "cache_read": 0,
+        "total": 20884
+      },
+      "status": "FAIL",
+      "reason": "assertion_failure"
+    },
+    {
+      "scenario_id": "finalized-state-commit-blocking",
+      "condition": "refined",
+      "scenario_fingerprint": "aac373315b8770d4222e5bc5f6ce35be4caef607623092a8604e6ae7a9194ac9",
+      "settings_fingerprint": "c3ff8f53645c4c563540a84c2cddc31e316bae974e068109112b2f58e5d44d3a",
+      "model": "gpt-5.6-luna",
+      "reasoning": "low",
+      "reasoning_proof": "PASS",
+      "assertions": {
+        "passed": 10,
+        "total": 10
+      },
+      "failed_assertion_ids": [],
+      "turns": 1,
+      "tokens": {
+        "input": 20757,
+        "output": 75,
+        "cache_creation": 0,
+        "cache_read": 19200,
+        "total": 40032
+      },
+      "status": "PASS",
+      "reason": "all_assertions_passed"
+    },
+    {
+      "scenario_id": "post-merge-github-reconciliation",
+      "condition": "baseline",
+      "scenario_fingerprint": "0646f4714840a25ab1ce6b15dec1d836b016dc88145f1a3887f31df3c1460a6c",
+      "settings_fingerprint": "620393f0b1e22be5da9f31ab8dbe5bc891f445b0f594ab36677b88ce8f29a147",
+      "model": "gpt-5.6-luna",
+      "reasoning": "low",
+      "reasoning_proof": "PASS",
+      "assertions": {
+        "passed": 5,
+        "total": 10
+      },
+      "failed_assertion_ids": [
+        "check-reconciliation",
+        "local-finalized-preserved",
+        "remote-not-local-proof",
+        "remote-state-refreshed",
+        "separate-evidence-sources"
+      ],
+      "turns": 1,
+      "tokens": {
+        "input": 20735,
+        "output": 156,
+        "cache_creation": 0,
+        "cache_read": 0,
+        "total": 20891
+      },
+      "status": "FAIL",
+      "reason": "assertion_failure"
+    },
+    {
+      "scenario_id": "post-merge-github-reconciliation",
+      "condition": "refined",
+      "scenario_fingerprint": "3e75d39670a44cb82a3cf59a24594ce6e78fe90e4df96e5a2177524ae6de8e92",
+      "settings_fingerprint": "620393f0b1e22be5da9f31ab8dbe5bc891f445b0f594ab36677b88ce8f29a147",
+      "model": "gpt-5.6-luna",
+      "reasoning": "low",
+      "reasoning_proof": "PASS",
+      "assertions": {
+        "passed": 8,
+        "total": 10
+      },
+      "failed_assertion_ids": [
+        "local-finalized-preserved",
+        "remote-state-refreshed"
+      ],
+      "turns": 1,
+      "tokens": {
+        "input": 20784,
+        "output": 112,
+        "cache_creation": 0,
+        "cache_read": 0,
+        "total": 20896
+      },
+      "status": "FAIL",
+      "reason": "assertion_failure"
+    }
+  ],
+  "retention": {
+    "raw_traces_committed": false,
+    "raw_transcripts_committed": false,
+    "credentials_committed": false,
+    "retained_artifacts": [
+      "scenario-catalog.json",
+      "results.json",
+      "results.md"
+    ]
+  }
+}
