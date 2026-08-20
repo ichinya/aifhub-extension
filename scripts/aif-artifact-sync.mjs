@@ -2,6 +2,7 @@
 import { access, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 
 import {
   normalizeChangeId,
@@ -650,11 +651,41 @@ function getOpenSpecSettings(config) {
   return resolveOpenSpecPolicy(config ?? { aifhub: { openspec: DEFAULT_OPENSPEC_SETTINGS } });
 }
 
+export async function readAnalyzeSkillVersion(options = {}) {
+  const skillUrl = options.analyzeSkillUrl ?? new URL('../skills/aif-analyze/SKILL.md', import.meta.url);
+  try {
+    const raw = await readFile(fileURLToPath(skillUrl), 'utf8');
+    const frontmatter = raw.split(/^---\s*$/m)[1] ?? '';
+    const match = frontmatter.match(/^version:\s*(\S+)\s*$/m);
+    if (!match) {
+      return {
+        ok: false,
+        version: null,
+        error: {
+          code: 'analyze-skill-version-missing',
+          message: 'skills/aif-analyze/SKILL.md frontmatter has no version key.'
+        }
+      };
+    }
+    return { ok: true, version: match[1], error: null };
+  } catch (err) {
+    return {
+      ok: false,
+      version: null,
+      error: {
+        code: 'analyze-skill-unreadable',
+        message: `Could not read skills/aif-analyze/SKILL.md: ${err?.code ?? err?.message ?? 'unknown error'}`
+      }
+    };
+  }
+}
+
 export async function writeModeConfig(mode, options = {}) {
   const rootDir = resolveRootDir(options);
   const dryRun = Boolean(options.dryRun);
   const config = await readProjectConfig(rootDir);
-  const content = renderConfigForMode(config.raw, mode);
+  const skill = await readAnalyzeSkillVersion(options.analyzeSkillUrl ? { analyzeSkillUrl: options.analyzeSkillUrl } : {});
+  const content = renderConfigForMode(config.raw, mode, skill.ok ? { analyzeSkillVersion: skill.version } : {});
   const configKeys = summarizeConfigKeyOwnership(config.raw, content);
   const target = path.join(rootDir, DEFAULT_CONFIG_PATH);
   const operation = {
@@ -673,16 +704,16 @@ export async function writeModeConfig(mode, options = {}) {
     mode,
     operations: [operation],
     configKeys,
-    warnings: [],
+    warnings: skill.ok ? [] : [skill.error],
     errors: []
   };
 }
 
-export function renderConfigForMode(existingRaw, mode) {
+export function renderConfigForMode(existingRaw, mode, options = {}) {
   const parsed = parseSimpleYaml(existingRaw);
   const paths = parsed.paths ?? {};
   const blocks = parseTopLevelBlocks(existingRaw);
-  const used = new Set(['config_version', 'language', 'aifhub', 'paths', 'utilities']);
+  const used = new Set(['config_version', 'language', 'aifhub', 'paths', 'utilities', 'analyze']);
   const rendered = [];
 
   rendered.push(renderScalarOrDefault(blocks, 'config_version', 'config_version: 1'));
@@ -695,6 +726,11 @@ export function renderConfigForMode(existingRaw, mode) {
   rendered.push(renderAifhubBlock(mode, blocks));
   rendered.push(renderPathsBlock(mode, paths));
   rendered.push(renderUtilitiesBlock(blocks));
+
+  const analyzeBlock = renderAnalyzeBlock(blocks, options.analyzeSkillVersion);
+  if (analyzeBlock !== null) {
+    rendered.push(analyzeBlock);
+  }
 
   for (const block of blocks) {
     if (!used.has(block.key)) {
@@ -1722,7 +1758,7 @@ function resolveMode(config) {
   return MODES.unknown;
 }
 
-function parseSimpleYaml(raw) {
+export function parseSimpleYaml(raw) {
   const root = {};
   const stack = [{ indent: -1, value: root }];
 
@@ -1775,7 +1811,7 @@ function parseScalar(value) {
   return trimmed.replace(/^["']|["']$/g, '');
 }
 
-function parseTopLevelBlocks(raw) {
+export function parseTopLevelBlocks(raw) {
   const lines = String(raw ?? '').replace(/\r\n/g, '\n').split('\n');
   const starts = [];
 
@@ -1841,7 +1877,7 @@ function summarizeConfigKeyOwnership(beforeRaw, afterRaw) {
   };
 }
 
-function flattenConfigKeyPaths(value, prefix = '', output = new Map()) {
+export function flattenConfigKeyPaths(value, prefix = '', output = new Map()) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     if (prefix !== '') output.set(prefix, JSON.stringify(value));
     return output;
@@ -1858,6 +1894,20 @@ function flattenConfigKeyPaths(value, prefix = '', output = new Map()) {
 
 function renderScalarOrDefault(blocks, key, fallback) {
   return blocks.find((block) => block.key === key)?.text.trimEnd() || fallback;
+}
+
+function renderAnalyzeBlock(blocks, skillVersion) {
+  const existing = blocks.find((block) => block.key === 'analyze')?.text.trimEnd();
+  if (existing) {
+    if (/^\s*skill_version:/m.test(existing) || skillVersion === undefined) {
+      return existing;
+    }
+    return `${existing}\n  skill_version: ${skillVersion}`;
+  }
+  if (skillVersion === undefined) {
+    return null;
+  }
+  return `analyze:\n  skill_version: ${skillVersion}`;
 }
 
 function renderBlockOrDefault(blocks, key, fallback) {

@@ -124,6 +124,8 @@ It does not replace `/aif-commit`. After `/aif-done`, run `/aif-commit` or your 
 
 `/aif-analyze` can create or patch an optional `paths.context` glossary after explicit opt-in. Other commands consume it read-only for prose terminology; source/tests, OpenSpec requirements, rules, architecture decisions, identifiers, and QA facts remain authoritative. Missing `CONTEXT.md` never blocks a workflow. See [Context Loading Policy](docs/context-loading-policy.md) and [ADR 0002](docs/adr/0002-optional-project-context-glossary.md).
 
+The config also records the aif-analyze skill version under `analyze.skill_version`. Before patching an existing config, `/aif-analyze` runs the read-only deterministic diff `ai-factory aifhub-analyze-config-diff --json`, which compares the config against the extension's required-keys manifest, reports what would be added and why, and takes a fast path when the config is already up to date.
+
 ### AI Factory 2.18 Reviewed Baseline
 
 AIFHub is reviewed against AI Factory `2.18.1` while retaining the compatibility range `>=2.11.0 <3.0.0`. The cumulative `2.16`/`2.17` behavior remains supported, while the `2.18` line adds only bounded artifact/profile adapters:
