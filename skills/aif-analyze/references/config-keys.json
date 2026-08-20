@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "description": "Manifest of AIFHub-owned config keys managed by the aif-analyze skill. The read-only diff command (ai-factory aifhub-analyze-config-diff) compares this manifest against .ai-factory/config.yaml; unknown user-owned keys are never reported.",
+  "description": "Manifest of AIFHub-owned config keys managed by the aif-analyze skill. The read-only diff command (ai-factory aifhub-analyze-config-diff) compares this manifest against .ai-factory/config.yaml; mode-specific required keys declare their applicable artifact protocol in modes, and unknown user-owned keys are never reported.",
   "keys": [
     {
       "key": "config_version",
@@ -47,18 +47,21 @@
     {
       "key": "paths.state",
       "required": true,
+      "modes": ["openspec"],
       "since": "1.0.0",
       "purpose": "Runtime state root for change-scoped notes, traces, and summaries."
     },
     {
       "key": "paths.qa",
       "required": true,
+      "modes": ["openspec"],
       "since": "1.0.0",
       "purpose": "QA evidence root for verify receipts, rules gate evidence, and readiness output."
     },
     {
       "key": "paths.generated_rules",
       "required": true,
+      "modes": ["openspec"],
       "since": "1.0.0",
       "purpose": "Directory for generated OpenSpec rules compiled by /aif-mode sync."
     },

@@ -2,7 +2,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
   flattenConfigKeyPaths,
@@ -51,6 +51,13 @@ function readFlatValue(flat, key) {
   } catch {
     return raw;
   }
+}
+
+function appliesToArtifactProtocol(entry, artifactProtocol) {
+  if (!Array.isArray(entry?.modes) || entry.modes.length === 0) {
+    return true;
+  }
+  return typeof artifactProtocol === 'string' && entry.modes.includes(artifactProtocol);
 }
 
 async function readManifest(manifestUrl) {
@@ -145,8 +152,13 @@ export async function buildAnalyzeConfigDiff(options = {}) {
 
   const flat = flattenConfigKeyPaths(parseSimpleYaml(configRaw));
   const entries = manifest.keys;
+  const artifactProtocol = readFlatValue(flat, 'aifhub.artifactProtocol');
   const missing = entries
-    .filter((entry) => entry?.required === true && !flat.has(entry.key))
+    .filter((entry) => (
+      entry?.required === true
+      && appliesToArtifactProtocol(entry, artifactProtocol)
+      && !flat.has(entry.key)
+    ))
     .map((entry) => ({
       key: entry.key,
       since: entry.since ?? null,
@@ -247,7 +259,7 @@ export async function runAnalyzeConfigDiffCommand(argv = process.argv.slice(2), 
 function pathToFileUrlOrPath(filePath) {
   return filePath.startsWith('file:')
     ? filePath
-    : new URL(`file://${encodeURI(path.resolve(filePath).replace(/\\/g, '/'))}`);
+    : pathToFileURL(path.resolve(filePath));
 }
 
 function toPosix(filePath) {

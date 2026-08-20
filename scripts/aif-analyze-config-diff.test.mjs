@@ -128,6 +128,42 @@ describe('analyze config required-keys diff', () => {
     assert.equal(result.config_analyze_version, '0.11.0');
   });
 
+  it('keeps a legacy config up to date without OpenSpec-only required paths', async () => {
+    const rootDir = await createTempRoot();
+    await createConfigFixture(
+      rootDir,
+      renderConfigForMode('', 'ai-factory', { analyzeSkillVersion: '0.11.0' })
+    );
+
+    const result = await buildAnalyzeConfigDiff({ rootDir });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.up_to_date, true);
+    assert.deepEqual(result.missing, []);
+  });
+
+  it('reports a mode-specific required key for its matching artifact protocol', async () => {
+    const rootDir = await createTempRoot();
+    await createConfigFixture(rootDir, COMPLETE_CONFIG);
+    const manifestUrl = await createManifestFixture(rootDir, [
+      ...BASE_MANIFEST,
+      {
+        key: 'paths.state',
+        required: true,
+        modes: ['openspec'],
+        since: '1.0.0',
+        purpose: 'OpenSpec runtime state root.'
+      }
+    ]);
+    const analyzeSkillUrl = await createSkillFixture(rootDir, '0.11.0');
+
+    const result = await buildAnalyzeConfigDiff({ rootDir, manifestUrl, analyzeSkillUrl });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.up_to_date, false);
+    assert.deepEqual(result.missing.map((item) => item.key), ['paths.state']);
+  });
+
   it('never flags unknown user-owned keys as missing or obsolete', async () => {
     const rootDir = await createTempRoot();
     await createConfigFixture(rootDir, [
@@ -231,6 +267,33 @@ describe('analyze config required-keys diff', () => {
     const command = await runAnalyzeConfigDiffCommand(
       ['--json'],
       { rootDir, manifestUrl, analyzeSkillUrl }
+    );
+
+    assert.equal(command.exitCode, 0);
+    const parsed = JSON.parse(command.stdout);
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.up_to_date, true);
+  });
+
+  it('accepts CLI override paths containing URL-reserved characters', async () => {
+    const rootDir = await createTempRoot();
+    await createConfigFixture(rootDir, COMPLETE_CONFIG);
+    const manifestPath = await writeFixture(
+      rootDir,
+      'extension#review/skills/aif-analyze/references/config-keys.json',
+      JSON.stringify({ schema_version: 1, keys: BASE_MANIFEST }, null, 2)
+    );
+    const skillPath = await writeFixture(rootDir, 'extension#review/skills/aif-analyze/SKILL.md', [
+      '---',
+      'name: aif-analyze',
+      'version: 0.11.0',
+      '---',
+      ''
+    ].join('\n'));
+
+    const command = await runAnalyzeConfigDiffCommand(
+      ['--manifest', manifestPath, '--skill', skillPath, '--json'],
+      { rootDir }
     );
 
     assert.equal(command.exitCode, 0);
