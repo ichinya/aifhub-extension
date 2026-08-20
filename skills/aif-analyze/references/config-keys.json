@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "description": "Manifest of AIFHub-owned config keys managed by the aif-analyze skill. The read-only diff command (ai-factory aifhub-analyze-config-diff) compares this manifest against .ai-factory/config.yaml; unknown user-owned keys are never reported.",
+  "keys": [
+    {
+      "key": "config_version",
+      "required": true,
+      "since": "1.0.0",
+      "purpose": "Schema version of .ai-factory/config.yaml consumed by AIFHub tooling."
+    },
+    {
+      "key": "language.ui",
+      "required": true,
+      "since": "1.0.0",
+      "purpose": "Language for user-facing responses, prompts, and next-step guidance."
+    },
+    {
+      "key": "language.artifacts",
+      "required": true,
+      "since": "1.0.0",
+      "purpose": "Language for generated artifacts such as plans, specs, and reports."
+    },
+    {
+      "key": "language.technical_terms",
+      "required": true,
+      "since": "1.0.0",
+      "purpose": "Policy for technical terms in artifacts: keep, translate, or mixed."
+    },
+    {
+      "key": "aifhub.artifactProtocol",
+      "required": true,
+      "since": "1.0.0",
+      "purpose": "Artifact protocol switch: openspec (OpenSpec-native) or legacy AI Factory-only mode."
+    },
+    {
+      "key": "paths.plans",
+      "required": true,
+      "since": "1.0.0",
+      "purpose": "Directory for OpenSpec changes (or legacy full plans) owned by /aif-plan full."
+    },
+    {
+      "key": "paths.specs",
+      "required": true,
+      "since": "1.0.0",
+      "purpose": "Directory for base OpenSpec specs."
+    },
+    {
+      "key": "paths.state",
+      "required": true,
+      "since": "1.0.0",
+      "purpose": "Runtime state root for change-scoped notes, traces, and summaries."
+    },
+    {
+      "key": "paths.qa",
+      "required": true,
+      "since": "1.0.0",
+      "purpose": "QA evidence root for verify receipts, rules gate evidence, and readiness output."
+    },
+    {
+      "key": "paths.generated_rules",
+      "required": true,
+      "since": "1.0.0",
+      "purpose": "Directory for generated OpenSpec rules compiled by /aif-mode sync."
+    },
+    {
+      "key": "analyze.skill_version",
+      "required": true,
+      "since": "0.11.0",
+      "purpose": "Version of the aif-analyze skill that last bootstrapped or updated this config; compared against the installed skill version to detect config drift."
+    },
+    {
+      "key": "workflow.plan_id_format",
+      "required": false,
+      "since": "1.0.0",
+      "purpose": "Full-plan filename shape (slug or sequential); defaulted by the config patcher when absent."
+    },
+    {
+      "key": "workflow.verify_mode",
+      "required": false,
+      "since": "1.0.0",
+      "purpose": "Default /aif-verify strictness (normal, strict, lenient); defaulted by the config patcher when absent."
+    },
+    {
+      "key": "rules.base",
+      "required": false,
+      "since": "1.0.0",
+      "purpose": "Path to project base rules loaded by implementation and verify flows; defaulted by the config patcher when absent."
+    },
+    {
+      "key": "agent_profile",
+      "required": false,
+      "since": "1.0.0",
+      "purpose": "Agent profile selector; defaulted by the config patcher when absent."
+    }
+  ]
+}

@@ -407,6 +407,14 @@ The selected artifact protocol owns its config profile. Legacy `artifactProtocol
 
 Config creation and mode changes structurally patch only explicit AIFHub-owned keys. They preserve upstream/core fields, unknown top-level fields, unknown nested `aifhub` fields, custom paths, and unknown user-authored fields inside a dormant profile. Known AIFHub-owned `aifhub.openspec` settings are omitted from the legacy profile, including known `allowWarnOnDone` children; the dormant block remains only when unknown fields must survive a later switch back. Diagnostics report bounded changed/preserved key paths and counts only; they do not log values, environment data, provider configuration, or credentials. Ultra research derives its root from `paths.research`; `research_bundles_dir` is not a config key.
 
+The config records the aif-analyze skill version that last bootstrapped or updated it under `analyze.skill_version`; the structural patcher preserves an existing value. Before patching an existing config, `/aif-analyze` runs the deterministic required-keys diff instead of LLM-based key comparison:
+
+```bash
+ai-factory aifhub-analyze-config-diff --json
+```
+
+The command is read-only, compares `.ai-factory/config.yaml` against the extension-local `skills/aif-analyze/references/config-keys.json` manifest and the installed skill's frontmatter version, and reports `missing` keys with their purpose text, deprecated keys still present (`obsolete`), `version_drift`, and `up_to_date`. Unknown user-owned keys are never reported. A config that is up to date takes the fast path and skips re-analysis; missing keys are presented to the user with their purposes before being written.
+
 In OpenSpec-native mode, `/aif-analyze` also compares the selected compatible CLI with AIFHub's latest reviewed stable version. An older supported CLI remains usable for validation/archive capabilities, but the handoff recommends a user-owned update and identifies whether the selected source is `project-local`, `path`, or `explicit`. The skill never guesses a package manager, installs or updates OpenSpec, or recommends downgrading a supported version that is already equal to or newer than the reviewed baseline.
 
 Shared protocol-neutral settings such as `utilities.context_tools.enabled`, `utilities.graphify.enabled`, and `utilities.codegraph.enabled` may appear in either profile. They record optional tooling preferences and do not make that tool an AIFHub dependency. Optional memory/context tool recommendations are resolved from local installed metadata with `ai-factory aifhub-memory-tools recommend --from-project --json`; runtime tool selection uses `ai-factory aifhub-memory-tools select --from-project --command <skill> --json`. Missing metadata is degraded context and leaves `rg` as the baseline.

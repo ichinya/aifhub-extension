@@ -1,8 +1,8 @@
 ---
 name: aif-analyze
 description: Bootstrap project context. Resolves localization and stack, creates/updates config.yaml and rules/base.md, then checks DESCRIPTION and guides core skill execution.
-allowed-tools: Read Write Edit Glob Grep Bash(mkdir *) Bash(ai-factory aifhub-memory-tools *) Bash(ai-factory aifhub-mode status --json) Bash(node --input-type=module -e *openspec-runner.mjs*) Bash(rg --version) Bash(uv --version) Bash(graphify --version) Bash(graphify --help) Bash(codex-agent-mem-policy --help) Bash(codex-agent-mem-smoke --help) Bash(codegraph --version) Bash(codegraph --help) Bash(codegraph status) Bash(ctx7 --version) Bash(npx --no-install ctx7 --help) Bash(openspec init --tools none) Skill AskUserQuestion Questions
-version: 0.10.0
+allowed-tools: Read Write Edit Glob Grep Bash(mkdir *) Bash(ai-factory aifhub-analyze-config-diff *) Bash(ai-factory aifhub-memory-tools *) Bash(ai-factory aifhub-mode status --json) Bash(node --input-type=module -e *openspec-runner.mjs*) Bash(rg --version) Bash(uv --version) Bash(graphify --version) Bash(graphify --help) Bash(codex-agent-mem-policy --help) Bash(codex-agent-mem-smoke --help) Bash(codegraph --version) Bash(codegraph --help) Bash(codegraph status) Bash(ctx7 --version) Bash(npx --no-install ctx7 --help) Bash(openspec init --tools none) Skill AskUserQuestion Questions
+version: 0.11.0
 author: ichi
 ---
 
@@ -240,6 +240,9 @@ Resolve the bootstrap/config mode before creating directories:
 
 - If config.yaml is missing, create it with v1 schema only after bootstrap mode is resolved.
 - If config.yaml exists, preserve existing values and add missing fields.
+- Before patching an existing config, run the deterministic required-keys diff instead of LLM-based key comparison: `ai-factory aifhub-analyze-config-diff --json`. The command is read-only and compares the config against `skills/aif-analyze/references/config-keys.json` plus this skill's frontmatter version.
+- When the diff reports `missing` entries or `version_drift`, present each missing key to the user with its manifest `purpose` text before writing it, then apply the additions through the structural patch below. When the diff reports `up_to_date: true`, take the fast path: skip config re-analysis and re-patching entirely.
+- After a successful config create/update, ensure the config records `analyze.skill_version` equal to this skill's frontmatter `version`. The config patcher preserves an existing value; update it explicitly when the skill version changed.
 - Treat an existing config update as a structural patch, not a full-file re-render. Preserve upstream/core fields such as `config_version`, `language`, `workflow`, `rules`, and `agent_profile`, plus unknown user-authored top-level and nested fields. Change only keys owned by the selected AIFHub bootstrap profile.
 - Keep AIFHub-owned profile keys explicit and namespaced under `aifhub`, including `aifhub.artifactProtocol` and the selected `aifhub.openspec.*` policy keys. Do not infer ownership of unrelated or unknown fields from their location.
 - Do not introduce `research_bundles_dir` or any equivalent config key. Derive the ultra research bundle root at runtime as `<parent(paths.research)>/research/`, preserving the configured `paths.research` file.

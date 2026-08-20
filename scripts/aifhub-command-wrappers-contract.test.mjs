@@ -78,6 +78,13 @@ const WRAPPER_COMMANDS = [
     args: ['recommend', '--shape', 'large_framework_app', '--task', 'architecture_or_impact_discovery', '--json']
   },
   {
+    name: 'aifhub-analyze-config-diff',
+    description: 'Run the read-only AIFHub analyze config required-keys diff.',
+    module: './commands/aifhub-analyze-config-diff.mjs',
+    script: 'aif-analyze-config-diff.mjs',
+    args: ['--json']
+  },
+  {
     name: 'aifhub-context-dedup',
     description: 'Run AIFHub session context dedup checks, status, and purge.',
     module: './commands/aifhub-context-dedup.mjs',

@@ -55,6 +55,11 @@
       "module": "./commands/aifhub-memory-tools.mjs"
     },
     {
+      "name": "aifhub-analyze-config-diff",
+      "description": "Run the read-only AIFHub analyze config required-keys diff.",
+      "module": "./commands/aifhub-analyze-config-diff.mjs"
+    },
+    {
       "name": "aifhub-context-dedup",
       "description": "Run AIFHub session context dedup checks, status, and purge.",
       "module": "./commands/aifhub-context-dedup.mjs"
