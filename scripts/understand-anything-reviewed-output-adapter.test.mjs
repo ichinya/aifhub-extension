@@ -202,6 +202,77 @@ describe('Understand Anything reviewed-output adapter', () => {
     );
   });
 
+  it('normalizes fixture stat failures without exposing sensitive absolute paths', async () => {
+    const sensitivePath = path.resolve('C:/Users/Example/private/missing-fixture');
+    for (const filesystemCode of ['ENOENT', 'EACCES']) {
+      await assert.rejects(
+        async () => loadReviewedOutputFixture({
+          fixtureRoot: sensitivePath,
+          fileOps: {
+            stat: async (targetPath) => {
+              const error = new Error(`${filesystemCode}: cannot inspect ${targetPath}`);
+              error.code = filesystemCode;
+              error.path = targetPath;
+              throw error;
+            }
+          }
+        }),
+        (error) => {
+          assert.equal(error.code, filesystemCode === 'ENOENT' ? 'missing_path' : 'path_inspection_failed');
+          assert.doesNotMatch(error.message, /Users|Example|private|missing-fixture/i);
+          assert.equal(Object.hasOwn(error, 'path'), false);
+          assert.equal(Object.hasOwn(error, 'cause'), false);
+          return true;
+        }
+      );
+    }
+  });
+
+  it('normalizes fixture read and realpath failures without retaining raw errors', async () => {
+    const fixtureRoot = path.join(FIXTURES_ROOT, 'architecture-onboarding');
+    const provenance = await buildFixtureProvenance('architecture-onboarding');
+    const sensitivePath = path.resolve('C:/Users/Example/private/provider-output.json');
+    const failureCases = [
+      {
+        operation: 'readFile',
+        code: 'EACCES',
+        expectedCode: 'file_read_failed',
+        expectedMessage: 'Unable to read required fixture file.'
+      },
+      {
+        operation: 'realpath',
+        code: 'EACCES',
+        expectedCode: 'path_resolution_failed',
+        expectedMessage: 'Unable to resolve required fixture path.'
+      }
+    ];
+
+    for (const failureCase of failureCases) {
+      await assert.rejects(
+        async () => loadReviewedOutputFixture({
+          fixtureRoot,
+          provenance,
+          fileOps: {
+            [failureCase.operation]: async () => {
+              const error = new Error(`${failureCase.code}: access denied at ${sensitivePath}`);
+              error.code = failureCase.code;
+              error.path = sensitivePath;
+              throw error;
+            }
+          }
+        }),
+        (error) => {
+          assert.equal(error.code, failureCase.expectedCode);
+          assert.equal(error.message, failureCase.expectedMessage);
+          assert.equal(Object.hasOwn(error, 'path'), false);
+          assert.equal(Object.hasOwn(error, 'cause'), false);
+          assert.equal(JSON.stringify(error).includes('Users'), false);
+          return true;
+        }
+      );
+    }
+  });
+
   it('rejects raw source text and self-declared provenance in graph payloads', async () => {
     await assert.rejects(
       async () => mutateFixtureAndLoad('hostile-comments', (graph) => {

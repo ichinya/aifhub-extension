@@ -13,6 +13,12 @@ import {
 
 export const UNDERSTAND_ANYTHING_CATALOG_SCHEMA = 'aifhub.understand_anything.ai_tester_scenario_catalog.v1';
 export const UNDERSTAND_ANYTHING_MATRIX_SCHEMA = 'aifhub.understand_anything.ai_tester_matrix.v1';
+export const UNDERSTAND_ANYTHING_PINNED_PROFILE = Object.freeze({
+  runtime: 'codex',
+  model: 'gpt-5.6-luna',
+  reasoning: 'low',
+  repetitions: 2
+});
 export const UNDERSTAND_ANYTHING_VARIANTS = Object.freeze(['baseline_rg', 'candidate_reviewed_graph']);
 export const UNDERSTAND_ANYTHING_SCENARIOS = Object.freeze([
   'architecture_onboarding',
@@ -41,10 +47,18 @@ export function validateUnderstandAnythingScenarioCatalog(catalog = {}) {
     errors.push(`schema must be ${UNDERSTAND_ANYTHING_CATALOG_SCHEMA}`);
   }
   const defaults = catalog.defaults ?? {};
-  if (defaults.runtime !== 'codex') errors.push('defaults.runtime must be codex');
-  if (defaults.model !== 'gpt-5.6-luna') errors.push('defaults.model must be gpt-5.6-luna');
-  if (defaults.reasoning !== 'low') errors.push('defaults.reasoning must be low');
-  if (defaults.repetitions !== 2) errors.push('defaults.repetitions must be 2');
+  if (defaults.runtime !== UNDERSTAND_ANYTHING_PINNED_PROFILE.runtime) {
+    errors.push(`defaults.runtime must be ${UNDERSTAND_ANYTHING_PINNED_PROFILE.runtime}`);
+  }
+  if (defaults.model !== UNDERSTAND_ANYTHING_PINNED_PROFILE.model) {
+    errors.push(`defaults.model must be ${UNDERSTAND_ANYTHING_PINNED_PROFILE.model}`);
+  }
+  if (defaults.reasoning !== UNDERSTAND_ANYTHING_PINNED_PROFILE.reasoning) {
+    errors.push(`defaults.reasoning must be ${UNDERSTAND_ANYTHING_PINNED_PROFILE.reasoning}`);
+  }
+  if (defaults.repetitions !== UNDERSTAND_ANYTHING_PINNED_PROFILE.repetitions) {
+    errors.push(`defaults.repetitions must be ${UNDERSTAND_ANYTHING_PINNED_PROFILE.repetitions}`);
+  }
   if (!sameOrderedValues(defaults.variants, UNDERSTAND_ANYTHING_VARIANTS)) {
     errors.push(`defaults.variants must be ${UNDERSTAND_ANYTHING_VARIANTS.join(', ')}`);
   }
@@ -270,7 +284,8 @@ export function validateCompactReviewedContext(value = {}, matrixCase = {}) {
     throw new Error('compact context provenance must be synthetic_schema_fixture');
   }
   const encoded = JSON.stringify(value);
-  if (/(?:[A-Za-z]:\\Users\\|\/Users\/|\/home\/[^/]+\/|BEGIN (?:RSA |OPENSSH )?PRIVATE KEY|(?:api[_-]?key|token|password)\s*[:=])/i.test(encoded)) {
+  if (/(?:[A-Za-z]:\\Users\\|\/Users\/|\/home\/[^/]+\/)/i.test(encoded)
+    || containsCredentialLikeMaterial(encoded)) {
     throw new Error('compact context contains private or credential-like material');
   }
   for (const file of asArray(value.files)) {
@@ -280,6 +295,19 @@ export function validateCompactReviewedContext(value = {}, matrixCase = {}) {
     throw new Error('compact context fixture identity mismatch');
   }
   return true;
+}
+
+export function containsCredentialLikeMaterial(value) {
+  let encoded;
+  try {
+    encoded = typeof value === 'string' ? value : JSON.stringify(value);
+  } catch {
+    return true;
+  }
+  const text = String(encoded ?? '');
+  const privateKeyBlock = /BEGIN (?:RSA |OPENSSH |EC |DSA |ENCRYPTED )?PRIVATE KEY/i;
+  const credentialField = /(?:^|[\s{,;["'])(?:api[_-]?key|private[_-]?key|(?:access|refresh|id)[_-]?token|token|password|aws[_-]?secret[_-]?access[_-]?key|(?:client[_-])?secret(?:[_-]?access[_-]?key)?|auth(?:orization)?(?:[_-]?token)?)\b["']?\s*[:=]/i;
+  return privateKeyBlock.test(text) || credentialField.test(text);
 }
 
 export function renderUnderstandAnythingAiTesterScenario(matrixCase = {}) {

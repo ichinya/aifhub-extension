@@ -5,7 +5,8 @@ import { buildUnderstandAnythingMatrix } from './understand-anything-ai-tester-m
 import {
   buildUnderstandAnythingResultsReport,
   evaluateUnderstandAnythingProviderPolicy,
-  normalizeUnderstandAnythingTraceRecord
+  normalizeUnderstandAnythingTraceRecord,
+  renderUnderstandAnythingResultsMarkdown
 } from './understand-anything-ai-tester-results-report.mjs';
 
 function catalog() {
@@ -49,7 +50,8 @@ function trace(matrixCase, {
   contextAccess = matrixCase.variant === 'candidate_reviewed_graph',
   contextCheck = false,
   rawPathLeak = false,
-  rawContextPayload = false
+  rawContextPayload = false,
+  credentialInput = null
 } = {}) {
   const output = [
     ...matrixCase.required_files,
@@ -60,7 +62,7 @@ function trace(matrixCase, {
   ].join('\n');
   const toolCalls = [{
     name: 'Bash',
-    input: { command: rawPathLeak ? 'Get-Content C:\\Users\\Example\\secret.txt' : 'rg -n . project/src' },
+    input: credentialInput ?? { command: rawPathLeak ? 'Get-Content C:\\Users\\Example\\secret.txt' : 'rg -n . project/src' },
     resultContent: 'bounded repository evidence'
   }];
   if (contextAccess) {
@@ -150,8 +152,14 @@ describe('Understand Anything correctness-first report', () => {
     const missing = traceIndex(value);
     delete missing.latest_by_scenario[value.cases[0].id];
     const missingReport = buildUnderstandAnythingResultsReport({ matrix: value, traceIndex: missing });
+    const missingPair = missingReport.pairs.find((pair) => pair.pair_id === value.cases[0].pair_id);
     assert.equal(missingReport.evidence_complete, false);
     assert.equal(missingReport.summary.not_run_rows, 1);
+    assert.ok(missingReport.pairs.every((pair) => pair.baseline !== null && pair.candidate !== null));
+    assert.equal(missingPair.decision, 'avoid');
+    assert.deepEqual(missingPair.reason_codes, ['pair_incomplete']);
+    assert.doesNotThrow(() => renderUnderstandAnythingResultsMarkdown(missingReport));
+    assert.match(renderUnderstandAnythingResultsMarkdown(missingReport), /0\/0/);
 
     const duplicate = traceIndex(value);
     duplicate.duplicate_scenarios = [value.cases[0].id];
@@ -210,13 +218,45 @@ describe('Understand Anything correctness-first report', () => {
 
     const report = buildUnderstandAnythingResultsReport({ matrix: value, traceIndex: traceIndex(value, overrides) });
     const row = report.rows.find((item) => item.id === candidate.id);
+    const pair = report.pairs.find((item) => item.pair_id === candidate.pair_id);
 
+    assert.equal(row.context_file_accessed, true);
+    assert.equal(row.correctness_pass, true);
     assert.equal(row.privacy_pass, false);
     assert.ok(row.reason_codes.includes('raw_trace_path_leak'));
     assert.ok(row.reason_codes.includes('raw_context_payload_retained'));
     assert.equal(report.summary.candidate_query.rows, 8);
     assert.equal(JSON.stringify(report).includes('C:\\Users\\Example'), false);
     assert.equal(JSON.stringify(report).includes('reviewed_output_context.v1'), false);
+    assert.equal(pair.decision, 'forbid');
+    assert.equal(pair.reason_codes.includes('candidate_correctness_failed'), false);
+  });
+
+  it('fails privacy on credential-like trace keys without retaining secret values', () => {
+    const credentialKeys = ['api_key', 'secret', 'private_key', 'auth', 'authorization', 'AWS_SECRET_ACCESS_KEY'];
+    for (const credentialKey of credentialKeys) {
+      const value = matrix();
+      const candidate = value.cases.find((item) => item.variant === 'candidate_reviewed_graph');
+      const sentinel = `private-${credentialKey}-sentinel`;
+      const overrides = new Map([[candidate.id, trace(candidate, {
+        credentialInput: { [credentialKey]: sentinel }
+      })]]);
+
+      const report = buildUnderstandAnythingResultsReport({ matrix: value, traceIndex: traceIndex(value, overrides) });
+      const row = report.rows.find((item) => item.id === candidate.id);
+
+      assert.equal(row.privacy_pass, false, credentialKey);
+      assert.ok(row.reason_codes.includes('raw_trace_secret_leak'), credentialKey);
+      assert.equal(JSON.stringify(report).includes(sentinel), false, credentialKey);
+    }
+
+    const value = matrix();
+    const candidate = value.cases.find((item) => item.variant === 'candidate_reviewed_graph');
+    const bounded = new Map([[candidate.id, trace(candidate, {
+      credentialInput: { secret_count: 0, authentication_mode: 'disabled' }
+    })]]);
+    const boundedReport = buildUnderstandAnythingResultsReport({ matrix: value, traceIndex: traceIndex(value, bounded) });
+    assert.equal(boundedReport.rows.find((item) => item.id === candidate.id).privacy_pass, true);
   });
 });
 

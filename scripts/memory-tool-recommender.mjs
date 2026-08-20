@@ -1036,6 +1036,8 @@ function buildDoNotRecommend(metadata, projectShape, taskSignals, projectProfile
 }
 
 async function runProbeForTool(toolId, options = {}) {
+  // Keep this source-level gate even when mutable metadata also says reject_defer:
+  // a denied provider must never reach a probe runner through metadata drift.
   if (SOURCE_DENYLIST_TOOL_IDS.has(toolId)) {
     return {
       availability: 'unknown',

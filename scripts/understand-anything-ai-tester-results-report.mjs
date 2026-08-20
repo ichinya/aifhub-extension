@@ -7,8 +7,12 @@ import { pathToFileURL } from 'node:url';
 
 import {
   UNDERSTAND_ANYTHING_MATRIX_SCHEMA,
-  UNDERSTAND_ANYTHING_VARIANTS
+  UNDERSTAND_ANYTHING_PINNED_PROFILE,
+  UNDERSTAND_ANYTHING_SCENARIOS,
+  UNDERSTAND_ANYTHING_VARIANTS,
+  containsCredentialLikeMaterial
 } from './understand-anything-ai-tester-matrix.mjs';
+import { REVIEWED_OUTPUT_CONTEXT_SCHEMA } from './understand-anything-reviewed-output-adapter.mjs';
 
 export const UNDERSTAND_ANYTHING_RESULTS_SCHEMA = 'aifhub.understand_anything.ai_tester_results.v1';
 export const UNDERSTAND_ANYTHING_PAIR_DECISIONS = Object.freeze(['recommend', 'conditional', 'avoid', 'forbid']);
@@ -77,9 +81,11 @@ export function normalizeUnderstandAnythingTraceRecord(record = {}) {
   const contextFileAccessed = traceToolCalls(record).some((toolCall) => {
     const input = stableText(toolCall?.input);
     const resultContent = String(toolCall?.resultContent ?? '');
+    const fingerprintEvidence = /sha256:[0-9a-f]{64}/.test(resultContent);
+    const rawContextPayloadEvidence = resultContent.includes(REVIEWED_OUTPUT_CONTEXT_SCHEMA);
+    // Raw payload proves access for correctness, while the privacy audit rejects retaining it.
     return input.includes('reviewed-graph-context.json')
-      && (/sha256:[0-9a-f]{64}/.test(resultContent)
-        || resultContent.includes('aifhub.understand_anything.reviewed_output_context.v1'));
+      && (fingerprintEvidence || rawContextPayloadEvidence);
   });
   return {
     scenario_name: String(record.scenario?.name ?? ''),
@@ -128,9 +134,11 @@ export function buildUnderstandAnythingResultsReport({
     trace: latest[matrixCase.id] ?? null
   }));
   const pairs = buildPairResults(rows);
-  const evidenceComplete = rows.length === 16
+  const expectedPairs = UNDERSTAND_ANYTHING_SCENARIOS.length * UNDERSTAND_ANYTHING_PINNED_PROFILE.repetitions;
+  const expectedRows = expectedPairs * UNDERSTAND_ANYTHING_VARIANTS.length;
+  const evidenceComplete = rows.length === expectedRows
     && rows.every((row) => row.trace_status === 'PASS')
-    && pairs.length === 8
+    && pairs.length === expectedPairs
     && pairs.every((pair) => pair.complete);
   const privacyPass = rows.every((row) => row.privacy_pass);
   const correctnessPass = rows.every((row) => row.correctness_pass);
@@ -361,25 +369,20 @@ function buildPairResults(rows) {
     const complete = pairRows.length === 2 && baseline?.trace_status === 'PASS' && candidate?.trace_status === 'PASS';
     const reasons = [];
     let decision = 'conditional';
-    if (!baseline || !candidate || !complete) {
-      decision = candidate && (!candidate.correctness_pass || !candidate.privacy_pass) ? 'forbid' : 'avoid';
+    if (!complete) {
       reasons.push('pair_incomplete');
-    }
-    if (candidate && !candidate.correctness_pass) {
-      decision = 'forbid';
-      reasons.push('candidate_correctness_failed');
-    }
-    if (candidate && !candidate.privacy_pass) {
-      decision = 'forbid';
-      reasons.push('candidate_privacy_failed');
-    }
-    if (complete && candidate.correctness_score < baseline.correctness_score) {
+      const candidateCorrectnessFailed = Boolean(candidate) && candidate.correctness_pass !== true;
+      const candidatePrivacyFailed = Boolean(candidate) && candidate.privacy_pass !== true;
+      if (candidateCorrectnessFailed) reasons.push('candidate_correctness_failed');
+      if (candidatePrivacyFailed) reasons.push('candidate_privacy_failed');
+      decision = candidateCorrectnessFailed || candidatePrivacyFailed ? 'forbid' : 'avoid';
+    } else if (candidate.correctness_score < baseline.correctness_score) {
       decision = 'avoid';
       reasons.push('candidate_correctness_regression');
-    } else if (complete && candidate.correctness_score > baseline.correctness_score) {
+    } else if (candidate.correctness_score > baseline.correctness_score) {
       decision = 'recommend';
       reasons.push('material_correctness_benefit');
-    } else if (complete) {
+    } else {
       decision = 'conditional';
       reasons.push('correctness_parity_only');
     }
@@ -404,10 +407,14 @@ function validateMatrixIdentity(matrix) {
   if (matrix?.schema !== UNDERSTAND_ANYTHING_MATRIX_SCHEMA) {
     throw new Error(`matrix schema must be ${UNDERSTAND_ANYTHING_MATRIX_SCHEMA}`);
   }
-  if (matrix.runtime !== 'codex' || matrix.model !== 'gpt-5.6-luna' || matrix.reasoning !== 'low') {
-    throw new Error('matrix profile must be codex/gpt-5.6-luna/low');
+  if (matrix.runtime !== UNDERSTAND_ANYTHING_PINNED_PROFILE.runtime
+    || matrix.model !== UNDERSTAND_ANYTHING_PINNED_PROFILE.model
+    || matrix.reasoning !== UNDERSTAND_ANYTHING_PINNED_PROFILE.reasoning) {
+    throw new Error(`matrix profile must be ${UNDERSTAND_ANYTHING_PINNED_PROFILE.runtime}/${UNDERSTAND_ANYTHING_PINNED_PROFILE.model}/${UNDERSTAND_ANYTHING_PINNED_PROFILE.reasoning}`);
   }
-  if (matrix.repetitions !== 2 || matrix.no_promote !== true) throw new Error('matrix repetitions/no-promote mismatch');
+  if (matrix.repetitions !== UNDERSTAND_ANYTHING_PINNED_PROFILE.repetitions || matrix.no_promote !== true) {
+    throw new Error('matrix repetitions/no-promote mismatch');
+  }
   const ids = matrix.cases.map((item) => item.id);
   if (new Set(ids).size !== ids.length) throw new Error('duplicate matrix case ids');
   const pairs = new Map();
@@ -478,8 +485,8 @@ function auditUnderstandAnythingTrace(record) {
   const toolCalls = traceToolCalls(record);
   const resultContents = toolCalls.map((toolCall) => String(toolCall?.resultContent ?? ''));
   const pathLeak = strings.some((value) => /(?:\\\\\?\\)?[A-Za-z]:\\|\/Users\/[^/]+\/|\/home\/[^/]+\/|\/tmp\/ai-tester-/i.test(value));
-  const secretLeak = strings.some((value) => /BEGIN (?:RSA |OPENSSH )?PRIVATE KEY|(?:api[_-]?key|password|authorization)\s*[:=]\s*\S+/i.test(value));
-  const rawContextPayload = resultContents.some((value) => value.includes('aifhub.understand_anything.reviewed_output_context.v1'));
+  const secretLeak = containsCredentialLikeMaterial(record);
+  const rawContextPayload = resultContents.some((value) => value.includes(REVIEWED_OUTPUT_CONTEXT_SCHEMA));
   const rawInstructionBody = resultContents.some((value) => /<SUBAGENT-STOP>|^---\s*\r?\nname:\s*using-superpowers/m.test(value));
   const reasonCodes = [];
   if (pathLeak) reasonCodes.push('raw_trace_path_leak');

@@ -500,11 +500,12 @@ async function readJsonFile(filePath, fileOps, { label, maxBytes = null } = {}) 
   if (maxBytes !== null && details.size > maxBytes) {
     throw createAdapterError('graph_too_large', `${label} exceeds the reviewed graph size limit.`);
   }
+  const raw = await fileOps.readFile(filePath, 'utf8');
   let parsed;
   try {
-    parsed = JSON.parse(await fileOps.readFile(filePath, 'utf8'));
-  } catch (error) {
-    throw createAdapterError('invalid_json', `${label} must be valid JSON.`, { cause: error });
+    parsed = JSON.parse(raw);
+  } catch {
+    throw createAdapterError('invalid_json', `${label} must be valid JSON.`);
   }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw createAdapterError('invalid_json', `${label} must be a JSON object.`);
@@ -603,20 +604,38 @@ function normalizeRelativePath(value, label) {
 }
 
 function createFileOps(fileOps = {}) {
+  const readFileImpl = fileOps.readFile ?? readFile;
+  const statImpl = fileOps.stat ?? stat;
+  const realpathImpl = fileOps.realpath ?? realpath;
   return {
-    readFile: fileOps.readFile ?? readFile,
-    stat: async (targetPath) => {
-      try {
-        return await (fileOps.stat ?? stat)(targetPath);
-      } catch (error) {
-        if (error?.code === 'ENOENT') {
-          throw createAdapterError('missing_path', `Required fixture path is missing: ${targetPath}`);
-        }
-        throw error;
-      }
-    },
-    realpath: fileOps.realpath ?? realpath
+    readFile: (...args) => runSafeFileOperation('readFile', () => readFileImpl(...args)),
+    stat: (...args) => runSafeFileOperation('stat', () => statImpl(...args)),
+    realpath: (...args) => runSafeFileOperation('realpath', () => realpathImpl(...args))
   };
+}
+
+async function runSafeFileOperation(operation, callback) {
+  try {
+    return await callback();
+  } catch (error) {
+    const filesystemCode = safeFilesystemCode(error?.code);
+    logFix('debug', 'fixture-filesystem.failed', { operation, filesystem_code: filesystemCode });
+    if (filesystemCode === 'ENOENT') {
+      throw createAdapterError('missing_path', 'Required fixture path is missing.');
+    }
+    const failures = {
+      readFile: ['file_read_failed', 'Unable to read required fixture file.'],
+      stat: ['path_inspection_failed', 'Unable to inspect required fixture path.'],
+      realpath: ['path_resolution_failed', 'Unable to resolve required fixture path.']
+    };
+    const [code, message] = failures[operation] ?? ['fixture_io_failed', 'Unable to access required fixture data.'];
+    throw createAdapterError(code, message);
+  }
+}
+
+function safeFilesystemCode(value) {
+  const normalized = String(value ?? 'UNKNOWN').toUpperCase();
+  return /^[A-Z][A-Z0-9_]{1,31}$/.test(normalized) ? normalized : 'UNKNOWN';
 }
 
 function validateAllowedKeys(value, allowedKeys, code) {

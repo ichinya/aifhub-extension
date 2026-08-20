@@ -7,9 +7,11 @@ import path from 'node:path';
 import {
   UNDERSTAND_ANYTHING_CATALOG_SCHEMA,
   UNDERSTAND_ANYTHING_MATRIX_SCHEMA,
+  UNDERSTAND_ANYTHING_PINNED_PROFILE,
   buildUnderstandAnythingMatrix,
   generateUnderstandAnythingMatrix,
   renderUnderstandAnythingAiTesterScenario,
+  validateCompactReviewedContext,
   validateUnderstandAnythingScenarioCatalog
 } from './understand-anything-ai-tester-matrix.mjs';
 
@@ -56,6 +58,13 @@ function catalog() {
 
 describe('Understand Anything scenario catalog', () => {
   it('requires the exact Luna profile, four scenarios, synthetic provenance and no-promote', () => {
+    assert.deepEqual(UNDERSTAND_ANYTHING_PINNED_PROFILE, {
+      runtime: 'codex',
+      model: 'gpt-5.6-luna',
+      reasoning: 'low',
+      repetitions: 2
+    });
+    assert.equal(Object.isFrozen(UNDERSTAND_ANYTHING_PINNED_PROFILE), true);
     const value = catalog();
     assert.deepEqual(validateUnderstandAnythingScenarioCatalog(value), []);
 
@@ -66,6 +75,18 @@ describe('Understand Anything scenario catalog', () => {
     assert.ok(errors.some((error) => error.includes('reasoning')));
     assert.ok(errors.some((error) => error.includes('no_promote')));
     assert.ok(errors.some((error) => error.includes('four required scenarios')));
+
+    for (const [field, invalid] of [
+      ['runtime', 'other-runtime'],
+      ['model', 'other-model'],
+      ['reasoning', 'medium'],
+      ['repetitions', 3]
+    ]) {
+      const invalidCatalog = catalog();
+      invalidCatalog.defaults[field] = invalid;
+      assert.ok(validateUnderstandAnythingScenarioCatalog(invalidCatalog)
+        .some((error) => error.includes(`defaults.${field}`)), field);
+    }
   });
 
   it('rejects authored tasks that disclose hidden correctness answers', () => {
@@ -99,6 +120,34 @@ describe('Understand Anything matrix identity', () => {
       assert.equal(new Set(pair.map((item) => item.settings_fingerprint)).size, 1);
       assert.equal(new Set(pair.map((item) => item.run_id)).size, 1);
     }
+  });
+
+  it('rejects credential-like compact context fields without rejecting descriptive counters', () => {
+    const baseContext = {
+      schema: 'aifhub.understand_anything.reviewed_context.v1',
+      provenance: { class: 'synthetic_schema_fixture' },
+      files: ['src/entry.ts']
+    };
+    for (const credentialKey of [
+      'api_key',
+      'secret',
+      'private_key',
+      'auth',
+      'authorization',
+      'AWS_SECRET_ACCESS_KEY'
+    ]) {
+      assert.throws(
+        () => validateCompactReviewedContext({ ...baseContext, [credentialKey]: 'credential-sentinel' }),
+        /credential-like material/,
+        credentialKey
+      );
+    }
+
+    assert.equal(validateCompactReviewedContext({
+      ...baseContext,
+      secret_count: 0,
+      authentication_mode: 'disabled'
+    }), true);
   });
 });
 
