@@ -39,6 +39,14 @@ Context7 - optional documentation provider для актуальных library/A
 
 Оба provider являются только supporting context. Final plans, review findings, generated rules, verification status, done status и roadmap completion должны оставаться source-grounded в canonical OpenSpec artifacts, source files, tests, runtime state, QA evidence, generated rules trace metadata или другом direct repository evidence.
 
+## Understand Anything
+
+`understand-anything` однозначно обозначает [`Egonex-AI/Understand-Anything`](https://github.com/Egonex-AI/Understand-Anything), reviewed release `v2.9.0` at `f08763d11d0202a8a8f52b5dedda6d1b2e2ebac8`. Текущая policy — [`reject_defer`](memory-tools-research/understand-anything.md): candidate отсутствует в normal recommendations, `selected_tools`, availability probes и safe field-run plan.
+
+Pinned provider lifecycle — interactive agent skill с local dependency preparation, `.understandignore` confirmation, до пяти concurrent analysis subagents, `.ua/knowledge-graph.json`, optional hooks и dashboard. AIFHub не устанавливает, не клонирует, не индексирует, не обновляет и не запускает этот lifecycle; не создаёт symlinks/plugins, не меняет agent config/Git hooks, не запускает viewer/server/browser/daemon и не пишет `.ua/` в user project.
+
+Если пользователь независимо создал graph, владеет его lifecycle и явно передал reviewed output, AIFHub пока может рассматривать его только как noncanonical supporting context. Raw graph, source snippets и provider transcript нельзя переносить в OpenSpec, generated rules, QA, verify/done evidence или metadata. Mandatory [paired benchmark](memory-tools-research/understand-anything-benchmark-results.md) проверяет adapter contract на `synthetic_schema_fixture`; эта provenance не доказывает provider generation и не разрешает permission promotion.
+
 ## Границы AIFHub
 
 AIFHub Extension не должен:
@@ -49,6 +57,7 @@ AIFHub Extension не должен:
 - добавлять provider package dependencies или manifest dependencies;
 - добавлять Context7 MCP templates в `extension.json`;
 - менять `.mcp.json`, `.cursor/mcp.json`, `.opencode.json`, agent rules, agent skills или runtime MCP settings для provider;
+- устанавливать/запускать Understand Anything, создавать `.ua/`, включать его hooks/auto-update/dashboard или принимать raw graph как canonical evidence;
 - превращать provider availability в validation, verification, review, rules, security, done или commit gates.
 
 Будущие runtime features вроде metadata field `context_provider_suggestion` могут рекомендовать manual provider usage, но не должны менять user-owned setup boundary.

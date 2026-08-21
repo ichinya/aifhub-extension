@@ -1,0 +1,50 @@
+{
+  "schema": "aifhub.understand_anything.reviewed_graph.v1",
+  "project": {
+    "id": "anon-impact-app",
+    "revision": "rev-c1"
+  },
+  "files": [
+    {
+      "id": "file:api-handler",
+      "path": "src/api/handler.js",
+      "role": "api"
+    },
+    {
+      "id": "file:orders-service",
+      "path": "src/domain/orders/service.js",
+      "role": "domain"
+    },
+    {
+      "id": "file:audit-publish",
+      "path": "src/integrations/audit/publish.js",
+      "role": "integration"
+    }
+  ],
+  "components": [],
+  "impacts": [
+    {
+      "id": "impact:order-status-change",
+      "direct_paths": [
+        "src/domain/orders/service.js"
+      ],
+      "transitive_paths": [
+        "src/api/handler.js",
+        "src/integrations/audit/publish.js"
+      ]
+    }
+  ],
+  "workspace_imports": [],
+  "incremental": {
+    "from_revision": "rev-c1",
+    "to_revision": "rev-c1",
+    "added_imports": []
+  },
+  "metrics": {
+    "file_count": 3,
+    "component_count": 0,
+    "impact_count": 1,
+    "workspace_import_count": 0,
+    "incremental_import_count": 0
+  }
+}

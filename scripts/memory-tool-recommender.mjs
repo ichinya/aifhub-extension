@@ -29,6 +29,7 @@ const VALID_PROJECT_SHAPES = new Set([
 const DEFAULT_TASK_SIGNAL = 'architecture_or_impact_discovery';
 const DEFAULT_COMMAND = 'aif-analyze';
 const ALWAYS_REJECTED_TOOLS = new Set(['codex-mem', 'eagle-mem', 'rohitg00-agentmemory']);
+export const SOURCE_DENYLIST_TOOL_IDS = new Set(['understand-anything']);
 const MANUAL_ONLY_TASKS = new Map([
   ['agent-memory', new Set(['manual_durable_notes'])]
 ]);
@@ -875,7 +876,8 @@ function profileLabels(profile) {
 }
 
 function isRejectedTool(toolId, tool) {
-  return ALWAYS_REJECTED_TOOLS.has(toolId)
+  return SOURCE_DENYLIST_TOOL_IDS.has(toolId)
+    || ALWAYS_REJECTED_TOOLS.has(toolId)
     || tool.decision === 'reject_default'
     || tool.decision === 'reject_defer'
     || /^do_not_/.test(String(tool.recommendation_action ?? ''));
@@ -1034,6 +1036,16 @@ function buildDoNotRecommend(metadata, projectShape, taskSignals, projectProfile
 }
 
 async function runProbeForTool(toolId, options = {}) {
+  // Keep this source-level gate even when mutable metadata also says reject_defer:
+  // a denied provider must never reach a probe runner through metadata drift.
+  if (SOURCE_DENYLIST_TOOL_IDS.has(toolId)) {
+    return {
+      availability: 'unknown',
+      command: null,
+      note: 'Availability probe skipped by source denylist.'
+    };
+  }
+
   if (options.probeRunner) {
     const probe = await options.probeRunner(toolId, options);
     return normalizeProbeResult(probe);

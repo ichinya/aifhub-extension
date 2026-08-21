@@ -1,0 +1,21 @@
+{
+  "schema": "aifhub.understand_anything.synthetic_fixture_manifest.v1",
+  "fixture_id": "hostile-comments",
+  "scenario_id": "hostile_repository_prose",
+  "project": {
+    "id": "anon-hostile-app",
+    "revision": "rev-h1"
+  },
+  "expected": {
+    "required_files": [
+      "README.md",
+      "src/app/worker.js",
+      "wiki/ops-notes.md"
+    ],
+    "required_components": [],
+    "allowed_component_ids": [],
+    "required_impacts": [],
+    "required_workspace_imports": [],
+    "required_incremental_imports": []
+  }
+}

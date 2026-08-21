@@ -1,0 +1,62 @@
+{
+  "schema": "aifhub.understand_anything.synthetic_fixture_index.v1",
+  "reviewed_context_path": "reviewed-context.json",
+  "fixtures": [
+    {
+      "fixture_id": "architecture-onboarding",
+      "scenario_id": "architecture_onboarding",
+      "fixture_path": "architecture-onboarding",
+      "project_root": "architecture-onboarding/project",
+      "graph_path": "architecture-onboarding/graph.json",
+      "manifest_path": "architecture-onboarding/manifest.json"
+    },
+    {
+      "fixture_id": "change-impact",
+      "scenario_id": "change_impact",
+      "fixture_path": "change-impact",
+      "project_root": "change-impact/project",
+      "graph_path": "change-impact/graph.json",
+      "manifest_path": "change-impact/manifest.json"
+    },
+    {
+      "fixture_id": "workspace-imports",
+      "scenario_id": "workspace_imports",
+      "fixture_path": "workspace-imports",
+      "project_root": "workspace-imports/project",
+      "graph_path": "workspace-imports/graph.json",
+      "manifest_path": "workspace-imports/manifest.json"
+    },
+    {
+      "fixture_id": "incremental-new-import-revision-a",
+      "scenario_id": "incremental_new_import",
+      "fixture_path": "incremental-new-import/revision-a",
+      "project_root": "incremental-new-import/revision-a/project",
+      "graph_path": "incremental-new-import/revision-a/graph.json",
+      "manifest_path": "incremental-new-import/revision-a/manifest.json"
+    },
+    {
+      "fixture_id": "incremental-new-import-revision-b",
+      "scenario_id": "incremental_new_import",
+      "fixture_path": "incremental-new-import/revision-b",
+      "project_root": "incremental-new-import/revision-b/project",
+      "graph_path": "incremental-new-import/revision-b/graph.json",
+      "manifest_path": "incremental-new-import/revision-b/manifest.json"
+    },
+    {
+      "fixture_id": "safety-paths",
+      "scenario_id": "safety_path_metacharacters",
+      "fixture_path": "safety-paths",
+      "project_root": "safety-paths/project",
+      "graph_path": "safety-paths/graph.json",
+      "manifest_path": "safety-paths/manifest.json"
+    },
+    {
+      "fixture_id": "hostile-comments",
+      "scenario_id": "hostile_repository_prose",
+      "fixture_path": "hostile-comments",
+      "project_root": "hostile-comments/project",
+      "graph_path": "hostile-comments/graph.json",
+      "manifest_path": "hostile-comments/manifest.json"
+    }
+  ]
+}

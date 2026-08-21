@@ -22,6 +22,7 @@ skill_usage_matrix:
       - codex-mem
       - eagle-mem
       - rohitg00-agentmemory
+      - understand-anything
     notes: "Recommend only; do not install, setup, index, register MCP, mutate provider config, or treat provider output as evidence."
   aif-explore:
     allowed:
@@ -36,6 +37,7 @@ skill_usage_matrix:
       - codex-mem
       - eagle-mem
       - rohitg00-agentmemory
+      - understand-anything
     notes: "Read existing reviewed provider output, or use explicitly enabled tools only when metadata grants command-specific permission and purge is defined."
   aif-architecture:
     allowed:
@@ -50,6 +52,7 @@ skill_usage_matrix:
       - codegraph
       - repowise
       - rohitg00-agentmemory
+      - understand-anything
     notes: "Project-level architecture context only; optional provider output is supporting reviewed context and must not drive OpenSpec writes."
   aif-plan:
     allowed:
@@ -63,6 +66,7 @@ skill_usage_matrix:
       - eagle-mem
       - codegraph
       - rohitg00-agentmemory
+      - understand-anything
     notes: "Optional supporting context before writing canonical OpenSpec artifacts; final plan must use direct repository evidence."
   aif-review:
     allowed:
@@ -77,6 +81,7 @@ skill_usage_matrix:
       - eagle-mem
       - codegraph
       - rohitg00-agentmemory
+      - understand-anything
     notes: "Optional supporting context for impact/docs/closure checks only."
   aif-rules-check:
     allowed:
@@ -90,6 +95,7 @@ skill_usage_matrix:
       - eagle-mem
       - codegraph
       - rohitg00-agentmemory
+      - understand-anything
     notes: "Context7 may support version-sensitive external docs only; generated rules and source evidence remain authoritative."
   aif-implement:
     allowed:
@@ -103,6 +109,7 @@ skill_usage_matrix:
       - eagle-mem
       - codegraph
       - rohitg00-agentmemory
+      - understand-anything
     notes: "Implementation commands must not use optional context providers by default."
   aif-fix:
     allowed:
@@ -116,6 +123,7 @@ skill_usage_matrix:
       - eagle-mem
       - codegraph
       - rohitg00-agentmemory
+      - understand-anything
     notes: "Fix commands must use QA evidence, source files, and canonical OpenSpec context."
   aif-verify:
     allowed:
@@ -129,6 +137,7 @@ skill_usage_matrix:
       - eagle-mem
       - codegraph
       - rohitg00-agentmemory
+      - understand-anything
     notes: "Verification must stay source-grounded and provider-independent."
   aif-done:
     allowed:
@@ -142,6 +151,7 @@ skill_usage_matrix:
       - eagle-mem
       - codegraph
       - rohitg00-agentmemory
+      - understand-anything
     notes: "Done/finalization must not depend on optional provider availability or output."
   aif-commit:
     allowed:
@@ -155,6 +165,7 @@ skill_usage_matrix:
       - eagle-mem
       - codegraph
       - rohitg00-agentmemory
+      - understand-anything
     notes: "Commit freshness checks may use direct repository and local artifact evidence only."
 permissions:
   recommend_only:
@@ -247,6 +258,8 @@ tool_permissions:
     aif-analyze: recommend_only
     aif-explore: manual_purged_cli_execution
     aif-review: recommend_only
+    default: forbidden
+  understand-anything:
     default: forbidden
 availability_probes:
   rg:
@@ -886,6 +899,52 @@ tools:
       default:
         mode: manual_user_owned_execution
         notes: "AIFHub may review an explicitly supplied export as supporting context; it never starts or configures the provider."
+  understand-anything:
+    display_name: "Understand Anything"
+    doc: understand-anything.md
+    results_doc: understand-anything-benchmark-results.md
+    repository: "https://github.com/Egonex-AI/Understand-Anything"
+    tested_version: "v2.9.0 tag commit f08763d11d0202a8a8f52b5dedda6d1b2e2ebac8 observed 2026-07-22"
+    decision: reject_defer
+    recommendation_action: do_not_suggest_install
+    integration_role: user_owned_repo_graph
+    install_policy: do_not_auto_install
+    stable_cli: not_proven_interactive_agent_skill_only
+    mcp_status: not_enabled
+    read_scope: reviewed_output_only_not_provider_runtime
+    storage_scope: user_owned_or_disposable_provider_output_only
+    purge_path: forbidden_no_aifhub_execution_ownership
+    purge_status: forbidden
+    allowed_in: []
+    forbidden_in:
+      - aif-analyze
+      - aif-explore
+      - aif-architecture
+      - aif-plan
+      - aif-review
+      - aif-rules-check
+      - aif-implement
+      - aif-fix
+      - aif-verify
+      - aif-done
+      - aif-commit
+    privacy_caveat: "Pinned upstream is an interactive repo-graph lifecycle with user-owned storage and purge boundaries that AIFHub does not own."
+    avoid_reason: "Reject by default and defer any promotion: AIFHub must not install, index, probe, select, or execute the provider; only a future reviewed-output contract could change that."
+    source_denylist: true
+    forbidden_operations:
+      - auto_install
+      - auto_run_setup
+      - auto_index_source
+      - auto_sync_memory
+      - auto_register_mcp
+      - mutate_provider_config
+      - install_hooks
+      - start_background_daemons
+      - run_provider_cli
+    execution:
+      default:
+        mode: forbidden
+        notes: "AIFHub must not run or probe the provider. Only explicit user-owned reviewed output may be considered in a future promoted policy."
   eagle-mem:
     display_name: eagle-mem
     doc: eagle-mem.md

@@ -51,6 +51,7 @@ Recommender только советует:
 - Любой optional tool сравнивается с `rg`: сначала baseline search на том же task/profile, затем tool run только если selector и permissions разрешают его.
 - `proven_label_evidence` может включить optional tool только при exact match по tool, skill, task, accepted run class и всем project labels; `known_avoid_cases` и command-specific forbidden scopes остаются сильнее.
 - `rohitg00-agentmemory` остаётся source-denied `reject_default`: config enablement, continuity/manual-notes task labels и future positive labels не могут сделать его recommendation или `selected_tool`.
+- `understand-anything` остаётся source-denied `reject_defer`: explicit config enablement не может запустить probe, selection или provider lifecycle; synthetic reviewed-output benchmark всегда `--no-promote`.
 
 Protected validation artifacts:
 
@@ -70,6 +71,7 @@ Protected validation artifacts:
 | `agent-memory` | [`jayzeng/agentmemory`](https://github.com/jayzeng/agentmemory), `myagentmemory 0.4.12` | Manual notes только по явному запросу. |
 | `codex-agent-mem` | [`MarceloCaporale/codex-agent-mem`](https://github.com/MarceloCaporale/codex-agent-mem), Python package `1.0.2` | Optional read-only continuity с explicit SQLite DB. |
 | `rohitg00-agentmemory` | [`rohitg00/agentmemory`](https://github.com/rohitg00/agentmemory), `@agentmemory/agentmemory`, `@agentmemory/mcp` | [`reject_default`](memory-tools-research/agentmemory-rohitg00.md); isolated safety [`PASS`](memory-tools-research/agentmemory-rohitg00-benchmark-results.md), full-product runtime `NOT_RUN`, runtime decision `avoid`. |
+| `understand-anything` | [`Egonex-AI/Understand-Anything`](https://github.com/Egonex-AI/Understand-Anything), `v2.9.0` at `f08763d11d0202a8a8f52b5dedda6d1b2e2ebac8` | [`reject_defer`](memory-tools-research/understand-anything.md); provider lifecycle `NOT_RUN(lifecycle_unavailable)`, reviewed-output contract matrix synthetic/non-promotable. |
 
 Разрешенные рекомендации:
 
@@ -86,6 +88,7 @@ Protected validation artifacts:
 - `codex-mem`: default scope может ingest broad Codex history.
 - `eagle-mem`: scoped read и purge behavior не доказаны.
 - `rohitg00-agentmemory`: normal tasks, explicit config enablement и continuity/manual-notes signals не переопределяют `reject_default`; 2/2 isolated safety pairs прошли, но обе дали `avoid`, а full-product lifecycle не проверен. Допустим только явно переданный и проверенный user-owned output как supporting context.
+- `understand-anything`: normal tasks и explicit config не переопределяют `reject_defer`; не запускать install/index/update/hooks/viewer/daemon/config lifecycle. Даже PASS synthetic adapter matrix не является `provider_generated` provenance и не разрешает provider permission.
 
 AIFHub по-прежнему не принимает CodeGraph `install`, MCP serving, hooks/background services или agent configuration mutation.
 
@@ -138,6 +141,8 @@ Decision mapping из matrix:
 Для `context-mode` active executable probe отсутствует; metadata/runtime возвращают `dedicated_harness_required`, а проверка разрешена только pinned isolated harness для issue `#134`.
 
 Для `rohitg00-agentmemory` executable status probe отсутствует; `status --json` возвращает `availability: unknown` и `command: null`.
+
+Для `understand-anything` executable status probe также отсутствует; source denylist возвращает `availability: unknown`, `command: null` и не пытается найти или запустить `/understand`.
 
 Каждый `probes.<tool>` object содержит обязательные поля `availability` и `command`. Поля `reason` и `note` являются optional diagnostics для намеренно skipped или disabled probes.
 

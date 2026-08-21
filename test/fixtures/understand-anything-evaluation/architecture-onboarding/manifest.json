@@ -1,0 +1,38 @@
+{
+  "schema": "aifhub.understand_anything.synthetic_fixture_manifest.v1",
+  "fixture_id": "architecture-onboarding",
+  "scenario_id": "architecture_onboarding",
+  "project": {
+    "id": "anon-architecture-app",
+    "revision": "rev-a1"
+  },
+  "expected": {
+    "required_files": [
+      "src/domain/orders/service.js",
+      "src/shared/log.js",
+      "src/web/app.js"
+    ],
+    "required_components": [
+      {
+        "id": "component:web-shell",
+        "file_paths": [
+          "src/web/app.js"
+        ]
+      },
+      {
+        "id": "component:orders-domain",
+        "file_paths": [
+          "src/domain/orders/service.js",
+          "src/shared/log.js"
+        ]
+      }
+    ],
+    "allowed_component_ids": [
+      "component:web-shell",
+      "component:orders-domain"
+    ],
+    "required_impacts": [],
+    "required_workspace_imports": [],
+    "required_incremental_imports": []
+  }
+}

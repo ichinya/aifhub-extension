@@ -1,0 +1,55 @@
+{
+  "schema": "aifhub.understand_anything.reviewed_graph.v1",
+  "project": {
+    "id": "anon-architecture-app",
+    "revision": "rev-a1"
+  },
+  "files": [
+    {
+      "id": "file:orders-service",
+      "path": "src/domain/orders/service.js",
+      "role": "domain"
+    },
+    {
+      "id": "file:shared-log",
+      "path": "src/shared/log.js",
+      "role": "support"
+    },
+    {
+      "id": "file:web-app",
+      "path": "src/web/app.js",
+      "role": "entrypoint"
+    }
+  ],
+  "components": [
+    {
+      "id": "component:orders-domain",
+      "kind": "service",
+      "file_paths": [
+        "src/domain/orders/service.js",
+        "src/shared/log.js"
+      ]
+    },
+    {
+      "id": "component:web-shell",
+      "kind": "ui",
+      "file_paths": [
+        "src/web/app.js"
+      ]
+    }
+  ],
+  "impacts": [],
+  "workspace_imports": [],
+  "incremental": {
+    "from_revision": "rev-a1",
+    "to_revision": "rev-a1",
+    "added_imports": []
+  },
+  "metrics": {
+    "file_count": 3,
+    "component_count": 2,
+    "impact_count": 0,
+    "workspace_import_count": 0,
+    "incremental_import_count": 0
+  }
+}

@@ -1,0 +1,176 @@
+{
+  "schema": "aifhub.understand_anything.static_audit.v1",
+  "provider": {
+    "id": "understand-anything",
+    "repository": "github:EORMeci/understand-anything"
+  },
+  "revision": {
+    "tag": "v2.9.0",
+    "commit": "f08763d11d0202a8a8f52b5dedda6d1b2e2ebac8"
+  },
+  "license": {
+    "spdx": "MIT"
+  },
+  "workspace": {
+    "private_workspace_package": true
+  },
+  "package_scripts": {
+    "audited": true
+  },
+  "interactive_skill": {
+    "entrypoint": "/understand",
+    "requires_ai_tester": true,
+    "bounded_subagents_max": 5
+  },
+  "filesystem_scope": {
+    "writes": [
+      ".ua/context.json"
+    ]
+  },
+  "ua_schema": {
+    "version": "1"
+  },
+  "hooks": {
+    "installs_git_hooks": false
+  },
+  "viewer": {
+    "enabled": false,
+    "daemon": false
+  },
+  "network_model": {
+    "runtime": "codex",
+    "model": "gpt-5.6-luna"
+  },
+  "windows_behavior": {
+    "supports_spaces": true
+  },
+  "purge_inventory": {
+    "requires_descendant_cleanup": true
+  },
+  "protected_boundaries": {
+    "forbidden_write_targets": []
+  },
+  "claims": [
+    {
+      "id": "license",
+      "status": "PASS",
+      "source_refs": [
+        {
+          "kind": "license",
+          "path": "C:/private/LICENSE",
+          "source_body": "license body"
+        }
+      ]
+    },
+    {
+      "id": "private_workspace_package",
+      "status": "PASS",
+      "source_refs": [
+        {
+          "kind": "manifest",
+          "path": "package.json#/workspaces"
+        }
+      ]
+    },
+    {
+      "id": "package_scripts",
+      "status": "PASS",
+      "source_refs": [
+        {
+          "kind": "manifest",
+          "path": "package.json#/scripts"
+        }
+      ]
+    },
+    {
+      "id": "interactive_skill_steps",
+      "status": "PASS",
+      "source_refs": [
+        {
+          "kind": "skill",
+          "path": "README.md#/interactive-skill"
+        }
+      ]
+    },
+    {
+      "id": "agent_and_subagent_prompts",
+      "status": "PASS",
+      "source_refs": [
+        {
+          "kind": "prompt",
+          "path": "src/agents/system-prompt.ts#bounded-subagents"
+        }
+      ]
+    },
+    {
+      "id": "filesystem_scope",
+      "status": "PASS",
+      "source_refs": [
+        {
+          "kind": "doc",
+          "path": "docs/filesystem.md#scope"
+        }
+      ]
+    },
+    {
+      "id": "ua_schema",
+      "status": "PASS",
+      "source_refs": [
+        {
+          "kind": "schema",
+          "path": "src/schema/ua-output.ts"
+        }
+      ]
+    },
+    {
+      "id": "hooks",
+      "status": "PASS",
+      "source_refs": [
+        {
+          "kind": "doc",
+          "path": "docs/install.md#hooks"
+        }
+      ]
+    },
+    {
+      "id": "viewer",
+      "status": "PASS",
+      "source_refs": [
+        {
+          "kind": "doc",
+          "path": "docs/viewer.md#launch"
+        }
+      ]
+    },
+    {
+      "id": "network_and_model",
+      "status": "PASS",
+      "source_refs": [
+        {
+          "kind": "doc",
+          "path": "docs/runtime.md#models"
+        }
+      ]
+    },
+    {
+      "id": "windows_behavior",
+      "status": "PASS",
+      "source_refs": [
+        {
+          "kind": "issue",
+          "path": "issues/129#windows"
+        }
+      ]
+    },
+    {
+      "id": "purge_inventory",
+      "status": "PASS",
+      "source_refs": [
+        {
+          "kind": "doc",
+          "path": "docs/purge.md#inventory"
+        }
+      ]
+    }
+  ]
+}

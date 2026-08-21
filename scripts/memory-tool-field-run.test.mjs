@@ -8,6 +8,7 @@ import path from 'node:path';
 import {
   REJECTED_FULL_INSTALL_IDS,
   SAFE_TOOL_IDS,
+  SOURCE_DENYLIST_TOOL_IDS,
   assertWithinDirectory,
   buildPublicRunSummary,
   discoverProjectRoots,
@@ -197,8 +198,12 @@ describe('tool plan', () => {
     assert.equal(installed.includes('context-mode'), false);
     assert.equal(plan.find((tool) => tool.id === 'context-mode').fullInstall, false);
     assert.equal(SAFE_TOOL_IDS.includes('rohitg00-agentmemory'), false);
+    assert.equal(SAFE_TOOL_IDS.includes('understand-anything'), false);
     assert.equal(ids.includes('rohitg00-agentmemory'), false);
+    assert.equal(ids.includes('understand-anything'), false);
     assert.equal(REJECTED_FULL_INSTALL_IDS.has('rohitg00-agentmemory'), true);
+    assert.equal(REJECTED_FULL_INSTALL_IDS.has('understand-anything'), true);
+    assert.equal(SOURCE_DENYLIST_TOOL_IDS.has('understand-anything'), true);
   });
 });
 

@@ -1,0 +1,26 @@
+{
+  "schema": "aifhub.understand_anything.synthetic_fixture_manifest.v1",
+  "fixture_id": "workspace-imports",
+  "scenario_id": "workspace_imports",
+  "project": {
+    "id": "anon-workspace-app",
+    "revision": "rev-w1"
+  },
+  "expected": {
+    "required_files": [
+      "apps/web/src/main.js",
+      "packages/shared/src/index.js"
+    ],
+    "required_components": [],
+    "allowed_component_ids": [],
+    "required_impacts": [],
+    "required_workspace_imports": [
+      {
+        "importer_path": "apps/web/src/main.js",
+        "package_name": "@workspace/shared",
+        "resolved_path": "packages/shared/src/index.js"
+      }
+    ],
+    "required_incremental_imports": []
+  }
+}
