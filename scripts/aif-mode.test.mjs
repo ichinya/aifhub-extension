@@ -1,7 +1,7 @@
 // aif-mode.test.mjs - tests for aif-mode CLI wrapper
 import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { access, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -57,7 +57,9 @@ function missingCliDetection() {
 afterEach(async () => {
   await Promise.all(tempRoots.splice(0).map((rootDir) => rm(rootDir, {
     recursive: true,
-    force: true
+    force: true,
+    maxRetries: 5,
+    retryDelay: 20
   })));
 });
 
@@ -109,6 +111,53 @@ describe('runModeCommand', () => {
     assert.match(result.stdout, /Current mode: openspec/);
     assert.match(result.stdout, /OpenSpec CLI: degraded/);
     assert.match(result.stdout, /Active change: add-oauth/);
+  });
+
+  it('returns a failing status exit when the authoritative active inventory is unreadable', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/changes/change-a/proposal.md', '# change-a\n');
+    await writeFixture(rootDir, '.ai-factory/rules/generated/openspec-base.md', '# Base rules\n');
+    await writeFixture(rootDir, '.ai-factory/rules/generated/index.json', `${JSON.stringify({
+      schema_version: 1,
+      generated_at: '2026-08-22T00:00:00.000Z',
+      base: {
+        markdown: '.ai-factory/rules/generated/openspec-base.md',
+        inputs: []
+      },
+      changes: []
+    }, null, 2)}\n`);
+
+    const result = await runModeCommand(['status', '--json'], {
+      rootDir,
+      detectOpenSpec: async () => missingCliDetection(),
+      getCurrentBranch: async () => 'feat/change-a',
+      fileOps: {
+        readdir: async (targetPath, options) => {
+          if (targetPath === path.join(rootDir, 'openspec', 'changes')) {
+            throw Object.assign(new Error('injected private inventory failure'), { code: 'EACCES' });
+          }
+          return readdir(targetPath, options);
+        }
+      }
+    });
+    const parsed = JSON.parse(result.stdout);
+
+    assert.equal(result.exitCode, 1);
+    assert.equal(parsed.ok, false);
+    assert.equal(parsed.generatedRules.state, 'invalid');
+    assert.equal(parsed.errors.some((item) => item.code === 'active-inventory-read-failed'), true);
+    assert.doesNotMatch(result.stdout, /injected private inventory failure/);
   });
 
   it('switches to AI Factory mode through the CLI wrapper', async () => {
@@ -233,6 +282,95 @@ describe('runModeCommand', () => {
     assert.equal(parsed.artifactContract.validator, 'aifhub-openspec-artifact-contract');
     assert.equal(parsed.artifactContract.change_id, 'add-oauth');
     assert.ok(parsed.diagnostics.some((diagnostic) => diagnostic.code === 'aifhub-artifact-contract'));
+  });
+});
+
+describe('generated-rules reconciliation rendering', () => {
+  it('renders dry-run cleanup as bounded project-relative would-remove operations in JSON and human output', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      '  openspec:',
+      '    compileRulesOnSync: true',
+      '    validateOnSync: false',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  rules: .ai-factory/rules',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, '.ai-factory/rules/generated/openspec-change-archived.md', 'orphan\n');
+    await writeFixture(rootDir, '.ai-factory/rules/generated/index.json', `${JSON.stringify({
+      schema_version: 1,
+      generated_at: '2026-08-21T00:00:00.000Z',
+      base: null,
+      changes: []
+    }, null, 2)}\n`);
+
+    const options = {
+      rootDir,
+      detectOpenSpec: async () => missingCliDetection(),
+      getCurrentBranch: async () => 'main'
+    };
+    const jsonResult = await runModeCommand(['sync', '--dry-run', '--json'], options);
+    const humanResult = await runModeCommand(['sync', '--dry-run'], options);
+    const parsed = JSON.parse(jsonResult.stdout);
+
+    assert.equal(jsonResult.exitCode, 0, 'no-active dry-run cleanup JSON should succeed');
+    assert.deepEqual(parsed.generatedRules.operations.filter((item) => item.action === 'would-remove'), [
+      {
+        action: 'would-remove',
+        kind: 'change',
+        target: '.ai-factory/rules/generated/openspec-change-archived.md',
+        change_id: 'archived'
+      }
+    ]);
+    assert.equal(parsed.generatedRules.operation_count >= 1, true, 'JSON should expose total operation_count');
+    assert.equal(parsed.generatedRules.operations_truncated, false, 'small JSON operation detail should not be truncated');
+    assert.match(humanResult.stdout, /would-remove: \.ai-factory\/rules\/generated\/openspec-change-archived\.md/, 'human output should render relative would-remove target');
+    assert.equal(await pathExists(rootDir, '.ai-factory/rules/generated/openspec-change-archived.md'), true, 'dry-run must not remove archived output');
+  });
+
+  it('caps JSON operation detail at 200 while preserving total and truncation metadata', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      '  openspec:',
+      '    compileRulesOnSync: true',
+      '    validateOnSync: false',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  rules: .ai-factory/rules',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await mkdir(path.join(rootDir, 'openspec', 'changes'), { recursive: true });
+    for (let index = 0; index < 205; index += 1) {
+      const changeId = `archived-${String(index).padStart(3, '0')}`;
+      await writeFixture(rootDir, `.ai-factory/rules/generated/openspec-change-${changeId}.md`, 'orphan\n');
+    }
+
+    const result = await runModeCommand(['sync', '--dry-run', '--json'], {
+      rootDir,
+      detectOpenSpec: async () => missingCliDetection(),
+      getCurrentBranch: async () => 'main'
+    });
+    const parsed = JSON.parse(result.stdout);
+
+    assert.equal(result.exitCode, 0, 'no-active 205-orphan dry-run should succeed');
+    assert.equal(parsed.generatedRules.operation_count, 207);
+    assert.equal(parsed.generatedRules.operations.length, 200);
+    assert.equal(parsed.generatedRules.operations_truncated, true);
+    assert.equal(parsed.generatedRules.operations.every((item) => !path.isAbsolute(item.target)), true);
+    assert.equal(await pathExists(rootDir, '.ai-factory/rules/generated/openspec-change-archived-204.md'), true, 'dry-run cap must not mutate files');
   });
 });
 

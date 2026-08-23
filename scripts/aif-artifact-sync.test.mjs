@@ -1,7 +1,7 @@
 // aif-artifact-sync.test.mjs - tests for AIFHub mode switching and artifact sync
 import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { access, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -98,10 +98,25 @@ function availableCliDetection(overrides = {}) {
   };
 }
 
+function generatedIndexEntry(changeId, generatedAt = '2026-08-22T00:00:00.000Z') {
+  return {
+    change_id: changeId,
+    generated_at: generatedAt,
+    trace: `.ai-factory/rules/generated/openspec-rules-trace-${changeId}.json`,
+    markdown: {
+      base: '.ai-factory/rules/generated/openspec-base.md',
+      change: `.ai-factory/rules/generated/openspec-change-${changeId}.md`,
+      merged: `.ai-factory/rules/generated/openspec-merged-${changeId}.md`
+    }
+  };
+}
+
 afterEach(async () => {
   await Promise.all(tempRoots.splice(0).map((rootDir) => rm(rootDir, {
     recursive: true,
-    force: true
+    force: true,
+    maxRetries: 5,
+    retryDelay: 20
   })));
 });
 
@@ -161,6 +176,54 @@ describe('mode status', () => {
     assert.equal(status.effectivePolicy.requirements.specCoverage.verify, false);
   });
 
+  it('fails status and doctor closed when the authoritative active inventory is unreadable', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/changes/change-a/proposal.md', '# change-a\n');
+    await writeFixture(rootDir, '.ai-factory/rules/generated/openspec-base.md', '# Base rules\n');
+    await writeFixture(rootDir, '.ai-factory/rules/generated/index.json', `${JSON.stringify({
+      schema_version: 1,
+      generated_at: '2026-08-22T00:00:00.000Z',
+      base: {
+        markdown: '.ai-factory/rules/generated/openspec-base.md',
+        inputs: []
+      },
+      changes: []
+    }, null, 2)}\n`);
+    const denyActiveInventory = async (targetPath, options) => {
+      if (targetPath === path.join(rootDir, 'openspec', 'changes')) {
+        throw Object.assign(new Error('injected private inventory failure'), { code: 'EACCES' });
+      }
+      return readdir(targetPath, options);
+    };
+    const options = {
+      rootDir,
+      detectOpenSpec: async () => missingCliDetection(),
+      getCurrentBranch: async () => 'feat/change-a',
+      fileOps: { readdir: denyActiveInventory }
+    };
+
+    const status = await getModeStatus(options);
+    const doctor = await doctorAifMode(options);
+
+    assert.equal(status.ok, false, 'unreadable authoritative inventory must fail status execution');
+    assert.equal(status.generatedRules.ok, false, 'generated-rules membership authority must be unavailable');
+    assert.equal(status.generatedRules.state, 'invalid');
+    assert.equal(status.errors.some((item) => item.code === 'active-inventory-read-failed'), true);
+    assert.equal(doctor.diagnostics.some((item) => item.code === 'active-inventory-read-failed' && item.level === 'fail'), true);
+    assert.equal(doctor.diagnostics.some((item) => item.code === 'generated-rules' && item.level === 'pass'), false);
+  });
+
   it('reports AI Factory mode', async () => {
     const rootDir = await createTempRoot();
     await writeFixture(rootDir, '.ai-factory/config.yaml', [
@@ -202,7 +265,24 @@ describe('mode status', () => {
     await writeFixture(rootDir, '.ai-factory/rules/generated/openspec-base.md', '# Generated\n\n## Source Fingerprints\n');
     await writeFixture(rootDir, '.ai-factory/rules/generated/openspec-change-add-oauth.md', '# Generated\n\n## Source Fingerprints\n');
     await writeFixture(rootDir, '.ai-factory/rules/generated/openspec-merged-add-oauth.md', '# Generated\n\n## Source Fingerprints\n');
-    await writeFixture(rootDir, '.ai-factory/rules/generated/index.json', '{"schema_version":1,"changes":[]}\n');
+    await writeFixture(rootDir, '.ai-factory/rules/generated/index.json', `${JSON.stringify({
+      schema_version: 1,
+      generated_at: '2026-04-29T00:00:00.000Z',
+      base: {
+        markdown: '.ai-factory/rules/generated/openspec-base.md',
+        inputs: []
+      },
+      changes: [{
+        change_id: 'add-oauth',
+        generated_at: '2026-04-29T00:00:00.000Z',
+        trace: '.ai-factory/rules/generated/openspec-rules-trace-add-oauth.json',
+        markdown: {
+          base: '.ai-factory/rules/generated/openspec-base.md',
+          change: '.ai-factory/rules/generated/openspec-change-add-oauth.md',
+          merged: '.ai-factory/rules/generated/openspec-merged-add-oauth.md'
+        }
+      }]
+    }, null, 2)}\n`);
 
     const status = await getModeStatus({
       rootDir,
@@ -276,7 +356,7 @@ describe('mode status', () => {
     assert.ok(status.generatedRules.warnings.some((warning) => warning.code === 'stale-generated-rules'));
   });
 
-  it('limits generated-rule status inspection to an explicit change when provided', async () => {
+  it('limits expensive hash inspection to an explicit change while auditing full active membership', async () => {
     const rootDir = await createTempRoot();
     await writeFixture(rootDir, '.ai-factory/config.yaml', [
       'aifhub:',
@@ -318,8 +398,103 @@ describe('mode status', () => {
     });
 
     assert.equal(explicit.activeChange.changeId, 'add-oauth');
-    assert.equal(explicit.generatedRules.state, 'ok');
-    assert.deepEqual(explicit.generatedRules.missing, []);
+    assert.equal(explicit.generatedRules.state, 'missing');
+    assert.deepEqual(explicit.generatedRules.missingActiveIndexEntries, ['add-passkeys']);
+    assert.equal(explicit.generatedRules.missing.includes('openspec-change-add-passkeys.md'), true);
+  });
+
+  it('audits active index membership beyond the 50-change hash inspection cap', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    const changeIds = Array.from({ length: 51 }, (_, index) => `change-${String(index).padStart(3, '0')}`);
+    for (const changeId of changeIds) {
+      await writeFixture(rootDir, `openspec/changes/${changeId}/proposal.md`, `# ${changeId}\n`);
+    }
+    await writeFixture(rootDir, '.ai-factory/rules/generated/openspec-base.md', '# Generated\n');
+    await writeFixture(rootDir, '.ai-factory/rules/generated/index.json', `${JSON.stringify({
+      schema_version: 1,
+      generated_at: '2026-08-22T00:00:00.000Z',
+      base: {
+        markdown: '.ai-factory/rules/generated/openspec-base.md',
+        inputs: []
+      },
+      changes: changeIds.slice(0, 50).map((changeId) => generatedIndexEntry(changeId))
+    }, null, 2)}\n`);
+
+    const status = await getModeStatus({
+      rootDir,
+      detectOpenSpec: async () => missingCliDetection(),
+      getCurrentBranch: async () => 'main'
+    });
+
+    assert.equal(status.openSpecChanges.length, 51);
+    assert.equal(status.generatedRules.state, 'missing');
+    assert.deepEqual(status.generatedRules.missingActiveIndexEntries, ['change-050'], 'full membership audit must include the 51st active change');
+    assert.equal(status.generatedRules.expected.includes('openspec-change-change-050.md'), true);
+  });
+
+  it('ignores benign unknown generated children but fails doctor on managed-name collisions', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      '  openspec:',
+      '    validateOnSync: false',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/changes/change-a/proposal.md', '# change-a\n');
+    const synced = await syncOpenSpecArtifacts({
+      rootDir,
+      changeId: 'change-a',
+      writeReport: false,
+      detectOpenSpec: async () => missingCliDetection()
+    });
+    assert.equal(synced.ok, true);
+    await writeFixture(rootDir, '.ai-factory/rules/generated/notes.txt', 'user-owned\n');
+
+    const benign = await getModeStatus({
+      rootDir,
+      changeId: 'change-a',
+      detectOpenSpec: async () => missingCliDetection(),
+      getCurrentBranch: async () => 'feat/change-a'
+    });
+    assert.equal(benign.generatedRules.state, 'ok', 'unknown regular child must not create drift');
+    assert.equal(benign.generatedRules.warnings.some((item) => item.code === 'orphaned-generated-managed-file'), false);
+
+    await mkdir(path.join(rootDir, '.ai-factory', 'rules', 'generated', 'openspec-change-archived.md'));
+    const invalid = await getModeStatus({
+      rootDir,
+      changeId: 'change-a',
+      detectOpenSpec: async () => missingCliDetection(),
+      getCurrentBranch: async () => 'feat/change-a'
+    });
+    const doctor = await doctorAifMode({
+      rootDir,
+      changeId: 'change-a',
+      detectOpenSpec: async () => missingCliDetection(),
+      getCurrentBranch: async () => 'feat/change-a'
+    });
+
+    assert.equal(invalid.generatedRules.state, 'invalid');
+    assert.deepEqual(invalid.generatedRules.invalidManagedEntries, ['.ai-factory/rules/generated/openspec-change-archived.md']);
+    assert.equal(invalid.generatedRules.errors.some((item) => item.code === 'invalid-managed-entry'), true);
+    assert.equal(doctor.diagnostics.some((item) => item.code === 'generated-rules-invalid' && item.level === 'fail'), true);
   });
 });
 
@@ -1414,10 +1589,16 @@ describe('artifact sync and export', () => {
       schema_version: 1,
       generated_at: '2026-04-29T01:00:00.000Z',
       base: null,
-      changes: [
-        { change_id: 'unrelated-alpha' },
-        { change_id: 'unrelated-beta' }
-      ]
+      changes: ['unrelated-alpha', 'unrelated-beta'].map((changeId) => ({
+        change_id: changeId,
+        generated_at: '2026-04-29T01:00:00.000Z',
+        trace: `.ai-factory/rules/generated/openspec-rules-trace-${changeId}.json`,
+        markdown: {
+          base: '.ai-factory/rules/generated/openspec-base.md',
+          change: `.ai-factory/rules/generated/openspec-change-${changeId}.md`,
+          merged: `.ai-factory/rules/generated/openspec-merged-${changeId}.md`
+        }
+      }))
     }, null, 2)}\n`);
 
     const result = await syncOpenSpecArtifacts({
@@ -1549,6 +1730,131 @@ describe('artifact sync and export', () => {
 
     assert.equal(overwritten.ok, true);
     assert.match(await readFixture(rootDir, '.ai-factory/plans/add-oauth.md'), /New/);
+  });
+});
+
+describe('generated-rules archive reconciliation', () => {
+  it('targeted sync preserves active siblings and prunes archived index/files with bounded relative operations', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      '  openspec:',
+      '    compileRulesOnSync: true',
+      '    validateOnSync: false',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  rules: .ai-factory/rules',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/specs/base/spec.md', [
+      '# Base',
+      '',
+      '## Requirements',
+      '',
+      '### Requirement: Keep accepted behavior',
+      '',
+      'The system MUST keep accepted behavior.',
+      ''
+    ].join('\n'));
+    for (const changeId of ['change-a', 'change-b', 'archived-change']) {
+      await writeFixture(rootDir, `openspec/changes/${changeId}/proposal.md`, `# ${changeId}\n`);
+      await writeFixture(rootDir, `openspec/changes/${changeId}/specs/demo/spec.md`, [
+        '# Delta',
+        '',
+        '## ADDED Requirements',
+        '',
+        `### Requirement: ${changeId}`,
+        '',
+        `The system MUST implement ${changeId}.`,
+        ''
+      ].join('\n'));
+    }
+
+    const initial = await syncOpenSpecArtifacts({
+      rootDir,
+      all: true,
+      writeReport: false,
+      detectOpenSpec: async () => missingCliDetection(),
+      now: new Date('2026-08-22T00:00:00.000Z')
+    });
+    assert.equal(initial.ok, true, 'all initial generated-rules sync should succeed');
+    await rm(path.join(rootDir, 'openspec', 'changes', 'archived-change'), { recursive: true, force: true });
+
+    const targeted = await syncOpenSpecArtifacts({
+      rootDir,
+      changeId: 'change-a',
+      writeReport: false,
+      detectOpenSpec: async () => missingCliDetection(),
+      now: new Date('2026-08-22T01:00:00.000Z')
+    });
+    const index = await readJsonFixture(rootDir, '.ai-factory/rules/generated/index.json');
+
+    assert.equal(targeted.ok, true, 'explicit/change-a post-archive sync should succeed');
+    assert.deepEqual(index.changes.map((entry) => entry.change_id), ['change-a', 'change-b'], 'explicit/change-a must preserve active sibling membership');
+    assert.equal(await pathExists(rootDir, '.ai-factory/rules/generated/openspec-change-archived-change.md'), false, 'archived change overlay must be pruned');
+    assert.deepEqual(targeted.generatedRules.operations.filter((item) => item.action === 'remove').map((item) => item.target), [
+      '.ai-factory/rules/generated/openspec-change-archived-change.md',
+      '.ai-factory/rules/generated/openspec-merged-archived-change.md',
+      '.ai-factory/rules/generated/openspec-rules-trace-archived-change.json'
+    ]);
+    assert.equal(targeted.generatedRules.operations.every((item) => !path.isAbsolute(item.target)), true, 'public generated-rules operations must stay project-relative');
+    const status = await getModeStatus({
+      rootDir,
+      detectOpenSpec: async () => missingCliDetection(),
+      getCurrentBranch: async () => 'main'
+    });
+    assert.equal(status.generatedRules.state, 'ok', 'post-reconciliation full membership and hashes should be green');
+  });
+
+  it('blocks generated mutation on authoritative inventory failure while still writing a bounded failure report', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      '  openspec:',
+      '    compileRulesOnSync: true',
+      '    validateOnSync: false',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  rules: .ai-factory/rules',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/changes/change-a/proposal.md', '# change-a\n');
+    await writeFixture(rootDir, '.ai-factory/rules/generated/openspec-base.md', 'sentinel base\n');
+    const before = await readFixture(rootDir, '.ai-factory/rules/generated/openspec-base.md');
+
+    const failed = await syncOpenSpecArtifacts({
+      rootDir,
+      all: true,
+      timestamp: '2026-08-22T04-00-00-000Z',
+      detectOpenSpec: async () => missingCliDetection(),
+      fileOps: {
+        readdir: async (targetPath, options) => {
+          if (targetPath === path.join(rootDir, 'openspec', 'changes')) {
+            throw Object.assign(new Error('injected inventory failure'), { code: 'EACCES' });
+          }
+          return readdir(targetPath, options);
+        }
+      }
+    });
+
+    assert.equal(failed.ok, false, 'all inventory failure must fail sync');
+    assert.equal(failed.generatedRules.errors[0].code, 'active-inventory-read-failed');
+    assert.equal(failed.generatedRules.operation_count, 0);
+    assert.equal(await readFixture(rootDir, '.ai-factory/rules/generated/openspec-base.md'), before, 'inventory failure must not mutate generated bytes');
+    assert.equal(failed.report.ok, true, 'normal bounded failure report remains allowed');
+    const report = await readFixture(rootDir, failed.report.path);
+    assert.match(report, /active-inventory-read-failed/, 'failure report should identify stable inventory code');
+    assert.doesNotMatch(report, /injected inventory failure/, 'failure report must not dump raw injected error detail');
   });
 });
 

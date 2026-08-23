@@ -228,13 +228,16 @@ function renderConfigKeySummary(configKeys) {
 }
 
 function renderSummaryOperations(result) {
+  const generatedOperations = Array.isArray(result.generatedRules?.operations)
+    ? result.generatedRules.operations
+    : (result.generatedRules?.files ?? []).map((file) => ({
+      action: file.written === false ? 'would-write' : 'write',
+      target: file.relativePath
+    }));
   const operations = [
     ...(result.config?.operations ?? []),
     ...(result.skeleton?.operations ?? []),
-    ...(result.generatedRules?.files ?? []).map((file) => ({
-      action: file.written === false ? 'would-write' : 'write',
-      target: file.relativePath
-    })),
+    ...generatedOperations,
     ...(result.export?.operations ?? []),
     ...(result.report?.operations ?? [])
   ];
@@ -245,6 +248,10 @@ function renderSummaryOperations(result) {
 
   return [
     '',
+    ...(result.generatedRules ? [
+      `Generated rules operations: ${result.generatedRules.operation_count ?? result.generatedRules.operationCount ?? generatedOperations.length}`,
+      `Generated rules operations truncated: ${(result.generatedRules.operations_truncated ?? result.generatedRules.operationsTruncated) ? 'yes' : 'no'}`
+    ] : []),
     'Operations:',
     ...operations.map((operation) => `- ${operation.action}: ${operation.target ?? operation.relativePath}`)
   ];
