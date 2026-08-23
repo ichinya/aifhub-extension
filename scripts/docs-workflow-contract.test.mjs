@@ -1216,23 +1216,15 @@ describe('complete OpenSpec workflow documentation contract', () => {
     }
   });
 
-  it('documents bounded generated-rules reconciliation across canonical and runtime-specific surfaces', async () => {
+  it('documents bounded generated-rules reconciliation across tracked source surfaces', async () => {
     const readme = await readRepoFile('README.md');
     const usage = await readRepoFile('docs/usage.md');
     const compatibility = await readRepoFile('docs/openspec-compatibility.md');
     const contextPolicy = await readRepoFile('docs/context-loading-policy.md');
     const canonicalSkill = await readRepoFile('skills/aif-mode/SKILL.md');
-    const agentsSkill = await readRepoFile('.agents/skills/aif-mode/SKILL.md');
-    const codexSkill = await readRepoFile('.codex/skills/aif-mode/SKILL.md');
     const canonicalSync = await readRepoFile('skills/aif-mode/references/ARTIFACT-SYNC.md');
-    const agentsSync = await readRepoFile('.agents/skills/aif-mode/references/ARTIFACT-SYNC.md');
-    const codexSync = await readRepoFile('.codex/skills/aif-mode/references/ARTIFACT-SYNC.md');
     const canonicalSafety = await readRepoFile('skills/aif-mode/references/SAFETY.md');
-    const agentsSafety = await readRepoFile('.agents/skills/aif-mode/references/SAFETY.md');
-    const codexSafety = await readRepoFile('.codex/skills/aif-mode/references/SAFETY.md');
     const canonicalTemplate = await readRepoFile('skills/aif-mode/templates/mode-switch-report.md');
-    const agentsTemplate = await readRepoFile('.agents/skills/aif-mode/templates/mode-switch-report.md');
-    const codexTemplate = await readRepoFile('.codex/skills/aif-mode/templates/mode-switch-report.md');
 
     for (const [asset, label] of [
       [usage, 'docs/usage.md'],
@@ -1256,42 +1248,17 @@ describe('complete OpenSpec workflow documentation contract', () => {
     assertIncludes(contextPolicy, 'raw paths found in `index.json`', 'docs/context-loading-policy.md index boundary');
     assertNotIncludes(contextPolicy, 'Files in that directory are safe to delete', 'docs/context-loading-policy.md broad cleanup wording');
 
-    for (const [asset, label] of [
-      [canonicalSkill, 'skills/aif-mode/SKILL.md'],
-      [agentsSkill, '.agents/skills/aif-mode/SKILL.md'],
-      [codexSkill, '.codex/skills/aif-mode/SKILL.md']
-    ]) {
-      assertIncludes(asset, 'version: "1.2.0"', `${label} version`);
-      assertIncludes(asset, 'openspec-change-<safe-id>.md', `${label} cleanup boundary`);
-      assertIncludes(asset, 'normal bounded failure report', `${label} failure-report exception`);
-    }
+    assertIncludes(canonicalSkill, 'version: "1.2.0"', 'skills/aif-mode/SKILL.md version');
+    assertIncludes(canonicalSkill, 'openspec-change-<safe-id>.md', 'skills/aif-mode/SKILL.md cleanup boundary');
+    assertIncludes(canonicalSkill, 'normal bounded failure report', 'skills/aif-mode/SKILL.md failure-report exception');
+    assertIncludes(canonicalSkill, 'selected `codex-app` runtime uses `$aif-mode`', 'skills/aif-mode/SKILL.md Codex invocation guidance');
+    assertIncludes(canonicalSkill, 'slash-command runtimes use `/aif-mode`', 'skills/aif-mode/SKILL.md slash-command guidance');
 
-    for (const [asset, label] of [
-      [canonicalSafety, 'skills/aif-mode/references/SAFETY.md'],
-      [agentsSafety, '.agents/skills/aif-mode/references/SAFETY.md'],
-      [codexSafety, '.codex/skills/aif-mode/references/SAFETY.md']
-    ]) {
-      assertIncludes(asset, 'must never recurse', `${label} recursive boundary`);
-      assertIncludes(asset, 'must not reduce the validated internal cleanup plan', `${label} public cap boundary`);
-    }
+    assertIncludes(canonicalSafety, 'must never recurse', 'skills/aif-mode/references/SAFETY.md recursive boundary');
+    assertIncludes(canonicalSafety, 'must not reduce the validated internal cleanup plan', 'skills/aif-mode/references/SAFETY.md public cap boundary');
 
-    for (const [asset, label] of [
-      [canonicalTemplate, 'skills/aif-mode/templates/mode-switch-report.md'],
-      [agentsTemplate, '.agents/skills/aif-mode/templates/mode-switch-report.md'],
-      [codexTemplate, '.codex/skills/aif-mode/templates/mode-switch-report.md']
-    ]) {
-      for (const placeholder of ['{{operation_count}}', '{{operations_truncated}}', '{{generated_rule_operations}}']) {
-        assertIncludes(asset, placeholder, label);
-      }
+    for (const placeholder of ['{{operation_count}}', '{{operations_truncated}}', '{{generated_rule_operations}}']) {
+      assertIncludes(canonicalTemplate, placeholder, 'skills/aif-mode/templates/mode-switch-report.md');
     }
-
-    assert.equal(agentsSkill, canonicalSkill, 'slash-command aif-mode skill mirror should match canonical content');
-    assert.notEqual(codexSkill, canonicalSkill, 'Codex aif-mode skill must retain runtime-specific invocation text');
-    assert.equal(agentsSync, canonicalSync, 'artifact-sync reference mirrors should match');
-    assert.equal(codexSync, canonicalSync, 'Codex artifact-sync reference mirror should match');
-    assert.equal(agentsSafety, canonicalSafety, 'safety reference mirrors should match');
-    assert.equal(codexSafety, canonicalSafety, 'Codex safety reference mirror should match');
-    assert.equal(agentsTemplate, canonicalTemplate, 'report template mirrors should match');
-    assert.equal(codexTemplate, canonicalTemplate, 'Codex report template mirror should match');
   });
 });

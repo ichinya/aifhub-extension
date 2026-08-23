@@ -1941,11 +1941,9 @@ describe('OpenSpec-native prompt asset contract', () => {
     }
   });
 
-  it('keeps aif-mode runtime prompts bounded to compiler-owned post-archive cleanup', async () => {
+  it('keeps the tracked aif-mode source prompt bounded to compiler-owned post-archive cleanup', async () => {
     const assets = [
-      ['skills/aif-mode/SKILL.md', '/aif-done'],
-      ['.agents/skills/aif-mode/SKILL.md', '/aif-done'],
-      ['.codex/skills/aif-mode/SKILL.md', '$aif-done']
+      ['skills/aif-mode/SKILL.md', '/aif-done']
     ];
 
     for (const [relativePath, doneInvocation] of assets) {
