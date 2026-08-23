@@ -6,7 +6,7 @@
 
 ## ai-tester paired A/B 2026-06-29 (claude/glm-5-turbo)
 
-Честный A/B эксперимент: 6 независимых прогонов (3 проекта × 2 инструмента), каждый с одинаковой задачей architecture_or_impact_discovery. Модель: `glm-5-turbo` через z.ai (claude runtime). ai-tester 0.5.0. Это даёт парные `proven_label_evidence`-eligible метрики.
+Честный A/B эксперимент: 6 независимых прогонов (3 проекта × 2 инструмента), каждый с одинаковой задачей architecture_or_impact_discovery. Модель: `glm-5-turbo` через z.ai (claude runtime). ai-tester 0.5.0. Это даёт paired smoke metrics для bounded tool-local `screening_policy`, но не generic `proven_label_evidence`: `run_class: accepted_evidence` и полная screening matrix не подтверждены.
 
 Профили обезличены через path-hash (sha256(sourceRoot)[:12]), как делает matrix generator.
 
@@ -137,7 +137,7 @@
 Оба профиля дают согласованную картину:
 1. **rg выигрывает на speed + zero-setup + entry-point discovery** — для one-shot "что это за проект" вопроса.
 2. **repowise выигрывает на structural analysis** — dead-code, duplication, health scoring, dependency graph — возможности, которых у rg нет.
-3. **repowise имеет framework-awareness gap** — на Laravel (service container) dead-code analysis даёт false positives. Это candidate для `known_avoid_cases` в future screening_policy.
+3. **repowise имеет framework-awareness gap** — на Laravel (service container) dead-code analysis даёт false positives. Этот сигнал уже зафиксирован как bounded PHP/framework `known_avoid_cases` entry для exact lookup; он не обобщается за пределы evidence-backed match.
 4. **Investment ratio:** на large проекте 42s init окупается; на mini — overhead заметен (50-70x), но insight всё равно добавляется.
 
 ### Качественные наблюдения из трасс

@@ -153,7 +153,7 @@ No paired positive source-retrieval `ai-tester` benchmark is recorded yet for `c
 | [codex-mem](codex-mem.md) | [results](codex-mem-benchmark-results.md) | package не содержит repository metadata; ближайший проверенный публичный repo: [Just-Boring-Cat/codex-mem](https://github.com/Just-Boring-Cat/codex-mem) | `0.1.1` | Codex session/history memory. | Reject as default; privacy risk без строгой изоляции. |
 | [eagle-mem](eagle-mem.md) | [results](eagle-mem-benchmark-results.md) | [eagleisbatman/eagle-mem](https://github.com/eagleisbatman/eagle-mem) | `4.9.10` | Shared memory + hooks + guardrails + lanes. | Reject/defer; scoped read/purge и MCP не доказаны. |
 | [CodeGraph](codegraph.md) | [results](codegraph-benchmark-results.md) | [colbymchenry/codegraph](https://github.com/colbymchenry/codegraph) | installed `0.9.3`, npm `0.9.4` | Manual CLI-only repo graph для exact screening cases. | `manual_cli_only`, `avoid_by_default`; final screening: +55.7% total tokens vs `rg`, useful only for exact skill+label cases. |
-| [Repowise](repowise.md) | [results](repowise-benchmark-results.md) | [repowise-dev/repowise](https://github.com/repowise-dev/repowise) | `repowise 0.25.0` | Repo-intelligence: Graph + Git + Health + dead-code + risk. | `manual_cli_only`, `avoid_by_default`; tiered (`--index-only` default, wiki при `doctor` OK); screening_policy пуст до ai-tester матрицы. |
+| [Repowise](repowise.md) | [results](repowise-benchmark-results.md) | [repowise-dev/repowise](https://github.com/repowise-dev/repowise) | `repowise 0.25.0` | Repo-intelligence: Graph + Git + Health + dead-code + risk. | `manual_cli_only`, `avoid_by_default`; после `rg` только bounded `skill + task + project_shape` match из `repowise-paired-ab-glm5turbo-2026-06-29-smoke`; conditional и PHP/framework avoid cases не заменяют полную accepted-evidence matrix. |
 
 ## Итоговые Таблицы По Форматам Проектов
 
@@ -214,7 +214,7 @@ No paired positive source-retrieval `ai-tester` benchmark is recorded yet for `c
 - `Context7` можно документировать как optional docs provider для актуальных library/API вопросов.
 - `context-mode` может остаться manual helper для temporary indexing больших command outputs.
 - `codex-mem`, `agent-memory`, `eagle-mem` и `rohitg00-agentmemory` не должны становиться default AIFHub integrations; последний остаётся отдельным `reject_default` candidate, а не заменой manual-notes или read-only continuity policies.
-- `CodeGraph` остается manual CLI-only и `avoid_by_default`; selector может вернуть его только при exact `screening_policy` match по skill + project labels, после `rg`, с непустым useful output и обязательным purge; `install`/MCP/agent-config surface не принят.
+- `CodeGraph` остается manual CLI-only и `avoid_by_default`; selector может вернуть его только при exact `screening_policy` match по skill + project labels, после `rg`, with non-empty useful output и обязательным purge; `install`/MCP/agent-config surface не принят.
 
 Любая будущая реализация должна требовать explicit opt-in, explicit local paths, отсутствие global hooks по умолчанию, отсутствие canonical OpenSpec writes, отсутствие зависимости от install path и документированный purge/delete-index path.
 

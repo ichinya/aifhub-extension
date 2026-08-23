@@ -55,6 +55,36 @@ async function runCli(args, options = {}) {
   return JSON.parse(stdout);
 }
 
+async function runJsonWithDeterministicProbes(args, options = {}) {
+  const stdout = [];
+  const stderr = [];
+  const probedTools = [];
+  const debugFix = ['debug', 'trace'].includes(
+    String(process.env.AIFHUB_LOG_LEVEL ?? process.env.LOG_LEVEL ?? '').toLowerCase()
+  );
+  const result = await runMemoryToolRecommender(args, {
+    cwd: options.cwd ?? REPO_ROOT,
+    stdout,
+    stderr,
+    exit: false,
+    probeRunner: async (toolId) => {
+      probedTools.push(toolId);
+      if (debugFix) {
+        process.stderr.write(`[FIX:memory-tool-recommender-test-probe] tool=${toolId} availability=unknown\n`);
+      }
+      return { availability: 'unknown', command: null };
+    }
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.deepEqual(stderr, []);
+  assert.equal(stdout.length, 1);
+  return {
+    body: JSON.parse(stdout[0]),
+    probedTools
+  };
+}
+
 describe('recommendation metadata parsing', () => {
   it('parses required policy fields and tool decisions', async () => {
     const raw = await readFile(REAL_METADATA, 'utf8');
@@ -86,6 +116,8 @@ describe('recommendation metadata parsing', () => {
     assert.equal(metadata.benchmark_matrix.ai_tester.result_schema, 'aifhub.memory_tools.ai_tester_matrix.v1');
     assert.equal(metadata.proven_label_evidence[0].scenario_id, 'architecture-impact-discovery');
     assert.equal(metadata.proven_label_evidence[0].run_class, 'accepted_evidence');
+    assert.equal(metadata.proven_label_evidence.every((entry) => entry.run_class === 'accepted_evidence'), true);
+    assert.deepEqual(metadata.proven_label_evidence.filter((entry) => entry.tool_id === 'repowise'), []);
     assert.deepEqual(metadata.benchmark_matrix.ai_tester.decision_actions, ['recommend', 'conditional', 'avoid', 'forbid']);
     assert.ok(metadata.benchmark_matrix.ai_tester.comparison_metrics.includes('usefulness_vs_rg'));
     assert.equal(metadata.benchmark_matrix.ai_tester.reduced_matrix_policy.default_matrix_size, 'screening');
@@ -1446,7 +1478,7 @@ describe('CLI behavior', () => {
   });
 
   it('keeps broad architecture recommendation JSON on rg unless an exact tool policy matches', async () => {
-    const result = await runCli([
+    const { body: result, probedTools } = await runJsonWithDeterministicProbes([
       'recommend',
       '--shape',
       'large_framework_app',
@@ -1461,10 +1493,11 @@ describe('CLI behavior', () => {
     assert.equal(result.project_shape, 'large_framework_app');
     assert.deepEqual(result.task_signals, ['architecture_or_impact_discovery']);
     assert.equal(result.recommendations.some((item) => item.tool_id === 'graphify'), false);
+    assert.deepEqual(probedTools, ['repowise']);
   });
 
-  it('accepts command context so skills receive their own tool permissions', async () => {
-    const result = await runCli([
+  it('keeps command permissions while excluding Repowise outside its smoke-backed shapes', async () => {
+    const { body: result, probedTools } = await runJsonWithDeterministicProbes([
       'recommend',
       '--shape',
       'small_microservice',
@@ -1485,11 +1518,13 @@ describe('CLI behavior', () => {
       '--metadata',
       REAL_METADATA,
       '--json'
-    ], { timeout: 30000 });
+    ]);
 
     const codegraph = result.recommendations.find((item) => item.tool_id === 'codegraph');
     assert.ok(codegraph);
     assert.equal(codegraph.permission, 'manual_purged_cli_execution');
+    assert.equal(result.recommendations.some((item) => item.tool_id === 'repowise'), false);
+    assert.deepEqual(probedTools, ['codegraph']);
   });
 
   it('accepts explicit project dimensions in addition to legacy shape', async () => {
