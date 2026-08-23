@@ -6,7 +6,7 @@ disable-model-invocation: true
 allowed-tools: Read Write Grep Glob Bash(ai-factory aifhub-mode *) Bash(ai-factory aifhub-migrate-legacy-plans *) Bash(npm run validate) Bash(npm test)
 metadata:
   author: aifhub-extension
-  version: "1.1.0"
+  version: "1.2.0"
   category: workflow
 ---
 
@@ -119,12 +119,15 @@ Refresh derived or compatibility artifacts without changing mode.
 
 - In OpenSpec-native mode: ensure skeleton paths, compile generated rules when `compileRulesOnSync` is enabled, validate selected changes through `validateOpenSpecChange(changeId)` and collect status through `getOpenSpecStatus(changeId)` from `scripts/openspec-runner.mjs` when `validateOnSync` is enabled and a compatible CLI is available, detect legacy plans, optionally update `.ai-factory/state/current.yaml` with `--current`, and write a sync report.
 - During `sync --all`, skip sync validation for selected changes that do not contain `openspec/changes/<id>/specs/**/spec.md` delta specs; report `no-delta-specs` warnings while still compiling generated rules and validating selected changes that do contain delta specs.
+- Keep the authoritative inventory of every active direct-child change separate from the selected compilation scope. Inventory read, canonical-root, unsafe managed entry, or selected-change preflight failure blocks every generated-rule write, index replacement, and cleanup operation.
+- Reconcile one prepare/commit batch: collect base once, prepare every selected overlay before mutation, finalize `index.json` once, and remove only exact compiler-owned direct regular files for absent changes. Targeted/resolved sync retains active sibling entries; ambiguous base-only sync prunes archived state without compiling overlays; no-active sync produces an empty `changes` set.
+- A malformed index may be rebuilt only when the prepared selection covers the complete active inventory or the active inventory is empty. Unsafe paths never become cleanup targets. `--dry-run` reports bounded `would-write`/`would-remove` operations; a byte-identical second sync reports no generated operations even with a later clock.
 - Missing or unsupported OpenSpec CLI is degraded sync validation/status, not a sync failure unless strict command context requires CLI-backed evidence.
 - In AI Factory-only mode: ensure legacy paths, optionally export OpenSpec changes with `--export-openspec`, preserve OpenSpec artifacts, and write a sync report.
 
 ### `doctor`
 
-Read-only diagnostics for config marker, required configured directories, OpenSpec CLI capability, Node compatibility, active change ambiguity, generated rules, coverage matrix status, legacy artifacts in OpenSpec-native mode, OpenSpec validation when available, and archive readiness for `/aif-done`. Optional `paths.context` file states are not doctor diagnostics.
+Read-only diagnostics for config marker, required configured directories, OpenSpec CLI capability, Node compatibility, active change ambiguity, generated rules, coverage matrix status, legacy artifacts in OpenSpec-native mode, OpenSpec validation when available, and archive readiness for `/aif-done`. Generated-rule membership checks cover the full active inventory; the 50-change cap applies only to expensive trace/hash reads. Orphan index entries/files, missing active membership, malformed index data, or managed-name collisions remain non-green until reconciliation. Optional `paths.context` file states are not doctor diagnostics.
 
 AI Factory 2.12+ also exposes an optional read-only artifact audit bridge:
 
@@ -146,3 +149,5 @@ Use this only as supplemental diagnostic context when available. It is optional,
 `aif-mode` must not delete `openspec/`, delete `.ai-factory/plans/`, archive OpenSpec changes, run `/aif-done`, mutate `openspec/specs` manually, install OpenSpec skills, overwrite artifacts without an explicit option, or create runtime files inside `openspec/changes/<id>/`.
 
 Allowed writes are `.ai-factory/config.yaml`, skeleton directories, migration outputs through `scripts/migrate-legacy-plans.mjs`, compatibility export outputs, generated rules through the rules compiler, current pointer updates when requested, and reports under `.ai-factory/state/mode-switches/`.
+
+Generated cleanup is confined to `.ai-factory/rules/generated/` and only the exact direct-child patterns `openspec-change-<safe-id>.md`, `openspec-merged-<safe-id>.md`, and `openspec-rules-trace-<safe-id>.json` for absent active changes. Preserve unknown files, directories, symlinks/reparse points, canonical OpenSpec artifacts, runtime/QA evidence, and external paths. Public JSON/human/report detail is sorted, project-relative, capped at 200 entries, and paired with total/truncation metadata; a normal bounded failure report may still be written after fail-closed preflight.

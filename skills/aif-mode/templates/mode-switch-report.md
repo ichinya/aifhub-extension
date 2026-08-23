@@ -19,6 +19,12 @@ Dry run: {{dry_run}}
 ## Sync
 
 - Generated rules: {{generated_rules}}
+- Selection source: {{selection_source}}
+- Active / selected / retained / removed changes: {{active_count}} / {{selected_count}} / {{retained_count}} / {{removed_count}}
+- Operations: {{operation_count}}
+- Operations truncated: {{operations_truncated}}
+- Bounded project-relative operations:
+  - {{generated_rule_operations}}
 - OpenSpec validation: {{openspec_validation}}
 
 ## Diagnostics

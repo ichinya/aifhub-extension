@@ -29,6 +29,19 @@ Generated rules are derived artifacts:
 
 They may be overwritten by sync, but canonical OpenSpec artifacts must remain unchanged. Trace metadata records source input hashes and generated markdown output hashes, so status/doctor can detect both stale specs and manual edits to generated rule text. Missing or invalid generated trace metadata is warning-only for rules gates; rerun `/aif-mode sync --change <change-id>` to refresh it.
 
+Reconciliation uses one prepare/commit batch. The full authoritative active-change inventory is read separately from the selected compilation scope; base sources are collected once, every selected overlay is rendered and target-checked before the first mutation, and `index.json` is finalized once. An inventory read failure, noncanonical `paths.generated_rules`, unsafe managed entry, selected-change failure, or precommit inventory digest conflict blocks generated writes, index replacement, and cleanup.
+
+Mode behavior is explicit:
+
+- `--all` rebuilds exact active membership.
+- Targeted or resolved sync refreshes the selected change, retains active sibling entries, and prunes archived entries/files.
+- `ambiguous-base-only` refreshes base rules and prunes archived state without compiling an overlay.
+- No-active sync writes an empty `changes` set and removes obsolete managed overlays.
+
+A malformed index may be rebuilt only with prepared complete active coverage or when that inventory is empty. Parseable unsafe paths always fail closed. Cleanup is non-recursive and recognizes only direct regular files named `openspec-change-<safe-id>.md`, `openspec-merged-<safe-id>.md`, or `openspec-rules-trace-<safe-id>.json`; unknown files and managed-name directories/symlinks/reparse points are preserved, with unsafe collisions reported non-green.
+
+Dry-run uses sorted project-relative `would-write` and `would-remove` operations. JSON, human output, and reports expose total operation count plus truncation state and at most 200 operation details; execution still applies the complete validated internal plan. A second semantically identical sync reuses timestamps and performs no generated writes or cleanup. If commit or unlink fails after mutation begins, the result is `partial` and status/doctor inspect the remaining drift; a normal bounded failure report is still allowed.
+
 OpenSpec CLI use is adapter-only. Do not call OpenSpec slash commands or install OpenSpec command layers; `/aif-mode` stays the orchestration surface.
 
 ## AI Factory Sync

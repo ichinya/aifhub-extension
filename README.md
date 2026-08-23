@@ -344,6 +344,8 @@ See [Legacy Plan Migration](docs/legacy-plan-migration.md) for collision modes, 
 
 Switching to OpenSpec-native mode updates `.ai-factory/config.yaml`, ensures `openspec/config.yaml`, `openspec/specs/`, `openspec/changes/`, `.ai-factory/state/`, `.ai-factory/qa/`, and `.ai-factory/rules/generated/`, detects legacy plans, compiles generated rules, validates changes when a compatible CLI is available, and writes a report under `.ai-factory/state/mode-switches/`.
 
+Generated-rule sync reconciles the complete active OpenSpec inventory separately from the selected compilation scope. It prepares the whole batch before mutation, prunes only exact compiler-owned direct-child overlays for archived changes, preserves unknown files, and reports bounded project-relative `remove`/`would-remove` operations. `status` and `doctor` stay non-green for orphan membership, missing active entries, malformed index data, or managed-name collisions until sync succeeds.
+
 Switching to AI Factory-only mode updates the legacy path profile and preserves `openspec/`. Use `--export-openspec` only when compatibility legacy artifacts are needed from OpenSpec changes.
 
 ## Troubleshooting
@@ -355,6 +357,7 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 | Invalid delta spec | Fix `openspec/changes/<change-id>/specs/**/spec.md`, then rerun `/aif-verify <change-id>`. |
 | Ambiguous active change | Pass an explicit `<change-id>` or update `.ai-factory/state/current.yaml`. |
 | Missing or stale generated rules | Regenerate derived rules from OpenSpec specs before relying on rules guidance. |
+| Orphaned generated rules after archive | Run `/aif-mode sync` (or `--all` for a full active sweep); inspect `generated-rules-invalid` before retrying if unsafe metadata or a managed-name collision blocks cleanup. |
 | Missing or stale coverage | Rerun `/aif-verify <change-id>` to refresh `.ai-factory/qa/<change-id>/coverage.json` before `/aif-done`. |
 | Dirty working tree before `/aif-done` | Inspect with `git status --short`; commit or stash unrelated changes, or rerun `ai-factory aifhub-done-finalizer --change <change-id> --record-dirty-state --json` to record the dirty workspace in final QA evidence before archive. |
 

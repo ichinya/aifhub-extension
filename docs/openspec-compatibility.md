@@ -371,6 +371,14 @@ When no active changes exist after archive, `/aif-mode sync` still refreshes `.a
 
 For `/aif-mode sync --all`, selected active changes without `openspec/changes/<change-id>/specs/**/spec.md` delta specs are reported as `no-delta-specs` warnings and skipped for sync validation. Changes with delta specs are still validated/statused when the CLI is available.
 
+Generated rules use a two-phase reconciliation contract. The authoritative active-change inventory of every safe direct-child change is distinct from the selected compilation scope; base collection and every selected collect/render/target preflight finish before the first mutation. The compiler then writes only changed outputs, atomically replaces `index.json` once through a same-directory temporary file, and performs preflighted non-recursive cleanup. A digest recheck detects concurrent active/index/managed inventory drift before commit.
+
+Selection semantics are deterministic: `--all` rebuilds exact active membership, targeted/resolved sync preserves active siblings and prunes archived state, `ambiguous-base-only` prunes without overlay compilation, and no-active sync produces an empty `changes` list. Malformed index rebuild requires prepared complete active coverage or an empty active inventory; parseable unsafe path metadata always blocks mutation.
+
+Cleanup recognizes only direct regular `openspec-change-<safe-id>.md`, `openspec-merged-<safe-id>.md`, and `openspec-rules-trace-<safe-id>.json` files under canonical `.ai-factory/rules/generated/`. It never follows raw index paths and preserves unknown files plus managed-name directory/symlink/reparse collisions, which remain non-green. Dry-run and real results expose sorted project-relative operations, total/truncation metadata, and at most 200 public details while retaining the complete internal plan. A semantically identical rerun is byte-stable; failures after mutation begins report `partial`, and the normal bounded failure report remains allowed.
+
+`status` and `doctor` audit membership across the full active inventory. The existing 50-change limit applies only to trace/hash inspection, not orphan or missing-membership detection. Orphan index entries/files, missing active membership/files, malformed index data, and managed-name collisions cannot produce a generated-rules PASS; benign unknown children do not affect state.
+
 ## Гейт Rules
 
 `/aif-rules-check` is read-only. It uses AIFHub generated rules in OpenSpec-native mode and returns a machine-readable `aif-gate-result` with `gate: "rules"`.

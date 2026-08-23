@@ -1940,4 +1940,39 @@ describe('OpenSpec-native prompt asset contract', () => {
       assertIncludes(compatibility, expected, 'docs/openspec-compatibility.md');
     }
   });
+
+  it('keeps aif-mode runtime prompts bounded to compiler-owned post-archive cleanup', async () => {
+    const assets = [
+      ['skills/aif-mode/SKILL.md', '/aif-done'],
+      ['.agents/skills/aif-mode/SKILL.md', '/aif-done'],
+      ['.codex/skills/aif-mode/SKILL.md', '$aif-done']
+    ];
+
+    for (const [relativePath, doneInvocation] of assets) {
+      const asset = await readRepoFile(relativePath);
+
+      for (const expected of [
+        'version: "1.2.0"',
+        'Generated cleanup is confined',
+        'openspec-change-<safe-id>.md',
+        'openspec-merged-<safe-id>.md',
+        'openspec-rules-trace-<safe-id>.json',
+        'Preserve unknown files',
+        'symlinks/reparse points',
+        'normal bounded failure report',
+        doneInvocation
+      ]) {
+        assertIncludes(asset, expected, `${relativePath} generated cleanup contract`);
+      }
+
+      for (const forbidden of [
+        'delete every file under `.ai-factory/rules/generated/`',
+        'follow raw index paths',
+        'delete canonical OpenSpec artifacts',
+        'recursive generated cleanup'
+      ]) {
+        assertNotIncludes(asset, forbidden, `${relativePath} forbidden cleanup ownership`);
+      }
+    }
+  });
 });
