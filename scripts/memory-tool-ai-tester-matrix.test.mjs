@@ -529,6 +529,47 @@ describe('ai-tester matrix manifest', () => {
     assert.equal(exactAllowRun.expectation, 'positive');
   });
 
+  it('keeps Repowise smoke screening bounded to supported project matches', async () => {
+    const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
+    const buildRepowiseExpectation = (profile, taskScenario = 'architecture_or_impact_discovery') => {
+      const manifest = buildAiTesterMatrixManifest({
+        metadata,
+        profiles: [{
+          id: `matrix-profile-${profile.project_shape}-${profile.languages[0]}`,
+          sourceRoot: path.join(tmpDir, 'fixture-project'),
+          volume: 'large',
+          complexity: 'framework',
+          repo_shape: 'single_repo',
+          artifact_mode: 'none',
+          ...profile
+        }],
+        skills: ['aif-explore'],
+        tools: ['repowise'],
+        taskScenarios: [taskScenario]
+      });
+      return manifest.cases.find((item) => item.tool_id === 'repowise').expectation;
+    };
+
+    assert.equal(buildRepowiseExpectation({
+      project_shape: 'small_microservice',
+      languages: ['js'],
+      volume: 'mini'
+    }), 'negative');
+    assert.equal(buildRepowiseExpectation({
+      project_shape: 'large_framework_app',
+      languages: ['go']
+    }), 'positive');
+    assert.equal(buildRepowiseExpectation({
+      project_shape: 'multirepo',
+      languages: ['go'],
+      repo_shape: 'multirepo'
+    }, 'multirepo_surface_mapping'), 'positive');
+    assert.equal(buildRepowiseExpectation({
+      project_shape: 'large_framework_app',
+      languages: ['php']
+    }, 'exact_file_or_symbol_lookup'), 'negative');
+  });
+
   it('renders ai-tester scenarios with direct ai-tester fields and selector wrapper separation', () => {
     const baselineScenario = renderAiTesterScenario({
       id: 'case-baseline',

@@ -10,8 +10,9 @@ import {
   writeCurrentChangePointer
 } from './active-change-resolver.mjs';
 import {
-  compileOpenSpecBaseRules,
-  compileOpenSpecRules
+  inspectOpenSpecGeneratedRules,
+  inventoryOpenSpecChanges,
+  reconcileOpenSpecGeneratedRules
 } from './openspec-rules-compiler.mjs';
 import {
   detectOpenSpec as defaultDetectOpenSpec,
@@ -114,7 +115,12 @@ export async function getModeStatus(options = {}) {
   const effectivePolicy = resolveOpenSpecPolicy(config);
   const mode = resolveMode(config);
   const detection = await detectOpenSpecCapability(rootDir, options);
-  const openSpecChanges = await listOpenSpecChanges({ rootDir });
+  const activeInventory = await inventoryOpenSpecChanges({
+    ...options,
+    rootDir,
+    allowMissingRoot: true
+  });
+  const openSpecChanges = activeInventory.ok ? activeInventory.changes : [];
   const legacy = await discoverLegacyPlansForMode(config, mode, { ...options, rootDir });
   const activeChange = await inspectActiveChange({
     ...options,
@@ -124,14 +130,19 @@ export async function getModeStatus(options = {}) {
   const generatedRuleChangeIds = options.changeId !== undefined && activeChange.state === 'resolved'
     ? [activeChange.changeId]
     : selectRuleInspectionChanges(openSpecChanges);
-  const generatedRules = await inspectGeneratedRules({
-    ...options,
-    rootDir,
-    changeIds: generatedRuleChangeIds
-  });
+  const activeInventoryUnavailable = mode === MODES.openspec && !activeInventory.ok;
+  const generatedRules = activeInventoryUnavailable
+    ? createUnavailableGeneratedRulesStatus(activeInventory.errors)
+    : await inspectGeneratedRules({
+      ...options,
+      rootDir,
+      activeChangeIds: activeInventory.changeIds,
+      changeIds: generatedRuleChangeIds,
+      generatedRulesPath: config.paths.generated_rules
+    });
 
   return {
-    ok: true,
+    ok: !activeInventoryUnavailable,
     mode,
     config,
     effectivePolicy,
@@ -146,14 +157,16 @@ export async function getModeStatus(options = {}) {
     legacyPlanErrors: legacy.errors ?? [],
     generatedRules,
     activeChange,
-    warnings: [
+    warnings: dedupeDiagnostics([
       ...(legacy.warnings ?? []),
+      ...(activeInventory.warnings ?? []),
       ...generatedRules.warnings
-    ],
-    errors: [
+    ]),
+    errors: dedupeDiagnostics([
       ...(legacy.errors ?? []),
+      ...(activeInventory.errors ?? []),
       ...generatedRules.errors
-    ]
+    ])
   };
 }
 
@@ -325,15 +338,36 @@ export async function syncOpenSpecArtifacts(options = {}) {
   const config = await readProjectConfig(rootDir);
   const openspecSettings = getOpenSpecSettings(config);
   const skeleton = await ensureOpenSpecSkeleton({ ...options, rootDir });
-  const changes = await resolveSyncChangeIds({ ...options, rootDir });
-  const generatedRules = openspecSettings.compileRulesOnSync
+  const activeInventory = await inventoryOpenSpecChanges({
+    ...options,
+    rootDir,
+    allowMissingRoot: dryRun
+  });
+  const changes = activeInventory.ok
+    ? await resolveSyncChangeIds({
+      ...options,
+      rootDir,
+      activeInventory
+    })
+    : {
+      ok: false,
+      source: 'inventory-error',
+      changeIds: [],
+      warnings: activeInventory.warnings,
+      errors: activeInventory.errors
+    };
+  const generatedRules = openspecSettings.compileRulesOnSync && changes.ok && activeInventory.ok
     ? await syncGeneratedRules({
       ...options,
       rootDir,
+      activeChangeIds: activeInventory.changeIds,
       changeIds: changes.changeIds,
-      resetIndexChanges: changes.source !== 'ambiguous-base-only'
+      selectionSource: changes.source,
+      generatedRulesPath: config.paths.generated_rules
     })
-    : createSkippedGeneratedRulesSync(dryRun, 'compileRulesOnSync-disabled');
+    : openspecSettings.compileRulesOnSync
+      ? createFailedGeneratedRulesSync(dryRun, changes.errors)
+      : createSkippedGeneratedRulesSync(dryRun, 'compileRulesOnSync-disabled');
   const validation = openspecSettings.validateOnSync
     ? await validateOpenSpecChanges({
       ...options,
@@ -485,8 +519,21 @@ export async function doctorAifMode(options = {}) {
     diagnostics.push(pass('active-change', `Active change is ${status.activeChange.changeId}.`));
   }
 
-  if (status.generatedRules.state === 'ok') {
+  const activeInventoryFailure = status.mode === MODES.openspec
+    ? status.errors.find((item) => item.code === 'active-inventory-read-failed')
+    : null;
+  if (activeInventoryFailure !== null && activeInventoryFailure !== undefined) {
+    diagnostics.push(fail(
+      'active-inventory-read-failed',
+      'The authoritative active OpenSpec change inventory is unreadable; restore filesystem access before inspecting or reconciling generated rules.'
+    ));
+  } else if (status.generatedRules.state === 'ok') {
     diagnostics.push(pass('generated-rules', 'Generated rules are present and current.'));
+  } else if (status.generatedRules.state === 'invalid') {
+    diagnostics.push(fail(
+      'generated-rules-invalid',
+      'Generated-rules inventory or index metadata is unsafe or malformed; inspect the bounded diagnostics before running /aif-mode sync --all.'
+    ));
   } else if (status.generatedRules.state === 'warn') {
     diagnostics.push(policyWarnOrFail(
       effectivePolicy.requirements.generatedRules.done,
@@ -497,13 +544,13 @@ export async function doctorAifMode(options = {}) {
     diagnostics.push(policyWarnOrFail(
       effectivePolicy.requirements.generatedRules.done,
       'generated-rules-stale',
-      'Generated rules are stale; blocking for /aif-done under current policy.'
+      'Generated rules are stale or contain archived membership; run /aif-mode sync --all before /aif-done.'
     ));
   } else {
     diagnostics.push(policyWarnOrFail(
       effectivePolicy.requirements.generatedRules.done,
       'generated-rules-missing',
-      'Generated rules are missing; blocking for /aif-done under current policy.'
+      'Generated rules or active index membership are missing; run /aif-mode sync or /aif-mode sync --all.'
     ));
   }
 
@@ -799,44 +846,37 @@ export async function ensureAiFactorySkeleton(options = {}) {
 }
 
 export async function listOpenSpecChanges(options = {}) {
-  const rootDir = resolveRootDir(options);
-  const changesRoot = path.join(rootDir, 'openspec', 'changes');
-
-  try {
-    const entries = await readdir(changesRoot, { withFileTypes: true });
-    return entries
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name)
-      .filter((name) => name !== 'archive' && !name.startsWith('.'))
-      .filter((name) => normalizeChangeId(name).ok)
-      .sort((left, right) => left.localeCompare(right))
-      .map((id) => ({ id, path: `openspec/changes/${id}` }));
-  } catch {
-    return [];
-  }
+  const inventory = await inventoryOpenSpecChanges({
+    ...options,
+    rootDir: resolveRootDir(options),
+    allowMissingRoot: true
+  });
+  return inventory.ok ? inventory.changes : [];
 }
 
 export async function inspectGeneratedRules(options = {}) {
   const rootDir = resolveRootDir(options);
-  const changeIds = Array.from(options.changeIds ?? []).map((item) => typeof item === 'string' ? item : item.id);
+  const activeChangeIds = Array.from(options.activeChangeIds ?? options.changeIds ?? [])
+    .map((item) => typeof item === 'string' ? item : item.id);
+  const changeIds = Array.from(options.changeIds ?? activeChangeIds)
+    .map((item) => typeof item === 'string' ? item : item.id);
+  const membership = await inspectOpenSpecGeneratedRules({
+    ...options,
+    rootDir,
+    activeChangeIds
+  });
   const expected = new Set(['index.json', 'openspec-base.md']);
 
-  for (const changeId of changeIds) {
+  for (const changeId of activeChangeIds) {
     expected.add(`openspec-change-${changeId}.md`);
     expected.add(`openspec-merged-${changeId}.md`);
     expected.add(`openspec-rules-trace-${changeId}.json`);
   }
 
-  const missing = [];
+  const missing = membership.missing.map((item) => path.basename(item));
   const stale = [];
-  const warnings = [];
-  const errors = [];
-
-  for (const fileName of expected) {
-    if (!await pathExists(path.join(rootDir, '.ai-factory', 'rules', 'generated', fileName))) {
-      missing.push(fileName);
-    }
-  }
+  const warnings = [...membership.warnings];
+  const errors = [...membership.errors];
 
   for (const changeId of changeIds) {
     const normalized = normalizeChangeId(changeId);
@@ -872,16 +912,84 @@ export async function inspectGeneratedRules(options = {}) {
     warning.code === 'missing-generated-rules-trace'
     || warning.code === 'invalid-generated-rules-trace'
   );
-  const state = stale.length > 0 ? 'stale' : missing.length > 0 ? 'missing' : warningOnly ? 'warn' : 'ok';
+  if (membership.orphanedIndexEntries.length > 0) {
+    warnings.push({
+      code: 'orphaned-generated-index-entry',
+      message: `Generated-rules index contains ${membership.orphanedIndexEntries.length} archived or absent change entries; first is '${membership.orphanedIndexEntries[0]}'. Run /aif-mode sync --all.`
+    });
+  }
+  if (membership.orphanedManagedFiles.length > 0) {
+    warnings.push({
+      code: 'orphaned-generated-managed-file',
+      message: `Found ${membership.orphanedManagedFiles.length} archived compiler-owned files; first is '${membership.orphanedManagedFiles[0]}'. Run /aif-mode sync --all.`
+    });
+  }
+  if (membership.missingActiveIndexEntries.length > 0) {
+    warnings.push({
+      code: 'missing-generated-index-membership',
+      message: `Generated-rules index is missing ${membership.missingActiveIndexEntries.length} active changes; first is '${membership.missingActiveIndexEntries[0]}'. Run /aif-mode sync --all.`
+    });
+  }
+  if (membership.missingActiveManagedFiles.length > 0) {
+    warnings.push({
+      code: 'missing-generated-managed-file',
+      message: `Generated-rules inventory is missing ${membership.missingActiveManagedFiles.length} active managed files; first is '${membership.missingActiveManagedFiles[0]}'. Run /aif-mode sync --all.`
+    });
+  }
+  const state = membership.state === 'invalid'
+    ? 'invalid'
+    : stale.length > 0 || membership.state === 'stale'
+      ? 'stale'
+      : missing.length > 0 || membership.state === 'missing'
+        ? 'missing'
+        : warningOnly
+          ? 'warn'
+          : 'ok';
 
   return {
-    ok: errors.length === 0,
+    ok: errors.length === 0 && membership.ok,
     state,
     expected: [...expected].sort((left, right) => left.localeCompare(right)),
     missing: [...new Set(missing)].sort((left, right) => left.localeCompare(right)),
     stale: [...new Set(stale)].sort((left, right) => left.localeCompare(right)),
+    indexedChangeIds: membership.indexedChangeIds,
+    orphanedIndexEntries: membership.orphanedIndexEntries,
+    orphanedManagedFiles: membership.orphanedManagedFiles,
+    missingActiveIndexEntries: membership.missingActiveIndexEntries,
+    missingActiveManagedFiles: membership.missingActiveManagedFiles,
+    invalidManagedEntries: membership.invalidManagedEntries,
+    indexed_change_ids: membership.indexedChangeIds,
+    orphaned_index_entries: membership.orphanedIndexEntries,
+    orphaned_managed_files: membership.orphanedManagedFiles,
+    missing_active_index_entries: membership.missingActiveIndexEntries,
+    missing_active_managed_files: membership.missingActiveManagedFiles,
+    invalid_managed_entries: membership.invalidManagedEntries,
     warnings: dedupeDiagnostics(warnings),
     errors
+  };
+}
+
+function createUnavailableGeneratedRulesStatus(errors) {
+  return {
+    ok: false,
+    state: 'invalid',
+    expected: [],
+    missing: [],
+    stale: [],
+    indexedChangeIds: [],
+    orphanedIndexEntries: [],
+    orphanedManagedFiles: [],
+    missingActiveIndexEntries: [],
+    missingActiveManagedFiles: [],
+    invalidManagedEntries: [],
+    indexed_change_ids: [],
+    orphaned_index_entries: [],
+    orphaned_managed_files: [],
+    missing_active_index_entries: [],
+    missing_active_managed_files: [],
+    invalid_managed_entries: [],
+    warnings: [],
+    errors: dedupeDiagnostics(errors ?? [])
   };
 }
 
@@ -889,47 +997,27 @@ async function syncGeneratedRules(options = {}) {
   const rootDir = resolveRootDir(options);
   const dryRun = Boolean(options.dryRun);
   const changeIds = Array.from(options.changeIds ?? []);
-  const results = [];
-
-  if (changeIds.length === 0) {
-    const result = await compileOpenSpecBaseRules({
-      ...options,
-      rootDir,
-      dryRun,
-      resetIndexChanges: options.resetIndexChanges ?? true
-    });
-
-    return {
-      ok: result.ok,
-      dryRun,
-      baseOnly: true,
-      changeSpecificSkipped: true,
-      openspecCli: result.openspecCli ?? null,
-      results: [result],
-      files: result.files ?? [],
-      warnings: dedupeDiagnostics([
-        ...(result.warnings ?? []),
-        {
-          code: 'no-active-change-specific-rules',
-          message: 'No active OpenSpec changes were selected; refreshed base generated rules only.'
-        }
-      ]),
-      errors: result.errors ?? []
-    };
-  }
-
-  for (const changeId of changeIds) {
-    results.push(await compileOpenSpecRules(changeId, { ...options, rootDir, dryRun }));
-  }
+  const result = await reconcileOpenSpecGeneratedRules({
+    ...options,
+    rootDir,
+    dryRun,
+    activeChangeIds: options.activeChangeIds ?? [],
+    selectedChangeIds: changeIds,
+    selectionSource: options.selectionSource ?? 'all'
+  });
 
   return {
-    ok: results.every((result) => result.ok),
-    dryRun,
-    openspecCli: results.find((result) => result.openspecCli !== null)?.openspecCli ?? null,
-    results,
-    files: results.flatMap((result) => result.files ?? []),
-    warnings: dedupeDiagnostics(results.flatMap((result) => result.warnings ?? [])),
-    errors: results.flatMap((result) => result.errors ?? [])
+    ...result,
+    results: result.ok
+      ? changeIds.map((changeId) => ({ ok: true, changeId }))
+      : [],
+    warnings: dedupeDiagnostics([
+      ...result.warnings,
+      ...(changeIds.length === 0 ? [{
+        code: 'no-active-change-specific-rules',
+        message: 'No active OpenSpec changes were selected; refreshed base generated rules only.'
+      }] : [])
+    ])
   };
 }
 
@@ -1098,13 +1186,28 @@ async function selectValidatableChanges(rootDir, changeIds) {
 
 async function resolveSyncChangeIds(options = {}) {
   const rootDir = resolveRootDir(options);
+  const inventory = options.activeInventory ?? await inventoryOpenSpecChanges({
+    ...options,
+    rootDir,
+    allowMissingRoot: Boolean(options.dryRun)
+  });
+
+  if (!inventory.ok) {
+    return {
+      ok: false,
+      source: 'inventory-error',
+      changeIds: [],
+      warnings: inventory.warnings,
+      errors: inventory.errors
+    };
+  }
+  const activeIds = inventory.changeIds;
 
   if (options.all) {
-    const changes = await listOpenSpecChanges({ rootDir });
     return {
       ok: true,
       source: 'all',
-      changeIds: changes.map((change) => change.id),
+      changeIds: activeIds,
       warnings: [],
       errors: []
     };
@@ -1112,7 +1215,7 @@ async function resolveSyncChangeIds(options = {}) {
 
   if (options.changeId) {
     const normalized = normalizeChangeId(options.changeId);
-    return normalized.ok
+    return normalized.ok && activeIds.includes(normalized.changeId)
       ? {
         ok: true,
         source: 'explicit',
@@ -1125,7 +1228,12 @@ async function resolveSyncChangeIds(options = {}) {
         source: 'explicit',
         changeIds: [],
         warnings: [],
-        errors: [normalized.error]
+        errors: normalized.ok
+          ? [{
+            code: 'explicit-change-not-found',
+            message: `OpenSpec change '${normalized.changeId}' was not found in the active inventory.`
+          }]
+          : [normalized.error]
       };
   }
 
@@ -1135,7 +1243,7 @@ async function resolveSyncChangeIds(options = {}) {
     getCurrentBranch: options.getCurrentBranch
   });
 
-  if (resolved.ok) {
+  if (resolved.ok && activeIds.includes(resolved.changeId)) {
     return {
       ok: true,
       source: resolved.source,
@@ -1145,8 +1253,7 @@ async function resolveSyncChangeIds(options = {}) {
     };
   }
 
-  const changes = await listOpenSpecChanges({ rootDir });
-  if (changes.length === 0 && resolved.errors.some((error) => error.code === 'no-active-change')) {
+  if (activeIds.length === 0 && resolved.errors.some((error) => error.code === 'no-active-change')) {
     return {
       ok: true,
       source: 'none',
@@ -2309,8 +2416,13 @@ function renderGeneratedRulesSection(generatedRules) {
     '## Generated Rules',
     '',
     `Files: ${generatedRules.files.length}`,
+    `Selection source: ${generatedRules.selectionSource ?? 'none'}`,
+    `Active / selected / retained / removed changes: ${generatedRules.activeChangeCount ?? (generatedRules.activeChangeIds ?? []).length} / ${generatedRules.selectedChangeCount ?? (generatedRules.selectedChangeIds ?? []).length} / ${generatedRules.retainedChangeCount ?? (generatedRules.retainedChangeIds ?? []).length} / ${generatedRules.removedChangeCount ?? (generatedRules.removedChangeIds ?? []).length}`,
+    `Operations: ${generatedRules.operation_count ?? generatedRules.operationCount ?? generatedRules.operations?.length ?? 0}`,
+    `Operations truncated: ${(generatedRules.operations_truncated ?? generatedRules.operationsTruncated) ? 'yes' : 'no'}`,
     `Base-only sync: ${generatedRules.baseOnly ? 'yes' : 'no'}`,
     `Change-specific rules skipped: ${generatedRules.changeSpecificSkipped ? 'yes' : 'no'}`,
+    ...renderOperations(generatedRules.operations ?? []),
     ...renderOpenSpecCommand(generatedRules.openspecCli),
     ...renderDiagnostics('Warnings', generatedRules.warnings),
     ...renderDiagnostics('Errors', generatedRules.errors)
@@ -2522,6 +2634,29 @@ function createSkippedGeneratedRulesSync(dryRun, reason) {
       }
     ],
     errors: []
+  };
+}
+
+function createFailedGeneratedRulesSync(dryRun, errors = []) {
+  return {
+    ok: false,
+    dryRun,
+    partial: false,
+    skipped: true,
+    reason: 'generated-rules-preflight-failed',
+    openspecCli: null,
+    results: [],
+    files: [],
+    operations: [],
+    operationCount: 0,
+    operationsTruncated: false,
+    operation_count: 0,
+    operations_truncated: false,
+    warnings: [],
+    errors: errors.length > 0 ? errors : [{
+      code: 'generated-rules-preflight-failed',
+      message: 'Generated-rules synchronization was blocked by preflight failure.'
+    }]
   };
 }
 

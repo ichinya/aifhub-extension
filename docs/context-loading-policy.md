@@ -380,16 +380,16 @@ The export does not make OpenSpec artifacts obsolete and does not delete or arch
 
 ## Generated Rules
 
-`.ai-factory/rules/generated/` is owned by the OpenSpec generated-rules compiler. Files in that directory are safe to delete and regenerate from:
+`.ai-factory/rules/generated/` contains compiler-owned outputs alongside potentially unknown user-owned children. Only `openspec-base.md`, `index.json`, and exact direct regular files named `openspec-change-<safe-id>.md`, `openspec-merged-<safe-id>.md`, or `openspec-rules-trace-<safe-id>.json` are compiler-managed. Do not treat the directory itself, unknown files, directories, symlinks/reparse points, or raw paths found in `index.json` as general deletion authority. Managed outputs are derived from:
 
 ```text
 openspec/specs/**/spec.md
 openspec/changes/<change-id>/specs/**/spec.md
 ```
 
-Read-only gates report missing or stale generated rules as warnings and do not regenerate them automatically.
+Read-only gates do not regenerate generated rules automatically. `status` and `doctor` audit full active membership and remain non-green for orphan index entries/files, missing active membership/files, malformed index data, or managed-name collisions; the 50-change cap applies only to expensive trace/hash reads. Benign unknown children do not affect state.
 
-`/aif-mode sync` owns regeneration of generated OpenSpec rules for mode maintenance. Consumer commands should still treat generated rules as derived guidance rather than source of truth.
+`/aif-mode sync` owns regeneration and bounded post-archive reconciliation. It prepares the selected batch before mutation, fails closed on inventory/unsafe metadata errors, removes only exact absent-change managed files, preserves unknown/external/canonical/runtime/QA artifacts, and reports project-relative `remove`/`would-remove` operations with total/truncation metadata. Consumer commands should still treat generated rules as derived guidance rather than source of truth.
 
 ## Fallback Behavior
 

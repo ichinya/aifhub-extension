@@ -1215,4 +1215,50 @@ describe('complete OpenSpec workflow documentation contract', () => {
       assertIncludes(aifMode, expected, 'skills/aif-mode/SKILL.md');
     }
   });
+
+  it('documents bounded generated-rules reconciliation across tracked source surfaces', async () => {
+    const readme = await readRepoFile('README.md');
+    const usage = await readRepoFile('docs/usage.md');
+    const compatibility = await readRepoFile('docs/openspec-compatibility.md');
+    const contextPolicy = await readRepoFile('docs/context-loading-policy.md');
+    const canonicalSkill = await readRepoFile('skills/aif-mode/SKILL.md');
+    const canonicalSync = await readRepoFile('skills/aif-mode/references/ARTIFACT-SYNC.md');
+    const canonicalSafety = await readRepoFile('skills/aif-mode/references/SAFETY.md');
+    const canonicalTemplate = await readRepoFile('skills/aif-mode/templates/mode-switch-report.md');
+
+    for (const [asset, label] of [
+      [usage, 'docs/usage.md'],
+      [compatibility, 'docs/openspec-compatibility.md'],
+      [canonicalSync, 'skills/aif-mode/references/ARTIFACT-SYNC.md']
+    ]) {
+      for (const expected of [
+        'authoritative active-change inventory',
+        'before the first mutation',
+        'complete active',
+        'at most 200',
+        'unknown files',
+        'partial'
+      ]) {
+        assertIncludes(asset, expected, label);
+      }
+    }
+
+    assertIncludes(readme, 'bounded project-relative `remove`/`would-remove` operations', 'README.md generated-rules troubleshooting');
+    assertIncludes(contextPolicy, 'Do not treat the directory itself', 'docs/context-loading-policy.md cleanup authority');
+    assertIncludes(contextPolicy, 'raw paths found in `index.json`', 'docs/context-loading-policy.md index boundary');
+    assertNotIncludes(contextPolicy, 'Files in that directory are safe to delete', 'docs/context-loading-policy.md broad cleanup wording');
+
+    assertIncludes(canonicalSkill, 'version: "1.2.0"', 'skills/aif-mode/SKILL.md version');
+    assertIncludes(canonicalSkill, 'openspec-change-<safe-id>.md', 'skills/aif-mode/SKILL.md cleanup boundary');
+    assertIncludes(canonicalSkill, 'normal bounded failure report', 'skills/aif-mode/SKILL.md failure-report exception');
+    assertIncludes(canonicalSkill, 'selected `codex-app` runtime uses `$aif-mode`', 'skills/aif-mode/SKILL.md Codex invocation guidance');
+    assertIncludes(canonicalSkill, 'slash-command runtimes use `/aif-mode`', 'skills/aif-mode/SKILL.md slash-command guidance');
+
+    assertIncludes(canonicalSafety, 'must never recurse', 'skills/aif-mode/references/SAFETY.md recursive boundary');
+    assertIncludes(canonicalSafety, 'must not reduce the validated internal cleanup plan', 'skills/aif-mode/references/SAFETY.md public cap boundary');
+
+    for (const placeholder of ['{{operation_count}}', '{{operations_truncated}}', '{{generated_rule_operations}}']) {
+      assertIncludes(canonicalTemplate, placeholder, 'skills/aif-mode/templates/mode-switch-report.md');
+    }
+  });
 });

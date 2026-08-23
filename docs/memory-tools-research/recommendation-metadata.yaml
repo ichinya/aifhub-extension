@@ -1286,7 +1286,8 @@ tools:
             caveat: "Smallest token win but largest cost win; rg sufficient for basic exploration on mini projects."
       conditional_cases:
         - id: large_framework_app_architecture_or_impact_discovery
-          required_shapes: [large_framework_app, multirepo]
+          match:
+            project_shape: [large_framework_app, multirepo]
           skills: [aif-analyze, aif-explore, aif-review]
           tasks: [architecture_or_impact_discovery, multirepo_surface_mapping]
           best_rows:
@@ -1295,8 +1296,9 @@ tools:
           recommendation_gate: "Smoke signal only (3 paired runs, glm-5-turbo). repowise saves tokens via fewer turns from structured-data queries, at cost of wall-clock init overhead. Apply only on large/framework projects for architecture discovery; rg remains baseline."
       known_avoid_cases:
         - id: framework_service_container_dead_code_false_positives
-          shapes: [large_framework_app]
-          languages: [php]
+          match:
+            project_shape: [large_framework_app]
+            language: [php]
           tasks: [exact_file_or_symbol_lookup]
           reason: "repowise dead-code analysis flags container-discovered services (Laravel DI) as unreachable (in_degree=0, 70% confidence). High false-positive rate on framework apps with service containers. Dead-code output unreliable without framework-aware tuning."
     do_not_recommend_for:
@@ -1488,32 +1490,6 @@ proven_label_evidence:
     provenance:
       report: .ai-factory/state/ai-tester-tool-evaluations/graphify-project-8d97432e6d7a-architecture-explore-plan-20260611t1821z/ai-tester-token-matrices.json
       generated_at: "2026-06-11T18:27:36.160Z"
-  - id: repowise-paired-ab-glm5turbo-2026-06-29-smoke
-    source_evidence: repowise-paired-ab-glm5turbo-2026-06-29
-    scenario_id: architecture-impact-discovery
-    run_class: smoke
-    tool_id: repowise
-    task_scenario: architecture_or_impact_discovery
-    skills: [aif-analyze, aif-explore, aif-review]
-    required_shapes: [large_framework_app, multirepo]
-    profiles:
-      total: 3
-      paired: 3
-      pass_pass: 3
-      useful: 3
-    aggregate_deltas:
-      total_tokens_percent: -24.8
-      cost_percent: -45.9
-      turns_percent: -33.2
-      duration_percent: 139.3
-    decision: conditional
-    caveat: "Smoke signal (3 paired runs, glm-5-turbo via z.ai). repowise saves tokens via fewer turns from structured-data queries on all 3 profiles (php/large, js/mini, go/large). Trade-off: wall-clock init overhead (+139%). dead-code false positives on framework service containers. Full screening matrix (300 rows like codegraph) not yet run — conditional_cases based on smoke only."
-    provenance:
-      report: docs/memory-tools-research/repowise-benchmark-results.md
-      runner: ai-tester 0.5.0
-      runtime: claude
-      model: glm-5-turbo
-      generated_at: "2026-06-29T00:00:00.000Z"
 evidence_runs:
   - id: live-ai-tester-path-hash-tool-batch-2026-06-11
     date: "2026-06-11"

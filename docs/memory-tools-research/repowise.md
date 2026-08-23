@@ -29,7 +29,9 @@ Repowise не заменяет `rg`. Baseline всегда остаётся `rg`
 
 Текущее решение: `manual_cli_only` + `avoid_by_default`.
 
-Repowise можно предлагать только при exact match по `skill + project labels` из `tools.repowise.screening_policy.conditional_cases` в [recommendation-metadata.yaml](recommendation-metadata.yaml). На первом этапе `conditional_cases`/`known_avoid_cases` пусты до завершения ai-tester матрицы; заполнение `proven_label_evidence` - отдельная фаза после smoke-прогона.
+Repowise можно предлагать только при exact match по `skill + task + project_shape` из `tools.repowise.screening_policy.conditional_cases` в [recommendation-metadata.yaml](recommendation-metadata.yaml). Текущая bounded policy основана на paired A/B smoke `repowise-paired-ab-glm5turbo-2026-06-29-smoke`: conditional allow ограничен `large_framework_app`/`multirepo` для architecture/impact discovery, а PHP framework dead-code false positives зафиксированы в `known_avoid_cases` и имеют приоритет.
+
+Это не full screening matrix и не generic `proven_label_evidence` allow. Smoke `run_class` не проходит общий `accepted_evidence` gate; selector использует только tool-local cases, сохраняет `avoid_by_default`, обязательный `rg` baseline и documented matcher constraints.
 
 Минимальный contract:
 

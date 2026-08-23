@@ -30,10 +30,15 @@ The command may:
 - let other AIFHub skills request OpenSpec instructions/archive through `scripts/openspec-runner.mjs`
 - write reports under `.ai-factory/state/mode-switches/`
 - update `.ai-factory/state/current.yaml` only when explicitly requested
+- reconcile absent-change generated outputs only inside the canonical `.ai-factory/rules/generated/` root and only for exact direct regular compiler-owned filenames
+
+Generated cleanup must never recurse, follow index paths, or treat an inventory failure as an empty active set. Preserve unknown files, directories, symlinks/reparse points, `openspec-base.md`, canonical OpenSpec artifacts, `.ai-factory/state/**`, `.ai-factory/qa/**`, and every external path. Managed-name collisions and unsafe index metadata block mutation.
 
 ## Dry Run
 
-`--dry-run` must not write files. It may inspect existing artifacts, resolve changes, detect collisions, and report planned operations.
+`--dry-run` must not write files. It may inspect existing artifacts, resolve changes, detect collisions, and report sorted project-relative `would-write`/`would-remove` operations with total and truncation metadata. The public 200-entry detail limit must not reduce the validated internal cleanup plan.
+
+All selected compilation and target preflight must complete before mutation. Recheck the active/index/managed inventory digest before commit, atomically replace `index.json` through a same-directory temporary file, then perform non-recursive cleanup. Report a truthful `partial` failure when an error occurs after mutation starts; a bounded mode report may still record the failure.
 
 ## Collision Handling
 

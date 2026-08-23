@@ -189,6 +189,33 @@ describe('OpenSpec lifecycle CLI integration contract', () => {
     }
   });
 
+  it('bounds post-archive generated cleanup to a fail-closed prepare/commit batch', async () => {
+    const sync = await readJoined(LIFECYCLE_ASSETS.sync);
+
+    for (const expected of [
+      'authoritative inventory',
+      'prepare/commit batch',
+      'complete active inventory',
+      'openspec-change-<safe-id>.md',
+      'openspec-merged-<safe-id>.md',
+      'openspec-rules-trace-<safe-id>.json',
+      'unknown files',
+      'at most 200',
+      'normal bounded failure report'
+    ]) {
+      assertIncludes(sync, expected, 'generated-rules reconciliation lifecycle');
+    }
+
+    for (const forbidden of [
+      'may delete canonical OpenSpec artifacts',
+      'recursive cleanup is allowed',
+      'raw index paths are cleanup targets',
+      'inventory failure means no active changes'
+    ]) {
+      assertNotIncludes(sync, forbidden, 'generated-rules cleanup ownership');
+    }
+  });
+
   it('requires verify to validate/status through the runner, fail invalid OpenSpec first, and write verify evidence', async () => {
     const verify = await readJoined(LIFECYCLE_ASSETS.verify);
 
