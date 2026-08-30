@@ -877,11 +877,15 @@ export async function inspectGeneratedRules(options = {}) {
   const stale = [];
   const warnings = [...membership.warnings];
   const errors = [...membership.errors];
+  const canInspectGeneratedContent = membership.ok && membership.state !== 'invalid';
 
   for (const changeId of changeIds) {
     const normalized = normalizeChangeId(changeId);
     if (!normalized.ok) {
       errors.push(normalized.error);
+      continue;
+    }
+    if (!canInspectGeneratedContent) {
       continue;
     }
 

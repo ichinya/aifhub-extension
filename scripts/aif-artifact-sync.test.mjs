@@ -1,7 +1,7 @@
 // aif-artifact-sync.test.mjs - tests for AIFHub mode switching and artifact sync
 import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { access, mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -495,6 +495,50 @@ describe('mode status', () => {
     assert.deepEqual(invalid.generatedRules.invalidManagedEntries, ['.ai-factory/rules/generated/openspec-change-archived.md']);
     assert.equal(invalid.generatedRules.errors.some((item) => item.code === 'invalid-managed-entry'), true);
     assert.equal(doctor.diagnostics.some((item) => item.code === 'generated-rules-invalid' && item.level === 'fail'), true);
+  });
+
+  it('does not inspect generated content through an unsafe generated-rules root', async () => {
+    const rootDir = await createTempRoot();
+    const externalRoot = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      'paths:',
+      '  plans: openspec/changes',
+      '  specs: openspec/specs',
+      '  state: .ai-factory/state',
+      '  qa: .ai-factory/qa',
+      '  generated_rules: .ai-factory/rules/generated',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/changes/change-a/proposal.md', '# change-a\n');
+    await writeFixture(externalRoot, 'openspec-base.md', '# External base\n');
+    await writeFixture(externalRoot, 'openspec-change-change-a.md', '# External change\n');
+    await writeFixture(externalRoot, 'openspec-merged-change-a.md', '# External merged\n');
+    await writeFixture(externalRoot, 'openspec-rules-trace-change-a.json', '{malformed external trace\n');
+    const generatedDir = path.join(rootDir, '.ai-factory', 'rules', 'generated');
+    await mkdir(path.dirname(generatedDir), { recursive: true });
+    await symlink(externalRoot, generatedDir, process.platform === 'win32' ? 'junction' : 'dir');
+
+    const status = await getModeStatus({
+      rootDir,
+      changeId: 'change-a',
+      detectOpenSpec: async () => missingCliDetection(),
+      getCurrentBranch: async () => 'feat/change-a'
+    });
+
+    assert.equal(status.generatedRules.ok, false, 'unsafe generated root must invalidate membership inspection');
+    assert.equal(status.generatedRules.state, 'invalid');
+    assert.equal(
+      status.generatedRules.errors.some((item) => item.code === 'generated-rules-root-unsafe'),
+      true,
+      'unsafe generated root must retain its primary diagnostic'
+    );
+    assert.equal(
+      status.generatedRules.warnings.some((item) => item.code === 'invalid-generated-rules-trace'),
+      false,
+      'unsafe generated root must not expose diagnostics derived from the external trace'
+    );
   });
 });
 
