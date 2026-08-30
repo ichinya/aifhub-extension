@@ -2641,6 +2641,31 @@ function parseGeneratedIndex(raw) {
         message: 'Generated-rules index contains malformed base metadata.'
       });
     }
+    for (const input of Array.isArray(parsed.base?.inputs) ? parsed.base.inputs : []) {
+      const inputShapeValid = (
+        input !== null
+        && typeof input === 'object'
+        && !Array.isArray(input)
+        && typeof input.path === 'string'
+        && typeof input.sha256 === 'string'
+        && input.kind === 'base-spec'
+      );
+      if (!inputShapeValid) {
+        diagnostics.push({
+          code: 'generated-index-malformed',
+          message: 'Generated-rules index contains malformed base input metadata.'
+        });
+      }
+      if (
+        typeof input?.path === 'string'
+        && isUnsafeGeneratedIndexBaseInputPath(input.path)
+      ) {
+        errors.push({
+          code: 'unsafe-generated-index-path',
+          message: 'Generated-rules index contains a base input path outside canonical base specs.'
+        });
+      }
+    }
     if (
       typeof parsed.base?.markdown === 'string'
       && (
@@ -2755,6 +2780,19 @@ function isUnsafeGeneratedIndexPath(value) {
     || path.posix.isAbsolute(normalized)
     || normalized.split('/').includes('..')
     || !normalized.startsWith(canonicalPrefix)
+  );
+}
+
+function isUnsafeGeneratedIndexBaseInputPath(value) {
+  const raw = String(value);
+  const normalized = raw.replaceAll('\\', '/');
+  return (
+    path.win32.isAbsolute(raw)
+    || path.posix.isAbsolute(normalized)
+    || raw !== normalized
+    || path.posix.normalize(normalized) !== normalized
+    || !normalized.startsWith('openspec/specs/')
+    || !normalized.endsWith('/spec.md')
   );
 }
 
