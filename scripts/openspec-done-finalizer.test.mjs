@@ -402,7 +402,9 @@ function finalizerCommandResult(overrides = {}) {
 afterEach(async () => {
   await Promise.all(tempRoots.splice(0).map((rootDir) => rm(rootDir, {
     recursive: true,
-    force: true
+    force: true,
+    maxRetries: 5,
+    retryDelay: 20
   })));
 });
 

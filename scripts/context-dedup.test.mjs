@@ -975,6 +975,77 @@ describe('session summary and purge', () => {
     await assert.rejects(stat(path.join(rootDir, '.ai-factory', 'state', 'context-dedup')));
   });
 
+  it('retries transient directory removal failures before reporting purge success', async () => {
+    const policy = await enabledPolicy();
+    await recordRead({
+      filePath: 'src/session.ts',
+      content: body('purge-transient-enotempty'),
+      rootDir,
+      policy,
+      sessionId: 'retry'
+    });
+    let removeAttempts = 0;
+    const logs = [];
+    const removeFn = async (target, removeOptions) => {
+      removeAttempts += 1;
+      if (removeAttempts < 3) {
+        const error = new Error('synthetic transient directory removal failure');
+        error.code = 'ENOTEMPTY';
+        throw error;
+      }
+      return rm(target, removeOptions);
+    };
+
+    const result = await purgeSession({
+      rootDir,
+      policy,
+      sessionId: 'retry',
+      removeFn,
+      logFix: true,
+      logger: (message) => logs.push(message)
+    });
+
+    assert.equal(removeAttempts, 3);
+    assert.equal(result.all, false);
+    assert.match(logs.join('\n'), /\[FIX\] purge-retry/);
+    assert.match(logs.join('\n'), /\[FIX\] purge-success/);
+    await assert.rejects(stat(path.dirname(resolveLedgerPath('retry', { rootDir, policy }))));
+  });
+
+  it('does not retry non-transient directory removal failures', async () => {
+    const policy = await enabledPolicy();
+    await recordRead({
+      filePath: 'src/session.ts',
+      content: body('purge-non-transient'),
+      rootDir,
+      policy,
+      sessionId: 'fail-fast'
+    });
+    let removeAttempts = 0;
+    const logs = [];
+    const removeFn = async () => {
+      removeAttempts += 1;
+      const error = new Error('synthetic non-transient directory removal failure');
+      error.code = 'EACCES';
+      throw error;
+    };
+
+    await assert.rejects(
+      purgeSession({
+        rootDir,
+        policy,
+        sessionId: 'fail-fast',
+        removeFn,
+        logFix: true,
+        logger: (message) => logs.push(message)
+      }),
+      (error) => error?.code === 'EACCES'
+    );
+
+    assert.equal(removeAttempts, 1);
+    assert.match(logs.join('\n'), /\[FIX\] purge-error/);
+  });
+
   it('waits for an in-flight ledger transaction before purging the session', async () => {
     const policy = await enabledPolicy();
     let releaseSave;

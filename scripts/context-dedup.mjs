@@ -32,6 +32,9 @@ const LOCK_STALE_MS = 30_000;
 const SQZ_TIMEOUT_MS = 15_000;
 const SQZ_MAX_OUTPUT_BYTES = 1024 * 1024;
 const PURGE_LOCK_ATTEMPTS = Math.ceil((SQZ_TIMEOUT_MS + 5_000) / LOCK_RETRY_MS);
+const PURGE_REMOVE_MAX_RETRIES = 5;
+const PURGE_REMOVE_RETRY_MS = 20;
+const RETRYABLE_PURGE_REMOVE_CODES = new Set(['EBUSY', 'EMFILE', 'ENFILE', 'ENOTEMPTY', 'EPERM']);
 const SQZ_REFERENCE_PATTERN = /^§ref:[0-9a-f]{8,64}§\s*$/iu;
 const SQZ_DELTA_PATTERN = /^§delta:[0-9a-f]{8,64}§(?:\r?\n|$)/iu;
 const UNSAFE_YAML_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -760,11 +763,18 @@ export async function purgeSession(options = {}) {
 
   if (options.all === true) {
     const dedupDir = path.join(rootDir, stateDir);
+    const relativeTarget = toPosix(path.relative(rootDir, dedupDir));
     const globalLock = await acquireLedgerLock(resolveGlobalLockPath(rootDir, stateDir), rootDir);
     try {
       await waitForActiveSessionLocks(rootDir, stateDir);
-      await rm(dedupDir, { recursive: true, force: true });
-      return { all: true, removed: [toPosix(path.relative(rootDir, dedupDir))] };
+      debugPurgeFix(options, 'purge-start', { scope: 'all', path: relativeTarget });
+      const removal = await removeDedupTree(dedupDir, options);
+      debugPurgeFix(options, 'purge-success', {
+        scope: 'all',
+        path: relativeTarget,
+        attempts: removal.attempts
+      });
+      return { all: true, removed: [relativeTarget] };
     } finally {
       await releaseLedgerLock(globalLock);
     }
@@ -777,12 +787,19 @@ export async function purgeSession(options = {}) {
     rootDir,
     stateDir
   );
+  const relativeTarget = toPosix(path.relative(rootDir, sessionDir));
   const releaseProcessTransaction = await acquireProcessLedgerTransaction(ledgerPath);
   let sessionLock;
   try {
     sessionLock = await acquireLedgerLock(resolveSessionLockPath(ledgerPath), rootDir);
-    await rm(sessionDir, { recursive: true, force: true });
-    return { all: false, sessionId, removed: [toPosix(path.relative(rootDir, sessionDir))] };
+    debugPurgeFix(options, 'purge-start', { scope: 'session', path: relativeTarget });
+    const removal = await removeDedupTree(sessionDir, options);
+    debugPurgeFix(options, 'purge-success', {
+      scope: 'session',
+      path: relativeTarget,
+      attempts: removal.attempts
+    });
+    return { all: false, sessionId, removed: [relativeTarget] };
   } finally {
     await releaseLedgerLock(sessionLock);
     releaseProcessTransaction();
@@ -1182,6 +1199,42 @@ async function releaseLedgerLock(lock) {
 
 function delay(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function removeDedupTree(target, options) {
+  const removeFn = options.removeFn ?? rm;
+
+  for (let attempt = 0; attempt <= PURGE_REMOVE_MAX_RETRIES; attempt += 1) {
+    try {
+      await removeFn(target, { recursive: true, force: true });
+      return { attempts: attempt + 1 };
+    } catch (error) {
+      const code = error?.code ?? 'UNKNOWN';
+      const canRetry = RETRYABLE_PURGE_REMOVE_CODES.has(code) && attempt < PURGE_REMOVE_MAX_RETRIES;
+      if (!canRetry) {
+        debugPurgeFix(options, 'purge-error', {
+          code,
+          attempts: attempt + 1
+        });
+        throw error;
+      }
+
+      debugPurgeFix(options, 'purge-retry', {
+        code,
+        attempt: attempt + 1,
+        maxRetries: PURGE_REMOVE_MAX_RETRIES
+      });
+      await delay((attempt + 1) * PURGE_REMOVE_RETRY_MS);
+    }
+  }
+
+  throw new Error('Unreachable context dedup purge retry state.');
+}
+
+function debugPurgeFix(options, event, fields) {
+  if (options.logFix !== true && process.env.AIFHUB_CONTEXT_DEDUP_DEBUG !== '1') return;
+  const logger = options.logger ?? console.error;
+  logger(`[FIX] ${event} ${JSON.stringify(fields)}`);
 }
 
 function debugFix(options, event, fields) {

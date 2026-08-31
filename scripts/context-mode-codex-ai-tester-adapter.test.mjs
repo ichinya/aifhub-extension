@@ -161,7 +161,9 @@ describe('context-mode sandbox and lifecycle boundary', () => {
     const result = await runBoundedProcess(process.execPath, ['-e', parentScript], {
       cwd: tempDir,
       env: process.env,
-      timeoutMs: 3_000
+      // This assertion owns inherited-pipe closure, not scheduler latency. Keep
+      // it bounded while allowing child startup during the parallel Windows suite.
+      timeoutMs: 15_000
     });
 
     assert.equal(result.exitCode, 0);
