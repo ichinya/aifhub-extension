@@ -70,7 +70,9 @@ The validator checks:
 | generated rules under `.ai-factory/rules/generated/` | `warn` when missing or stale |
 | supplied changed paths under `openspec/specs/**` | `fail` unless direct base spec mutation is explicitly allowed |
 
-OpenSpec `1.8.0` strict validation also reports scenario loss when a `MODIFIED` requirement omits an existing scenario. AIFHub preserves that upstream path and message in validation QA evidence and stops code verification. Capability retirement remains an OpenSpec-owned archive operation and requires explicit `retire_capabilities: true` metadata; AIFHub planning must not infer the marker.
+OpenSpec `1.9.0` strict validation treats task-numbering warnings as blocking: the same warnings are a valid exit-`0` observation in non-strict upstream validation, while strict validation returns exit `1` and AIFHub stops code verification. Scenario loss for an arbitrary real nested `####` child also fails strict validation; AIFHub preserves the upstream `widgets/spec.md` path and omission message in validation QA evidence, so neither verify nor archive readiness can report a false PASS. Capability retirement remains an OpenSpec-owned archive operation and requires explicit `retire_capabilities: true` metadata on OpenSpec `>=1.8.0`; AIFHub planning must not infer the marker.
+
+`openspec validate --archived` is advisory-only. It is not invoked by the shared current-change runner, `/aif-verify`, `/aif-done`, package validation scripts, tracked CI, or the release acceptance PASS boolean. If run for an informational historical snapshot, execute it separately and report its exit/count without chaining it into mandatory gates or rewriting historical archives.
 
 Generated-rule warnings suggest:
 

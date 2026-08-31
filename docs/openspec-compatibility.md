@@ -26,12 +26,12 @@ AI Factory = execution runtime
 
 AI Factory-only workflows follow AI Factory's runtime support. OpenSpec validation/archive follows the OpenSpec CLI runtime requirement.
 
-## OpenSpec 1.8.0 Reviewed Baseline
+## OpenSpec 1.9.0 Reviewed Baseline
 
-AIFHub metadata records OpenSpec `1.8.0` as the latest reviewed upstream baseline while keeping the supported stable CLI range `>=1.3.1 <2.0.0`.
+AIFHub metadata records OpenSpec `1.9.0` as the latest reviewed upstream baseline while keeping the supported stable CLI range `>=1.3.1 <2.0.0`.
 
 - Baseline `1.3.1` is the first supported and reviewed release.
-- Reviewed stable releases: `1.3.1`, `1.4.0`, `1.4.1`, `1.5.0`, `1.6.0`, `1.7.0`, `1.8.0`.
+- Reviewed stable releases: `1.3.1`, `1.4.0`, `1.4.1`, `1.5.0`, `1.6.0`, `1.7.0`, `1.8.0`, `1.9.0`.
 - Reviewed prereleases: `1.6.0-beta.1`. A prerelease review does not imply production support; prerelease detection remains unavailable for production capabilities.
 
 | Release | Channel | Adapter result | Checked AIFHub surfaces | Required adaptation |
@@ -44,6 +44,38 @@ AIFHub metadata records OpenSpec `1.8.0` as the latest reviewed upstream baselin
 | `1.6.0` | stable | supported | exact CLI validate/status/show/instructions JSON, archive flags, invalid-change archive exit | stable ledger advancement; beta-to-stable code diff only changes version/changelog |
 | `1.7.0` | stable | supported | exact CLI native `skip_specs: true`, `openspec instructions archive --change <id> --json`, leading-digit IDs, nested spec folders, standard command smoke | native metadata reader for artifact/sync gates plus focused no-op regressions for already-compatible surfaces |
 | `1.8.0` | stable | supported | exact CLI capability retirement, scenario-loss validation, nested task progress, non-TTY archive guidance, and standard command smoke | version-gated retirement planning plus fail-closed and nested-task regressions; agent targets remain upstream-owned |
+| `1.9.0` | stable | supported | checksum-verified extracted CLI, strict/non-strict task numbering, arbitrary nested scenario-loss, telemetry-free JSON, rootless list/validate/schemas, invalid archive no-mutation, archive serialization, and standard command smoke | advance reviewed metadata and deterministic diagnostics/docs contracts; Command Code, schemas, skills, agents, tools, Stores, and package management remain upstream-owned |
+
+### Exact 1.9.0 Custody and Evidence Boundary
+
+Git source custody and npm executable custody were verified independently:
+
+| Chain | Pinned evidence |
+|---|---|
+| Git source custody | official tag [`v1.9.0`](https://github.com/Fission-AI/OpenSpec/releases/tag/v1.9.0), resolved commit `2826b8889e5223a9a8095d4428b60b56597e1020`, release publication `2026-08-13T15:38:22Z`, and official compare [`v1.8.0...v1.9.0`](https://github.com/Fission-AI/OpenSpec/compare/v1.8.0...v1.9.0) |
+| npm executable custody | `@fission-ai/openspec@1.9.0`, publication `2026-08-13T15:29:22.483Z`, integrity `sha512-yKV8mFz+J5+epLugvcSt7B+mBkkCSycOB6euLJmW6JL+2jhL+Um0JZ6zuGIdXcbsd3jU2+YQfeDz2EVwft++LA==`, shasum `98f27aea1d95b7472790d4e27acc8669fcba4fc6`, bin `openspec: bin/openspec.js`, and Node engine `>=20.19.0` |
+
+The npm tarball was checksum-verified before its explicitly extracted `bin/openspec.js` was run in disposable fixtures. A PATH-resolved executable was not used as exact-package proof. Context7 documentation for `/fission-ai/openspec` reflected current `main` and served only as supporting context, not a version-pinned `1.9.0` authority.
+
+This is local exact-package compatibility evidence. It does not constitute CI verification, deployment verification, or production verification. OpenSpec `1.10` and `1.11` were not reviewed, executed, added to the ledger, or included in compatibility/acceptance claims for this checkpoint.
+
+### 1.9.0 Ownership and No-op Matrix
+
+The official compare contains 25 commits and 97 changed files. Every entry is classified in the bounded runtime receipt; the tracked ownership summary is:
+
+| Classification | Commits | Files | AIFHub result |
+|---|---:|---:|---|
+| `adapter-change-required` | 4 | 14 | reviewed baseline metadata, freshness diagnostics, fail-closed verification tests, negative mandatory-gate contract, and public docs |
+| `regression-or-no-op` | 7 | 20 | existing runner/finalizer behavior is retained and locked by exact semantic regressions; no local fork |
+| `upstream-owned` | 14 | 63 | Command Code adapters, schema fork/update, skill/agent/tool generation, Stores/workspace behavior, and package/dependency management are not copied into AIFHub |
+
+### 1.9.0 Release-specific Semantics
+
+- Non-strict validation keeps malformed task numbering as three `tasks.md` warnings, returns exit `0`, and reports the change as valid. Strict validation preserves the same warnings, returns exit `1`, and reports the change as invalid; AIFHub verification uses strict validation and fails closed.
+- Scenario-loss validation detects an arbitrary real nested `#### Edge case`, returns exit `1`, and preserves the stable `widgets/spec.md` path and omission message in QA evidence. A failing scenario-loss result cannot produce a passing verify gate or archive eligibility.
+- In a root without registered Stores, `list --json` and bulk `validate --all --json` fail, while `schemas --json` succeeds and includes the built-in `spec-driven` schema. The successful schemas result is the exact `1.9.0` contract, not a false green.
+- Invalid archive input returns exit `1` without changing the disposable fixture tree. Successful non-TTY archive output is ANSI-free; merged specs preserve blank lines and end with exactly one final newline.
+- Generated apply guidance retains an out-of-scope work guard, and JSON command output remains parseable without a telemetry notice when telemetry is disabled process-locally.
 
 Reviewed upstream behavior:
 
@@ -468,7 +500,7 @@ openspec:
   canArchive: boolean
   version: string | null
   supportedRange: ">=1.3.1 <2.0.0"
-  latestReviewedVersion: "1.8.0"
+  latestReviewedVersion: "1.9.0"
   versionOutdated: boolean | null
   requiresNode: ">=20.19.0"
 ```
@@ -549,6 +581,12 @@ openspec archive <change-id> --yes --no-color
 `ai-factory aifhub-done-finalizer --change <change-id> --skip-specs --json` adds `--skip-specs` for docs/tooling-only changes. Do not execute `scripts/openspec-done-finalizer.mjs` or other `scripts/openspec-*.mjs` modules from a consumer root or internal installed-extension path; they are extension-local implementation modules.
 
 AIFHub artifact contract validation is a separate read-only layer over the CLI adapter. It checks workflow ownership, runtime evidence placement, generated-rule freshness, and pre-archive verification evidence. See [OpenSpec Artifact Validation](openspec-validation.md).
+
+### Archived-wide Validation Is Advisory
+
+OpenSpec `1.9.0` exposes `openspec validate --archived`. AIFHub may run it as a separate informational snapshot, but its exit code and counts do not participate in the release acceptance PASS boolean. It is absent from mandatory `package.json` validation scripts, tracked CI definitions, `validateOpenSpecChange()` argv, `/aif-verify`, and `/aif-done`; an advisory invocation must never be chained into a mandatory gate through the same exit-status pipeline.
+
+The local pre-implementation advisory snapshot reported `26/28` archived changes valid because two historical archives still contain incomplete task lists. Those historical records are not rewritten by the `1.9.0` compatibility change. Authoritative acceptance remains strict current-change/all-active OpenSpec validation, repository validation/tests, and AIFHub lifecycle gates.
 
 ## See Also
 
