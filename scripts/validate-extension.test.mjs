@@ -8,6 +8,12 @@ import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
+import {
+  OPENSPEC_LATEST_REVIEWED_VERSION,
+  OPENSPEC_NODE_RANGE,
+  OPENSPEC_SUPPORTED_RANGE
+} from './openspec-runner.mjs';
+
 const execFileAsync = promisify(execFile);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
@@ -78,16 +84,16 @@ function validAifhubMetadata(extra = {}) {
       },
       openspec: {
         url: 'https://github.com/Fission-AI/OpenSpec',
-        version: '1.8.0',
+        version: '1.9.0',
         baselineVersion: '1.3.1',
         supportedRange: '>=1.3.1 <2.0.0',
-        reviewedStableVersions: ['1.3.1', '1.4.0', '1.4.1', '1.5.0', '1.6.0', '1.7.0', '1.8.0'],
+        reviewedStableVersions: ['1.3.1', '1.4.0', '1.4.1', '1.5.0', '1.6.0', '1.7.0', '1.8.0', '1.9.0'],
         reviewedPrereleaseVersions: ['1.6.0-beta.1'],
-        lastSync: '2026-08-09',
+        lastSync: '2026-08-31',
         optional: true,
         requiresNode: '>=20.19.0',
         mode: 'optional-cli-adapter',
-        notes: 'Validated against upstream OpenSpec 1.8.0; AIFHub remains adapter-only.'
+        notes: 'Validated against upstream OpenSpec 1.9.0; AIFHub remains adapter-only.'
       }
     },
     ...extra
@@ -118,6 +124,70 @@ async function writeValidProject({
 }
 
 describe('validate-extension.mjs', () => {
+  it('keeps archived validation advisory-only across package scripts, tracked CI and release acceptance', async () => {
+    const packageJson = JSON.parse(await readFile(join(REPO_ROOT, 'package.json'), 'utf-8'));
+    const packageScripts = Object.entries(packageJson.scripts ?? {});
+    const { stdout: trackedCiOutput } = await execFileAsync('git', [
+      'ls-files',
+      '--',
+      '.github/workflows',
+      '.gitlab-ci.yml',
+      'azure-pipelines.yml',
+      '.circleci'
+    ], { cwd: REPO_ROOT, timeout: 10000 });
+    const trackedCiPaths = trackedCiOutput.trim().length === 0
+      ? []
+      : trackedCiOutput.trim().split(/\r?\n/).sort();
+    const trackedCiSources = await Promise.all(trackedCiPaths.map(async (relativePath) => ({
+      relativePath,
+      source: await readFile(join(REPO_ROOT, relativePath), 'utf-8')
+    })));
+
+    for (const [name, command] of packageScripts) {
+      assert.equal(command.includes('--archived'), false, `package script ${name}`);
+    }
+    for (const { relativePath, source } of trackedCiSources) {
+      assert.equal(source.includes('--archived'), false, `tracked CI ${relativePath}`);
+    }
+
+    const mandatoryResults = [
+      ...packageScripts.map(([, command]) => !command.includes('--archived')),
+      ...trackedCiSources.map(({ source }) => !source.includes('--archived'))
+    ];
+    const releaseAcceptancePass = mandatoryResults.every(Boolean);
+    const advisoryArchivedObservation = { exitCode: 1, affectsReleaseAcceptance: false };
+
+    assert.equal(releaseAcceptancePass, true);
+    assert.equal(advisoryArchivedObservation.exitCode, 1, 'fixture models historical archived debt');
+    assert.equal(advisoryArchivedObservation.affectsReleaseAcceptance, false);
+    assert.equal(releaseAcceptancePass, true, 'advisory exit must not change the mandatory PASS boolean');
+  });
+
+  it('keeps the OpenSpec 1.9.0 manifest, runner and immutable compatibility constraints atomic', async () => {
+    const metadata = JSON.parse(await readFile(join(REPO_ROOT, 'aifhub-extension.json'), 'utf-8'));
+    const openspec = metadata.sources.openspec;
+
+    assert.equal(openspec.version, '1.9.0', 'sources.openspec.version');
+    assert.equal(OPENSPEC_LATEST_REVIEWED_VERSION, '1.9.0', 'runner reviewed baseline');
+    assert.equal(openspec.version, OPENSPEC_LATEST_REVIEWED_VERSION, 'manifest/runner reviewed baseline');
+    assert.deepEqual(openspec.reviewedStableVersions, [
+      '1.3.1',
+      '1.4.0',
+      '1.4.1',
+      '1.5.0',
+      '1.6.0',
+      '1.7.0',
+      '1.8.0',
+      '1.9.0'
+    ], 'ordered reviewed stable ledger');
+    assert.equal(openspec.baselineVersion, '1.3.1');
+    assert.equal(openspec.supportedRange, '>=1.3.1 <2.0.0');
+    assert.equal(OPENSPEC_SUPPORTED_RANGE, openspec.supportedRange);
+    assert.deepEqual(openspec.reviewedPrereleaseVersions, ['1.6.0-beta.1']);
+    assert.equal(openspec.requiresNode, '>=20.19.0');
+    assert.equal(OPENSPEC_NODE_RANGE, openspec.requiresNode);
+  });
+
   it('requires baselineVersion for every source metadata entry in the JSON Schema', async () => {
     const schema = JSON.parse(await readFile(join(REPO_ROOT, 'schemas/aifhub-extension.schema.json'), 'utf-8'));
 
@@ -274,7 +344,7 @@ describe('validate-extension.mjs', () => {
 
   it('fails when the latest reviewed OpenSpec stable version differs from source version', async () => {
     const parsed = JSON.parse(validAifhubMetadata());
-    parsed.sources.openspec.version = '1.9.0';
+    parsed.sources.openspec.version = '1.8.0';
     await writeValidProject({ metadata: JSON.stringify(parsed) });
 
     const code = await runValidatorExitCode(tmpDir);
@@ -283,8 +353,8 @@ describe('validate-extension.mjs', () => {
 
   it('fails when OpenSpec metadata advances without the runtime reviewed-version diagnostic', async () => {
     const parsed = JSON.parse(validAifhubMetadata());
-    parsed.sources.openspec.version = '1.9.0';
-    parsed.sources.openspec.reviewedStableVersions.push('1.9.0');
+    parsed.sources.openspec.version = '1.9.1';
+    parsed.sources.openspec.reviewedStableVersions.push('1.9.1');
     await writeValidProject({ metadata: JSON.stringify(parsed) });
 
     const code = await runValidatorExitCode(tmpDir);

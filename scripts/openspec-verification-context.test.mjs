@@ -454,14 +454,112 @@ describe('OpenSpec verification context API', () => {
     });
   });
 
-  it('preserves OpenSpec 1.8 scenario-loss diagnostics while failing fast', async () => {
+  it('treats OpenSpec 1.9 strict task-numbering warnings as blocking diagnostics', async () => {
     const rootDir = await createTempRoot();
     await createOpenSpecChange(rootDir);
-    const scenarioLoss = 'MODIFIED "Widget state" omits scenario(s) the current spec still has: "Second scenario".';
+    let statusCalls = 0;
+    const issues = [
+      {
+        level: 'WARNING',
+        path: 'tasks.md',
+        line: 8,
+        message: 'Task "10.7" is under group 11, but its leading number points to group 10. Move it to group 10 or renumber it.'
+      },
+      {
+        level: 'WARNING',
+        path: 'tasks.md',
+        line: 9,
+        message: 'Task "10.8" is under group 11, but its leading number points to group 10. Move it to group 10 or renumber it.'
+      },
+      {
+        level: 'WARNING',
+        path: 'tasks.md',
+        line: 11,
+        message: 'Task ID "11.1" is duplicated; it was first declared on line 10.'
+      }
+    ];
+    const payload = {
+      items: [{ id: 'add-oauth', type: 'change', valid: false, issues }],
+      summary: { totals: { items: 1, passed: 0, failed: 1 } },
+      version: '1.0'
+    };
 
     const result = await runOpenSpecVerification('add-oauth', {
       rootDir,
-      detectOpenSpec: async () => ({ ...availableCliDetection(), version: '1.8.0' }),
+      detectOpenSpec: async () => ({ ...availableCliDetection(), version: '1.9.0' }),
+      validateOpenSpecChange: async () => validationResult({
+        ok: false,
+        exitCode: 1,
+        stdout: JSON.stringify(payload),
+        json: null,
+        error: {
+          code: 'non-zero-exit',
+          message: 'OpenSpec command failed with exit code 1.'
+        }
+      }),
+      getOpenSpecStatus: async () => {
+        statusCalls += 1;
+        return statusResult();
+      }
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.shouldRunCodeVerification, false);
+    assert.equal(statusCalls, 0, 'strict validation failure must stop before status');
+    assert.ok(result.openspec.validation.args.includes('--strict'));
+    assert.deepEqual(
+      result.openspec.validation.parsedJson.items[0].issues.map(({ level, path, line, message }) => ({ level, path, line, message })),
+      issues
+    );
+    const verifySummary = await readFile(path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'verify.md'), 'utf8');
+    const gate = getLatestGateResult(verifySummary, { gate: 'verify' });
+    assert.equal(gate.ok, true);
+    assert.equal(gate.result.status, 'fail');
+    assert.ok(gate.result.blockers.some((item) => item.id === 'openspec-validation-failed'));
+  });
+
+  it('keeps the same OpenSpec 1.9 task-numbering warnings non-blocking in a non-strict upstream observation', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+    await createGeneratedRules(rootDir);
+    const warning = {
+      level: 'WARNING',
+      path: 'tasks.md',
+      line: 8,
+      message: 'Task "10.7" is under group 11, but its leading number points to group 10. Move it to group 10 or renumber it.'
+    };
+    const payload = {
+      items: [{ id: 'add-oauth', type: 'change', valid: true, issues: [warning] }],
+      summary: { totals: { items: 1, passed: 1, failed: 0 } },
+      version: '1.0'
+    };
+
+    const result = await runOpenSpecVerification('add-oauth', {
+      rootDir,
+      detectOpenSpec: async () => ({ ...availableCliDetection(), version: '1.9.0' }),
+      validateOpenSpecChange: async () => ({
+        ...validationResult({ stdout: JSON.stringify(payload), json: payload }),
+        args: ['validate', 'add-oauth', '--type', 'change', '--json', '--no-interactive', '--no-color']
+      }),
+      getOpenSpecStatus: async () => statusResult()
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.shouldRunCodeVerification, true);
+    assert.equal(result.openspec.validation.args.includes('--strict'), false);
+    assert.deepEqual(result.openspec.validation.parsedJson.items[0].issues[0], warning);
+    assert.deepEqual(result.errors, []);
+  });
+
+  it('preserves OpenSpec 1.9 scenario-loss path/message and prevents a verify false PASS', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+    const scenarioLoss = 'MODIFIED "Widget state" omits scenario(s) the current spec still has: "Edge case". Copy them into the MODIFIED block (a MODIFIED requirement replaces the whole block, so archive refuses to drop them).';
+    let statusCalls = 0;
+
+    const result = await runOpenSpecVerification('add-oauth', {
+      rootDir,
+      detectOpenSpec: async () => ({ ...availableCliDetection(), version: '1.9.0' }),
       validateOpenSpecChange: async () => validationResult({
         ok: false,
         exitCode: 1,
@@ -479,15 +577,23 @@ describe('OpenSpec verification context API', () => {
           message: 'OpenSpec command failed with exit code 1.'
         }
       }),
-      getOpenSpecStatus: async () => statusResult()
+      getOpenSpecStatus: async () => {
+        statusCalls += 1;
+        return statusResult();
+      }
     });
 
     assert.equal(result.ok, false);
     assert.equal(result.shouldRunCodeVerification, false);
+    assert.equal(statusCalls, 0, 'scenario-loss must stop before status/archive eligibility');
     assert.equal(result.openspec.validation.parsedJson.items[0].issues[0].message, scenarioLoss);
     const evidence = await readJson(path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'openspec-validation.json'));
     assert.equal(evidence.parsedJson.items[0].issues[0].path, 'widgets/spec.md');
     assert.equal(evidence.parsedJson.items[0].issues[0].message, scenarioLoss);
+    const verifySummary = await readFile(path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'verify.md'), 'utf8');
+    const gate = getLatestGateResult(verifySummary, { gate: 'verify' });
+    assert.equal(gate.ok, true);
+    assert.equal(gate.result.status, 'fail');
   });
 
   it('uses degraded missing-CLI mode unless strict config requires CLI', async () => {

@@ -98,7 +98,7 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
     assert.ok(version, `${filePath} frontmatter should declare version`);
     assert.match(version, /^['"]?\d+\.\d+\.\d+['"]?$/);
     assert.ok(
-      compareSemver(version, '0.10.0') >= 0,
+      compareSemver(version, '0.12.0') >= 0,
       `${filePath} should include the feature-level metadata bump introduced with analyze version freshness`
     );
   });
@@ -499,6 +499,22 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
     const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
     const latestReviewedVersion = metadata.sources.openspec.version;
     const combined = [skill, compatibility, usage].join('\n');
+
+    assert.equal(latestReviewedVersion, '1.9.0', 'OpenSpec analyze reviewed baseline');
+    assert.equal(metadata.sources.openspec.baselineVersion, '1.3.1');
+    assert.equal(metadata.sources.openspec.supportedRange, '>=1.3.1 <2.0.0');
+    assert.deepEqual(metadata.sources.openspec.reviewedPrereleaseVersions, ['1.6.0-beta.1']);
+    assert.equal(metadata.sources.openspec.requiresNode, '>=20.19.0');
+    assert.deepEqual(metadata.sources.openspec.reviewedStableVersions, [
+      '1.3.1',
+      '1.4.0',
+      '1.4.1',
+      '1.5.0',
+      '1.6.0',
+      '1.7.0',
+      '1.8.0',
+      '1.9.0'
+    ]);
 
     for (const expected of [
       `latestReviewedVersion: "${latestReviewedVersion}"`,
