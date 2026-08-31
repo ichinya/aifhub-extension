@@ -557,6 +557,13 @@ function assertRepowiseOptionalContextGuidance(source, label) {
 }
 
 describe('OpenSpec-native prompt asset contract', () => {
+  it('keeps archived-wide validation out of mandatory verify and done prompt paths', async () => {
+    for (const relativePath of [...VERIFY_PROMPT_ASSETS, ...DONE_PROMPT_ASSETS]) {
+      const source = await readRepoFile(relativePath);
+      assertNotIncludes(source, '--archived', `${relativePath} mandatory lifecycle contract`);
+    }
+  });
+
   it('discovers active prompt assets from extension.json only', async () => {
     const assets = await activePromptAssets();
 
