@@ -65,7 +65,7 @@ function missingCliDetection() {
     canValidate: false,
     canArchive: false,
     version: null,
-    latestReviewedVersion: '1.8.0',
+    latestReviewedVersion: '1.9.0',
     versionOutdated: null,
     command: 'openspec',
     commandSource: 'path',
@@ -86,8 +86,8 @@ function availableCliDetection(overrides = {}) {
     canValidate: true,
     canArchive: true,
     version,
-    latestReviewedVersion: '1.8.0',
-    versionOutdated: overrides.versionOutdated ?? version.localeCompare('1.8.0', 'en', { numeric: true }) < 0,
+    latestReviewedVersion: '1.9.0',
+    versionOutdated: overrides.versionOutdated ?? version.localeCompare('1.9.0', 'en', { numeric: true }) < 0,
     command: overrides.command ?? 'openspec',
     commandSource: overrides.commandSource ?? 'path',
     nodeVersion: overrides.nodeVersion ?? '20.19.0',
@@ -139,10 +139,42 @@ describe('mode status', () => {
 
     assert.equal(status.openspecCli.state, 'available');
     assert.equal(status.openspecCli.version, '1.4.0');
-    assert.equal(status.openspecCli.latestReviewedVersion, '1.8.0');
+    assert.equal(status.openspecCli.latestReviewedVersion, '1.9.0');
     assert.equal(status.openspecCli.versionOutdated, true);
     assert.equal(status.openspecCli.canValidate, true);
     assert.equal(status.openspecCli.canArchive, true);
+  });
+
+  it('preserves fresh, newer-supported and unknown reviewed-version classifications', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: openspec',
+      ''
+    ].join('\n'));
+
+    for (const expectation of [
+      { version: '1.9.0', versionOutdated: false },
+      { version: '1.9.1', versionOutdated: false }
+    ]) {
+      const status = await getModeStatus({
+        rootDir,
+        detectOpenSpec: async () => availableCliDetection(expectation)
+      });
+
+      assert.equal(status.openspecCli.version, expectation.version);
+      assert.equal(status.openspecCli.latestReviewedVersion, '1.9.0');
+      assert.equal(status.openspecCli.versionOutdated, false);
+      assert.equal(status.openspecCli.commandSource, 'path');
+    }
+
+    const missing = await getModeStatus({
+      rootDir,
+      detectOpenSpec: async () => missingCliDetection()
+    });
+    assert.equal(missing.openspecCli.version, null);
+    assert.equal(missing.openspecCli.latestReviewedVersion, '1.9.0');
+    assert.equal(missing.openspecCli.versionOutdated, null);
   });
 
   it('reports OpenSpec mode and drift fields', async () => {

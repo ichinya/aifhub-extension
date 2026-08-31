@@ -81,7 +81,7 @@ describe('detectOpenSpec', () => {
     assert.equal(result.version, '1.4.0');
     assert.equal(result.supportedRange, '>=1.3.1 <2.0.0');
     assert.equal(result.versionSupported, true);
-    assert.equal(result.latestReviewedVersion, '1.8.0');
+    assert.equal(result.latestReviewedVersion, '1.9.0');
     assert.equal(result.versionOutdated, true);
     assert.equal(result.reason, null);
   });
@@ -146,7 +146,7 @@ describe('detectOpenSpec', () => {
     assert.equal(result.reason, null);
   });
 
-  it('returns available capabilities for reviewed version 1.8.0 on supported Node', async () => {
+  it('keeps supported version 1.8.0 available but marks it older than the reviewed baseline', async () => {
     const result = await detectOpenSpec({
       executor: async () => ({ exitCode: 0, stdout: 'openspec 1.8.0\n', stderr: '' }),
       nodeVersion: '20.19.0'
@@ -158,20 +158,38 @@ describe('detectOpenSpec', () => {
     assert.equal(result.version, '1.8.0');
     assert.equal(result.supportedRange, '>=1.3.1 <2.0.0');
     assert.equal(result.versionSupported, true);
-    assert.equal(result.latestReviewedVersion, '1.8.0');
-    assert.equal(result.versionOutdated, false);
+    assert.equal(result.latestReviewedVersion, '1.9.0');
+    assert.equal(result.versionOutdated, true);
     assert.equal(result.reason, null);
   });
 
-  it('does not mark a newer supported version as outdated or recommend a downgrade signal', async () => {
+  it('returns fresh capabilities for reviewed version 1.9.0 on supported Node', async () => {
     const result = await detectOpenSpec({
       executor: async () => ({ exitCode: 0, stdout: 'openspec 1.9.0\n', stderr: '' }),
       nodeVersion: '20.19.0'
     });
 
     assert.equal(result.available, true);
+    assert.equal(result.canValidate, true);
+    assert.equal(result.canArchive, true);
+    assert.equal(result.version, '1.9.0');
+    assert.equal(result.supportedRange, '>=1.3.1 <2.0.0');
     assert.equal(result.versionSupported, true);
-    assert.equal(result.latestReviewedVersion, '1.8.0');
+    assert.equal(result.latestReviewedVersion, '1.9.0');
+    assert.equal(result.versionOutdated, false);
+    assert.equal(result.reason, null);
+  });
+
+  it('does not mark a newer supported version as outdated or recommend a downgrade signal', async () => {
+    const result = await detectOpenSpec({
+      executor: async () => ({ exitCode: 0, stdout: 'openspec 1.9.1\n', stderr: '' }),
+      nodeVersion: '20.19.0'
+    });
+
+    assert.equal(result.available, true);
+    assert.equal(result.version, '1.9.1');
+    assert.equal(result.versionSupported, true);
+    assert.equal(result.latestReviewedVersion, '1.9.0');
     assert.equal(result.versionOutdated, false);
     assert.equal(result.reason, null);
   });
@@ -189,7 +207,7 @@ describe('detectOpenSpec', () => {
     assert.equal(result.canArchive, false);
     assert.equal(result.version, null);
     assert.equal(result.versionSupported, false);
-    assert.equal(result.latestReviewedVersion, '1.8.0');
+    assert.equal(result.latestReviewedVersion, '1.9.0');
     assert.equal(result.versionOutdated, null);
     assert.equal(result.nodeSupported, true);
     assert.equal(result.reason, 'missing-cli');
@@ -212,7 +230,7 @@ describe('detectOpenSpec', () => {
     assert.equal(result.canArchive, false);
     assert.equal(result.version, '1.2.0');
     assert.equal(result.versionSupported, false);
-    assert.equal(result.latestReviewedVersion, '1.8.0');
+    assert.equal(result.latestReviewedVersion, '1.9.0');
     assert.equal(result.versionOutdated, null);
     assert.equal(result.nodeSupported, true);
     assert.equal(result.reason, 'unsupported-version');
@@ -728,6 +746,7 @@ describe('OpenSpec command wrappers', () => {
       '--no-interactive',
       '--no-color'
     ]);
+    assert.equal(calls[0].args.includes('--archived'), false, 'shared validation argv must remain current-change scoped');
     assert.deepEqual(result.json, { valid: true });
   });
 
