@@ -597,8 +597,10 @@ OpenSpec-native planning includes task intake normalization inside `/aif-plan fu
 
 - `proposal.md`: intent, scope, non-goals, approach, assumptions, risks, and open questions
 - `design.md`: technical approach, C4 impact, ADR candidates, dependency graph, integration points, alternatives, and risks
-- `tasks.md`: executable implementation checklist
+- `tasks.md`: executable implementation checklist; every task states its completion verification inline as a test, command, observable behavior, or delivered artifact, with separate verification tasks reserved for broader cross-task integration or system behavior
 - `specs/**/spec.md`: behavior-changing requirements and scenarios
+
+When `/aif-improve` encounters a legacy `tasks.md` without inline verification, it applies a bounded checklist migration to each affected checkbox. Only the missing verification clause is appended; task numbers, checked/unchecked states, order, original actions and intent are preserved, and already compliant unrelated checkboxes remain unchanged.
 
 When the request explicitly links an issue, milestone, or roadmap item, `proposal.md` also records the standardized `## Roadmap Linkage` section:
 

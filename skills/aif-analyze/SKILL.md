@@ -423,7 +423,7 @@ openspec:
   canArchive: boolean
   version: string | null
   supportedRange: ">=1.3.1 <2.0.0"
-  latestReviewedVersion: "1.9.0"
+  latestReviewedVersion: "1.10.0"
   versionOutdated: boolean | null
   requiresNode: ">=20.19.0"
   nodeSupported: boolean
