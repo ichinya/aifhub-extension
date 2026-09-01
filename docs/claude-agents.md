@@ -93,6 +93,8 @@ Run after code changes and before verification starts:
 
 All sidecars are read-only and end with final `aif-gate-result`.
 
+Before delegation, parent `/aif-review` loads `reviews.policy_file` (`REVIEW.md` by default) through `ai-factory aifhub-review-policy load --json`. Because `aifhub-review-sidecar` deliberately has no shell tool, it consumes only that complete ephemeral canonical, identity-bound `present` snapshot and never reopens the config-selected path. Symlink/junction escapes and managed/protected artifact collisions are skipped. Missing policy is non-blocking, and session comments or resolution state are never written back to it.
+
 ### Verification and fix loop
 
 - `aifhub-verifier`

@@ -575,7 +575,7 @@ describe('mode status', () => {
 });
 
 describe('mode switching', () => {
-  it('renders fresh 2.19 warmup defaults and the optional glossary without creating context files', async () => {
+  it('renders fresh 2.19 warmup, glossary, and review-policy settings without creating optional context files', async () => {
     const rootDir = await createTempRoot();
 
     const openSpecResult = await switchToOpenSpecMode({
@@ -596,6 +596,12 @@ describe('mode switching', () => {
       false,
       'OpenSpec profile should not create the optional glossary file'
     );
+    assert.match(openSpecConfig, /^reviews:\n  policy_file: REVIEW\.md$/m);
+    assert.equal(
+      await pathExists(rootDir, 'REVIEW.md'),
+      false,
+      'OpenSpec mode switch should not create the review policy file'
+    );
     assert.match(
       openSpecConfig,
       /^warmup:\n  paths: \[\]$/m,
@@ -607,9 +613,9 @@ describe('mode switching', () => {
       detectOpenSpec: async () => missingCliDetection()
     });
     assert.equal(
-      doctor.diagnostics.some((diagnostic) => /CONTEXT\.md|paths\.context/.test(diagnostic.message)),
+      doctor.diagnostics.some((diagnostic) => /CONTEXT\.md|paths\.context|REVIEW\.md|reviews\.policy_file/.test(diagnostic.message)),
       false,
-      'Mode doctor should not inspect the optional glossary file'
+      'Mode doctor should not inspect the optional glossary or review policy file'
     );
 
     const legacyResult = await switchToAiFactoryMode({
@@ -628,6 +634,12 @@ describe('mode switching', () => {
       await pathExists(rootDir, 'CONTEXT.md'),
       false,
       'Legacy profile should not create the optional glossary file'
+    );
+    assert.match(legacyConfig, /^reviews:\n  policy_file: REVIEW\.md$/m);
+    assert.equal(
+      await pathExists(rootDir, 'REVIEW.md'),
+      false,
+      'Legacy mode switch should not create the review policy file'
     );
     assert.match(
       legacyConfig,
@@ -695,6 +707,8 @@ describe('mode switching', () => {
       '  plans: .ai-factory/plans',
       '  specs: .ai-factory/specs',
       '  rules: .ai-factory/rules',
+      'reviews:',
+      '  policy_file: docs/review-guidelines.md',
       ''
     ].join('\n'));
 
@@ -707,6 +721,11 @@ describe('mode switching', () => {
       await readFixture(rootDir, '.ai-factory/config.yaml'),
       /^  context: docs\/project-glossary\.md$/m,
       'OpenSpec profile should preserve custom paths.context'
+    );
+    assert.match(
+      await readFixture(rootDir, '.ai-factory/config.yaml'),
+      /^  policy_file: docs\/review-guidelines\.md$/m,
+      'OpenSpec profile should preserve custom reviews.policy_file'
     );
 
     await switchToAiFactoryMode({
@@ -722,6 +741,16 @@ describe('mode switching', () => {
       await pathExists(rootDir, 'docs/project-glossary.md'),
       false,
       'Mode switching should not create a custom optional glossary file'
+    );
+    assert.match(
+      await readFixture(rootDir, '.ai-factory/config.yaml'),
+      /^  policy_file: docs\/review-guidelines\.md$/m,
+      'Legacy profile should preserve custom reviews.policy_file'
+    );
+    assert.equal(
+      await pathExists(rootDir, 'docs/review-guidelines.md'),
+      false,
+      'Mode switching should not create a custom review policy file'
     );
   });
 
