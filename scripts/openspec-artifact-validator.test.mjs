@@ -218,6 +218,10 @@ describe('OpenSpec artifact contract validator', () => {
     });
     assert.equal(mismatch.status, 'fail');
     assert.equal(getCheck(mismatch, 'issue-source-binding').details.rule_code, 'source-binding-change-id-mismatch');
+    assert.deepEqual(mismatch.suggested_next, {
+      command: '/aif-fix eng-431-fix-login-timeout',
+      reason: 'repair the malformed or mismatched AIFHub source binding before continuing'
+    });
 
     const ordinaryNumericRoot = await createTempRoot();
     await createValidChange(ordinaryNumericRoot, '156');

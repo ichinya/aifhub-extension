@@ -1350,7 +1350,9 @@ describe('complete OpenSpec workflow documentation contract', () => {
       '`156-fix-login`',
       '`eng-431-fix-login`',
       'persist provider, full primary source, external ID, and creation branch separately',
-      'resolver checks that binding before slug matching',
+      'resolver checks one exact binding before slug matching',
+      'current pointer to disambiguate several plans intentionally created on the same branch',
+      'contains unrelated malformed bindings to warnings',
       'Ambiguous multi-item input keeps ordinary allocation',
       'collisions fail closed'
     ]) {
@@ -1374,8 +1376,10 @@ describe('complete OpenSpec workflow documentation contract', () => {
       'source_binding.primary_source',
       'source_binding.external_id',
       'source_binding.branch',
-      'binding is checked before ordinary slug branch variants',
-      'complete derived change ID to the current-change pointer',
+      'one exact binding is checked before ordinary slug branch variants',
+      'complete resolved change ID to the current-change pointer',
+      'pointer selects one of the exact candidates',
+      'unrelated invalid binding becomes a warning',
       'roadmap-list membership and external-ID equality are insufficient'
     ]) {
       assertIncludes(planUsage, expected, 'docs/usage.md MCP work-item plan identity');
@@ -1388,7 +1392,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
       '`0042_PROJ-77-refresh-token`',
       '`source-plan-id-collision`',
       '`HANDOFF_BRANCH_PREPARED=1` retains upstream precedence',
-      'exact `## AIFHub Source Binding` with `Provider`, `Primary source`, `External ID`, and `Branch`',
+      'source-bound proposal persists one exact `## AIFHub Source Binding` with `Provider`, `Primary source`, `External ID`, and `Branch`',
       'secondary links and equal external IDs never satisfy a collision check',
       'source_binding.primary_source',
       'source_binding.external_id',
@@ -1399,15 +1403,18 @@ describe('complete OpenSpec workflow documentation contract', () => {
     }
 
     for (const expected of [
-      'Current git branch matched to an exact persisted `## AIFHub Source Binding`',
+      'Current git branch matched to one exact persisted `## AIFHub Source Binding`',
       '`source-binding-change-id-mismatch`',
       '`ambiguous-branch-binding`',
+      '`ambiguous-branch-binding-disambiguated`',
       '`parseWorkItemSourceBinding()`',
+      '`parseSynchronizedWorkItemSourceBinding()`',
       '`matchesPrimarySourceBinding()`',
       '`deriveSourceBoundChangeId()`',
       'another repository, tenant, or provider never matches by key alone',
       'source `branch-binding` before ordinary slug matching',
-      'do not fall through to an older slug change or current pointer'
+      'may disambiguate only by naming one of those candidates',
+      'one unrelated artifact cannot block every command in the repository'
     ]) {
       assertIncludes(resolver, expected, 'docs/active-change-resolver.md source binding');
     }

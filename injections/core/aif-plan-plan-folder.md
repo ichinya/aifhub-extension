@@ -59,7 +59,7 @@ When the work-item identity resolves, persist it separately from the many-valued
 - In OpenSpec-native mode, write the exact section once in `proposal.md`. In legacy classic mode, write it once in the parent `.md` entrypoint and synchronize the same values to `status.yaml` as exact double-quoted scalars under `source_binding.provider`, `source_binding.primary_source`, `source_binding.external_id`, and `source_binding.branch`. For an upstream-owned marked ultra bundle, persist the Markdown section once in `index.md` and do not create a companion `status.yaml`.
 - `Primary source` is the single canonical collision identity. `Provider` and `External ID` make it readable, but neither may authorize reuse by itself. The `Issues` list in `## Roadmap Linkage` remains lifecycle linkage and MUST NOT establish or replace the primary binding, even when it contains the same external ID from another provider, tenant, or repository.
 - Treat `Provider`, `Primary source`, and `External ID` as immutable. Preserve `Branch` during ordinary refinement; change it only for an explicit branch-rebind request that keeps the same primary source and passes the same collision checks.
-- Use `parseWorkItemSourceBinding()`, `parseLegacyWorkItemSourceBinding()`, `matchesPrimarySourceBinding()`, and `deriveSourceBoundChangeId()` from `scripts/active-change-resolver.mjs` when creating or inspecting artifacts. Missing, duplicate, malformed, mismatched, or differently bound metadata fails closed.
+- Use `parseWorkItemSourceBinding()`, `parseLegacyWorkItemSourceBinding()`, `parseSynchronizedWorkItemSourceBinding()`, `matchesPrimarySourceBinding()`, and `deriveSourceBoundChangeId()` from `scripts/active-change-resolver.mjs` when creating or inspecting artifacts. Missing, duplicate, malformed, mismatched, unsynchronized, or differently bound metadata fails closed for creation, refinement, and direct validation.
 
 Apply the resolved work-item identity by artifact mode:
 
@@ -75,7 +75,7 @@ Collision handling is fail-closed and source-aware:
 - In legacy mode, reuse an occupied plan identifier only when its Markdown entrypoint and, for classic plans, companion `status.yaml` contain valid synchronized bindings with the exact same `Primary source`. Any unbound, differently bound, unsynchronized, or differently shaped occupant stops with `ERROR [aif-plan] source-plan-id-collision external-id=<bounded-id> identifier=<bounded-plan-id>`.
 - Never overwrite, allocate a suffix, or silently drop the external-ID prefix after a source-bound collision. The request slug is the readable disambiguator; the persisted full primary source protects the remaining cross-provider and cross-tenant collision case. Diagnostics may include only bounded provider, external ID, project-relative path or identifier, mode, and stable code.
 
-After a new source-bound OpenSpec change has been written successfully, call `writeCurrentChangePointer(<derived-change-id>)` from `scripts/active-change-resolver.mjs`. Do not advance the pointer before all canonical artifacts and the exact source binding pass local shape checks, and do not advance it on any collision or failed write. The persisted exact branch binding remains higher-precedence than ordinary slug branch matching; the pointer is the deterministic fallback when `Branch` is `none` or no branch mapping applies.
+After a source-bound OpenSpec change has been created or successfully refined, call `writeCurrentChangePointer(<resolved-change-id>)` from `scripts/active-change-resolver.mjs`. Do not advance the pointer before all canonical artifacts and the exact source binding pass local shape checks, and do not advance it on any collision or failed write. One exact persisted branch binding remains higher-precedence than ordinary slug branch matching. When several active source-bound changes intentionally share the same creation branch, the pointer written by the latest successful `/aif-plan` disambiguates them; without a pointer to one of those exact candidates, resolution fails with `ambiguous-branch-binding`. The pointer is also the deterministic fallback when `Branch` is `none` or no branch mapping applies.
 
 On success, emit `INFO [aif-plan] source-bound plan identity: provider=<provider> external-id=<bounded-id> artifact=<project-relative-path>`.
 
@@ -232,13 +232,6 @@ Context7 is optional supporting documentation context for current library/API do
 
 <verbatim explicit request; omit for research-only planning>
 
-## AIFHub Source Binding
-
-- Provider: <canonical lowercase provider or MCP server identifier>
-- Primary source: <canonical HTTPS work-item URL or stable MCP resource URI>
-- External ID: <provider's human-readable work-item key>
-- Branch: <exact current git branch|none>
-
 ## Roadmap Linkage
 
 - Issues: <comma-separated canonical HTTPS work-item URL(s) or stable MCP resource URI(s)|none>
@@ -274,6 +267,17 @@ Affected code, APIs, dependencies, systems, assumptions, risks, and open questio
 Source: <exact selected RESEARCH.md source> (Active Summary, Updated: <timestamp>, SHA256: <digest>)
 
 <committed relevant Active Summary; omit when research did not shape the plan>
+```
+
+For source-bound proposals only, insert this exact block immediately after `## Original Request` and before `## Roadmap Linkage`. For every ordinary plan, omit the complete heading and body; never emit placeholders, `none`, or an example binding.
+
+```markdown
+## AIFHub Source Binding
+
+- Provider: <canonical lowercase provider or MCP server identifier>
+- Primary source: <canonical HTTPS work-item URL or stable MCP resource URI>
+- External ID: <provider's human-readable work-item key>
+- Branch: <exact current git branch|none>
 ```
 
 The source-template proposal headings are exact and case-sensitive: `## Why`, `## What Changes`, `## Capabilities`, `### New Capabilities`, `### Modified Capabilities`, and `## Impact`. Do not translate, rename, or replace them with older `Intent`, `Scope`, or `Approach` headings. AIFHub-owned `## Original Request`, conditional `## AIFHub Source Binding`, `## Roadmap Linkage`, and conditional `## Research Context` are additions; they do not replace the source headings.
@@ -393,7 +397,7 @@ This mode is legacy AI Factory-only mode. The companion rules below apply only t
 Treat the plan file as the parent-compatible summary artifact and the folder as the structured execution/state artifact set.
 The companion plan file may remain plain upstream markdown; the shared YAML frontmatter contract applies to the plan-folder markdown artifacts, not to the parent-compatible plan file.
 
-For a source-bound classic plan, persist the exact Markdown source-binding section in `.ai-factory/plans/<plan-id>.md` and keep this exact mapping synchronized in `.ai-factory/plans/<plan-id>/status.yaml`:
+For a source-bound classic plan, persist the exact Markdown source-binding section in `.ai-factory/plans/<plan-id>.md` and keep this exact mapping synchronized in `.ai-factory/plans/<plan-id>/status.yaml`. Create or explicitly rebind the Markdown and YAML values as one logical update, then require `parseSynchronizedWorkItemSourceBinding(markdown, status)` to pass before reporting success:
 
 ```yaml
 source_binding:

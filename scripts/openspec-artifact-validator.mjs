@@ -862,6 +862,13 @@ function createCheck({ id, status, path: checkPath, message, details }) {
 function chooseSuggestedNext(changeId, checks) {
   const failing = checks.find((check) => check.status === 'fail');
 
+  if (failing?.id === 'issue-source-binding') {
+    return {
+      command: `/aif-fix ${changeId}`,
+      reason: 'repair the malformed or mismatched AIFHub source binding before continuing'
+    };
+  }
+
   if (failing?.id === 'generated-rules-current') {
     return {
       command: `/aif-mode sync --change ${changeId}`,

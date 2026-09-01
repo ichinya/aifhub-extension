@@ -215,8 +215,8 @@ describe('aif-plan OpenSpec-native planning contract', () => {
       'keep the required four-digit compatibility prefix',
       '`0042_PROJ-77-refresh-token`',
       '`HANDOFF_BRANCH_PREPARED=1` retains upstream precedence and disables the legacy sequential prefix',
-      'writeCurrentChangePointer(<derived-change-id>)',
-      'persisted exact branch binding remains higher-precedence than ordinary slug branch matching'
+      'writeCurrentChangePointer(<resolved-change-id>)',
+      'One exact persisted branch binding remains higher-precedence than ordinary slug branch matching'
     ]) {
       assertIncludes(identity, expected, 'aif-plan source-bound mode mapping');
     }
@@ -326,8 +326,20 @@ describe('aif-plan OpenSpec-native planning contract', () => {
     }
     assertOrder(
       proposalTemplate,
-      ['## Original Request', '## AIFHub Source Binding', '## Roadmap Linkage', '## Why', '## What Changes', '## Capabilities', '## Impact'],
+      ['## Original Request', '## Roadmap Linkage', '## Why', '## What Changes', '## Capabilities', '## Impact'],
       'OpenSpec proposal template'
+    );
+    assertNotIncludes(proposalTemplate, '## AIFHub Source Binding', 'universal OpenSpec proposal template');
+
+    const conditionalBinding = extractFencedBlockAfter(
+      openspec,
+      'For source-bound proposals only, insert this exact block'
+    );
+    assertIncludes(conditionalBinding, '## AIFHub Source Binding', 'conditional source-binding template');
+    assertIncludes(
+      openspec,
+      'For every ordinary plan, omit the complete heading and body',
+      'conditional source-binding template'
     );
   });
 
@@ -342,6 +354,7 @@ describe('aif-plan OpenSpec-native planning contract', () => {
       '`Issues` list in `## Roadmap Linkage` remains lifecycle linkage',
       '`parseWorkItemSourceBinding()`',
       '`parseLegacyWorkItemSourceBinding()`',
+      '`parseSynchronizedWorkItemSourceBinding()`',
       '`matchesPrimarySourceBinding()`',
       'source_binding.provider',
       'source_binding.primary_source',
@@ -465,7 +478,7 @@ describe('aif-plan OpenSpec-native planning contract', () => {
     const proposalTemplate = extractFencedBlockAfter(openspec, '`proposal.md` should use:');
     assertOrder(
       proposalTemplate,
-      ['## Original Request', '## AIFHub Source Binding', '## Roadmap Linkage', '## Why'],
+      ['## Original Request', '## Roadmap Linkage', '## Why'],
       `${label} proposal ordering`
     );
 

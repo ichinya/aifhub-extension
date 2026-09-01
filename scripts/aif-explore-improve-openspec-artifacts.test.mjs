@@ -485,6 +485,8 @@ describe('aif-explore and aif-improve OpenSpec-native contracts', () => {
       'Preserve its complete heading and body byte-for-byte during ordinary refinement',
       '`Provider`, `Primary source`, and `External ID` are immutable',
       '`Branch` may change only for an explicit branch-rebind request',
+      'update the Markdown entrypoint and `status.yaml.source_binding.branch` as one logical rebind',
+      '`parseSynchronizedWorkItemSourceBinding(markdown, status)`',
       'existing `## Research Context` body and `Source` revision metadata as the committed requirements snapshot',
       'unless the user explicitly requests a research rebase',
       'WARN [research-drift]',
