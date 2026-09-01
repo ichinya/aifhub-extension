@@ -1412,6 +1412,31 @@ describe('OpenSpec-native prompt asset contract', () => {
     }
   });
 
+  it('requires OpenSpec 1.10 inline completion verification in plan and improve task authoring', async () => {
+    for (const relativePath of [
+      'injections/core/aif-plan-plan-folder.md',
+      'injections/core/aif-improve-plan-folder.md'
+    ]) {
+      const asset = await readRepoFile(relativePath);
+
+      assertIncludes(
+        asset,
+        'test, command, observable behavior, or delivered artifact',
+        `${relativePath} inline task verification contract`
+      );
+      assert.match(
+        asset,
+        /every task checkbox.*(?:completion|verified)|every checkbox.*completion.*verified/i,
+        `${relativePath} should apply the rule to every task checkbox`
+      );
+      assert.match(
+        asset,
+        /separate verification task only.*broader integration or system behavior/i,
+        `${relativePath} should reserve standalone verification tasks for cross-task checks`
+      );
+    }
+  });
+
   it('keeps verify prompt wording aligned with done-owned archive finalization', async () => {
     const asset = stripFencedBlocks(await readRepoFile('injections/core/aif-verify-plan-folder.md'));
 

@@ -75,7 +75,7 @@ When refining an OpenSpec-native change, audit normalized task quality across th
 
 - `proposal.md` for intent, scope, non-goals, assumptions, risks, and open questions
 - `design.md` for C4 impact, ADR candidates, dependency notes, integration points, alternatives, and risks
-- `tasks.md` for an executable checklist
+- `tasks.md` for an executable checklist whose task descriptions state how completion is verified
 - `specs/**/spec.md` for behavior deltas
 
 Classify open questions as `blocker`, `warn`, or `info` when useful, without requiring classification in trivial changes or forcing a specific table format.
@@ -94,6 +94,7 @@ Preservation rules:
 - On an explicit research rebase, copy the selected current Active Summary, recompute the stable digest, update the `Source` path plus `Updated` and `SHA256` metadata, and report that committed scope changed.
 - Preserve user-written sections unless they are explicitly obsolete or contradict the refined requirement.
 - Prefer patch-style edits over whole-file regeneration.
+- In `tasks.md`, require every task checkbox to state its completion verification inline through a test, command, observable behavior, or delivered artifact. Keep a separate verification task only when it checks broader integration or system behavior spanning multiple implementation tasks.
 - If an artifact is missing, create only missing artifacts needed by the requested refinement.
 - When a delta spec exists, update the relevant requirement in an existing delta spec instead of regenerating the whole file.
 - Keep unrelated requirements, scenarios, task checkboxes, and design notes intact.

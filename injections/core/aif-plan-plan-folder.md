@@ -242,17 +242,20 @@ The source-template proposal headings are exact and case-sensitive: `## Why`, `#
 
 `tasks.md` must be a checkbox checklist:
 
+- Every task checkbox MUST state how completion will be verified: a test, command, observable behavior, or delivered artifact.
+- Keep that verification in the task description. Use a separate verification task only for broader integration or system behavior that spans multiple implementation tasks.
+
 ```markdown
 # Tasks
 
 ## 1. Planning and artifacts
 
-- [ ] 1.1 Create/update OpenSpec delta specs
-- [ ] 1.2 Confirm generated artifacts validate
+- [ ] 1.1 Create/update OpenSpec delta specs and verify strict validation accepts every changed requirement
+- [ ] 1.2 Confirm generated artifacts validate by running the configured OpenSpec validation command
 
 ## 2. Implementation
 
-- [ ] 2.1 ...
+- [ ] 2.1 Implement the scoped behavior and verify the focused regression passes
 ```
 
 Delta specs must use OpenSpec requirement sections:

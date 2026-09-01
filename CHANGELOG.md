@@ -7,13 +7,16 @@
 ## [В разработке]
 
 ### Добавлено
+- Exact-tagged OpenSpec `1.10.0` compatibility evidence с независимыми Git source custody (`v1.10.0`, commit `1ebddd17f40dde15dfd28289e4493c3cf05ee9df`, compare `v1.9.0...v1.10.0`) и checksum-verified npm executable custody (`@fission-ai/openspec@1.10.0`, integrity, shasum, bin, lifecycle scripts, dependencies и Node engine `>=20.19.0`). Локальный exact-package smoke не заявляется как CI, deployment или production evidence.
+- Bounded OpenSpec `1.10.0` CLI matrix для version detection, strict validate, status, show, apply/archive/specs instructions, open JSON envelopes, Store-root resolution, no-spec schema `skip_specs`, stderr-only telemetry notice и blocked-retirement archive no-mutation.
 - Exact-tagged OpenSpec `1.9.0` compatibility evidence с независимыми Git source custody (`v1.9.0`, commit `2826b8889e5223a9a8095d4428b60b56597e1020`, compare `v1.8.0...v1.9.0`) и npm executable custody (`@fission-ai/openspec@1.9.0`, integrity, shasum, bin и Node engine `>=20.19.0`). Локальный extracted-package smoke не заявляется как CI, deployment или production evidence.
 - Deterministic regressions для strict/non-strict task numbering, arbitrary nested scenario loss, rootless list/bulk/schemas behavior, invalid archive no-mutation и archive serialization с preserved blank lines и ровно одним final newline.
 - Negative repository contract, удерживающий `openspec validate --archived` вне package scripts, tracked CI, shared runner argv, `/aif-verify`, `/aif-done` и release acceptance PASS boolean.
 
 ### Изменено
-- Reviewed OpenSpec baseline обновлён с `1.8.0` до `1.9.0` при неизменных baseline `1.3.1`, stable range `>=1.3.1 <2.0.0`, prerelease ledger `1.6.0-beta.1` и Node requirement `>=20.19.0`; `/aif-analyze` продолжает только source-aware non-blocking update guidance без automatic install/update/downgrade.
-- Command Code, schema fork/update, skill/agent/tool generation, Stores/workspace behavior и package management остаются upstream-owned. OpenSpec `1.10`/`1.11` не входят в review или compatibility claims этого checkpoint.
+- Reviewed OpenSpec baseline последовательно обновлён с `1.8.0` через `1.9.0` до `1.10.0` при неизменных baseline `1.3.1`, stable range `>=1.3.1 <2.0.0`, prerelease ledger `1.6.0-beta.1` и Node requirement `>=20.19.0`; `/aif-analyze` продолжает только source-aware non-blocking update guidance без automatic install/update/downgrade.
+- OpenSpec-native `/aif-plan` и `/aif-improve` теперь требуют inline completion verification в каждом task checkbox; отдельная verification task допустима только для broader integration/system checks, охватывающих несколько implementation tasks.
+- Zed, `init --language`, Store selection, profiles, schema generation, OpenCode assets, completion/update behavior и package management остаются upstream-owned. OpenSpec `1.11.0` не входит в review или compatibility claims этого checkpoint.
 - Archived-wide validation документирована как отдельное advisory observation: historical incomplete archives не исправляются, а advisory exit не влияет на обязательный PASS.
 
 ### Исправлено

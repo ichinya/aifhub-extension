@@ -1088,7 +1088,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
     );
   });
 
-  it('documents the exact-tagged OpenSpec 1.9.0 baseline, custody and advisory archive boundary', async () => {
+  it('documents the exact-tagged OpenSpec 1.10.0 baseline, custody and adapter boundary', async () => {
     const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
     const readme = await readRepoFile('README.md');
     const compatibility = await readRepoFile('docs/openspec-compatibility.md');
@@ -1099,13 +1099,13 @@ describe('complete OpenSpec workflow documentation contract', () => {
     const combinedDocs = [readme, compatibility, validation, docsIndex, changelog].join('\n');
     const readmeCompatibility = extractSection(readme, '## OpenSpec Compatibility');
 
-    assert.equal(openspec.version, '1.9.0');
+    assert.equal(openspec.version, '1.10.0');
     assert.equal(openspec.baselineVersion, '1.3.1');
     assert.equal(openspec.supportedRange, '>=1.3.1 <2.0.0');
-    assert.deepEqual(openspec.reviewedStableVersions, ['1.3.1', '1.4.0', '1.4.1', '1.5.0', '1.6.0', '1.7.0', '1.8.0', '1.9.0']);
+    assert.deepEqual(openspec.reviewedStableVersions, ['1.3.1', '1.4.0', '1.4.1', '1.5.0', '1.6.0', '1.7.0', '1.8.0', '1.9.0', '1.10.0']);
     assert.deepEqual(openspec.reviewedPrereleaseVersions, ['1.6.0-beta.1']);
-    assert.equal(openspec.lastSync, '2026-08-31');
-    assertIncludes(openspec.notes, 'upstream OpenSpec 1.3.1 through 1.9.0', 'aifhub-extension.json');
+    assert.equal(openspec.lastSync, '2026-09-01');
+    assertIncludes(openspec.notes, 'upstream OpenSpec 1.3.1 through 1.10.0', 'aifhub-extension.json');
     assertIncludes(openspec.notes, 'adapter-only', 'aifhub-extension.json');
 
     assertIncludes(
@@ -1113,26 +1113,39 @@ describe('complete OpenSpec workflow documentation contract', () => {
       `The reviewed OpenSpec baseline is OpenSpec \`${openspec.version}\``,
       'README.md OpenSpec Compatibility reviewed baseline'
     );
-    assertIncludes(docsIndex, 'OpenSpec 1.9.0', 'docs/README.md');
+    assertIncludes(docsIndex, 'OpenSpec 1.10.0', 'docs/README.md');
 
     for (const expected of [
-      'OpenSpec 1.9.0 Reviewed Baseline',
-      'Exact 1.9.0 Custody and Evidence Boundary',
+      'OpenSpec 1.10.0 Reviewed Baseline',
+      'Exact 1.10.0 Custody and Evidence Boundary',
+      'Exact 1.10.0 CLI Matrix',
+      '1.10.0 Source Classification',
       'Git source custody',
       'npm executable custody',
-      'official tag [`v1.9.0`]',
-      '`2826b8889e5223a9a8095d4428b60b56597e1020`',
-      '`@fission-ai/openspec@1.9.0`',
-      '`sha512-yKV8mFz+J5+epLugvcSt7B+mBkkCSycOB6euLJmW6JL+2jhL+Um0JZ6zuGIdXcbsd3jU2+YQfeDz2EVwft++LA==`',
-      '`98f27aea1d95b7472790d4e27acc8669fcba4fc6`',
-      '`openspec: bin/openspec.js`',
+      'official tag [`v1.10.0`]',
+      '`1ebddd17f40dde15dfd28289e4493c3cf05ee9df`',
+      '`@fission-ai/openspec@1.10.0`',
+      '`sha512-fuL3Rz7Jv+NnHeUM1XkbaXFo4bUdPttOWOC66/6SyfJr9rPOvGE47oBp+8XdDtPiiWZawa0Z9RDzGasetFu2eQ==`',
+      '`a29f5a69038df6ab1f7be3d36645c866279f0245`',
+      '`openspec: ./bin/openspec.js`',
       'Node engine `>=20.19.0`',
+      'no `preinstall`, `install`, or `postinstall` lifecycle script',
+      '`@inquirer/core`',
+      '`@inquirer/prompts`',
       'local exact-package compatibility evidence',
       'does not constitute CI verification, deployment verification, or production verification',
-      '25 commits and 97 changed files',
+      '18 commits and 78 changed files',
       '`adapter-change-required`',
       '`regression-or-no-op`',
       '`upstream-owned`',
+      '`planningHome.root`',
+      'schema without a specs artifact',
+      'stderr-only telemetry',
+      'inline completion verification',
+      'test, command, observable behavior, or delivered artifact',
+      'Zed',
+      '`init --language`',
+      'OpenSpec `1.11.0` was not reviewed',
       'strict task-numbering',
       'Non-strict validation',
       '`widgets/spec.md`',
@@ -1142,7 +1155,6 @@ describe('complete OpenSpec workflow documentation contract', () => {
       'Archived-wide Validation Is Advisory',
       '`openspec validate --archived`',
       'release acceptance PASS boolean',
-      'OpenSpec `1.10` and `1.11` were not reviewed',
       '## [В разработке]',
       'OpenSpec `1.8.0`',
       'Baseline `1.3.1`',
@@ -1188,7 +1200,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
       '`openspec update` is upstream OpenSpec behavior',
       '`/aif-mode sync` compiles AIFHub generated rules'
     ]) {
-      assertIncludes(combinedDocs, expected, 'OpenSpec 1.9.0 docs baseline');
+      assertIncludes(combinedDocs, expected, 'OpenSpec 1.10.0 docs baseline');
     }
 
     for (const forbiddenClaim of [
@@ -1199,7 +1211,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
       'AIFHub owns workspace beta state',
       'AIFHub runs openspec update'
     ]) {
-      assertNotIncludes(combinedDocs, forbiddenClaim, 'OpenSpec 1.9.0 docs ownership boundaries');
+      assertNotIncludes(combinedDocs, forbiddenClaim, 'OpenSpec 1.10.0 docs ownership boundaries');
     }
   });
 
