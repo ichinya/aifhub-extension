@@ -271,6 +271,32 @@ describe('OpenSpec artifact contract validator', () => {
     assert.match(getCheck(result, 'delta-specs-present').message, /skip_specs: true/);
   });
 
+  it('accepts OpenSpec 1.10 no-spec schema scaffolding through native skip_specs metadata', async () => {
+    const rootDir = await createTempRoot();
+    await createValidChange(rootDir);
+    await rm(path.join(rootDir, 'openspec', 'changes', 'add-oauth', 'specs'), {
+      recursive: true,
+      force: true
+    });
+    await writeFixture(rootDir, 'openspec/changes/add-oauth/.openspec.yaml', [
+      'schema: no-specs',
+      'created: 2026-09-01',
+      'skip_specs: true',
+      ''
+    ].join('\n'));
+
+    const result = await validateOpenSpecArtifactContract({
+      rootDir,
+      changeId: 'add-oauth'
+    });
+
+    assert.notEqual(result.status, 'fail');
+    assert.equal(result.blocking, false);
+    assert.equal(getCheck(result, 'delta-specs-present').status, 'pass');
+    assert.equal(getCheck(result, 'delta-specs-present').path, 'openspec/changes/add-oauth/.openspec.yaml');
+    assert.match(getCheck(result, 'delta-specs-present').message, /native skip_specs: true/);
+  });
+
   it('fails closed when native skip_specs metadata is not boolean', async () => {
     const rootDir = await createTempRoot();
     await createValidChange(rootDir);

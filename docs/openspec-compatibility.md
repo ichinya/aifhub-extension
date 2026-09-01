@@ -26,12 +26,12 @@ AI Factory = execution runtime
 
 AI Factory-only workflows follow AI Factory's runtime support. OpenSpec validation/archive follows the OpenSpec CLI runtime requirement.
 
-## OpenSpec 1.9.0 Reviewed Baseline
+## OpenSpec 1.10.0 Reviewed Baseline
 
-AIFHub metadata records OpenSpec `1.9.0` as the latest reviewed upstream baseline while keeping the supported stable CLI range `>=1.3.1 <2.0.0`.
+AIFHub metadata records OpenSpec `1.10.0` as the latest reviewed upstream baseline while keeping the supported stable CLI range `>=1.3.1 <2.0.0`.
 
 - Baseline `1.3.1` is the first supported and reviewed release.
-- Reviewed stable releases: `1.3.1`, `1.4.0`, `1.4.1`, `1.5.0`, `1.6.0`, `1.7.0`, `1.8.0`, `1.9.0`.
+- Reviewed stable releases: `1.3.1`, `1.4.0`, `1.4.1`, `1.5.0`, `1.6.0`, `1.7.0`, `1.8.0`, `1.9.0`, `1.10.0`.
 - Reviewed prereleases: `1.6.0-beta.1`. A prerelease review does not imply production support; prerelease detection remains unavailable for production capabilities.
 
 | Release | Channel | Adapter result | Checked AIFHub surfaces | Required adaptation |
@@ -45,31 +45,60 @@ AIFHub metadata records OpenSpec `1.9.0` as the latest reviewed upstream baselin
 | `1.7.0` | stable | supported | exact CLI native `skip_specs: true`, `openspec instructions archive --change <id> --json`, leading-digit IDs, nested spec folders, standard command smoke | native metadata reader for artifact/sync gates plus focused no-op regressions for already-compatible surfaces |
 | `1.8.0` | stable | supported | exact CLI capability retirement, scenario-loss validation, nested task progress, non-TTY archive guidance, and standard command smoke | version-gated retirement planning plus fail-closed and nested-task regressions; agent targets remain upstream-owned |
 | `1.9.0` | stable | supported | checksum-verified extracted CLI, strict/non-strict task numbering, arbitrary nested scenario-loss, telemetry-free JSON, rootless list/validate/schemas, invalid archive no-mutation, archive serialization, and standard command smoke | advance reviewed metadata and deterministic diagnostics/docs contracts; Command Code, schemas, skills, agents, tools, Stores, and package management remain upstream-owned |
+| `1.10.0` | stable | supported | checksum-verified exact CLI version/validate/status/show/instructions matrix, Store-root specs instructions, no-spec schema scaffolding, stderr output hygiene, blocked-retirement diagnostics, and archive no-mutation | advance reviewed metadata, mirror inline task verification in AIFHub plan/refinement prompts, and preserve open envelopes, fail-closed diagnostics, native `skip_specs`, and upstream ownership |
 
-### Exact 1.9.0 Custody and Evidence Boundary
+### Exact 1.10.0 Custody and Evidence Boundary
 
 Git source custody and npm executable custody were verified independently:
 
 | Chain | Pinned evidence |
 |---|---|
-| Git source custody | official tag [`v1.9.0`](https://github.com/Fission-AI/OpenSpec/releases/tag/v1.9.0), resolved commit `2826b8889e5223a9a8095d4428b60b56597e1020`, release publication `2026-08-13T15:38:22Z`, and official compare [`v1.8.0...v1.9.0`](https://github.com/Fission-AI/OpenSpec/compare/v1.8.0...v1.9.0) |
-| npm executable custody | `@fission-ai/openspec@1.9.0`, publication `2026-08-13T15:29:22.483Z`, integrity `sha512-yKV8mFz+J5+epLugvcSt7B+mBkkCSycOB6euLJmW6JL+2jhL+Um0JZ6zuGIdXcbsd3jU2+YQfeDz2EVwft++LA==`, shasum `98f27aea1d95b7472790d4e27acc8669fcba4fc6`, bin `openspec: bin/openspec.js`, and Node engine `>=20.19.0` |
+| Git source custody | official tag [`v1.10.0`](https://github.com/Fission-AI/OpenSpec/releases/tag/v1.10.0), resolved commit `1ebddd17f40dde15dfd28289e4493c3cf05ee9df`, release publication `2026-08-19T22:33:44Z`, and official compare [`v1.9.0...v1.10.0`](https://github.com/Fission-AI/OpenSpec/compare/v1.9.0...v1.10.0) |
+| npm executable custody | `@fission-ai/openspec@1.10.0`, publication `2026-08-19T22:31:32.924Z`, integrity `sha512-fuL3Rz7Jv+NnHeUM1XkbaXFo4bUdPttOWOC66/6SyfJr9rPOvGE47oBp+8XdDtPiiWZawa0Z9RDzGasetFu2eQ==`, shasum `a29f5a69038df6ab1f7be3d36645c866279f0245`, bin `openspec: ./bin/openspec.js`, and Node engine `>=20.19.0` |
 
-The npm tarball was checksum-verified before its explicitly extracted `bin/openspec.js` was run in disposable fixtures. A PATH-resolved executable was not used as exact-package proof. Context7 documentation for `/fission-ai/openspec` reflected current `main` and served only as supporting context, not a version-pinned `1.9.0` authority.
+The npm tarball was checksum-verified before its installed `.bin/openspec.cmd` shim, bound to the extracted `bin/openspec.js`, was run in disposable Windows fixtures. A PATH-resolved executable was not used as exact-package proof. The published package has no `preinstall`, `install`, or `postinstall` lifecycle script. Its dependency delta from `1.9.0` is confined to `@inquirer/core` (`^10.3.2` to `^11.2.1`) and `@inquirer/prompts` (`^7.10.1` to `^8.5.2`); the remaining runtime dependency names and ranges are unchanged. Context7 documentation for `/fission-ai/openspec` reflected current `main` and served only as supporting context, not a version-pinned `1.10.0` authority.
 
-This is local exact-package compatibility evidence. It does not constitute CI verification, deployment verification, or production verification. OpenSpec `1.10` and `1.11` were not reviewed, executed, added to the ledger, or included in compatibility/acceptance claims for this checkpoint.
+This is local exact-package compatibility evidence. It does not constitute CI verification, deployment verification, or production verification. OpenSpec `1.11.0` was not reviewed, executed, added to the ledger, or included in compatibility/acceptance claims for this checkpoint.
 
-### 1.9.0 Ownership and No-op Matrix
+### Exact 1.10.0 CLI Matrix
 
-The official compare contains 25 commits and 97 changed files. Every entry is classified in the bounded runtime receipt; the tracked ownership summary is:
+All commands below used the checksum-verified exact package in disposable fixtures with telemetry disabled process-locally unless the row explicitly audits the notice stream. Successful JSON rows parsed as one complete document.
 
-| Classification | Commits | Files | AIFHub result |
-|---|---:|---:|---|
-| `adapter-change-required` | 4 | 14 | reviewed baseline metadata, freshness diagnostics, fail-closed verification tests, negative mandatory-gate contract, and public docs |
-| `regression-or-no-op` | 7 | 20 | existing runner/finalizer behavior is retained and locked by exact semantic regressions; no local fork |
-| `upstream-owned` | 14 | 63 | Command Code adapters, schema fork/update, skill/agent/tool generation, Stores/workspace behavior, and package/dependency management are not copied into AIFHub |
+| Surface | Exact result | AIFHub conclusion |
+|---|---|---|
+| `--version` | exit `0`, stdout `1.10.0`, empty stderr | version detection remains compatible |
+| strict valid change | exit `0`; JSON keys `items`, `summary`, `version`, `root` | current strict runner argv and open envelope remain compatible |
+| strict invalid change | exit `1`; parseable JSON preserved three `tasks.md` diagnostics | non-zero result remains fail-closed and raw evidence remains available |
+| `status --json` | exit `0`; additive `planningHome`, `artifactPaths`, `actionContext`, and `root` fields | open-envelope parsing remains compatible |
+| `show --deltas-only --json` | exit `0`; JSON keys `id`, `title`, `deltaCount`, `deltas`, `root` | show wrapper remains compatible |
+| `instructions apply --json` | exit `0`; progress/tasks/state plus additive `root` | apply guidance remains compatible |
+| `instructions archive --json` | exit `0`; `changeName`, `context`, `root` | archive guidance remains compatible |
+| `instructions specs --json` through a declared Store | exit `0`; `planningHome.root` and `root.path` selected the Store, and both main-spec operations used `<planningHome.root>/openspec/specs/<capability-path>/spec.md` | no Store flag or resolver expansion is required in AIFHub |
+| custom schema without a specs artifact | `new change` emitted native `skip_specs: true`; strict validation exited `0`; the AIFHub delta-spec check passed | existing native marker reader is compatible |
+| blocked capability retirement | archive exited `1`, named bounded blocking content and `No files were changed.`, and the pre/post file inventory plus SHA-256 values were identical | finalizer remains fail-closed; no local archive fork is needed |
+| telemetry notice module | first-run notice produced zero stdout writes and one stderr write | JSON/piped stdout remains clean; runner stderr preservation is sufficient |
+| `schemas --json` | exit `0` and returned the built-in `spec-driven` schema | schema discovery remains upstream-owned |
 
-### 1.9.0 Release-specific Semantics
+### 1.10.0 Source Classification
+
+The official compare contains 18 commits and 78 changed files. Every commit and changed file was inspected against the adapter boundary:
+
+| Classification | Upstream concerns | AIFHub result |
+|---|---|---|
+| `adapter-change-required` | release/version boundary and stronger task-plan guidance | update reviewed metadata/freshness docs and require inline completion verification in `/aif-plan` plus `/aif-improve` |
+| `regression-or-no-op` | stderr telemetry hygiene, Store-root specs instructions, no-spec schema scaffolding, blocked-retirement diagnostics, and existing command JSON/exit behavior | retain the runner, finalizer, and native `skip_specs` reader; add focused deterministic contracts only |
+| `upstream-owned` | Zed support, `init --language`, prompt picker, feedback, custom profiles, OpenCode command generation, completion tip/package lifecycle, `openspec update`, schemas, and generated tool assets | do not copy, install, update, or manage these surfaces in AIFHub |
+
+### 1.10.0 Release-specific Semantics
+
+- Generated task instructions now require each checkbox to say how completion is verified through a test, command, observable behavior, or delivered artifact. Because AIFHub authors and refines canonical `tasks.md`, its plan and improve injections mirror that rule; standalone verification tasks are reserved for broader integration or system behavior spanning multiple implementation tasks.
+- Specs instructions now identify main-spec reads through the response's Store-aware `planningHome.root`. AIFHub preserves the additive JSON envelope and keeps Stores upstream-owned; it does not add `--store` selection to the production resolver.
+- A custom schema without a specs artifact now scaffolds `skip_specs: true`. AIFHub's existing native metadata reader accepts that marker and does not demand a delta the schema cannot produce.
+- A blocked last-requirement retirement now names bounded unaccounted content. AIFHub preserves the non-zero exit plus raw stdout/stderr evidence, and failed archive remains non-mutating.
+- The first-run telemetry notice moved to stderr, JSON commands remain parseable, and the published package removed install lifecycle scripts. AIFHub does not add telemetry, completion, install, or package-manager logic.
+- Zed, `init --language`, prompt picker changes, custom-profile sync dependencies, OpenCode argument forwarding, feedback, update hints, generated skills/commands, and package dependency changes remain upstream-owned no-ops.
+
+Previous `1.9.0` evidence remains part of the sequential ledger:
 
 - Non-strict validation keeps malformed task numbering as three `tasks.md` warnings, returns exit `0`, and reports the change as valid. Strict validation preserves the same warnings, returns exit `1`, and reports the change as invalid; AIFHub verification uses strict validation and fails closed.
 - Scenario-loss validation detects an arbitrary real nested `#### Edge case`, returns exit `1`, and preserves the stable `widgets/spec.md` path and omission message in QA evidence. A failing scenario-loss result cannot produce a passing verify gate or archive eligibility.
@@ -95,7 +124,7 @@ Reviewed upstream behavior:
 - OpenSpec `1.4.0` includes Kimi CLI support, Mistral Vibe support, sync skills by default through `/opsx:sync`, case-insensitive requirement headers, and clearer validation hints.
 - OpenSpec workspace beta view state is OpenSpec-owned and lives under `.openspec-workspace/view.yaml`.
 
-AIFHub remains adapter-only: it does not install or manage OpenSpec skills, `/opsx:*` commands, tool integrations, agent targets, Stores, OpenSpec workspace beta state, or `openspec update`. In particular, it does not install or manage Kimi CLI or Mistral Vibe integrations. It also does not install or manage MiniMax Code or Rovo Dev CLI integrations. The default Store, self-upgrade flow, tool command names, config parsing, and generated command/frontmatter content remain upstream-owned. AIFHub does not own OpenSpec workspace beta state and does not run or manage `openspec update`.
+AIFHub remains adapter-only: it does not install or manage OpenSpec skills, `/opsx:*` commands, tool integrations, agent targets, Stores, OpenSpec workspace beta state, or `openspec update`. In particular, it does not install or manage Kimi CLI or Mistral Vibe integrations; it also does not manage MiniMax Code, Rovo Dev CLI, or Zed integrations, and it does not run `openspec init --language`. The default Store, self-upgrade flow, profiles, tool command names, config parsing, and generated command/frontmatter content remain upstream-owned. AIFHub does not own OpenSpec workspace beta state and does not run or manage `openspec update`.
 
 `openspec update` is upstream OpenSpec behavior. `/aif-mode sync` compiles AIFHub generated rules and requests OpenSpec validate/status through the adapter when configured and available.
 
@@ -313,6 +342,24 @@ Current QA-check results bind to `tested_revision` plus `worktree_digest` for gi
 
 Branch-scoped `qa-check.md` is not change-scoped AIFHub evidence. It cannot by itself satisfy `/aif-verify`, `/aif-done`, `coverage.json`, rules evidence, `done-readiness.json`, `done.md`, or `openspec-archive.json`; no implicit bridge is registered.
 
+## AI Factory 2.19 Reviewed Source Snapshot
+
+AIFHub reviewed the AI Factory `2.x` source at commit [`3c1ddd4740d7b1c30d8ecb3dc80fa5e7b8d7ef5a`](https://github.com/lee-to/ai-factory/commit/3c1ddd4740d7b1c30d8ecb3dc80fa5e7b8d7ef5a), where `package.json` declares `2.19.0`. The exact comparison base is tagged `2.18.1` (`00243dea805fb2ba226a7b9731f23b67fb8eec77`); the reviewed range is 7 commits and 16 changed files.
+
+This is source-snapshot evidence, not a published-release claim. At the 2026-09-01 review boundary, upstream had no `2.19.0` Git tag, GitHub release, or npm package. The exact published-executable consumer smoke therefore remains `2.18.1` until a separately pinned 2.19 release artifact exists.
+
+| Upstream 2.19 source surface | Evidence and AIFHub decision |
+|---|---|
+| `/aif-warmup` | Upstream-owned read-only workflow. AIFHub adds no duplicate skill, command, or injection and does not turn the handoff into a lifecycle gate. |
+| `warmup.paths` config | Fresh AIFHub-created configs include `warmup.paths: []`. Existing user-owned lists and nested comments are preserved through mode switches; an absent section in an existing config is not backfilled. |
+| Warmup context boundary | Configured core artifacts, scoped rules and applicable `AGENTS.md` remain upstream inputs. Optional glossary/provider notes require an explicit safe `warmup.paths` entry; OpenSpec changes, QA evidence, generated rules, raw provider output and credentials are not implicit startup context. |
+| Workflow transformers and hints | Upstream registers `aif-warmup` in its workflow set, wizard hint and Antigravity guidance. No AIFHub transformer fork is needed. |
+| Extension schema, loader, injections and MCP | Exact diff review: `schemas/extension.schema.json`, extension loading/operations, injection application, MCP core and extension CLI command files are unchanged from `2.18.1`. |
+| Node, bin and dependencies | Node stays `>=18.0.0`, bin stays `ai-factory -> ./bin/ai-factory.js`, and runtime/dev dependency sets are unchanged. Only the package version changes. |
+| Microsoft APM manifest | Upstream adds `apm.yml` with `type: skill` and `includes: auto`. This distributes upstream skills; it does not replace the npm CLI or the AI Factory extension install/update path needed for AIFHub commands, injections, MCP templates and agent files. AIFHub adds no speculative APM package. |
+
+The compatibility range remains `>=2.11.0 <3.0.0`. New 2.19 behavior is version-labeled and additive; supported older runtimes simply do not provide `/aif-warmup` or the upstream APM surface.
+
 ## AI Factory 2.18 Reviewed Baseline
 
 The reviewed AI Factory `2.18.1` baseline is cumulative: it retains the existing AI Factory `2.13`-`2.17` compatibility facts, including config-aware project-context utilities, the full `2.17.0...2.18.0` audit (21 commits, 63 changed files), and the bounded `2.18.0...2.18.1` patch audit (2 commits, 8 changed files). AIFHub adapts only behavior that crosses its OpenSpec-native or legacy compatibility ownership boundaries; upstream-owned behavior remains upstream-owned.
@@ -506,7 +553,7 @@ openspec:
   canArchive: boolean
   version: string | null
   supportedRange: ">=1.3.1 <2.0.0"
-  latestReviewedVersion: "1.9.0"
+  latestReviewedVersion: "1.10.0"
   versionOutdated: boolean | null
   requiresNode: ">=20.19.0"
 ```

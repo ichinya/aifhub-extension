@@ -11,6 +11,7 @@ AI Factory UX + OpenSpec artifact protocol
 ## What This Extension Does
 
 - Keeps `/aif-analyze`, `/aif-plan`, `/aif-explore`, `/aif-improve`, `/aif-implement`, `/aif-rules-check`, `/aif-review`, `/aif-security-checklist`, `/aif-verify`, `/aif-fix`, `/aif-done`, `/aif-commit`, `/aif-evolve`, and `/aif-mode` as the public command vocabulary.
+- Sharpens `/aif-explore` requests through dependency-aware decision rounds: project facts stay assistant-owned and read-only, user-owned decisions are asked by prerequisite frontier with recommendations, and research waits for confirmation of the normalized brief. Non-interactive runs return an unconfirmed brief to the interactive parent instead of treating assumptions as approval.
 - In OpenSpec-native mode, writes canonical change artifacts under `openspec/changes/<change-id>/` and accepted specs under `openspec/specs/`.
 - Keeps AI Factory runtime state, verification evidence, finalization evidence, and generated rules outside canonical OpenSpec changes.
 - Requests OpenSpec validation, status, instructions, and archive through the AIFHub wrapper and `scripts/openspec-runner.mjs` when a compatible CLI is available.
@@ -127,9 +128,17 @@ It does not replace `/aif-commit`. After `/aif-done`, run `/aif-commit` or your 
 
 The config also records the aif-analyze skill version under `analyze.skill_version`. Before patching an existing config, `/aif-analyze` runs the read-only deterministic diff `ai-factory aifhub-analyze-config-diff --json`, which compares the config against the extension's required-keys manifest, reports what would be added and why, and takes a fast path when the config is already up to date.
 
-### AI Factory 2.18 Reviewed Baseline
+### AI Factory 2.19 Reviewed Source Snapshot
 
-AIFHub is reviewed against AI Factory `2.18.1` while retaining the compatibility range `>=2.11.0 <3.0.0`. The cumulative `2.16`/`2.17` behavior remains supported, while the `2.18` line adds only bounded artifact/profile adapters:
+AIFHub is source-reviewed against the AI Factory `2.x` snapshot at commit [`3c1ddd4740d7b1c30d8ecb3dc80fa5e7b8d7ef5a`](https://github.com/lee-to/ai-factory/commit/3c1ddd4740d7b1c30d8ecb3dc80fa5e7b8d7ef5a), whose package declares `2.19.0`, while retaining the compatibility range `>=2.11.0 <3.0.0`. At review time there was no `2.19.0` Git tag, GitHub release, or npm package, so this is a pinned source-compatibility result; `2.18.1` remains the last exact published-executable consumer-smoke baseline.
+
+The seven-commit `2.18.1...3c1ddd4740d7` delta changes 16 files and is additive for AIFHub:
+
+- `/aif-warmup` remains an upstream-owned, read-only session handoff. AIFHub ships no duplicate skill, command, or injection. Fresh AIFHub-created configs include `warmup.paths: []`; existing user-owned lists are preserved through mode switches and are never backfilled when absent.
+- The upstream root `apm.yml` is a skills distribution surface. It does not replace the npm-installed AI Factory CLI or `ai-factory extension add/update` path required for AIFHub injections, wrapper commands, MCP templates, and managed agent files; AIFHub therefore adds no speculative APM package.
+- The extension schema/loader, injection and MCP contracts, Node `>=18`, bin entrypoint, and dependency sets are unchanged, so no runtime adapter or compatibility-range increase is required.
+
+The cumulative `2.16`/`2.17` behavior and `2.18.1` executable baseline remain supported, while the `2.18` line retains only bounded artifact/profile adapters:
 
 - Planning preserves explicit input as immutable `## Original Request`; research-backed plans use a revision-bound `## Research Context` and report `WARN [research-drift]` instead of silently rebasing scope. See [Usage](docs/usage.md) and [Context Loading Policy](docs/context-loading-policy.md).
 - Planning from one explicit primary MCP work item supports GitHub, Linear, Jira, YouGile, and other providers, and uses its readable provider ID as the plan prefix: `156`, `ENG-431`, `PROJ-77`, and generic opaque-ID fallbacks become IDs such as `156-fix-login`, `eng-431-fix-login`, `proj-77-refresh-token`, or `yougile-a1b2c3d4-refresh-token`. Source-bound plans persist provider, full primary source, external ID, and creation branch separately from secondary roadmap links; the resolver checks that binding before slug matching. Ambiguous multi-item input keeps ordinary allocation unless one item is explicitly primary, and collisions fail closed. See [OpenSpec Compatibility](docs/openspec-compatibility.md).
@@ -296,9 +305,9 @@ OpenSpec is optional for extension install and AI Factory-only workflows.
 | OpenSpec CLI runtime | Node `>=20.19.0` |
 | OpenSpec skills/commands | Not installed by this extension |
 
-The reviewed OpenSpec baseline is OpenSpec `1.9.0`, replayed sequentially from baseline `1.3.1` and including prerelease `1.6.0-beta.1`, while the compatible stable CLI range remains `>=1.3.1 <2.0.0`. The `1.9.0` checkpoint is bound independently to official Git tag `v1.9.0` at commit `2826b8889e5223a9a8095d4428b60b56597e1020` and to checksum-verified npm package `@fission-ai/openspec@1.9.0`; this is local exact-package evidence, not CI or production evidence. See [OpenSpec Compatibility](docs/openspec-compatibility.md) for the reviewed-release ledger and adapter-only ownership notes.
+The reviewed OpenSpec baseline is OpenSpec `1.10.0`, replayed sequentially from baseline `1.3.1` and including prerelease `1.6.0-beta.1`, while the compatible stable CLI range remains `>=1.3.1 <2.0.0`. The `1.10.0` checkpoint is bound independently to official Git tag `v1.10.0` at commit `1ebddd17f40dde15dfd28289e4493c3cf05ee9df` and to checksum-verified npm package `@fission-ai/openspec@1.10.0`; this is local exact-package evidence, not CI or production evidence. See [OpenSpec Compatibility](docs/openspec-compatibility.md) for the reviewed-release ledger, exact CLI matrix, and adapter-only ownership notes.
 
-OpenSpec `validate --archived` is advisory-only. It is not part of package validation scripts, tracked CI, the shared runner's current-change validation argv, `/aif-verify`, `/aif-done`, or the release acceptance PASS boolean. OpenSpec `1.10` and `1.11` are outside this reviewed checkpoint and receive no compatibility claim here.
+OpenSpec `validate --archived` is advisory-only. It is not part of package validation scripts, tracked CI, the shared runner's current-change validation argv, `/aif-verify`, `/aif-done`, or the release acceptance PASS boolean. OpenSpec `1.11.0` is outside this reviewed checkpoint and receives no compatibility claim here.
 
 When the OpenSpec CLI is missing or unsupported, OpenSpec-aware commands report degraded validate/archive capabilities. Planning and filesystem-based context loading can continue, but archive-required `/aif-done` fails until a compatible CLI is available.
 
@@ -370,11 +379,11 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 | Guide | Description |
 |---|---|
 | [Documentation Index](docs/README.md) | Reading order and docs map |
-| [Usage](docs/usage.md) | Full command flow, read/write boundaries, upstream project-context utilities, examples, and troubleshooting |
+| [Usage](docs/usage.md) | Full command flow, AI Factory 2.19 session warmup, read/write boundaries, upstream project-context utilities, examples, and troubleshooting |
 | [Context Providers](docs/context-providers.md) | Optional Graphify and Context7 provider guidance, reviewed-note paths, degraded behavior, and user-owned setup boundaries |
 | [Memory Tool Recommendations](docs/memory-tool-recommendations.md) | Local metadata-driven optional memory/context tool recommendations and installed wrapper commands |
-| [Context Loading Policy](docs/context-loading-policy.md) | Consumer context, Optional Project Glossary, optional provider context, GitHub-aware roadmap evidence, command ownership, upstream utility boundaries, and legacy boundaries |
-| [OpenSpec Compatibility](docs/openspec-compatibility.md) | Optional CLI adapter policy, exact-tagged OpenSpec `1.9.0` reviewed baseline from `1.3.1`, AI Factory 2.18 classic/ultra planning, research, verification, archive and ownership matrix, reviewed no-ops, and capability flags |
+| [Context Loading Policy](docs/context-loading-policy.md) | Consumer context, AI Factory 2.19 upstream warmup, Optional Project Glossary, optional provider context, GitHub-aware roadmap evidence, command ownership, upstream utility boundaries, and legacy boundaries |
+| [OpenSpec Compatibility](docs/openspec-compatibility.md) | Optional CLI adapter policy, exact-tagged OpenSpec `1.10.0` reviewed baseline from `1.3.1`, pinned AI Factory 2.19 source snapshot, AI Factory 2.18 classic/ultra planning, research, verification, archive and ownership matrix, reviewed no-ops, and capability flags |
 | [OpenSpec Artifact Validation](docs/openspec-validation.md) | Read-only AIFHub contract validator for OpenSpec-native artifacts |
 | [OpenSpec Coverage Matrix](docs/spec-coverage.md) | Requirement-to-code coverage artifact and verify/done policy |
 | [Legacy Plan Migration](docs/legacy-plan-migration.md) | Explicit migration from legacy plans to OpenSpec-native changes |
@@ -398,6 +407,7 @@ npm test
 
 ## Update Behavior
 
+- The reviewed AI Factory source declaring `2.19.0` is not a published update target at this checkpoint; no `2.19.0` tag/npm artifact or executable update PASS is claimed.
 - `ai-factory update --force` is the global exact `2.17.0`-to-`2.18.1` project refresh used by the consumer contract: it refreshes selected built-in skills and managed extensions, then reapplies injections. Stable `2.18.0` remains the ultra/transfer feature boundary.
 - `ai-factory extension update aifhub-extension --force` is the exact targeted refresh and must not be treated as evidence that unrelated extensions were updated.
 - `ai-factory upgrade` is the v1-to-v2 skill-name migration command; it is not the 2.17.0-to-2.18.1 update path.

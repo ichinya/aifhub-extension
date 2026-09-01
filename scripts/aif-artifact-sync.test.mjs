@@ -65,7 +65,7 @@ function missingCliDetection() {
     canValidate: false,
     canArchive: false,
     version: null,
-    latestReviewedVersion: '1.9.0',
+    latestReviewedVersion: '1.10.0',
     versionOutdated: null,
     command: 'openspec',
     commandSource: 'path',
@@ -86,8 +86,8 @@ function availableCliDetection(overrides = {}) {
     canValidate: true,
     canArchive: true,
     version,
-    latestReviewedVersion: '1.9.0',
-    versionOutdated: overrides.versionOutdated ?? version.localeCompare('1.9.0', 'en', { numeric: true }) < 0,
+    latestReviewedVersion: '1.10.0',
+    versionOutdated: overrides.versionOutdated ?? version.localeCompare('1.10.0', 'en', { numeric: true }) < 0,
     command: overrides.command ?? 'openspec',
     commandSource: overrides.commandSource ?? 'path',
     nodeVersion: overrides.nodeVersion ?? '20.19.0',
@@ -139,7 +139,7 @@ describe('mode status', () => {
 
     assert.equal(status.openspecCli.state, 'available');
     assert.equal(status.openspecCli.version, '1.4.0');
-    assert.equal(status.openspecCli.latestReviewedVersion, '1.9.0');
+    assert.equal(status.openspecCli.latestReviewedVersion, '1.10.0');
     assert.equal(status.openspecCli.versionOutdated, true);
     assert.equal(status.openspecCli.canValidate, true);
     assert.equal(status.openspecCli.canArchive, true);
@@ -154,8 +154,8 @@ describe('mode status', () => {
     ].join('\n'));
 
     for (const expectation of [
-      { version: '1.9.0', versionOutdated: false },
-      { version: '1.9.1', versionOutdated: false }
+      { version: '1.10.0', versionOutdated: false },
+      { version: '1.10.1', versionOutdated: false }
     ]) {
       const status = await getModeStatus({
         rootDir,
@@ -163,7 +163,7 @@ describe('mode status', () => {
       });
 
       assert.equal(status.openspecCli.version, expectation.version);
-      assert.equal(status.openspecCli.latestReviewedVersion, '1.9.0');
+      assert.equal(status.openspecCli.latestReviewedVersion, '1.10.0');
       assert.equal(status.openspecCli.versionOutdated, false);
       assert.equal(status.openspecCli.commandSource, 'path');
     }
@@ -173,7 +173,7 @@ describe('mode status', () => {
       detectOpenSpec: async () => missingCliDetection()
     });
     assert.equal(missing.openspecCli.version, null);
-    assert.equal(missing.openspecCli.latestReviewedVersion, '1.9.0');
+    assert.equal(missing.openspecCli.latestReviewedVersion, '1.10.0');
     assert.equal(missing.openspecCli.versionOutdated, null);
   });
 
@@ -575,7 +575,7 @@ describe('mode status', () => {
 });
 
 describe('mode switching', () => {
-  it('renders the optional glossary path in stable order without creating or requiring the file', async () => {
+  it('renders fresh 2.19 warmup defaults and the optional glossary without creating context files', async () => {
     const rootDir = await createTempRoot();
 
     const openSpecResult = await switchToOpenSpecMode({
@@ -595,6 +595,11 @@ describe('mode switching', () => {
       await pathExists(rootDir, 'CONTEXT.md'),
       false,
       'OpenSpec profile should not create the optional glossary file'
+    );
+    assert.match(
+      openSpecConfig,
+      /^warmup:\n  paths: \[\]$/m,
+      'A fresh OpenSpec profile should include the upstream 2.19 warmup default'
     );
 
     const doctor = await doctorAifMode({
@@ -623,6 +628,60 @@ describe('mode switching', () => {
       await pathExists(rootDir, 'CONTEXT.md'),
       false,
       'Legacy profile should not create the optional glossary file'
+    );
+    assert.match(
+      legacyConfig,
+      /^warmup:\n  paths: \[\]$/m,
+      'The fresh-config warmup default should survive a later mode switch'
+    );
+  });
+
+  it('preserves user-owned warmup paths and never backfills an existing config', async () => {
+    const rootDir = await createTempRoot();
+    const warmupBlock = [
+      'warmup:',
+      '  # user-owned startup context',
+      '  paths:',
+      '    - docs/domain/',
+      '    - infrastructure/decisions.md'
+    ].join('\n');
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: ai-factory',
+      'paths:',
+      '  plans: .ai-factory/plans',
+      '  specs: .ai-factory/specs',
+      '  rules: .ai-factory/rules',
+      warmupBlock,
+      ''
+    ].join('\n'));
+
+    await switchToOpenSpecMode({
+      rootDir,
+      detectOpenSpec: async () => missingCliDetection(),
+      timestamp: '2026-09-01T00-00-00-000Z'
+    });
+    const openSpecConfig = await readFixture(rootDir, '.ai-factory/config.yaml');
+    assert.ok(openSpecConfig.includes(warmupBlock), 'OpenSpec mode should preserve user-owned warmup paths and comment text');
+
+    await switchToAiFactoryMode({
+      rootDir,
+      timestamp: '2026-09-01T00-00-01-000Z'
+    });
+    const legacyConfig = await readFixture(rootDir, '.ai-factory/config.yaml');
+    assert.ok(legacyConfig.includes(warmupBlock), 'Legacy mode should preserve user-owned warmup paths and comment text');
+
+    const existingWithoutWarmup = renderConfigForMode([
+      'aifhub:',
+      '  artifactProtocol: ai-factory',
+      'paths:',
+      '  plans: .ai-factory/plans',
+      ''
+    ].join('\n'), 'openspec');
+    assert.doesNotMatch(
+      existingWithoutWarmup,
+      /^warmup:/m,
+      'An existing config without warmup must not receive a backfilled user-owned section'
     );
   });
 
