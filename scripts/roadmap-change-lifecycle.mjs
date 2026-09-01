@@ -5,6 +5,7 @@ import path from 'node:path';
 import process from 'node:process';
 
 import { normalizeChangeId } from './active-change-resolver.mjs';
+import { findExactMarkdownH2Sections } from './markdown-structural-markers.mjs';
 
 export const ROADMAP_LIFECYCLE_START_MARKER = '<!-- aifhub:roadmap-change-lifecycle:start -->';
 export const ROADMAP_LIFECYCLE_END_MARKER = '<!-- aifhub:roadmap-change-lifecycle:end -->';
@@ -35,7 +36,7 @@ export function parseRoadmapLinkage(proposalContent) {
     return malformedLinkage('roadmap-linkage-invalid-content');
   }
 
-  const sections = findRoadmapLinkageSections(proposalContent);
+  const sections = findExactMarkdownH2Sections(proposalContent, 'Roadmap Linkage');
   if (sections.length === 0) {
     return {
       ok: true,
@@ -271,47 +272,6 @@ export async function updateRoadmapChangeLifecycle(options = {}) {
   }
 }
 
-function findRoadmapLinkageSections(content) {
-  const lines = content.split(/\r\n|\n|\r/);
-  const sections = [];
-  let fence = null;
-
-  for (let index = 0; index < lines.length; index += 1) {
-    const fenceMatch = lines[index].match(/^\s*(`{3,}|~{3,})/);
-    if (fenceMatch) {
-      const marker = fenceMatch[1][0];
-      fence = fence === marker ? null : fence ?? marker;
-      continue;
-    }
-    if (fence !== null || !/^##(?!#)\s+Roadmap Linkage\s*$/.test(lines[index])) {
-      continue;
-    }
-
-    const section = [];
-    let sectionFence = null;
-    for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
-      const nestedFence = lines[cursor].match(/^\s*(`{3,}|~{3,})/);
-      if (nestedFence) {
-        const marker = nestedFence[1][0];
-        sectionFence = sectionFence === marker ? null : sectionFence ?? marker;
-        section.push(lines[cursor]);
-        continue;
-      }
-      if (sectionFence === null && /^##(?!#)\s+/.test(lines[cursor])) {
-        index = cursor - 1;
-        break;
-      }
-      section.push(lines[cursor]);
-      if (cursor === lines.length - 1) {
-        index = cursor;
-      }
-    }
-    sections.push(section);
-  }
-
-  return sections;
-}
-
 function normalizeIssues(value) {
   if (isNone(value)) {
     return { ok: true, values: [] };
@@ -324,7 +284,7 @@ function normalizeIssues(value) {
   if (
     values.length === 0
     || values.length > MAX_ISSUES
-    || values.some((entry) => !isCanonicalIssueUrl(entry))
+    || values.some((entry) => !isCanonicalWorkItemReference(entry))
   ) {
     return { ok: false, values: [] };
   }
@@ -335,10 +295,31 @@ function normalizeIssues(value) {
   };
 }
 
-function isCanonicalIssueUrl(value) {
-  return typeof value === 'string'
-    && value.length <= MAX_ISSUE_LENGTH
-    && /^https:\/\/github\.com\/[A-Za-z0-9][A-Za-z0-9.-]*\/[A-Za-z0-9._-]+\/issues\/[1-9][0-9]*$/.test(value);
+function isCanonicalWorkItemReference(value) {
+  if (
+    typeof value !== 'string'
+    || value.length === 0
+    || value.length > MAX_ISSUE_LENGTH
+    || value !== value.trim()
+    || /[\u0000-\u0020\u007f]/.test(value)
+  ) {
+    return false;
+  }
+
+  let reference;
+  try {
+    reference = new URL(value);
+  } catch {
+    return false;
+  }
+
+  return (reference.protocol === 'https:' || reference.protocol === 'mcp:')
+    && reference.hostname.length > 0
+    && reference.pathname !== '/'
+    && reference.username.length === 0
+    && reference.password.length === 0
+    && reference.search.length === 0
+    && reference.hash.length === 0;
 }
 
 function normalizeOptionalText(value, maxLength) {

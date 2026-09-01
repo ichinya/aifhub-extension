@@ -234,6 +234,58 @@ describe('OpenSpec execution context API', () => {
     ]);
   });
 
+  it('resolves a newly planned MCP work-item change for implementation with multiple active changes', async () => {
+    const { buildImplementationContext } = await loadExecutionContext();
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir, 'eng-431-some-request-slug');
+    await createOpenSpecChange(rootDir, 'proj-77-second-request');
+    await createOpenSpecChange(rootDir, 'some-request-slug');
+    await createOpenSpecChange(rootDir, 'another-active-change');
+    await writeFixture(rootDir, 'openspec/changes/eng-431-some-request-slug/proposal.md', [
+      '# Proposal',
+      '',
+      '## AIFHub Source Binding',
+      '',
+      '- Provider: linear',
+      '- Primary source: mcp://linear/issue/6a1f24c8',
+      '- External ID: ENG-431',
+      '- Branch: feature/some-request-slug',
+      '',
+      '## Roadmap Linkage',
+      '',
+      '- Issues: mcp://linear/issue/6a1f24c8, https://acme.atlassian.net/browse/PROJ-77',
+      '- Milestone: none',
+      '- Roadmap item/slice: none',
+      '- Rationale: primary plus secondary linkage',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/changes/proj-77-second-request/proposal.md', [
+      '# Proposal',
+      '',
+      '## AIFHub Source Binding',
+      '',
+      '- Provider: jira',
+      '- Primary source: mcp://jira/issue/PROJ-77',
+      '- External ID: PROJ-77',
+      '- Branch: feature/some-request-slug',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, '.ai-factory/state/current.yaml', 'change_id: eng-431-some-request-slug\n');
+
+    const result = await buildImplementationContext({
+      rootDir,
+      getCurrentBranch: async () => 'feature/some-request-slug',
+      detectOpenSpec: async () => missingCliDetection()
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.changeId, 'eng-431-some-request-slug');
+    assert.equal(result.resolver.source, 'current-pointer');
+    assert.deepEqual(result.resolver.candidates, ['eng-431-some-request-slug']);
+    assert.equal(result.resolver.warnings.at(-1).code, 'ambiguous-branch-binding-disambiguated');
+    assert.match(result.canonicalArtifacts.proposal.content, /Primary source: mcp:\/\/linear\/issue\/6a1f24c8/);
+  });
+
   it('reads generated rules when present and warns when fingerprints are stale', async () => {
     const { buildImplementationContext } = await loadExecutionContext();
     const rootDir = await createTempRoot();

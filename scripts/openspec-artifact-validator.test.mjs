@@ -165,6 +165,71 @@ describe('OpenSpec artifact contract validator', () => {
     assert.equal(result.status, 'pass');
     assert.equal(result.blocking, false);
     assert.equal(getCheck(result, 'delta-specs-present').status, 'pass');
+    assert.equal(getCheck(result, 'issue-source-binding').status, 'pass');
+  });
+
+  it('validates provider-neutral MCP work-item bindings and their external ID prefixes', async () => {
+    const validRoot = await createTempRoot();
+    await createValidChange(validRoot, 'eng-431-fix-login-timeout');
+    await writeFixture(validRoot, 'openspec/changes/eng-431-fix-login-timeout/proposal.md', [
+      '# Proposal',
+      '',
+      '## AIFHub Source Binding',
+      '',
+      '- Provider: linear',
+      '- Primary source: mcp://linear/issue/6a1f24c8',
+      '- External ID: ENG-431',
+      '- Branch: feature/some-request-slug',
+      '',
+      '## Roadmap Linkage',
+      '',
+      '- Issues: mcp://linear/issue/6a1f24c8, https://acme.atlassian.net/browse/PROJ-77',
+      '- Milestone: none',
+      '- Roadmap item/slice: none',
+      '- Rationale: primary plus secondary linkage',
+      '',
+      '## Why',
+      '',
+      'Implement the primary issue.',
+      ''
+    ].join('\n'));
+
+    const valid = await validateOpenSpecArtifactContract({
+      rootDir: validRoot,
+      changeId: 'eng-431-fix-login-timeout'
+    });
+    assert.equal(valid.status, 'pass');
+    assert.equal(getCheck(valid, 'issue-source-binding').status, 'pass');
+
+    await writeFixture(validRoot, 'openspec/changes/eng-431-fix-login-timeout/proposal.md', [
+      '# Proposal',
+      '',
+      '## AIFHub Source Binding',
+      '',
+      '- Provider: jira',
+      '- Primary source: https://acme.atlassian.net/browse/PROJ-77',
+      '- External ID: PROJ-77',
+      '- Branch: feature/some-request-slug',
+      ''
+    ].join('\n'));
+    const mismatch = await validateOpenSpecArtifactContract({
+      rootDir: validRoot,
+      changeId: 'eng-431-fix-login-timeout'
+    });
+    assert.equal(mismatch.status, 'fail');
+    assert.equal(getCheck(mismatch, 'issue-source-binding').details.rule_code, 'source-binding-change-id-mismatch');
+    assert.deepEqual(mismatch.suggested_next, {
+      command: '/aif-fix eng-431-fix-login-timeout',
+      reason: 'repair the malformed or mismatched AIFHub source binding before continuing'
+    });
+
+    const ordinaryNumericRoot = await createTempRoot();
+    await createValidChange(ordinaryNumericRoot, '156');
+    const ordinaryNumeric = await validateOpenSpecArtifactContract({
+      rootDir: ordinaryNumericRoot,
+      changeId: '156'
+    });
+    assert.equal(getCheck(ordinaryNumeric, 'issue-source-binding').status, 'pass');
   });
 
   it('fails when delta specs are missing without an explicit skip-specs reason', async () => {

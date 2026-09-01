@@ -19,6 +19,9 @@
 ### Исправлено
 - Review policy resolution теперь использует один installed canonical resolver для scaffold и read-only consumers: symlink/Windows junction escapes, managed-file collisions и canonical OpenSpec/project-rules/generated/runtime/QA roots fail closed до чтения или создания; реальные сценарии защищены executable regression-тестами.
 
+### Исправлено
+- `/aif-plan` теперь использует provider-neutral identity задач из GitHub, Linear, Jira, YouGile и других MCP-систем: читаемый внешний ID становится префиксом `<external-id>-<request-slug>`, а отдельный условный `AIFHub Source Binding` сохраняет provider, полный primary source, external ID и exact creation branch. Active-change resolver выбирает одну точную привязку до slug-эвристики, current pointer детерминированно разрешает несколько планов на одной ветке, а повреждённая привязка другой ветки изолируется warning-ом. Одинаковые ключи в разных provider/repository/tenant, primary + secondary linkage, opaque-ID fallback, malformed/mismatched binding и существующие коллизии обрабатываются без overwrite или потери ID-префикса. Legacy classic проверяет синхронизацию Markdown с `status.yaml`, а sequential сохраняет four-digit compatibility prefix.
+
 ## [1.5.0] - 2026-09-01
 
 ### Добавлено

@@ -86,6 +86,7 @@ Preservation rules:
 
 - Read current artifact content before editing.
 - Treat the complete `## Original Request` heading and body as immutable raw source. Preserve its exact bytes, including line endings, whitespace, punctuation, casing, and line breaks; patch other sections around it instead of reconstructing `proposal.md`.
+- Treat an existing `## AIFHub Source Binding` as reserved identity metadata. Preserve its complete heading and body byte-for-byte during ordinary refinement; `Provider`, `Primary source`, and `External ID` are immutable, and `Branch` may change only for an explicit branch-rebind request that keeps the same primary source and passes source-binding validation. In a legacy classic plan, update the Markdown entrypoint and `status.yaml.source_binding.branch` as one logical rebind and require `parseSynchronizedWorkItemSourceBinding(markdown, status)` to pass before reporting success.
 - Treat an existing `## Research Context` body and `Source` revision metadata as the committed requirements snapshot. Do not translate, normalize, regenerate, or replace it unless the user explicitly requests a research rebase.
 - For an embedded ultra source, pass its exact project-relative `RESEARCH.md` path to `resolveUltraResearchSource()` from `scripts/ultra-research-resolver.mjs`. Consume the structured `source`, `revision`, and `diagnostic` so the sibling marked `INDEX.md`, active status, Artifact Index link, path confinement, and normalized Active Summary digest are all revalidated centrally.
 - For an explicit research rebase, use resolver precedence: safe explicit `RESEARCH.md` path, exact slug, then exactly one caller-reviewed relevant active candidate. Ambiguity stops; recency never chooses a source.
@@ -146,7 +147,7 @@ Preserved:
 ```
 
 The response must report the selected change ID, selected source, changed canonical artifact paths, preserved user-written areas, and validation status. Do not install OpenSpec skills or slash commands.
-Report `Original Request` and `Research Context` as preserved section names when applicable, but do not duplicate their raw bodies in output.
+Report `Original Request`, `AIFHub Source Binding`, and `Research Context` as preserved section names when applicable, but do not duplicate their raw bodies in output.
 
 ### Legacy AI Factory-only mode
 
