@@ -132,6 +132,49 @@ describe('complete OpenSpec workflow documentation contract', () => {
     ], 'docs/usage.md workflow');
   });
 
+  it('documents deterministic prompt-language fallback without weakening exact output contracts', async () => {
+    const readme = await readRepoFile('README.md');
+    const usage = await readRepoFile('docs/usage.md');
+    const changelog = await readRepoFile('CHANGELOG.md');
+    const languageResolution = extractSection(usage, '## Prompt Language Resolution');
+    const unreleased = extractSection(changelog, '## [В разработке]');
+
+    for (const expected of [
+      'usable non-empty `language.ui`',
+      'current conversation language for the current response only',
+      'English only when the conversation language is indeterminate',
+      'OS locale and repository programming language are not inputs',
+      'does not persist the inferred choice',
+      'exactly one concise setup hint',
+      'only when the active output contract permits human-readable prose',
+      'before any required final `aif-gate-result` block',
+      'exact-output-only',
+      'exact handoffs, fixed commands, paths, keys/enums, and machine-only output',
+      '`language.artifacts` remains separate'
+    ]) {
+      assertIncludes(languageResolution, expected, 'docs/usage.md Prompt Language Resolution');
+    }
+
+    assertOrder(languageResolution, [
+      'usable non-empty `language.ui`',
+      'current conversation language for the current response only',
+      'English only when the conversation language is indeterminate'
+    ], 'docs/usage.md prompt-language precedence');
+    assertIncludes(
+      readme,
+      '`language.ui` → current conversation → English only when indeterminate',
+      'README.md prompt-language summary'
+    );
+    for (const expected of [
+      'issue #166',
+      '`language.ui` → current conversation → English-last',
+      'exact-output-only',
+      'matched start/end'
+    ]) {
+      assertIncludes(unreleased, expected, 'CHANGELOG.md unreleased prompt-language fix');
+    }
+  });
+
   it('documents optional project glossary ownership, lexical precedence, mode preservation, and deferred OKF', async () => {
     const contextPolicy = await readRepoFile('docs/context-loading-policy.md');
     const usage = await readRepoFile('docs/usage.md');

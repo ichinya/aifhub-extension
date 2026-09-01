@@ -15,6 +15,7 @@ const REPO_ROOT = resolve(__dirname, '..');
 
 const SHARED_LANGUAGE_POLICY_ASSET = 'skills/shared/LANGUAGE-POLICY.md';
 const SHARED_PROJECT_GLOSSARY_ASSET = 'skills/shared/PROJECT-GLOSSARY.md';
+const UI_LANGUAGE_RESOLUTION_CLAUSE = 'Resolve user-facing prose language in this order: use a usable non-empty `language.ui`; otherwise preserve the current conversation language for this response only; use English only when that language is indeterminate. This rule overrides downstream generic English defaults; do not infer from OS locale or persist the inferred choice. On that hard-English fallback, add exactly one concise setup hint only when the output contract permits human-readable prose, before any required final machine-readable block; never add it inside or after `aif-gate-result`, and never alter exact handoffs, fixed commands, paths, keys/enums, or machine-only output.';
 
 const EXPLICIT_REFERENCE_ASSETS = [
   SHARED_LANGUAGE_POLICY_ASSET,
@@ -412,6 +413,10 @@ function assertNotIncludes(source, unexpected, label) {
   assert.ok(!source.includes(unexpected), `${label} should not include ${JSON.stringify(unexpected)}`);
 }
 
+function countOccurrences(source, fragment) {
+  return source.split(fragment).length - 1;
+}
+
 function assertOrder(source, orderedFragments, label) {
   let cursor = -1;
   for (const fragment of orderedFragments) {
@@ -764,6 +769,43 @@ describe('OpenSpec-native prompt asset contract', () => {
       'injections/references/aif-roadmap/slice-checklist.md'
     ]) {
       assert.ok(!assets.includes(excluded), `language policy coverage should not require reference asset ${excluded}`);
+    }
+  });
+
+  it('enforces one manifest-derived UI-language precedence clause in every active injection', async () => {
+    const policy = await readRepoFile(SHARED_LANGUAGE_POLICY_ASSET);
+
+    for (const expected of [
+      'usable non-empty `language.ui`',
+      'current conversation language for the current response only',
+      'English only when the current conversation language is indeterminate',
+      'exactly one concise setup hint',
+      'output contract permits human-readable prose',
+      'before any required final machine-readable block',
+      'exact-output-only branch',
+      'OS locale',
+      'Do not persist inferred language guesses'
+    ]) {
+      assertIncludes(policy, expected, SHARED_LANGUAGE_POLICY_ASSET);
+    }
+
+    const manifest = await loadManifest();
+    const injections = manifest.injections ?? [];
+    assert.equal(injections.length, 13, 'extension.json should declare the 13 active injection targets');
+
+    for (const injection of injections) {
+      const relativePath = normalizeManifestPath(injection.file);
+      const label = `target=${injection.target} path=${relativePath}`;
+      const asset = await readRepoFile(relativePath);
+      const policyReference = `\`${SHARED_LANGUAGE_POLICY_ASSET}\``;
+
+      assert.equal(injection.position, 'prepend', `${label} should remain a prepend injection`);
+      assert.equal(
+        countOccurrences(asset, UI_LANGUAGE_RESOLUTION_CLAUSE),
+        1,
+        `${label} should contain exactly one operational UI-language clause`
+      );
+      assertOrder(asset, [policyReference, UI_LANGUAGE_RESOLUTION_CLAUSE], label);
     }
   });
 

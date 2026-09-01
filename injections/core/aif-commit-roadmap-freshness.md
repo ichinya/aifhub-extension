@@ -4,6 +4,8 @@ Apply this extension guidance before the base `aif-commit` instructions. When an
 
 Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing warnings, questions, or commit summaries. Commands, file paths, code identifiers, JSON keys, and YAML keys remain in English.
 
+Resolve user-facing prose language in this order: use a usable non-empty `language.ui`; otherwise preserve the current conversation language for this response only; use English only when that language is indeterminate. This rule overrides downstream generic English defaults; do not infer from OS locale or persist the inferred choice. On that hard-English fallback, add exactly one concise setup hint only when the output contract permits human-readable prose, before any required final machine-readable block; never add it inside or after `aif-gate-result`, and never alter exact handoffs, fixed commands, paths, keys/enums, or machine-only output.
+
 ### Goal
 
 Treat `/aif-commit` as the final read-only freshness check before creating a git commit. It must classify deterministic local lifecycle drift separately from volatile external drift, report labeled `WARN`/`ERROR` findings, and preserve the upstream commit message and confirmation flow when no blocking local contradiction exists.
