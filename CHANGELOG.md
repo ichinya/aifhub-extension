@@ -15,7 +15,7 @@
 
 ### Изменено
 - Reviewed OpenSpec baseline последовательно обновлён с `1.8.0` через `1.9.0` до `1.10.0` при неизменных baseline `1.3.1`, stable range `>=1.3.1 <2.0.0`, prerelease ledger `1.6.0-beta.1` и Node requirement `>=20.19.0`; `/aif-analyze` продолжает только source-aware non-blocking update guidance без automatic install/update/downgrade.
-- OpenSpec-native `/aif-plan` и `/aif-improve` теперь требуют inline completion verification в каждом task checkbox; отдельная verification task допустима только для broader integration/system checks, охватывающих несколько implementation tasks.
+- OpenSpec-native `/aif-plan` и `/aif-improve` теперь требуют inline completion verification в каждом task checkbox; отдельная verification task допустима только для broader integration/system checks, охватывающих несколько implementation tasks. Для legacy checklist `/aif-improve` выполняет bounded migration недостающих verification clauses, сохраняя номера, checkbox states, порядок и исходный intent задач.
 - Zed, `init --language`, Store selection, profiles, schema generation, OpenCode assets, completion/update behavior и package management остаются upstream-owned. OpenSpec `1.11.0` не входит в review или compatibility claims этого checkpoint.
 - Archived-wide validation документирована как отдельное advisory observation: historical incomplete archives не исправляются, а advisory exit не влияет на обязательный PASS.
 

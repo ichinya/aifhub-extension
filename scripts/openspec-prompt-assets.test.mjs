@@ -1435,6 +1435,73 @@ describe('OpenSpec-native prompt asset contract', () => {
         `${relativePath} should reserve standalone verification tasks for cross-task checks`
       );
     }
+
+    const plan = await readRepoFile('injections/core/aif-plan-plan-folder.md');
+    const taskExample = plan.match(
+      /`tasks\.md` must be a checkbox checklist:[\s\S]*?```markdown\r?\n([\s\S]*?)\r?\n```/i
+    );
+    assert.ok(taskExample, 'plan prompt should contain a tasks.md checklist example');
+
+    const exampleCheckboxes = taskExample[1]
+      .split(/\r?\n/)
+      .filter((line) => /^- \[[ xX]\]\s+\d+\.\d+\s+/.test(line));
+    assert.ok(exampleCheckboxes.length >= 2, 'plan example should exercise multiple task checkboxes');
+
+    for (const checkbox of exampleCheckboxes) {
+      assert.match(
+        checkbox,
+        /;\s*verify\b/i,
+        `plan example should keep verification inline with authored work: ${checkbox}`
+      );
+      assert.doesNotMatch(
+        checkbox,
+        /^- \[[ xX]\]\s+\d+\.\d+\s+(?:confirm|verify|validate)\b/i,
+        `plan example should not model a standalone local verification task: ${checkbox}`
+      );
+    }
+  });
+
+  it('defines a bounded legacy tasks.md migration for /aif-improve', async () => {
+    const improve = await readRepoFile('injections/core/aif-improve-plan-folder.md');
+
+    for (const expected of [
+      'bounded checklist migration',
+      'task number, checked/unchecked state, order, and original action and intent',
+      'do not split, merge, reorder, renumber, reopen, complete, or broaden the task',
+      'Leave already compliant unrelated checkboxes unchanged'
+    ]) {
+      assertIncludes(improve, expected, 'legacy tasks.md migration contract');
+    }
+
+    const migrationExample = improve.match(
+      /Legacy checklist migration example:[\s\S]*?Before:\s*```markdown\r?\n([\s\S]*?)\r?\n```[\s\S]*?After:\s*```markdown\r?\n([\s\S]*?)\r?\n```/i
+    );
+    assert.ok(migrationExample, 'improve prompt should include a legacy checklist before/after example');
+
+    const parseCheckboxes = (block) => block
+      .split(/\r?\n/)
+      .filter((line) => /^- \[[ xX]\]\s+\d+\.\d+\s+/.test(line))
+      .map((line) => {
+        const parsed = line.match(/^- \[([ xX])\]\s+(\d+\.\d+)\s+(.+)$/);
+        assert.ok(parsed, `expected a parseable checklist row: ${line}`);
+        return { state: parsed[1].toLowerCase(), number: parsed[2], description: parsed[3] };
+      });
+
+    const before = parseCheckboxes(migrationExample[1]);
+    const after = parseCheckboxes(migrationExample[2]);
+    assert.ok(before.length >= 2, 'legacy migration example should cover several existing checkboxes');
+    assert.equal(after.length, before.length, 'legacy migration must not split or merge task rows');
+
+    for (let index = 0; index < before.length; index += 1) {
+      assert.equal(after[index].state, before[index].state, 'legacy migration should preserve checkbox state');
+      assert.equal(after[index].number, before[index].number, 'legacy migration should preserve task number and order');
+      assert.equal(
+        after[index].description.startsWith(`${before[index].description}; verify `),
+        true,
+        'legacy migration should preserve the original action and append only verification'
+      );
+      assert.doesNotMatch(before[index].description, /\bverif(?:y|ied|ication)\b/i);
+    }
   });
 
   it('keeps verify prompt wording aligned with done-owned archive finalization', async () => {

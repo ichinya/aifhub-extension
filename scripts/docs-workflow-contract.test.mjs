@@ -1142,6 +1142,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
       'schema without a specs artifact',
       'stderr-only telemetry',
       'inline completion verification',
+      'bounded checklist migration',
       'test, command, observable behavior, or delivered artifact',
       'Zed',
       '`init --language`',

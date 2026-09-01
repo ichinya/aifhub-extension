@@ -74,6 +74,8 @@ OpenSpec `1.9.0` strict validation treats task-numbering warnings as blocking: t
 
 OpenSpec `1.10.0` strengthens task authoring guidance: every task must name its completion check inline as a test, command, observable behavior, or delivered artifact. AIFHub applies the same rule when `/aif-plan` authors a checklist and when `/aif-improve` refines one; a separate verification task is reserved for broader integration or system behavior spanning multiple implementation tasks.
 
+For a pre-existing checklist whose tasks lack that clause, `/aif-improve` performs a bounded checklist migration across every affected checkbox. It appends only the missing verification while preserving the task number, checked/unchecked state, order, original action and intent; it does not split, merge, renumber, reopen, complete, or broaden tasks solely for migration. Already compliant unrelated checkboxes remain unchanged.
+
 `openspec validate --archived` is advisory-only. It is not invoked by the shared current-change runner, `/aif-verify`, `/aif-done`, package validation scripts, tracked CI, or the release acceptance PASS boolean. If run for an informational historical snapshot, execute it separately and report its exit/count without chaining it into mandatory gates or rewriting historical archives.
 
 Generated-rule warnings suggest:

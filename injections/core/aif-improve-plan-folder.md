@@ -95,9 +95,28 @@ Preservation rules:
 - Preserve user-written sections unless they are explicitly obsolete or contradict the refined requirement.
 - Prefer patch-style edits over whole-file regeneration.
 - In `tasks.md`, require every task checkbox to state its completion verification inline through a test, command, observable behavior, or delivered artifact. Keep a separate verification task only when it checks broader integration or system behavior spanning multiple implementation tasks.
+- For a `tasks.md` created before this rule, treat every checkbox missing inline completion verification as affected by a bounded checklist migration, even when its implementation action is otherwise unrelated to the requested refinement.
+- For each migrated checkbox, preserve its task number, checked/unchecked state, order, and original action and intent. Append only the concrete verification clause needed for compliance; do not split, merge, reorder, renumber, reopen, complete, or broaden the task.
+- Leave already compliant unrelated checkboxes unchanged unless the requested refinement affects them.
 - If an artifact is missing, create only missing artifacts needed by the requested refinement.
 - When a delta spec exists, update the relevant requirement in an existing delta spec instead of regenerating the whole file.
-- Keep unrelated requirements, scenarios, task checkboxes, and design notes intact.
+- Keep unrelated requirements, scenarios, already compliant task checkboxes, and design notes intact. A checkbox missing required inline verification is part of the bounded checklist migration rather than unrelated content.
+
+Legacy checklist migration example:
+
+Before:
+
+```markdown
+- [x] 1.1 Add parser support
+- [ ] 1.2 Update usage docs
+```
+
+After:
+
+```markdown
+- [x] 1.1 Add parser support; verify focused parser tests pass
+- [ ] 1.2 Update usage docs; verify documentation contract tests pass
+```
 
 Validation and runtime state:
 

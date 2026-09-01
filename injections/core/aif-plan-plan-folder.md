@@ -250,12 +250,11 @@ The source-template proposal headings are exact and case-sensitive: `## Why`, `#
 
 ## 1. Planning and artifacts
 
-- [ ] 1.1 Create/update OpenSpec delta specs and verify strict validation accepts every changed requirement
-- [ ] 1.2 Confirm generated artifacts validate by running the configured OpenSpec validation command
+- [ ] 1.1 Create/update the OpenSpec proposal, design, tasks, and delta specs; verify the configured strict validation command accepts the complete artifact set
 
 ## 2. Implementation
 
-- [ ] 2.1 Implement the scoped behavior and verify the focused regression passes
+- [ ] 2.1 Implement the scoped behavior; verify the focused regression passes
 ```
 
 Delta specs must use OpenSpec requirement sections:
