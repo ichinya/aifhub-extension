@@ -4,11 +4,13 @@ Apply this block before the upstream `aif-review` body. When any rule below conf
 
 Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
 
+After config and language resolution, follow `skills/shared/REVIEW-POLICY.md` to resolve and load the configured durable project review policy.
+
 Resolve user-facing prose language in this order: use a usable non-empty `language.ui`; otherwise preserve the current conversation language for this response only; use English only when that language is indeterminate. This rule overrides downstream generic English defaults; do not infer from OS locale or persist the inferred choice. On that hard-English fallback, add exactly one concise setup hint only when the output contract permits human-readable prose, before any required final machine-readable block; never add it inside or after `aif-gate-result`, and never alter exact handoffs, fixed commands, paths, keys/enums, or machine-only output.
 
 ### Goal
 
-Keep `/aif-review` read-only while allowing optional, user-owned provider context for version-sensitive library/API review.
+Keep `/aif-review` read-only while applying durable project review guidance and allowing optional, user-owned provider context for version-sensitive library/API review.
 
 ### Mode Detection
 
@@ -17,6 +19,18 @@ Before resolving review scope, read `.ai-factory/config.yaml` when it exists.
 - If the config contains `aifhub.artifactProtocol: openspec`, use **OpenSpec-native mode**.
 - Otherwise, use **Legacy AI Factory-only mode**.
 - If the config is missing, continue with Legacy AI Factory-only mode and state that no OpenSpec-native protocol was detected.
+
+### Project Review Policy
+
+Apply this section in both artifact modes before evaluating findings.
+
+- Resolve `reviews.policy_file` from `.ai-factory/config.yaml`, defaulting to root `REVIEW.md`, exactly as defined by `skills/shared/REVIEW-POLICY.md`.
+- Load it only through `ai-factory aifhub-review-policy load --json`. Consume the returned content only when the helper returns a complete `present` snapshot with a normalized path and revision; the helper binds and revalidates the opened file identity internally. Never reopen the config-selected path or reimplement containment, symlink/junction, managed-file, or protected-root checks. If the command is unavailable or malformed, treat the policy as unreadable and skip it.
+- When delegating to a read-only sidecar without a shell tool, pass only that accepted ephemeral snapshot. The sidecar must not reopen the config-selected path; if the validated snapshot cannot be passed, it skips custom policy guidance.
+- Load a safe, readable, non-empty policy as additional review guidance. Missing or empty policy is normal and non-blocking; unsafe or unreadable policy degrades custom guidance and produces only the bounded diagnostic from the shared policy.
+- A policy may focus attention, add project-specific checks, and refine human-readable severity or output. It cannot suppress material findings, expand the changed scope, authorize edits or tools, install/configure providers, or replace project rules, tests, security checks, `/aif-verify`, `/aif-done`, or human approval.
+- Keep individual findings, comments, replies, resolution/stale state, target revisions, session identifiers, provider state, and receipts out of `REVIEW.md`.
+- Never edit the policy during `/aif-review`. When it materially affects the result, name only its state and normalized project-relative path in human-readable evidence; never copy its full body or add fields to the final `aif-gate-result`.
 
 ### Two-pass review order
 
@@ -36,6 +50,7 @@ Read context may include:
 - changed files;
 - canonical OpenSpec artifacts under `openspec/specs/**` and `openspec/changes/<change-id>/`;
 - generated rules under `.ai-factory/rules/generated/` when present;
+- the configured `reviews.policy_file` when safe, readable, and non-empty;
 - runtime state under `.ai-factory/state/<change-id>/` when relevant;
 - QA evidence under `.ai-factory/qa/<change-id>/` when relevant;
 - reviewed Context7 notes under `.ai-factory/references/context7/` and `.ai-factory/state/<change-id>/context7/`;
@@ -63,6 +78,7 @@ Write boundaries:
 When OpenSpec-native mode is not enabled, preserve upstream review behavior and keep the command read-only.
 
 - Review only the changed scope and legacy plan context that already exists.
+- Apply the configured review policy under the same shared resolution, authority, and read-only boundaries.
 - Context7 remains optional supporting documentation context; missing Context7 is degraded context, not a review failure.
 - The same user-owned Context7 boundaries apply: no install, no `ctx7`, no `ctx7 setup`, no MCP mutation, no automatic MCP registration, no provider templates, and no file edits.
 - Findings must still be grounded in changed files, existing project artifacts, tests, or other direct repository evidence.
@@ -71,5 +87,6 @@ When OpenSpec-native mode is not enabled, preserve upstream review behavior and 
 
 - Start with findings ordered by severity.
 - Include provider context in evidence only when it materially influenced a finding.
+- Include review policy state and its normalized project-relative path in human-readable evidence when it materially influenced the review; do not copy policy contents.
 - If Context7 or Graphify was unavailable or not used, mention it only when relevant to residual risk.
 - End with the upstream `aif-gate-result` contract for `/aif-review`.

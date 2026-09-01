@@ -66,6 +66,12 @@
       "purpose": "Directory for generated OpenSpec rules compiled by /aif-mode sync."
     },
     {
+      "key": "reviews.policy_file",
+      "required": true,
+      "since": "0.13.0",
+      "purpose": "Project-relative Markdown file containing durable code review policy; defaults to REVIEW.md at the project root."
+    },
+    {
       "key": "analyze.skill_version",
       "required": true,
       "since": "0.11.0",

@@ -124,6 +124,19 @@ The project glossary is protocol-neutral Base Context for preferred terminology.
 - Glossary contents are excluded from canonical OpenSpec authority, generated-rule inputs, QA evidence, runtime traces, provider stores, status/doctor checks, verification gates, and done readiness.
 - OKF remains deferred until a concrete producer/consumer use case justifies a separate OpenSpec change and ADR.
 
+## Project Review Policy
+
+`reviews.policy_file` configures durable, protocol-neutral code review guidance and defaults to repository-root `REVIEW.md`. Unlike Base Context, the review policy is loaded only by `/aif-review` and AIFHub review sidecars through `skills/shared/REVIEW-POLICY.md`.
+
+- `/aif-analyze` creates a missing safe scaffold through `ai-factory aifhub-review-policy scaffold --json` and preserves an existing policy during ordinary bootstrap. `/aif-mode` preserves/configures the setting but never creates or inspects the file.
+- Review consumers use `ai-factory aifhub-review-policy load --json` and never reopen the configured path. The shared resolver canonicalizes the project root and nearest existing parent, binds and revalidates the opened file identity, rejects symlink/Windows junction components and canonical escapes, and blocks managed-file collisions plus canonical OpenSpec, project/generated-rules, plan/spec, archive, runtime-state, and QA roots. Missing or empty policy is non-blocking; unsafe or unreadable policy degrades custom guidance with one bounded diagnostic.
+- Policy can add focus areas, conventions, forbidden patterns, testing/security/performance expectations, ignore/deprioritization guidance, severity/output preferences, and optional human-review stages.
+- Policy is additive guidance below source/tests, canonical OpenSpec requirements, project/generated rules, and accepted architecture decisions. It cannot suppress material findings, authorize edits or tools, expand scope, install/configure providers, or replace verification/finalization/human approval.
+- Individual findings, comments, replies, resolution/stale state, reviewed revisions, session ids, provider state, and receipts never belong in `REVIEW.md`.
+- Policy contents stay out of canonical OpenSpec artifacts, generated rules, runtime/QA evidence, provider stores, receipts, diagnostics, and the final `aif-gate-result`.
+
+See [Project Review Policy](review-policy.md) and [ADR 0003](adr/0003-durable-project-review-policy.md).
+
 ## Опциональные Context Providers
 
 Optional providers - это read-only supporting context. Они не являются command prerequisites, dependency requirements, generated rules input, QA evidence, verification gates, done gates или canonical OpenSpec sources.
@@ -246,7 +259,7 @@ GitHub access is non-blocking. If `gh`, connector data, network access, authenti
 | Command | May write canonical OpenSpec artifacts | May write runtime or QA artifacts |
 |---|---|---|
 | `/aif-mode` | skeleton only; never manual `openspec/specs/**` mutations | mode reports, generated rules, optional migration/export outputs |
-| `/aif-analyze` | Optional `openspec/` skeleton only when configured | capability/config setup; optional glossary creation or patch-update only with explicit opt-in |
+| `/aif-analyze` | Optional `openspec/` skeleton only when configured | capability/config setup; missing review-policy scaffold; optional glossary creation or patch-update only with explicit opt-in |
 | `/aif-architecture` | no | no |
 | `/aif-roadmap` | no | configured roadmap artifact, including managed local lifecycle reconciliation |
 | `/aif-docs` | no | no |
@@ -288,7 +301,7 @@ OpenSpec-native quality gates:
 | Command | Reads | Writes |
 |---|---|---|
 | `/aif-rules-check` | generated rules, project rules, changed files, optional OpenSpec context | none |
-| `/aif-review` | changed files, OpenSpec context, generated rules | none |
+| `/aif-review` | changed files, OpenSpec context, generated rules, configured review policy | none |
 | `/aif-security-checklist` | changed files, OpenSpec context, generated rules | none |
 | `/aif-verify` | canonical OpenSpec artifacts, generated rules, runtime state, gate outputs when available | `.ai-factory/qa/<change-id>/` |
 | `/aif-done` | passing verify evidence, verify gate result, OpenSpec change | final QA/state evidence, OpenSpec archive via CLI, then one managed `finalized` roadmap row when linked |
@@ -420,3 +433,5 @@ If `.ai-factory/config.yaml` is missing or incomplete:
 - [Legacy Plan Migration](legacy-plan-migration.md)
 - [ADR 0001](adr/0001-openspec-native-artifact-protocol.md)
 - [ADR 0002: Optional Project Glossary](adr/0002-optional-project-context-glossary.md)
+- [Project Review Policy](review-policy.md)
+- [ADR 0003: Durable Project Review Policy](adr/0003-durable-project-review-policy.md)
