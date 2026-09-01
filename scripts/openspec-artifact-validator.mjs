@@ -6,7 +6,9 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import {
+  matchesSourceBoundChangeId,
   normalizeChangeId,
+  parseWorkItemSourceBinding,
   resolveActiveChange as defaultResolveActiveChange
 } from './active-change-resolver.mjs';
 import {
@@ -101,6 +103,7 @@ export async function validateOpenSpecArtifactContract(options = {}) {
   const skipSpecs = await readOpenSpecSkipSpecsMarker(changeDir);
 
   checks.push(...inspectRequiredArtifacts(artifacts));
+  checks.push(inspectWorkItemSourceBinding(changeId, artifacts.proposal));
   checks.push(inspectDesignArtifact(artifacts.design, config.requireDesign));
   checks.push(inspectDeltaSpecs(artifacts, config, skipSpecs, rootDir));
   checks.push(...await inspectPlanningArtifacts(rootDir, changeDir));
@@ -226,6 +229,51 @@ function inspectRequiredArtifacts(artifacts) {
         ? `${artifactName} is present.`
         : `${artifactName} is required for an AIFHub OpenSpec change.`
     });
+  });
+}
+
+function inspectWorkItemSourceBinding(changeId, proposal) {
+  const checkPath = proposal?.path ?? `openspec/changes/${changeId}/proposal.md`;
+  const parsed = parseWorkItemSourceBinding(proposal?.content ?? '');
+
+  if (!parsed.ok) {
+    return createCheck({
+      id: 'issue-source-binding',
+      status: 'fail',
+      path: checkPath,
+      message: 'The reserved AIFHub source binding is malformed.',
+      details: {
+        rule_code: parsed.error.code
+      }
+    });
+  }
+
+  if (parsed.status === 'absent') {
+    return createCheck({
+      id: 'issue-source-binding',
+      status: 'pass',
+      path: checkPath,
+      message: 'No MCP work-item source binding is declared for this change.'
+    });
+  }
+
+  if (!matchesSourceBoundChangeId(changeId, parsed.binding.externalId)) {
+    return createCheck({
+      id: 'issue-source-binding',
+      status: 'fail',
+      path: checkPath,
+      message: 'The OpenSpec change id must start with the normalized external ID followed by a request slug.',
+      details: {
+        rule_code: 'source-binding-change-id-mismatch'
+      }
+    });
+  }
+
+  return createCheck({
+    id: 'issue-source-binding',
+    status: 'pass',
+    path: checkPath,
+    message: 'The provider, primary source, external ID, and branch binding match the source-bound change id.'
   });
 }
 
@@ -813,6 +861,13 @@ function createCheck({ id, status, path: checkPath, message, details }) {
 
 function chooseSuggestedNext(changeId, checks) {
   const failing = checks.find((check) => check.status === 'fail');
+
+  if (failing?.id === 'issue-source-binding') {
+    return {
+      command: `/aif-fix ${changeId}`,
+      reason: 'repair the malformed or mismatched AIFHub source binding before continuing'
+    };
+  }
 
   if (failing?.id === 'generated-rules-current') {
     return {

@@ -1335,6 +1335,100 @@ describe('complete OpenSpec workflow documentation contract', () => {
     }
   });
 
+  it('documents provider-neutral MCP work-item IDs across OpenSpec and legacy modes', async () => {
+    const readme = await readRepoFile('README.md');
+    const usage = await readRepoFile('docs/usage.md');
+    const compatibility = await readRepoFile('docs/openspec-compatibility.md');
+    const resolver = await readRepoFile('docs/active-change-resolver.md');
+    const changelog = await readRepoFile('CHANGELOG.md');
+    const planUsage = extractSection(usage, '### `/aif-plan full`');
+    const planPolicy = extractSection(compatibility, '## Workflow Plan ID Policy');
+    const unreleased = extractSection(changelog, '## [В разработке]');
+
+    for (const expected of [
+      'GitHub, Linear, Jira, YouGile',
+      '`156-fix-login`',
+      '`eng-431-fix-login`',
+      'persist provider, full primary source, external ID, and creation branch separately',
+      'resolver checks one exact binding before slug matching',
+      'current pointer to disambiguate several plans intentionally created on the same branch',
+      'contains unrelated malformed bindings to warnings',
+      'Ambiguous multi-item input keeps ordinary allocation',
+      'collisions fail closed'
+    ]) {
+      assertIncludes(readme, expected, 'README.md MCP work-item plan identity');
+    }
+
+    for (const expected of [
+      'exactly one explicit primary work item',
+      '`156-fix-login-timeout`',
+      '`eng-431-fix-login-timeout`',
+      '`proj-77-refresh-token`',
+      '`yougile-a1b2c3d4-refresh-token`',
+      'A bare number, PR URL, branch name, title, label, milestone, or discovered search result does not establish this binding',
+      'explicitly primary',
+      '`source-plan-id-collision`',
+      '## AIFHub Source Binding',
+      'Provider: linear',
+      'Primary source: mcp://linear/issue/6a1f24c8',
+      'External ID: ENG-431',
+      'secondary reference in `Roadmap Linkage.Issues`',
+      'source_binding.primary_source',
+      'source_binding.external_id',
+      'source_binding.branch',
+      'one exact binding is checked before ordinary slug branch variants',
+      'complete resolved change ID to the current-change pointer',
+      'pointer selects one of the exact candidates',
+      'unrelated invalid binding becomes a warning',
+      'roadmap-list membership and external-ID equality are insufficient'
+    ]) {
+      assertIncludes(planUsage, expected, 'docs/usage.md MCP work-item plan identity');
+    }
+
+    for (const expected of [
+      'takes precedence over ordinary new-plan allocation',
+      '`openspec/changes/156-fix-login-timeout/`',
+      '`openspec/changes/eng-431-fix-login-timeout/`',
+      '`0042_PROJ-77-refresh-token`',
+      '`source-plan-id-collision`',
+      '`HANDOFF_BRANCH_PREPARED=1` retains upstream precedence',
+      'source-bound proposal persists one exact `## AIFHub Source Binding` with `Provider`, `Primary source`, `External ID`, and `Branch`',
+      'secondary links and equal external IDs never satisfy a collision check',
+      'source_binding.primary_source',
+      'source_binding.external_id',
+      'source_binding.branch',
+      'same full `Primary source`'
+    ]) {
+      assertIncludes(planPolicy, expected, 'docs/openspec-compatibility.md Workflow Plan ID Policy');
+    }
+
+    for (const expected of [
+      'Current git branch matched to one exact persisted `## AIFHub Source Binding`',
+      '`source-binding-change-id-mismatch`',
+      '`ambiguous-branch-binding`',
+      '`ambiguous-branch-binding-disambiguated`',
+      '`parseWorkItemSourceBinding()`',
+      '`parseSynchronizedWorkItemSourceBinding()`',
+      '`matchesPrimarySourceBinding()`',
+      '`deriveSourceBoundChangeId()`',
+      'another repository, tenant, or provider never matches by key alone',
+      'source `branch-binding` before ordinary slug matching',
+      'may disambiguate only by naming one of those candidates',
+      'one unrelated artifact cannot block every command in the repository'
+    ]) {
+      assertIncludes(resolver, expected, 'docs/active-change-resolver.md source binding');
+    }
+
+    for (const expected of [
+      'GitHub, Linear, Jira, YouGile',
+      '`<external-id>-<request-slug>`',
+      'primary source',
+      'four-digit compatibility prefix'
+    ]) {
+      assertIncludes(unreleased, expected, 'CHANGELOG.md unreleased MCP work-item plan identity');
+    }
+  });
+
   it('documents bounded generated-rules reconciliation across tracked source surfaces', async () => {
     const readme = await readRepoFile('README.md');
     const usage = await readRepoFile('docs/usage.md');

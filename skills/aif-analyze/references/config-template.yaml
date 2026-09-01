@@ -66,6 +66,14 @@ paths:
   rules: .ai-factory/rules
 
 # ============================================================================
+# REVIEW CONFIGURATION
+# ============================================================================
+# Durable project review policy. /aif-analyze creates the file when missing;
+# review commands consume it read-only.
+reviews:
+  policy_file: REVIEW.md
+
+# ============================================================================
 # OPTIONAL UTILITIES
 # ============================================================================
 # Optional, user-owned tools that can provide extra context.

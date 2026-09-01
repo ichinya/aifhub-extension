@@ -13,6 +13,7 @@ import {
 } from './openspec-runner.mjs';
 import {
   countActiveStandaloneMarker,
+  findExactMarkdownH2Sections,
   maskMarkdownCode,
   ULTRA_PLAN_MARKER
 } from './markdown-structural-markers.mjs';
@@ -854,27 +855,10 @@ function countLiteral(content, literal) {
 }
 
 function extractMarkdownSection(content, heading) {
-  const lines = String(content ?? '').split(/\r?\n/);
-  const indexes = [];
-  for (let index = 0; index < lines.length; index += 1) {
-    if (lines[index].trim() === `## ${heading}`) {
-      indexes.push(index);
-    }
-  }
-
-  if (indexes.length !== 1) {
-    return { matches: indexes.length, content: '' };
-  }
-
-  const body = [];
-  for (let index = indexes[0] + 1; index < lines.length; index += 1) {
-    if (/^##\s+/.test(lines[index])) {
-      break;
-    }
-    body.push(lines[index]);
-  }
-
-  return { matches: 1, content: body.join('\n') };
+  const sections = findExactMarkdownH2Sections(content, heading);
+  return sections.length === 1
+    ? { matches: 1, content: sections[0].join('\n') }
+    : { matches: sections.length, content: '' };
 }
 
 function isSafeDirectPhaseLink(target) {

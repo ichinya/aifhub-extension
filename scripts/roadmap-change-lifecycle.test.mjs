@@ -81,6 +81,23 @@ describe('roadmap change lifecycle helper', () => {
     });
   });
 
+  it('accepts canonical HTTPS and MCP work-item references from different providers', () => {
+    const result = parseRoadmapLinkage(`## Roadmap Linkage
+
+- Issues: https://linear.app/acme/issue/ENG-431/fix-login, https://acme.atlassian.net/browse/PROJ-77, mcp://yougile/task/a1b2c3d4
+- Milestone: none
+- Roadmap item/slice: Cross-provider intake
+- Rationale: One primary item plus supporting work items.
+`);
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.linkage.issues, [
+      'https://acme.atlassian.net/browse/PROJ-77',
+      'https://linear.app/acme/issue/ENG-431/fix-login',
+      'mcp://yougile/task/a1b2c3d4'
+    ]);
+  });
+
   it('distinguishes missing, explicit-none, and malformed linkage without returning proposal text', () => {
     const missing = parseRoadmapLinkage('# Proposal\n\n## Intent\n\nNo linkage.\n');
     const unlinked = parseRoadmapLinkage(`## Roadmap Linkage

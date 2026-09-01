@@ -6,7 +6,7 @@ artifact_status: archived
 owner: aif-done
 created_at: {{start_date}}
 updated_at: {{archive_date}}
-source_issue: {{issue_number}}
+source_work_item: "{{work_item_reference}}"
 source_plan: "{{plan_id}}"
 ---
 
@@ -95,7 +95,7 @@ source_plan: "{{plan_id}}"
 |------|-----------|
 | Original Plan | `.ai-factory/plans/{{plan_id}}/` |
 | Plan File | `.ai-factory/plans/{{plan_id}}.md` |
-| Issue | #{{issue_number}} |
+| Work item | {{work_item_reference}} |
 | PR | #{{pr_number}} |
 | Branch | `{{branch_name}}` |
 
