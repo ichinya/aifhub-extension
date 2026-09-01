@@ -254,11 +254,12 @@ export async function runReviewPolicyCommand(argv = process.argv.slice(2), optio
       stdout: parsed.json ? `${JSON.stringify(publicResult, null, 2)}\n` : `${renderSummary(publicResult)}\n`,
       stderr: ''
     };
-  } catch {
+  } catch (error) {
+    const errorCode = sanitizeErrorCode(error?.code);
     return {
       exitCode: 1,
       stdout: '',
-      stderr: 'Review policy resolver failed without reading or writing the configured policy.\n'
+      stderr: `Review policy resolver failed without reading or writing the configured policy.${errorCode ? ` Code: ${errorCode}.` : ''}\n`
     };
   }
 }
@@ -549,7 +550,11 @@ function contentRevision(content) {
 }
 
 function normalizeMaxBytes(value, fallback) {
-  return Number.isSafeInteger(value) && value > 0 ? value : fallback;
+  return Number.isSafeInteger(value) && value > 0 ? Math.min(value, fallback) : fallback;
+}
+
+function sanitizeErrorCode(value) {
+  return typeof value === 'string' && /^[A-Z][A-Z0-9_]{0,63}$/.test(value) ? value : null;
 }
 
 function isPortableSegment(segment) {

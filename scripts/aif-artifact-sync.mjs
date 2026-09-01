@@ -2049,7 +2049,7 @@ function renderReviewsBlock(blocks) {
     return existing;
   }
 
-  if (/^  policy_file:(?:\s|$)/m.test(existing)) {
+  if (/^[ \t]+policy_file:(?:\s|$)/m.test(existing)) {
     return existing;
   }
 

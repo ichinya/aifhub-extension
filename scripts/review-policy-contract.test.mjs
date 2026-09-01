@@ -63,6 +63,21 @@ describe('durable project review policy', () => {
     assert.equal((custom.match(/^reviews:$/gm) ?? []).length, 1);
     assert.equal((custom.match(/^  policy_file:/gm) ?? []).length, 1);
 
+    for (const indentation of ['    ', '\t']) {
+      const indented = renderConfigForMode([
+        'reviews:',
+        `${indentation}policy_file: docs/indented-review.md`,
+        ''
+      ].join('\n'), 'ai-factory');
+      assert.equal(
+        (indented.match(/^[ \t]+policy_file:/gm) ?? []).length,
+        1,
+        `reviews.policy_file with ${JSON.stringify(indentation)} indentation must not be duplicated`
+      );
+      assert.match(indented, /^[ \t]+policy_file: docs\/indented-review\.md$/m);
+      assert.doesNotMatch(indented, /^  policy_file: REVIEW\.md$/m);
+    }
+
     const completed = renderConfigForMode('reviews:\n  custom_setting: keep\n', 'ai-factory');
     assert.match(completed, /reviews:\n  custom_setting: keep\n  policy_file: REVIEW\.md/);
   });
@@ -467,21 +482,52 @@ describe('review policy canonical resolver', () => {
     assert.doesNotMatch(loadCommand.stdout, /aifhub-review-policy-cli-/);
   });
 
+  it('reports only a bounded error code for unexpected command failures', async () => {
+    const rootDir = await createTemporaryRoot('coded-error');
+    const error = new Error('private implementation detail');
+    error.code = 'E_TEST_FAILURE';
+    const config = new Proxy({}, {
+      get() {
+        throw error;
+      }
+    });
+
+    const command = await runReviewPolicyCommand(['resolve', '--json'], { rootDir, config });
+
+    assert.equal(command.exitCode, 1);
+    assert.equal(command.stdout, '');
+    assert.match(command.stderr, /Code: E_TEST_FAILURE\./);
+    assert.doesNotMatch(command.stderr, /private implementation detail|coded-error/);
+  });
+
   it('rejects oversized, invalid UTF-8, and NUL-bearing policy snapshots', async () => {
     const rootDir = await createTemporaryRoot('content-safety');
     await writeFixture(rootDir, 'large.md', '#'.repeat(32));
+    await writeFixture(rootDir, 'default-limit.md', '#'.repeat((256 * 1024) + 1));
     await writeFixture(rootDir, 'invalid.md', Buffer.from([0xff, 0xfe, 0xfd]));
     await writeFixture(rootDir, 'with-nul.md', Buffer.from('# Review\0hidden\n', 'utf8'));
 
     const large = await loadReviewPolicy({ rootDir, config: {}, policyFile: 'large.md', maxPolicyBytes: 8 });
+    const clamped = await loadReviewPolicy({
+      rootDir,
+      config: {},
+      policyFile: 'default-limit.md',
+      maxPolicyBytes: Number.MAX_SAFE_INTEGER
+    });
     const invalid = await loadReviewPolicy({ rootDir, config: {}, policyFile: 'invalid.md' });
     const nul = await loadReviewPolicy({ rootDir, config: {}, policyFile: 'with-nul.md' });
 
     assert.deepEqual(
-      [large.reason, invalid.reason, nul.reason],
-      ['review-policy-too-large', 'review-policy-encoding-invalid', 'review-policy-encoding-invalid']
+      [large.reason, clamped.reason, invalid.reason, nul.reason],
+      [
+        'review-policy-too-large',
+        'review-policy-too-large',
+        'review-policy-encoding-invalid',
+        'review-policy-encoding-invalid'
+      ]
     );
     assert.equal(large.content, null);
+    assert.equal(clamped.content, null);
     assert.equal(invalid.content, null);
     assert.equal(nul.content, null);
   });
