@@ -1,8 +1,8 @@
 ---
 name: aif-analyze
-description: Bootstrap project context. Resolves localization and stack, creates/updates config.yaml and rules/base.md, then checks DESCRIPTION and guides core skill execution.
+description: Bootstrap project context. Resolves localization and stack, creates/updates config.yaml, rules/base.md, and REVIEW.md, then checks DESCRIPTION and guides core skill execution.
 allowed-tools: Read Write Edit Glob Grep Bash(mkdir *) Bash(ai-factory aifhub-analyze-config-diff *) Bash(ai-factory aifhub-memory-tools *) Bash(ai-factory aifhub-mode status --json) Bash(node --input-type=module -e *openspec-runner.mjs*) Bash(rg --version) Bash(uv --version) Bash(graphify --version) Bash(graphify --help) Bash(codex-agent-mem-policy --help) Bash(codex-agent-mem-smoke --help) Bash(codegraph --version) Bash(codegraph --help) Bash(codegraph status) Bash(ctx7 --version) Bash(npx --no-install ctx7 --help) Bash(openspec init --tools none) Skill AskUserQuestion Questions
-version: 0.12.0
+version: 0.13.0
 author: ichi
 ---
 
@@ -16,6 +16,7 @@ Bootstrap project context for AI Factory. This skill prepares configuration and 
 |----------|-------|------------|
 | `config.yaml` | **aif-analyze** | Creates/updates |
 | `rules/base.md` | **aif-analyze** | Creates if missing |
+| `reviews.policy_file` / review policy | **aif-analyze** | Registers the path and creates the scaffold if missing; preserves existing policy |
 | `paths.context` / project glossary | **aif-analyze** | Registers the path; creates or patch-updates only with explicit user opt-in |
 | `DESCRIPTION.md` | core `aif` | Checks existence, suggests the selected runtime invocation (`$aif` for `codex-app`, `/aif` for slash-command runtimes) if missing |
 | `ARCHITECTURE.md` | core `aif-architecture` | Initiates the selected runtime invocation based on workflow flag |
@@ -249,7 +250,8 @@ Resolve the bootstrap/config mode before creating directories:
 - Config diagnostics may report only sorted changed and preserved key paths plus bounded counts. Never include config values, environment data, credentials, tokens, raw provider output, or private absolute paths.
 - Preserve existing `language.ui`, `language.artifacts`, and `language.technical_terms` values. If `language.technical_terms` is missing, default it to `keep`; accepted values are `keep | translate | mixed`.
 - If localization answers were collected while config was missing, write those pending config values into the selected legacy `ai-factory` or `openspec-native` config shape.
-- Keep schema consistent with nested sections: `language`, `aifhub`, `paths`, `utilities`, `rules`, `workflow`.
+- Keep schema consistent with nested sections: `language`, `aifhub`, `paths`, `reviews`, `utilities`, `rules`, `workflow`.
+- Register or preserve `reviews.policy_file`; use `REVIEW.md` when the key is missing. This protocol-neutral setting applies in both legacy `ai-factory` and `openspec-native` modes.
 - Preserve existing `aifhub.contextDedup` values, add only missing keys, and never enable context dedup automatically. The optional profile is protocol-neutral and disabled by default. `enabled: false|true` remains a legacy read-compatible alias for `mode: off|aifhub`, but new config MUST use the type-stable mode enum:
 
 ```yaml
@@ -378,6 +380,19 @@ Use [references/config-template.yaml](references/config-template.yaml) as refere
 - Use [references/project-glossary-template.md](references/project-glossary-template.md) as the allowed lexical shape. Do not place requirements, project rules, architecture decisions, task notes, provider output, or scratch notes in the glossary.
 - In the final handoff, report the glossary status as `created`, `updated`, `preserved`, or `skipped` and include only its project-relative path. Never include glossary contents in the handoff.
 
+### Step 3.3: Project Review Policy
+
+`/aif-analyze` owns initial review-policy scaffolding. The configured policy is durable project guidance for review commands, not a review-session transcript or a replacement for project rules, tests, verification, or human approval.
+
+- Resolve the non-empty `reviews.policy_file` value; use `REVIEW.md` when the key is missing or empty. The default therefore creates the file at the project root for cross-agent discovery.
+- Accept only a normalized project-relative Markdown file path that remains inside the project root. Reject absolute paths, URI-like values, paths that escape the project root, non-Markdown targets, and directory targets. Do not read or write a rejected target.
+- On rejection, emit one sanitized warning with the reason and continue without creating the review policy. Do not print an external absolute path or file contents.
+- If the safe target is missing, create it from [references/review-policy-template.md](references/review-policy-template.md). Replace guidance comments with concrete project rules only when direct repository evidence supports them; preserve comment prompts for unresolved sections instead of inventing policy.
+- If the target exists, preserve it byte-for-byte during ordinary bootstrap. Patch it only when the user explicitly requests a policy edit, and preserve manual and unknown sections.
+- Keep durable content bounded to review focus areas, project conventions and forbidden patterns, testing/security/performance expectations, ignore or deprioritization guidance, severity policy, output preferences, and optional human-review stages.
+- Never store individual findings, line comments, selected quotes, reviewer identities, replies, addressed/resolved/stale state, target revisions, session ids, receipts, credentials, provider configuration, hooks, or unrestricted external commands in the policy file.
+- In the final handoff, report review policy status as `created`, `preserved`, or `skipped` plus its normalized project-relative path. Never include policy contents in the handoff.
+
 ### Step 3.5: Detect OpenSpec Capabilities
 
 Run this step only in `openspec-native` mode, after config mode is resolved and before directory creation.
@@ -451,7 +466,7 @@ openspec:
 
 ### Step 5: Ensure Directories Exist
 
-- Create only directory-valued configured paths. File-valued paths such as `paths.description`, `paths.architecture`, `paths.context`, `paths.roadmap`, and `paths.research` must never be created as directories.
+- Create only directory-valued configured paths. File-valued settings such as `paths.description`, `paths.architecture`, `paths.context`, `paths.roadmap`, `paths.research`, and `reviews.policy_file` must never be created as directories.
 
 - In legacy `ai-factory` mode, create directories from config paths if missing:
   - `paths.plans` (typically `.ai-factory/plans`)
@@ -487,12 +502,13 @@ openspec init --tools none
 ### Step 7: Finish with Guided Handoff
 
 - Use the saved scope plus preferred language for the reply.
-- Mention created/updated files: `config.yaml`, `rules/base.md`, and artifact status (`DESCRIPTION.md`, `ARCHITECTURE.md`, `ROADMAP.md`).
+- Mention created/updated files: `config.yaml`, `rules/base.md`, the configured review policy, and artifact status (`DESCRIPTION.md`, `ARCHITECTURE.md`, `ROADMAP.md`).
 - If a `Control Flow` rule was generated, report the evidence paths and patterns that support it. If it was omitted or left unresolved, say that repository evidence was insufficient or mixed; do not substitute unsupported generic advice.
 - Report the resolved bootstrap mode.
 - Report the bootstrap mode selection source: existing config, explicit user request, first-bootstrap answer, or autonomous default.
 - Report whether config values were created or preserved.
 - Report the optional glossary status as `created`, `updated`, `preserved`, or `skipped` plus its project-relative path; never report glossary contents.
+- Report the review policy status as `created`, `preserved`, or `skipped` plus its normalized project-relative path; never report policy contents.
 - Report project labels from `ai-factory aifhub-memory-tools labels --from-project --json` first: languages, volume, complexity, repo shape, artifact mode, project shape, task signals, matched dimension signals, and short evidence for the labels that affected recommendations.
 - Report optional local tool recommendations from explicit-label `ai-factory aifhub-memory-tools recommend --command aif-analyze ... --json` output when the installed wrapper is available, or from source-tree metadata only when running inside the AIFHub extension repository. Include baseline `rg`, enablement-eligible `recommendations` with availability/read scope/purge path/skill usefulness, separate non-configurable `manual_guidance`, and not-recommended tools with label-based reasons such as `codex-mem`, `eagle-mem`, tools forbidden for the skill, or tools without exact skill+label evidence. Ask which entries from `recommendations` to enable and write only those accepted tool ids to `utilities.context_tools.enabled`; never enable `manual_guidance`. If metadata is unavailable, report a degraded note and continue.
 - Report that follow-on skills select their own usable subset with `ai-factory aifhub-memory-tools select --from-project --command <skill> --json`; enabled config entries are not permission to use a tool unless they appear in `selected_tools`.
@@ -531,6 +547,9 @@ rules:
   base: .ai-factory/rules/base.md
   # area rules added by planning when needed
 
+reviews:
+  policy_file: REVIEW.md
+
 utilities:
   graphify:
     enabled: false
@@ -557,6 +576,9 @@ paths:
   plans: .ai-factory/plans
   specs: .ai-factory/specs
   rules: .ai-factory/rules
+
+reviews:
+  policy_file: REVIEW.md
 ```
 
 OpenSpec-native profile:
@@ -602,12 +624,15 @@ paths:
   state: .ai-factory/state
   qa: .ai-factory/qa
   generated_rules: .ai-factory/rules/generated
+
+reviews:
+  policy_file: REVIEW.md
 ```
 
 ## Rules
 
 - Use evidence over assumptions.
-- Create/update `config.yaml` and `rules/base.md` first.
+- Create/update `config.yaml`, `rules/base.md`, and the missing configured review-policy scaffold first.
 - Use OpenSpec-native mode only when explicitly requested, when existing config has `aifhub.artifactProtocol: openspec`, or when the user selects `OpenSpec-native` in the first-bootstrap artifact protocol question.
 - Do not write a missing config with a default artifact protocol before first-bootstrap artifact protocol resolution completes.
 - In OpenSpec-native mode, use `detectOpenSpec()` from `scripts/openspec-runner.mjs` when available and treat missing or unsupported CLI as degraded capability, not failure.
@@ -619,8 +644,9 @@ paths:
 - If DESCRIPTION is missing, suggest the selected runtime invocation for `aif` first (`$aif` for `codex-app`, `/aif` for slash-command runtimes).
 - Follow workflow flags to suggest or initiate the selected runtime invocation for `aif-architecture` and `aif-roadmap`.
 - Create `rules/base.md` with project-specific rules, not generic advice.
+- Create a missing safe `reviews.policy_file` from the review-policy template, defaulting to root `REVIEW.md`; preserve an existing policy during ordinary bootstrap.
 - Do NOT create optional area rules — planning owns those when needed.
-- Ensure all directory-valued config paths exist; never create file-valued paths such as `paths.context` as directories.
+- Ensure all directory-valued config paths exist; never create file-valued settings such as `paths.context` or `reviews.policy_file` as directories.
 - Keep the result concise and repository-specific.
 
 ## Example Requests

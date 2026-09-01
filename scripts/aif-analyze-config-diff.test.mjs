@@ -132,7 +132,7 @@ describe('analyze config required-keys diff', () => {
     const rootDir = await createTempRoot();
     await createConfigFixture(
       rootDir,
-      renderConfigForMode('', 'ai-factory', { analyzeSkillVersion: '0.12.0' })
+      renderConfigForMode('', 'ai-factory', { analyzeSkillVersion: '0.13.0' })
     );
 
     const result = await buildAnalyzeConfigDiff({ rootDir });
@@ -140,6 +140,23 @@ describe('analyze config required-keys diff', () => {
     assert.equal(result.ok, true);
     assert.equal(result.up_to_date, true);
     assert.deepEqual(result.missing, []);
+  });
+
+  it('reports the durable review policy key for configs created by the previous analyze version', async () => {
+    const rootDir = await createTempRoot();
+    const previousConfig = renderConfigForMode('', 'ai-factory', {
+      analyzeSkillVersion: '0.12.0'
+    }).replace(/\nreviews:\n  policy_file: REVIEW\.md\n/, '\n');
+    await createConfigFixture(rootDir, previousConfig);
+
+    const result = await buildAnalyzeConfigDiff({ rootDir });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.up_to_date, false);
+    assert.equal(result.version_drift, true);
+    assert.equal(result.config_analyze_version, '0.12.0');
+    assert.deepEqual(result.missing.map((item) => item.key), ['reviews.policy_file']);
+    assert.match(result.missing[0].purpose, /REVIEW\.md at the project root/);
   });
 
   it('reports a mode-specific required key for its matching artifact protocol', async () => {

@@ -80,6 +80,19 @@ The key is valid in OpenSpec-native and legacy AI Factory-only profiles, and a c
 
 `/aif-analyze` is the only AIFHub writer. Creation requires explicit opt-in plus concrete source-grounded terms; updates require an explicit request or accepted proposal and preserve manual/unknown sections. All other commands are read-only consumers. The glossary affects prose only and cannot override source/tests, canonical OpenSpec requirements, project rules, accepted architecture decisions, or verifiable QA facts. See [Context Loading Policy](context-loading-policy.md) and [ADR 0002](adr/0002-optional-project-context-glossary.md).
 
+## Project Review Policy
+
+Projects configure durable code review guidance independently of artifact mode:
+
+```yaml
+reviews:
+  policy_file: REVIEW.md
+```
+
+`/aif-analyze` creates a missing safe scaffold at the configured project-relative Markdown path; the default is repository-root `REVIEW.md` for cross-agent discovery. Existing policy is preserved during ordinary bootstrap, and `/aif-mode` preserves the setting without creating or inspecting the file.
+
+`/aif-review` and the AIFHub review sidecars consume the policy read-only as additive guidance. It may focus review or add checks, but cannot suppress material findings, expand scope, authorize edits/tools, or replace project rules, tests, security checks, `/aif-verify`, `/aif-done`, or human approval. Per-review findings, comments, replies, resolution/stale state, revisions, provider state, and receipts do not belong in the durable policy. See [Project Review Policy](review-policy.md) and [ADR 0003](adr/0003-durable-project-review-policy.md).
+
 ## Опциональные Context Providers
 
 Context providers - ручные, user-owned research aids. AIFHub может читать reviewed provider notes как optional supporting context, но provider availability всегда degraded behavior и никогда не является validation, verification, review, rules, security, done или commit gate.
@@ -394,11 +407,13 @@ Reads:
 - project files and repository metadata
 - existing `.ai-factory/config.yaml` when present
 - existing rules/context artifacts when present
+- existing configured review policy when present
 
 Writes:
 
 - `.ai-factory/config.yaml`
 - `.ai-factory/rules/base.md`
+- missing safe `reviews.policy_file` scaffold (`REVIEW.md` by default)
 - configured `paths.context` project glossary only after explicit user opt-in
 - optional OpenSpec-native skeleton paths such as `openspec/specs/`, `openspec/changes/`, `.ai-factory/state/`, `.ai-factory/qa/`, and `.ai-factory/rules/generated/`
 
@@ -408,6 +423,7 @@ Does not write:
 - canonical change artifacts for a feature request
 - `.ai-factory/plans` in OpenSpec-native mode
 - an empty or unapproved glossary placeholder
+- an existing review policy during ordinary bootstrap
 
 Select OpenSpec-native mode explicitly by asking for it or by starting from config with:
 
@@ -775,6 +791,7 @@ Reads:
 
 - changed files
 - OpenSpec context and generated rules when available
+- configured `reviews.policy_file` (`REVIEW.md` by default) when safe, readable, and non-empty
 - optional reviewed Context7 notes under `.ai-factory/references/context7/` or `.ai-factory/state/<change-id>/context7/` for version-sensitive API review
 
 Writes:
@@ -782,6 +799,8 @@ Writes:
 - none
 
 `/aif-review` is an optional read-only code review gate. It returns a final `aif-gate-result` with `gate: "review"`, is useful before `/aif-verify` or for high-risk changes, and does not write OpenSpec, runtime, or QA artifacts.
+
+The configured review policy is additional guidance, not standalone evidence that a defect exists. Missing or empty policy is non-blocking; unsafe or unreadable policy degrades custom guidance. When policy materially affects a result, the review may name only its state and normalized project-relative path in human-readable evidence and never copies the full policy into `aif-gate-result`.
 
 Review findings may use Context7 as supporting documentation context only. Findings still need changed-file evidence, canonical OpenSpec context, generated rules, runtime state, QA evidence, or other direct repository evidence; missing Context7 is degraded context, not a review failure.
 
@@ -1168,6 +1187,8 @@ See [Codex Plan Mode](codex-plan-mode.md) for question-format guidance.
 | Ambiguous active change | More than one active change can be selected. | Pass `<change-id>` explicitly or update `.ai-factory/state/current.yaml`. |
 | Missing generated rules | Derived rules are absent. | Regenerate `.ai-factory/rules/generated/*.md` from OpenSpec specs before relying on rules guidance. |
 | Stale generated rules | Generated rules do not match canonical OpenSpec artifacts. | Regenerate them; do not edit generated rules as source of truth. |
+| Missing `REVIEW.md` | No custom durable review guidance is available. | Continue with the standard review contract, or run `/aif-analyze` to create the configured scaffold. |
+| Unsafe review policy path | `reviews.policy_file` is absolute, URI-like, escaping, non-Markdown, or a directory. | Configure a normalized project-relative Markdown path; review continues without custom policy. |
 | Missing or stale coverage | `.ai-factory/qa/<change-id>/coverage.json` is absent or fingerprints no longer match source artifacts. | Rerun `/aif-verify <change-id>` to regenerate coverage before `/aif-done`. |
 | Artifact contract failure | Canonical OpenSpec artifacts, runtime state, QA evidence, or generated rules violate the AIFHub contract. | Fix the reported path or run the suggested command from `artifactContract.suggested_next`. |
 | Dirty working tree before `/aif-done` | Finalization cannot prove archive/summary scope safely. | Inspect with `git status --short`; commit or stash unrelated changes, or rerun `ai-factory aifhub-done-finalizer --change <change-id> --record-dirty-state --json` to record the dirty workspace in final QA evidence before archive. |
@@ -1224,3 +1245,5 @@ npm test
 - [Active Change Resolver](active-change-resolver.md)
 - [ADR 0001](adr/0001-openspec-native-artifact-protocol.md)
 - [ADR 0002: Optional Project Glossary](adr/0002-optional-project-context-glossary.md)
+- [Project Review Policy](review-policy.md)
+- [ADR 0003: Durable Project Review Policy](adr/0003-durable-project-review-policy.md)

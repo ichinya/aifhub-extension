@@ -7,6 +7,7 @@
 ## [В разработке]
 
 ### Добавлено
+- Configurable durable review policy `reviews.policy_file` с root-default `REVIEW.md`: `/aif-analyze` создаёт missing safe scaffold, `/aif-mode` сохраняет путь без file lifecycle, а `/aif-review` и namespaced review sidecars читают policy только как additive guidance; per-session comments, resolution state, provider state и receipts остаются вне policy.
 - Exact-tagged OpenSpec `1.9.0` compatibility evidence с независимыми Git source custody (`v1.9.0`, commit `2826b8889e5223a9a8095d4428b60b56597e1020`, compare `v1.8.0...v1.9.0`) и npm executable custody (`@fission-ai/openspec@1.9.0`, integrity, shasum, bin и Node engine `>=20.19.0`). Локальный extracted-package smoke не заявляется как CI, deployment или production evidence.
 - Deterministic regressions для strict/non-strict task numbering, arbitrary nested scenario loss, rootless list/bulk/schemas behavior, invalid archive no-mutation и archive serialization с preserved blank lines и ровно одним final newline.
 - Negative repository contract, удерживающий `openspec validate --archived` вне package scripts, tracked CI, shared runner argv, `/aif-verify`, `/aif-done` и release acceptance PASS boolean.

@@ -99,6 +99,8 @@ Run after code changes and before verification starts:
 
 All sidecars are read-only and end with final `aif-gate-result`.
 
+`aifhub-review-sidecar` additionally resolves `reviews.policy_file` (`REVIEW.md` by default) through the shared safe-path policy and applies it as read-only, additive review guidance. Missing policy is non-blocking, and session comments or resolution state are never written back to it.
+
 ### Verification and fix loop
 
 - `aifhub-verifier`

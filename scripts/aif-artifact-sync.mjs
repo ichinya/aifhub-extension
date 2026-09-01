@@ -106,6 +106,7 @@ const DEFAULT_CONTEXT_PATHS = {
   roadmap: '.ai-factory/ROADMAP.md',
   research: '.ai-factory/RESEARCH.md'
 };
+const DEFAULT_REVIEW_POLICY_FILE = 'REVIEW.md';
 const MODE_SWITCH_DIR = path.join('.ai-factory', 'state', 'mode-switches');
 const OPEN_SPEC_CONFIG = path.join('openspec', 'config.yaml');
 
@@ -760,7 +761,7 @@ export function renderConfigForMode(existingRaw, mode, options = {}) {
   const parsed = parseSimpleYaml(existingRaw);
   const paths = parsed.paths ?? {};
   const blocks = parseTopLevelBlocks(existingRaw);
-  const used = new Set(['config_version', 'language', 'aifhub', 'paths', 'utilities', 'analyze']);
+  const used = new Set(['config_version', 'language', 'aifhub', 'paths', 'reviews', 'utilities', 'analyze']);
   const rendered = [];
 
   rendered.push(renderScalarOrDefault(blocks, 'config_version', 'config_version: 1'));
@@ -772,6 +773,7 @@ export function renderConfigForMode(existingRaw, mode, options = {}) {
   ].join('\n')));
   rendered.push(renderAifhubBlock(mode, blocks));
   rendered.push(renderPathsBlock(mode, paths));
+  rendered.push(renderReviewsBlock(blocks));
   rendered.push(renderUtilitiesBlock(blocks));
 
   const analyzeBlock = renderAnalyzeBlock(blocks, options.analyzeSkillVersion);
@@ -2023,6 +2025,28 @@ function renderAnalyzeBlock(blocks, skillVersion) {
 
 function renderBlockOrDefault(blocks, key, fallback) {
   return blocks.find((block) => block.key === key)?.text.trimEnd() || fallback;
+}
+
+function renderReviewsBlock(blocks) {
+  const fallback = [
+    'reviews:',
+    `  policy_file: ${DEFAULT_REVIEW_POLICY_FILE}`
+  ].join('\n');
+  const existing = blocks.find((block) => block.key === 'reviews')?.text.trimEnd();
+
+  if (!existing) {
+    return fallback;
+  }
+
+  if (hasTopLevelScalarValue(existing, 'reviews')) {
+    return existing;
+  }
+
+  if (/^  policy_file:(?:\s|$)/m.test(existing)) {
+    return existing;
+  }
+
+  return `${existing}\n  policy_file: ${DEFAULT_REVIEW_POLICY_FILE}`;
 }
 
 function renderUtilitiesBlock(blocks) {

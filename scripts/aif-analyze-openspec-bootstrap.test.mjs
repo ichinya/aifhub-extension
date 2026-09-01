@@ -98,8 +98,8 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
     assert.ok(version, `${filePath} frontmatter should declare version`);
     assert.match(version, /^['"]?\d+\.\d+\.\d+['"]?$/);
     assert.ok(
-      compareSemver(version, '0.12.0') >= 0,
-      `${filePath} should include the feature-level metadata bump introduced with analyze version freshness`
+      compareSemver(version, '0.13.0') >= 0,
+      `${filePath} should include the feature-level metadata bump introduced with durable review policy support`
     );
   });
 
@@ -651,7 +651,7 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
       'Continue without glossary context',
       'one sanitized warning with the rejection reason',
       'Do not include an external absolute path',
-      'file-valued paths such as `paths.context`',
+      'File-valued settings such as `paths.description`, `paths.architecture`, `paths.context`, `paths.roadmap`, `paths.research`, and `reviews.policy_file`',
       'must never be created as directories'
     ]) {
       assertIncludes(skill, expected, 'skills/aif-analyze/SKILL.md glossary path-safety contract');
