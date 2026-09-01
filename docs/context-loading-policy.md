@@ -179,6 +179,14 @@ Safe probes ограничены `codegraph --version`, `codegraph --help` и `c
 
 AIFHub commands не должны запускать CodeGraph installer, sync, MCP server, hooks или agent configuration mutation commands. CodeGraph output не должен заменять `rg`, canonical OpenSpec artifacts, generated rules, QA evidence или verification/done gates.
 
+## T-Search Candidate
+
+T-Search имеет policy `reject_defer` и не является optional provider для normal command selection. Это agentic query planner/ranker поверх отдельно served model endpoint и user-owned search backend/index; официальный harness не предоставляет ingestion, redaction, freshness, purge или MCP lifecycle.
+
+AIFHub commands не должны рекомендовать, probe/select, устанавливать или запускать T-Search, скачивать weights, стартовать model/search endpoints, индексировать repository, менять provider config или сохранять raw provider output. Search snippets попадают в model messages и serialized transcripts, поэтому `result.documents`, `messages`, `all_round_messages`, round summaries и tool traces не являются допустимым durable context.
+
+Будущий явно авторизованный experiment может использовать только bounded user-owned index и вернуть reviewed project-relative pointers; каждое утверждение нужно проверить по direct source files. Promotion требует redaction/exclusions, revision freshness, verified purge и same-run mixed Russian/English code/Markdown/OpenSpec benchmark против `rg`. См. [T-Search research](memory-tools-research/t-search.md) и [benchmark results](memory-tools-research/t-search-benchmark-results.md).
+
 ## Опциональный Context7 Documentation Context
 
 Context7 - optional documentation provider для current library/API docs. AIFHub commands и sidecars могут использовать existing user-provided или reviewed Context7 notes как supporting context, но не должны делать Context7 required extension dependency, устанавливать `ctx7` или `@upstash/context7-mcp`, запускать `ctx7`, запускать `ctx7 setup`, добавлять Context7 manifest dependencies, добавлять Context7 MCP templates в `extension.json`, start/register Context7 MCP automatically, mutate `.mcp.json`, `.cursor/mcp.json`, `.opencode.json`, agent rules или agent skills, или превращать Context7 availability в verification gate.

@@ -1,5 +1,5 @@
 schema: aifhub.memory_tools.recommendation.v1
-updated: "2026-08-04"
+updated: "2026-09-01"
 purpose: "Метаданные для этапа анализа проекта: какие memory/retrieval инструменты можно предлагать пользователю, когда и с какими ограничениями."
 default_policy:
   install_policy: explicit_user_opt_in_only
@@ -23,6 +23,7 @@ skill_usage_matrix:
       - eagle-mem
       - rohitg00-agentmemory
       - understand-anything
+      - t-search
     notes: "Recommend only; do not install, setup, index, register MCP, mutate provider config, or treat provider output as evidence."
   aif-explore:
     allowed:
@@ -38,6 +39,7 @@ skill_usage_matrix:
       - eagle-mem
       - rohitg00-agentmemory
       - understand-anything
+      - t-search
     notes: "Read existing reviewed provider output, or use explicitly enabled tools only when metadata grants command-specific permission and purge is defined."
   aif-architecture:
     allowed:
@@ -53,6 +55,7 @@ skill_usage_matrix:
       - repowise
       - rohitg00-agentmemory
       - understand-anything
+      - t-search
     notes: "Project-level architecture context only; optional provider output is supporting reviewed context and must not drive OpenSpec writes."
   aif-plan:
     allowed:
@@ -67,6 +70,7 @@ skill_usage_matrix:
       - codegraph
       - rohitg00-agentmemory
       - understand-anything
+      - t-search
     notes: "Optional supporting context before writing canonical OpenSpec artifacts; final plan must use direct repository evidence."
   aif-review:
     allowed:
@@ -82,6 +86,7 @@ skill_usage_matrix:
       - codegraph
       - rohitg00-agentmemory
       - understand-anything
+      - t-search
     notes: "Optional supporting context for impact/docs/closure checks only."
   aif-rules-check:
     allowed:
@@ -96,6 +101,7 @@ skill_usage_matrix:
       - codegraph
       - rohitg00-agentmemory
       - understand-anything
+      - t-search
     notes: "Context7 may support version-sensitive external docs only; generated rules and source evidence remain authoritative."
   aif-implement:
     allowed:
@@ -110,6 +116,7 @@ skill_usage_matrix:
       - codegraph
       - rohitg00-agentmemory
       - understand-anything
+      - t-search
     notes: "Implementation commands must not use optional context providers by default."
   aif-fix:
     allowed:
@@ -124,6 +131,7 @@ skill_usage_matrix:
       - codegraph
       - rohitg00-agentmemory
       - understand-anything
+      - t-search
     notes: "Fix commands must use QA evidence, source files, and canonical OpenSpec context."
   aif-verify:
     allowed:
@@ -138,6 +146,7 @@ skill_usage_matrix:
       - codegraph
       - rohitg00-agentmemory
       - understand-anything
+      - t-search
     notes: "Verification must stay source-grounded and provider-independent."
   aif-done:
     allowed:
@@ -152,6 +161,7 @@ skill_usage_matrix:
       - codegraph
       - rohitg00-agentmemory
       - understand-anything
+      - t-search
     notes: "Done/finalization must not depend on optional provider availability or output."
   aif-commit:
     allowed:
@@ -166,6 +176,7 @@ skill_usage_matrix:
       - codegraph
       - rohitg00-agentmemory
       - understand-anything
+      - t-search
     notes: "Commit freshness checks may use direct repository and local artifact evidence only."
 permissions:
   recommend_only:
@@ -260,6 +271,8 @@ tool_permissions:
     aif-review: recommend_only
     default: forbidden
   understand-anything:
+    default: forbidden
+  t-search:
     default: forbidden
 availability_probes:
   rg:
@@ -945,6 +958,75 @@ tools:
       default:
         mode: forbidden
         notes: "AIFHub must not run or probe the provider. Only explicit user-owned reviewed output may be considered in a future promoted policy."
+  t-search:
+    display_name: T-Search
+    doc: t-search.md
+    results_doc: t-search-benchmark-results.md
+    repository: "https://huggingface.co/t-tech/T-Search"
+    fp8_repository: "https://huggingface.co/t-tech/T-Search-FP8"
+    nvfp4_repository: "https://huggingface.co/t-tech/T-Search-NVFP4"
+    gguf_repository: "https://huggingface.co/t-tech/T-Search-GGUF"
+    harness_repository: "https://github.com/turbo-llm/t-search-harness"
+    tested_version: "BF16 bf0b272e0f69921ec39040807336602758448099; FP8 03ed451626ef84848866f00b6e106c4a2e843fd3; NVFP4 ad97a604e738aebccb049d57419b59048f802953; GGUF 5e5a39987b20533c6bf09ca10d3c0c6e81eae067; harness 997a0ba1685d24ad840e3e2542b59952ff3fb362 observed 2026-09-01"
+    model_license: Apache-2.0
+    harness_license: Apache-2.0
+    benchmark_dataset_license: ODC-BY-1.0
+    decision: reject_defer
+    recommendation_action: do_not_suggest_install
+    integration_role: user_owned_agentic_retriever_candidate
+    install_policy: do_not_auto_install
+    stable_cli: false
+    distribution_status: source_only_no_release_no_pypi
+    mcp_status: not_found
+    hosted_inference_status: not_found
+    read_scope: user_question_and_retriever_snippets_sent_to_model_endpoint
+    storage_scope: user_owned_model_endpoint_search_index_and_harness_runtime
+    purge_path: unverified_no_aifhub_lifecycle
+    purge_status: unverified
+    allowed_in: []
+    forbidden_in:
+      - aif-analyze
+      - aif-explore
+      - aif-architecture
+      - aif-plan
+      - aif-review
+      - aif-rules-check
+      - aif-implement
+      - aif-fix
+      - aif-verify
+      - aif-done
+      - aif-commit
+    privacy_caveat: "The harness sends the user question and retrieved source snippets to the configured model endpoint. RetrievalResult transcripts include those snippets and must not be persisted as AIFHub artifacts."
+    avoid_reason: "Reject and defer: T-Search is a query-planning and ranking model that requires a separately owned corpus, index, search backend and model endpoint. No AIFHub-like paired benchmark, stable packaged harness, MCP contract, redaction boundary, freshness policy or purge contract is proven."
+    source_denylist: true
+    normal_command_selection: forbidden
+    evaluation_evidence:
+      static_source_audit: pass
+      upstream_harness_tests_utf8: 27_pass
+      aifhub_paired_benchmark: not_run_no_bounded_corpus
+      live_model_run: not_run_resource_profile
+      upstream_benchmarks: author_reported_fixed_web_corpora_only
+    forbidden_operations:
+      - auto_install
+      - auto_download_weights
+      - auto_start_model_endpoint
+      - auto_index_source
+      - auto_run_harness
+      - auto_register_mcp
+      - mutate_provider_config
+      - persist_raw_provider_output
+      - persist_raw_transcript
+    reevaluation_requirements:
+      - user_owned_bounded_repository_index_and_search_backend
+      - explicit_source_exclusions_and_redaction
+      - verified_refresh_and_purge_lifecycle
+      - same_run_mixed_russian_english_repo_and_openspec_benchmark_against_rg
+      - measured_correctness_privacy_latency_and_cost
+      - stable_packaged_harness_or_reviewed_mcp_service_contract
+    execution:
+      default:
+        mode: forbidden
+        notes: "AIFHub must not download weights, start an endpoint, index a corpus, run the harness, probe the provider or persist its raw snippets/transcripts."
   eagle-mem:
     display_name: eagle-mem
     doc: eagle-mem.md
