@@ -137,7 +137,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
     const usage = await readRepoFile('docs/usage.md');
     const changelog = await readRepoFile('CHANGELOG.md');
     const languageResolution = extractSection(usage, '## Prompt Language Resolution');
-    const unreleased = extractSection(changelog, '## [В разработке]');
+    const released = extractSection(changelog, '## [1.5.0] - 2026-09-01');
 
     for (const expected of [
       'usable non-empty `language.ui`',
@@ -171,7 +171,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
       'exact-output-only',
       'matched start/end'
     ]) {
-      assertIncludes(unreleased, expected, 'CHANGELOG.md unreleased prompt-language fix');
+      assertIncludes(released, expected, 'CHANGELOG.md 1.5.0 prompt-language fix');
     }
   });
 

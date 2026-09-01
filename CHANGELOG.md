@@ -4,6 +4,11 @@
 
 Формат основан на [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [В разработке]
+
+### Добавлено
+- `dcg` (`destructive_command_guard`) документирован как optional user-owned safety provider для pre-execution command guarding (issue #135): manual install остается вне AIFHub ownership, automation ограничена read-only probes, отсутствие provider является degraded behavior, а hooks, agent/runtime config, dependencies, gates и raw denial artifact persistence явно запрещены.
+
 ## [1.5.0] - 2026-09-01
 
 ### Добавлено
