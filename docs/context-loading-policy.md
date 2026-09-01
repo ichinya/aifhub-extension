@@ -63,6 +63,18 @@ Consumer commands load these project context files when present:
 
 Consumer commands must not use bridge files such as `AGENTS.md`, `CLAUDE.md`, `QWEN.md`, or `AIFACTORY.md` as substitutes for configured context paths.
 
+## AI Factory 2.19 Session Warmup
+
+The reviewed AI Factory source snapshot declaring `2.19.0` adds upstream `/aif-warmup` as a read-only session-start handoff. AIFHub does not copy, replace, or inject that skill.
+
+- Upstream warmup reads the configured DESCRIPTION, ARCHITECTURE, ROADMAP, RESEARCH, top-level and area rules, applicable `AGENTS.md` instructions, selected language/git/workflow preferences, and explicit `warmup.paths` entries.
+- Applicable `AGENTS.md` files are instruction context for the handoff; they do not replace missing configured project artifacts or become canonical OpenSpec requirements.
+- `warmup.paths` is an ordered user-owned list. Fresh AIFHub-created configs include `[]`; existing lists are preserved, and existing configs without the section are not backfilled.
+- Optional glossary or reviewed provider notes enter warmup only when the user explicitly lists a safe project-relative file or directory. Warmup does not auto-run providers, MCP setup, context dedup, OpenSpec CLI operations, validation, or generated-rules compilation.
+- Canonical changes, plans, QA evidence, generated rules, raw provider output, credentials, and unrelated application code are not implicit startup inputs. Their normal command-specific ownership and safety rules remain unchanged.
+
+Warmup may summarize context for a later command or fork, but it stops before planning or implementation and writes no repository or AI Factory artifact.
+
 ## OpenSpec-Native Context Set
 
 Plan-aware consumer commands load these canonical artifacts:
