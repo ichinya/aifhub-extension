@@ -427,6 +427,7 @@ If `.ai-factory/config.yaml` is missing or incomplete:
 ## See Also
 
 - [Usage](usage.md)
+- [Safety Providers](safety-providers.md)
 - [Memory Tool Recommendations](memory-tool-recommendations.md)
 - [Session Context Dedup](context-dedup.md)
 - [OpenSpec Compatibility](openspec-compatibility.md)

@@ -7,6 +7,7 @@
 ## [В разработке]
 
 ### Добавлено
+- `dcg` (`destructive_command_guard`) документирован как optional user-owned safety provider для pre-execution command guarding (issue #135): manual install остается вне AIFHub ownership, automation ограничена read-only probes, отсутствие provider является degraded behavior, а hooks, agent/runtime config, dependencies, gates и raw denial artifact persistence явно запрещены.
 - Bounded adaptation идей `obra/superpowers` для issue #141: RED -> GREEN -> REFACTOR evidence в implementation traces, systematic root-cause hypothesis/experiment evidence в fix traces, two-pass plan/spec-then-quality review и отдельный source/ownership документ без plugin/bootstrap installation.
 - Configurable durable review policy `reviews.policy_file` с root-default `REVIEW.md`: `/aif-analyze` создаёт missing safe scaffold, `/aif-mode` сохраняет путь без file lifecycle, а `/aif-review` и namespaced review sidecars читают policy только как additive guidance; per-session comments, resolution state, provider state и receipts остаются вне policy.
 

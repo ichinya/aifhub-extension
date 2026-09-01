@@ -390,6 +390,7 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 | [Usage](docs/usage.md) | Full command flow, AI Factory 2.19 session warmup, read/write boundaries, upstream project-context utilities, examples, and troubleshooting |
 | [Superpowers Adaptation](docs/superpowers-adaptation.md) | Bounded RED/GREEN/REFACTOR, systematic debugging, two-pass review, and ownership boundaries |
 | [Context Providers](docs/context-providers.md) | Optional Graphify and Context7 provider guidance, reviewed-note paths, degraded behavior, and user-owned setup boundaries |
+| [Safety Providers](docs/safety-providers.md) | Optional dcg pre-execution guard guidance, manual user-owned setup, allowed probes, degraded behavior, and strict hook/config boundaries |
 | [Memory Tool Recommendations](docs/memory-tool-recommendations.md) | Local metadata-driven optional memory/context tool recommendations and installed wrapper commands |
 | [Context Loading Policy](docs/context-loading-policy.md) | Consumer context, AI Factory 2.19 upstream warmup, Optional Project Glossary, optional provider context, GitHub-aware roadmap evidence, command ownership, upstream utility boundaries, and legacy boundaries |
 | [Project Review Policy](docs/review-policy.md) | Configurable root-default `REVIEW.md`, scaffold ownership, safe review consumption, precedence, and session-state boundary |

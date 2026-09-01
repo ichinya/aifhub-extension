@@ -1,4 +1,4 @@
-[Предыдущая страница](usage.md) | [К документации](README.md) | [Следующая страница](memory-tool-recommendations.md)
+[Предыдущая страница](usage.md) | [К документации](README.md) | [Следующая страница](safety-providers.md)
 
 # Провайдеры Контекста
 
@@ -38,6 +38,8 @@ Graphify - optional provider для repository architecture и relation discover
 Context7 - optional documentation provider для актуальных library/API docs. Он снижает неопределенность вокруг version-sensitive API behavior, framework migration details и third-party usage patterns.
 
 Оба provider являются только supporting context. Final plans, review findings, generated rules, verification status, done status и roadmap completion должны оставаться source-grounded в canonical OpenSpec artifacts, source files, tests, runtime state, QA evidence, generated rules trace metadata или другом direct repository evidence.
+
+Pre-execution infrastructure guards имеют другую ownership boundary. Optional `dcg` integration и его отличие от `/aif-security-checklist` описаны в [Safety Providers](safety-providers.md).
 
 ## Understand Anything
 
