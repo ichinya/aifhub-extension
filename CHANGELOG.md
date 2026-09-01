@@ -18,6 +18,7 @@
 - Archived-wide validation документирована как отдельное advisory observation: historical incomplete archives не исправляются, а advisory exit не влияет на обязательный PASS.
 
 ### Исправлено
+- Review policy resolution теперь использует один installed canonical resolver для scaffold и read-only consumers: symlink/Windows junction escapes, managed-file collisions и canonical OpenSpec/project-rules/generated/runtime/QA roots fail closed до чтения или создания; реальные сценарии защищены executable regression-тестами.
 - Исправлен fallback языка prompt для issue #166: user-facing prose теперь детерминированно следует `language.ui` → current conversation → English-last без OS locale или persistence. Setup hint появляется только при hard English fallback с доступным prose slot, сохраняет exact-output-only branches и располагается до обязательного `aif-gate-result`; все 13 active injections и clean/global/targeted consumer smoke защищены matched start/end marker pairs и byte-identical upstream suffix checks.
 
 ## [1.4.0] - 2026-08-19

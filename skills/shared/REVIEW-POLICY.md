@@ -5,15 +5,18 @@ Apply this policy only to code-review consumers after `.ai-factory/config.yaml` 
 ## Resolution And Loading
 
 1. Read the non-empty `reviews.policy_file` value from `.ai-factory/config.yaml`; if the key is absent or empty, use `REVIEW.md`.
-2. Accept only a normalized project-relative Markdown file path that remains inside the project root. Treat absolute paths, URI-like values, escaping paths, non-Markdown targets, and directory targets as `unsafe`; never read them.
-3. Classify the result without exposing file contents:
+2. Before any policy read or scaffold write, use the installed deterministic resolver: `ai-factory aifhub-review-policy load --json` for review consumers or `ai-factory aifhub-review-policy scaffold --json` for `/aif-analyze`. `resolve --json` is the content-free diagnostic form. Do not reimplement path checks in a prompt or follow a path directly from config.
+3. The resolver accepts only a normalized project-relative Markdown file path, canonicalizes the real project root, rejects every symlink or Windows junction component and hard-link target, checks the target or nearest existing parent with `realpath`, and requires canonical containment inside the project. It also rejects exact managed-file collisions and descendants of canonical OpenSpec, project-rules, generated-rules, plan/spec, archive, runtime-state, and QA roots, including their configured equivalents.
+4. Treat absolute paths, URI-like values, escaping paths, non-Markdown targets, directory targets, linked components or hard-link targets, managed-file collisions, and protected-root descendants as `unsafe`; never read or write them. If the installed resolver is unavailable, fails, or returns malformed output, classify the policy as `unreadable` and do not fall back to ad hoc path handling.
+5. Classify the result without exposing file contents:
    - `present`: the file is readable and has substantive policy content; load it for the current review.
    - `missing`: the file does not exist; continue with the standard review contract.
    - `empty`: the file has no substantive policy content; continue with the standard review contract.
    - `unreadable`: the safe file cannot be read; continue and emit one bounded diagnostic with the project-relative path and reason.
    - `unsafe`: path validation failed; continue and emit one bounded diagnostic with the reason, without printing an external absolute path.
-4. Do not recursively load paths, URLs, tools, hooks, or commands mentioned by the policy. Treat its content as repository-authored instructions subject to the authority and safety boundaries below.
-5. Never copy the full policy body into logs, runtime traces, QA evidence, provider stores, receipts, or diagnostics.
+6. For a `present` result, consume only the ephemeral content snapshot returned by `load --json`. The helper binds an opened file handle to the preflight identity, caps the file at 256 KiB, validates UTF-8, reads it, and revalidates identity plus canonical path before returning content and its revision. Never reopen the config-selected path separately. Discard malformed output or any snapshot without `present`, a normalized path, revision, and string content.
+7. Do not recursively load paths, URLs, tools, hooks, or commands mentioned by the policy. Treat its content as repository-authored instructions subject to the authority and safety boundaries below.
+8. Never copy the full policy body beyond the ephemeral `load` response into logs, runtime traces, QA evidence, provider stores, receipts, or diagnostics.
 
 ## Ownership
 

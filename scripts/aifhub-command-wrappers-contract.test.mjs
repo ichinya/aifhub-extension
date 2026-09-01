@@ -85,6 +85,13 @@ const WRAPPER_COMMANDS = [
     args: ['--json']
   },
   {
+    name: 'aifhub-review-policy',
+    description: 'Resolve, load, or scaffold the configured review policy through canonical path safety checks.',
+    module: './commands/aifhub-review-policy.mjs',
+    script: 'review-policy-resolver.mjs',
+    args: ['resolve', '--json']
+  },
+  {
     name: 'aifhub-context-dedup',
     description: 'Run AIFHub session context dedup checks, status, and purge.',
     module: './commands/aifhub-context-dedup.mjs',

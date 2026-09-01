@@ -17,7 +17,8 @@ Issue #144 requests a configurable `REVIEW.md` with project review rules and a r
 - Make `/aif-mode` preserve/configure the setting without creating or inspecting the file.
 - Limit read-only consumers to `/aif-review` and the AIFHub review sidecars through `skills/shared/REVIEW-POLICY.md`.
 - Treat review policy as additive guidance below source/tests, canonical requirements, project/generated rules, and accepted architecture decisions.
-- Reject absolute, URI-like, escaping, non-Markdown, and directory targets. Missing or empty policy is non-blocking; unsafe or unreadable policy only degrades custom guidance.
+- Use one installed deterministic resolver for both scaffold and read-only consumers. It canonicalizes the project root and nearest existing parent, rejects symlink/Windows junction components and canonical escapes, binds reads/writes to revalidated file identities, and keeps content-free diagnostics separate from the ephemeral `load` snapshot.
+- Reject absolute, URI-like, escaping, non-portable, non-Markdown, and directory targets; exact managed-file collisions; and descendants of canonical OpenSpec, project/generated rules, plan/spec, archive, runtime-state, and QA roots, including configured equivalents. Missing or empty policy is non-blocking; unsafe or unreadable policy only degrades custom guidance.
 - Keep individual findings, comments, replies, resolution state, target revisions, provider state, and receipts out of the durable policy.
 
 ## Consequences
@@ -32,6 +33,7 @@ Tradeoffs:
 
 - Markdown policy is intentionally guidance rather than a machine-validated rule schema.
 - Review consumers must resolve and validate one additional repository-authored file.
+- Custom policy paths cannot reuse symlink/junction layouts or artifact-owner roots; projects must choose a regular unowned Markdown path instead.
 - Projects that need enforceable implementation or completion gates must still encode those requirements in the owning rules, tests, OpenSpec, or workflow policy rather than relying on `REVIEW.md` alone.
 
 ## See Also

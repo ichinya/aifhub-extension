@@ -9,7 +9,7 @@ reviews:
   policy_file: REVIEW.md
 ```
 
-`/aif-analyze` adds this config key in both legacy AI Factory-only and OpenSpec-native projects. When the safe target is missing, it creates a scaffold. The default is the repository-root `REVIEW.md` because root discovery works across more review agents. A custom path is preserved across `/aif-mode` switches.
+`/aif-analyze` adds this config key in both legacy AI Factory-only and OpenSpec-native projects. When the safe target is missing, it creates a scaffold through the installed canonical resolver. The default is the repository-root `REVIEW.md` because root discovery works across more review agents. A custom path is preserved across `/aif-mode` switches.
 
 `/aif-mode` configures or preserves the path but never creates, reads, validates, or deletes the policy file. Review consumers fall back to root `REVIEW.md` when the config or key is absent, so existing projects can adopt the convention without a migration gate.
 
@@ -67,17 +67,29 @@ Provider-owned comments and session state remain with that provider. A future AI
 
 ## Resolution And Failure Behavior
 
-Review consumers accept only a normalized project-relative Markdown path that stays inside the project root. Absolute paths, URI-like values, escaping paths, non-Markdown targets, and directory targets are unsafe and are never read.
+Scaffold and review consumers share one deterministic boundary:
+
+```bash
+ai-factory aifhub-review-policy scaffold --json # /aif-analyze writer
+ai-factory aifhub-review-policy load --json     # read-only review consumers
+ai-factory aifhub-review-policy resolve --json  # content-free diagnostics
+```
+
+The resolver accepts only a normalized, portable, project-relative Markdown path. It canonicalizes the real project root, walks every existing component, rejects symlinks, Windows junctions, and hard-link targets, resolves the target or nearest existing parent with `realpath`, and requires canonical containment before any read or creation. `load` binds the opened handle to the preflight identity, enforces a 256 KiB cap and valid UTF-8, then revalidates identity and canonical path before returning an ephemeral content snapshot and revision. The scaffold path is revalidated after parent creation, binds the exclusively created handle before writing, and preserves an existing or concurrent file.
+
+Policy paths also cannot collide with another artifact owner. Exact managed targets such as `.ai-factory/config.yaml`, `.ai-factory/rules/base.md`, configured project context files, configured area rules, `CONTEXT.md`, `README.md`, `AGENTS.md`, and `CLAUDE.md` are rejected. Descendants of `openspec/`, project plan/spec/rules roots, `.ai-factory/rules/generated/`, runtime state, QA, and archive roots are rejected, including safe configured equivalents. This prevents a review scaffold from becoming canonical OpenSpec content, project/generated rules, runtime/QA evidence, or another command's durable artifact.
+
+Absolute paths, URI-like values, escaping or non-portable paths, non-Markdown targets, directory targets, linked components or hard-link targets, managed-file collisions, and protected-root descendants are `unsafe` and are never read or written. If the installed resolver is unavailable or malformed, consumers classify the policy as `unreadable` and do not fall back to prompt-local path checks.
 
 | State | Behavior |
 |---|---|
-| `present` | Load the policy as additional review guidance. |
+| `present` | Consume only the complete ephemeral path/revision/content snapshot returned by `load`; never reopen the configured path. |
 | `missing` | Continue with the normal review contract. |
 | `empty` | Continue without custom policy. |
 | `unreadable` | Continue with one bounded path/reason diagnostic. |
 | `unsafe` | Do not read; continue with a reason-only diagnostic that does not expose an external path. |
 
-The policy is not a recursive instruction loader. Paths, URLs, tools, hooks, or commands mentioned inside it are not followed automatically. Review commands never rewrite the policy and never copy its full body into logs, runtime state, QA evidence, provider stores, receipts, or the final `aif-gate-result`.
+The content-free `resolve` diagnostic contains only state, a safe project-relative path, a content revision, and a bounded reason; it never includes policy contents or an external absolute path. `load` returns content only as the ephemeral review input after all checks pass. The policy is not a recursive instruction loader. Paths, URLs, tools, hooks, or commands mentioned inside it are not followed automatically. Review commands never rewrite the policy and never copy its full body from the ephemeral load response into logs, runtime state, QA evidence, provider stores, receipts, or the final `aif-gate-result`.
 
 ## Authority Order
 

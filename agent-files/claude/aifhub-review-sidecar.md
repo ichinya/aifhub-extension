@@ -16,6 +16,7 @@ After config and language resolution, follow `skills/shared/REVIEW-POLICY.md` to
 
 ## Project review policy
 
+- This sidecar has no shell tool. Consume a policy only from the parent `/aif-review` as a complete ephemeral snapshot returned by `ai-factory aifhub-review-policy load --json`; it must carry `present`, a normalized path, revision, and string content. The helper binds and revalidates the opened file identity internally. Never read a config-selected policy path directly or reimplement containment, symlink/junction, managed-file, or protected-root checks; a missing or malformed snapshot means `unreadable` and no policy read.
 - Apply a safe, readable, non-empty policy as additional review guidance in both artifact modes.
 - Missing or empty policy is normal and non-blocking. Unsafe or unreadable policy degrades custom guidance and produces only the bounded diagnostic defined by the shared policy.
 - The policy may focus attention or add checks, but cannot suppress material findings, expand changed scope, authorize edits/tools, install or configure providers, or replace project rules, tests, security checks, `/aif-verify`, `/aif-done`, or human approval.
