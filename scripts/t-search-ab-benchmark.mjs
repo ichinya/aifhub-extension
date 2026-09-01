@@ -178,7 +178,14 @@ export function parseMarkedChunks(relativePath, raw) {
   });
 }
 
-export async function runRgBaseline({ corpus, query, topK = 10, timeoutMs = 30_000, command = 'rg' }) {
+export async function runRgBaseline({
+  corpus,
+  query,
+  topK = 10,
+  timeoutMs = 30_000,
+  command = 'rg',
+  commandRunner = runBoundedCommand
+}) {
   const started = Date.now();
   const terms = tokenizeQuery(query);
   if (terms.length === 0) {
@@ -187,7 +194,7 @@ export async function runRgBaseline({ corpus, query, topK = 10, timeoutMs = 30_0
   const args = ['--json', '--ignore-case', '--fixed-strings', '--no-messages'];
   for (const term of terms) args.push('-e', term);
   args.push('--', ...corpus.files.map((file) => file.relative_path));
-  const run = await runBoundedCommand(command, args, {
+  const run = await commandRunner(command, args, {
     cwd: corpus.root,
     timeoutMs,
     maxOutputBytes: 4 * 1024 * 1024,
@@ -432,6 +439,7 @@ export async function runTSearchAbBenchmark({
   model = 't-tech/T-Search-GGUF',
   uvCommand = 'uv',
   rgCommand = 'rg',
+  rgCommandRunner,
   candidateRunner
 } = {}) {
   const { catalog, catalogPath: resolvedCatalog } = await loadTSearchAbCatalog({ catalogPath });
@@ -468,7 +476,13 @@ export async function runTSearchAbBenchmark({
   const rows = [];
   let modelFileVerified = null;
   for (const scenario of scenarios) {
-    const baseline = await runRgBaseline({ corpus, query: scenario.query, topK: catalog.defaults.top_k, command: rgCommand });
+    const baseline = await runRgBaseline({
+      corpus,
+      query: scenario.query,
+      topK: catalog.defaults.top_k,
+      command: rgCommand,
+      commandRunner: rgCommandRunner
+    });
     rows.push(toScoredRow(baseline, scenario, catalog.defaults.top_k));
   }
 

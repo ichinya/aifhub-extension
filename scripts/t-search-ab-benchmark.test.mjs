@@ -24,6 +24,14 @@ const REPO_ROOT = path.resolve(import.meta.dirname, '..');
 const CATALOG = path.join(REPO_ROOT, 'docs', 'memory-tools-research', 't-search-ab-scenarios.json');
 const FIXTURE = path.join(REPO_ROOT, 'test', 'fixtures', 't-search-evaluation', 'project');
 const ADAPTER = path.join(REPO_ROOT, 'scripts', 't-search-ab-adapter.py');
+const NO_MATCH_RG_COMMAND_RUNNER = async () => ({
+  exitCode: 1,
+  stdout: '',
+  stderr: '',
+  timedOut: false,
+  overflow: false,
+  elapsedMs: 1
+});
 
 describe('T-Search A/B scenario catalog', () => {
   it('pins a bilingual, non-promotable paired pilot', async () => {
@@ -88,11 +96,40 @@ describe('T-Search rg baseline and scoring', () => {
     const { catalog } = await loadTSearchAbCatalog({ catalogPath: CATALOG });
     const corpus = await buildTSearchCorpus({ fixtureRoot: FIXTURE });
     const scenario = catalog.scenarios.find((item) => item.id === 'order-status-audit-path');
-    const result = await runRgBaseline({ corpus, query: scenario.query, topK: catalog.defaults.top_k });
+    const target = corpus.chunks.find((chunk) => chunk.chunk_id === 'src/orders/status-service.ts#c012');
+    let invocation;
+    const result = await runRgBaseline({
+      corpus,
+      query: scenario.query,
+      topK: catalog.defaults.top_k,
+      commandRunner: async (command, args, options) => {
+        invocation = { command, args, options };
+        return {
+          exitCode: 0,
+          stdout: `${JSON.stringify({
+            type: 'match',
+            data: {
+              path: { text: target.relative_path },
+              lines: { text: target.content },
+              line_number: target.start_line,
+              submatches: [{ start: 0, end: 1 }]
+            }
+          })}\n`,
+          stderr: '',
+          timedOut: false,
+          overflow: false,
+          elapsedMs: 1
+        };
+      }
+    });
     assert.equal(result.status, 'PASS');
     assert.equal(result.metrics.search_calls, 1);
     assert.ok(result.ranked_chunk_ids.includes('src/orders/status-service.ts#c012'));
     assert.ok(result.ranked_chunk_ids.every((chunkId) => corpus.chunks.some((chunk) => chunk.chunk_id === chunkId)));
+    assert.equal(invocation.command, 'rg');
+    assert.equal(invocation.options.cwd, corpus.root);
+    assert.ok(invocation.args.includes('--json'));
+    assert.ok(invocation.args.includes(target.relative_path));
   });
 
   it('computes bounded Recall@10, precision and reciprocal rank', () => {
@@ -177,7 +214,8 @@ describe('T-Search paired pilot decisions', () => {
       catalogPath: CATALOG,
       fixtureRoot: FIXTURE,
       baselineOnly: true,
-      maxScenarios: 1
+      maxScenarios: 1,
+      rgCommandRunner: NO_MATCH_RG_COMMAND_RUNNER
     });
     assert.equal(result.summary.pilot_decision, 'not_run');
     assert.equal(result.summary.privacy_passed, null);
@@ -191,6 +229,7 @@ describe('T-Search paired pilot decisions', () => {
     const result = await runTSearchAbBenchmark({
       catalogPath: CATALOG,
       fixtureRoot: FIXTURE,
+      rgCommandRunner: NO_MATCH_RG_COMMAND_RUNNER,
       candidateRunner: async (scenario) => makeCandidate(scenario)
     });
     assert.equal(result.summary.pilot_decision, 'pilot_positive');
@@ -213,6 +252,7 @@ describe('T-Search paired pilot decisions', () => {
     const result = await runTSearchAbBenchmark({
       catalogPath: CATALOG,
       fixtureRoot: FIXTURE,
+      rgCommandRunner: NO_MATCH_RG_COMMAND_RUNNER,
       candidateRunner: async (scenario) => ({
         ...makeCandidate(scenario),
         ranked_chunk_ids: [
@@ -269,7 +309,8 @@ describe('T-Search paired pilot decisions', () => {
       fixtureRoot: FIXTURE,
       maxScenarios: 1,
       harnessRoot: os.tmpdir(),
-      endpoint: 'https://example.com/v1'
+      endpoint: 'https://example.com/v1',
+      rgCommandRunner: NO_MATCH_RG_COMMAND_RUNNER
     }), /local HTTP|loopback-only/);
   });
 
@@ -281,6 +322,7 @@ describe('T-Search paired pilot decisions', () => {
         fixtureRoot: FIXTURE,
         maxScenarios: 1,
         outDir: out,
+        rgCommandRunner: NO_MATCH_RG_COMMAND_RUNNER,
         candidateRunner: async (scenario) => makeCandidate(scenario)
       });
       const summary = await readFile(path.join(out, 'summary.json'), 'utf8');
