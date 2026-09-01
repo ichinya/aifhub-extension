@@ -25,6 +25,9 @@ Use this mode when config declares `aifhub.artifactProtocol: openspec`.
 - Map checked tasks to completed, set the selected unfinished task or tightly coupled task group to in_progress, keep other unfinished tasks pending, and report a task snapshot as a capability fallback when direct todo access is unavailable.
 - Runtime todo hydration does not authorize broad task expansion; execute exactly one task or tightly coupled task group.
 - Read generated rules from `.ai-factory/rules/generated/` when present.
+- For each testable behavior change whose plan, project policy, or existing test conventions call for an automated check, use a bounded **RED** -> **GREEN** -> **REFACTOR** cycle. RED records the narrowest `testCheck` and `redResult` after the expected behavioral failure is observed before the production edit; syntax, fixture, dependency, or environment failures do not qualify. GREEN makes the smallest in-scope production change, reruns the same focused automated check, and records `greenResult`. REFACTOR performs only safe in-scope cleanup, reruns the check, and records `refactorResult`.
+- Persist `testCheck`, `redResult`, `greenResult`, `refactorResult`, and `fallbackDecision` through `writeExecutionTrace()`. Documentation-only work, generated artifacts, user-authorized no-test work, or a task with no useful automated check must record a bounded fallback instead of fabricated RED evidence and use the narrowest applicable non-test verification.
+- Treat the development cycle as supporting runtime evidence only; `/aif-verify <change-id>` remains authoritative.
 - Use `.ai-factory/state/<change-id>/` for runtime state and implementation traces.
 - Treat `.ai-factory/qa/<change-id>/` as QA evidence owned by verification; name it in reports but do not write verifier findings.
 - Do not create legacy plan artifacts in OpenSpec-native mode.
