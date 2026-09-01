@@ -967,7 +967,7 @@ tools:
     nvfp4_repository: "https://huggingface.co/t-tech/T-Search-NVFP4"
     gguf_repository: "https://huggingface.co/t-tech/T-Search-GGUF"
     harness_repository: "https://github.com/turbo-llm/t-search-harness"
-    tested_version: "BF16 bf0b272e0f69921ec39040807336602758448099; FP8 03ed451626ef84848866f00b6e106c4a2e843fd3; NVFP4 ad97a604e738aebccb049d57419b59048f802953; GGUF 5e5a39987b20533c6bf09ca10d3c0c6e81eae067; harness 997a0ba1685d24ad840e3e2542b59952ff3fb362 observed 2026-09-01"
+    tested_version: "BF16 bf0b272e0f69921ec39040807336602758448099; FP8 03ed451626ef84848866f00b6e106c4a2e843fd3; NVFP4 ad97a604e738aebccb049d57419b59048f802953; GGUF 5e5a39987b20533c6bf09ca10d3c0c6e81eae067 Q4_K_M sha256 f645dce898117a1f9165dfbb014d61e5f09daec06bb64f4b91de7f103b8761bb; harness 997a0ba1685d24ad840e3e2542b59952ff3fb362; llama.cpp b10068 571d0d540df04f25298d0e159e520d9fc62ed121; live pilot 2026-09-01"
     model_license: Apache-2.0
     harness_license: Apache-2.0
     benchmark_dataset_license: ODC-BY-1.0
@@ -981,8 +981,8 @@ tools:
     hosted_inference_status: not_found
     read_scope: user_question_and_retriever_snippets_sent_to_model_endpoint
     storage_scope: user_owned_model_endpoint_search_index_and_harness_runtime
-    purge_path: unverified_no_aifhub_lifecycle
-    purge_status: unverified
+    purge_path: local_stateless_pilot_passed_external_index_unverified
+    purge_status: pilot_only_external_lifecycle_unverified
     allowed_in: []
     forbidden_in:
       - aif-analyze
@@ -997,14 +997,16 @@ tools:
       - aif-done
       - aif-commit
     privacy_caveat: "The harness sends the user question and retrieved source snippets to the configured model endpoint. RetrievalResult transcripts include those snippets and must not be persisted as AIFHub artifacts."
-    avoid_reason: "Reject and defer: T-Search is a query-planning and ranking model that requires a separately owned corpus, index, search backend and model endpoint. No AIFHub-like paired benchmark, stable packaged harness, MCP contract, redaction boundary, freshness policy or purge contract is proven."
+    avoid_reason: "Reject and defer: T-Search is a query-planning and ranking model that requires a separately owned corpus, index, search backend and model endpoint. A reduced six-pair synthetic pilot improved Recall@10 but regressed aggregate false-positive rate and added extreme latency/token overhead. No real-repository external index lifecycle, stable packaged harness, MCP contract, redaction boundary, refresh policy or production purge contract is proven."
     source_denylist: true
     normal_command_selection: forbidden
     evaluation_evidence:
       static_source_audit: pass
       upstream_harness_tests_utf8: 27_pass
-      aifhub_paired_benchmark: not_run_no_bounded_corpus
-      live_model_run: not_run_resource_profile
+      aifhub_paired_benchmark: 6_pair_local_synthetic_pilot_negative
+      live_model_run: pass_q4_k_m_reduced_8192_context
+      local_pilot_safety_gates: pass
+      external_index_lifecycle: not_run
       upstream_benchmarks: author_reported_fixed_web_corpora_only
     forbidden_operations:
       - auto_install
@@ -1020,7 +1022,7 @@ tools:
       - user_owned_bounded_repository_index_and_search_backend
       - explicit_source_exclusions_and_redaction
       - verified_refresh_and_purge_lifecycle
-      - same_run_mixed_russian_english_repo_and_openspec_benchmark_against_rg
+      - same_run_real_repository_mixed_russian_english_repo_and_openspec_benchmark_against_rg
       - measured_correctness_privacy_latency_and_cost
       - stable_packaged_harness_or_reviewed_mcp_service_contract
     execution:

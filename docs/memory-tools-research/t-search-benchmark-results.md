@@ -2,13 +2,14 @@
 
 ## Outcome
 
-No controlled AIFHub-like A/B benchmark was run, so T-Search is not eligible for recommendation. The decision is `reject_defer`.
+An authorized controlled local A/B completed all six synthetic AIFHub-like pairs. T-Search recovered every ground-truth chunk, but its aggregate false-positive rate was worse than the bounded `rg` baseline and its runtime/token overhead was large. The strict pilot result is therefore `pilot_negative`, and the policy decision remains `reject_defer`.
 
 - Static upstream identity, license, API, model-card, harness, and deployment review: complete.
 - Upstream harness quality checks: complete against the pinned source revision.
-- Model execution: `NOT_RUN(resource_profile)`; no weights were downloaded.
-- Repository retrieval comparison: `NOT_RUN(no_bounded_corpus_or_search_backend)`.
-- Privacy/freshness/purge lifecycle: `NOT_RUN(no_user_owned_index_lifecycle)`.
+- Model execution: PASS for the exact Q4_K_M GGUF on pinned `llama.cpp` b10068 in a reduced 8,192-context hybrid CPU/GPU profile.
+- Repository retrieval comparison: 6/6 paired synthetic rows completed; aggregate Recall@10 improved from `0.666667` to `1.0`, while false-positive rate worsened from `0.44` to `0.495238`.
+- Local stateless privacy/source/freshness/purge gates: PASS; no raw transcript or persistent search state was retained.
+- Production repository and external index build/refresh/staleness/purge lifecycle: `NOT_RUN`.
 - Upstream benchmark results: recorded as author-reported context only and excluded from AIFHub recommendation evidence.
 
 ## Evaluation Snapshot
@@ -22,8 +23,54 @@ No controlled AIFHub-like A/B benchmark was run, so T-Search is not eligible for
 | GGUF revision | `5e5a39987b20533c6bf09ca10d3c0c6e81eae067` |
 | Harness revision | `997a0ba1685d24ad840e3e2542b59952ff3fb362` |
 | Harness distribution | One source commit; no GitHub release and no PyPI distribution found |
-| Local hardware profile | Anonymous NVIDIA 16 GB VRAM class, about 64 GB system RAM |
+| Local hardware profile | NVIDIA GeForce RTX 4060 Ti 16 GB, Intel Core i9-11900K, 64 GB system RAM |
 | Smallest official weight | Q4_K_M GGUF, 21.71 GB before runtime/KV-cache overhead |
+| Executed candidate | `T-Search-Q4_K_M.gguf`, 21,713,463,136 bytes, SHA-256 `f645dce898117a1f9165dfbb014d61e5f09daec06bb64f4b91de7f103b8761bb` |
+| Runtime | `llama.cpp` b10068 / `571d0d540df04f25298d0e159e520d9fc62ed121`, loopback alias `t-tech/T-Search-GGUF` |
+
+## Local Paired Runner
+
+The authorized follow-up adds an answer-independent local runner and [scenario catalog](t-search-ab-scenarios.json). Its synthetic corpus contains 23 eligible files and 30 marked chunks across TypeScript, Markdown, Russian/English documentation, and OpenSpec. Three excluded files carry privacy canaries under `.env`, `.ai-factory/qa/**`, and `vendor/**`.
+
+The candidate does not receive a privileged index. Every harness `search_corpus` call executes the same bounded `rg --json` backend over the reviewed corpus, while the baseline receives one such search. This measures whether T-Search's query decomposition and final ranking improve retrieval enough to justify their model, latency, and token overhead. It does not establish production semantic-index performance.
+
+The runner persists no raw query, snippet, reasoning, message, transcript, or round summary. It records project-relative chunk IDs and aggregate scores only. Candidate PASS requires exact harness provenance, loopback model identity, privacy-canary absence, source confinement, an unchanged pre/post corpus snapshot, and zero persistent search state. The output boundary refuses canonical OpenSpec, QA, and generated-rules directories.
+
+### Authorized live result 2026-09-01
+
+The live run used one round, one server slot, an 8,192-token context/budget, at most 2,048 generated tokens per turn, `top_k=10`, `temperature=0.7`, and `top_p=1.0`. `llama-server` used automatic hybrid offload, loaded in about 152 seconds, and reached approximately 15,820 MiB of GPU memory. This is intentionally smaller than the upstream 65,536-context, up-to-five-round profile.
+
+| Aggregate metric | `baseline_rg` | `candidate_t_search` | Interpretation |
+|---|---:|---:|---|
+| Recall@10 | 0.666667 | 1.000000 | Candidate found all ground-truth chunks. |
+| Precision among returned results (max 10) | 0.466667 | 0.504762 | Small aggregate improvement, with large per-scenario variance. |
+| False-positive rate | 0.440000 | 0.495238 | Candidate regressed by 0.055238, so the strict pilot cannot be positive. |
+| Reciprocal rank | 0.750000 | 1.000000 | Every candidate ranking placed a relevant chunk first. |
+| Total measured row time | 0.569 s | 449.815 s | Candidate was about 790.5x slower in this local profile. |
+| Model tokens | 0 | 206,212 | 196,436 prompt plus 9,776 completion tokens. |
+| Search calls | 6 | 85 | Baseline used one `rg` call per scenario; the agent decomposed and repeated searches. |
+
+| Scenario | Language | Recall@10 (`rg` → T-Search) | Precision (`rg` → T-Search) | FPR (`rg` → T-Search) | Candidate time | Candidate tokens | Search calls |
+|---|---|---:|---:|---:|---:|---:|---:|
+| `expired-login-boundary` | en | 0.5 → 1.0 | 0.166667 → 0.5 | 0.833333 → 0.5 | 102.986 s | 37,727 | 16 |
+| `audit-transient-retry` | ru | 0.5 → 1.0 | 1.0 → 0.4 | 0.0 → 0.6 | 74.389 s | 12,770 | 8 |
+| `openspec-task-completion` | en | 1.0 → 1.0 | 0.333333 → 0.5 | 0.666667 → 0.5 | 97.292 s | 47,950 | 18 |
+| `retrieval-provider-privacy` | ru | 0.0 → 1.0 | 0.0 → 1.0 | no baseline hits → 0.0 | 100.715 s | 76,327 | 24 |
+| `order-status-audit-path` | en | 1.0 → 1.0 | 0.3 → 0.428571 | 0.7 → 0.571429 | 31.585 s | 12,068 | 7 |
+| `bilingual-order-status-glossary` | ru | 1.0 → 1.0 | 1.0 → 0.2 | 0.0 → 0.8 | 42.848 s | 19,370 | 12 |
+
+All six candidate rows finalized and passed exact model identity, exact harness provenance, privacy-canary scanning, source confinement, unchanged-corpus freshness, sandbox cleanup, and zero-persistent-state gates. The loopback endpoint had zero provider charge; local electricity was not priced. Index build and refresh cost were zero only because both arms used a stateless bounded `rg` backend, so this run does not validate an external production index lifecycle. The preflight smoke row was excluded from the aggregate.
+
+The pilot decision requires a Recall@10 gain without worse false-positive rate, or an FPR gain without worse recall. The observed recall gain accompanied an aggregate FPR regression, yielding `pilot_negative`; `no_promote: true` would have prevented a policy promotion even under a positive pilot score.
+
+Safe preparation and baseline commands are:
+
+```bash
+node scripts/t-search-ab-benchmark.mjs --dry-run --json
+node scripts/t-search-ab-benchmark.mjs --baseline-only --json
+```
+
+Live candidate execution additionally requires the evaluator's exact pinned harness root, verified external GGUF file, and loopback model endpoint. It is never part of `npm test`, validation, recommendation, availability probing, or normal command selection.
 
 ## Harness Audit
 
@@ -47,10 +94,10 @@ The locale-sensitive test is a portability defect in upstream test code, not evi
 | BF16 | 71.92 GB repository storage | Not suitable for this host. |
 | FP8 | 37.49 GB repository storage | Exceeds local VRAM; exact runtime requirements not tested. |
 | NVFP4 | 25.47 GB repository storage | Exceeds local VRAM and requires a compatible quantized runtime; not tested. |
-| GGUF Q4_K_M | 21.71 GB file | Exceeds local VRAM before cache/overhead; hybrid offload was not run. |
+| GGUF Q4_K_M | 21.71 GB file | Executed successfully with automatic hybrid CPU/GPU offload, 8,192 context, and one slot; not representative of the upstream full-context profile. |
 | GGUF Q5_K_M / Q6_K / Q8_0 | 25.35 / 29.21 / 37.80 GB | Larger than Q4; not run. |
 
-Downloading a large checkpoint would not produce a valid A/B result without a bounded repository corpus, search backend, ground-truth questions, and privacy/purge contract. A slow CPU-hybrid smoke would test process startup, not retrieval quality or adoption fitness, so it was intentionally omitted.
+The Q4 run proves local feasibility on a 16 GB GPU only through hybrid offload. It does not prove the official 65,536-token profile, multi-round behavior, concurrency, production latency, or an indexed corpus lifecycle. The measured reduced-profile overhead is already too high for default AIFHub retrieval.
 
 ## Author-Reported Recall@10
 
@@ -100,24 +147,24 @@ This spread reinforces the architectural finding: T-Search does not replace the 
 |---|---|
 | Exact model URL and license | VERIFIED: four official `t-tech` model repositories, Apache-2.0. |
 | Runnable integration path | PARTIAL: source-only Python harness plus OpenAI-compatible model endpoint and caller-provided search contract. |
-| vLLM / SGLang / llama.cpp | SGLang and llama.cpp have upstream reference recipes; vLLM matches the interface but the exact checkpoint path was not run. |
+| vLLM / SGLang / llama.cpp | The pinned Q4 GGUF ran on `llama.cpp` b10068; SGLang remains source-supported and vLLM interface-compatible in principle, but neither was executed. |
 | MCP adapter | NOT FOUND. |
 | Built-in indexing or corpus ingestion | NOT FOUND. |
 | Source exclusions, redaction, freshness, or purge | NOT PROVIDED by the harness. |
-| AIFHub-like mixed code/docs/OpenSpec benchmark | NOT RUN and not present upstream. |
+| AIFHub-like mixed code/docs/OpenSpec benchmark | 6/6 local synthetic pairs completed in a reduced profile; `pilot_negative`, not a real-repository or production-index result. |
 | H100 requirement | UNVERIFIED by the reviewed official sources. |
 | 20-50% cost reduction | UNVERIFIED by the reviewed official sources. |
 | Hosted Hugging Face inference | NOT FOUND on the observed model pages. |
 
-## Required Paired Benchmark
+## Remaining Re-evaluation Evidence
 
-A future authorized run must use the same repository revision and answer-independent tasks for both variants:
+The local run establishes that the bounded runner works and that the exact Q4 model can improve recall on a small mixed-language fixture. A future promotion-grade run must use the same real repository revision and answer-independent tasks for both variants:
 
 | Variant | Required behavior |
 |---|---|
 | `baseline_rg` | Direct bounded repository search and source-file verification. |
 | `candidate_t_search` | Same question and corpus; T-Search may plan searches against the reviewed backend, return bounded pointers, then the answerer verifies direct files. |
 
-The corpus must include source code, Markdown, Russian/English documentation, and OpenSpec artifacts. It must include exact exclusions and privacy canaries. The evaluator must record correctness, citation validity, Recall@10, stale-hit behavior, privacy, wall time, model/search calls, total tokens, endpoint cost, index build/refresh cost, output noise, and complete purge. Raw snippets and transcripts must be scanned and deleted rather than promoted into durable evidence.
+The real corpus must include source code, Markdown, Russian/English documentation, and OpenSpec artifacts. It must exercise an actual user-owned index/search lifecycle with exact exclusions, redaction, revision identity, stale-hit behavior, incremental refresh, and complete purge. The evaluator must record correctness, citation validity, Recall@10, false-positive rate, privacy, wall time, model/search calls, total tokens, endpoint cost, index build/refresh cost, output noise, and complete purge. Raw snippets and transcripts must be scanned and deleted rather than promoted into durable evidence.
 
-Until that run and lifecycle both pass, upstream web benchmark gains cannot change the `reject_defer` policy.
+Until that run improves retrieval without an unacceptable quality or cost tradeoff and the external lifecycle passes, neither this synthetic result nor upstream web benchmark gains can change the `reject_defer` policy.

@@ -1,0 +1,91 @@
+{
+  "schema": "aifhub.t_search.ab_scenario_catalog.v1",
+  "candidate_identity": {
+    "model_repo": "t-tech/T-Search-GGUF",
+    "model_revision": "5e5a39987b20533c6bf09ca10d3c0c6e81eae067",
+    "model_file": "T-Search-Q4_K_M.gguf",
+    "model_size_bytes": 21713463136,
+    "model_sha256": "f645dce898117a1f9165dfbb014d61e5f09daec06bb64f4b91de7f103b8761bb",
+    "harness_revision": "997a0ba1685d24ad840e3e2542b59952ff3fb362",
+    "llama_cpp_build": 10068,
+    "llama_cpp_revision": "571d0d540df04f25298d0e159e520d9fc62ed121"
+  },
+  "defaults": {
+    "variants": [
+      "baseline_rg",
+      "candidate_t_search"
+    ],
+    "top_k": 10,
+    "profile": "local_gguf_q4_reduced_context",
+    "server_context_tokens": 8192,
+    "max_rounds": 1,
+    "budget_tokens": 8192,
+    "max_tokens_per_turn": 2048,
+    "max_turns_per_round": 20,
+    "timeout_seconds": 1200,
+    "temperature": 0.7,
+    "top_p": 1.0,
+    "no_promote": true,
+    "privacy_canaries": [
+      "TSEARCH_PRIVATE_CANARY_147_ENV",
+      "TSEARCH_PRIVATE_CANARY_147_QA",
+      "TSEARCH_PRIVATE_CANARY_147_VENDOR"
+    ]
+  },
+  "fixture_root": "test/fixtures/t-search-evaluation/project",
+  "scenarios": [
+    {
+      "id": "expired-login-boundary",
+      "language": "en",
+      "query": "Where is an expired login rejected before a request reaches its application handler?",
+      "ground_truth_chunk_ids": [
+        "src/auth/session-guard.ts#c001",
+        "src/http/auth-middleware.ts#c003"
+      ]
+    },
+    {
+      "id": "audit-transient-retry",
+      "language": "ru",
+      "query": "Как система повторяет отправку аудита после временного сбоя и где описана эта политика?",
+      "ground_truth_chunk_ids": [
+        "src/audit/retry-queue.ts#c004",
+        "docs/operations/audit-delivery.md#c006"
+      ]
+    },
+    {
+      "id": "openspec-task-completion",
+      "language": "en",
+      "query": "What evidence is required before an OpenSpec implementation task checkbox may be marked complete?",
+      "ground_truth_chunk_ids": [
+        "openspec/specs/task-verification/spec.md#c008"
+      ]
+    },
+    {
+      "id": "retrieval-provider-privacy",
+      "language": "ru",
+      "query": "Какие данные внешнего retrieval-провайдера запрещено сохранять и что разрешено оставить вместо них?",
+      "ground_truth_chunk_ids": [
+        "openspec/specs/provider-privacy/spec.md#c010",
+        "openspec/specs/provider-privacy/spec.md#c011"
+      ]
+    },
+    {
+      "id": "order-status-audit-path",
+      "language": "en",
+      "query": "Which code path publishes an audit record when an order status changes?",
+      "ground_truth_chunk_ids": [
+        "src/http/order-handler.ts#c014",
+        "src/orders/status-service.ts#c012",
+        "src/audit/publisher.ts#c013"
+      ]
+    },
+    {
+      "id": "bilingual-order-status-glossary",
+      "language": "ru",
+      "query": "Где определены согласованные русские и английские термины для статуса заказа?",
+      "ground_truth_chunk_ids": [
+        "docs/glossary.md#c015"
+      ]
+    }
+  ]
+}

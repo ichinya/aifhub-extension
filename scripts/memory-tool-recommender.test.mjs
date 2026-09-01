@@ -184,6 +184,12 @@ describe('recommendation metadata parsing', () => {
     assert.equal(metadata.tools['t-search'].harness_repository, 'https://github.com/turbo-llm/t-search-harness');
     assert.match(metadata.tools['t-search'].tested_version, /bf0b272e0f69921ec39040807336602758448099/);
     assert.match(metadata.tools['t-search'].tested_version, /997a0ba1685d24ad840e3e2542b59952ff3fb362/);
+    assert.match(metadata.tools['t-search'].tested_version, /f645dce898117a1f9165dfbb014d61e5f09daec06bb64f4b91de7f103b8761bb/);
+    assert.match(metadata.tools['t-search'].tested_version, /llama\.cpp b10068/);
+    assert.equal(metadata.tools['t-search'].evaluation_evidence.aifhub_paired_benchmark, '6_pair_local_synthetic_pilot_negative');
+    assert.equal(metadata.tools['t-search'].evaluation_evidence.live_model_run, 'pass_q4_k_m_reduced_8192_context');
+    assert.equal(metadata.tools['t-search'].evaluation_evidence.local_pilot_safety_gates, 'pass');
+    assert.equal(metadata.tools['t-search'].evaluation_evidence.external_index_lifecycle, 'not_run');
     assert.equal(metadata.tools['t-search'].decision, 'reject_defer');
     assert.equal(metadata.tools['t-search'].recommendation_action, 'do_not_suggest_install');
     assert.equal(metadata.tools['t-search'].integration_role, 'user_owned_agentic_retriever_candidate');

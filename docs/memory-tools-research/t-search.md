@@ -4,7 +4,7 @@
 
 `t-search` is `reject_defer`. AIFHub must not recommend, install, download, probe, configure, index for, or execute T-Search in normal workflows. The candidate is not a drop-in retrieval provider: it is an agentic query planner and ranker that requires both a separately served model and a user-owned search backend over a user-owned corpus.
 
-The upstream results are promising on fixed web-search benchmarks, but they do not establish correctness, privacy, latency, or cost on an AIFHub-like repository containing mixed source code, Markdown, Russian/English documentation, and OpenSpec artifacts. The official [T-Bank technical report](https://habr.com/ru/companies/tbank/articles/1060262/) likewise recommends validation on the consumer's own index. No `docs/retrieval-providers.md` integration guide is added because the issue's positive-evaluation gate was not met.
+The upstream results are promising on fixed web-search benchmarks. An authorized reduced-profile local pilot also improved Recall@10 on a synthetic AIFHub-like mixed corpus, but it regressed aggregate false-positive rate and added substantial latency/token overhead. It still does not establish a real-repository external index lifecycle, production cost, or full-context behavior. The official [T-Bank technical report](https://habr.com/ru/companies/tbank/articles/1060262/) likewise recommends validation on the consumer's own index. No `docs/retrieval-providers.md` integration guide is added because the issue's positive-evaluation gate was not met.
 
 ## Exact Identity
 
@@ -46,17 +46,49 @@ The harness provides the search loop, tool schemas, round state, and final ranki
 | Runtime | Evidence | Evaluation status |
 |---|---|---|
 | SGLang | The FP8 model card publishes a 65,536-context reference using `qwen3` reasoning parsing and `qwen3_coder` tool parsing, adapted from the official [Qwen3.6 SGLang cookbook](https://lmsysorg.mintlify.app/cookbook/autoregressive/Qwen/Qwen3.6#qwen3-6). | Source-supported; not executed locally. |
-| llama.cpp | The GGUF card publishes an OpenAI-compatible `llama-server` setup and pins build `b10068` / commit [`571d0d540df04f25298d0e159e520d9fc62ed121`](https://github.com/ggml-org/llama.cpp/commit/571d0d540df04f25298d0e159e520d9fc62ed121). | Source-supported; not executed locally. |
+| llama.cpp | The GGUF card publishes an OpenAI-compatible `llama-server` setup and pins build `b10068` / commit [`571d0d540df04f25298d0e159e520d9fc62ed121`](https://github.com/ggml-org/llama.cpp/commit/571d0d540df04f25298d0e159e520d9fc62ed121). | Exact pinned build executed with Q4_K_M, 8,192 context, one slot, MTP speculative decoding, and automatic hybrid CPU/GPU offload. |
 | vLLM | The harness example points at a vLLM-style `/v1` endpoint, and current [vLLM documentation](https://docs.vllm.ai/en/stable/serving/openai_compatible_server.html) supports OpenAI-compatible chat completions, reasoning parsing, and tool calling. The exact T-Search checkpoint/runtime combination is not validated by this evaluation. | Interface-compatible in principle; `NOT_RUN`. |
 | Hosted Hugging Face inference | None of the four observed model pages listed a deployed Hugging Face Inference Provider. | Not available at observation time. |
 
-The smallest official checkpoint is the 21.71 GB Q4_K_M GGUF. That already exceeds the anonymous evaluation host's 16 GB VRAM before runtime and KV-cache overhead. A CPU/GPU hybrid may fit in roughly 64 GB system RAM, but it would be slow and would not answer the missing corpus, privacy, or integration questions. No weights were downloaded.
+The smallest official checkpoint is the 21.71 GB Q4_K_M GGUF. Its exact 21,713,463,136-byte file (SHA-256 `f645dce898117a1f9165dfbb014d61e5f09daec06bb64f4b91de7f103b8761bb`) exceeded the local RTX 4060 Ti's VRAM, but `llama.cpp --fit` successfully used hybrid offload with 64 GB system RAM. Model load took about 152 seconds and GPU memory reached approximately 15,820 MiB. This proves reduced-profile feasibility, not a practical default deployment.
 
 ## Runtime and Cost Surface
 
 The harness defaults are a ceiling of five rounds, 32K tokens per round, 16,384 generated tokens per assistant turn, 60 turns per round, five searches before a round may be saved, and a 600-second model request timeout. Actual sessions can finish earlier, but this is a materially larger and more variable runtime surface than direct `rg` retrieval.
 
 Issue #147 references H100-class deployment and a 20-50% cost reduction claim from a Telegram post. The pinned model cards, harness, and T-Bank technical report reviewed here do not substantiate those two claims, so they are treated as unverified and are not used in the decision.
+
+## Authorized Local Pilot Contract
+
+The follow-up evaluation authorized on 2026-09-01 uses an explicit, non-promotable runner rather than changing the normal AIFHub boundary. [`t-search-ab-scenarios.json`](t-search-ab-scenarios.json) pins the Q4_K_M file identity, official harness revision, `llama.cpp` build, six answer-independent Russian/English questions, and the `local_gguf_q4_reduced_context` profile. The synthetic fixture contains mixed TypeScript, Markdown, and OpenSpec content with 23 eligible files and 30 deterministic marked chunks.
+
+The two variants receive the same question and corpus:
+
+- `baseline_rg` performs one bounded `rg --json` lookup;
+- `candidate_t_search` runs the exact pinned harness against a loopback-only OpenAI-compatible endpoint and injects the same bounded `rg` corpus search as its search tool.
+
+This isolates the value of agentic query planning and ranking. It does not claim that `rg` is a semantic index, and it does not test a production vector/BM25 lifecycle. The reduced profile uses one round, an 8,192-token server context and per-round budget, 2,048 maximum generated tokens per turn, 20 turns, `top_k=10`, and the model card's `temperature=0.7` / `top_p=1.0`. It is intentionally different from the upstream 65,536-context, up-to-five-round profile.
+
+The runner is explicit opt-in only. It does not download weights, install the harness, or start a model server. An authorized evaluator supplies the pinned harness root and loopback `/v1` endpoint:
+
+```bash
+node scripts/t-search-ab-benchmark.mjs --dry-run --json
+node scripts/t-search-ab-benchmark.mjs --baseline-only --json
+node scripts/t-search-ab-benchmark.mjs \
+  --harness-root /user-owned/pinned/t-search-harness \
+  --model-file /user-owned/T-Search-Q4_K_M.gguf \
+  --endpoint http://127.0.0.1:18000/v1 \
+  --out /os-temp/t-search-ab-result \
+  --json
+```
+
+Safety is part of the result, not a post-hoc note. The runner rejects a GGUF filename/size/SHA mismatch, repository-local weights, non-loopback endpoints, harness digest drift, model-alias mismatch, corpus symlinks/path escapes, excluded secret/QA/state/vendor/build paths, unknown chunk IDs, raw snippets/messages/transcripts, absolute paths, protected output directories, corpus changes during a row, or any persistent search state. Raw in-memory harness state is scanned for synthetic privacy canaries and discarded; durable output contains only aggregate metrics and project-relative chunk IDs. A privacy, source-boundary, freshness, or purge failure vetoes retrieval quality. The overall policy remains `reject_defer` regardless of the pilot score.
+
+### Pilot result
+
+The 2026-09-01 run completed all six pairs and all safety/provenance gates. Aggregate Recall@10 improved from `0.666667` to `1.0`, precision among returned results improved from `0.466667` to `0.504762`, and reciprocal rank improved from `0.75` to `1.0`. However, false-positive rate worsened from `0.44` to `0.495238`. T-Search used 85 search calls, 206,212 model tokens, and 449.815 seconds of measured row time; the six direct `rg` rows took 0.569 seconds. The strict quality rule therefore records `pilot_negative`, while the permanent policy remains `reject_defer`.
+
+The local endpoint had no provider charge; electricity was not priced. The stateless `rg` search backend had no index build or refresh cost, so the passed freshness/purge checks cover only the bounded pilot adapter and temporary sandboxes. They do not prove a production vector/BM25 index lifecycle. Full per-scenario metrics are in [T-Search Benchmark Results](t-search-benchmark-results.md#authorized-live-result-2026-09-01).
 
 ## Privacy, Freshness, and Storage
 
@@ -70,7 +102,7 @@ The model endpoint receives the user question and every snippet returned by the 
 
 ## AIFHub Boundary
 
-AIFHub must not:
+Outside a separate explicit evaluation such as the pilot above, AIFHub must not:
 
 - clone or install the source-only harness;
 - download any T-Search weights or start vLLM, SGLang, llama.cpp, containers, endpoints, or background processes;
@@ -82,16 +114,16 @@ The recommender enforces this with explicit command-level `forbidden` entries, `
 
 ## Re-evaluation Gate
 
-Promotion requires all of the following in a separate, explicitly authorized evaluation:
+The synthetic pilot satisfied the bounded mixed-language runner and local stateless safety gates, but did not satisfy promotion. Promotion still requires all of the following in a separate, explicitly authorized evaluation:
 
-1. A bounded user-owned repository corpus and search backend with project-root confinement, symlink/path-escape protection, explicit secret/vendor/build exclusions, and deterministic chunk IDs.
+1. A bounded real user-owned repository corpus and production-representative search backend with project-root confinement, symlink/path-escape protection, explicit secret/vendor/build exclusions, redaction, and deterministic chunk IDs.
 2. Verified index build, revision identity, incremental refresh, stale-entry behavior, and complete purge.
-3. A same-run paired benchmark against `rg` on mixed Russian/English source, Markdown, and OpenSpec tasks, with fixed answers and source citations.
-4. Correctness, Recall@10, privacy-canary, wall-time, total-token, endpoint-cost, index-build, refresh, and output-noise measurements.
+3. A same-run paired benchmark against `rg` on mixed Russian/English real-repository source, Markdown, and OpenSpec tasks, with fixed answers and source citations.
+4. Correctness, Recall@10, false-positive-rate, privacy-canary, wall-time, total-token, endpoint-cost, index-build, refresh, and output-noise measurements that improve the observed quality/cost tradeoff.
 5. A stable packaged harness or reviewed MCP/service contract whose transcript and failure behavior can be bounded without patching upstream.
 6. Direct-source verification of every selected pointer and zero persistence of raw snippets or transcripts.
 
-Static and author-reported evidence is recorded in [T-Search Benchmark Results](t-search-benchmark-results.md).
+Static, author-reported, and authorized local pilot evidence is recorded in [T-Search Benchmark Results](t-search-benchmark-results.md).
 
 ## Meta for Analysis
 
@@ -102,5 +134,7 @@ recommendation_action: do_not_suggest_install
 integration_role: user_owned_agentic_retriever_candidate
 normal_command_selection: forbidden
 source_denylist: true
-paired_aifhub_benchmark: NOT_RUN
+paired_aifhub_benchmark: LOCAL_SYNTHETIC_PILOT_NEGATIVE
+live_model_run: PASS_REDUCED_8192_CONTEXT
+external_index_lifecycle: NOT_RUN
 ```
