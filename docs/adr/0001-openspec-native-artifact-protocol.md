@@ -94,18 +94,20 @@ Canonical planning linkage lives in `openspec/changes/<change-id>/proposal.md`:
 ```markdown
 ## AIFHub Source Binding
 
-- Primary issue: <one canonical issue URL>
+- Provider: <canonical provider or MCP server ID>
+- Primary source: <canonical HTTPS work-item URL or stable MCP resource URI>
+- External ID: <human-readable provider key>
 - Branch: <exact creation branch|none>
 
 ## Roadmap Linkage
 
-- Issues: <canonical URL(s)|none>
+- Issues: <canonical HTTPS work-item URL(s) or stable MCP resource URI(s)|none>
 - Milestone: <exact title|none>
 - Roadmap item/slice: <exact item|none>
 - Rationale: <bounded explanation>
 ```
 
-The source-binding section is conditional on issue-derived identity and separates one immutable primary issue from the many-valued lifecycle linkage. Its exact branch maps numeric change IDs back to downstream commands before slug heuristics; a current pointer remains a lower-precedence fallback. Secondary roadmap links, including same-number issues in another repository, cannot satisfy source collision checks. Explicit `none` values prevent later commands from inventing issue, milestone, or slice ownership. `/aif-roadmap check` turns a valid linked active change into local `planned`; canonical planning and implementation do not claim completion.
+The source-binding section is conditional on MCP work-item identity and separates one immutable full primary source from the many-valued lifecycle linkage. The change ID starts with the normalized external key and a request slug; its exact branch maps that change back to downstream commands before slug heuristics, while a current pointer remains a lower-precedence fallback. Secondary roadmap links and equal external IDs from another provider, tenant, or repository cannot satisfy source collision checks. Explicit `none` values prevent later commands from inventing issue, milestone, or slice ownership. `/aif-roadmap check` turns a valid linked active change into local `planned`; canonical planning and implementation do not claim completion.
 
 The configured roadmap may contain one marker-bounded block:
 

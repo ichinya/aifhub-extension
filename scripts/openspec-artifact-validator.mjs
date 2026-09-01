@@ -6,8 +6,9 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import {
+  matchesSourceBoundChangeId,
   normalizeChangeId,
-  parseIssueSourceBinding,
+  parseWorkItemSourceBinding,
   resolveActiveChange as defaultResolveActiveChange
 } from './active-change-resolver.mjs';
 import {
@@ -102,7 +103,7 @@ export async function validateOpenSpecArtifactContract(options = {}) {
   const skipSpecs = await readOpenSpecSkipSpecsMarker(changeDir);
 
   checks.push(...inspectRequiredArtifacts(artifacts));
-  checks.push(inspectIssueSourceBinding(changeId, artifacts.proposal));
+  checks.push(inspectWorkItemSourceBinding(changeId, artifacts.proposal));
   checks.push(inspectDesignArtifact(artifacts.design, config.requireDesign));
   checks.push(inspectDeltaSpecs(artifacts, config, skipSpecs, rootDir));
   checks.push(...await inspectPlanningArtifacts(rootDir, changeDir));
@@ -231,10 +232,9 @@ function inspectRequiredArtifacts(artifacts) {
   });
 }
 
-function inspectIssueSourceBinding(changeId, proposal) {
+function inspectWorkItemSourceBinding(changeId, proposal) {
   const checkPath = proposal?.path ?? `openspec/changes/${changeId}/proposal.md`;
-  const parsed = parseIssueSourceBinding(proposal?.content ?? '');
-  const numericChange = /^[1-9][0-9]*$/.test(changeId);
+  const parsed = parseWorkItemSourceBinding(proposal?.content ?? '');
 
   if (!parsed.ok) {
     return createCheck({
@@ -251,23 +251,18 @@ function inspectIssueSourceBinding(changeId, proposal) {
   if (parsed.status === 'absent') {
     return createCheck({
       id: 'issue-source-binding',
-      status: numericChange ? 'fail' : 'pass',
+      status: 'pass',
       path: checkPath,
-      message: numericChange
-        ? 'Numeric issue-derived changes require one canonical AIFHub source binding.'
-        : 'No issue-derived source binding is required for this slug change.',
-      details: numericChange
-        ? { rule_code: 'source-binding-missing' }
-        : undefined
+      message: 'No MCP work-item source binding is declared for this change.'
     });
   }
 
-  if (parsed.binding.issueNumber !== changeId) {
+  if (!matchesSourceBoundChangeId(changeId, parsed.binding.externalId)) {
     return createCheck({
       id: 'issue-source-binding',
       status: 'fail',
       path: checkPath,
-      message: 'The primary issue number must equal the numeric OpenSpec change id.',
+      message: 'The OpenSpec change id must start with the normalized external ID followed by a request slug.',
       details: {
         rule_code: 'source-binding-change-id-mismatch'
       }
@@ -278,7 +273,7 @@ function inspectIssueSourceBinding(changeId, proposal) {
     id: 'issue-source-binding',
     status: 'pass',
     path: checkPath,
-    message: 'The canonical primary issue and branch binding match the numeric change id.'
+    message: 'The provider, primary source, external ID, and branch binding match the source-bound change id.'
   });
 }
 

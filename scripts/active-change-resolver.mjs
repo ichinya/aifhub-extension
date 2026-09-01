@@ -18,9 +18,14 @@ export const DEFAULT_PATHS = {
 const ACTIVE_CHANGE_MARKERS = ['proposal.md', 'design.md', 'tasks.md', 'specs'];
 const CURRENT_POINTER_KEYS = ['change_id', 'changeId', 'active_change', 'activeChange'];
 const SOURCE_BINDING_HEADING = 'AIFHub Source Binding';
-const SOURCE_BINDING_FIELDS = ['Primary issue', 'Branch'];
-const LEGACY_SOURCE_BINDING_FIELDS = ['primary_issue', 'branch'];
+const SOURCE_BINDING_FIELDS = ['Provider', 'Primary source', 'External ID', 'Branch'];
+const LEGACY_SOURCE_BINDING_FIELDS = ['provider', 'primary_source', 'external_id', 'branch'];
 const MAX_GIT_BRANCH_LENGTH = 255;
+const MAX_SOURCE_PROVIDER_LENGTH = 64;
+const MAX_PRIMARY_SOURCE_LENGTH = 2048;
+const MAX_EXTERNAL_ID_LENGTH = 80;
+const MAX_NORMALIZED_EXTERNAL_ID_LENGTH = 64;
+const MAX_SOURCE_BOUND_CHANGE_ID_LENGTH = 120;
 
 export async function resolveActiveChange(options = {}) {
   const context = await createResolverContext(options);
@@ -174,7 +179,7 @@ export function mapBranchToChangeCandidates(branchName, openChangeIds) {
     .sort((left, right) => left.localeCompare(right));
 }
 
-export function parseIssueSourceBinding(content) {
+export function parseWorkItemSourceBinding(content) {
   if (typeof content !== 'string') {
     return invalidSourceBinding('source-binding-input-invalid', 'Source binding content must be text.');
   }
@@ -199,12 +204,14 @@ export function parseIssueSourceBinding(content) {
   }
 
   return validateSourceBindingValues({
-    primaryIssue: parsedFields.values['Primary issue'],
+    provider: parsedFields.values.Provider,
+    primarySource: parsedFields.values['Primary source'],
+    externalId: parsedFields.values['External ID'],
     branch: parsedFields.values.Branch
   });
 }
 
-export function parseLegacyIssueSourceBinding(content) {
+export function parseLegacyWorkItemSourceBinding(content) {
   if (typeof content !== 'string') {
     return invalidSourceBinding('source-binding-input-invalid', 'Source binding content must be text.');
   }
@@ -234,20 +241,123 @@ export function parseLegacyIssueSourceBinding(content) {
   }
 
   return validateSourceBindingValues({
-    primaryIssue: parsedFields.values.primary_issue,
+    provider: parsedFields.values.provider,
+    primarySource: parsedFields.values.primary_source,
+    externalId: parsedFields.values.external_id,
     branch: parsedFields.values.branch
   });
 }
 
-export function matchesPrimaryIssueBinding(content, canonicalIssueUrl, options = {}) {
+export function matchesPrimarySourceBinding(content, primarySource, options = {}) {
   const parser = options.format === 'legacy-status'
-    ? parseLegacyIssueSourceBinding
-    : parseIssueSourceBinding;
+    ? parseLegacyWorkItemSourceBinding
+    : parseWorkItemSourceBinding;
   const parsed = parser(content);
 
   return parsed.ok
     && parsed.status === 'bound'
-    && parsed.binding.primaryIssue === canonicalIssueUrl;
+    && parsed.binding.primarySource === primarySource;
+}
+
+// Backward-compatible export names for consumers of the first source-binding draft.
+export const parseIssueSourceBinding = parseWorkItemSourceBinding;
+export const parseLegacyIssueSourceBinding = parseLegacyWorkItemSourceBinding;
+export const matchesPrimaryIssueBinding = matchesPrimarySourceBinding;
+
+export function normalizeExternalWorkItemId(input) {
+  if (typeof input !== 'string') {
+    return invalidExternalWorkItemId();
+  }
+
+  const externalId = input.trim();
+  if (
+    externalId.length === 0
+    || externalId.length > MAX_EXTERNAL_ID_LENGTH
+    || /[\u0000-\u001f\u007f]/.test(externalId)
+  ) {
+    return invalidExternalWorkItemId();
+  }
+
+  const normalizedExternalId = normalizeIdentifierComponent(externalId)
+    .slice(0, MAX_NORMALIZED_EXTERNAL_ID_LENGTH)
+    .replace(/-+$/g, '');
+
+  if (normalizedExternalId.length === 0) {
+    return invalidExternalWorkItemId();
+  }
+
+  return {
+    ok: true,
+    externalId,
+    normalizedExternalId,
+    error: null
+  };
+}
+
+export function deriveSourceBoundChangeId(externalId, requestSlug) {
+  const normalizedExternalId = normalizeExternalWorkItemId(externalId);
+  if (!normalizedExternalId.ok) {
+    return {
+      ok: false,
+      changeId: null,
+      error: normalizedExternalId.error
+    };
+  }
+
+  let normalizedRequestSlug = normalizeIdentifierComponent(requestSlug);
+  const prefix = `${normalizedExternalId.normalizedExternalId}-`;
+
+  if (normalizedRequestSlug.startsWith(prefix)) {
+    normalizedRequestSlug = normalizedRequestSlug.slice(prefix.length);
+  }
+
+  if (normalizedRequestSlug.length === 0) {
+    return {
+      ok: false,
+      changeId: null,
+      error: {
+        code: 'source-binding-request-slug-invalid',
+        message: 'A source-bound change requires a non-empty request slug.'
+      }
+    };
+  }
+
+  const availableSlugLength = MAX_SOURCE_BOUND_CHANGE_ID_LENGTH - prefix.length;
+  normalizedRequestSlug = normalizedRequestSlug
+    .slice(0, availableSlugLength)
+    .replace(/-+$/g, '');
+
+  if (normalizedRequestSlug.length === 0) {
+    return {
+      ok: false,
+      changeId: null,
+      error: {
+        code: 'source-binding-request-slug-invalid',
+        message: 'A source-bound change requires a non-empty request slug.'
+      }
+    };
+  }
+
+  return {
+    ok: true,
+    changeId: `${prefix}${normalizedRequestSlug}`,
+    normalizedExternalId: normalizedExternalId.normalizedExternalId,
+    normalizedRequestSlug,
+    error: null
+  };
+}
+
+export function matchesSourceBoundChangeId(changeId, externalId) {
+  const normalizedChange = normalizeChangeId(changeId);
+  const normalizedExternalId = normalizeExternalWorkItemId(externalId);
+
+  if (!normalizedChange.ok || !normalizedExternalId.ok) {
+    return false;
+  }
+
+  const prefix = `${normalizedExternalId.normalizedExternalId}-`;
+  return normalizedChange.changeId.startsWith(prefix)
+    && normalizedChange.changeId.length > prefix.length;
 }
 
 export function normalizeChangeId(input) {
@@ -464,7 +574,7 @@ async function inspectActiveSourceBindings(context, branchName, openChangeIds) {
       continue;
     }
 
-    const parsed = parseIssueSourceBinding(content);
+    const parsed = parseWorkItemSourceBinding(content);
 
     if (!parsed.ok) {
       errors.push({
@@ -482,10 +592,10 @@ async function inspectActiveSourceBindings(context, branchName, openChangeIds) {
 
     boundChangeIds.push(changeId);
 
-    if (parsed.binding.issueNumber !== changeId) {
+    if (!matchesSourceBoundChangeId(changeId, parsed.binding.externalId)) {
       errors.push({
         code: 'source-binding-change-id-mismatch',
-        message: `Source binding in '${projectRelativePath(context.rootDir, proposalPath)}' does not match its numeric change id.`,
+        message: `Source binding in '${projectRelativePath(context.rootDir, proposalPath)}' does not match its external-id-prefixed change id.`,
         changeId,
         path: projectRelativePath(context.rootDir, proposalPath)
       });
@@ -925,15 +1035,27 @@ function parseLegacyBindingScalar(value) {
   }
 }
 
-function validateSourceBindingValues({ primaryIssue, branch }) {
-  const issueMatch = String(primaryIssue ?? '').match(
-    /^https:\/\/github\.com\/[A-Za-z0-9][A-Za-z0-9.-]*\/[A-Za-z0-9._-]+\/issues\/([1-9][0-9]*)$/
-  );
-
-  if (!issueMatch) {
+function validateSourceBindingValues({ provider, primarySource, externalId, branch }) {
+  const normalizedProvider = normalizeSourceProvider(provider);
+  if (!normalizedProvider.ok) {
     return invalidSourceBinding(
-      'source-binding-primary-issue-invalid',
-      'Primary issue must be one canonical GitHub issue URL.'
+      'source-binding-provider-invalid',
+      'Provider must be one canonical lowercase provider or MCP server identifier.'
+    );
+  }
+
+  if (!isCanonicalPrimarySource(primarySource)) {
+    return invalidSourceBinding(
+      'source-binding-primary-source-invalid',
+      'Primary source must be one canonical HTTPS work-item URL or stable MCP resource URI.'
+    );
+  }
+
+  const normalizedExternalId = normalizeExternalWorkItemId(externalId);
+  if (!normalizedExternalId.ok) {
+    return invalidSourceBinding(
+      'source-binding-external-id-invalid',
+      'External ID must contain a bounded, human-readable identifier.'
     );
   }
 
@@ -950,11 +1072,82 @@ function validateSourceBindingValues({ primaryIssue, branch }) {
     ok: true,
     status: 'bound',
     binding: {
-      primaryIssue,
-      issueNumber: issueMatch[1],
+      provider: normalizedProvider.provider,
+      primarySource,
+      externalId: normalizedExternalId.externalId,
+      normalizedExternalId: normalizedExternalId.normalizedExternalId,
       branch: normalizedBranch.branch
     },
     error: null
+  };
+}
+
+function normalizeSourceProvider(input) {
+  if (typeof input !== 'string') {
+    return { ok: false, provider: null };
+  }
+
+  const provider = input.trim();
+  const valid = provider.length > 0
+    && provider.length <= MAX_SOURCE_PROVIDER_LENGTH
+    && provider === provider.toLowerCase()
+    && /^[a-z0-9][a-z0-9._-]*$/.test(provider);
+
+  return valid
+    ? { ok: true, provider }
+    : { ok: false, provider: null };
+}
+
+function isCanonicalPrimarySource(input) {
+  if (
+    typeof input !== 'string'
+    || input.length === 0
+    || input.length > MAX_PRIMARY_SOURCE_LENGTH
+    || input !== input.trim()
+    || /[\u0000-\u0020\u007f]/.test(input)
+  ) {
+    return false;
+  }
+
+  let source;
+  try {
+    source = new URL(input);
+  } catch {
+    return false;
+  }
+
+  return (source.protocol === 'https:' || source.protocol === 'mcp:')
+    && source.hostname.length > 0
+    && source.pathname !== '/'
+    && source.username.length === 0
+    && source.password.length === 0
+    && source.search.length === 0
+    && source.hash.length === 0;
+}
+
+function normalizeIdentifierComponent(input) {
+  if (typeof input !== 'string') {
+    return '';
+  }
+
+  return input
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-+/g, '-');
+}
+
+function invalidExternalWorkItemId() {
+  return {
+    ok: false,
+    externalId: null,
+    normalizedExternalId: null,
+    error: {
+      code: 'source-binding-external-id-invalid',
+      message: 'External ID must contain a bounded, human-readable identifier.'
+    }
   };
 }
 

@@ -62,7 +62,7 @@ The validator checks:
 | Check | Result |
 |---|---|
 | `proposal.md` and `tasks.md` exist | `fail` when missing |
-| numeric change `## AIFHub Source Binding` | `fail` when missing, duplicate, malformed, unsafe, or when `Primary issue` does not have the same canonical number as the change ID |
+| declared `## AIFHub Source Binding` | `fail` when duplicate, malformed, unsafe, or when the change ID does not begin with the normalized `External ID` plus a non-empty request slug; absence is valid for ordinary non-MCP plans |
 | `design.md` exists | `warn` when missing, or `fail` when `aifhub.openspec.requireDesign: true` |
 | `specs/**/spec.md` delta exists | `fail` unless `.openspec.yaml` declares native `skip_specs: true`; an explicit legacy proposal reason remains accepted for compatibility |
 | runtime or evidence files inside `openspec/changes/<change-id>/` | `fail` |

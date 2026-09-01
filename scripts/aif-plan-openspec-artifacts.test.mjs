@@ -159,91 +159,92 @@ describe('aif-plan OpenSpec-native planning contract', () => {
     }
   });
 
-  it('uses one explicit GitHub issue as the plan identity before ordinary allocation', async () => {
+  it('uses one explicit MCP work item as provider-neutral plan identity before ordinary allocation', async () => {
     const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
-    const identity = extractSection(injection, 'Issue-derived plan identity');
+    const identity = extractSection(injection, 'MCP work-item-derived plan identity');
 
     assertOrder(
       injection,
       [
         '### Planning profile and AI Factory version gate',
-        '### Issue-derived plan identity',
+        '### MCP work-item-derived plan identity',
         '### OpenSpec-native mode',
         '### Legacy AI Factory-only mode'
       ],
-      'aif-plan issue identity routing'
+      'aif-plan work-item identity routing'
     );
 
     for (const expected of [
-      'https://github.com/<owner>/<repo>/issues/<positive-decimal>',
-      '`issue #<positive-decimal>` / `issue <positive-decimal>`',
-      'canonical decimal digits without leading zeroes',
-      'A bare `#<number>`',
+      'GitHub Issues, Linear, Jira, YouGile',
+      'structured MCP record selected for that input',
+      '`identifier`, `key`, `number`, or display ID',
+      '`mcp://<server>/<resource-kind>/<stable-record-id>`',
+      '`yougile-a1b2c3d4`',
+      'A bare number',
       'a pull-request URL',
-      'is not issue-identity evidence',
-      'Exactly one distinct explicit issue selects `issue_number`',
-      '`primary_issue_url`',
-      'explicitly designates one as primary',
-      'never choose the first, lowest, or highest issue implicitly',
-      'Preserve `## Original Request` byte-for-byte',
-      'retain every canonical issue URL in `## Roadmap Linkage`',
+      'is not identity evidence',
+      'Exactly one distinct work item selects `source_provider`, `primary_source`, and `external_id`',
+      'explicitly primary',
+      'never choose the first, lowest, or highest item implicitly',
+      '`deriveSourceBoundChangeId(external_id, request_slug)`',
       '## AIFHub Source Binding',
-      '- Primary issue: <primary_issue_url>',
+      '- Provider: <source_provider>',
+      '- Primary source: <primary_source>',
+      '- External ID: <external_id>',
       '- Branch: <exact current git branch|none>',
       'MUST NOT establish or replace the primary binding'
     ]) {
-      assertIncludes(identity, expected, 'aif-plan explicit issue identity');
+      assertIncludes(identity, expected, 'aif-plan explicit MCP work-item identity');
     }
   });
 
-  it('maps issue identity to numeric OpenSpec IDs and compatible legacy sequential prefixes', async () => {
+  it('maps external work-item IDs to readable OpenSpec IDs and compatible legacy identifiers', async () => {
     const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
-    const identity = extractSection(injection, 'Issue-derived plan identity');
+    const identity = extractSection(injection, 'MCP work-item-derived plan identity');
     const openspec = extractSection(injection, 'OpenSpec-native mode');
 
     for (const expected of [
-      'set the new canonical `change-id` to the exact canonical decimal `<issue_number>`',
+      '`<normalized-external-id>-<request-slug>`',
+      '`156-fix-login-timeout`',
+      '`eng-431-fix-login-timeout`',
+      '`proj-77-refresh-token`',
+      'set the new canonical `change-id` to `deriveSourceBoundChangeId(external_id, request_slug).changeId`',
       'independent of `workflow.plan_id_format`',
       'validate it with `normalizeChangeId()` before any write',
-      'replace the next sequential prefix with the issue number represented as exactly four digits (`156` -> `0156`)',
-      '`plan_identifier = <issue-prefix>_<plan_file_stem>`',
-      'Do not scan for or allocate `max(existing) + 1`',
-      '`0001` through `9999`',
-      'issue-plan-id-out-of-range',
-      '`HANDOFF_BRANCH_PREPARED=1` retains upstream precedence',
-      'Fast plans, fix plans, and legacy `slug` / reserved `timestamp` / reserved `uuid` formats keep their ordinary identity behavior',
-      'writeCurrentChangePointer(issue_number)',
+      'use `<normalized-external-id>-<request-slug>` as the plan identifier',
+      'keep the required four-digit compatibility prefix',
+      '`0042_PROJ-77-refresh-token`',
+      '`HANDOFF_BRANCH_PREPARED=1` retains upstream precedence and disables the legacy sequential prefix',
+      'writeCurrentChangePointer(<derived-change-id>)',
       'persisted exact branch binding remains higher-precedence than ordinary slug branch matching'
     ]) {
-      assertIncludes(identity, expected, 'aif-plan issue-derived mode mapping');
+      assertIncludes(identity, expected, 'aif-plan source-bound mode mapping');
     }
 
     assertIncludes(
       openspec,
-      'use that exact canonical decimal value and do not derive a request slug',
+      'use `deriveSourceBoundChangeId(external_id, request_slug).changeId`',
       'OpenSpec Change ID policy'
     );
   });
 
-  it('fails closed on issue-derived ID collisions without suffix or sequential fallback', async () => {
+  it('fails closed on source-bound ID collisions without losing the external-ID prefix', async () => {
     const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
-    const identity = extractSection(injection, 'Issue-derived plan identity');
+    const identity = extractSection(injection, 'MCP work-item-derived plan identity');
 
     for (const expected of [
-      '`openspec/changes/<issue_number>/` already exists',
-      'whose `Primary issue` exactly equals `primary_issue_url`',
-      'route to refinement with the explicit numeric ID instead of creating a second change',
-      'Mere membership in `## Roadmap Linkage` is insufficient',
-      "another repository's same-number issue",
-      'issue-plan-id-collision',
-      'inspect every full-plan file and directory using the exact four-digit issue prefix before writing',
-      'Markdown entrypoint and, for classic plans, companion `status.yaml` have valid synchronized source bindings',
-      'Never overwrite, allocate a deterministic suffix, or silently resume ordinary sequential allocation',
-      'bounded project-relative candidate path/prefix',
-      'never include request bodies, issue bodies, credentials, raw provider output, raw stdout, or raw stderr',
-      'INFO [aif-plan] issue-derived plan identity: issue=<number> artifact=<project-relative-path>'
+      'scan active source-bound artifacts',
+      '`Primary source` equal to `primary_source`',
+      'reuse its existing identifier and route to refinement even if the current request would derive a different slug',
+      'ambiguous-primary-source-binding',
+      '`openspec/changes/<derived-change-id>/` exists',
+      'equality of `Provider` / `External ID`, is insufficient',
+      'source-plan-id-collision',
+      'Never overwrite, allocate a suffix, or silently drop the external-ID prefix',
+      'persisted full primary source protects the remaining cross-provider and cross-tenant collision case',
+      'INFO [aif-plan] source-bound plan identity: provider=<provider> external-id=<bounded-id> artifact=<project-relative-path>'
     ]) {
-      assertIncludes(identity, expected, 'aif-plan issue-derived collision contract');
+      assertIncludes(identity, expected, 'aif-plan source-bound collision contract');
     }
   });
 
@@ -330,19 +331,21 @@ describe('aif-plan OpenSpec-native planning contract', () => {
     );
   });
 
-  it('persists primary issue and branch identity separately in OpenSpec and legacy plans', async () => {
+  it('persists provider, primary source, external ID, and branch separately in OpenSpec and legacy plans', async () => {
     const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
-    const identity = extractSection(injection, 'Issue-derived plan identity');
+    const identity = extractSection(injection, 'MCP work-item-derived plan identity');
     const legacy = extractSection(injection, 'Legacy AI Factory-only mode');
 
     for (const expected of [
       'write the exact section once in `proposal.md`',
-      '`Primary issue` is the single canonical collision identity',
+      '`Primary source` is the single canonical collision identity',
       '`Issues` list in `## Roadmap Linkage` remains lifecycle linkage',
-      '`parseIssueSourceBinding()`',
-      '`parseLegacyIssueSourceBinding()`',
-      '`matchesPrimaryIssueBinding()`',
-      'source_binding.primary_issue',
+      '`parseWorkItemSourceBinding()`',
+      '`parseLegacyWorkItemSourceBinding()`',
+      '`matchesPrimarySourceBinding()`',
+      'source_binding.provider',
+      'source_binding.primary_source',
+      'source_binding.external_id',
       'source_binding.branch'
     ]) {
       assertIncludes(identity, expected, 'aif-plan persisted source binding');
@@ -350,7 +353,9 @@ describe('aif-plan OpenSpec-native planning contract', () => {
 
     for (const expected of [
       'source_binding:',
-      'primary_issue: "https://github.com/<owner>/<repo>/issues/<number>"',
+      'provider: "linear"',
+      'primary_source: "mcp://linear/issue/<stable-record-id>"',
+      'external_id: "ENG-431"',
       'branch: "<exact current git branch|none>"',
       'require the exact Markdown source-binding section in `index.md`',
       'do not create or synchronize `task.md`, `context.md`, `rules.md`, `verify.md`, `status.yaml`, or `explore.md`'
@@ -466,7 +471,7 @@ describe('aif-plan OpenSpec-native planning contract', () => {
 
     for (const expected of [
       '#### Roadmap Linkage',
-      '- Issues: <comma-separated canonical URL(s)|none>',
+      '- Issues: <comma-separated canonical HTTPS work-item URL(s) or stable MCP resource URI(s)|none>',
       '- Milestone: <exact title|none>',
       '- Roadmap item/slice: <exact item or slice|none>',
       '- Rationale: <one bounded explanation|none>',

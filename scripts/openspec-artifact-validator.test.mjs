@@ -168,30 +168,22 @@ describe('OpenSpec artifact contract validator', () => {
     assert.equal(getCheck(result, 'issue-source-binding').status, 'pass');
   });
 
-  it('requires and validates the canonical primary source binding for numeric changes', async () => {
-    const missingRoot = await createTempRoot();
-    await createValidChange(missingRoot, '156');
-
-    const missing = await validateOpenSpecArtifactContract({
-      rootDir: missingRoot,
-      changeId: '156'
-    });
-    assert.equal(missing.status, 'fail');
-    assert.equal(getCheck(missing, 'issue-source-binding').details.rule_code, 'source-binding-missing');
-
+  it('validates provider-neutral MCP work-item bindings and their external ID prefixes', async () => {
     const validRoot = await createTempRoot();
-    await createValidChange(validRoot, '156');
-    await writeFixture(validRoot, 'openspec/changes/156/proposal.md', [
+    await createValidChange(validRoot, 'eng-431-fix-login-timeout');
+    await writeFixture(validRoot, 'openspec/changes/eng-431-fix-login-timeout/proposal.md', [
       '# Proposal',
       '',
       '## AIFHub Source Binding',
       '',
-      '- Primary issue: https://github.com/repo-a/project/issues/156',
+      '- Provider: linear',
+      '- Primary source: mcp://linear/issue/6a1f24c8',
+      '- External ID: ENG-431',
       '- Branch: feature/some-request-slug',
       '',
       '## Roadmap Linkage',
       '',
-      '- Issues: https://github.com/repo-a/project/issues/156, https://github.com/repo-b/project/issues/156',
+      '- Issues: mcp://linear/issue/6a1f24c8, https://acme.atlassian.net/browse/PROJ-77',
       '- Milestone: none',
       '- Roadmap item/slice: none',
       '- Rationale: primary plus secondary linkage',
@@ -204,26 +196,36 @@ describe('OpenSpec artifact contract validator', () => {
 
     const valid = await validateOpenSpecArtifactContract({
       rootDir: validRoot,
-      changeId: '156'
+      changeId: 'eng-431-fix-login-timeout'
     });
     assert.equal(valid.status, 'pass');
     assert.equal(getCheck(valid, 'issue-source-binding').status, 'pass');
 
-    await writeFixture(validRoot, 'openspec/changes/156/proposal.md', [
+    await writeFixture(validRoot, 'openspec/changes/eng-431-fix-login-timeout/proposal.md', [
       '# Proposal',
       '',
       '## AIFHub Source Binding',
       '',
-      '- Primary issue: https://github.com/repo-b/project/issues/157',
+      '- Provider: jira',
+      '- Primary source: https://acme.atlassian.net/browse/PROJ-77',
+      '- External ID: PROJ-77',
       '- Branch: feature/some-request-slug',
       ''
     ].join('\n'));
     const mismatch = await validateOpenSpecArtifactContract({
       rootDir: validRoot,
-      changeId: '156'
+      changeId: 'eng-431-fix-login-timeout'
     });
     assert.equal(mismatch.status, 'fail');
     assert.equal(getCheck(mismatch, 'issue-source-binding').details.rule_code, 'source-binding-change-id-mismatch');
+
+    const ordinaryNumericRoot = await createTempRoot();
+    await createValidChange(ordinaryNumericRoot, '156');
+    const ordinaryNumeric = await validateOpenSpecArtifactContract({
+      rootDir: ordinaryNumericRoot,
+      changeId: '156'
+    });
+    assert.equal(getCheck(ordinaryNumeric, 'issue-source-binding').status, 'pass');
   });
 
   it('fails when delta specs are missing without an explicit skip-specs reason', async () => {

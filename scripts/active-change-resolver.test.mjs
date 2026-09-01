@@ -6,13 +6,16 @@ import os from 'node:os';
 import path from 'node:path';
 
 import {
+  deriveSourceBoundChangeId,
   ensureRuntimeLayout,
   listActiveOpenSpecChanges,
   mapBranchToChangeCandidates,
-  matchesPrimaryIssueBinding,
+  matchesPrimarySourceBinding,
+  matchesSourceBoundChangeId,
   normalizeChangeId,
-  parseIssueSourceBinding,
-  parseLegacyIssueSourceBinding,
+  normalizeExternalWorkItemId,
+  parseLegacyWorkItemSourceBinding,
+  parseWorkItemSourceBinding,
   readCurrentChangePointer,
   resolveActiveChange,
   writeCurrentChangePointer
@@ -65,9 +68,12 @@ describe('active change resolver API', () => {
     assert.equal(typeof readCurrentChangePointer, 'function');
     assert.equal(typeof writeCurrentChangePointer, 'function');
     assert.equal(typeof mapBranchToChangeCandidates, 'function');
-    assert.equal(typeof parseIssueSourceBinding, 'function');
-    assert.equal(typeof parseLegacyIssueSourceBinding, 'function');
-    assert.equal(typeof matchesPrimaryIssueBinding, 'function');
+    assert.equal(typeof parseWorkItemSourceBinding, 'function');
+    assert.equal(typeof parseLegacyWorkItemSourceBinding, 'function');
+    assert.equal(typeof matchesPrimarySourceBinding, 'function');
+    assert.equal(typeof normalizeExternalWorkItemId, 'function');
+    assert.equal(typeof deriveSourceBoundChangeId, 'function');
+    assert.equal(typeof matchesSourceBoundChangeId, 'function');
     assert.equal(typeof normalizeChangeId, 'function');
   });
 
@@ -284,78 +290,112 @@ describe('explicit and cwd resolution', () => {
   });
 });
 
-describe('issue source binding', () => {
-  it('keeps one canonical primary issue distinct from secondary issues with the same number', () => {
-    const primaryIssue = 'https://github.com/repo-a/project/issues/156';
-    const secondaryIssue = 'https://github.com/repo-b/project/issues/156';
+describe('MCP work-item source binding', () => {
+  it('keeps one canonical primary source distinct from secondary items with the same external ID', () => {
+    const primarySource = 'https://github.com/repo-a/project/issues/156';
+    const secondarySource = 'https://github.com/repo-b/project/issues/156';
     const proposal = [
       '# Proposal',
       '',
       '## AIFHub Source Binding',
       '',
-      `- Primary issue: ${primaryIssue}`,
+      '- Provider: github',
+      `- Primary source: ${primarySource}`,
+      '- External ID: 156',
       '- Branch: feature/some-request-slug',
       '',
       '## Roadmap Linkage',
       '',
-      `- Issues: ${primaryIssue}, ${secondaryIssue}`,
+      `- Issues: ${primarySource}, ${secondarySource}`,
       '- Milestone: none',
       '- Roadmap item/slice: none',
       '- Rationale: primary plus secondary linkage',
       ''
     ].join('\n');
 
-    assert.deepEqual(parseIssueSourceBinding(proposal), {
+    assert.deepEqual(parseWorkItemSourceBinding(proposal), {
       ok: true,
       status: 'bound',
       binding: {
-        primaryIssue,
-        issueNumber: '156',
+        provider: 'github',
+        primarySource,
+        externalId: '156',
+        normalizedExternalId: '156',
         branch: 'feature/some-request-slug'
       },
       error: null
     });
-    assert.equal(matchesPrimaryIssueBinding(proposal, primaryIssue), true);
-    assert.equal(matchesPrimaryIssueBinding(proposal, secondaryIssue), false);
+    assert.equal(matchesPrimarySourceBinding(proposal, primarySource), true);
+    assert.equal(matchesPrimarySourceBinding(proposal, secondarySource), false);
   });
 
-  it('parses the synchronized legacy status source_binding mapping', () => {
-    const primaryIssue = 'https://github.com/repo-a/project/issues/156';
+  it('derives readable provider-neutral change IDs for GitHub, Linear, Jira, and YouGile records', () => {
+    const cases = [
+      ['156', 'Fix login timeout', '156-fix-login-timeout'],
+      ['ENG-431', 'Fix login timeout', 'eng-431-fix-login-timeout'],
+      ['PROJ-77', 'Refresh token', 'proj-77-refresh-token'],
+      ['yougile-A1B2C3D4', 'Refresh token', 'yougile-a1b2c3d4-refresh-token']
+    ];
+
+    for (const [externalId, requestSlug, expected] of cases) {
+      const result = deriveSourceBoundChangeId(externalId, requestSlug);
+      assert.equal(result.ok, true);
+      assert.equal(result.changeId, expected);
+      assert.equal(matchesSourceBoundChangeId(result.changeId, externalId), true);
+    }
+
+    assert.equal(
+      deriveSourceBoundChangeId('ENG-431', 'eng-431-fix-login-timeout').changeId,
+      'eng-431-fix-login-timeout'
+    );
+    assert.equal(matchesSourceBoundChangeId('eng-432-fix-login-timeout', 'ENG-431'), false);
+  });
+
+  it('parses the synchronized legacy status source_binding mapping for a non-GitHub provider', () => {
+    const primarySource = 'https://acme.atlassian.net/browse/PROJ-77';
     const status = [
       'status: planned',
       'source_binding:',
-      `  primary_issue: ${JSON.stringify(primaryIssue)}`,
+      '  provider: "jira"',
+      `  primary_source: ${JSON.stringify(primarySource)}`,
+      '  external_id: "PROJ-77"',
       '  branch: "feature/some-request-slug"',
       'history: []',
       ''
     ].join('\n');
 
-    assert.deepEqual(parseLegacyIssueSourceBinding(status), {
+    assert.deepEqual(parseLegacyWorkItemSourceBinding(status), {
       ok: true,
       status: 'bound',
       binding: {
-        primaryIssue,
-        issueNumber: '156',
+        provider: 'jira',
+        primarySource,
+        externalId: 'PROJ-77',
+        normalizedExternalId: 'proj-77',
         branch: 'feature/some-request-slug'
       },
       error: null
     });
-    assert.equal(matchesPrimaryIssueBinding(status, primaryIssue, { format: 'legacy-status' }), true);
+    assert.equal(matchesPrimarySourceBinding(status, primarySource, { format: 'legacy-status' }), true);
   });
 
   it('rejects duplicate or malformed source bindings instead of using roadmap membership', () => {
     const section = [
       '## AIFHub Source Binding',
       '',
-      '- Primary issue: https://github.com/repo-a/project/issues/156',
+      '- Provider: linear',
+      '- Primary source: mcp://linear/issue/6a1f24c8',
+      '- External ID: ENG-431',
       '- Branch: feature/some-request-slug',
       ''
     ].join('\n');
     const duplicate = `${section}\n${section}`;
-    const malformed = section.replace('- Primary issue:', '- Issues:');
+    const malformed = section.replace('- Primary source:', '- Issues:');
+    const unsafeSource = section.replace('mcp://linear/issue/6a1f24c8', 'https://linear.app/issue/ENG-431?token=secret');
 
-    assert.equal(parseIssueSourceBinding(duplicate).error.code, 'source-binding-duplicate');
-    assert.equal(parseIssueSourceBinding(malformed).error.code, 'source-binding-fields-invalid');
+    assert.equal(parseWorkItemSourceBinding(duplicate).error.code, 'source-binding-duplicate');
+    assert.equal(parseWorkItemSourceBinding(malformed).error.code, 'source-binding-fields-invalid');
+    assert.equal(parseWorkItemSourceBinding(unsafeSource).error.code, 'source-binding-primary-source-invalid');
   });
 });
 
@@ -387,17 +427,19 @@ describe('branch-derived resolution', () => {
     assert.deepEqual(result.candidates, ['add-oauth']);
   });
 
-  it('prefers an exact persisted branch binding for a numeric change over an older slug match', async () => {
+  it('prefers an exact persisted branch binding for an external-id-prefixed change over an older slug match', async () => {
     const rootDir = await createTempRoot();
-    const numericPath = await createChange(rootDir, '156');
+    const sourceBoundPath = await createChange(rootDir, 'eng-431-some-request-slug');
     await createChange(rootDir, 'some-request-slug');
     await createChange(rootDir, 'unrelated-active-change');
-    await writeFile(path.join(numericPath, 'proposal.md'), [
-      '# Numeric plan',
+    await writeFile(path.join(sourceBoundPath, 'proposal.md'), [
+      '# MCP work-item plan',
       '',
       '## AIFHub Source Binding',
       '',
-      '- Primary issue: https://github.com/repo-a/project/issues/156',
+      '- Provider: linear',
+      '- Primary source: https://linear.app/acme/issue/ENG-431/some-request',
+      '- External ID: ENG-431',
       '- Branch: feature/some-request-slug',
       ''
     ].join('\n'), 'utf8');
@@ -408,22 +450,28 @@ describe('branch-derived resolution', () => {
     });
 
     assert.equal(result.ok, true);
-    assert.equal(result.changeId, '156');
+    assert.equal(result.changeId, 'eng-431-some-request-slug');
     assert.equal(result.source, 'branch-binding');
-    assert.equal(result.changePath, numericPath);
-    assert.deepEqual(result.candidates, ['156']);
+    assert.equal(result.changePath, sourceBoundPath);
+    assert.deepEqual(result.candidates, ['eng-431-some-request-slug']);
   });
 
-  it('fails closed when persisted branch bindings are ambiguous or disagree with numeric IDs', async () => {
+  it('fails closed when persisted branch bindings are ambiguous or disagree with external ID prefixes', async () => {
     const ambiguousRoot = await createTempRoot();
-    for (const changeId of ['156', '157']) {
+    const ambiguousChanges = [
+      ['eng-431-first-work', 'linear', 'mcp://linear/issue/a1', 'ENG-431'],
+      ['proj-77-second-work', 'jira', 'mcp://jira/issue/b2', 'PROJ-77']
+    ];
+    for (const [changeId, provider, primarySource, externalId] of ambiguousChanges) {
       const changePath = await createChange(ambiguousRoot, changeId);
       await writeFile(path.join(changePath, 'proposal.md'), [
-        '# Numeric plan',
+        '# MCP work-item plan',
         '',
         '## AIFHub Source Binding',
         '',
-        `- Primary issue: https://github.com/repo-a/project/issues/${changeId}`,
+        `- Provider: ${provider}`,
+        `- Primary source: ${primarySource}`,
+        `- External ID: ${externalId}`,
         '- Branch: feature/shared-branch',
         ''
       ].join('\n'), 'utf8');
@@ -436,16 +484,18 @@ describe('branch-derived resolution', () => {
     assert.equal(ambiguous.ok, false);
     assert.equal(ambiguous.source, 'branch-binding');
     assert.equal(ambiguous.errors[0].code, 'ambiguous-branch-binding');
-    assert.deepEqual(ambiguous.candidates, ['156', '157']);
+    assert.deepEqual(ambiguous.candidates, ['eng-431-first-work', 'proj-77-second-work']);
 
     const mismatchRoot = await createTempRoot();
-    const mismatchPath = await createChange(mismatchRoot, '156');
+    const mismatchPath = await createChange(mismatchRoot, 'eng-431-some-request');
     await writeFile(path.join(mismatchPath, 'proposal.md'), [
-      '# Numeric plan',
+      '# MCP work-item plan',
       '',
       '## AIFHub Source Binding',
       '',
-      '- Primary issue: https://github.com/repo-a/project/issues/157',
+      '- Provider: jira',
+      '- Primary source: mcp://jira/issue/PROJ-77',
+      '- External ID: PROJ-77',
       '- Branch: feature/shared-branch',
       ''
     ].join('\n'), 'utf8');
@@ -457,7 +507,7 @@ describe('branch-derived resolution', () => {
     assert.equal(mismatch.ok, false);
     assert.equal(mismatch.source, 'branch-binding');
     assert.equal(mismatch.errors[0].code, 'source-binding-change-id-mismatch');
-    assert.deepEqual(mismatch.candidates, ['156']);
+    assert.deepEqual(mismatch.candidates, ['eng-431-some-request']);
   });
 
   it('fails when a branch maps to multiple active changes', async () => {

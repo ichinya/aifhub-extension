@@ -1288,7 +1288,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
     }
   });
 
-  it('documents issue-derived plan IDs across OpenSpec and legacy sequential modes', async () => {
+  it('documents provider-neutral MCP work-item IDs across OpenSpec and legacy modes', async () => {
     const readme = await readRepoFile('README.md');
     const usage = await readRepoFile('docs/usage.md');
     const compatibility = await readRepoFile('docs/openspec-compatibility.md');
@@ -1299,52 +1299,54 @@ describe('complete OpenSpec workflow documentation contract', () => {
     const unreleased = extractSection(changelog, '## [В разработке]');
 
     for (const expected of [
-      'issue `#156` becomes OpenSpec change `156` or legacy sequential prefix `0156_`',
-      'persist the exact primary issue separately from secondary roadmap links',
-      'active-change resolver checks that binding before slug matching',
-      'Ambiguous multi-issue input keeps ordinary allocation',
+      'GitHub, Linear, Jira, YouGile',
+      '`156-fix-login`',
+      '`eng-431-fix-login`',
+      'persist provider, full primary source, external ID, and creation branch separately',
+      'resolver checks that binding before slug matching',
+      'Ambiguous multi-item input keeps ordinary allocation',
       'collisions fail closed'
     ]) {
-      assertIncludes(readme, expected, 'README.md issue-derived plan identity');
+      assertIncludes(readme, expected, 'README.md MCP work-item plan identity');
     }
 
     for (const expected of [
-      'exactly one explicit canonical GitHub issue',
-      '`openspec/changes/156/`',
-      '`0156_<plan_file_stem>`',
-      '`max(existing) + 1`',
-      'A bare `#156`, PR URL, branch name, title, label, milestone, or discovered issue does not establish this binding',
+      'exactly one explicit primary work item',
+      '`156-fix-login-timeout`',
+      '`eng-431-fix-login-timeout`',
+      '`proj-77-refresh-token`',
+      '`yougile-a1b2c3d4-refresh-token`',
+      'A bare number, PR URL, branch name, title, label, milestone, or discovered search result does not establish this binding',
       'explicitly primary',
-      '`issue-plan-id-collision`',
-      '`issue-plan-id-out-of-range`',
-      '`HANDOFF_BRANCH_PREPARED=1`',
+      '`source-plan-id-collision`',
       '## AIFHub Source Binding',
-      'Primary issue: https://github.com/example/project/issues/156',
-      'secondary URL in `Roadmap Linkage.Issues`',
-      'same issue number in another repository',
-      'source_binding.primary_issue',
+      'Provider: linear',
+      'Primary source: mcp://linear/issue/6a1f24c8',
+      'External ID: ENG-431',
+      'secondary reference in `Roadmap Linkage.Issues`',
+      'source_binding.primary_source',
+      'source_binding.external_id',
       'source_binding.branch',
-      'persisted mapping is checked before ordinary slug branch variants',
-      'numeric current-change pointer as a fallback',
-      'roadmap-list membership is insufficient'
+      'binding is checked before ordinary slug branch variants',
+      'complete derived change ID to the current-change pointer',
+      'roadmap-list membership and external-ID equality are insufficient'
     ]) {
-      assertIncludes(planUsage, expected, 'docs/usage.md issue-derived plan identity');
+      assertIncludes(planUsage, expected, 'docs/usage.md MCP work-item plan identity');
     }
 
     for (const expected of [
       'takes precedence over ordinary new-plan allocation',
-      'issue `#156` writes `openspec/changes/156/`',
-      '`0156_<plan_file_stem>.md`',
-      '`0156_<plan_file_stem>/index.md`',
-      'It bypasses `max(existing) + 1`',
-      '`issue-plan-id-collision`',
-      '`issue-plan-id-out-of-range`',
+      '`openspec/changes/156-fix-login-timeout/`',
+      '`openspec/changes/eng-431-fix-login-timeout/`',
+      '`0042_PROJ-77-refresh-token`',
+      '`source-plan-id-collision`',
       '`HANDOFF_BRANCH_PREPARED=1` retains upstream precedence',
-      'exact `## AIFHub Source Binding` with `Primary issue` and `Branch`',
-      'secondary links never satisfy a collision check',
-      'source_binding.primary_issue',
+      'exact `## AIFHub Source Binding` with `Provider`, `Primary source`, `External ID`, and `Branch`',
+      'secondary links and equal external IDs never satisfy a collision check',
+      'source_binding.primary_source',
+      'source_binding.external_id',
       'source_binding.branch',
-      'exact persisted primary binding matches the canonical issue URL'
+      'same full `Primary source`'
     ]) {
       assertIncludes(planPolicy, expected, 'docs/openspec-compatibility.md Workflow Plan ID Policy');
     }
@@ -1353,9 +1355,10 @@ describe('complete OpenSpec workflow documentation contract', () => {
       'Current git branch matched to an exact persisted `## AIFHub Source Binding`',
       '`source-binding-change-id-mismatch`',
       '`ambiguous-branch-binding`',
-      '`parseIssueSourceBinding()`',
-      '`matchesPrimaryIssueBinding()`',
-      '`repo-a#156` never matches `repo-b#156`',
+      '`parseWorkItemSourceBinding()`',
+      '`matchesPrimarySourceBinding()`',
+      '`deriveSourceBoundChangeId()`',
+      'another repository, tenant, or provider never matches by key alone',
       'source `branch-binding` before ordinary slug matching',
       'do not fall through to an older slug change or current pointer'
     ]) {
@@ -1363,12 +1366,12 @@ describe('complete OpenSpec workflow documentation contract', () => {
     }
 
     for (const expected of [
-      'issue #156',
-      'exact decimal ID',
-      'four-digit prefix',
-      'без overwrite, suffix или silent fallback allocation'
+      'GitHub, Linear, Jira, YouGile',
+      '`<external-id>-<request-slug>`',
+      'primary source',
+      'four-digit compatibility prefix'
     ]) {
-      assertIncludes(unreleased, expected, 'CHANGELOG.md unreleased issue-derived plan identity');
+      assertIncludes(unreleased, expected, 'CHANGELOG.md unreleased MCP work-item plan identity');
     }
   });
 

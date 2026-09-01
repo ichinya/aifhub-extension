@@ -424,7 +424,7 @@ describe('aif-explore and aif-improve OpenSpec-native contracts', () => {
       'patch other sections around it instead of reconstructing `proposal.md`',
       'existing `## AIFHub Source Binding` as reserved identity metadata',
       'Preserve its complete heading and body byte-for-byte during ordinary refinement',
-      '`Primary issue` is immutable',
+      '`Provider`, `Primary source`, and `External ID` are immutable',
       '`Branch` may change only for an explicit branch-rebind request',
       'existing `## Research Context` body and `Source` revision metadata as the committed requirements snapshot',
       'unless the user explicitly requests a research rebase',

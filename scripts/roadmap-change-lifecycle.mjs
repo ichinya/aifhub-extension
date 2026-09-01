@@ -324,7 +324,7 @@ function normalizeIssues(value) {
   if (
     values.length === 0
     || values.length > MAX_ISSUES
-    || values.some((entry) => !isCanonicalIssueUrl(entry))
+    || values.some((entry) => !isCanonicalWorkItemReference(entry))
   ) {
     return { ok: false, values: [] };
   }
@@ -335,10 +335,31 @@ function normalizeIssues(value) {
   };
 }
 
-function isCanonicalIssueUrl(value) {
-  return typeof value === 'string'
-    && value.length <= MAX_ISSUE_LENGTH
-    && /^https:\/\/github\.com\/[A-Za-z0-9][A-Za-z0-9.-]*\/[A-Za-z0-9._-]+\/issues\/[1-9][0-9]*$/.test(value);
+function isCanonicalWorkItemReference(value) {
+  if (
+    typeof value !== 'string'
+    || value.length === 0
+    || value.length > MAX_ISSUE_LENGTH
+    || value !== value.trim()
+    || /[\u0000-\u0020\u007f]/.test(value)
+  ) {
+    return false;
+  }
+
+  let reference;
+  try {
+    reference = new URL(value);
+  } catch {
+    return false;
+  }
+
+  return (reference.protocol === 'https:' || reference.protocol === 'mcp:')
+    && reference.hostname.length > 0
+    && reference.pathname !== '/'
+    && reference.username.length === 0
+    && reference.password.length === 0
+    && reference.search.length === 0
+    && reference.hash.length === 0;
 }
 
 function normalizeOptionalText(value, maxLength) {

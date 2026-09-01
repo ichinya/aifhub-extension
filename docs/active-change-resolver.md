@@ -47,9 +47,9 @@ Common failure codes:
 | `invalid-change-id` | The supplied ID is empty, absolute, contains path separators, contains `..`, or contains characters outside letters, numbers, `.`, `_`, and `-`. |
 | `explicit-change-not-found` | The explicit ID is safe but no matching active change directory exists. |
 | `source-binding-duplicate` / `source-binding-fields-invalid` | A reserved proposal source-binding section is duplicated or malformed. |
-| `source-binding-primary-issue-invalid` / `source-binding-branch-invalid` | A source binding contains a non-canonical primary issue or unsafe branch value. |
-| `source-binding-change-id-mismatch` | The canonical primary issue number does not equal the numeric change directory ID. |
-| `ambiguous-branch-binding` | More than one active numeric change is bound to the exact current branch. |
+| `source-binding-provider-invalid` / `source-binding-primary-source-invalid` / `source-binding-external-id-invalid` / `source-binding-branch-invalid` | A source binding contains a non-canonical provider, work-item reference, external ID, or branch value. |
+| `source-binding-change-id-mismatch` | The change directory ID does not start with the normalized external ID followed by a request slug. |
+| `ambiguous-branch-binding` | More than one active source-bound change is bound to the exact current branch. |
 | `ambiguous-branch-change` | The current branch maps to more than one active change. |
 | `current-pointer-not-found` | The current pointer references a missing or inactive change. |
 | `ambiguous-active-change` | More than one active change exists and no higher-precedence source selected one. |
@@ -101,16 +101,18 @@ A stale pointer is an error and blocks fallback, so broken runtime state is visi
 
 ## Branch Mapping
 
-Issue-derived numeric changes persist exact identity in `proposal.md`:
+Plans created from GitHub, Linear, Jira, YouGile, or another MCP work item persist exact identity in `proposal.md`:
 
 ```markdown
 ## AIFHub Source Binding
 
-- Primary issue: https://github.com/example/project/issues/156
+- Provider: linear
+- Primary source: mcp://linear/issue/6a1f24c8
+- External ID: ENG-431
 - Branch: feature/some-request-slug
 ```
 
-`parseIssueSourceBinding()` requires one exact section, one canonical GitHub issue URL, and one exact safe branch name or `none`. The primary issue number must equal the numeric change ID. `matchesPrimaryIssueBinding()` compares the full canonical URL, so `repo-a#156` never matches `repo-b#156` merely because their numbers are equal. `parseLegacyIssueSourceBinding()` applies the same value contract to double-quoted `source_binding.primary_issue` and `source_binding.branch` values in legacy `status.yaml`.
+`parseWorkItemSourceBinding()` requires one exact section, a canonical lowercase provider, one canonical HTTPS work-item URL or stable `mcp://` resource URI, a bounded readable external ID, and one exact safe branch name or `none`. `deriveSourceBoundChangeId()` normalizes `ENG-431` plus `Fix login timeout` to `eng-431-fix-login-timeout`; `matchesSourceBoundChangeId()` enforces that prefix and non-empty slug. `matchesPrimarySourceBinding()` compares the full primary reference, so the same `156` or `PROJ-77` from another repository, tenant, or provider never matches by key alone. `parseLegacyWorkItemSourceBinding()` applies the same value contract to double-quoted `source_binding.provider`, `source_binding.primary_source`, `source_binding.external_id`, and `source_binding.branch` values in legacy `status.yaml`.
 
 The resolver scans active proposals after detecting the branch. One exact binding match returns source `branch-binding` before ordinary slug matching. Duplicate, malformed, ID-mismatched, or ambiguous bindings fail closed and do not fall through to an older slug change or current pointer. Changes with valid bindings to another branch are excluded from legacy slug matching because their persisted binding is authoritative.
 

@@ -10,7 +10,7 @@ specs:
   #   files_changed: 12
   #   tests_added: 0
   #   tags: [workflow, example]
-  #   issue: null
+  #   work_item: null
   #   pr: null
 
 stats:
@@ -29,5 +29,5 @@ _schema:
     files_changed: "number of files modified/created"
     tests_added: "number of new tests"
     tags: ["list", "of", "tags"]
-    issue: "issue number (optional)"
+    work_item: "canonical work-item reference (optional)"
     pr: "pull request number (optional)"

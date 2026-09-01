@@ -33,46 +33,51 @@ For stable AI Factory `>=2.18.0`, route explicit `ultra` by the resolved artifac
 - OpenSpec-native `ultra` still writes only `proposal.md`, `design.md`, `tasks.md`, and applicable delta specs. It MUST NOT create `index.md`, `phase-NN-*.md`, companion files, or an active standalone `<!-- aif:plan-mode:ultra -->` anywhere under the canonical change.
 - In legacy AI Factory-only mode, explicit `ultra` remains upstream-owned. Hand control to the upstream `aif-plan` ultra workflow before AIFHub classic companion normalization; do not create or synchronize a sibling classic plan or companion files.
 
-### Issue-derived plan identity
+### MCP work-item-derived plan identity
 
-Resolve issue identity after preserving the explicit request and before deriving a new OpenSpec `change-id` or running the upstream sequential next-number scan.
+Resolve work-item identity after preserving the explicit request and before deriving a new OpenSpec `change-id` or running the upstream sequential next-number scan. This contract is provider-neutral and covers GitHub Issues, Linear, Jira, YouGile, and other issue or task systems exposed through MCP.
 
-- Accept an issue identity only from explicit planning input: a GitHub URL whose origin and path normalize to `https://github.com/<owner>/<repo>/issues/<positive-decimal>`, or the unambiguous forms `issue #<positive-decimal>` / `issue <positive-decimal>` when the current repository owner and name are directly known. Normalize the issue number to canonical decimal digits without leading zeroes and normalize the linkage URL to the canonical URL above.
-- A bare `#<number>`, a pull-request URL, a branch name, issue title, label, milestone, roadmap text, or issue discovered during repository/GitHub exploration is not issue-identity evidence. Never fetch unrelated issues and choose one by title, recency, or numeric order.
-- Exactly one distinct explicit issue selects `issue_number` and `primary_issue_url`. If several issues are linked, use an issue-derived ID only when the request explicitly designates one as primary; preserve every issue under `## Roadmap Linkage`. Without an explicit primary issue, keep the ordinary mode-specific ID policy and never choose the first, lowest, or highest issue implicitly.
-- Issue-derived identity changes the artifact identifier and adds the reserved source-binding metadata below. Preserve `## Original Request` byte-for-byte under its existing contract, retain every canonical issue URL in `## Roadmap Linkage`, and preserve the upstream branch and `plan_file_stem` rules.
+- Accept a work-item identity only from the explicit planning input or the structured MCP record selected for that input. Prefer provider fields such as `identifier`, `key`, `number`, or display ID; never extract an ID from the title, description, labels, milestone text, branch name, or search-result ordering.
+- Set `source_provider` to a canonical lowercase provider or MCP server identifier. Set `primary_source` to the provider's canonical HTTPS work-item URL when available; otherwise use a stable MCP resource URI returned by the provider. If MCP returns only a stable server name, resource kind, and record ID, construct `mcp://<server>/<resource-kind>/<stable-record-id>`. Never persist credentials, fragments, secret query parameters, raw provider payloads, or a transient search URL.
+- Set `external_id` to the provider's short human-readable work-item key, for example `156`, `ENG-431`, or `PROJ-77`. If the provider exposes only an opaque stable ID, create `<provider>-<first-eight-stable-alphanumeric-characters>`, for example `yougile-a1b2c3d4`, while retaining the full opaque identity only in `primary_source`.
+- A bare number, a pull-request URL, a branch name, title, label, milestone, roadmap text, or unrelated item discovered during exploration is not identity evidence. A GitHub shorthand such as `issue #156` is accepted only when the current repository is directly known and it resolves unambiguously to one canonical issue URL.
+- Exactly one distinct work item selects `source_provider`, `primary_source`, and `external_id`. If several items are linked, use source-derived identity only when one is explicitly primary; preserve every canonical work-item reference under `## Roadmap Linkage`. Without an explicit primary item, keep the ordinary mode-specific ID policy and never choose the first, lowest, or highest item implicitly.
+- Derive a bounded request slug from the requested work without repeating the external ID, then call `deriveSourceBoundChangeId(external_id, request_slug)`. The resulting semantic ID is `<normalized-external-id>-<request-slug>`, for example `156-fix-login-timeout`, `eng-431-fix-login-timeout`, or `proj-77-refresh-token`.
 
-When `issue_number` resolves, persist the primary identity separately from the many-valued roadmap linkage:
+When the work-item identity resolves, persist it separately from the many-valued roadmap linkage:
 
 ```markdown
 ## AIFHub Source Binding
 
-- Primary issue: <primary_issue_url>
+- Provider: <source_provider>
+- Primary source: <primary_source>
+- External ID: <external_id>
 - Branch: <exact current git branch|none>
 ```
 
-- Capture `Branch` from the exact attached git branch used for plan creation. Write the literal `none` only when no attached branch can be resolved; never derive it from the request slug or issue title.
-- In OpenSpec-native mode, write the exact section once in `proposal.md`. In legacy sequential classic mode, write it once in the parent `.md` entrypoint and synchronize the same values to `status.yaml` as exact double-quoted scalars under `source_binding.primary_issue` and `source_binding.branch`. For an upstream-owned marked ultra bundle, persist the Markdown section once in `index.md` and do not create a companion `status.yaml`.
-- `Primary issue` is the single canonical collision identity. The `Issues` list in `## Roadmap Linkage` remains lifecycle linkage and MUST NOT establish or replace the primary binding, even when it contains a URL with the same issue number from another repository.
-- Treat `Primary issue` as immutable. Preserve `Branch` during ordinary refinement; change it only for an explicit branch-rebind request that keeps the same primary issue and passes the same collision checks.
-- Use `parseIssueSourceBinding()`, `parseLegacyIssueSourceBinding()`, and `matchesPrimaryIssueBinding()` from `scripts/active-change-resolver.mjs` when inspecting an existing artifact. Missing, duplicate, malformed, mismatched, or differently bound metadata fails closed.
+- Capture `Branch` from the exact attached git branch used for plan creation. Write the literal `none` only when no attached branch can be resolved; never derive it from the request slug or work-item title.
+- In OpenSpec-native mode, write the exact section once in `proposal.md`. In legacy classic mode, write it once in the parent `.md` entrypoint and synchronize the same values to `status.yaml` as exact double-quoted scalars under `source_binding.provider`, `source_binding.primary_source`, `source_binding.external_id`, and `source_binding.branch`. For an upstream-owned marked ultra bundle, persist the Markdown section once in `index.md` and do not create a companion `status.yaml`.
+- `Primary source` is the single canonical collision identity. `Provider` and `External ID` make it readable, but neither may authorize reuse by itself. The `Issues` list in `## Roadmap Linkage` remains lifecycle linkage and MUST NOT establish or replace the primary binding, even when it contains the same external ID from another provider, tenant, or repository.
+- Treat `Provider`, `Primary source`, and `External ID` as immutable. Preserve `Branch` during ordinary refinement; change it only for an explicit branch-rebind request that keeps the same primary source and passes the same collision checks.
+- Use `parseWorkItemSourceBinding()`, `parseLegacyWorkItemSourceBinding()`, `matchesPrimarySourceBinding()`, and `deriveSourceBoundChangeId()` from `scripts/active-change-resolver.mjs` when creating or inspecting artifacts. Missing, duplicate, malformed, mismatched, or differently bound metadata fails closed.
 
-Apply the resolved `issue_number` by artifact mode:
+Apply the resolved work-item identity by artifact mode:
 
-- **OpenSpec-native mode:** set the new canonical `change-id` to the exact canonical decimal `<issue_number>` instead of deriving a request slug. This source-binding override is independent of `workflow.plan_id_format`; validate it with `normalizeChangeId()` before any write.
-- **Legacy AI Factory-only mode with active `workflow.plan_id_format: sequential`:** preserve the upstream `plan_file_stem`, but replace the next sequential prefix with the issue number represented as exactly four digits (`156` -> `0156`). Set `plan_identifier = <issue-prefix>_<plan_file_stem>` for both classic full plans and marked ultra bundles. Do not scan for or allocate `max(existing) + 1` in this case.
-- Legacy issue-derived prefixes inherit the upstream sequential range `0001` through `9999`. For a larger issue number, stop before every write with `ERROR [aif-plan] issue-plan-id-out-of-range issue=<number> max=9999`; do not truncate, wrap, or fall back to the next sequential number.
-- `HANDOFF_BRANCH_PREPARED=1` retains upstream precedence and force-disables every sequential prefix, including an issue-derived prefix. Fast plans, fix plans, and legacy `slug` / reserved `timestamp` / reserved `uuid` formats keep their ordinary identity behavior because they have no sequential ordinal to replace.
+- **OpenSpec-native mode:** set the new canonical `change-id` to `deriveSourceBoundChangeId(external_id, request_slug).changeId`. This source-binding override is independent of `workflow.plan_id_format`; validate it with `normalizeChangeId()` before any write.
+- **Legacy AI Factory-only mode with active `workflow.plan_id_format: slug`:** use `<normalized-external-id>-<request-slug>` as the plan identifier.
+- **Legacy AI Factory-only mode with active `workflow.plan_id_format: sequential`:** keep the required four-digit compatibility prefix. When `external_id` is a decimal value in `1..9999`, use that value as the four-digit prefix and the request slug as the stem (`156` -> `0156_fix-login-timeout`). For an alphanumeric or out-of-range external ID, allocate the upstream four-digit ordinal normally and begin the semantic stem with `<normalized-external-id>-<request-slug>`, for example `0042_PROJ-77-refresh-token`. The source binding, not the compatibility ordinal, remains the identity.
+- `HANDOFF_BRANCH_PREPARED=1` retains upstream precedence and disables the legacy sequential prefix; the unprefixed semantic stem still begins with `<normalized-external-id>-`. Fast and fix plans keep their upstream artifact shapes but use the same semantic stem whenever their workflow accepts a plan identifier.
 
 Collision handling is fail-closed and source-aware:
 
-- In OpenSpec-native mode, if `openspec/changes/<issue_number>/` already exists and its proposal has exactly one valid `## AIFHub Source Binding` whose `Primary issue` exactly equals `primary_issue_url`, treat it as the existing plan for that issue and route to refinement with the explicit numeric ID instead of creating a second change. Mere membership in `## Roadmap Linkage` is insufficient. If the directory is unbound, malformed, or bound to another repository's same-number issue, stop with `ERROR [aif-plan] issue-plan-id-collision issue=<number> path=openspec/changes/<issue_number>`.
-- In legacy sequential mode, inspect every full-plan file and directory using the exact four-digit issue prefix before writing. Reuse only an existing artifact whose Markdown entrypoint and, for classic plans, companion `status.yaml` have valid synchronized source bindings whose primary URL exactly equals `primary_issue_url`, and whose stem resolves to the same work. Any unbound, differently bound, unsynchronized, or differently shaped occupant of that prefix stops with `ERROR [aif-plan] issue-plan-id-collision issue=<number> prefix=<NNNN>`.
-- Never overwrite, allocate a deterministic suffix, or silently resume ordinary sequential allocation after an issue-derived collision. Diagnostics may include only the issue number, bounded project-relative candidate path/prefix, mode, and stable code; never include request bodies, issue bodies, credentials, raw provider output, raw stdout, or raw stderr.
+- Before choosing a path, scan active source-bound artifacts. If exactly one valid binding has `Primary source` equal to `primary_source`, reuse its existing identifier and route to refinement even if the current request would derive a different slug. If more than one active artifact claims the same primary source, stop with `ERROR [aif-plan] ambiguous-primary-source-binding provider=<provider> external-id=<bounded-id>`.
+- In OpenSpec-native mode, if `openspec/changes/<derived-change-id>/` exists, reuse it only when its proposal has exactly one valid binding whose `Primary source` equals `primary_source`. Mere membership in `## Roadmap Linkage`, or equality of `Provider` / `External ID`, is insufficient. Otherwise stop with `ERROR [aif-plan] source-plan-id-collision external-id=<bounded-id> path=openspec/changes/<derived-change-id>`.
+- In legacy mode, reuse an occupied plan identifier only when its Markdown entrypoint and, for classic plans, companion `status.yaml` contain valid synchronized bindings with the exact same `Primary source`. Any unbound, differently bound, unsynchronized, or differently shaped occupant stops with `ERROR [aif-plan] source-plan-id-collision external-id=<bounded-id> identifier=<bounded-plan-id>`.
+- Never overwrite, allocate a suffix, or silently drop the external-ID prefix after a source-bound collision. The request slug is the readable disambiguator; the persisted full primary source protects the remaining cross-provider and cross-tenant collision case. Diagnostics may include only bounded provider, external ID, project-relative path or identifier, mode, and stable code.
 
-After a new issue-derived OpenSpec change has been written successfully, call `writeCurrentChangePointer(issue_number)` from `scripts/active-change-resolver.mjs`. Do not advance the pointer before all canonical artifacts and the exact source binding pass local shape checks, and do not advance it on any collision or failed write. The persisted exact branch binding remains higher-precedence than ordinary slug branch matching; the pointer is the deterministic fallback when `Branch` is `none` or no branch mapping applies.
+After a new source-bound OpenSpec change has been written successfully, call `writeCurrentChangePointer(<derived-change-id>)` from `scripts/active-change-resolver.mjs`. Do not advance the pointer before all canonical artifacts and the exact source binding pass local shape checks, and do not advance it on any collision or failed write. The persisted exact branch binding remains higher-precedence than ordinary slug branch matching; the pointer is the deterministic fallback when `Branch` is `none` or no branch mapping applies.
 
-On success, emit `INFO [aif-plan] issue-derived plan identity: issue=<number> artifact=<project-relative-path>`.
+On success, emit `INFO [aif-plan] source-bound plan identity: provider=<provider> external-id=<bounded-id> artifact=<project-relative-path>`.
 
 ### OpenSpec-native mode
 
@@ -159,13 +164,13 @@ Always include `## Roadmap Linkage` in every canonical OpenSpec proposal so down
 ```markdown
 ## Roadmap Linkage
 
-- Issues: <comma-separated canonical URL(s)|none>
+- Issues: <comma-separated canonical HTTPS work-item URL(s) or stable MCP resource URI(s)|none>
 - Milestone: <exact title|none>
 - Roadmap item/slice: <exact item or slice|none>
 - Rationale: <one bounded explanation|none>
 ```
 
-- Capture only linkage explicitly supplied by the user or already committed in the selected planning source. Normalize an explicit GitHub issue reference to `https://github.com/<owner>/<repo>/issues/<number>` when the repository identity is directly available.
+- Capture only linkage explicitly supplied by the user or already committed in the selected planning source. Normalize every reference to a canonical provider HTTPS work-item URL or stable `mcp://` resource URI. GitHub issue references normalize to `https://github.com/<owner>/<repo>/issues/<number>` when the repository identity is directly available.
 - For every missing value, write `none`. When the user explicitly supplies `none`, preserve an explicit `none` value verbatim. Do not omit a field whose value is `none`.
 - Planning MUST NOT infer an issue or milestone from an issue title, branch name, repository labels, unrelated roadmap text, or another uncommitted contextual hint.
 - If at least one of `Issues`, `Milestone`, or `Roadmap item/slice` is non-`none` and the configured roadmap should register the new change as `planned`, return the exact owner handoff `/aif-roadmap check`. Planning must not edit the roadmap itself.
@@ -210,13 +215,13 @@ Context7 is optional supporting documentation context for current library/API do
 
 #### Change ID policy
 
-- When `issue_number` resolved under the top-level Issue-derived plan identity contract, use that exact canonical decimal value and do not derive a request slug.
+- When a primary MCP work-item identity resolved under the top-level source-bound contract, use `deriveSourceBoundChangeId(external_id, request_slug).changeId`.
 - Otherwise derive a safe `<change-id>` slug from the request for new plans.
 - Prefer lowercase kebab-case.
 - Allow only safe relative IDs.
 - Reject IDs containing `/`, `\`, `..`, absolute paths, path traversal, or unsafe characters.
 - Use or reference `normalizeChangeId()` from `scripts/active-change-resolver.mjs` when useful.
-- If `openspec/changes/<change-id>` already exists, do not overwrite silently. Ask for a new ID, or create a deterministic suffix only in autonomous mode when asking is unavailable.
+- If `openspec/changes/<change-id>` already exists, do not overwrite silently. Apply the source-aware collision rules above for source-bound IDs; for ordinary IDs, ask for a new ID or create a deterministic suffix only in autonomous mode when asking is unavailable.
 
 #### Required artifact shape
 
@@ -229,12 +234,14 @@ Context7 is optional supporting documentation context for current library/API do
 
 ## AIFHub Source Binding
 
-- Primary issue: <primary canonical issue URL; include this section only for issue-derived identity>
+- Provider: <canonical lowercase provider or MCP server identifier>
+- Primary source: <canonical HTTPS work-item URL or stable MCP resource URI>
+- External ID: <provider's human-readable work-item key>
 - Branch: <exact current git branch|none>
 
 ## Roadmap Linkage
 
-- Issues: <comma-separated canonical URL(s)|none>
+- Issues: <comma-separated canonical HTTPS work-item URL(s) or stable MCP resource URI(s)|none>
 - Milestone: <exact title|none>
 - Roadmap item/slice: <exact item or slice|none>
 - Rationale: <one bounded explanation|none>
@@ -384,15 +391,17 @@ This mode is legacy AI Factory-only mode. The companion rules below apply only t
 Treat the plan file as the parent-compatible summary artifact and the folder as the structured execution/state artifact set.
 The companion plan file may remain plain upstream markdown; the shared YAML frontmatter contract applies to the plan-folder markdown artifacts, not to the parent-compatible plan file.
 
-For an issue-derived classic sequential plan, persist the exact Markdown source-binding section in `.ai-factory/plans/<plan-id>.md` and keep this exact mapping synchronized in `.ai-factory/plans/<plan-id>/status.yaml`:
+For a source-bound classic plan, persist the exact Markdown source-binding section in `.ai-factory/plans/<plan-id>.md` and keep this exact mapping synchronized in `.ai-factory/plans/<plan-id>/status.yaml`:
 
 ```yaml
 source_binding:
-  primary_issue: "https://github.com/<owner>/<repo>/issues/<number>"
+  provider: "linear"
+  primary_source: "mcp://linear/issue/<stable-record-id>"
+  external_id: "ENG-431"
   branch: "<exact current git branch|none>"
 ```
 
-For explicit `/aif-plan ultra`, first require the shared stable AI Factory `>=2.18.0` version gate, then leave creation and orchestration to the upstream skill. A valid upstream bundle is `<paths.plans>/<plan-id>/index.md` plus direct `phase-NN-<slug>.md` files with the exact standalone ultra marker, and `index.md` is its sole progress ledger. When its ID is issue-derived, require the exact Markdown source-binding section in `index.md` without changing this ownership boundary. Do not create a sibling `<plan-id>.md`; do not create or synchronize `task.md`, `context.md`, `rules.md`, `verify.md`, `status.yaml`, or `explore.md`; and do not add AIFHub checkboxes to phase files.
+For explicit `/aif-plan ultra`, first require the shared stable AI Factory `>=2.18.0` version gate, then leave creation and orchestration to the upstream skill. A valid upstream bundle is `<paths.plans>/<plan-id>/index.md` plus direct `phase-NN-<slug>.md` files with the exact standalone ultra marker, and `index.md` is its sole progress ledger. When its ID is source-bound, require the exact Markdown source-binding section in `index.md` without changing this ownership boundary. Do not create a sibling `<plan-id>.md`; do not create or synchronize `task.md`, `context.md`, `rules.md`, `verify.md`, `status.yaml`, or `explore.md`; and do not add AIFHub checkboxes to phase files.
 
 ### Research Normalization
 
