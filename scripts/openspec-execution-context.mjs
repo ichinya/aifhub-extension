@@ -548,19 +548,31 @@ function renderTraceMarkdown({ changeId, trace, type }) {
 }
 
 function renderImplementationEvidenceSections(type, trace) {
-  const evidenceFields = [
+  const cycleFields = [
     'testCheck',
     'redResult',
     'greenResult',
-    'refactorResult',
-    'fallbackDecision'
+    'refactorResult'
   ];
+  const hasCycleEvidence = cycleFields.some((field) => Object.hasOwn(trace ?? {}, field));
+  const hasFallbackDecision = Object.hasOwn(trace ?? {}, 'fallbackDecision');
 
   if (
     type !== 'Implementation'
-    || !evidenceFields.some((field) => Object.hasOwn(trace ?? {}, field))
+    || (!hasCycleEvidence && !hasFallbackDecision)
   ) {
     return [];
+  }
+
+  if (!hasCycleEvidence) {
+    return [
+      '## Development cycle',
+      '',
+      '### Fallback decision',
+      '',
+      ...renderTraceDetail(trace?.fallbackDecision, 'Not applicable or not recorded.'),
+      ''
+    ];
   }
 
   return [

@@ -26,6 +26,30 @@ const REVIEW_PROMPTS = [
   'agent-files/claude/aifhub-review-sidecar.md'
 ];
 
+const AGENT_SEMANTIC_PAIRS = [
+  {
+    label: 'implementation discipline',
+    codexPath: 'agent-files/codex/aifhub-implement-worker.toml',
+    claudePath: 'agent-files/claude/aifhub-implement-worker.md',
+    start: 'For each testable behavior change',
+    end: 'Treat the development cycle as supporting runtime evidence only'
+  },
+  {
+    label: 'fix discipline',
+    codexPath: 'agent-files/codex/aifhub-fixer.toml',
+    claudePath: 'agent-files/claude/aifhub-fixer.md',
+    start: 'Before editing, record direct',
+    end: 'A passing post-fix check is supporting runtime evidence'
+  },
+  {
+    label: 'review discipline',
+    codexPath: 'agent-files/codex/aifhub-review-sidecar.toml',
+    claudePath: 'agent-files/claude/aifhub-review-sidecar.md',
+    start: 'Review in two ordered passes for either artifact mode',
+    end: 'Return one combined findings-first verdict'
+  }
+];
+
 async function readRepoFile(relativePath) {
   return readFile(join(REPO_ROOT, relativePath), 'utf8');
 }
@@ -43,6 +67,29 @@ function assertOrder(source, fragments, label) {
     assert.ok(index > cursor, `${label} should order ${JSON.stringify(fragment)} after the previous fragment`);
     cursor = index;
   }
+}
+
+function extractLineBlock(source, startFragment, endFragment, label) {
+  const lines = source.split(/\r?\n/);
+  const startIndex = lines.findIndex((line) => line.includes(startFragment));
+  assert.notEqual(startIndex, -1, `${label} should include start witness ${JSON.stringify(startFragment)}`);
+  const endIndex = lines.findIndex((line, index) => index >= startIndex && line.includes(endFragment));
+  assert.notEqual(endIndex, -1, `${label} should include end witness ${JSON.stringify(endFragment)}`);
+  return lines.slice(startIndex, endIndex + 1).join('\n');
+}
+
+function normalizePromptSemantics(source) {
+  return source
+    .replace(/[`*_]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extractMarkdownSection(source, heading) {
+  const start = source.indexOf(heading);
+  assert.notEqual(start, -1, `Expected heading ${heading}`);
+  const next = source.indexOf('\n## ', start + heading.length);
+  return source.slice(start, next === -1 ? source.length : next);
 }
 
 describe('Superpowers-inspired workflow discipline', () => {
@@ -64,7 +111,7 @@ describe('Superpowers-inspired workflow discipline', () => {
         assertIncludes(source, expected, relativePath);
       }
 
-      assertOrder(source, ['RED', 'GREEN', 'REFACTOR'], relativePath);
+      assertOrder(source, ['testCheck', 'redResult', 'greenResult', 'refactorResult', 'fallbackDecision'], relativePath);
       assert.match(
         source,
         /docs-only|documentation-only|generated artifacts|no useful automated check/i,
@@ -105,20 +152,65 @@ describe('Superpowers-inspired workflow discipline', () => {
     }
   });
 
+  it('keeps paired Codex and Claude agent semantics synchronized', async () => {
+    for (const pair of AGENT_SEMANTIC_PAIRS) {
+      const [codexSource, claudeSource] = await Promise.all([
+        readRepoFile(pair.codexPath),
+        readRepoFile(pair.claudePath)
+      ]);
+      const codexBlock = normalizePromptSemantics(extractLineBlock(
+        codexSource,
+        pair.start,
+        pair.end,
+        pair.codexPath
+      ));
+      const claudeBlock = normalizePromptSemantics(extractLineBlock(
+        claudeSource,
+        pair.start,
+        pair.end,
+        pair.claudePath
+      ));
+
+      assert.equal(
+        codexBlock,
+        claudeBlock,
+        `${pair.label} should remain semantically aligned between Codex and Claude agents`
+      );
+    }
+  });
+
+  it('keeps the adaptation guide linked from every documentation entry point', async () => {
+    for (const relativePath of ['README.md', 'docs/README.md', 'docs/usage.md']) {
+      const source = await readRepoFile(relativePath);
+      assertIncludes(source, 'superpowers-adaptation.md', relativePath);
+    }
+  });
+
   it('documents adopted ideas, rejected duplication, and the reviewed upstream revision', async () => {
     const source = await readRepoFile('docs/superpowers-adaptation.md');
+    const changelog = await readRepoFile('CHANGELOG.md');
+    const unreleased = extractMarkdownSection(changelog, '## [В разработке]');
 
     for (const expected of [
       'https://github.com/obra/superpowers',
+      'https://github.com/ichinya/aifhub-extension/issues/141',
+      'v6.3.0',
       'b36e0829c6d0140e93cfef2ca599b1b07d4a7797',
+      '2026-08-12',
       'RED -> GREEN -> REFACTOR',
       'one falsifiable hypothesis',
       'plan/spec compliance',
       'AI Factory already owns',
       'issue #168',
+      'prompt/documentation contract',
+      'нормализованную семантическую парность Claude/Codex',
       '/aif-verify'
     ]) {
       assertIncludes(source, expected, 'docs/superpowers-adaptation.md');
+    }
+
+    for (const expected of ['issue #141', 'RED -> GREEN -> REFACTOR', 'Claude/Codex-пар']) {
+      assertIncludes(unreleased, expected, 'CHANGELOG.md unreleased Superpowers adaptation');
     }
   });
 });

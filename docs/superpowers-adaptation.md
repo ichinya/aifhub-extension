@@ -2,7 +2,7 @@
 
 # Адаптация идей Superpowers
 
-Этот документ фиксирует bounded adaptation идей из [obra/superpowers](https://github.com/obra/superpowers) для существующего AI Factory/OpenSpec lifecycle. Источник рассмотрен на commit `b36e0829c6d0140e93cfef2ca599b1b07d4a7797` 2026-09-01. AIFHub не устанавливает Superpowers, не копирует его bootstrap/hooks и не добавляет второй набор публичных workflow skills.
+Этот документ фиксирует bounded adaptation идей из [obra/superpowers](https://github.com/obra/superpowers) для существующего AI Factory/OpenSpec lifecycle и [issue #141](https://github.com/ichinya/aifhub-extension/issues/141). Источник рассмотрен 2026-09-01 на release tag [`v6.3.0`](https://github.com/obra/superpowers/releases/tag/v6.3.0), который указывает на commit [`b36e0829c6d0140e93cfef2ca599b1b07d4a7797`](https://github.com/obra/superpowers/commit/b36e0829c6d0140e93cfef2ca599b1b07d4a7797) от 2026-08-12. AIFHub не устанавливает Superpowers, не копирует его bootstrap/hooks и не добавляет второй набор публичных workflow skills.
 
 ## Принятые идеи
 
@@ -47,6 +47,12 @@ Superpowers предлагает полный mandatory workflow с design appro
 - archive/finalization принадлежит `/aif-done`.
 
 Более крупные SDD additions - right-sized profiles, SessionBrief, plan-compliance receipt и fresh-context review - отслеживаются отдельно в [issue #168](https://github.com/ichinya/aifhub-extension/issues/168). Эта адаптация не предрешает их schemas, paths или policy.
+
+## Проверочное покрытие
+
+`scripts/superpowers-discipline-contract.test.mjs` является prompt/documentation contract: он проверяет стабильные evidence-поля, их порядок, ссылки и нормализованную семантическую парность Claude/Codex-блоков. Он не заявляется как validator произвольного trace-файла.
+
+Поведение рендерера отдельно покрывает `scripts/openspec-execution-context.test.mjs`: полный development cycle, компактный fallback-only trace, fix evidence и type-scoping между Implementation/Fix. Authoritative валидация результата по-прежнему принадлежит `/aif-verify`.
 
 ## Проверяемый порядок
 

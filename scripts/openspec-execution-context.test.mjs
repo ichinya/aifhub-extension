@@ -565,6 +565,7 @@ describe('OpenSpec execution context API', () => {
       summary: 'Fixed OAuth',
       canonicalArtifactsRead: ['openspec/changes/add-oauth/tasks.md'],
       generatedRulesRead: [],
+      testCheck: { command: 'must not render in a Fix trace' },
       qaEvidenceRead: ['.ai-factory/qa/add-oauth/verify.md'],
       rootCauseEvidence: {
         boundary: 'OAuth callback parser',
@@ -693,6 +694,11 @@ describe('OpenSpec execution context API', () => {
     ]) {
       assert.match(fixContent, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `Fix trace should include ${expected}.`);
     }
+    assert.doesNotMatch(
+      fixContent,
+      /## Development cycle/,
+      'Fix traces must not render implementation evidence even when mixed-type fields are present.'
+    );
     assert.equal(await pathExists(path.join(rootDir, 'openspec', 'changes', 'add-oauth', '.ai-factory')), false);
     assert.equal(await pathExists(path.join(rootDir, '.ai-factory', 'plans', 'add-oauth')), false);
 
@@ -712,6 +718,30 @@ describe('OpenSpec execution context API', () => {
       await readFile(customState.path, 'utf8'),
       /## Development cycle/,
       'Legacy implementation trace callers without development-cycle fields should retain their compact shape.'
+    );
+
+    const fallbackExecution = await writeExecutionTrace('add-oauth', {
+      summary: 'Updated generated documentation.',
+      canonicalArtifactsRead: ['openspec/changes/add-oauth/tasks.md'],
+      generatedRulesRead: [],
+      fallbackDecision: {
+        status: 'not-applicable',
+        reason: 'documentation-only',
+        verification: 'node scripts/validate-doc-links.mjs'
+      },
+      changedFiles: ['docs/oauth.md']
+    }, {
+      rootDir,
+      runId: 'implementation-docs-only'
+    });
+    const fallbackExecutionContent = await readFile(fallbackExecution.path, 'utf8');
+    assert.match(fallbackExecutionContent, /## Development cycle/);
+    assert.match(fallbackExecutionContent, /### Fallback decision/);
+    assert.match(fallbackExecutionContent, /"reason": "documentation-only"/);
+    assert.doesNotMatch(
+      fallbackExecutionContent,
+      /### Focused automated check|### RED result|### GREEN result|### REFACTOR result/,
+      'Fallback-only implementation traces should not imply that an inapplicable test cycle was skipped.'
     );
 
     await assert.rejects(
