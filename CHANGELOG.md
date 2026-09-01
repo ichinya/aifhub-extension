@@ -12,6 +12,7 @@
 ### Изменено
 - `/aif-implement` и managed implement workers теперь записывают focused-check RED/GREEN/REFACTOR или explicit no-test fallback только как supporting runtime evidence; `/aif-fix` и fixer agents требуют direct root-cause evidence, one falsifiable hypothesis и minimal experiment до edit; `/aif-review` и review sidecars проверяют plan/spec compliance перед code quality. `/aif-verify` остаётся authoritative.
 - Superpowers discipline contract теперь сверяет нормализованную семантику Claude/Codex-пар и порядок стабильных evidence-полей; runtime tests отдельно покрывают полный цикл, компактный fallback-only trace и type-scoping, а source metadata фиксирует upstream release `v6.3.0` и дату commit.
+- `/aif-explore` теперь уточняет research brief через dependency-aware design tree: самостоятельно собирает доступные repository/config facts в read-only режиме, задаёт пользовательские решения раундами по frontier зависимостей с рекомендациями и начинает полный research только после подтверждения нормализованного brief без создания отдельного interview artifact; autonomous/subagent запуск возвращает неподтверждённый brief родителю с blocker `research-brief-confirmation-required`, а не принимает assumptions за согласие.
 
 ## [1.5.0] - 2026-09-01
 

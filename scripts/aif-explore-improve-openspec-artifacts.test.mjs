@@ -270,6 +270,64 @@ describe('aif-explore and aif-improve OpenSpec-native contracts', () => {
     }
   });
 
+  it('sharpens the research brief through dependency-aware rounds before research execution', async () => {
+    const injection = await readRepoFile('injections/core/aif-explore-plan-folder.md');
+    const interview = extractSection(injection, 'Dependency-aware research brief interview');
+    const label = 'runtime=shared asset=aif-explore case=dependency-aware-research-brief';
+
+    assertOrder(
+      injection,
+      [
+        '### Research profile and AI Factory version gate',
+        '### Dependency-aware research brief interview',
+        '### Upstream Research Coherence Gate pass-through',
+        '### OpenSpec-native mode'
+      ],
+      `${label} section ordering`
+    );
+
+    for (const expected of [
+      'dependency-aware **design tree**',
+      'The **frontier** is every unresolved decision whose prerequisites are settled',
+      'Ask the whole current frontier in one round',
+      'number each question',
+      'one concise recommended answer',
+      'Never ask a downstream question while one of its prerequisites remains open',
+      'If the runtime imposes a smaller question-count limit',
+      'Keep the remaining nodes on the same frontier',
+      'recompute the frontier',
+      "Repository, configuration, and tool-availability facts are the assistant's responsibility",
+      'bounded read-only inspection instead of asking the user',
+      'The user owns product, scope, risk, and tradeoff decisions',
+      'target question, boundaries and non-goals, constraints, evidence standard, and desired deliverable',
+      'The interview ends only when the frontier is empty',
+      'wait for explicit user confirmation before starting the full research run',
+      'bounded read-only fact-finding is the only permitted work',
+      'Do not create a separate interview, design-tree, decision-log, or research-brief file',
+      'skills/shared/QUESTION-TOOL.md'
+    ]) {
+      assertIncludes(interview, expected, label);
+    }
+  });
+
+  it('returns autonomous confirmation to the interactive parent instead of assuming approval', async () => {
+    const injection = await readRepoFile('injections/core/aif-explore-plan-folder.md');
+    const interview = extractSection(injection, 'Dependency-aware research brief interview');
+    const label = 'runtime=shared asset=aif-explore case=autonomous-confirmation-handoff';
+
+    assertOrder(
+      interview,
+      [
+        'This confirmation gate is intentional for every research run',
+        'assumptions never satisfy confirmation: do not start the full research run',
+        'Return the normalized brief, recorded assumptions, and open questions',
+        '`research-brief-confirmation-required` blocker',
+        'resume only after the parent passes back explicit user confirmation'
+      ],
+      label
+    );
+  });
+
   it('preserves the upstream 2.18.1 Research Coherence Gate as a non-bypass pass-through', async () => {
     const injection = await readRepoFile('injections/core/aif-explore-plan-folder.md');
     const passThrough = extractSection(injection, 'Upstream Research Coherence Gate pass-through');
@@ -279,6 +337,7 @@ describe('aif-explore and aif-improve OpenSpec-native contracts', () => {
       injection,
       [
         '### Research profile and AI Factory version gate',
+        '### Dependency-aware research brief interview',
         '### Upstream Research Coherence Gate pass-through',
         '### OpenSpec-native mode'
       ],
