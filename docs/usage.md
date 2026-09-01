@@ -575,7 +575,20 @@ Planning preserves explicit `none` values and does not infer linkage from a bran
 
 When planning input contains exactly one explicit canonical GitHub issue, or explicitly marks one linked issue as primary, AIFHub uses the canonical decimal issue number as the stable plan identity before ordinary allocation. A canonical URL such as `https://github.com/example/project/issues/156` produces `openspec/changes/156/` in OpenSpec-native mode. In legacy AI Factory-only mode with active `workflow.plan_id_format: sequential`, the same issue produces the compatible four-digit prefix `0156_<plan_file_stem>` instead of the next `max(existing) + 1` prefix. The branch and plan stem remain unchanged.
 
-A bare `#156`, PR URL, branch name, title, label, milestone, or discovered issue does not establish this binding. Multiple linked issues retain ordinary mode-specific IDs unless one is explicitly primary. Existing artifacts are reused only when their canonical source binding matches the same issue; otherwise planning stops with `issue-plan-id-collision` and does not overwrite, suffix, or fall back to another sequential number. Legacy issue numbers above `9999` stop with `issue-plan-id-out-of-range`, and `HANDOFF_BRANCH_PREPARED=1` continues to disable every sequential prefix.
+An issue-derived OpenSpec proposal persists identity separately from the many-valued roadmap fields:
+
+```markdown
+## AIFHub Source Binding
+
+- Primary issue: https://github.com/example/project/issues/156
+- Branch: feature/some-request-slug
+```
+
+`Primary issue` is the only collision identity. A secondary URL in `Roadmap Linkage.Issues`, including the same issue number in another repository, cannot authorize reuse. The exact attached creation branch maps the numeric change back to downstream `/aif-improve`, `/aif-implement`, and `/aif-verify`; this persisted mapping is checked before ordinary slug branch variants. After successful creation, planning also writes the numeric current-change pointer as a fallback. A malformed, duplicate, ambiguous, or change-ID-mismatched source binding fails closed.
+
+Legacy classic sequential plans persist the same Markdown section in the parent plan and synchronized double-quoted `source_binding.primary_issue` / `source_binding.branch` values in companion `status.yaml`. Marked ultra keeps the Markdown binding in its upstream-owned `index.md` and does not gain a companion status file.
+
+A bare `#156`, PR URL, branch name, title, label, milestone, or discovered issue does not establish this binding. Multiple linked issues retain ordinary mode-specific IDs unless one is explicitly primary. Existing artifacts are reused only when their exact canonical `Primary issue` matches; roadmap-list membership is insufficient. Otherwise planning stops with `issue-plan-id-collision` and does not overwrite, suffix, or fall back to another sequential number. Legacy issue numbers above `9999` stop with `issue-plan-id-out-of-range`, and `HANDOFF_BRANCH_PREPARED=1` continues to disable every sequential prefix.
 
 `/aif-plan full` does not create `/aif-task-prepare`, does not create `.ai-factory/specs/<task-id>.md`, and does not create `task-prepare.md`. Raw input trace, normalization confidence, and temporary notes belong only under `.ai-factory/state/<change-id>/` when they are persisted.
 

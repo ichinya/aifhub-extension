@@ -10,10 +10,11 @@ Resolution uses this order:
 
 1. Explicit `changeId`.
 2. Current working directory under `openspec/changes/<change-id>/`.
-3. Current git branch mapped to an existing active change.
-4. `.ai-factory/state/current.yaml`.
-5. A single active change under `openspec/changes/`.
-6. A structured failure with candidates when no unique change can be selected.
+3. Current git branch matched to an exact persisted `## AIFHub Source Binding`.
+4. Current git branch mapped to an unbound active change by legacy slug variants.
+5. `.ai-factory/state/current.yaml`.
+6. A single active change under `openspec/changes/`.
+7. A structured failure with candidates when no unique change can be selected.
 
 Explicit IDs are authoritative. An invalid or missing explicit ID returns `invalid-change-id` or `explicit-change-not-found` and does not fall back to another source.
 
@@ -45,6 +46,10 @@ Common failure codes:
 |---|---|
 | `invalid-change-id` | The supplied ID is empty, absolute, contains path separators, contains `..`, or contains characters outside letters, numbers, `.`, `_`, and `-`. |
 | `explicit-change-not-found` | The explicit ID is safe but no matching active change directory exists. |
+| `source-binding-duplicate` / `source-binding-fields-invalid` | A reserved proposal source-binding section is duplicated or malformed. |
+| `source-binding-primary-issue-invalid` / `source-binding-branch-invalid` | A source binding contains a non-canonical primary issue or unsafe branch value. |
+| `source-binding-change-id-mismatch` | The canonical primary issue number does not equal the numeric change directory ID. |
+| `ambiguous-branch-binding` | More than one active numeric change is bound to the exact current branch. |
 | `ambiguous-branch-change` | The current branch maps to more than one active change. |
 | `current-pointer-not-found` | The current pointer references a missing or inactive change. |
 | `ambiguous-active-change` | More than one active change exists and no higher-precedence source selected one. |
@@ -96,7 +101,20 @@ A stale pointer is an error and blocks fallback, so broken runtime state is visi
 
 ## Branch Mapping
 
-Branch mapping only selects existing active changes. For a branch such as `feat/add-oauth`, the resolver checks these variants against active change IDs:
+Issue-derived numeric changes persist exact identity in `proposal.md`:
+
+```markdown
+## AIFHub Source Binding
+
+- Primary issue: https://github.com/example/project/issues/156
+- Branch: feature/some-request-slug
+```
+
+`parseIssueSourceBinding()` requires one exact section, one canonical GitHub issue URL, and one exact safe branch name or `none`. The primary issue number must equal the numeric change ID. `matchesPrimaryIssueBinding()` compares the full canonical URL, so `repo-a#156` never matches `repo-b#156` merely because their numbers are equal. `parseLegacyIssueSourceBinding()` applies the same value contract to double-quoted `source_binding.primary_issue` and `source_binding.branch` values in legacy `status.yaml`.
+
+The resolver scans active proposals after detecting the branch. One exact binding match returns source `branch-binding` before ordinary slug matching. Duplicate, malformed, ID-mismatched, or ambiguous bindings fail closed and do not fall through to an older slug change or current pointer. Changes with valid bindings to another branch are excluded from legacy slug matching because their persisted binding is authoritative.
+
+For active changes without a source binding, the legacy branch mapping remains available. For a branch such as `feat/add-oauth`, the resolver checks these variants against unbound active change IDs:
 
 - `feat/add-oauth`
 - `add-oauth`

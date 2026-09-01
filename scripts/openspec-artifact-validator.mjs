@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   normalizeChangeId,
+  parseIssueSourceBinding,
   resolveActiveChange as defaultResolveActiveChange
 } from './active-change-resolver.mjs';
 import {
@@ -101,6 +102,7 @@ export async function validateOpenSpecArtifactContract(options = {}) {
   const skipSpecs = await readOpenSpecSkipSpecsMarker(changeDir);
 
   checks.push(...inspectRequiredArtifacts(artifacts));
+  checks.push(inspectIssueSourceBinding(changeId, artifacts.proposal));
   checks.push(inspectDesignArtifact(artifacts.design, config.requireDesign));
   checks.push(inspectDeltaSpecs(artifacts, config, skipSpecs, rootDir));
   checks.push(...await inspectPlanningArtifacts(rootDir, changeDir));
@@ -226,6 +228,57 @@ function inspectRequiredArtifacts(artifacts) {
         ? `${artifactName} is present.`
         : `${artifactName} is required for an AIFHub OpenSpec change.`
     });
+  });
+}
+
+function inspectIssueSourceBinding(changeId, proposal) {
+  const checkPath = proposal?.path ?? `openspec/changes/${changeId}/proposal.md`;
+  const parsed = parseIssueSourceBinding(proposal?.content ?? '');
+  const numericChange = /^[1-9][0-9]*$/.test(changeId);
+
+  if (!parsed.ok) {
+    return createCheck({
+      id: 'issue-source-binding',
+      status: 'fail',
+      path: checkPath,
+      message: 'The reserved AIFHub source binding is malformed.',
+      details: {
+        rule_code: parsed.error.code
+      }
+    });
+  }
+
+  if (parsed.status === 'absent') {
+    return createCheck({
+      id: 'issue-source-binding',
+      status: numericChange ? 'fail' : 'pass',
+      path: checkPath,
+      message: numericChange
+        ? 'Numeric issue-derived changes require one canonical AIFHub source binding.'
+        : 'No issue-derived source binding is required for this slug change.',
+      details: numericChange
+        ? { rule_code: 'source-binding-missing' }
+        : undefined
+    });
+  }
+
+  if (parsed.binding.issueNumber !== changeId) {
+    return createCheck({
+      id: 'issue-source-binding',
+      status: 'fail',
+      path: checkPath,
+      message: 'The primary issue number must equal the numeric OpenSpec change id.',
+      details: {
+        rule_code: 'source-binding-change-id-mismatch'
+      }
+    });
+  }
+
+  return createCheck({
+    id: 'issue-source-binding',
+    status: 'pass',
+    path: checkPath,
+    message: 'The canonical primary issue and branch binding match the numeric change id.'
   });
 }
 

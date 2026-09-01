@@ -165,6 +165,65 @@ describe('OpenSpec artifact contract validator', () => {
     assert.equal(result.status, 'pass');
     assert.equal(result.blocking, false);
     assert.equal(getCheck(result, 'delta-specs-present').status, 'pass');
+    assert.equal(getCheck(result, 'issue-source-binding').status, 'pass');
+  });
+
+  it('requires and validates the canonical primary source binding for numeric changes', async () => {
+    const missingRoot = await createTempRoot();
+    await createValidChange(missingRoot, '156');
+
+    const missing = await validateOpenSpecArtifactContract({
+      rootDir: missingRoot,
+      changeId: '156'
+    });
+    assert.equal(missing.status, 'fail');
+    assert.equal(getCheck(missing, 'issue-source-binding').details.rule_code, 'source-binding-missing');
+
+    const validRoot = await createTempRoot();
+    await createValidChange(validRoot, '156');
+    await writeFixture(validRoot, 'openspec/changes/156/proposal.md', [
+      '# Proposal',
+      '',
+      '## AIFHub Source Binding',
+      '',
+      '- Primary issue: https://github.com/repo-a/project/issues/156',
+      '- Branch: feature/some-request-slug',
+      '',
+      '## Roadmap Linkage',
+      '',
+      '- Issues: https://github.com/repo-a/project/issues/156, https://github.com/repo-b/project/issues/156',
+      '- Milestone: none',
+      '- Roadmap item/slice: none',
+      '- Rationale: primary plus secondary linkage',
+      '',
+      '## Why',
+      '',
+      'Implement the primary issue.',
+      ''
+    ].join('\n'));
+
+    const valid = await validateOpenSpecArtifactContract({
+      rootDir: validRoot,
+      changeId: '156'
+    });
+    assert.equal(valid.status, 'pass');
+    assert.equal(getCheck(valid, 'issue-source-binding').status, 'pass');
+
+    await writeFixture(validRoot, 'openspec/changes/156/proposal.md', [
+      '# Proposal',
+      '',
+      '## AIFHub Source Binding',
+      '',
+      '- Primary issue: https://github.com/repo-b/project/issues/157',
+      '- Branch: feature/some-request-slug',
+      ''
+    ].join('\n'));
+    const mismatch = await validateOpenSpecArtifactContract({
+      rootDir: validRoot,
+      changeId: '156'
+    });
+    assert.equal(mismatch.status, 'fail');
+    assert.equal(getCheck(mismatch, 'issue-source-binding').details.rule_code, 'source-binding-change-id-mismatch');
   });
 
   it('fails when delta specs are missing without an explicit skip-specs reason', async () => {

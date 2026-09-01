@@ -1292,6 +1292,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
     const readme = await readRepoFile('README.md');
     const usage = await readRepoFile('docs/usage.md');
     const compatibility = await readRepoFile('docs/openspec-compatibility.md');
+    const resolver = await readRepoFile('docs/active-change-resolver.md');
     const changelog = await readRepoFile('CHANGELOG.md');
     const planUsage = extractSection(usage, '### `/aif-plan full`');
     const planPolicy = extractSection(compatibility, '## Workflow Plan ID Policy');
@@ -1299,6 +1300,8 @@ describe('complete OpenSpec workflow documentation contract', () => {
 
     for (const expected of [
       'issue `#156` becomes OpenSpec change `156` or legacy sequential prefix `0156_`',
+      'persist the exact primary issue separately from secondary roadmap links',
+      'active-change resolver checks that binding before slug matching',
       'Ambiguous multi-issue input keeps ordinary allocation',
       'collisions fail closed'
     ]) {
@@ -1314,7 +1317,16 @@ describe('complete OpenSpec workflow documentation contract', () => {
       'explicitly primary',
       '`issue-plan-id-collision`',
       '`issue-plan-id-out-of-range`',
-      '`HANDOFF_BRANCH_PREPARED=1`'
+      '`HANDOFF_BRANCH_PREPARED=1`',
+      '## AIFHub Source Binding',
+      'Primary issue: https://github.com/example/project/issues/156',
+      'secondary URL in `Roadmap Linkage.Issues`',
+      'same issue number in another repository',
+      'source_binding.primary_issue',
+      'source_binding.branch',
+      'persisted mapping is checked before ordinary slug branch variants',
+      'numeric current-change pointer as a fallback',
+      'roadmap-list membership is insufficient'
     ]) {
       assertIncludes(planUsage, expected, 'docs/usage.md issue-derived plan identity');
     }
@@ -1327,9 +1339,27 @@ describe('complete OpenSpec workflow documentation contract', () => {
       'It bypasses `max(existing) + 1`',
       '`issue-plan-id-collision`',
       '`issue-plan-id-out-of-range`',
-      '`HANDOFF_BRANCH_PREPARED=1` retains upstream precedence'
+      '`HANDOFF_BRANCH_PREPARED=1` retains upstream precedence',
+      'exact `## AIFHub Source Binding` with `Primary issue` and `Branch`',
+      'secondary links never satisfy a collision check',
+      'source_binding.primary_issue',
+      'source_binding.branch',
+      'exact persisted primary binding matches the canonical issue URL'
     ]) {
       assertIncludes(planPolicy, expected, 'docs/openspec-compatibility.md Workflow Plan ID Policy');
+    }
+
+    for (const expected of [
+      'Current git branch matched to an exact persisted `## AIFHub Source Binding`',
+      '`source-binding-change-id-mismatch`',
+      '`ambiguous-branch-binding`',
+      '`parseIssueSourceBinding()`',
+      '`matchesPrimaryIssueBinding()`',
+      '`repo-a#156` never matches `repo-b#156`',
+      'source `branch-binding` before ordinary slug matching',
+      'do not fall through to an older slug change or current pointer'
+    ]) {
+      assertIncludes(resolver, expected, 'docs/active-change-resolver.md source binding');
     }
 
     for (const expected of [

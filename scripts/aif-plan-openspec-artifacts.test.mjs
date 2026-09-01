@@ -182,10 +182,15 @@ describe('aif-plan OpenSpec-native planning contract', () => {
       'a pull-request URL',
       'is not issue-identity evidence',
       'Exactly one distinct explicit issue selects `issue_number`',
+      '`primary_issue_url`',
       'explicitly designates one as primary',
       'never choose the first, lowest, or highest issue implicitly',
       'Preserve `## Original Request` byte-for-byte',
-      'retain the canonical issue URL in `## Roadmap Linkage`'
+      'retain every canonical issue URL in `## Roadmap Linkage`',
+      '## AIFHub Source Binding',
+      '- Primary issue: <primary_issue_url>',
+      '- Branch: <exact current git branch|none>',
+      'MUST NOT establish or replace the primary binding'
     ]) {
       assertIncludes(identity, expected, 'aif-plan explicit issue identity');
     }
@@ -206,7 +211,9 @@ describe('aif-plan OpenSpec-native planning contract', () => {
       '`0001` through `9999`',
       'issue-plan-id-out-of-range',
       '`HANDOFF_BRANCH_PREPARED=1` retains upstream precedence',
-      'Fast plans, fix plans, and legacy `slug` / reserved `timestamp` / reserved `uuid` formats keep their ordinary identity behavior'
+      'Fast plans, fix plans, and legacy `slug` / reserved `timestamp` / reserved `uuid` formats keep their ordinary identity behavior',
+      'writeCurrentChangePointer(issue_number)',
+      'persisted exact branch binding remains higher-precedence than ordinary slug branch matching'
     ]) {
       assertIncludes(identity, expected, 'aif-plan issue-derived mode mapping');
     }
@@ -224,11 +231,13 @@ describe('aif-plan OpenSpec-native planning contract', () => {
 
     for (const expected of [
       '`openspec/changes/<issue_number>/` already exists',
-      'contains the same canonical issue URL',
-      'route to refinement instead of creating a second change',
+      'whose `Primary issue` exactly equals `primary_issue_url`',
+      'route to refinement with the explicit numeric ID instead of creating a second change',
+      'Mere membership in `## Roadmap Linkage` is insufficient',
+      "another repository's same-number issue",
       'issue-plan-id-collision',
       'inspect every full-plan file and directory using the exact four-digit issue prefix before writing',
-      'entrypoint or companion metadata contains the same canonical issue URL',
+      'Markdown entrypoint and, for classic plans, companion `status.yaml` have valid synchronized source bindings',
       'Never overwrite, allocate a deterministic suffix, or silently resume ordinary sequential allocation',
       'bounded project-relative candidate path/prefix',
       'never include request bodies, issue bodies, credentials, raw provider output, raw stdout, or raw stderr',
@@ -316,9 +325,38 @@ describe('aif-plan OpenSpec-native planning contract', () => {
     }
     assertOrder(
       proposalTemplate,
-      ['## Original Request', '## Roadmap Linkage', '## Why', '## What Changes', '## Capabilities', '## Impact'],
+      ['## Original Request', '## AIFHub Source Binding', '## Roadmap Linkage', '## Why', '## What Changes', '## Capabilities', '## Impact'],
       'OpenSpec proposal template'
     );
+  });
+
+  it('persists primary issue and branch identity separately in OpenSpec and legacy plans', async () => {
+    const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
+    const identity = extractSection(injection, 'Issue-derived plan identity');
+    const legacy = extractSection(injection, 'Legacy AI Factory-only mode');
+
+    for (const expected of [
+      'write the exact section once in `proposal.md`',
+      '`Primary issue` is the single canonical collision identity',
+      '`Issues` list in `## Roadmap Linkage` remains lifecycle linkage',
+      '`parseIssueSourceBinding()`',
+      '`parseLegacyIssueSourceBinding()`',
+      '`matchesPrimaryIssueBinding()`',
+      'source_binding.primary_issue',
+      'source_binding.branch'
+    ]) {
+      assertIncludes(identity, expected, 'aif-plan persisted source binding');
+    }
+
+    for (const expected of [
+      'source_binding:',
+      'primary_issue: "https://github.com/<owner>/<repo>/issues/<number>"',
+      'branch: "<exact current git branch|none>"',
+      'require the exact Markdown source-binding section in `index.md`',
+      'do not create or synchronize `task.md`, `context.md`, `rules.md`, `verify.md`, `status.yaml`, or `explore.md`'
+    ]) {
+      assertIncludes(legacy, expected, 'aif-plan legacy persisted source binding');
+    }
   });
 
   it('requires task intake normalization before writing OpenSpec artifacts', async () => {
@@ -420,7 +458,11 @@ describe('aif-plan OpenSpec-native planning contract', () => {
     const label = 'aif-plan standardized Roadmap Linkage contract';
 
     const proposalTemplate = extractFencedBlockAfter(openspec, '`proposal.md` should use:');
-    assertOrder(proposalTemplate, ['## Original Request', '## Roadmap Linkage', '## Why'], `${label} proposal ordering`);
+    assertOrder(
+      proposalTemplate,
+      ['## Original Request', '## AIFHub Source Binding', '## Roadmap Linkage', '## Why'],
+      `${label} proposal ordering`
+    );
 
     for (const expected of [
       '#### Roadmap Linkage',

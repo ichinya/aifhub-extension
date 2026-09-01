@@ -9,7 +9,10 @@ import {
   ensureRuntimeLayout,
   listActiveOpenSpecChanges,
   mapBranchToChangeCandidates,
+  matchesPrimaryIssueBinding,
   normalizeChangeId,
+  parseIssueSourceBinding,
+  parseLegacyIssueSourceBinding,
   readCurrentChangePointer,
   resolveActiveChange,
   writeCurrentChangePointer
@@ -62,6 +65,9 @@ describe('active change resolver API', () => {
     assert.equal(typeof readCurrentChangePointer, 'function');
     assert.equal(typeof writeCurrentChangePointer, 'function');
     assert.equal(typeof mapBranchToChangeCandidates, 'function');
+    assert.equal(typeof parseIssueSourceBinding, 'function');
+    assert.equal(typeof parseLegacyIssueSourceBinding, 'function');
+    assert.equal(typeof matchesPrimaryIssueBinding, 'function');
     assert.equal(typeof normalizeChangeId, 'function');
   });
 
@@ -278,6 +284,81 @@ describe('explicit and cwd resolution', () => {
   });
 });
 
+describe('issue source binding', () => {
+  it('keeps one canonical primary issue distinct from secondary issues with the same number', () => {
+    const primaryIssue = 'https://github.com/repo-a/project/issues/156';
+    const secondaryIssue = 'https://github.com/repo-b/project/issues/156';
+    const proposal = [
+      '# Proposal',
+      '',
+      '## AIFHub Source Binding',
+      '',
+      `- Primary issue: ${primaryIssue}`,
+      '- Branch: feature/some-request-slug',
+      '',
+      '## Roadmap Linkage',
+      '',
+      `- Issues: ${primaryIssue}, ${secondaryIssue}`,
+      '- Milestone: none',
+      '- Roadmap item/slice: none',
+      '- Rationale: primary plus secondary linkage',
+      ''
+    ].join('\n');
+
+    assert.deepEqual(parseIssueSourceBinding(proposal), {
+      ok: true,
+      status: 'bound',
+      binding: {
+        primaryIssue,
+        issueNumber: '156',
+        branch: 'feature/some-request-slug'
+      },
+      error: null
+    });
+    assert.equal(matchesPrimaryIssueBinding(proposal, primaryIssue), true);
+    assert.equal(matchesPrimaryIssueBinding(proposal, secondaryIssue), false);
+  });
+
+  it('parses the synchronized legacy status source_binding mapping', () => {
+    const primaryIssue = 'https://github.com/repo-a/project/issues/156';
+    const status = [
+      'status: planned',
+      'source_binding:',
+      `  primary_issue: ${JSON.stringify(primaryIssue)}`,
+      '  branch: "feature/some-request-slug"',
+      'history: []',
+      ''
+    ].join('\n');
+
+    assert.deepEqual(parseLegacyIssueSourceBinding(status), {
+      ok: true,
+      status: 'bound',
+      binding: {
+        primaryIssue,
+        issueNumber: '156',
+        branch: 'feature/some-request-slug'
+      },
+      error: null
+    });
+    assert.equal(matchesPrimaryIssueBinding(status, primaryIssue, { format: 'legacy-status' }), true);
+  });
+
+  it('rejects duplicate or malformed source bindings instead of using roadmap membership', () => {
+    const section = [
+      '## AIFHub Source Binding',
+      '',
+      '- Primary issue: https://github.com/repo-a/project/issues/156',
+      '- Branch: feature/some-request-slug',
+      ''
+    ].join('\n');
+    const duplicate = `${section}\n${section}`;
+    const malformed = section.replace('- Primary issue:', '- Issues:');
+
+    assert.equal(parseIssueSourceBinding(duplicate).error.code, 'source-binding-duplicate');
+    assert.equal(parseIssueSourceBinding(malformed).error.code, 'source-binding-fields-invalid');
+  });
+});
+
 describe('branch-derived resolution', () => {
   it('maps common feature branch names to existing active changes', () => {
     assert.deepEqual(
@@ -304,6 +385,79 @@ describe('branch-derived resolution', () => {
     assert.equal(result.source, 'branch');
     assert.equal(result.changePath, changePath);
     assert.deepEqual(result.candidates, ['add-oauth']);
+  });
+
+  it('prefers an exact persisted branch binding for a numeric change over an older slug match', async () => {
+    const rootDir = await createTempRoot();
+    const numericPath = await createChange(rootDir, '156');
+    await createChange(rootDir, 'some-request-slug');
+    await createChange(rootDir, 'unrelated-active-change');
+    await writeFile(path.join(numericPath, 'proposal.md'), [
+      '# Numeric plan',
+      '',
+      '## AIFHub Source Binding',
+      '',
+      '- Primary issue: https://github.com/repo-a/project/issues/156',
+      '- Branch: feature/some-request-slug',
+      ''
+    ].join('\n'), 'utf8');
+
+    const result = await resolveActiveChange({
+      rootDir,
+      getCurrentBranch: async () => 'feature/some-request-slug'
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.changeId, '156');
+    assert.equal(result.source, 'branch-binding');
+    assert.equal(result.changePath, numericPath);
+    assert.deepEqual(result.candidates, ['156']);
+  });
+
+  it('fails closed when persisted branch bindings are ambiguous or disagree with numeric IDs', async () => {
+    const ambiguousRoot = await createTempRoot();
+    for (const changeId of ['156', '157']) {
+      const changePath = await createChange(ambiguousRoot, changeId);
+      await writeFile(path.join(changePath, 'proposal.md'), [
+        '# Numeric plan',
+        '',
+        '## AIFHub Source Binding',
+        '',
+        `- Primary issue: https://github.com/repo-a/project/issues/${changeId}`,
+        '- Branch: feature/shared-branch',
+        ''
+      ].join('\n'), 'utf8');
+    }
+
+    const ambiguous = await resolveActiveChange({
+      rootDir: ambiguousRoot,
+      getCurrentBranch: async () => 'feature/shared-branch'
+    });
+    assert.equal(ambiguous.ok, false);
+    assert.equal(ambiguous.source, 'branch-binding');
+    assert.equal(ambiguous.errors[0].code, 'ambiguous-branch-binding');
+    assert.deepEqual(ambiguous.candidates, ['156', '157']);
+
+    const mismatchRoot = await createTempRoot();
+    const mismatchPath = await createChange(mismatchRoot, '156');
+    await writeFile(path.join(mismatchPath, 'proposal.md'), [
+      '# Numeric plan',
+      '',
+      '## AIFHub Source Binding',
+      '',
+      '- Primary issue: https://github.com/repo-a/project/issues/157',
+      '- Branch: feature/shared-branch',
+      ''
+    ].join('\n'), 'utf8');
+
+    const mismatch = await resolveActiveChange({
+      rootDir: mismatchRoot,
+      getCurrentBranch: async () => 'feature/shared-branch'
+    });
+    assert.equal(mismatch.ok, false);
+    assert.equal(mismatch.source, 'branch-binding');
+    assert.equal(mismatch.errors[0].code, 'source-binding-change-id-mismatch');
+    assert.deepEqual(mismatch.candidates, ['156']);
   });
 
   it('fails when a branch maps to multiple active changes', async () => {

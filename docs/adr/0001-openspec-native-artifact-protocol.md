@@ -92,6 +92,11 @@ These paths are reserved names only in v1. Their detailed behavior is out of sco
 Canonical planning linkage lives in `openspec/changes/<change-id>/proposal.md`:
 
 ```markdown
+## AIFHub Source Binding
+
+- Primary issue: <one canonical issue URL>
+- Branch: <exact creation branch|none>
+
 ## Roadmap Linkage
 
 - Issues: <canonical URL(s)|none>
@@ -100,7 +105,7 @@ Canonical planning linkage lives in `openspec/changes/<change-id>/proposal.md`:
 - Rationale: <bounded explanation>
 ```
 
-Explicit `none` values prevent later commands from inventing issue, milestone, or slice ownership. `/aif-roadmap check` turns a valid linked active change into local `planned`; canonical planning and implementation do not claim completion.
+The source-binding section is conditional on issue-derived identity and separates one immutable primary issue from the many-valued lifecycle linkage. Its exact branch maps numeric change IDs back to downstream commands before slug heuristics; a current pointer remains a lower-precedence fallback. Secondary roadmap links, including same-number issues in another repository, cannot satisfy source collision checks. Explicit `none` values prevent later commands from inventing issue, milestone, or slice ownership. `/aif-roadmap check` turns a valid linked active change into local `planned`; canonical planning and implementation do not claim completion.
 
 The configured roadmap may contain one marker-bounded block:
 

@@ -234,6 +234,42 @@ describe('OpenSpec execution context API', () => {
     ]);
   });
 
+  it('resolves a newly planned numeric change for implementation with multiple active changes', async () => {
+    const { buildImplementationContext } = await loadExecutionContext();
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir, '156');
+    await createOpenSpecChange(rootDir, 'some-request-slug');
+    await createOpenSpecChange(rootDir, 'another-active-change');
+    await writeFixture(rootDir, 'openspec/changes/156/proposal.md', [
+      '# Proposal',
+      '',
+      '## AIFHub Source Binding',
+      '',
+      '- Primary issue: https://github.com/repo-a/project/issues/156',
+      '- Branch: feature/some-request-slug',
+      '',
+      '## Roadmap Linkage',
+      '',
+      '- Issues: https://github.com/repo-a/project/issues/156, https://github.com/repo-b/project/issues/156',
+      '- Milestone: none',
+      '- Roadmap item/slice: none',
+      '- Rationale: primary plus secondary linkage',
+      ''
+    ].join('\n'));
+
+    const result = await buildImplementationContext({
+      rootDir,
+      getCurrentBranch: async () => 'feature/some-request-slug',
+      detectOpenSpec: async () => missingCliDetection()
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.changeId, '156');
+    assert.equal(result.resolver.source, 'branch-binding');
+    assert.deepEqual(result.resolver.candidates, ['156']);
+    assert.match(result.canonicalArtifacts.proposal.content, /Primary issue: https:\/\/github\.com\/repo-a\/project\/issues\/156/);
+  });
+
   it('reads generated rules when present and warns when fingerprints are stale', async () => {
     const { buildImplementationContext } = await loadExecutionContext();
     const rootDir = await createTempRoot();

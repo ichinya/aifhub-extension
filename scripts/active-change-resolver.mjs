@@ -17,6 +17,10 @@ export const DEFAULT_PATHS = {
 
 const ACTIVE_CHANGE_MARKERS = ['proposal.md', 'design.md', 'tasks.md', 'specs'];
 const CURRENT_POINTER_KEYS = ['change_id', 'changeId', 'active_change', 'activeChange'];
+const SOURCE_BINDING_HEADING = 'AIFHub Source Binding';
+const SOURCE_BINDING_FIELDS = ['Primary issue', 'Branch'];
+const LEGACY_SOURCE_BINDING_FIELDS = ['primary_issue', 'branch'];
+const MAX_GIT_BRANCH_LENGTH = 255;
 
 export async function resolveActiveChange(options = {}) {
   const context = await createResolverContext(options);
@@ -170,6 +174,82 @@ export function mapBranchToChangeCandidates(branchName, openChangeIds) {
     .sort((left, right) => left.localeCompare(right));
 }
 
+export function parseIssueSourceBinding(content) {
+  if (typeof content !== 'string') {
+    return invalidSourceBinding('source-binding-input-invalid', 'Source binding content must be text.');
+  }
+
+  const sections = findMarkdownSections(content, SOURCE_BINDING_HEADING);
+
+  if (sections.length === 0) {
+    return absentSourceBinding();
+  }
+
+  if (sections.length > 1) {
+    return invalidSourceBinding(
+      'source-binding-duplicate',
+      `Proposal contains more than one '## ${SOURCE_BINDING_HEADING}' section.`
+    );
+  }
+
+  const parsedFields = parseExactBindingFields(sections[0], SOURCE_BINDING_FIELDS, /^-\s+([^:]+):\s*(.*?)\s*$/);
+
+  if (!parsedFields.ok) {
+    return parsedFields;
+  }
+
+  return validateSourceBindingValues({
+    primaryIssue: parsedFields.values['Primary issue'],
+    branch: parsedFields.values.Branch
+  });
+}
+
+export function parseLegacyIssueSourceBinding(content) {
+  if (typeof content !== 'string') {
+    return invalidSourceBinding('source-binding-input-invalid', 'Source binding content must be text.');
+  }
+
+  const sections = findLegacySourceBindingSections(content);
+
+  if (sections.length === 0) {
+    return absentSourceBinding();
+  }
+
+  if (sections.length > 1) {
+    return invalidSourceBinding(
+      'source-binding-duplicate',
+      "Legacy status contains more than one top-level 'source_binding' mapping."
+    );
+  }
+
+  const parsedFields = parseExactBindingFields(
+    sections[0],
+    LEGACY_SOURCE_BINDING_FIELDS,
+    /^\s{2}([A-Za-z_][A-Za-z0-9_]*):\s*(.*?)\s*$/,
+    parseLegacyBindingScalar
+  );
+
+  if (!parsedFields.ok) {
+    return parsedFields;
+  }
+
+  return validateSourceBindingValues({
+    primaryIssue: parsedFields.values.primary_issue,
+    branch: parsedFields.values.branch
+  });
+}
+
+export function matchesPrimaryIssueBinding(content, canonicalIssueUrl, options = {}) {
+  const parser = options.format === 'legacy-status'
+    ? parseLegacyIssueSourceBinding
+    : parseIssueSourceBinding;
+  const parsed = parser(content);
+
+  return parsed.ok
+    && parsed.status === 'bound'
+    && parsed.binding.primaryIssue === canonicalIssueUrl;
+}
+
 export function normalizeChangeId(input) {
   if (typeof input !== 'string') {
     return invalidChangeId(input);
@@ -289,7 +369,46 @@ async function resolveBranchChange(context, openChangeIds, inheritedWarnings = [
     return null;
   }
 
-  const candidates = mapBranchToChangeCandidates(branchName, openChangeIds);
+  const normalizedBranch = branchName.trim();
+  const bindings = await inspectActiveSourceBindings(context, normalizedBranch, openChangeIds);
+
+  if (bindings.errors.length > 0) {
+    return createFailureResult({
+      source: 'branch-binding',
+      candidates: bindings.errors.map((error) => error.changeId),
+      warnings: inheritedWarnings,
+      error: bindings.errors[0]
+    });
+  }
+
+  if (bindings.candidates.length > 1) {
+    return createFailureResult({
+      source: 'branch-binding',
+      candidates: bindings.candidates,
+      warnings: inheritedWarnings,
+      error: {
+        code: 'ambiguous-branch-binding',
+        message: `Git branch '${normalizedBranch}' is bound to multiple active OpenSpec changes.`,
+        branch: normalizedBranch
+      }
+    });
+  }
+
+  if (bindings.candidates.length === 1) {
+    const changeId = bindings.candidates[0];
+
+    return createSuccessResult({
+      changeId,
+      source: 'branch-binding',
+      changePath: path.join(context.changesDir, changeId),
+      context,
+      candidates: [changeId],
+      warnings: inheritedWarnings
+    });
+  }
+
+  const unboundChangeIds = openChangeIds.filter((changeId) => !bindings.boundChangeIds.includes(changeId));
+  const candidates = mapBranchToChangeCandidates(normalizedBranch, unboundChangeIds);
 
   if (candidates.length === 0) {
     return null;
@@ -302,8 +421,8 @@ async function resolveBranchChange(context, openChangeIds, inheritedWarnings = [
       warnings: inheritedWarnings,
       error: {
         code: 'ambiguous-branch-change',
-        message: `Git branch '${branchName}' maps to multiple active OpenSpec changes.`,
-        branch: branchName
+        message: `Git branch '${normalizedBranch}' maps to multiple active OpenSpec changes.`,
+        branch: normalizedBranch
       }
     });
   }
@@ -318,6 +437,71 @@ async function resolveBranchChange(context, openChangeIds, inheritedWarnings = [
     candidates,
     warnings: inheritedWarnings
   });
+}
+
+async function inspectActiveSourceBindings(context, branchName, openChangeIds) {
+  const candidates = [];
+  const boundChangeIds = [];
+  const errors = [];
+
+  for (const changeId of openChangeIds) {
+    const proposalPath = path.join(context.changesDir, changeId, 'proposal.md');
+    let content;
+
+    try {
+      content = await readFile(proposalPath, 'utf8');
+    } catch (err) {
+      if (err?.code === 'ENOENT') {
+        continue;
+      }
+
+      errors.push({
+        code: 'source-binding-read-failed',
+        message: `Unable to read source binding from '${projectRelativePath(context.rootDir, proposalPath)}'.`,
+        changeId,
+        path: projectRelativePath(context.rootDir, proposalPath)
+      });
+      continue;
+    }
+
+    const parsed = parseIssueSourceBinding(content);
+
+    if (!parsed.ok) {
+      errors.push({
+        code: parsed.error.code,
+        message: `Invalid source binding in '${projectRelativePath(context.rootDir, proposalPath)}'.`,
+        changeId,
+        path: projectRelativePath(context.rootDir, proposalPath)
+      });
+      continue;
+    }
+
+    if (parsed.status !== 'bound') {
+      continue;
+    }
+
+    boundChangeIds.push(changeId);
+
+    if (parsed.binding.issueNumber !== changeId) {
+      errors.push({
+        code: 'source-binding-change-id-mismatch',
+        message: `Source binding in '${projectRelativePath(context.rootDir, proposalPath)}' does not match its numeric change id.`,
+        changeId,
+        path: projectRelativePath(context.rootDir, proposalPath)
+      });
+      continue;
+    }
+
+    if (parsed.binding.branch === branchName) {
+      candidates.push(changeId);
+    }
+  }
+
+  return {
+    candidates: candidates.sort((left, right) => left.localeCompare(right)),
+    boundChangeIds: boundChangeIds.sort((left, right) => left.localeCompare(right)),
+    errors: errors.sort((left, right) => left.changeId.localeCompare(right.changeId))
+  };
 }
 
 async function resolveCurrentPointer(context, openChangeIds, inheritedWarnings = []) {
@@ -410,7 +594,15 @@ function nullWithWarning(inheritedWarnings, warning) {
 }
 
 async function createResolverContext(options = {}) {
-  if (options.changesDir !== undefined && options.stateDir !== undefined && options.qaDir !== undefined) {
+  if (
+    options.rootDir !== undefined
+    && options.cwd !== undefined
+    && options.changesDir !== undefined
+    && options.stateDir !== undefined
+    && options.qaDir !== undefined
+    && options.currentPointerPath !== undefined
+    && typeof options.getCurrentBranch === 'function'
+  ) {
     return options;
   }
 
@@ -597,6 +789,233 @@ function createBranchVariants(branchName) {
   variants.add(normalized.replaceAll('/', '-'));
 
   return variants;
+}
+
+function findMarkdownSections(content, heading) {
+  const lines = content.split(/\r\n|\n|\r/);
+  const sections = [];
+  let fence = null;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const fenceMatch = lines[index].match(/^\s*(`{3,}|~{3,})/);
+    if (fenceMatch) {
+      const marker = fenceMatch[1][0];
+      fence = fence === marker ? null : fence ?? marker;
+      continue;
+    }
+
+    if (fence !== null || lines[index] !== `## ${heading}`) {
+      continue;
+    }
+
+    const section = [];
+    let sectionFence = null;
+
+    for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+      const nestedFence = lines[cursor].match(/^\s*(`{3,}|~{3,})/);
+      if (nestedFence) {
+        const marker = nestedFence[1][0];
+        sectionFence = sectionFence === marker ? null : sectionFence ?? marker;
+        section.push(lines[cursor]);
+        continue;
+      }
+
+      if (sectionFence === null && /^##(?!#)\s+/.test(lines[cursor])) {
+        index = cursor - 1;
+        break;
+      }
+
+      section.push(lines[cursor]);
+
+      if (cursor === lines.length - 1) {
+        index = cursor;
+      }
+    }
+
+    sections.push(section);
+  }
+
+  return sections;
+}
+
+function findLegacySourceBindingSections(content) {
+  const lines = content.split(/\r\n|\n|\r/);
+  const sections = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    if (lines[index] !== 'source_binding:') {
+      continue;
+    }
+
+    const section = [];
+
+    for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+      if (lines[cursor].length > 0 && !/^\s/.test(lines[cursor])) {
+        index = cursor - 1;
+        break;
+      }
+
+      section.push(lines[cursor]);
+
+      if (cursor === lines.length - 1) {
+        index = cursor;
+      }
+    }
+
+    sections.push(section);
+  }
+
+  return sections;
+}
+
+function parseExactBindingFields(lines, expectedFields, fieldPattern, parseValue = (value) => value) {
+  const values = {};
+
+  for (const line of lines) {
+    if (line.trim().length === 0) {
+      continue;
+    }
+
+    const match = line.match(fieldPattern);
+
+    if (!match || !expectedFields.includes(match[1]) || Object.hasOwn(values, match[1])) {
+      return invalidSourceBinding(
+        'source-binding-fields-invalid',
+        'Source binding must contain each required field exactly once and no additional content.'
+      );
+    }
+
+    const parsedValue = parseValue(match[2]);
+
+    if (parsedValue === null) {
+      return invalidSourceBinding(
+        'source-binding-fields-invalid',
+        'Source binding contains an invalid scalar value.'
+      );
+    }
+
+    values[match[1]] = parsedValue;
+  }
+
+  if (expectedFields.some((field) => !Object.hasOwn(values, field))) {
+    return invalidSourceBinding(
+      'source-binding-fields-invalid',
+      'Source binding must contain each required field exactly once.'
+    );
+  }
+
+  return {
+    ok: true,
+    values
+  };
+}
+
+function parseLegacyBindingScalar(value) {
+  const scalar = value.trim();
+
+  if (!scalar.startsWith('"') || !scalar.endsWith('"')) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(scalar);
+    return typeof parsed === 'string' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function validateSourceBindingValues({ primaryIssue, branch }) {
+  const issueMatch = String(primaryIssue ?? '').match(
+    /^https:\/\/github\.com\/[A-Za-z0-9][A-Za-z0-9.-]*\/[A-Za-z0-9._-]+\/issues\/([1-9][0-9]*)$/
+  );
+
+  if (!issueMatch) {
+    return invalidSourceBinding(
+      'source-binding-primary-issue-invalid',
+      'Primary issue must be one canonical GitHub issue URL.'
+    );
+  }
+
+  const normalizedBranch = normalizeSourceBindingBranch(branch);
+
+  if (!normalizedBranch.ok) {
+    return invalidSourceBinding(
+      'source-binding-branch-invalid',
+      'Branch must be an exact safe git branch name or the literal none.'
+    );
+  }
+
+  return {
+    ok: true,
+    status: 'bound',
+    binding: {
+      primaryIssue,
+      issueNumber: issueMatch[1],
+      branch: normalizedBranch.branch
+    },
+    error: null
+  };
+}
+
+function normalizeSourceBindingBranch(input) {
+  if (typeof input !== 'string') {
+    return { ok: false, branch: null };
+  }
+
+  const branch = input.trim();
+
+  if (branch === 'none') {
+    return { ok: true, branch: null };
+  }
+
+  const segments = branch.split('/');
+  const invalid = branch.length === 0
+    || branch.length > MAX_GIT_BRANCH_LENGTH
+    || branch === 'HEAD'
+    || branch === '@'
+    || branch.startsWith('-')
+    || branch.startsWith('/')
+    || branch.endsWith('/')
+    || branch.includes('//')
+    || branch.includes('..')
+    || branch.includes('@{')
+    || /[\u0000-\u0020\u007f~^:?*[\\]/.test(branch)
+    || segments.some((segment) => (
+      segment.length === 0
+      || segment.startsWith('.')
+      || segment.endsWith('.')
+      || segment.endsWith('.lock')
+    ));
+
+  return invalid
+    ? { ok: false, branch: null }
+    : { ok: true, branch };
+}
+
+function absentSourceBinding() {
+  return {
+    ok: true,
+    status: 'absent',
+    binding: null,
+    error: null
+  };
+}
+
+function invalidSourceBinding(code, message) {
+  return {
+    ok: false,
+    status: 'invalid',
+    binding: null,
+    error: {
+      code,
+      message
+    }
+  };
+}
+
+function projectRelativePath(rootDir, targetPath) {
+  return path.relative(rootDir, targetPath).replaceAll('\\', '/');
 }
 
 async function getCurrentBranch(options = {}) {

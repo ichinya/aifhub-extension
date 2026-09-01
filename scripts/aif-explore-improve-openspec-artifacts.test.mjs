@@ -422,6 +422,10 @@ describe('aif-explore and aif-improve OpenSpec-native contracts', () => {
       'complete `## Original Request` heading and body as immutable raw source',
       'Preserve its exact bytes, including line endings, whitespace, punctuation, casing, and line breaks',
       'patch other sections around it instead of reconstructing `proposal.md`',
+      'existing `## AIFHub Source Binding` as reserved identity metadata',
+      'Preserve its complete heading and body byte-for-byte during ordinary refinement',
+      '`Primary issue` is immutable',
+      '`Branch` may change only for an explicit branch-rebind request',
       'existing `## Research Context` body and `Source` revision metadata as the committed requirements snapshot',
       'unless the user explicitly requests a research rebase',
       'WARN [research-drift]',
@@ -430,7 +434,7 @@ describe('aif-explore and aif-improve OpenSpec-native contracts', () => {
       'Do not apply requirements from a newer Active Summary',
       'On an explicit research rebase',
       'update the `Source` path plus `Updated` and `SHA256` metadata',
-      'Report `Original Request` and `Research Context` as preserved section names',
+      'Report `Original Request`, `AIFHub Source Binding`, and `Research Context` as preserved section names',
       'do not duplicate their raw bodies in output'
     ]) {
       assertIncludes(openspec, expected, label);
