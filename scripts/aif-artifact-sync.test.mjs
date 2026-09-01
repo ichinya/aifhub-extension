@@ -662,14 +662,14 @@ describe('mode switching', () => {
       timestamp: '2026-09-01T00-00-00-000Z'
     });
     const openSpecConfig = await readFixture(rootDir, '.ai-factory/config.yaml');
-    assert.ok(openSpecConfig.includes(warmupBlock), 'OpenSpec mode should preserve the exact user-owned warmup block');
+    assert.ok(openSpecConfig.includes(warmupBlock), 'OpenSpec mode should preserve user-owned warmup paths and comment text');
 
     await switchToAiFactoryMode({
       rootDir,
       timestamp: '2026-09-01T00-00-01-000Z'
     });
     const legacyConfig = await readFixture(rootDir, '.ai-factory/config.yaml');
-    assert.ok(legacyConfig.includes(warmupBlock), 'Legacy mode should preserve the exact user-owned warmup block');
+    assert.ok(legacyConfig.includes(warmupBlock), 'Legacy mode should preserve user-owned warmup paths and comment text');
 
     const existingWithoutWarmup = renderConfigForMode([
       'aifhub:',

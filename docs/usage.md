@@ -67,7 +67,7 @@ warmup:
   paths: []
 ```
 
-`warmup.paths` is user-owned. Entries are ordered, literal, project-relative files or directories; upstream warmup rejects absolute paths and `..` escapes, does not follow symlinks, skips likely secrets and binary content, and reports missing or oversized input instead of silently truncating it. An existing list is preserved byte-for-byte by AIFHub mode switches. An existing config with no `warmup` section is not backfilled because absence is equivalent to an empty list.
+`warmup.paths` is user-owned. Entries are ordered, literal, project-relative files or directories; upstream warmup rejects absolute paths and `..` escapes, does not follow symlinks, skips likely secrets and binary content, and reports missing or oversized input instead of silently truncating it. AIFHub mode switches preserve existing path entries and comments without interpreting them, but may normalize EOLs or move the top-level block relative to managed sections. An existing config with no `warmup` section is not backfilled because absence is equivalent to an empty list.
 
 AIFHub adds no `/aif-warmup` skill or injection. The optional `paths.context` glossary, reviewed provider notes, canonical OpenSpec changes, QA evidence, and generated rules are not implicitly added to startup context. A user may explicitly add a safe reviewed file or directory to `warmup.paths`; raw provider output, credentials, and validation evidence remain subject to the existing context and artifact boundaries.
 
@@ -1224,7 +1224,7 @@ The live flow runs three separately attributed checks:
 
 Local deterministic or live PASS proves only the isolated consumer contract. It does not prove package publication, registry availability, deployment, release readiness, or successful end-user migration.
 
-The AI Factory 2.19 review is intentionally recorded as source-snapshot evidence. Because `2.19.0` had no Git tag, GitHub release, or npm package at the review boundary, the `smoke:ai-factory-2-18` driver remains the last published-executable compatibility smoke and must not be presented as a 2.19 PASS. Default tests separately lock fresh `warmup.paths: []`, no-backfill behavior, exact user-list preservation, and upstream ownership.
+The AI Factory 2.19 review is intentionally recorded as source-snapshot evidence. Because `2.19.0` had no Git tag, GitHub release, or npm package at the review boundary, the `smoke:ai-factory-2-18` driver remains the last published-executable compatibility smoke and must not be presented as a 2.19 PASS. Default tests separately lock fresh `warmup.paths: []`, no-backfill behavior, user-owned path and comment preservation, and upstream ownership.
 
 Run repository validation separately:
 
