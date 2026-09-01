@@ -9,11 +9,16 @@
 ### Добавлено
 - `dcg` (`destructive_command_guard`) документирован как optional user-owned safety provider для pre-execution command guarding (issue #135): manual install остается вне AIFHub ownership, automation ограничена read-only probes, отсутствие provider является degraded behavior, а hooks, agent/runtime config, dependencies, gates и raw denial artifact persistence явно запрещены.
 
+### Изменено
+- `/aif-explore` теперь уточняет research brief через dependency-aware design tree: самостоятельно собирает доступные repository/config facts в read-only режиме, задаёт пользовательские решения раундами по frontier зависимостей с рекомендациями и начинает полный research только после подтверждения нормализованного brief без создания отдельного interview artifact; autonomous/subagent запуск возвращает неподтверждённый brief родителю с blocker `research-brief-confirmation-required`, а не принимает assumptions за согласие.
+
 ## [1.5.0] - 2026-09-01
 
 ### Добавлено
 - Pinned source-compatibility evidence для AI Factory `2.19.0` на commit `3c1ddd4740d7b1c30d8ecb3dc80fa5e7b8d7ef5a`: exact `2.18.1...3c1ddd4740d7` audit включает 7 commits и 16 changed files, upstream-owned `/aif-warmup`, `warmup.paths` и Microsoft APM manifest. Отсутствие `2.19.0` tag, GitHub release и npm package зафиксировано отдельно от последнего published-executable smoke `2.18.1`.
 - Regression coverage для fresh `warmup.paths: []`, сохранения user-owned warmup list через оба mode profile и запрета backfill в существующий config без секции.
+- Exact-tagged OpenSpec `1.10.0` compatibility evidence с независимыми Git source custody (`v1.10.0`, commit `1ebddd17f40dde15dfd28289e4493c3cf05ee9df`, compare `v1.9.0...v1.10.0`) и checksum-verified npm executable custody (`@fission-ai/openspec@1.10.0`, integrity, shasum, bin, lifecycle scripts, dependencies и Node engine `>=20.19.0`). Локальный exact-package smoke не заявляется как CI, deployment или production evidence.
+- Bounded OpenSpec `1.10.0` CLI matrix для version detection, strict validate, status, show, apply/archive/specs instructions, open JSON envelopes, Store-root resolution, no-spec schema `skip_specs`, stderr-only telemetry notice и blocked-retirement archive no-mutation.
 - Exact-tagged OpenSpec `1.9.0` compatibility evidence с независимыми Git source custody (`v1.9.0`, commit `2826b8889e5223a9a8095d4428b60b56597e1020`, compare `v1.8.0...v1.9.0`) и npm executable custody (`@fission-ai/openspec@1.9.0`, integrity, shasum, bin и Node engine `>=20.19.0`). Локальный extracted-package smoke не заявляется как CI, deployment или production evidence.
 - Deterministic regressions для strict/non-strict task numbering, arbitrary nested scenario loss, rootless list/bulk/schemas behavior, invalid archive no-mutation и archive serialization с preserved blank lines и ровно одним final newline.
 - Negative repository contract, удерживающий `openspec validate --archived` вне package scripts, tracked CI, shared runner argv, `/aif-verify`, `/aif-done` и release acceptance PASS boolean.
@@ -23,8 +28,9 @@
 ### Изменено
 - Reviewed AI Factory source baseline обновлён до snapshot, declaring `2.19.0`, при неизменном compatibility range `>=2.11.0 <3.0.0`; `/aif-warmup` и APM distribution остаются upstream-owned, а schema/loader, injection/MCP, Node, bin и dependency contracts не меняются.
 - Fresh AIFHub config теперь включает upstream default `warmup.paths: []`; существующая секция остаётся user-owned и сохраняется, а её отсутствие в existing config эквивалентно пустому списку и не вызывает backfill.
-- Reviewed OpenSpec baseline обновлён с `1.8.0` до `1.9.0` при неизменных baseline `1.3.1`, stable range `>=1.3.1 <2.0.0`, prerelease ledger `1.6.0-beta.1` и Node requirement `>=20.19.0`; `/aif-analyze` продолжает только source-aware non-blocking update guidance без automatic install/update/downgrade.
-- Command Code, schema fork/update, skill/agent/tool generation, Stores/workspace behavior и package management остаются upstream-owned. OpenSpec `1.10`/`1.11` не входят в review или compatibility claims этого checkpoint.
+- Reviewed OpenSpec baseline последовательно обновлён с `1.8.0` через `1.9.0` до `1.10.0` при неизменных baseline `1.3.1`, stable range `>=1.3.1 <2.0.0`, prerelease ledger `1.6.0-beta.1` и Node requirement `>=20.19.0`; `/aif-analyze` продолжает только source-aware non-blocking update guidance без automatic install/update/downgrade.
+- OpenSpec-native `/aif-plan` и `/aif-improve` теперь требуют inline completion verification в каждом task checkbox; отдельная verification task допустима только для broader integration/system checks, охватывающих несколько implementation tasks. Для legacy checklist `/aif-improve` выполняет bounded migration недостающих verification clauses, сохраняя номера, checkbox states, порядок и исходный intent задач.
+- Zed, `init --language`, Store selection, profiles, schema generation, OpenCode assets, completion/update behavior и package management остаются upstream-owned. OpenSpec `1.11.0` не входит в review или compatibility claims этого checkpoint.
 - Archived-wide validation документирована как отдельное advisory observation: historical incomplete archives не исправляются, а advisory exit не влияет на обязательный PASS.
 
 ### Исправлено

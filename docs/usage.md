@@ -581,8 +581,10 @@ OpenSpec-native planning includes task intake normalization inside `/aif-plan fu
 
 - `proposal.md`: intent, scope, non-goals, approach, assumptions, risks, and open questions
 - `design.md`: technical approach, C4 impact, ADR candidates, dependency graph, integration points, alternatives, and risks
-- `tasks.md`: executable implementation checklist
+- `tasks.md`: executable implementation checklist; every task states its completion verification inline as a test, command, observable behavior, or delivered artifact, with separate verification tasks reserved for broader cross-task integration or system behavior
 - `specs/**/spec.md`: behavior-changing requirements and scenarios
+
+When `/aif-improve` encounters a legacy `tasks.md` without inline verification, it applies a bounded checklist migration to each affected checkbox. Only the missing verification clause is appended; task numbers, checked/unchecked states, order, original actions and intent are preserved, and already compliant unrelated checkboxes remain unchanged.
 
 When the request explicitly links an issue, milestone, or roadmap item, `proposal.md` also records the standardized `## Roadmap Linkage` section:
 
@@ -627,6 +629,8 @@ Does not write:
 - `.ai-factory/state/<change-id>/explore.md` and `.ai-factory/qa/<change-id>/`
 
 Exploration is research-only until promoted into canonical OpenSpec artifacts by planning or refinement.
+
+Before the full research run or any write, `/aif-explore` turns the request into a dependency-aware research brief. It resolves repository and configuration facts through bounded read-only inspection, asks only user-owned decisions whose prerequisites are settled, groups independent questions into rounds with a recommendation for each, and recomputes the decision frontier after every answer batch. Research starts only after the frontier is empty and the user confirms the normalized brief. This confirmation is required even for an already precise request. In autonomous or subagent mode, assumptions never count as confirmation: the agent returns the normalized brief, assumptions, and open questions to the interactive parent with a `research-brief-confirmation-required` blocker and does not begin full research until the parent passes back explicit user confirmation. The interview remains conversation context and creates no separate decision-tree, brief, plan, or OpenSpec artifact.
 
 Regular and ultra research are mutually exclusive writes for one run. A valid ultra `INDEX.md` contains exactly one standalone `<!-- aif:research-mode:ultra -->`, one supported status, and a safe direct `RESEARCH.md` link in `## Artifact Index`. Selection precedence is an explicit safe `RESEARCH.md` path, an exact slug, then exactly one reviewed materially relevant active bundle. Ambiguity stops with `ultra-research-ambiguous`; recency and fuzzy matching never break the tie. Planning/implementation consumers bind to the selected source path, active summary, revision, and digest; sibling C4/ADR/graph rationale cannot expand scope unless reflected in the active summary.
 

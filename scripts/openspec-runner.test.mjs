@@ -81,7 +81,7 @@ describe('detectOpenSpec', () => {
     assert.equal(result.version, '1.4.0');
     assert.equal(result.supportedRange, '>=1.3.1 <2.0.0');
     assert.equal(result.versionSupported, true);
-    assert.equal(result.latestReviewedVersion, '1.9.0');
+    assert.equal(result.latestReviewedVersion, '1.10.0');
     assert.equal(result.versionOutdated, true);
     assert.equal(result.reason, null);
   });
@@ -158,12 +158,12 @@ describe('detectOpenSpec', () => {
     assert.equal(result.version, '1.8.0');
     assert.equal(result.supportedRange, '>=1.3.1 <2.0.0');
     assert.equal(result.versionSupported, true);
-    assert.equal(result.latestReviewedVersion, '1.9.0');
+    assert.equal(result.latestReviewedVersion, '1.10.0');
     assert.equal(result.versionOutdated, true);
     assert.equal(result.reason, null);
   });
 
-  it('returns fresh capabilities for reviewed version 1.9.0 on supported Node', async () => {
+  it('keeps supported version 1.9.0 available but marks it older than the reviewed baseline', async () => {
     const result = await detectOpenSpec({
       executor: async () => ({ exitCode: 0, stdout: 'openspec 1.9.0\n', stderr: '' }),
       nodeVersion: '20.19.0'
@@ -175,21 +175,38 @@ describe('detectOpenSpec', () => {
     assert.equal(result.version, '1.9.0');
     assert.equal(result.supportedRange, '>=1.3.1 <2.0.0');
     assert.equal(result.versionSupported, true);
-    assert.equal(result.latestReviewedVersion, '1.9.0');
+    assert.equal(result.latestReviewedVersion, '1.10.0');
+    assert.equal(result.versionOutdated, true);
+    assert.equal(result.reason, null);
+  });
+
+  it('returns fresh capabilities for reviewed version 1.10.0 on supported Node', async () => {
+    const result = await detectOpenSpec({
+      executor: async () => ({ exitCode: 0, stdout: 'openspec 1.10.0\n', stderr: '' }),
+      nodeVersion: '20.19.0'
+    });
+
+    assert.equal(result.available, true);
+    assert.equal(result.canValidate, true);
+    assert.equal(result.canArchive, true);
+    assert.equal(result.version, '1.10.0');
+    assert.equal(result.supportedRange, '>=1.3.1 <2.0.0');
+    assert.equal(result.versionSupported, true);
+    assert.equal(result.latestReviewedVersion, '1.10.0');
     assert.equal(result.versionOutdated, false);
     assert.equal(result.reason, null);
   });
 
   it('does not mark a newer supported version as outdated or recommend a downgrade signal', async () => {
     const result = await detectOpenSpec({
-      executor: async () => ({ exitCode: 0, stdout: 'openspec 1.9.1\n', stderr: '' }),
+      executor: async () => ({ exitCode: 0, stdout: 'openspec 1.10.1\n', stderr: '' }),
       nodeVersion: '20.19.0'
     });
 
     assert.equal(result.available, true);
-    assert.equal(result.version, '1.9.1');
+    assert.equal(result.version, '1.10.1');
     assert.equal(result.versionSupported, true);
-    assert.equal(result.latestReviewedVersion, '1.9.0');
+    assert.equal(result.latestReviewedVersion, '1.10.0');
     assert.equal(result.versionOutdated, false);
     assert.equal(result.reason, null);
   });
@@ -207,7 +224,7 @@ describe('detectOpenSpec', () => {
     assert.equal(result.canArchive, false);
     assert.equal(result.version, null);
     assert.equal(result.versionSupported, false);
-    assert.equal(result.latestReviewedVersion, '1.9.0');
+    assert.equal(result.latestReviewedVersion, '1.10.0');
     assert.equal(result.versionOutdated, null);
     assert.equal(result.nodeSupported, true);
     assert.equal(result.reason, 'missing-cli');
@@ -230,7 +247,7 @@ describe('detectOpenSpec', () => {
     assert.equal(result.canArchive, false);
     assert.equal(result.version, '1.2.0');
     assert.equal(result.versionSupported, false);
-    assert.equal(result.latestReviewedVersion, '1.9.0');
+    assert.equal(result.latestReviewedVersion, '1.10.0');
     assert.equal(result.versionOutdated, null);
     assert.equal(result.nodeSupported, true);
     assert.equal(result.reason, 'unsupported-version');
@@ -477,6 +494,25 @@ describe('runOpenSpec', () => {
     assert.deepEqual(result.json, { changes: ['add-oauth'] });
     assert.equal(result.jsonParseError, null);
     assert.equal(result.error, null);
+  });
+
+  it('keeps JSON stdout parseable when OpenSpec writes a notice to stderr', async () => {
+    const result = await runOpenSpec(['show', 'auth', '--json'], {
+      expectJson: true,
+      executor: async () => ({
+        exitCode: 0,
+        stdout: '{"id":"auth","root":{"path":"C:/repo","source":"nearest"}}',
+        stderr: 'OpenSpec notice stays on stderr'
+      })
+    });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.json, {
+      id: 'auth',
+      root: { path: 'C:/repo', source: 'nearest' }
+    });
+    assert.equal(result.stderr, 'OpenSpec notice stays on stderr');
+    assert.equal(result.jsonParseError, null);
   });
 
   it('reports invalid JSON when expectJson is true and stdout is not JSON', async () => {
@@ -852,6 +888,48 @@ describe('OpenSpec command wrappers', () => {
       'archive',
       '--change',
       'add-oauth',
+      '--json',
+      '--no-color'
+    ]);
+  });
+
+  it('preserves the OpenSpec 1.10 store-aware specs instruction envelope', async () => {
+    const envelope = {
+      changeName: 'store-change',
+      artifactId: 'specs',
+      planningHome: {
+        kind: 'repo',
+        root: 'C:/stores/team-context',
+        changesDir: 'C:/stores/team-context/openspec/changes',
+        defaultSchema: 'spec-driven'
+      },
+      instruction: 'Read <planningHome.root>/openspec/specs/<capability-path>/spec.md.',
+      root: {
+        path: 'C:/stores/team-context',
+        source: 'declared',
+        store_id: 'team-context'
+      }
+    };
+    const { executor, calls } = createRecordingExecutor({
+      exitCode: 0,
+      stdout: JSON.stringify(envelope),
+      stderr: ''
+    });
+
+    const result = await getOpenSpecInstructions('specs', {
+      change: 'store-change',
+      executor
+    });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.json, envelope);
+    assert.equal(result.json.planningHome.root, result.json.root.path);
+    assert.match(result.json.instruction, /<planningHome\.root>\/openspec\/specs/);
+    assert.deepEqual(calls[0].args, [
+      'instructions',
+      'specs',
+      '--change',
+      'store-change',
       '--json',
       '--no-color'
     ]);
