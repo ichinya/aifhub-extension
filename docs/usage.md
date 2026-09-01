@@ -604,12 +604,31 @@ When `/aif-improve` encounters a legacy `tasks.md` without inline verification, 
 
 When the request explicitly links an issue, milestone, or roadmap item, `proposal.md` also records the standardized `## Roadmap Linkage` section:
 
-- `Issues`: canonical issue URL or comma-separated URLs
+- `Issues`: canonical HTTPS work-item URL or stable MCP resource URI, optionally comma-separated
 - `Milestone`: exact GitHub milestone title or explicit `none`
 - `Roadmap item/slice`: exact local roadmap item or explicit `none`
 - `Rationale`: one bounded explanation of the linkage
 
 Planning preserves explicit `none` values and does not infer linkage from a branch name, issue title, label, or unrelated roadmap text. If any linkage field is non-`none`, the planning response returns `/aif-roadmap check`; the roadmap owner may then register the active change as local `planned`. Planning does not claim implementation, verification, finalization, merge, or issue closure.
+
+When planning input or a selected structured MCP record contains exactly one explicit primary work item, AIFHub uses its readable external ID as the plan prefix. GitHub `156`, Linear `ENG-431`, Jira `PROJ-77`, and an opaque YouGile fallback such as `yougile-a1b2c3d4` produce IDs such as `156-fix-login-timeout`, `eng-431-fix-login-timeout`, `proj-77-refresh-token`, and `yougile-a1b2c3d4-refresh-token`. The request slug keeps repeated external IDs readable while the full source binding below keeps them distinct across providers, tenants, and repositories.
+
+A source-bound OpenSpec proposal persists identity separately from the many-valued roadmap fields:
+
+```markdown
+## AIFHub Source Binding
+
+- Provider: linear
+- Primary source: mcp://linear/issue/6a1f24c8
+- External ID: ENG-431
+- Branch: feature/some-request-slug
+```
+
+`Primary source` is the only collision identity. `Provider` and `External ID` make the binding readable but cannot authorize reuse alone. A secondary reference in `Roadmap Linkage.Issues`, including the same external ID from another provider or repository, cannot replace the primary binding. Ordinary plans omit the complete reserved section. The exact attached creation branch maps the prefixed change back to downstream `/aif-improve`, `/aif-implement`, and `/aif-verify`; one exact binding is checked before ordinary slug branch variants. After successful source-bound creation or refinement, planning also writes the complete resolved change ID to the current-change pointer. If several active plans intentionally share the creation branch, that pointer selects one of the exact candidates; otherwise resolution reports `ambiguous-branch-binding`. Malformed or prefix-mismatched metadata declaring the current branch fails closed, while an unrelated invalid binding becomes a warning and is excluded from slug matching.
+
+Legacy classic plans persist the same Markdown section in the parent plan and synchronized double-quoted `source_binding.provider`, `source_binding.primary_source`, `source_binding.external_id`, and `source_binding.branch` values in companion `status.yaml`. Creation and explicit branch rebind validate both surfaces together; the tolerant reader also accepts consistently deeper indentation and single-quoted YAML scalars. Marked ultra keeps the Markdown binding in its upstream-owned `index.md` and does not gain a companion status file. Legacy `slug` identifiers use the same `<external-id>-<slug>` form. Sequential mode preserves its required four-digit prefix: numeric IDs in `1..9999` can occupy it (`0156_fix-login-timeout`), while alphanumeric IDs begin the semantic stem after an upstream ordinal (`0042_PROJ-77-refresh-token`).
+
+A bare number, PR URL, branch name, title, label, milestone, or discovered search result does not establish this binding. The planner reads structured MCP `identifier`, `key`, `number`, or display-ID fields; when only an opaque stable ID exists, it creates a provider-prefixed short key and preserves the full value in a stable `mcp://` primary source. Multiple linked items retain ordinary mode-specific IDs unless one is explicitly primary. Existing artifacts are reused only when their exact `Primary source` matches; roadmap-list membership and external-ID equality are insufficient. Otherwise planning stops with `source-plan-id-collision` and never overwrites or drops the external-ID prefix.
 
 `/aif-plan full` does not create `/aif-task-prepare`, does not create `.ai-factory/specs/<task-id>.md`, and does not create `task-prepare.md`. Raw input trace, normalization confidence, and temporary notes belong only under `.ai-factory/state/<change-id>/` when they are persisted.
 

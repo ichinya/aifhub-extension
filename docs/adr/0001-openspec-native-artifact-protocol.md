@@ -92,15 +92,22 @@ These paths are reserved names only in v1. Their detailed behavior is out of sco
 Canonical planning linkage lives in `openspec/changes/<change-id>/proposal.md`:
 
 ```markdown
+## AIFHub Source Binding
+
+- Provider: <canonical provider or MCP server ID>
+- Primary source: <canonical HTTPS work-item URL or stable MCP resource URI>
+- External ID: <human-readable provider key>
+- Branch: <exact creation branch|none>
+
 ## Roadmap Linkage
 
-- Issues: <canonical URL(s)|none>
+- Issues: <canonical HTTPS work-item URL(s) or stable MCP resource URI(s)|none>
 - Milestone: <exact title|none>
 - Roadmap item/slice: <exact item|none>
 - Rationale: <bounded explanation>
 ```
 
-Explicit `none` values prevent later commands from inventing issue, milestone, or slice ownership. `/aif-roadmap check` turns a valid linked active change into local `planned`; canonical planning and implementation do not claim completion.
+The source-binding section is conditional on MCP work-item identity and separates one immutable full primary source from the many-valued lifecycle linkage. The change ID starts with the normalized external key and a request slug; one exact branch binding maps that change back to downstream commands before slug heuristics. When several active source-bound changes share the branch, the current pointer written by successful planning selects one exact candidate; unrelated malformed bindings remain visible as warnings without blocking the repository. Secondary roadmap links and equal external IDs from another provider, tenant, or repository cannot satisfy source collision checks. Explicit `none` values prevent later commands from inventing issue, milestone, or slice ownership. `/aif-roadmap check` turns a valid linked active change into local `planned`; canonical planning and implementation do not claim completion.
 
 The configured roadmap may contain one marker-bounded block:
 
