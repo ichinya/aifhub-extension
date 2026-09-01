@@ -1,4 +1,4 @@
-[Предыдущая страница](context-providers.md) | [К документации](README.md) | [Следующая страница](context-dedup.md)
+[Предыдущая страница](safety-providers.md) | [К документации](README.md) | [Следующая страница](context-dedup.md)
 
 # Рекомендации По Memory Tools
 
