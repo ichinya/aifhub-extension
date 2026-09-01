@@ -96,13 +96,23 @@ Read generated rules as derived fix guidance when present:
 - `.ai-factory/rules/generated/openspec-change-<change-id>.md`
 - `.ai-factory/rules/generated/openspec-base.md`
 
+Systematic root-cause discipline before editing:
+
+1. Record direct `rootCauseEvidence` from the selected finding and relevant component boundaries. Trace the bad value or control flow backward far enough to identify where it first becomes wrong; do not stop at the final symptom.
+2. State one falsifiable `hypothesis` that explains both the observed failure and the direct evidence.
+3. Define the smallest `experiment` that can disprove or support that hypothesis without applying the full fix.
+4. Test one hypothesis at a time. After three failed hypotheses or experiments, stop, re-check the selected finding and architecture assumptions, and do not stack another speculative edit.
+5. Continue to `regressionCheck` and implementation only when the evidence supports a safely bounded root cause. Otherwise record the blocker and stop without implementation edits.
+
+Persist evidence in this order through `writeFixTrace()`: `rootCauseEvidence`, `hypothesis`, `experiment`, `regressionCheck`, `preFixResult`, `postFixResult`, and `fallbackDecision`. Keep the evidence bounded and credential-safe.
+
 Regression-first execution order:
 
 1. Select the narrowest current failing command or reproducible scenario from the chosen QA finding. Record its QA evidence path, command/check, non-sensitive inputs, and relevant environment assumptions before editing.
 2. Run or reproduce that exact check before editing and record `preFixResult` with exit code or observed status. Do not claim reproduction when the check passes unexpectedly or cannot run.
 3. When the failure is reproduced, apply the smallest root-cause fix within the selected finding's scope.
 4. Rerun the identical command/check after editing and record `postFixResult` with exit code or observed status.
-5. Persist `qaEvidenceRead`, `regressionCheck`, `preFixResult`, `postFixResult`, and `fallbackDecision` through `writeFixTrace()` under `.ai-factory/state/<change-id>/fixes/`. Redact credentials, tokens, authorization values, cookies, sensitive URL parameters, and raw provider output.
+5. Persist `qaEvidenceRead`, `rootCauseEvidence`, `hypothesis`, `experiment`, `regressionCheck`, `preFixResult`, `postFixResult`, and `fallbackDecision` through `writeFixTrace()` under `.ai-factory/state/<change-id>/fixes/`. Redact credentials, tokens, authorization values, cookies, sensitive URL parameters, and raw provider output.
 6. If the pre-fix check passes unexpectedly or no useful check exists in an interactive session, record the fallback reason and ask whether to investigate further, adjust reproduction, or proceed with a bounded likely fix. Do not edit until the user chooses.
 7. In autonomous, Handoff, or bounded fixer-agent mode, investigate only within the selected finding. If no plausible safely bounded root cause is established, record a blocked or unreproducible `fallbackDecision` and stop without implementation edits.
 
