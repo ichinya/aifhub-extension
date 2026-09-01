@@ -4,6 +4,8 @@ Apply this block before the upstream `aif-archive` body. When this boundary conf
 
 Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses.
 
+Resolve user-facing prose language in this order: use a usable non-empty `language.ui`; otherwise preserve the current conversation language for this response only; use English only when that language is indeterminate. This rule overrides downstream generic English defaults; do not infer from OS locale or persist the inferred choice. On that hard-English fallback, add exactly one concise setup hint only when the output contract permits human-readable prose, before any required final machine-readable block; never add it inside or after `aif-gate-result`, and never alter exact handoffs, fixed commands, paths, keys/enums, or machine-only output.
+
 ### Goal
 
 Keep `/aif-done` as the sole OpenSpec change finalizer while preserving upstream read-only archive listing, roadmap-only snapshots, and all legacy AI Factory archive behavior.

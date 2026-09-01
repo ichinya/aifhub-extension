@@ -58,6 +58,10 @@ const TRANSPORT_PATTERN = /(?:EAI_AGAIN|ENETUNREACH|ECONNRESET|ECONNREFUSED|ETIM
 const LEGACY_PLAN_SOURCE_ROOT = '.ai-factory/plans';
 const CLASSIC_PLAN_ID = 'classic-smoke';
 const ULTRA_PLAN_ID = 'ultra-smoke';
+const SHARED_LANGUAGE_POLICY_PATH = 'skills/shared/LANGUAGE-POLICY.md';
+const PROMPT_LANGUAGE_TARGET = 'aif-review';
+const UPSTREAM_REVIEW_LANGUAGE_DEFAULT = 'Language: en';
+const UI_LANGUAGE_RESOLUTION_CLAUSE = 'Resolve user-facing prose language in this order: use a usable non-empty `language.ui`; otherwise preserve the current conversation language for this response only; use English only when that language is indeterminate. This rule overrides downstream generic English defaults; do not infer from OS locale or persist the inferred choice. On that hard-English fallback, add exactly one concise setup hint only when the output contract permits human-readable prose, before any required final machine-readable block; never add it inside or after `aif-gate-result`, and never alter exact handoffs, fixed commands, paths, keys/enums, or machine-only output.';
 
 const ARTIFACT_FIXTURES = Object.freeze({
   'openspec/changes/smoke-preserved/proposal.md': '# Proposal\n\nPreserve canonical proposal.\n',
@@ -607,19 +611,217 @@ async function assertCanonicalOpenSpecConfig(projectDir, flow) {
   return { digest: sha256(config), markerCount: 1 };
 }
 
-async function inspectInjectionCardinality(projectDir, manifest, flow) {
+function markerPositions(content, marker) {
+  const positions = [];
+  let offset = 0;
+  while ((offset = content.indexOf(marker, offset)) !== -1) {
+    positions.push(offset);
+    offset += marker.length;
+  }
+  return positions;
+}
+
+function failMarkerShape(flow, target, shape) {
+  throw new SmokeFailure(
+    SMOKE_STATUS.FAIL,
+    flow,
+    `injection-marker-pair-${shape}`,
+    `injection-marker-pair-${shape}`,
+    { target, shape }
+  );
+}
+
+function inspectManagedMarkerPair(content, injection, flow) {
+  const target = injection.target;
+  const startMarker = `<!-- aif-ext:${EXTENSION_NAME}:${target}:${injection.position}:start -->`;
+  const endMarker = `<!-- aif-ext:${EXTENSION_NAME}:${target}:${injection.position}:end -->`;
+  const starts = markerPositions(content, startMarker);
+  const ends = markerPositions(content, endMarker);
+
+  if (starts.length === 0 || ends.length === 0 || starts.length !== ends.length) {
+    failMarkerShape(flow, target, 'incomplete');
+  }
+
+  const tokens = [
+    ...starts.map((index) => ({ index, type: 'start' })),
+    ...ends.map((index) => ({ index, type: 'end' }))
+  ].sort((left, right) => left.index - right.index || left.type.localeCompare(right.type));
+  let depth = 0;
+  let pairCount = 0;
+  let nested = false;
+  let reversed = false;
+
+  for (const token of tokens) {
+    if (token.type === 'start') {
+      if (depth > 0) nested = true;
+      depth += 1;
+      continue;
+    }
+    if (depth === 0) {
+      reversed = true;
+      continue;
+    }
+    depth -= 1;
+    if (depth === 0) pairCount += 1;
+  }
+
+  if (nested) failMarkerShape(flow, target, 'nested');
+  if (reversed) failMarkerShape(flow, target, 'reversed');
+  if (depth !== 0) failMarkerShape(flow, target, 'incomplete');
+  if (starts.length !== 1 || ends.length !== 1 || pairCount !== 1) {
+    failMarkerShape(flow, target, 'duplicate');
+  }
+
+  return {
+    startMarker,
+    endMarker,
+    startMarkerCount: starts.length,
+    endMarkerCount: ends.length,
+    markerPairCount: pairCount,
+    startIndex: starts[0],
+    endIndex: ends[0]
+  };
+}
+
+function classifyLanguageUiState(config) {
+  const lines = config.split(/\r?\n/);
+  let languageIndent = null;
+
+  for (const line of lines) {
+    if (languageIndent === null) {
+      const languageMatch = /^(\s*)language\s*:\s*(?:#.*)?$/.exec(line);
+      if (languageMatch) languageIndent = languageMatch[1].length;
+      continue;
+    }
+
+    if (line.trim().length === 0 || line.trimStart().startsWith('#')) continue;
+    const indent = line.length - line.trimStart().length;
+    if (indent <= languageIndent) break;
+    const uiMatch = /^\s*ui\s*:\s*(.*?)\s*(?:#.*)?$/.exec(line);
+    if (!uiMatch) continue;
+    const value = uiMatch[1].trim();
+    return value.length === 0 || value === "''" || value === '""' ? 'blank' : 'present';
+  }
+
+  return 'missing';
+}
+
+async function inspectInjectionContracts(projectDir, manifest, flow) {
   const entries = [];
   for (const injection of manifest.injections ?? []) {
     const skillPath = path.join(projectDir, '.codex', 'skills', injection.target, 'SKILL.md');
     assertContract(await exists(skillPath), flow, 'missing-injection-target', { target: injection.target });
     const content = await readFile(skillPath, 'utf8');
-    const marker = `<!-- aif-ext:${EXTENSION_NAME}:${injection.target}:${injection.position}:start -->`;
-    const count = countOccurrences(content, marker);
-    assertContract(count === 1, flow, 'injection-cardinality-mismatch', { target: injection.target, count });
-    entries.push({ target: injection.target, position: injection.position, count });
+    const markerPair = inspectManagedMarkerPair(content, injection, flow);
+    const clauseCount = countOccurrences(content, UI_LANGUAGE_RESOLUTION_CLAUSE);
+    assertContract(clauseCount === 1, flow, 'injection-language-clause-cardinality-mismatch', {
+      target: injection.target,
+      count: clauseCount
+    });
+    const clauseIndex = content.indexOf(UI_LANGUAGE_RESOLUTION_CLAUSE);
+    const clauseInsidePair = clauseIndex > markerPair.startIndex
+      && clauseIndex + UI_LANGUAGE_RESOLUTION_CLAUSE.length < markerPair.endIndex;
+    assertContract(clauseInsidePair, flow, 'injection-language-clause-outside-marker-pair', {
+      target: injection.target
+    });
+    entries.push({
+      target: injection.target,
+      position: injection.position,
+      startMarkerCount: markerPair.startMarkerCount,
+      endMarkerCount: markerPair.endMarkerCount,
+      markerPairCount: markerPair.markerPairCount,
+      clauseCount,
+      clauseInsidePair
+    });
   }
   entries.sort((left, right) => `${left.target}:${left.position}`.localeCompare(`${right.target}:${right.position}`));
   return { count: entries.length, digest: stableJsonDigest(entries), entries };
+}
+
+async function inspectPromptLanguageContract(projectDir, extension, toolchain, flow) {
+  const reviewInjections = (extension.manifest.injections ?? []).filter((entry) => entry.target === PROMPT_LANGUAGE_TARGET);
+  assertContract(
+    reviewInjections.length === 1 && reviewInjections[0].position === 'prepend',
+    flow,
+    'review-language-injection-contract-mismatch',
+    { target: PROMPT_LANGUAGE_TARGET, count: reviewInjections.length }
+  );
+
+  const injection = reviewInjections[0];
+  const installedPath = path.join(projectDir, '.codex', 'skills', PROMPT_LANGUAGE_TARGET, 'SKILL.md');
+  const upstreamPath = path.resolve(toolchain.provenanceRoot, 'skills', PROMPT_LANGUAGE_TARGET, 'SKILL.md');
+  const installedPolicyPath = path.join(
+    projectDir,
+    '.ai-factory',
+    'extensions',
+    EXTENSION_NAME,
+    ...SHARED_LANGUAGE_POLICY_PATH.split('/')
+  );
+  const sourcePolicyPath = path.resolve(extension.root, SHARED_LANGUAGE_POLICY_PATH);
+  const configPath = path.join(projectDir, '.ai-factory', 'config.yaml');
+
+  assertContract(await exists(installedPath), flow, 'missing-installed-review-skill', { target: PROMPT_LANGUAGE_TARGET });
+  assertContract(isWithin(toolchain.provenanceRoot, upstreamPath), flow, 'unsafe-upstream-review-source');
+  assertContract(await exists(upstreamPath), flow, 'missing-upstream-review-source');
+  assertContract(isWithin(extension.root, sourcePolicyPath), flow, 'unsafe-source-language-policy');
+  assertContract(await exists(sourcePolicyPath), flow, 'missing-source-language-policy');
+  assertContract(await exists(installedPolicyPath), flow, 'missing-packaged-language-policy');
+  assertContract(await exists(configPath), flow, 'missing-aif-config');
+
+  const [installedBytes, upstreamBytes, installedPolicyBytes, sourcePolicyBytes, config] = await Promise.all([
+    readFile(installedPath),
+    readFile(upstreamPath),
+    readFile(installedPolicyPath),
+    readFile(sourcePolicyPath),
+    readFile(configPath, 'utf8')
+  ]);
+  const retainedBytes = installedBytes.subarray(Math.max(0, installedBytes.byteLength - upstreamBytes.byteLength));
+  assertContract(
+    installedBytes.byteLength >= upstreamBytes.byteLength && retainedBytes.equals(upstreamBytes),
+    flow,
+    'upstream-review-bytes-changed',
+    { target: PROMPT_LANGUAGE_TARGET }
+  );
+  assertContract(installedPolicyBytes.equals(sourcePolicyBytes), flow, 'packaged-language-policy-bytes-changed');
+
+  const installed = installedBytes.toString('utf8');
+  const upstream = upstreamBytes.toString('utf8');
+  const markerPair = inspectManagedMarkerPair(installed, injection, flow);
+  const clauseCount = countOccurrences(installed, UI_LANGUAGE_RESOLUTION_CLAUSE);
+  assertContract(clauseCount === 1, flow, 'review-language-clause-cardinality-mismatch', {
+    target: PROMPT_LANGUAGE_TARGET,
+    count: clauseCount
+  });
+  const clauseIndex = installed.indexOf(UI_LANGUAGE_RESOLUTION_CLAUSE);
+  const clauseInsidePair = clauseIndex > markerPair.startIndex
+    && clauseIndex + UI_LANGUAGE_RESOLUTION_CLAUSE.length < markerPair.endIndex;
+  assertContract(clauseInsidePair, flow, 'review-language-clause-outside-marker-pair', {
+    target: PROMPT_LANGUAGE_TARGET
+  });
+  const upstreamSentinelCount = countOccurrences(upstream, UPSTREAM_REVIEW_LANGUAGE_DEFAULT);
+  assertContract(upstreamSentinelCount === 1, flow, 'upstream-review-language-default-mismatch', {
+    target: PROMPT_LANGUAGE_TARGET,
+    count: upstreamSentinelCount
+  });
+  const upstreamStartIndex = installed.length - upstream.length;
+  const clauseBeforeUpstream = clauseIndex < upstreamStartIndex + upstream.indexOf(UPSTREAM_REVIEW_LANGUAGE_DEFAULT);
+  assertContract(clauseBeforeUpstream, flow, 'review-language-clause-ordering-mismatch', {
+    target: PROMPT_LANGUAGE_TARGET
+  });
+
+  return {
+    target: PROMPT_LANGUAGE_TARGET,
+    languageUiState: classifyLanguageUiState(config),
+    startMarkerCount: markerPair.startMarkerCount,
+    endMarkerCount: markerPair.endMarkerCount,
+    markerPairCount: markerPair.markerPairCount,
+    clauseCount,
+    clauseInsidePair,
+    clauseBeforeUpstream,
+    upstreamSentinelCount,
+    upstreamDigest: sha256(upstreamBytes),
+    packagedPolicyDigest: sha256(installedPolicyBytes)
+  };
 }
 
 async function inspectExploreUpstreamContract(projectDir, extension, toolchain, flow) {
@@ -928,7 +1130,13 @@ async function runCleanInstallFlow(context) {
     const ledger = await readConsumerLedger(workspace.projectDir);
     assertContract(ledger.version === EXPECTED_AI_FACTORY_VERSIONS.v218, 'clean-install', 'clean-ledger-version-mismatch');
     const config = await assertCanonicalOpenSpecConfig(workspace.projectDir, 'clean-install');
-    const injections = await inspectInjectionCardinality(workspace.projectDir, extension.manifest, 'clean-install');
+    const injections = await inspectInjectionContracts(workspace.projectDir, extension.manifest, 'clean-install');
+    const promptLanguage = await inspectPromptLanguageContract(
+      workspace.projectDir,
+      extension,
+      toolchains.v218,
+      'clean-install'
+    );
     const upstreamExplore = await inspectExploreUpstreamContract(
       workspace.projectDir,
       extension,
@@ -940,6 +1148,11 @@ async function runCleanInstallFlow(context) {
     const agents = await assertManagedAgentsMatchSource(workspace.projectDir, extension, 'clean-install');
     record('clean-install', 'contract-assertions', SMOKE_STATUS.PASS, {
       injectionCount: injections.count,
+      promptLanguageTarget: promptLanguage.target,
+      promptLanguageMarkerPairCount: promptLanguage.markerPairCount,
+      promptLanguageClauseCount: promptLanguage.clauseCount,
+      promptLanguageUpstreamDigest: promptLanguage.upstreamDigest,
+      packagedPolicyDigest: promptLanguage.packagedPolicyDigest,
       exploreUpstreamDigest: upstreamExplore.upstreamDigest,
       transferCount: transfer.fileCount,
       adapterCount: adapters.length,
@@ -950,6 +1163,7 @@ async function runCleanInstallFlow(context) {
       version: ledger.version,
       config,
       injections: { count: injections.count, digest: injections.digest },
+      promptLanguage,
       upstreamExplore,
       transfer,
       adapters,
@@ -1000,7 +1214,7 @@ async function runUpdateFlows(context) {
     });
     await seedPreservationSentinels(workspace.projectDir);
     const preservationBaseline = await snapshotPreservationState(workspace.projectDir, 'global-update');
-    const beforeInjections = await inspectInjectionCardinality(workspace.projectDir, extension.manifest, 'global-update');
+    const beforeInjections = await inspectInjectionContracts(workspace.projectDir, extension.manifest, 'global-update');
     const beforeTransfer = await inspectTransferInventory(workspace.projectDir, 0, 'global-update');
     record('global-update', 'preservation-snapshot', SMOKE_STATUS.PASS, {
       artifactCount: preservationBaseline.artifacts.paths.length,
@@ -1026,7 +1240,13 @@ async function runUpdateFlows(context) {
     const globalLedger = await readConsumerLedger(workspace.projectDir);
     assertContract(globalLedger.version === EXPECTED_AI_FACTORY_VERSIONS.v218, 'global-update', 'global-ledger-version-mismatch');
     const globalPreservation = await assertPreservationState(workspace.projectDir, preservationBaseline, 'global-update');
-    const globalInjections = await inspectInjectionCardinality(workspace.projectDir, extension.manifest, 'global-update');
+    const globalInjections = await inspectInjectionContracts(workspace.projectDir, extension.manifest, 'global-update');
+    const globalPromptLanguage = await inspectPromptLanguageContract(
+      workspace.projectDir,
+      extension,
+      toolchains.v218,
+      'global-update'
+    );
     const globalExplore = await inspectExploreUpstreamContract(
       workspace.projectDir,
       extension,
@@ -1038,6 +1258,11 @@ async function runUpdateFlows(context) {
     record('global-update', 'contract-assertions-recorded', SMOKE_STATUS.PASS, {
       artifactDigest: globalPreservation.artifacts.digest,
       injectionDigest: globalInjections.digest,
+      promptLanguageTarget: globalPromptLanguage.target,
+      promptLanguageMarkerPairCount: globalPromptLanguage.markerPairCount,
+      promptLanguageClauseCount: globalPromptLanguage.clauseCount,
+      promptLanguageUpstreamDigest: globalPromptLanguage.upstreamDigest,
+      packagedPolicyDigest: globalPromptLanguage.packagedPolicyDigest,
       exploreUpstreamDigest: globalExplore.upstreamDigest,
       transferCount: globalTransfer.fileCount,
       managedAgentCount: globalAgents.count
@@ -1054,6 +1279,7 @@ async function runUpdateFlows(context) {
         artifactShapes: globalPreservation.artifactShapes
       },
       injections: { count: globalInjections.count, digest: globalInjections.digest },
+      promptLanguage: globalPromptLanguage,
       upstreamExplore: globalExplore,
       transfer: globalTransfer,
       managedAgents: { count: globalAgents.count, digest: globalAgents.digest }
@@ -1074,7 +1300,7 @@ async function runUpdateFlows(context) {
     });
     const dummyBaseline = await snapshotDummyState(workspace.projectDir);
     const targetedPreservationBaseline = await snapshotPreservationState(workspace.projectDir, 'targeted-update');
-    const targetedInjectionBaseline = await inspectInjectionCardinality(workspace.projectDir, extension.manifest, 'targeted-update');
+    const targetedInjectionBaseline = await inspectInjectionContracts(workspace.projectDir, extension.manifest, 'targeted-update');
     const targetAgent = extension.codexAgentFiles[0];
     const codexAgent = findCodexAgent(await readConsumerLedger(workspace.projectDir), 'targeted-update');
     const targetPath = path.resolve(workspace.projectDir, codexAgent.agentsDir ?? '.codex/agents', targetAgent.target);
@@ -1115,7 +1341,13 @@ async function runUpdateFlows(context) {
       targetedPreservationBaseline,
       'targeted-update'
     );
-    const targetedInjections = await inspectInjectionCardinality(workspace.projectDir, extension.manifest, 'targeted-update');
+    const targetedInjections = await inspectInjectionContracts(workspace.projectDir, extension.manifest, 'targeted-update');
+    const targetedPromptLanguage = await inspectPromptLanguageContract(
+      workspace.projectDir,
+      extension,
+      toolchains.v218,
+      'targeted-update'
+    );
     const targetedExplore = await inspectExploreUpstreamContract(
       workspace.projectDir,
       extension,
@@ -1135,7 +1367,12 @@ async function runUpdateFlows(context) {
       dummyLedgerDigest: dummyCurrent.ledgerDigest,
       dummyFilesDigest: dummyCurrent.filesDigest,
       artifactDigest: targetedPreservation.artifacts.digest,
-      injectionDigest: targetedInjections.digest
+      injectionDigest: targetedInjections.digest,
+      promptLanguageTarget: targetedPromptLanguage.target,
+      promptLanguageMarkerPairCount: targetedPromptLanguage.markerPairCount,
+      promptLanguageClauseCount: targetedPromptLanguage.clauseCount,
+      promptLanguageUpstreamDigest: targetedPromptLanguage.upstreamDigest,
+      packagedPolicyDigest: targetedPromptLanguage.packagedPolicyDigest
     });
     return {
       globalUpdate: globalResult,
@@ -1155,6 +1392,7 @@ async function runUpdateFlows(context) {
           artifactShapes: targetedPreservation.artifactShapes
         },
         injections: { count: targetedInjections.count, digest: targetedInjections.digest },
+        promptLanguage: targetedPromptLanguage,
         upstreamExplore: targetedExplore,
         transfer: targetedTransfer,
         managedAgents: { count: targetedAgents.count, digest: targetedAgents.digest }

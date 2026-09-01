@@ -20,6 +20,7 @@ AI Factory UX + OpenSpec artifact protocol
 - Ships an optional, opt-in context optimization service (`ai-factory aifhub-context-dedup` and MCP dedup tools) with `off | aifhub | sqz` modes. AIFHub serves unchanged same-session reads as a short replay, always returns protected validation artifacts in full, and invokes `sqz` only when the user explicitly supplies that third-party utility.
 - Documents upstream project-context utilities such as `/aif-architecture`, `/aif-roadmap`, `/aif-docs`, `/aif-qa`, `/aif-archive`, and `/aif-distillation` with AIFHub write-boundary guardrails.
 - Supports an optional protocol-neutral project glossary at `paths.context` (`CONTEXT.md` by default) for consistent prose terminology.
+- Resolves human-readable response language as `language.ui` → current conversation → English only when indeterminate, without using OS locale or changing exact machine-output contracts. See [Usage](docs/usage.md#prompt-language-resolution).
 - Does not install OpenSpec skills or slash commands.
 
 ## Quick Start

@@ -53,6 +53,20 @@ AIFHub commands request OpenSpec validation, status, instructions, and archive t
 
 The shared resolver selects one CLI source per operation in deterministic order: explicit non-empty extension API `options.command`, project-local `node_modules/.bin/openspec` (`openspec.cmd` on Windows), then `openspec` from `PATH`. An explicit or project-local selection is authoritative and never silently falls through after failure. AIFHub does not run `npx`, search parent projects, download, or auto-install OpenSpec. Missing or unsupported CLI remains degraded for filesystem-based planning/context loading; archive-required finalization still refuses until a compatible CLI is available. Human and JSON diagnostics expose only a safe project-relative/bounded command and `explicit`, `project-local`, or `path` source.
 
+## Prompt Language Resolution
+
+AIFHub resolves human-readable response prose in this order:
+
+1. Use a usable non-empty `language.ui`, even when the current conversation uses another language.
+2. If `language.ui` is missing, blank, or unusable, preserve the current conversation language for the current response only.
+3. Use English only when the conversation language is indeterminate.
+
+OS locale and repository programming language are not inputs. The fallback is ephemeral and does not persist the inferred choice to config, rules, memory, generated artifacts, runtime state, or QA evidence. Configured and identifiable-conversation paths do not add a setup hint.
+
+On the hard fallback to English, include exactly one concise setup hint to configure `language.ui` or run `/aif-analyze` only when the active output contract permits human-readable prose. Place it before any required final `aif-gate-result` block, never inside or after that block. An exact-output-only branch wins: no additional hint or prose is appended, and exact handoffs, fixed commands, paths, keys/enums, and machine-only output remain unchanged.
+
+This resolver affects UI prose only. `language.artifacts` remains separate for durable artifact prose, while commands, filenames, identifiers, JSON/YAML keys, package names, and CLI flags remain in English according to the shared policy.
+
 ## Optional Project Glossary
 
 Projects may configure a protocol-neutral glossary for preferred human-readable terminology:

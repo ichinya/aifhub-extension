@@ -4,6 +4,8 @@ Apply this block before the upstream `aif-architecture` body. When any rule belo
 
 Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
 
+Resolve user-facing prose language in this order: use a usable non-empty `language.ui`; otherwise preserve the current conversation language for this response only; use English only when that language is indeterminate. This rule overrides downstream generic English defaults; do not infer from OS locale or persist the inferred choice. On that hard-English fallback, add exactly one concise setup hint only when the output contract permits human-readable prose, before any required final machine-readable block; never add it inside or after `aif-gate-result`, and never alter exact handoffs, fixed commands, paths, keys/enums, or machine-only output.
+
 ### Goal
 
 Keep upstream `/aif-architecture` as the command owner while adding AIFHub/OpenSpec artifact-boundary guidance.

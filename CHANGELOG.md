@@ -16,6 +16,9 @@
 - Command Code, schema fork/update, skill/agent/tool generation, Stores/workspace behavior и package management остаются upstream-owned. OpenSpec `1.10`/`1.11` не входят в review или compatibility claims этого checkpoint.
 - Archived-wide validation документирована как отдельное advisory observation: historical incomplete archives не исправляются, а advisory exit не влияет на обязательный PASS.
 
+### Исправлено
+- Исправлен fallback языка prompt для issue #166: user-facing prose теперь детерминированно следует `language.ui` → current conversation → English-last без OS locale или persistence. Setup hint появляется только при hard English fallback с доступным prose slot, сохраняет exact-output-only branches и располагается до обязательного `aif-gate-result`; все 13 active injections и clean/global/targeted consumer smoke защищены matched start/end marker pairs и byte-identical upstream suffix checks.
+
 ## [1.4.0] - 2026-08-19
 
 ### Добавлено
