@@ -7,7 +7,7 @@
 ## [В разработке]
 
 ### Добавлено
-- Exact-source evaluation для DietrichGebert/ponytail `v4.9.0` с policy `manual_experiment_only`: новый skill-provider guide фиксирует session/subagent hook scope, отличие upstream deterministic safety scorers от AIFHub gates, OpenSpec precedence, user-owned setup boundary и required paired promotion benchmark.
+- Exact-source evaluation для DietrichGebert/ponytail `v4.9.0` с policy `manual_experiment_only`: новый skill-provider guide фиксирует session/subagent hook scope, отличие upstream deterministic safety scorers от AIFHub gates, OpenSpec precedence, user-owned setup boundary и required paired promotion benchmark (issue #137).
 
 ## [1.5.0] - 2026-09-01
 

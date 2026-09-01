@@ -1342,6 +1342,9 @@ describe('complete OpenSpec workflow documentation contract', () => {
     const changelog = await readRepoFile('CHANGELOG.md');
     const extensionManifest = await readRepoFile('extension.json');
     const packageManifest = await readRepoFile('package.json');
+    const analyzeSkill = await readRepoFile('skills/aif-analyze/SKILL.md');
+    const claudeImplementWorker = await readRepoFile('agent-files/claude/aifhub-implement-worker.md');
+    const codexImplementWorker = await readRepoFile('agent-files/codex/aifhub-implement-worker.toml');
 
     for (const expected of [
       'manual_experiment_only',
@@ -1372,6 +1375,9 @@ describe('complete OpenSpec workflow documentation contract', () => {
 
     assertNotIncludes(extensionManifest, 'ponytail', 'extension.json integration boundary');
     assertNotIncludes(packageManifest, 'ponytail', 'package.json dependency boundary');
+    assertNotIncludes(analyzeSkill, 'ponytail', 'aif-analyze recommendation boundary');
+    assertNotIncludes(claudeImplementWorker, 'ponytail', 'Claude implementation instruction boundary');
+    assertNotIncludes(codexImplementWorker, 'ponytail', 'Codex implementation instruction boundary');
   });
 
   it('documents bounded generated-rules reconciliation across tracked source surfaces', async () => {
