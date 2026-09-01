@@ -42,6 +42,24 @@ bundle = <research_bundles_dir>/<english-topic-slug>/
 
 Bounded diagnostics may contain only `mode`, resolved version and version `source`, safe project-relative bundle path, created artifact names, and a stable invalid-marker/collision `code`. Never include topic/research bodies, provider output, credentials, raw stdout, raw stderr, or private absolute paths.
 
+### Dependency-aware research brief interview
+
+After resolving the artifact mode, research profile, and any ultra version gate, but before the full research run or any write, map the request as a dependency-aware **design tree**.
+
+- Treat explicit decisions already present in the request or conversation as settled roots. Each unresolved user-owned decision is a node whose children are the decisions that depend on it.
+- The **frontier** is every unresolved decision whose prerequisites are settled. Ask the whole current frontier in one round, number each question, and include one concise recommended answer with its main rationale or tradeoff. Never ask a downstream question while one of its prerequisites remains open.
+- If the runtime imposes a smaller question-count limit, ask the maximum supported independent subset. Keep the remaining nodes on the same frontier; do not treat the partial batch as a completed round.
+- After each answer batch, update the design tree, preserve settled answers unless the user reopens them, recompute the frontier, and ask the next round. Do not drip questions one at a time when independent frontier questions can be asked together.
+- Repository, configuration, and tool-availability facts are the assistant's responsibility. Resolve obtainable facts with bounded read-only inspection instead of asking the user. While fact-finding is pending, keep only the dependent questions off the frontier and continue with independent questions.
+- The user owns product, scope, risk, and tradeoff decisions. If a decision cannot be made without a prototype, measurement, or unavailable evidence, record that dependency as an open blocker and recommend the smallest evidence-producing next action; do not invent an answer.
+- Keep the tree scoped to a research brief: the target question, boundaries and non-goals, constraints, evidence standard, and desired deliverable. Do not turn `/aif-explore` into an implementation plan or canonical OpenSpec design session.
+
+The interview ends only when the frontier is empty. Present one normalized research brief and wait for explicit user confirmation before starting the full research run. A request that is already precise may have an empty initial frontier, but the normalized brief still requires confirmation.
+
+This confirmation gate is intentional for every research run and is not bypassed by a precise request, assumptions, or autonomous execution. In autonomous or subagent mode, assumptions never satisfy confirmation: do not start the full research run. Return the normalized brief, recorded assumptions, and open questions as a `research-brief-confirmation-required` blocker to the interactive parent; resume only after the parent passes back explicit user confirmation.
+
+Before confirmation, bounded read-only fact-finding is the only permitted work: do not persist research, present a saved result, append the session, mutate a plan, or create canonical OpenSpec artifacts. Do not create a separate interview, design-tree, decision-log, or research-brief file; the confirmed brief remains conversation context for the existing regular or ultra research output. Use the question mechanism and autonomous/subagent fallback defined in `skills/shared/QUESTION-TOOL.md` and the Codex Runtime section below.
+
 ### Upstream Research Coherence Gate pass-through
 
 The AIFHub prepend owns only mode, version, path, and write boundaries. Its pass-through runs after every permitted persisted regular or ultra research write or update: continue into the upstream AI Factory 2.18.1 `#### Research Coherence Gate (all persisted modes)` before presenting the saved result or appending the current session. A successful AIFHub write is not a coherence verdict and is not completion of upstream `/aif-explore`.
