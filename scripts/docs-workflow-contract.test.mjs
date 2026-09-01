@@ -1288,6 +1288,60 @@ describe('complete OpenSpec workflow documentation contract', () => {
     }
   });
 
+  it('documents issue-derived plan IDs across OpenSpec and legacy sequential modes', async () => {
+    const readme = await readRepoFile('README.md');
+    const usage = await readRepoFile('docs/usage.md');
+    const compatibility = await readRepoFile('docs/openspec-compatibility.md');
+    const changelog = await readRepoFile('CHANGELOG.md');
+    const planUsage = extractSection(usage, '### `/aif-plan full`');
+    const planPolicy = extractSection(compatibility, '## Workflow Plan ID Policy');
+    const unreleased = extractSection(changelog, '## [В разработке]');
+
+    for (const expected of [
+      'issue `#156` becomes OpenSpec change `156` or legacy sequential prefix `0156_`',
+      'Ambiguous multi-issue input keeps ordinary allocation',
+      'collisions fail closed'
+    ]) {
+      assertIncludes(readme, expected, 'README.md issue-derived plan identity');
+    }
+
+    for (const expected of [
+      'exactly one explicit canonical GitHub issue',
+      '`openspec/changes/156/`',
+      '`0156_<plan_file_stem>`',
+      '`max(existing) + 1`',
+      'A bare `#156`, PR URL, branch name, title, label, milestone, or discovered issue does not establish this binding',
+      'explicitly primary',
+      '`issue-plan-id-collision`',
+      '`issue-plan-id-out-of-range`',
+      '`HANDOFF_BRANCH_PREPARED=1`'
+    ]) {
+      assertIncludes(planUsage, expected, 'docs/usage.md issue-derived plan identity');
+    }
+
+    for (const expected of [
+      'takes precedence over ordinary new-plan allocation',
+      'issue `#156` writes `openspec/changes/156/`',
+      '`0156_<plan_file_stem>.md`',
+      '`0156_<plan_file_stem>/index.md`',
+      'It bypasses `max(existing) + 1`',
+      '`issue-plan-id-collision`',
+      '`issue-plan-id-out-of-range`',
+      '`HANDOFF_BRANCH_PREPARED=1` retains upstream precedence'
+    ]) {
+      assertIncludes(planPolicy, expected, 'docs/openspec-compatibility.md Workflow Plan ID Policy');
+    }
+
+    for (const expected of [
+      'issue #156',
+      'exact decimal ID',
+      'four-digit prefix',
+      'без overwrite, suffix или silent fallback allocation'
+    ]) {
+      assertIncludes(unreleased, expected, 'CHANGELOG.md unreleased issue-derived plan identity');
+    }
+  });
+
   it('documents bounded generated-rules reconciliation across tracked source surfaces', async () => {
     const readme = await readRepoFile('README.md');
     const usage = await readRepoFile('docs/usage.md');

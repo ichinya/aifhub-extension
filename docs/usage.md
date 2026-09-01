@@ -573,6 +573,10 @@ When the request explicitly links an issue, milestone, or roadmap item, `proposa
 
 Planning preserves explicit `none` values and does not infer linkage from a branch name, issue title, label, or unrelated roadmap text. If any linkage field is non-`none`, the planning response returns `/aif-roadmap check`; the roadmap owner may then register the active change as local `planned`. Planning does not claim implementation, verification, finalization, merge, or issue closure.
 
+When planning input contains exactly one explicit canonical GitHub issue, or explicitly marks one linked issue as primary, AIFHub uses the canonical decimal issue number as the stable plan identity before ordinary allocation. A canonical URL such as `https://github.com/example/project/issues/156` produces `openspec/changes/156/` in OpenSpec-native mode. In legacy AI Factory-only mode with active `workflow.plan_id_format: sequential`, the same issue produces the compatible four-digit prefix `0156_<plan_file_stem>` instead of the next `max(existing) + 1` prefix. The branch and plan stem remain unchanged.
+
+A bare `#156`, PR URL, branch name, title, label, milestone, or discovered issue does not establish this binding. Multiple linked issues retain ordinary mode-specific IDs unless one is explicitly primary. Existing artifacts are reused only when their canonical source binding matches the same issue; otherwise planning stops with `issue-plan-id-collision` and does not overwrite, suffix, or fall back to another sequential number. Legacy issue numbers above `9999` stop with `issue-plan-id-out-of-range`, and `HANDOFF_BRANCH_PREPARED=1` continues to disable every sequential prefix.
+
 `/aif-plan full` does not create `/aif-task-prepare`, does not create `.ai-factory/specs/<task-id>.md`, and does not create `task-prepare.md`. Raw input trace, normalization confidence, and temporary notes belong only under `.ai-factory/state/<change-id>/` when they are persisted.
 
 Docs/tooling-only changes may omit delta specs only when the proposal explains why no product or workflow behavior changes.

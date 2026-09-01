@@ -159,6 +159,85 @@ describe('aif-plan OpenSpec-native planning contract', () => {
     }
   });
 
+  it('uses one explicit GitHub issue as the plan identity before ordinary allocation', async () => {
+    const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
+    const identity = extractSection(injection, 'Issue-derived plan identity');
+
+    assertOrder(
+      injection,
+      [
+        '### Planning profile and AI Factory version gate',
+        '### Issue-derived plan identity',
+        '### OpenSpec-native mode',
+        '### Legacy AI Factory-only mode'
+      ],
+      'aif-plan issue identity routing'
+    );
+
+    for (const expected of [
+      'https://github.com/<owner>/<repo>/issues/<positive-decimal>',
+      '`issue #<positive-decimal>` / `issue <positive-decimal>`',
+      'canonical decimal digits without leading zeroes',
+      'A bare `#<number>`',
+      'a pull-request URL',
+      'is not issue-identity evidence',
+      'Exactly one distinct explicit issue selects `issue_number`',
+      'explicitly designates one as primary',
+      'never choose the first, lowest, or highest issue implicitly',
+      'Preserve `## Original Request` byte-for-byte',
+      'retain the canonical issue URL in `## Roadmap Linkage`'
+    ]) {
+      assertIncludes(identity, expected, 'aif-plan explicit issue identity');
+    }
+  });
+
+  it('maps issue identity to numeric OpenSpec IDs and compatible legacy sequential prefixes', async () => {
+    const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
+    const identity = extractSection(injection, 'Issue-derived plan identity');
+    const openspec = extractSection(injection, 'OpenSpec-native mode');
+
+    for (const expected of [
+      'set the new canonical `change-id` to the exact canonical decimal `<issue_number>`',
+      'independent of `workflow.plan_id_format`',
+      'validate it with `normalizeChangeId()` before any write',
+      'replace the next sequential prefix with the issue number represented as exactly four digits (`156` -> `0156`)',
+      '`plan_identifier = <issue-prefix>_<plan_file_stem>`',
+      'Do not scan for or allocate `max(existing) + 1`',
+      '`0001` through `9999`',
+      'issue-plan-id-out-of-range',
+      '`HANDOFF_BRANCH_PREPARED=1` retains upstream precedence',
+      'Fast plans, fix plans, and legacy `slug` / reserved `timestamp` / reserved `uuid` formats keep their ordinary identity behavior'
+    ]) {
+      assertIncludes(identity, expected, 'aif-plan issue-derived mode mapping');
+    }
+
+    assertIncludes(
+      openspec,
+      'use that exact canonical decimal value and do not derive a request slug',
+      'OpenSpec Change ID policy'
+    );
+  });
+
+  it('fails closed on issue-derived ID collisions without suffix or sequential fallback', async () => {
+    const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
+    const identity = extractSection(injection, 'Issue-derived plan identity');
+
+    for (const expected of [
+      '`openspec/changes/<issue_number>/` already exists',
+      'contains the same canonical issue URL',
+      'route to refinement instead of creating a second change',
+      'issue-plan-id-collision',
+      'inspect every full-plan file and directory using the exact four-digit issue prefix before writing',
+      'entrypoint or companion metadata contains the same canonical issue URL',
+      'Never overwrite, allocate a deterministic suffix, or silently resume ordinary sequential allocation',
+      'bounded project-relative candidate path/prefix',
+      'never include request bodies, issue bodies, credentials, raw provider output, raw stdout, or raw stderr',
+      'INFO [aif-plan] issue-derived plan identity: issue=<number> artifact=<project-relative-path>'
+    ]) {
+      assertIncludes(identity, expected, 'aif-plan issue-derived collision contract');
+    }
+  });
+
   it('requires canonical OpenSpec change artifacts without legacy plan companion files', async () => {
     const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
     const openspec = extractSection(injection, 'OpenSpec-native mode');

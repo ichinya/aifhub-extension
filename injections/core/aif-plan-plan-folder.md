@@ -33,6 +33,30 @@ For stable AI Factory `>=2.18.0`, route explicit `ultra` by the resolved artifac
 - OpenSpec-native `ultra` still writes only `proposal.md`, `design.md`, `tasks.md`, and applicable delta specs. It MUST NOT create `index.md`, `phase-NN-*.md`, companion files, or an active standalone `<!-- aif:plan-mode:ultra -->` anywhere under the canonical change.
 - In legacy AI Factory-only mode, explicit `ultra` remains upstream-owned. Hand control to the upstream `aif-plan` ultra workflow before AIFHub classic companion normalization; do not create or synchronize a sibling classic plan or companion files.
 
+### Issue-derived plan identity
+
+Resolve issue identity after preserving the explicit request and before deriving a new OpenSpec `change-id` or running the upstream sequential next-number scan.
+
+- Accept an issue identity only from explicit planning input: a GitHub URL whose origin and path normalize to `https://github.com/<owner>/<repo>/issues/<positive-decimal>`, or the unambiguous forms `issue #<positive-decimal>` / `issue <positive-decimal>` when the current repository owner and name are directly known. Normalize the issue number to canonical decimal digits without leading zeroes and normalize the linkage URL to the canonical URL above.
+- A bare `#<number>`, a pull-request URL, a branch name, issue title, label, milestone, roadmap text, or issue discovered during repository/GitHub exploration is not issue-identity evidence. Never fetch unrelated issues and choose one by title, recency, or numeric order.
+- Exactly one distinct explicit issue selects `issue_number`. If several issues are linked, use an issue-derived ID only when the request explicitly designates one as primary; preserve every issue under `## Roadmap Linkage`. Without an explicit primary issue, keep the ordinary mode-specific ID policy and never choose the first, lowest, or highest issue implicitly.
+- Issue-derived identity changes only the artifact identifier. Preserve `## Original Request` byte-for-byte under its existing contract, retain the canonical issue URL in `## Roadmap Linkage`, and preserve the upstream branch and `plan_file_stem` rules.
+
+Apply the resolved `issue_number` by artifact mode:
+
+- **OpenSpec-native mode:** set the new canonical `change-id` to the exact canonical decimal `<issue_number>` instead of deriving a request slug. This source-binding override is independent of `workflow.plan_id_format`; validate it with `normalizeChangeId()` before any write.
+- **Legacy AI Factory-only mode with active `workflow.plan_id_format: sequential`:** preserve the upstream `plan_file_stem`, but replace the next sequential prefix with the issue number represented as exactly four digits (`156` -> `0156`). Set `plan_identifier = <issue-prefix>_<plan_file_stem>` for both classic full plans and marked ultra bundles. Do not scan for or allocate `max(existing) + 1` in this case.
+- Legacy issue-derived prefixes inherit the upstream sequential range `0001` through `9999`. For a larger issue number, stop before every write with `ERROR [aif-plan] issue-plan-id-out-of-range issue=<number> max=9999`; do not truncate, wrap, or fall back to the next sequential number.
+- `HANDOFF_BRANCH_PREPARED=1` retains upstream precedence and force-disables every sequential prefix, including an issue-derived prefix. Fast plans, fix plans, and legacy `slug` / reserved `timestamp` / reserved `uuid` formats keep their ordinary identity behavior because they have no sequential ordinal to replace.
+
+Collision handling is fail-closed and source-aware:
+
+- In OpenSpec-native mode, if `openspec/changes/<issue_number>/` already exists and its canonical proposal linkage contains the same canonical issue URL, treat it as the existing plan for that issue and route to refinement instead of creating a second change. If the directory is unbound or bound to another issue, stop with `ERROR [aif-plan] issue-plan-id-collision issue=<number> path=openspec/changes/<issue_number>`.
+- In legacy sequential mode, inspect every full-plan file and directory using the exact four-digit issue prefix before writing. Reuse only an existing artifact whose entrypoint or companion metadata contains the same canonical issue URL and whose stem resolves to the same work. Any unbound, differently bound, or differently shaped occupant of that prefix stops with `ERROR [aif-plan] issue-plan-id-collision issue=<number> prefix=<NNNN>`.
+- Never overwrite, allocate a deterministic suffix, or silently resume ordinary sequential allocation after an issue-derived collision. Diagnostics may include only the issue number, bounded project-relative candidate path/prefix, mode, and stable code; never include request bodies, issue bodies, credentials, raw provider output, raw stdout, or raw stderr.
+
+On success, emit `INFO [aif-plan] issue-derived plan identity: issue=<number> artifact=<project-relative-path>`.
+
 ### OpenSpec-native mode
 
 When `.ai-factory/config.yaml` has `aifhub.artifactProtocol: openspec`, OpenSpec-native instructions override legacy plan-folder instructions.
@@ -169,7 +193,8 @@ Context7 is optional supporting documentation context for current library/API do
 
 #### Change ID policy
 
-- Derive a safe `<change-id>` slug from the request for new plans.
+- When `issue_number` resolved under the top-level Issue-derived plan identity contract, use that exact canonical decimal value and do not derive a request slug.
+- Otherwise derive a safe `<change-id>` slug from the request for new plans.
 - Prefer lowercase kebab-case.
 - Allow only safe relative IDs.
 - Reject IDs containing `/`, `\`, `..`, absolute paths, path traversal, or unsafe characters.

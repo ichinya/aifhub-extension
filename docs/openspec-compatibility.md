@@ -216,13 +216,17 @@ The defaults keep planning and verification degraded-friendly while making `/aif
 
 ## Workflow Plan ID Policy
 
-OpenSpec-native mode uses OpenSpec `change-id` values and ignores AI Factory `workflow.plan_id_format` for canonical artifact names. The active change directory stays `openspec/changes/<change-id>/` whether upstream AI Factory is configured for `slug` or `sequential` legacy plan IDs.
+One explicit canonical GitHub issue reference is an AIFHub source binding and takes precedence over ordinary new-plan allocation. Accepted evidence is a canonical `https://github.com/<owner>/<repo>/issues/<number>` URL, or explicit `issue #<number>` wording when the current repository identity is known. A bare `#<number>`, PR URL, branch name, title, label, milestone, roadmap text, or issue discovered during exploration is not sufficient. Multiple linked issues keep ordinary mode-specific allocation unless the request explicitly designates one issue as primary.
 
-Legacy AI Factory-only mode follows upstream `workflow.plan_id_format`. Use `slug` for slug-named plan files, or `sequential` for upstream sequential filenames under `paths.plans`.
+OpenSpec-native mode uses OpenSpec `change-id` values and ignores AI Factory `workflow.plan_id_format` for canonical artifact names. Ordinary unlinked new plans derive a slug-like change ID. For an issue-bound new plan, the exact canonical decimal issue number overrides slug derivation: issue `#156` writes `openspec/changes/156/`. This source-binding override remains independent of `workflow.plan_id_format` and uses the same numeric-leading IDs accepted by AIFHub's active-change resolver.
+
+Legacy AI Factory-only mode follows upstream `workflow.plan_id_format`. Use `slug` for slug-named plan files, or `sequential` for upstream sequential filenames under `paths.plans`. When sequential mode receives an issue binding, the issue number replaces the next ordinal while preserving the four-digit consumer contract: issue `#156` uses `0156_<plan_file_stem>.md` for full mode or `0156_<plan_file_stem>/index.md` for ultra. It bypasses `max(existing) + 1`; the branch and unprefixed stem do not change.
+
+Issue-derived identity remains fail-closed. An existing artifact is reused only when its canonical linkage binds it to the same issue; an unbound or differently bound occupant returns `issue-plan-id-collision` without overwrite, suffix, or fallback allocation. Legacy sequential issue numbers are bounded to `1..9999`; larger values return `issue-plan-id-out-of-range`. `HANDOFF_BRANCH_PREPARED=1` retains upstream precedence and disables the issue prefix together with all other sequential prefixes.
 
 When legacy AI Factory-only mode uses `sequential`, upstream `/aif-archive` excludes archived files under `paths.archive/plans/` from active plan discovery and from the next sequential number calculation. OpenSpec-native `change-id` directories remain non-sequential and are not renamed to `NNNN_` plan files.
 
-In short: archived legacy plans are excluded from active plan discovery, while OpenSpec-native active changes remain `openspec/changes/<change-id>/` directories.
+In short: explicit single-issue planning uses the issue number, archived legacy plans are excluded from active plan discovery and ordinary sequential numbering, and unlinked OpenSpec-native changes remain `openspec/changes/<change-id>/` directories.
 
 ## AIFHub Wrapper Behavior
 
