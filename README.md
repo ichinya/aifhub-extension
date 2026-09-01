@@ -11,6 +11,7 @@ AI Factory UX + OpenSpec artifact protocol
 ## What This Extension Does
 
 - Keeps `/aif-analyze`, `/aif-plan`, `/aif-explore`, `/aif-improve`, `/aif-implement`, `/aif-rules-check`, `/aif-review`, `/aif-security-checklist`, `/aif-verify`, `/aif-fix`, `/aif-done`, `/aif-commit`, `/aif-evolve`, and `/aif-mode` as the public command vocabulary.
+- Sharpens `/aif-explore` requests through dependency-aware decision rounds: project facts stay assistant-owned and read-only, user-owned decisions are asked by prerequisite frontier with recommendations, and research waits for confirmation of the normalized brief.
 - In OpenSpec-native mode, writes canonical change artifacts under `openspec/changes/<change-id>/` and accepted specs under `openspec/specs/`.
 - Keeps AI Factory runtime state, verification evidence, finalization evidence, and generated rules outside canonical OpenSpec changes.
 - Requests OpenSpec validation, status, instructions, and archive through the AIFHub wrapper and `scripts/openspec-runner.mjs` when a compatible CLI is available.

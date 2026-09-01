@@ -4,6 +4,11 @@
 
 Формат основан на [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [В разработке]
+
+### Изменено
+- `/aif-explore` теперь уточняет research brief через dependency-aware design tree: самостоятельно собирает доступные repository/config facts в read-only режиме, задаёт пользовательские решения раундами по frontier зависимостей с рекомендациями и начинает полный research только после подтверждения нормализованного brief без создания отдельного interview artifact.
+
 ## [1.5.0] - 2026-09-01
 
 ### Добавлено
