@@ -56,6 +56,8 @@ After resolving the artifact mode, research profile, and any ultra version gate,
 
 The interview ends only when the frontier is empty. Present one normalized research brief and wait for explicit user confirmation before starting the full research run. A request that is already precise may have an empty initial frontier, but the normalized brief still requires confirmation.
 
+This confirmation gate is intentional for every research run and is not bypassed by a precise request, assumptions, or autonomous execution. In autonomous or subagent mode, assumptions never satisfy confirmation: do not start the full research run. Return the normalized brief, recorded assumptions, and open questions as a `research-brief-confirmation-required` blocker to the interactive parent; resume only after the parent passes back explicit user confirmation.
+
 Before confirmation, bounded read-only fact-finding is the only permitted work: do not persist research, present a saved result, append the session, mutate a plan, or create canonical OpenSpec artifacts. Do not create a separate interview, design-tree, decision-log, or research-brief file; the confirmed brief remains conversation context for the existing regular or ultra research output. Use the question mechanism and autonomous/subagent fallback defined in `skills/shared/QUESTION-TOOL.md` and the Codex Runtime section below.
 
 ### Upstream Research Coherence Gate pass-through

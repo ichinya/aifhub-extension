@@ -7,7 +7,7 @@
 ## [В разработке]
 
 ### Изменено
-- `/aif-explore` теперь уточняет research brief через dependency-aware design tree: самостоятельно собирает доступные repository/config facts в read-only режиме, задаёт пользовательские решения раундами по frontier зависимостей с рекомендациями и начинает полный research только после подтверждения нормализованного brief без создания отдельного interview artifact.
+- `/aif-explore` теперь уточняет research brief через dependency-aware design tree: самостоятельно собирает доступные repository/config facts в read-only режиме, задаёт пользовательские решения раундами по frontier зависимостей с рекомендациями и начинает полный research только после подтверждения нормализованного brief без создания отдельного interview artifact; autonomous/subagent запуск возвращает неподтверждённый brief родителю с blocker `research-brief-confirmation-required`, а не принимает assumptions за согласие.
 
 ## [1.5.0] - 2026-09-01
 

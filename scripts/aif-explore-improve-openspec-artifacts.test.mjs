@@ -310,6 +310,24 @@ describe('aif-explore and aif-improve OpenSpec-native contracts', () => {
     }
   });
 
+  it('returns autonomous confirmation to the interactive parent instead of assuming approval', async () => {
+    const injection = await readRepoFile('injections/core/aif-explore-plan-folder.md');
+    const interview = extractSection(injection, 'Dependency-aware research brief interview');
+    const label = 'runtime=shared asset=aif-explore case=autonomous-confirmation-handoff';
+
+    assertOrder(
+      interview,
+      [
+        'This confirmation gate is intentional for every research run',
+        'assumptions never satisfy confirmation: do not start the full research run',
+        'Return the normalized brief, recorded assumptions, and open questions',
+        '`research-brief-confirmation-required` blocker',
+        'resume only after the parent passes back explicit user confirmation'
+      ],
+      label
+    );
+  });
+
   it('preserves the upstream 2.18.1 Research Coherence Gate as a non-bypass pass-through', async () => {
     const injection = await readRepoFile('injections/core/aif-explore-plan-folder.md');
     const passThrough = extractSection(injection, 'Upstream Research Coherence Gate pass-through');
