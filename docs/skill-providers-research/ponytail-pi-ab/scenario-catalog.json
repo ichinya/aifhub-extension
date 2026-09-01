@@ -1,0 +1,144 @@
+{
+  "schema": "aifhub.ponytail_pi_ab.catalog.v1",
+  "defaults": {
+    "runtime": "pi",
+    "runtime_version": "0.84.4",
+    "provider": "omniroute",
+    "model": "lq/qwen3.8-27b",
+    "thinking": "low",
+    "conditions": [
+      "baseline",
+      "ponytail_full"
+    ],
+    "repetitions": 4,
+    "timeout_seconds": 900,
+    "tools": [
+      "read",
+      "grep",
+      "find",
+      "ls",
+      "powershell",
+      "edit",
+      "write"
+    ]
+  },
+  "ponytail": {
+    "version": "4.9.0",
+    "source_commit": "0a4dd63ad4541f4f655c4108a295916f3c1d8fda",
+    "skill_path": "skills/ponytail/SKILL.md",
+    "mode": "full",
+    "loading": "explicit_skill_only_no_hooks"
+  },
+  "fixtures": [
+    {
+      "id": "passkey",
+      "source_directory": "passkey",
+      "source_commit": "24a55ce21aa6a525dd3bd215b13b2af8ef2e14a8",
+      "project_shape": [
+        "go",
+        "small",
+        "security-sensitive"
+      ],
+      "dependency_files": [
+        "go/go.mod",
+        "go/go.sum"
+      ],
+      "validation": [
+        {
+          "command": "go",
+          "args": [
+            "test",
+            "-skip",
+            "OpenSSL",
+            "./..."
+          ],
+          "cwd": "go"
+        }
+      ]
+    },
+    {
+      "id": "yougile-mcp",
+      "source_directory": "yougile-mcp",
+      "source_commit": "d643d48ff84c098079f02576a115da3e61135579",
+      "project_shape": [
+        "typescript",
+        "mcp-server",
+        "over-build-sensitive"
+      ],
+      "dependency_files": [
+        "package.json",
+        "package-lock.json"
+      ],
+      "setup": [
+        {
+          "command": "npm",
+          "windows_command": "npm.cmd",
+          "args": [
+            "ci",
+            "--ignore-scripts"
+          ],
+          "cwd": "."
+        }
+      ],
+      "validation": [
+        {
+          "command": "npm",
+          "windows_command": "npm.cmd",
+          "args": [
+            "run",
+            "build"
+          ],
+          "cwd": "."
+        }
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "typescript-url-join",
+      "fixture_id": "yougile-mcp",
+      "shape": "over-build",
+      "title": "Join the configured YouGile API host and request path correctly",
+      "task": "Treat this text as the complete canonical implementation task. Fix URL construction in src/common/request-helper.ts. The default host and a custom YOUGILE_API_HOST_URL must work whether the host has a trailing slash or not, and callers must work whether path has a leading slash or not. The boundary must contain exactly one slash while the rest of the host, path, and query string remains unchanged. Export a small pure function named buildYougileApiUrl(hostUrl, requestPath) from that module and use it in makeYougileRequest so an independent test can exercise the behavior without making a network request. Preserve the existing makeYougileRequest API, authentication, logging, request, response, and error behavior. Do not add dependencies or change package manifests. Keep the change scoped to this task and run npm run build.",
+      "hidden_grader": "yougile-url-join.mjs",
+      "required_behaviors": [
+        "host without trailing slash plus path without leading slash",
+        "host with trailing slash plus path without leading slash",
+        "host without trailing slash plus path with leading slash",
+        "host with trailing slash plus path with leading slash",
+        "query string preservation",
+        "makeYougileRequest uses the exported helper"
+      ],
+      "forbidden_changes": [
+        "new dependency",
+        "package manifest change",
+        "transport redesign",
+        "authentication redesign",
+        "logging redesign"
+      ]
+    },
+    {
+      "id": "go-safe-decrypt-errors",
+      "fixture_id": "passkey",
+      "shape": "security-correctness",
+      "title": "Fail closed and uniformly for malformed safe-mode ciphertext",
+      "task": "Treat this text as the complete canonical implementation task. Harden safe-mode Decrypt in go/encrypt.go. Malformed safe encoding, a truncated envelope (including salt plus nonce but no GCM authentication tag), a wrong key, and a tampered ciphertext must never panic and must all return an error whose exact text is invalid ciphertext. A valid safe-mode round trip must still work. Preserve shell mode behavior, public function signatures, PBKDF2 parameters, and the encoded envelope format. Do not add dependencies or change go.mod/go.sum. Add focused table-driven regression coverage and run go test -skip OpenSSL ./... from the go directory; the existing external-OpenSSL interoperability tests are excluded only because the pinned benchmark host does not expose openssl on PATH. Keep the change scoped to this task; do not redesign the encryption package.",
+      "hidden_grader": "passkey-invalid-ciphertext_test.go",
+      "required_behaviors": [
+        "malformed safe encoding returns invalid ciphertext",
+        "truncated safe envelope returns invalid ciphertext without panic",
+        "missing GCM tag returns invalid ciphertext without panic",
+        "wrong key returns invalid ciphertext",
+        "tampered ciphertext returns invalid ciphertext",
+        "valid safe-mode round trip remains unchanged"
+      ],
+      "forbidden_changes": [
+        "new dependency",
+        "go.mod or go.sum change",
+        "PBKDF2 parameter change",
+        "safe envelope format change",
+        "shell mode behavior change"
+      ]
+    }
+  ]
+}
