@@ -575,7 +575,7 @@ describe('mode status', () => {
 });
 
 describe('mode switching', () => {
-  it('renders protocol-neutral glossary and review-policy settings without creating or requiring either file', async () => {
+  it('renders fresh 2.19 warmup, glossary, and review-policy settings without creating optional context files', async () => {
     const rootDir = await createTempRoot();
 
     const openSpecResult = await switchToOpenSpecMode({
@@ -601,6 +601,11 @@ describe('mode switching', () => {
       await pathExists(rootDir, 'REVIEW.md'),
       false,
       'OpenSpec mode switch should not create the review policy file'
+    );
+    assert.match(
+      openSpecConfig,
+      /^warmup:\n  paths: \[\]$/m,
+      'A fresh OpenSpec profile should include the upstream 2.19 warmup default'
     );
 
     const doctor = await doctorAifMode({
@@ -635,6 +640,60 @@ describe('mode switching', () => {
       await pathExists(rootDir, 'REVIEW.md'),
       false,
       'Legacy mode switch should not create the review policy file'
+    );
+    assert.match(
+      legacyConfig,
+      /^warmup:\n  paths: \[\]$/m,
+      'The fresh-config warmup default should survive a later mode switch'
+    );
+  });
+
+  it('preserves user-owned warmup paths and never backfills an existing config', async () => {
+    const rootDir = await createTempRoot();
+    const warmupBlock = [
+      'warmup:',
+      '  # user-owned startup context',
+      '  paths:',
+      '    - docs/domain/',
+      '    - infrastructure/decisions.md'
+    ].join('\n');
+    await writeFixture(rootDir, '.ai-factory/config.yaml', [
+      'aifhub:',
+      '  artifactProtocol: ai-factory',
+      'paths:',
+      '  plans: .ai-factory/plans',
+      '  specs: .ai-factory/specs',
+      '  rules: .ai-factory/rules',
+      warmupBlock,
+      ''
+    ].join('\n'));
+
+    await switchToOpenSpecMode({
+      rootDir,
+      detectOpenSpec: async () => missingCliDetection(),
+      timestamp: '2026-09-01T00-00-00-000Z'
+    });
+    const openSpecConfig = await readFixture(rootDir, '.ai-factory/config.yaml');
+    assert.ok(openSpecConfig.includes(warmupBlock), 'OpenSpec mode should preserve user-owned warmup paths and comment text');
+
+    await switchToAiFactoryMode({
+      rootDir,
+      timestamp: '2026-09-01T00-00-01-000Z'
+    });
+    const legacyConfig = await readFixture(rootDir, '.ai-factory/config.yaml');
+    assert.ok(legacyConfig.includes(warmupBlock), 'Legacy mode should preserve user-owned warmup paths and comment text');
+
+    const existingWithoutWarmup = renderConfigForMode([
+      'aifhub:',
+      '  artifactProtocol: ai-factory',
+      'paths:',
+      '  plans: .ai-factory/plans',
+      ''
+    ].join('\n'), 'openspec');
+    assert.doesNotMatch(
+      existingWithoutWarmup,
+      /^warmup:/m,
+      'An existing config without warmup must not receive a backfilled user-owned section'
     );
   });
 

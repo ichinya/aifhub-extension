@@ -11,6 +11,9 @@ setup and mode:
   /aif-mode openspec                                # required when switching modes
   /aif-mode doctor                                  # optional readiness check
 
+session startup (AI Factory 2.19 source snapshot):
+  /aif-warmup                                       # optional read-only handoff
+
 optional discovery:
   /aif-explore "<topic>"                            # optional
   /aif-grounded "<question>"                        # optional upstream certainty gate
@@ -45,13 +48,30 @@ finalization:
 
 OpenSpec-native mode uses OpenSpec artifacts as canonical planning/spec artifacts and AI Factory paths for runtime state, QA evidence, and generated rules in user projects.
 
-Upstream project-context utilities such as `/aif-architecture`, `/aif-roadmap`, `/aif-docs`, `/aif-qa`, `/aif-archive`, and `/aif-distillation` remain available with AIFHub guardrails. They are not required per-change OpenSpec lifecycle gates.
+Upstream project-context utilities such as `/aif-warmup`, `/aif-architecture`, `/aif-roadmap`, `/aif-docs`, `/aif-qa`, `/aif-archive`, and `/aif-distillation` remain available with AIFHub guardrails. They are not required per-change OpenSpec lifecycle gates.
 
 The `aifhub-extension` package repository stays artifact-light: root `openspec/`, `.ai-factory/state/`, `.ai-factory/qa/`, `.ai-factory/plans/`, and `.ai-factory/rules/generated/` are not extension package source. Root `.ai-factory/rules/generated/` is derived in user projects and safe to regenerate. OpenSpec examples may be committed only under fixture paths such as `test/fixtures/` or `scripts/fixtures/`.
 
 AIFHub commands request OpenSpec validation, status, instructions, and archive through the extension-local `scripts/openspec-runner.mjs` implementation module when the CLI is available. Installed projects must not execute that module from the consumer root or an internal installed path. Slash-command runtimes should keep using `/aif-*` commands. Codex app uses `$aif-*` skill invocations, as shown in the Recommended Codex App Flow. This extension does not install or rely on OpenSpec slash commands.
 
 The shared resolver selects one CLI source per operation in deterministic order: explicit non-empty extension API `options.command`, project-local `node_modules/.bin/openspec` (`openspec.cmd` on Windows), then `openspec` from `PATH`. An explicit or project-local selection is authoritative and never silently falls through after failure. AIFHub does not run `npx`, search parent projects, download, or auto-install OpenSpec. Missing or unsupported CLI remains degraded for filesystem-based planning/context loading; archive-required finalization still refuses until a compatible CLI is available. Human and JSON diagnostics expose only a safe project-relative/bounded command and `explicit`, `project-local`, or `path` source.
+
+## Session Warmup (AI Factory 2.19 Source Snapshot)
+
+The reviewed AI Factory `2.x` source snapshot declaring `2.19.0` adds upstream `/aif-warmup`. It reads configured DESCRIPTION, ARCHITECTURE, ROADMAP, RESEARCH, the scoped rules hierarchy, applicable `AGENTS.md`, and optional extra context, then stops with a compact read-only handoff. It does not plan or implement in the same invocation.
+
+Fresh configs created through AIFHub mode/bootstrap tooling include the upstream empty default:
+
+```yaml
+warmup:
+  paths: []
+```
+
+`warmup.paths` is user-owned. Entries are ordered, literal, project-relative files or directories; upstream warmup rejects absolute paths and `..` escapes, does not follow symlinks, skips likely secrets and binary content, and reports missing or oversized input instead of silently truncating it. AIFHub mode switches preserve existing path entries and comments without interpreting them, but may normalize EOLs or move the top-level block relative to managed sections. An existing config with no `warmup` section is not backfilled because absence is equivalent to an empty list.
+
+AIFHub adds no `/aif-warmup` skill or injection. The optional `paths.context` glossary, reviewed provider notes, canonical OpenSpec changes, QA evidence, and generated rules are not implicitly added to startup context. A user may explicitly add a safe reviewed file or directory to `warmup.paths`; raw provider output, credentials, and validation evidence remain subject to the existing context and artifact boundaries.
+
+The same upstream snapshot adds a root `apm.yml` with `type: skill` and `includes: auto`. That manifest distributes upstream AI Factory skills only; it is not evidence that the npm CLI or AIFHub extension assets were installed. Continue to use `ai-factory extension add` and `ai-factory extension update` for AIFHub wrapper commands, injections, MCP templates, and managed agent files.
 
 ## Prompt Language Resolution
 
@@ -1224,6 +1244,8 @@ The live flow runs three separately attributed checks:
 `ai-factory upgrade` is intentionally absent: it migrates v1 skill names to v2 and is not the 2.17.0-to-2.18.1 update command.
 
 Local deterministic or live PASS proves only the isolated consumer contract. It does not prove package publication, registry availability, deployment, release readiness, or successful end-user migration.
+
+The AI Factory 2.19 review is intentionally recorded as source-snapshot evidence. Because `2.19.0` had no Git tag, GitHub release, or npm package at the review boundary, the `smoke:ai-factory-2-18` driver remains the last published-executable compatibility smoke and must not be presented as a 2.19 PASS. Default tests separately lock fresh `warmup.paths: []`, no-backfill behavior, user-owned path and comment preservation, and upstream ownership.
 
 Run repository validation separately:
 

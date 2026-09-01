@@ -191,6 +191,9 @@ describe('analyze config required-keys diff', () => {
       '  artifactProtocol: openspec',
       'analyze:',
       '  skill_version: 0.11.0',
+      'warmup:',
+      '  paths:',
+      '    - docs/domain/',
       'custom_user_block:',
       '  nested_setting: keep-me',
       ''
@@ -205,6 +208,8 @@ describe('analyze config required-keys diff', () => {
     const reportedKeys = [...result.missing, ...result.obsolete].map((item) => item.key);
     assert.ok(!reportedKeys.includes('custom_user_block'));
     assert.ok(!reportedKeys.includes('custom_user_block.nested_setting'));
+    assert.ok(!reportedKeys.includes('warmup'));
+    assert.ok(!reportedKeys.includes('warmup.paths'));
   });
 
   it('reports deprecated manifest keys still present in the config as obsolete', async () => {

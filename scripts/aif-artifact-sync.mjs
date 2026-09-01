@@ -761,6 +761,7 @@ export function renderConfigForMode(existingRaw, mode, options = {}) {
   const parsed = parseSimpleYaml(existingRaw);
   const paths = parsed.paths ?? {};
   const blocks = parseTopLevelBlocks(existingRaw);
+  const isFreshConfig = blocks.length === 0 && String(existingRaw ?? '').trim().length === 0;
   const used = new Set(['config_version', 'language', 'aifhub', 'paths', 'reviews', 'utilities', 'analyze']);
   const rendered = [];
 
@@ -774,6 +775,12 @@ export function renderConfigForMode(existingRaw, mode, options = {}) {
   rendered.push(renderAifhubBlock(mode, blocks));
   rendered.push(renderPathsBlock(mode, paths));
   rendered.push(renderReviewsBlock(blocks));
+  if (isFreshConfig) {
+    rendered.push([
+      'warmup:',
+      '  paths: []'
+    ].join('\n'));
+  }
   rendered.push(renderUtilitiesBlock(blocks));
 
   const analyzeBlock = renderAnalyzeBlock(blocks, options.analyzeSkillVersion);
