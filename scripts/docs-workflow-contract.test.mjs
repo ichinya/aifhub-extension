@@ -137,7 +137,6 @@ describe('complete OpenSpec workflow documentation contract', () => {
     const usage = await readRepoFile('docs/usage.md');
     const changelog = await readRepoFile('CHANGELOG.md');
     const languageResolution = extractSection(usage, '## Prompt Language Resolution');
-    const unreleased = extractSection(changelog, '## [В разработке]');
 
     for (const expected of [
       'usable non-empty `language.ui`',
@@ -171,7 +170,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
       'exact-output-only',
       'matched start/end'
     ]) {
-      assertIncludes(unreleased, expected, 'CHANGELOG.md unreleased prompt-language fix');
+      assertIncludes(changelog, expected, 'CHANGELOG.md prompt-language fix history');
     }
   });
 
@@ -1333,6 +1332,46 @@ describe('complete OpenSpec workflow documentation contract', () => {
     ]) {
       assertIncludes(aifMode, expected, 'skills/aif-mode/SKILL.md');
     }
+  });
+
+  it('keeps Ponytail evaluation manual, implementation-only, and outside extension integration', async () => {
+    const providerGuide = await readRepoFile('docs/skill-providers.md');
+    const usage = await readRepoFile('docs/usage.md');
+    const docsIndex = await readRepoFile('docs/README.md');
+    const readme = await readRepoFile('README.md');
+    const changelog = await readRepoFile('CHANGELOG.md');
+    const extensionManifest = await readRepoFile('extension.json');
+    const packageManifest = await readRepoFile('package.json');
+
+    for (const expected of [
+      'manual_experiment_only',
+      'v4.9.0',
+      '0a4dd63ad4541f4f655c4108a295916f3c1d8fda',
+      'SessionStart',
+      'SubagentStart',
+      'UserPromptSubmit',
+      'PONYTAIL_SUBAGENT_MATCHER',
+      'fails open',
+      'NOT_RUN(dedicated_isolated_runner_required)',
+      '/aif-security-checklist',
+      'fresh isolated copies',
+      'extension/plugin/package dependencies',
+      'recommendation metadata',
+      'auto-inject Ponytail',
+      'raw hook output'
+    ]) {
+      assertIncludes(providerGuide, expected, 'docs/skill-providers.md provider boundary');
+    }
+
+    assertIncludes(usage, 'manual_experiment_only', 'docs/usage.md provider status');
+    assertIncludes(usage, 'semantic security gate', 'docs/usage.md security boundary');
+    assertIncludes(docsIndex, 'skill-providers.md', 'docs/README.md discoverability');
+    assertIncludes(readme, 'skill-providers.md', 'README.md discoverability');
+    assertIncludes(changelog, 'DietrichGebert/ponytail', 'CHANGELOG.md evaluation record');
+    assertIncludes(changelog, 'manual_experiment_only', 'CHANGELOG.md provider status');
+
+    assertNotIncludes(extensionManifest, 'ponytail', 'extension.json integration boundary');
+    assertNotIncludes(packageManifest, 'ponytail', 'package.json dependency boundary');
   });
 
   it('documents bounded generated-rules reconciliation across tracked source surfaces', async () => {

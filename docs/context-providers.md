@@ -1,4 +1,4 @@
-[Предыдущая страница](usage.md) | [К документации](README.md) | [Следующая страница](memory-tool-recommendations.md)
+[Предыдущая страница](usage.md) | [К документации](README.md) | [Следующая страница](skill-providers.md)
 
 # Провайдеры Контекста
 
