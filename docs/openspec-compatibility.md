@@ -307,6 +307,24 @@ Current QA-check results bind to `tested_revision` plus `worktree_digest` for gi
 
 Branch-scoped `qa-check.md` is not change-scoped AIFHub evidence. It cannot by itself satisfy `/aif-verify`, `/aif-done`, `coverage.json`, rules evidence, `done-readiness.json`, `done.md`, or `openspec-archive.json`; no implicit bridge is registered.
 
+## AI Factory 2.19 Reviewed Source Snapshot
+
+AIFHub reviewed the AI Factory `2.x` source at commit [`3c1ddd4740d7b1c30d8ecb3dc80fa5e7b8d7ef5a`](https://github.com/lee-to/ai-factory/commit/3c1ddd4740d7b1c30d8ecb3dc80fa5e7b8d7ef5a), where `package.json` declares `2.19.0`. The exact comparison base is tagged `2.18.1` (`00243dea805fb2ba226a7b9731f23b67fb8eec77`); the reviewed range is 7 commits and 16 changed files.
+
+This is source-snapshot evidence, not a published-release claim. At the 2026-09-01 review boundary, upstream had no `2.19.0` Git tag, GitHub release, or npm package. The exact published-executable consumer smoke therefore remains `2.18.1` until a separately pinned 2.19 release artifact exists.
+
+| Upstream 2.19 source surface | Evidence and AIFHub decision |
+|---|---|
+| `/aif-warmup` | Upstream-owned read-only workflow. AIFHub adds no duplicate skill, command, or injection and does not turn the handoff into a lifecycle gate. |
+| `warmup.paths` config | Fresh AIFHub-created configs include `warmup.paths: []`. Existing user-owned lists and nested comments are preserved through mode switches; an absent section in an existing config is not backfilled. |
+| Warmup context boundary | Configured core artifacts, scoped rules and applicable `AGENTS.md` remain upstream inputs. Optional glossary/provider notes require an explicit safe `warmup.paths` entry; OpenSpec changes, QA evidence, generated rules, raw provider output and credentials are not implicit startup context. |
+| Workflow transformers and hints | Upstream registers `aif-warmup` in its workflow set, wizard hint and Antigravity guidance. No AIFHub transformer fork is needed. |
+| Extension schema, loader, injections and MCP | Exact diff review: `schemas/extension.schema.json`, extension loading/operations, injection application, MCP core and extension CLI command files are unchanged from `2.18.1`. |
+| Node, bin and dependencies | Node stays `>=18.0.0`, bin stays `ai-factory -> ./bin/ai-factory.js`, and runtime/dev dependency sets are unchanged. Only the package version changes. |
+| Microsoft APM manifest | Upstream adds `apm.yml` with `type: skill` and `includes: auto`. This distributes upstream skills; it does not replace the npm CLI or the AI Factory extension install/update path needed for AIFHub commands, injections, MCP templates and agent files. AIFHub adds no speculative APM package. |
+
+The compatibility range remains `>=2.11.0 <3.0.0`. New 2.19 behavior is version-labeled and additive; supported older runtimes simply do not provide `/aif-warmup` or the upstream APM surface.
+
 ## AI Factory 2.18 Reviewed Baseline
 
 The reviewed AI Factory `2.18.1` baseline is cumulative: it retains the existing AI Factory `2.13`-`2.17` compatibility facts, including config-aware project-context utilities, the full `2.17.0...2.18.0` audit (21 commits, 63 changed files), and the bounded `2.18.0...2.18.1` patch audit (2 commits, 8 changed files). AIFHub adapts only behavior that crosses its OpenSpec-native or legacy compatibility ownership boundaries; upstream-owned behavior remains upstream-owned.
