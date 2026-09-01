@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
   T_SEARCH_AB_CATALOG_SCHEMA,
@@ -20,7 +21,7 @@ import {
   verifyCandidateModelFile
 } from './t-search-ab-benchmark.mjs';
 
-const REPO_ROOT = path.resolve(import.meta.dirname, '..');
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CATALOG = path.join(REPO_ROOT, 'docs', 'memory-tools-research', 't-search-ab-scenarios.json');
 const FIXTURE = path.join(REPO_ROOT, 'test', 'fixtures', 't-search-evaluation', 'project');
 const ADAPTER = path.join(REPO_ROOT, 'scripts', 't-search-ab-adapter.py');
