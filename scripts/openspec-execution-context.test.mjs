@@ -538,6 +538,23 @@ describe('OpenSpec execution context API', () => {
       summary: 'Implemented OAuth',
       canonicalArtifactsRead: ['openspec/changes/add-oauth/tasks.md'],
       generatedRulesRead: ['.ai-factory/rules/generated/openspec-base.md'],
+      testCheck: {
+        command: 'node --test auth.test.mjs',
+        scope: 'OAuth callback behavior'
+      },
+      redResult: {
+        exitCode: 1,
+        observed: 'callback expectation failed for the intended reason'
+      },
+      greenResult: {
+        exitCode: 0,
+        observed: 'same focused check passed'
+      },
+      refactorResult: {
+        exitCode: 0,
+        observed: 'same focused check stayed green after cleanup'
+      },
+      fallbackDecision: 'Not applicable; focused automated check was available.',
       changedFiles: ['src/auth.js']
     }, {
       rootDir,
@@ -549,6 +566,12 @@ describe('OpenSpec execution context API', () => {
       canonicalArtifactsRead: ['openspec/changes/add-oauth/tasks.md'],
       generatedRulesRead: [],
       qaEvidenceRead: ['.ai-factory/qa/add-oauth/verify.md'],
+      rootCauseEvidence: {
+        boundary: 'OAuth callback parser',
+        observed: 'state was decoded after validation'
+      },
+      hypothesis: 'Validating decoded state before lookup will reject the stale callback.',
+      experiment: 'Move only the validation boundary and rerun the focused callback check.',
       regressionCheck: {
         command: 'node --test auth.test.mjs',
         inputs: 'OAuth callback fixture',
@@ -590,6 +613,48 @@ describe('OpenSpec execution context API', () => {
         '',
         '- .ai-factory/rules/generated/openspec-base.md',
         '',
+        '## Development cycle',
+        '',
+        '### Focused automated check',
+        '',
+        '```json',
+        '{',
+        '  "command": "node --test auth.test.mjs",',
+        '  "scope": "OAuth callback behavior"',
+        '}',
+        '```',
+        '',
+        '### RED result',
+        '',
+        '```json',
+        '{',
+        '  "exitCode": 1,',
+        '  "observed": "callback expectation failed for the intended reason"',
+        '}',
+        '```',
+        '',
+        '### GREEN result',
+        '',
+        '```json',
+        '{',
+        '  "exitCode": 0,',
+        '  "observed": "same focused check passed"',
+        '}',
+        '```',
+        '',
+        '### REFACTOR result',
+        '',
+        '```json',
+        '{',
+        '  "exitCode": 0,',
+        '  "observed": "same focused check stayed green after cleanup"',
+        '}',
+        '```',
+        '',
+        '### Fallback decision',
+        '',
+        'Not applicable; focused automated check was available.',
+        '',
         '## Changed files',
         '',
         '- src/auth.js',
@@ -599,13 +664,20 @@ describe('OpenSpec execution context API', () => {
         '/aif-verify add-oauth',
         ''
       ].join('\n'),
-      'Implementation trace shape must remain byte-identical when Fix-only evidence fields are added.'
+      'Implementation trace should persist the bounded development-cycle evidence.'
     );
     const fixContent = await readFile(fix.path, 'utf8');
     for (const expected of [
       '# Fix Trace: add-oauth',
       '## QA evidence read',
       '.ai-factory/qa/add-oauth/verify.md',
+      '## Root cause evidence',
+      'OAuth callback parser',
+      'state was decoded after validation',
+      '## Hypothesis',
+      'Validating decoded state before lookup will reject the stale callback.',
+      '## Experiment',
+      'Move only the validation boundary and rerun the focused callback check.',
       '## Regression check',
       'node --test auth.test.mjs',
       'OAuth callback fixture',
@@ -636,6 +708,11 @@ describe('OpenSpec execution context API', () => {
     });
 
     assert.equal(customState.relativePath, '.ai-factory/custom-state/add-oauth/implementation/custom-001.md');
+    assert.doesNotMatch(
+      await readFile(customState.path, 'utf8'),
+      /## Development cycle/,
+      'Legacy implementation trace callers without development-cycle fields should retain their compact shape.'
+    );
 
     await assert.rejects(
       () => writeExecutionTrace('add-oauth', { summary: 'bad state' }, {

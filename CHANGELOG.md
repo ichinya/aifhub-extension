@@ -7,6 +7,7 @@
 ## [В разработке]
 
 ### Добавлено
+- Bounded adaptation идей `obra/superpowers` для issue #141: RED -> GREEN -> REFACTOR evidence в implementation traces, systematic root-cause hypothesis/experiment evidence в fix traces, two-pass plan/spec-then-quality review и отдельный source/ownership документ без plugin/bootstrap installation.
 - Pinned source-compatibility evidence для AI Factory `2.19.0` на commit `3c1ddd4740d7b1c30d8ecb3dc80fa5e7b8d7ef5a`: exact `2.18.1...3c1ddd4740d7` audit включает 7 commits и 16 changed files, upstream-owned `/aif-warmup`, `warmup.paths` и Microsoft APM manifest. Отсутствие `2.19.0` tag, GitHub release и npm package зафиксировано отдельно от последнего published-executable smoke `2.18.1`.
 - Regression coverage для fresh `warmup.paths: []`, сохранения user-owned warmup list через оба mode profile и запрета backfill в существующий config без секции.
 - Exact-tagged OpenSpec `1.9.0` compatibility evidence с независимыми Git source custody (`v1.9.0`, commit `2826b8889e5223a9a8095d4428b60b56597e1020`, compare `v1.8.0...v1.9.0`) и npm executable custody (`@fission-ai/openspec@1.9.0`, integrity, shasum, bin и Node engine `>=20.19.0`). Локальный extracted-package smoke не заявляется как CI, deployment или production evidence.
@@ -14,6 +15,7 @@
 - Negative repository contract, удерживающий `openspec validate --archived` вне package scripts, tracked CI, shared runner argv, `/aif-verify`, `/aif-done` и release acceptance PASS boolean.
 
 ### Изменено
+- `/aif-implement` и managed implement workers теперь записывают focused-check RED/GREEN/REFACTOR или explicit no-test fallback только как supporting runtime evidence; `/aif-fix` и fixer agents требуют direct root-cause evidence, one falsifiable hypothesis и minimal experiment до edit; `/aif-review` и review sidecars проверяют plan/spec compliance перед code quality. `/aif-verify` остаётся authoritative.
 - Reviewed AI Factory source baseline обновлён до snapshot, declaring `2.19.0`, при неизменном compatibility range `>=2.11.0 <3.0.0`; `/aif-warmup` и APM distribution остаются upstream-owned, а schema/loader, injection/MCP, Node, bin и dependency contracts не меняются.
 - Fresh AIFHub config теперь включает upstream default `warmup.paths: []`; существующая секция остаётся user-owned и сохраняется, а её отсутствие в existing config эквивалентно пустому списку и не вызывает backfill.
 - Reviewed OpenSpec baseline обновлён с `1.8.0` до `1.9.0` при неизменных baseline `1.3.1`, stable range `>=1.3.1 <2.0.0`, prerelease ledger `1.6.0-beta.1` и Node requirement `>=20.19.0`; `/aif-analyze` продолжает только source-aware non-blocking update guidance без automatic install/update/downgrade.

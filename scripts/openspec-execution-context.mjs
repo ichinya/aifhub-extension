@@ -532,6 +532,7 @@ function renderTraceMarkdown({ changeId, trace, type }) {
     '',
     ...renderList(trace?.generatedRulesRead),
     '',
+    ...renderImplementationEvidenceSections(type, trace),
     ...renderFixEvidenceSections(type, trace),
     '## Changed files',
     '',
@@ -546,6 +547,48 @@ function renderTraceMarkdown({ changeId, trace, type }) {
   return lines.join('\n');
 }
 
+function renderImplementationEvidenceSections(type, trace) {
+  const evidenceFields = [
+    'testCheck',
+    'redResult',
+    'greenResult',
+    'refactorResult',
+    'fallbackDecision'
+  ];
+
+  if (
+    type !== 'Implementation'
+    || !evidenceFields.some((field) => Object.hasOwn(trace ?? {}, field))
+  ) {
+    return [];
+  }
+
+  return [
+    '## Development cycle',
+    '',
+    '### Focused automated check',
+    '',
+    ...renderTraceDetail(trace?.testCheck, 'Not recorded.'),
+    '',
+    '### RED result',
+    '',
+    ...renderTraceDetail(trace?.redResult, 'Not recorded.'),
+    '',
+    '### GREEN result',
+    '',
+    ...renderTraceDetail(trace?.greenResult, 'Not recorded.'),
+    '',
+    '### REFACTOR result',
+    '',
+    ...renderTraceDetail(trace?.refactorResult, 'Not recorded.'),
+    '',
+    '### Fallback decision',
+    '',
+    ...renderTraceDetail(trace?.fallbackDecision, 'Not applicable or not recorded.'),
+    ''
+  ];
+}
+
 function renderFixEvidenceSections(type, trace) {
   if (type !== 'Fix') {
     return [];
@@ -555,6 +598,18 @@ function renderFixEvidenceSections(type, trace) {
     '## QA evidence read',
     '',
     ...renderEvidenceList(trace?.qaEvidenceRead),
+    '',
+    '## Root cause evidence',
+    '',
+    ...renderTraceDetail(trace?.rootCauseEvidence, 'Not recorded.'),
+    '',
+    '## Hypothesis',
+    '',
+    ...renderTraceDetail(trace?.hypothesis, 'Not recorded.'),
+    '',
+    '## Experiment',
+    '',
+    ...renderTraceDetail(trace?.experiment, 'Not recorded.'),
     '',
     '## Regression check',
     '',

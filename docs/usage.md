@@ -721,6 +721,16 @@ Runtime todo behavior:
 - If no todo tool is available, `/aif-implement` reports a task snapshot as a capability fallback and continues from `tasks.md`.
 - Runtime todo hydration does not authorize broad task expansion; execution remains one task or one tightly coupled task group.
 
+Development cycle for a testable behavior change:
+
+- **RED**: choose or add the narrowest useful automated check and observe the intended behavioral failure before editing production code.
+- **GREEN**: make the smallest in-scope production change and rerun the same check.
+- **REFACTOR**: perform only bounded cleanup and keep the same check green.
+- Persist `testCheck`, `redResult`, `greenResult`, `refactorResult`, and `fallbackDecision` in the implementation trace under `.ai-factory/state/<change-id>/implementation/`.
+- For docs-only work, generated artifacts, explicitly authorized no-test scope, or no useful automated check, record the fallback and run the narrowest applicable non-test verification instead of fabricating RED evidence.
+
+This is supporting runtime evidence, not an authoritative QA verdict. See [Адаптация идей Superpowers](superpowers-adaptation.md).
+
 Writes:
 
 - implementation source files in the selected task scope
@@ -803,6 +813,8 @@ Writes:
 
 `/aif-review` is an optional read-only code review gate. It returns a final `aif-gate-result` with `gate: "review"`, is useful before `/aif-verify` or for high-risk changes, and does not write OpenSpec, runtime, or QA artifacts.
 
+Review runs in two ordered passes: **plan/spec compliance** first, then **code quality** inside the validated scope. A code-quality pass cannot erase or downgrade a compliance finding; both passes contribute to one findings-first verdict and one final review gate.
+
 Review findings may use Context7 as supporting documentation context only. Findings still need changed-file evidence, canonical OpenSpec context, generated rules, runtime state, QA evidence, or other direct repository evidence; missing Context7 is degraded context, not a review failure.
 
 ### `/aif-security-checklist`
@@ -860,6 +872,10 @@ Writes:
 
 - implementation fixes in the selected finding scope
 - `.ai-factory/state/<change-id>/fixes/`
+
+Before editing, the fixer records `rootCauseEvidence`, one falsifiable `hypothesis`, and the smallest discriminating `experiment`. It tests one hypothesis at a time, then runs the exact `regressionCheck` before and after the smallest supported root-cause fix. Three failed hypotheses trigger reassessment and a no-edit stop rather than stacked speculative changes.
+
+The fix trace records `rootCauseEvidence`, `hypothesis`, `experiment`, `regressionCheck`, `preFixResult`, `postFixResult`, and `fallbackDecision`. This remains supporting runtime evidence; `/aif-verify <change-id>` is authoritative.
 
 Does not write:
 

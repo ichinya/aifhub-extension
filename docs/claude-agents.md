@@ -26,6 +26,9 @@
 - `aifhub-rules-sidecar` keeps the upstream `rules-sidecar` contract instead of replacing it: it uses `aif-rules-check` and reads generated markdown plus trace metadata under `.ai-factory/rules/generated/*` in OpenSpec-native mode.
 - `low-write verifier`: `aifhub-verifier`. Агент может обновлять только verification artifacts, но не implementation files.
 - `bounded worker`: `aifhub-plan-polisher`, `aifhub-implement-worker`, `aifhub-fixer`. Они write-capable, но у каждого есть жёстко ограниченный рабочий scope.
+- `aifhub-implement-worker` records a bounded RED -> GREEN -> REFACTOR cycle for testable behavior changes, or an explicit no-test fallback, under runtime state only.
+- `aifhub-fixer` records direct root-cause evidence, one falsifiable hypothesis and a minimal experiment before its regression-first edit.
+- `aifhub-review-sidecar` runs plan/spec compliance before code quality and returns one combined read-only gate.
 - `finalization helper`: `aifhub-done-finalizer`. Для OpenSpec-native installed project он запускает `ai-factory aifhub-done-finalizer --change <change-id> --json`; extension-local implementation выполняет readiness и `openspec archive <change-id> --yes`. Поддерживаются `--skip-specs` и `--record-dirty-state`; результат остаётся bounded, а roadmap write ограничен одной linked row внутри marker-bounded lifecycle block.
 
 ## Как это работает

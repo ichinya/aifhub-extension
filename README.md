@@ -140,7 +140,7 @@ The seven-commit `2.18.1...3c1ddd4740d7` delta changes 16 files and is additive 
 The cumulative `2.16`/`2.17` behavior and `2.18.1` executable baseline remain supported, while the `2.18` line retains only bounded artifact/profile adapters:
 
 - Planning preserves explicit input as immutable `## Original Request`; research-backed plans use a revision-bound `## Research Context` and report `WARN [research-drift]` instead of silently rebasing scope. See [Usage](docs/usage.md) and [Context Loading Policy](docs/context-loading-policy.md).
-- Post-verify fixes use the same targeted regression check before and after the edit and keep the result as supporting runtime evidence; `/aif-verify` remains authoritative. See [Usage](docs/usage.md).
+- Behavior-changing implementation uses a bounded RED -> GREEN -> REFACTOR evidence cycle when a useful automated check is required and available; docs-only/no-test fallbacks are explicit instead of fabricated. Post-verify fixes add root-cause evidence, one falsifiable hypothesis, a minimal experiment, and the same targeted regression check before and after the edit. Review checks plan/spec compliance before code quality. All of this remains supporting runtime evidence; `/aif-verify` stays authoritative. See [Superpowers Adaptation](docs/superpowers-adaptation.md).
 - `/aif-qa-check` consumes branch-scoped `test-cases.md` and writes branch-scoped `qa-check.md`; it does not satisfy AIFHub verify, coverage, done, or archive gates. See [OpenSpec Compatibility](docs/openspec-compatibility.md).
 - AI Factory `2.16+` Universal / Other MCP rendering uses `.mcp.json` with `mcpServers`; older compatible runtimes are not promised this rendering. See [AIFHub MCP](docs/aifhub-mcp.md).
 - `aif-analyze` may add a project-specific `Control Flow` base rule only when repository evidence supports it. Generated OpenSpec rules remain a separate derived layer.
@@ -378,6 +378,7 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 |---|---|
 | [Documentation Index](docs/README.md) | Reading order and docs map |
 | [Usage](docs/usage.md) | Full command flow, AI Factory 2.19 session warmup, read/write boundaries, upstream project-context utilities, examples, and troubleshooting |
+| [Superpowers Adaptation](docs/superpowers-adaptation.md) | Bounded RED/GREEN/REFACTOR, systematic debugging, two-pass review, and ownership boundaries |
 | [Context Providers](docs/context-providers.md) | Optional Graphify and Context7 provider guidance, reviewed-note paths, degraded behavior, and user-owned setup boundaries |
 | [Memory Tool Recommendations](docs/memory-tool-recommendations.md) | Local metadata-driven optional memory/context tool recommendations and installed wrapper commands |
 | [Context Loading Policy](docs/context-loading-policy.md) | Consumer context, AI Factory 2.19 upstream warmup, Optional Project Glossary, optional provider context, GitHub-aware roadmap evidence, command ownership, upstream utility boundaries, and legacy boundaries |

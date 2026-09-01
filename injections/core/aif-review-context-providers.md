@@ -18,6 +18,15 @@ Before resolving review scope, read `.ai-factory/config.yaml` when it exists.
 - Otherwise, use **Legacy AI Factory-only mode**.
 - If the config is missing, continue with Legacy AI Factory-only mode and state that no OpenSpec-native protocol was detected.
 
+### Two-pass review order
+
+Run review in this order for both artifact modes:
+
+1. **Pass 1 - plan/spec compliance**: compare the changed scope with the canonical OpenSpec requirements, design, tasks, and generated rules, or with the active legacy plan when OpenSpec-native mode is disabled. Report missing, extra, or contradicted behavior before style or maintainability observations.
+2. **Pass 2 - code quality**: review correctness, regression risk, security, performance, maintainability, and test quality inside the already validated change scope.
+
+Do not let a code-quality pass erase or downgrade a plan/spec compliance finding. Return one combined findings-first verdict; this ordering does not create a second gate or authorize file edits.
+
 ### OpenSpec-native mode
 
 When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, `/aif-review` is an optional read-only gate for one active OpenSpec change.
