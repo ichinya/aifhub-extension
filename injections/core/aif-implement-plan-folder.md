@@ -102,6 +102,18 @@ Read generated rules as derived implementation guidance when present:
 - `.ai-factory/rules/generated/openspec-change-<change-id>.md`
 - `.ai-factory/rules/generated/openspec-base.md`
 
+#### Evidence-driven development cycle
+
+For each testable behavior change whose plan, project policy, or existing test conventions call for an automated check, use this bounded cycle before declaring the task complete:
+
+1. **RED** - select or add the narrowest focused automated check, record it as `testCheck`, and run it before the production edit. Record `redResult` only after observing the expected behavioral failure; a syntax, fixture, dependency, or environment failure is not valid RED evidence.
+2. **GREEN** - make the smallest in-scope production change that satisfies the focused check, rerun the same check, and record `greenResult`. Do not broaden implementation merely to make unrelated checks green.
+3. **REFACTOR** - perform only safe cleanup justified by the task, rerun the same focused check, and record `refactorResult`. Skip cleanup when it would expand scope.
+
+Persist `testCheck`, `redResult`, `greenResult`, `refactorResult`, and `fallbackDecision` through `writeExecutionTrace()` under `.ai-factory/state/<change-id>/implementation/`. For documentation-only work, generated artifacts, user-authorized no-test work, or a task with no useful automated check, do not fabricate RED evidence: record a bounded `fallbackDecision` and run the narrowest applicable non-test verification instead.
+
+This cycle is supporting runtime evidence only. It does not write QA evidence, weaken project-specific test policy, or replace the authoritative `/aif-verify <change-id>` gate.
+
 Execution trace and runtime state boundaries:
 
 - Prefer `writeExecutionTrace(changeId, trace, options)` from `scripts/openspec-execution-context.mjs` for implementation traces.

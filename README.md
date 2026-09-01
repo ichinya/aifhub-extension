@@ -11,7 +11,7 @@ AI Factory UX + OpenSpec artifact protocol
 ## What This Extension Does
 
 - Keeps `/aif-analyze`, `/aif-plan`, `/aif-explore`, `/aif-improve`, `/aif-implement`, `/aif-rules-check`, `/aif-review`, `/aif-security-checklist`, `/aif-verify`, `/aif-fix`, `/aif-done`, `/aif-commit`, `/aif-evolve`, and `/aif-mode` as the public command vocabulary.
-- Sharpens `/aif-explore` requests through dependency-aware decision rounds: project facts stay assistant-owned and read-only, user-owned decisions are asked by prerequisite frontier with recommendations, and research waits for confirmation of the normalized brief. Non-interactive runs return an unconfirmed brief to the interactive parent instead of treating assumptions as approval.
+- Sharpens `/aif-explore` requests through dependency-aware decision rounds: project facts stay assistant-owned and read-only, user-owned decisions are asked by prerequisite frontier with recommendations, and an empty blocked or cyclic frontier never counts as completion. Research waits until every brief decision is settled and the normalized brief is confirmed; non-interactive runs return unresolved decisions or the confirmation-ready brief to the interactive parent instead of treating assumptions as approval.
 - In OpenSpec-native mode, writes canonical change artifacts under `openspec/changes/<change-id>/` and accepted specs under `openspec/specs/`.
 - Keeps AI Factory runtime state, verification evidence, finalization evidence, and generated rules outside canonical OpenSpec changes.
 - Requests OpenSpec validation, status, instructions, and archive through the AIFHub wrapper and `scripts/openspec-runner.mjs` when a compatible CLI is available.
@@ -146,7 +146,7 @@ The seven-commit `2.18.1...3c1ddd4740d7` delta changes 16 files and is additive 
 The cumulative `2.16`/`2.17` behavior and `2.18.1` executable baseline remain supported, while the `2.18` line retains only bounded artifact/profile adapters:
 
 - Planning preserves explicit input as immutable `## Original Request`; research-backed plans use a revision-bound `## Research Context` and report `WARN [research-drift]` instead of silently rebasing scope. See [Usage](docs/usage.md) and [Context Loading Policy](docs/context-loading-policy.md).
-- Post-verify fixes use the same targeted regression check before and after the edit and keep the result as supporting runtime evidence; `/aif-verify` remains authoritative. See [Usage](docs/usage.md).
+- Behavior-changing implementation uses a bounded RED -> GREEN -> REFACTOR evidence cycle when a useful automated check is required and available; docs-only/no-test fallbacks are explicit instead of fabricated. Post-verify fixes add root-cause evidence, one falsifiable hypothesis, a minimal experiment, and the same targeted regression check before and after the edit. Review checks plan/spec compliance before code quality. All of this remains supporting runtime evidence; `/aif-verify` stays authoritative. See [Superpowers Adaptation](docs/superpowers-adaptation.md).
 - `/aif-qa-check` consumes branch-scoped `test-cases.md` and writes branch-scoped `qa-check.md`; it does not satisfy AIFHub verify, coverage, done, or archive gates. See [OpenSpec Compatibility](docs/openspec-compatibility.md).
 - AI Factory `2.16+` Universal / Other MCP rendering uses `.mcp.json` with `mcpServers`; older compatible runtimes are not promised this rendering. See [AIFHub MCP](docs/aifhub-mcp.md).
 - `aif-analyze` may add a project-specific `Control Flow` base rule only when repository evidence supports it. Generated OpenSpec rules remain a separate derived layer.
@@ -387,6 +387,7 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 |---|---|
 | [Documentation Index](docs/README.md) | Reading order and docs map |
 | [Usage](docs/usage.md) | Full command flow, AI Factory 2.19 session warmup, read/write boundaries, upstream project-context utilities, examples, and troubleshooting |
+| [Superpowers Adaptation](docs/superpowers-adaptation.md) | Bounded RED/GREEN/REFACTOR, systematic debugging, two-pass review, and ownership boundaries |
 | [Context Providers](docs/context-providers.md) | Optional Graphify and Context7 provider guidance, reviewed-note paths, degraded behavior, and user-owned setup boundaries |
 | [Safety Providers](docs/safety-providers.md) | Optional dcg pre-execution guard guidance, manual user-owned setup, allowed probes, degraded behavior, and strict hook/config boundaries |
 | [Memory Tool Recommendations](docs/memory-tool-recommendations.md) | Local metadata-driven optional memory/context tool recommendations and installed wrapper commands |

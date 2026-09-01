@@ -32,6 +32,15 @@ Apply this section in both artifact modes before evaluating findings.
 - Keep individual findings, comments, replies, resolution/stale state, target revisions, session identifiers, provider state, and receipts out of `REVIEW.md`.
 - Never edit the policy during `/aif-review`. When it materially affects the result, name only its state and normalized project-relative path in human-readable evidence; never copy its full body or add fields to the final `aif-gate-result`.
 
+### Two-pass review order
+
+Run review in this order for both artifact modes:
+
+1. **Pass 1 - plan/spec compliance**: compare the changed scope with the canonical OpenSpec requirements, design, tasks, and generated rules, or with the active legacy plan when OpenSpec-native mode is disabled. Report missing, extra, or contradicted behavior before style or maintainability observations.
+2. **Pass 2 - code quality**: review correctness, regression risk, security, performance, maintainability, and test quality inside the already validated change scope.
+
+Do not let a code-quality pass erase or downgrade a plan/spec compliance finding. Return one combined findings-first verdict; this ordering does not create a second gate or authorize file edits.
+
 ### OpenSpec-native mode
 
 When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, `/aif-review` is an optional read-only gate for one active OpenSpec change.

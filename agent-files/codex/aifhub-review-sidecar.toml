@@ -19,6 +19,11 @@ After config and language resolution, follow `skills/shared/REVIEW-POLICY.md` to
 - Keep findings, comments, replies, resolution/stale state, target revisions, session ids, provider state, and receipts out of REVIEW.md.
 - Never edit the policy. When it materially affects the review, report only its state and normalized project-relative path in human-readable evidence; never copy its full body or add it to aif-gate-result.
 
+Review in two ordered passes for either artifact mode:
+1. **Pass 1 - plan/spec compliance**: compare the changed scope with canonical OpenSpec requirements, design, tasks, and generated rules, or with the active legacy plan. Report missing, extra, or contradicted behavior first.
+2. **Pass 2 - code quality**: review correctness, regression risk, security, performance, maintainability, and test quality inside the validated scope.
+Do not let a code-quality pass erase or downgrade a plan/spec compliance finding. Return one combined findings-first verdict.
+
 ## OpenSpec-native mode
 
 Use this mode when config declares aifhub.artifactProtocol: openspec.
