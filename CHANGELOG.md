@@ -6,8 +6,14 @@
 
 ## [В разработке]
 
+### Добавлено
+- Configurable durable review policy `reviews.policy_file` с root-default `REVIEW.md`: `/aif-analyze` создаёт missing safe scaffold, `/aif-mode` сохраняет путь без file lifecycle, а `/aif-review` и namespaced review sidecars читают policy только как additive guidance; per-session comments, resolution state, provider state и receipts остаются вне policy.
+
 ### Изменено
 - `/aif-explore` теперь уточняет research brief через dependency-aware design tree: самостоятельно собирает доступные repository/config facts в read-only режиме, задаёт пользовательские решения раундами по frontier зависимостей с рекомендациями и начинает полный research только после подтверждения нормализованного brief без создания отдельного interview artifact; autonomous/subagent запуск возвращает неподтверждённый brief родителю с blocker `research-brief-confirmation-required`, а не принимает assumptions за согласие.
+
+### Исправлено
+- Review policy resolution теперь использует один installed canonical resolver для scaffold и read-only consumers: symlink/Windows junction escapes, managed-file collisions и canonical OpenSpec/project-rules/generated/runtime/QA roots fail closed до чтения или создания; реальные сценарии защищены executable regression-тестами.
 
 ## [1.5.0] - 2026-09-01
 

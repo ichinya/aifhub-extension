@@ -41,6 +41,9 @@ paths:
   qa: .ai-factory/qa
   generated_rules: .ai-factory/rules/generated
 
+reviews:
+  policy_file: REVIEW.md
+
 utilities:
   graphify:
     enabled: false
@@ -53,6 +56,8 @@ utilities:
 Canonical requirements and change intent live under `openspec/`. Runtime state, QA evidence, migration reports, and generated rules live under `.ai-factory/`.
 
 `paths.context` is protocol-neutral optional context. Preserve a custom project-relative value; do not create or validate the glossary file.
+
+`reviews.policy_file` is protocol-neutral durable review guidance. Preserve a custom project-relative value; mode operations do not create or validate the policy file.
 
 Ensure these paths:
 
@@ -81,6 +86,9 @@ paths:
   specs: .ai-factory/specs
   rules: .ai-factory/rules
 
+reviews:
+  policy_file: REVIEW.md
+
 utilities:
   graphify:
     enabled: false
@@ -92,7 +100,7 @@ utilities:
 
 Legacy mode uses the companion plan model:
 
-`paths.context` remains protocol-neutral and optional in this profile. Its default is `CONTEXT.md`, and mode operations do not create or inspect the file.
+`paths.context` remains protocol-neutral and optional in this profile. Its default is `CONTEXT.md`, and mode operations do not create or inspect the file. `reviews.policy_file` also remains protocol-neutral; its default is `REVIEW.md`, and mode operations preserve it without creating or inspecting the file.
 
 ```text
 .ai-factory/plans/<id>.md

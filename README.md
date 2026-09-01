@@ -21,6 +21,7 @@ AI Factory UX + OpenSpec artifact protocol
 - Ships an optional, opt-in context optimization service (`ai-factory aifhub-context-dedup` and MCP dedup tools) with `off | aifhub | sqz` modes. AIFHub serves unchanged same-session reads as a short replay, always returns protected validation artifacts in full, and invokes `sqz` only when the user explicitly supplies that third-party utility.
 - Documents upstream project-context utilities such as `/aif-architecture`, `/aif-roadmap`, `/aif-docs`, `/aif-qa`, `/aif-archive`, and `/aif-distillation` with AIFHub write-boundary guardrails.
 - Supports an optional protocol-neutral project glossary at `paths.context` (`CONTEXT.md` by default) for consistent prose terminology.
+- Supports durable project review guidance at `reviews.policy_file` (`REVIEW.md` at the project root by default), consumed read-only by `/aif-review` and AIFHub review sidecars.
 - Resolves human-readable response language as `language.ui` → current conversation → English only when indeterminate, without using OS locale or changing exact machine-output contracts. See [Usage](docs/usage.md#prompt-language-resolution).
 - Does not install OpenSpec skills or slash commands.
 
@@ -125,6 +126,10 @@ It does not replace `/aif-commit`. After `/aif-done`, run `/aif-commit` or your 
 ### Optional Project Glossary
 
 `/aif-analyze` can create or patch an optional `paths.context` glossary after explicit opt-in. Other commands consume it read-only for prose terminology; source/tests, OpenSpec requirements, rules, architecture decisions, identifiers, and QA facts remain authoritative. Missing `CONTEXT.md` never blocks a workflow. See [Context Loading Policy](docs/context-loading-policy.md) and [ADR 0002](docs/adr/0002-optional-project-context-glossary.md).
+
+### Project Review Policy
+
+`/aif-analyze` registers `reviews.policy_file` and creates a missing safe scaffold at root `REVIEW.md` by default. Scaffold and review consumers share `ai-factory aifhub-review-policy`: it requires canonical containment, rejects symlink/Windows junction components, and blocks managed files plus canonical/generated/runtime/QA roots before any policy I/O. Existing policy is preserved during ordinary bootstrap. `/aif-review` and the AIFHub review sidecars consume it read-only as additional guidance; it cannot suppress material findings or replace project rules, tests, verification, finalization, or human approval. Individual review comments, replies, resolution state, target revisions, provider state, and receipts stay out of this durable file. See [Project Review Policy](docs/review-policy.md) and [ADR 0003](docs/adr/0003-durable-project-review-policy.md).
 
 The config also records the aif-analyze skill version under `analyze.skill_version`. Before patching an existing config, `/aif-analyze` runs the read-only deterministic diff `ai-factory aifhub-analyze-config-diff --json`, which compares the config against the extension's required-keys manifest, reports what would be added and why, and takes a fast path when the config is already up to date.
 
@@ -236,6 +241,8 @@ A new bug report starts as planned OpenSpec work:
 OpenSpec-native v1 uses this ownership model in user projects:
 
 ```text
+REVIEW.md                         # default durable project review policy
+
 openspec/
   specs/
     <capability>/spec.md
@@ -280,6 +287,7 @@ openspec/
 | `.ai-factory/qa` | Verification and finalization evidence |
 | `.ai-factory/rules/generated` | Derived rules, safe to regenerate |
 | `.ai-factory/plans` | Legacy compatibility and migration input only |
+| `REVIEW.md` or configured `reviews.policy_file` | Durable review-only project guidance |
 
 The `aifhub-extension` package repository stays artifact-light. Root `openspec/`, `.ai-factory/state/`, `.ai-factory/qa/`, `.ai-factory/plans/`, and `.ai-factory/rules/generated/` are created in user projects and are not shipped as extension package content. Root `.ai-factory/rules/generated/` is derived and safe to regenerate. OpenSpec examples in this repo belong only under fixture paths such as `test/fixtures/` or `scripts/fixtures/`; extension behavior requirements are validated by prompt contracts and tests, not by committed root OpenSpec specs.
 
@@ -382,6 +390,7 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 | [Context Providers](docs/context-providers.md) | Optional Graphify and Context7 provider guidance, reviewed-note paths, degraded behavior, and user-owned setup boundaries |
 | [Memory Tool Recommendations](docs/memory-tool-recommendations.md) | Local metadata-driven optional memory/context tool recommendations and installed wrapper commands |
 | [Context Loading Policy](docs/context-loading-policy.md) | Consumer context, AI Factory 2.19 upstream warmup, Optional Project Glossary, optional provider context, GitHub-aware roadmap evidence, command ownership, upstream utility boundaries, and legacy boundaries |
+| [Project Review Policy](docs/review-policy.md) | Configurable root-default `REVIEW.md`, scaffold ownership, safe review consumption, precedence, and session-state boundary |
 | [OpenSpec Compatibility](docs/openspec-compatibility.md) | Optional CLI adapter policy, exact-tagged OpenSpec `1.10.0` reviewed baseline from `1.3.1`, pinned AI Factory 2.19 source snapshot, AI Factory 2.18 classic/ultra planning, research, verification, archive and ownership matrix, reviewed no-ops, and capability flags |
 | [OpenSpec Artifact Validation](docs/openspec-validation.md) | Read-only AIFHub contract validator for OpenSpec-native artifacts |
 | [OpenSpec Coverage Matrix](docs/spec-coverage.md) | Requirement-to-code coverage artifact and verify/done policy |
@@ -389,6 +398,7 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 | [Active Change Resolver](docs/active-change-resolver.md) | Active change selection and runtime paths |
 | [ADR 0001](docs/adr/0001-openspec-native-artifact-protocol.md) | v1 artifact ownership decision |
 | [ADR 0002: Optional Project Glossary](docs/adr/0002-optional-project-context-glossary.md) | Configurable `CONTEXT.md`, lexical authority, and deferred OKF |
+| [ADR 0003: Durable Project Review Policy](docs/adr/0003-durable-project-review-policy.md) | Review policy namespace, ownership, authority, and durable-policy boundary |
 | [AIFHub MCP](docs/aifhub-mcp.md) | Optional MCP server tools, runtime-specific settings shapes, and AI Factory 2.16+ Universal / Other rendering |
 | [Codex Agents](docs/codex-agents.md) | Namespaced Codex CLI agent files |
 | [Claude Agents](docs/claude-agents.md) | Namespaced Claude agent files |
