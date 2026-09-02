@@ -102,6 +102,18 @@ The second pass changed only the server context to 16,384 tokens; the model iden
 
 The quality gain was not uniform: one scenario's Recall@10 regressed from `0.75` to `0.25`, and another remained `0` in both variants. The strict aggregate rule nevertheless yields `pilot_decision: pilot_positive` because recall improved while false-positive rate fell. `no_promote: true` still prevents a policy change.
 
+#### Search-quality interpretation
+
+| Quality view | Observed result | Interpretation |
+|---|---:|---|
+| Recall@10 change | `0.250000` to `0.541667` (`+0.291667`, about `2.17x`) | T-Search recovered substantially more of the fixed relevant set. |
+| Recall outcomes by scenario | 3 improved / 2 unchanged / 1 regressed | The aggregate gain is not consistent across every task. |
+| Precision change | `0.083333` to `0.183333` (`+0.100000`, about `2.20x`) | Precision more than doubled, but only 18.3% of returned items were relevant on average. |
+| False-positive rate | `0.916667` to `0.816667` | Noise fell by 10 percentage points but remained high at 81.7%. |
+| Reciprocal rank | `0.144444` to `0.833333` | Five of six candidate rankings placed a relevant chunk first; top-result ordering is the strongest observed gain. |
+
+The same bounded `rg` corpus search backed both variants. The baseline issued one search per scenario, while T-Search used 26 calls in total, about 4.3 per scenario, to reformulate queries and rank the results. The evidence therefore supports a narrow claim: iterative agentic planning and ranking improved average coverage and first-result placement over one direct search on this sample. It does not support a broad claim that retrieval is consistently better, because one scenario lost two thirds of its recall, one still found no relevant chunk, average false-positive rate remained high, and six scenarios are too few for a statistical generalization.
+
 Startup and benchmark timing are separate measurements:
 
 | Timing surface | Observed time | Interpretation |
