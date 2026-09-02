@@ -5,6 +5,7 @@ import { createReadStream } from 'node:fs';
 import { lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 
 export const T_SEARCH_AB_CATALOG_SCHEMA = 'aifhub.t_search.ab_scenario_catalog.v1';
@@ -440,8 +441,16 @@ export async function runTSearchAbBenchmark({
   uvCommand = 'uv',
   rgCommand = 'rg',
   rgCommandRunner,
-  candidateRunner
+  candidateRunner,
+  serverStartupMs
 } = {}) {
+  const benchmarkStartedAt = performance.now();
+  if (serverStartupMs !== undefined && (!Number.isInteger(serverStartupMs) || serverStartupMs < 0)) {
+    throw new Error('--server-startup-ms must be a non-negative integer');
+  }
+  if (serverStartupMs !== undefined && (dryRun || baselineOnly)) {
+    throw new Error('--server-startup-ms requires a candidate run');
+  }
   const { catalog, catalogPath: resolvedCatalog } = await loadTSearchAbCatalog({ catalogPath });
   if (model !== catalog.candidate_identity.model_repo) {
     throw new Error('candidate model alias must match the pinned catalog identity');
@@ -548,6 +557,11 @@ export async function runTSearchAbBenchmark({
     corpusUnchangedPassed: finalCorpus.fingerprint === corpus.fingerprint,
     modelFileVerified
   });
+  summary.server_startup_ms = serverStartupMs ?? null;
+  summary.benchmark_elapsed_ms = Math.round(performance.now() - benchmarkStartedAt);
+  summary.end_to_end_elapsed_ms = serverStartupMs === undefined
+    ? null
+    : serverStartupMs + summary.benchmark_elapsed_ms;
   if (outDir) await writeSanitizedResults({ outDir, summary, rows });
   return { summary, rows };
 }
@@ -991,6 +1005,7 @@ function parseArgs(args) {
     else if (token === '--rg') parsed.rgCommand = args[++index];
     else if (token === '--scenario') parsed.scenarioIds.push(args[++index]);
     else if (token === '--max-scenarios') parsed.maxScenarios = Number(args[++index]);
+    else if (token === '--server-startup-ms') parsed.serverStartupMs = Number(args[++index]);
     else if (token === '--baseline-only') parsed.baselineOnly = true;
     else if (token === '--dry-run') parsed.dryRun = true;
     else if (token === '--json') parsed.json = true;
@@ -1012,6 +1027,7 @@ function usage() {
     '  --out <dir>               Write sanitized summary.json and rows.json.',
     '  --scenario <id>           Select one scenario; repeatable.',
     '  --max-scenarios <n>       Bound the selected scenario prefix.',
+    '  --server-startup-ms <n>   Measured model process-to-readiness time.',
     '  --json                     Print the sanitized summary as JSON.'
   ].join('\n');
 }

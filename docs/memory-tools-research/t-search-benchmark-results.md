@@ -2,13 +2,13 @@
 
 ## Outcome
 
-An authorized controlled local A/B completed all six synthetic AIFHub-like pairs. T-Search recovered every ground-truth chunk, but its aggregate false-positive rate was worse than the bounded `rg` baseline and its runtime/token overhead was large. The strict synthetic pilot result is therefore `pilot_negative`. A later authorized committed-snapshot sample from a real Laravel project completed only one of six candidate rows under the same reduced profile, so that follow-up is `incomplete` and the policy decision remains `reject_defer`.
+An authorized controlled local A/B completed all six synthetic AIFHub-like pairs. T-Search recovered every ground-truth chunk, but its aggregate false-positive rate was worse than the bounded `rg` baseline and its runtime/token overhead was large. The strict synthetic pilot result is therefore `pilot_negative`. A later authorized committed-snapshot sample from a real Laravel project exposed a context boundary: only 1/6 candidate rows completed at 8,192 server tokens, while the same six scenarios completed at 16,384 tokens with an aggregate `pilot_positive` score. The real-project result was not uniform, startup and row latency remained large, and no production index lifecycle was exercised, so the policy decision remains `reject_defer`.
 
 - Static upstream identity, license, API, model-card, harness, and deployment review: complete.
 - Upstream harness quality checks: complete against the pinned source revision.
-- Model execution: PASS for the exact Q4_K_M GGUF on pinned `llama.cpp` b10068 in a reduced 8,192-context hybrid CPU/GPU profile.
+- Model execution: PASS for the exact Q4_K_M GGUF on pinned `llama.cpp` b10068 in reduced 8,192- and 16,384-context hybrid CPU/GPU profiles.
 - Repository retrieval comparison: 6/6 paired synthetic rows completed; aggregate Recall@10 improved from `0.666667` to `1.0`, while false-positive rate worsened from `0.44` to `0.495238`.
-- Real Laravel snapshot follow-up: 6/6 direct `rg` rows passed, but only 1/6 T-Search rows finalized; the other rows ended with four bounded LLM errors and one free-text loop.
+- Real Laravel snapshot context sweep: 1/6 T-Search rows finalized at 8,192 context; 6/6 finalized at 16,384 context, improving aggregate Recall@10 from `0.25` to `0.541667` and false-positive rate from `0.916667` to `0.816667`.
 - Local stateless privacy/source/freshness/purge gates: PASS; no raw transcript or persistent search state was retained.
 - Production repository and external index build/refresh/staleness/purge lifecycle: `NOT_RUN`.
 - Upstream benchmark results: recorded as author-reported context only and excluded from AIFHub recommendation evidence.
@@ -35,7 +35,7 @@ The authorized follow-up adds an answer-independent local runner and [scenario c
 
 The candidate does not receive a privileged index. Every harness `search_corpus` call executes the same bounded `rg --json` backend over the reviewed corpus, while the baseline receives one such search. This measures whether T-Search's query decomposition and final ranking improve retrieval enough to justify their model, latency, and token overhead. It does not establish production semantic-index performance.
 
-The runner persists no raw query, snippet, reasoning, message, transcript, or round summary. It records project-relative chunk IDs and aggregate scores only. Candidate PASS requires exact harness provenance, loopback model identity, privacy-canary absence, source confinement, an unchanged pre/post corpus snapshot, and zero persistent search state. The output boundary refuses canonical OpenSpec, QA, and generated-rules directories.
+The runner persists no raw query, snippet, reasoning, message, transcript, or round summary. It records project-relative chunk IDs and aggregate scores only. Candidate PASS requires exact harness provenance, loopback model identity, privacy-canary absence, source confinement, an unchanged pre/post corpus snapshot, and zero persistent search state. The output boundary refuses canonical OpenSpec, QA, and generated-rules directories. Because the runner deliberately does not start the model server, an evaluator may supply process-to-readiness time with `--server-startup-ms`; output then separates model-row time, whole benchmark-command time, and startup-inclusive end-to-end time.
 
 ### Authorized live result 2026-09-01
 
@@ -64,11 +64,13 @@ All six candidate rows finalized and passed exact model identity, exact harness 
 
 The pilot decision requires a Recall@10 gain without worse false-positive rate, or an FPR gain without worse recall. The observed recall gain accompanied an aggregate FPR regression, yielding `pilot_negative`; `no_promote: true` would have prevented a policy promotion even under a positive pilot score.
 
-### Authorized real Laravel snapshot follow-up 2026-09-02
+### Authorized real Laravel snapshot context sweep 2026-09-02
 
 The same runner was exercised against an authorized committed snapshot from a real Laravel 13 project. The project identity, revision, source, scenario catalog, queries, paths, corpus fingerprint, and raw model/server output are intentionally not committed. The deterministic temporary corpus sampled 218 safe committed files into 614 marked chunks across PHP, Vue, JavaScript/TypeScript, Markdown, JSON, and configuration sources. Six fixed Russian/English code-navigation scenarios were scored. Uncommitted working-tree files were not read into the corpus, and `.env*`, `storage/**`, `bootstrap/cache/**`, `vendor/**`, `node_modules/**`, QA/state, and generated-rule paths were excluded.
 
-| Aggregate metric | `baseline_rg` | `candidate_t_search` | Interpretation |
+The first pass retained the synthetic pilot's 8,192-token server context. It established a failure boundary rather than a six-pair quality result:
+
+| 8,192-context metric | `baseline_rg` | `candidate_t_search` | Interpretation |
 |---|---:|---:|---|
 | Completed rows | 6/6 | 1/6 | Five candidate rows are incomplete and cannot receive retrieval scores. |
 | Recall@10 | 0.250000 across six rows | 1.000000 on the sole completed pair | The candidate improved that pair from 0 to 1, but this is not an aggregate six-pair comparison. |
@@ -80,9 +82,39 @@ The same runner was exercised against an authorized committed snapshot from a re
 | Search calls | 6 | 30 | Candidate cost includes both successful and failed bounded rows. |
 | Failure categories | none | 4 `termination_llm_error`; 1 `termination_free_text_loop` | The 8,192-context server logged six context truncations during the run. |
 
-All candidate rows still passed exact model identity, exact harness provenance, privacy-canary scanning, source confinement, unchanged-corpus freshness, purge, and zero-persistent-state gates. Sanitized durable results contained zero canary values. The pinned Q4_K_M server's cold start took about 362 seconds on this follow-up, in addition to measured row time.
+All candidate rows still passed exact model identity, exact harness provenance, privacy-canary scanning, source confinement, unchanged-corpus freshness, purge, and zero-persistent-state gates. Sanitized durable results contained zero canary values. The pinned Q4_K_M server's cold-ish process-to-readiness time was about 362 seconds on this pass, in addition to measured row time.
 
-This is real-source evidence, but it remains a deterministic sample using the stateless bounded `rg` search adapter rather than a production vector/BM25 index. Because five candidate rows failed to finalize, the runner records `pilot_decision: incomplete`; the permanent decision remains `reject_defer`. Candidate averages from this run must never be presented without the `1/6` completion denominator.
+The 8,192-context runner therefore records `pilot_decision: incomplete`; its candidate averages must never be presented without the `1/6` completion denominator.
+
+The second pass changed only the server context to 16,384 tokens; the model identity, one-slot server, 8,192-token harness budget, corpus, search backend, and six scenarios stayed fixed. All rows finalized, the server logged zero context truncations and zero parse errors, and its largest observed slot usage was 10,892 tokens. This leaves about 5,492 tokens of headroom, so a 32K context is not justified by this workload.
+
+| 16,384-context metric | `baseline_rg` | `candidate_t_search` | Interpretation |
+|---|---:|---:|---|
+| Completed rows | 6/6 | 6/6 | All six pairs are comparable. |
+| Recall@10 | 0.250000 | 0.541667 | Aggregate improvement of 0.291667. |
+| Precision among returned results | 0.083333 | 0.183333 | Aggregate improvement of 0.100000. |
+| False-positive rate | 0.916667 | 0.816667 | Aggregate reduction of 0.100000. |
+| Reciprocal rank | 0.144444 | 0.833333 | Relevant material moved earlier in most rankings. |
+| Total measured row time | 0.514 s | 498.844 s | Candidate was about 970.5x slower while the server was already ready. |
+| Model tokens | 0 | 153,472 | 142,607 prompt plus 10,865 completion tokens. |
+| Search calls | 6 | 26 | Candidate averaged 4.3 bounded searches per scenario. |
+| Failure categories | none | none | Zero context truncations and zero server parse errors. |
+
+The quality gain was not uniform: one scenario's Recall@10 regressed from `0.75` to `0.25`, and another remained `0` in both variants. The strict aggregate rule nevertheless yields `pilot_decision: pilot_positive` because recall improved while false-positive rate fell. `no_promote: true` still prevents a policy change.
+
+Startup and benchmark timing are separate measurements:
+
+| Timing surface | Observed time | Interpretation |
+|---|---:|---|
+| Repeated process start to `/health` | 116.869 s | Warm OS file-cache observation; not a cold-start claim. |
+| Earlier cold-ish process start to `/health` | 361.800 s | Separate 8K observation showing startup variance. |
+| Whole 16K benchmark command | 532.792 s | Includes corpus/model verification, both variants, subprocess work, and result aggregation. |
+| Candidate rows within the command | 498.844 s | About 83.141 s per scenario with a ready server. |
+| Other benchmark work | 33.434 s | Whole-command time less candidate and baseline row time. |
+| Warm-cache startup plus whole command | 649.661 s | Observed one-shot end-to-end time, about 10m 50s. |
+| Cold-ish startup plus whole command | 894.592 s | Cross-run estimate, about 14m 55s; not one contiguous observation. |
+
+Amortizing only startup plus candidate row time across these six scenarios gives about 102.619 seconds per scenario with the warm-cache start and 143.441 seconds with the earlier cold-ish start. Long-lived serving can amortize startup, but it cannot remove the roughly 83-second candidate row cost. This is real-source evidence, but it remains a deterministic sample using the stateless bounded `rg` adapter rather than a production vector/BM25 index. The permanent decision remains `reject_defer`.
 
 Safe preparation and baseline commands are:
 
@@ -91,7 +123,7 @@ node scripts/t-search-ab-benchmark.mjs --dry-run --json
 node scripts/t-search-ab-benchmark.mjs --baseline-only --json
 ```
 
-Live candidate execution additionally requires the evaluator's exact pinned harness root, verified external GGUF file, and loopback model endpoint. It is never part of `npm test`, validation, recommendation, availability probing, or normal command selection.
+Live candidate execution additionally requires the evaluator's exact pinned harness root, verified external GGUF file, and loopback model endpoint. If model startup is measured separately, pass its non-negative process-to-readiness duration through `--server-startup-ms` so the sanitized summary reports `server_startup_ms`, `benchmark_elapsed_ms`, and `end_to_end_elapsed_ms` independently of candidate row time. Candidate execution is never part of `npm test`, validation, recommendation, availability probing, or normal command selection.
 
 ## Harness Audit
 
@@ -115,7 +147,7 @@ The locale-sensitive test is a portability defect in upstream test code, not evi
 | BF16 | 71.92 GB repository storage | Not suitable for this host. |
 | FP8 | 37.49 GB repository storage | Exceeds local VRAM; exact runtime requirements not tested. |
 | NVFP4 | 25.47 GB repository storage | Exceeds local VRAM and requires a compatible quantized runtime; not tested. |
-| GGUF Q4_K_M | 21.71 GB file | Executed successfully with automatic hybrid CPU/GPU offload, 8,192 context, and one slot; not representative of the upstream full-context profile. |
+| GGUF Q4_K_M | 21.71 GB file | Executed successfully with automatic hybrid CPU/GPU offload, 8,192 and 16,384 context, and one slot; not representative of the upstream full-context profile. |
 | GGUF Q5_K_M / Q6_K / Q8_0 | 25.35 / 29.21 / 37.80 GB | Larger than Q4; not run. |
 
 The Q4 run proves local feasibility on a 16 GB GPU only through hybrid offload. It does not prove the official 65,536-token profile, multi-round behavior, concurrency, production latency, or an indexed corpus lifecycle. The measured reduced-profile overhead is already too high for default AIFHub retrieval.
@@ -172,20 +204,20 @@ This spread reinforces the architectural finding: T-Search does not replace the 
 | MCP adapter | NOT FOUND. |
 | Built-in indexing or corpus ingestion | NOT FOUND. |
 | Source exclusions, redaction, freshness, or purge | NOT PROVIDED by the harness. |
-| AIFHub-like mixed code/docs/OpenSpec benchmark | 6/6 local synthetic pairs completed with `pilot_negative`; a real Laravel committed-snapshot sample completed only 1/6 candidate rows with `incomplete`. Neither used a production index lifecycle. |
+| AIFHub-like mixed code/docs/OpenSpec benchmark | 6/6 local synthetic pairs completed with `pilot_negative`; the real Laravel committed-snapshot sample moved from 1/6 `incomplete` at 8K context to 6/6 `pilot_positive` at 16K. Neither used a production index lifecycle, and the candidate remained about 970.5x slower than direct `rg` in warm row time. |
 | H100 requirement | UNVERIFIED by the reviewed official sources. |
 | 20-50% cost reduction | UNVERIFIED by the reviewed official sources. |
 | Hosted Hugging Face inference | NOT FOUND on the observed model pages. |
 
 ## Remaining Re-evaluation Evidence
 
-The local runs establish that the bounded runner works and that the exact Q4 model can improve recall on both synthetic data and one completed real-project pair. The 5/6 real-project completion failure means this is not promotion-grade evidence. A future run must use the same complete real repository revision and answer-independent tasks for both variants, while preventing context growth or structured-output failure from invalidating most candidate rows:
+The local runs establish that the bounded runner works, that 8K context is insufficient for this real-project workload, and that the exact Q4 model can improve aggregate real-project retrieval at 16K. They also establish a large startup and row-time penalty, a per-scenario regression, and no evidence for an external index lifecycle. A future run must use the same complete real repository revision and answer-independent tasks for both variants:
 
 | Variant | Required behavior |
 |---|---|
 | `baseline_rg` | Direct bounded repository search and source-file verification. |
 | `candidate_t_search` | Same question and corpus; T-Search may plan searches against the reviewed backend, return bounded pointers, then the answerer verifies direct files. |
 
-The real corpus must include source code, Markdown, Russian/English documentation, and OpenSpec artifacts. It must exercise an actual user-owned index/search lifecycle with exact exclusions, redaction, revision identity, stale-hit behavior, incremental refresh, and complete purge. The evaluator must record correctness, citation validity, Recall@10, false-positive rate, privacy, wall time, model/search calls, total tokens, endpoint cost, index build/refresh cost, output noise, and complete purge. Raw snippets and transcripts must be scanned and deleted rather than promoted into durable evidence.
+The real corpus must include source code, Markdown, Russian/English documentation, and OpenSpec artifacts. It must exercise an actual user-owned index/search lifecycle with exact exclusions, redaction, revision identity, stale-hit behavior, incremental refresh, and complete purge. The evaluator must record correctness, citation validity, Recall@10, false-positive rate, privacy, startup time, ready-server row time, whole-command and end-to-end wall time, model/search calls, total tokens, endpoint cost, index build/refresh cost, output noise, and complete purge. Raw snippets and transcripts must be scanned and deleted rather than promoted into durable evidence.
 
 Until that run improves retrieval without an unacceptable quality or cost tradeoff and the external lifecycle passes, neither this synthetic result nor upstream web benchmark gains can change the `reject_defer` policy.

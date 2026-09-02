@@ -247,6 +247,9 @@ describe('T-Search paired pilot decisions', () => {
     assert.equal(result.summary.purge_passed, null);
     assert.equal(result.summary.persistent_state_created, null);
     assert.equal(result.summary.pairs[0].candidate_recall_at_10, null);
+    assert.equal(result.summary.server_startup_ms, null);
+    assert.ok(Number.isInteger(result.summary.benchmark_elapsed_ms));
+    assert.equal(result.summary.end_to_end_elapsed_ms, null);
   });
 
   it('records a synthetic all-pass candidate as pilot-positive without promoting policy', async () => {
@@ -254,7 +257,8 @@ describe('T-Search paired pilot decisions', () => {
       catalogPath: CATALOG,
       fixtureRoot: FIXTURE,
       rgCommandRunner: NO_MATCH_RG_COMMAND_RUNNER,
-      candidateRunner: async (scenario) => makeCandidate(scenario)
+      candidateRunner: async (scenario) => makeCandidate(scenario),
+      serverStartupMs: 1234
     });
     assert.equal(result.summary.pilot_decision, 'pilot_positive');
     assert.equal(result.summary.policy_decision, 'reject_defer');
@@ -270,6 +274,23 @@ describe('T-Search paired pilot decisions', () => {
     assert.equal(result.summary.harness_provenance_passed, true);
     assert.equal(result.summary.model_identity_passed, true);
     assert.equal(result.summary.corpus_unchanged_passed, true);
+    assert.equal(result.summary.server_startup_ms, 1234);
+    assert.ok(Number.isInteger(result.summary.benchmark_elapsed_ms));
+    assert.ok(result.summary.benchmark_elapsed_ms >= 0);
+    assert.equal(
+      result.summary.end_to_end_elapsed_ms,
+      result.summary.server_startup_ms + result.summary.benchmark_elapsed_ms
+    );
+  });
+
+  it('rejects invalid or inapplicable server startup timing', async () => {
+    await assert.rejects(runTSearchAbBenchmark({
+      serverStartupMs: -1
+    }), /non-negative integer/);
+    await assert.rejects(runTSearchAbBenchmark({
+      baselineOnly: true,
+      serverStartupMs: 1234
+    }), /requires a candidate run/);
   });
 
   it('does not call a recall gain positive when false-positive rate gets worse', async () => {
