@@ -16,8 +16,8 @@ const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..');
 const DEFAULT_CATALOG = path.join(REPO_ROOT, 'docs', 'memory-tools-research', 't-search-ab-scenarios.json');
 const ADAPTER_PATH = path.join(SCRIPT_DIR, 't-search-ab-adapter.py');
-const ALLOWED_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts', '.tsx', '.py', '.md', '.json', '.yaml', '.yml', '.toml']);
-const EXCLUDED_SEGMENTS = new Set(['.git', 'node_modules', 'vendor', 'dist', 'build', 'coverage']);
+const ALLOWED_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts', '.tsx', '.py', '.php', '.vue', '.md', '.json', '.yaml', '.yml', '.toml']);
+const EXCLUDED_SEGMENTS = new Set(['.git', 'node_modules', 'vendor', 'storage', 'dist', 'build', 'coverage']);
 const FORBIDDEN_OUTPUT_PREFIXES = [
   'openspec/',
   '.ai-factory/qa/',
@@ -776,7 +776,8 @@ function isExcludedCorpusPath(relativePath) {
   const parts = normalized.split('/');
   if (parts.some((part) => EXCLUDED_SEGMENTS.has(part))) return true;
   if (parts.some((part) => part === '.env' || part.startsWith('.env.'))) return true;
-  return normalized === '.ai-factory/qa' || normalized.startsWith('.ai-factory/qa/')
+  return normalized === 'bootstrap/cache' || normalized.startsWith('bootstrap/cache/')
+    || normalized === '.ai-factory/qa' || normalized.startsWith('.ai-factory/qa/')
     || normalized === '.ai-factory/state' || normalized.startsWith('.ai-factory/state/')
     || normalized === '.ai-factory/rules/generated' || normalized.startsWith('.ai-factory/rules/generated/');
 }

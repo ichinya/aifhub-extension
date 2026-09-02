@@ -2,12 +2,13 @@
 
 ## Outcome
 
-An authorized controlled local A/B completed all six synthetic AIFHub-like pairs. T-Search recovered every ground-truth chunk, but its aggregate false-positive rate was worse than the bounded `rg` baseline and its runtime/token overhead was large. The strict pilot result is therefore `pilot_negative`, and the policy decision remains `reject_defer`.
+An authorized controlled local A/B completed all six synthetic AIFHub-like pairs. T-Search recovered every ground-truth chunk, but its aggregate false-positive rate was worse than the bounded `rg` baseline and its runtime/token overhead was large. The strict synthetic pilot result is therefore `pilot_negative`. A later authorized committed-snapshot sample from a real Laravel project completed only one of six candidate rows under the same reduced profile, so that follow-up is `incomplete` and the policy decision remains `reject_defer`.
 
 - Static upstream identity, license, API, model-card, harness, and deployment review: complete.
 - Upstream harness quality checks: complete against the pinned source revision.
 - Model execution: PASS for the exact Q4_K_M GGUF on pinned `llama.cpp` b10068 in a reduced 8,192-context hybrid CPU/GPU profile.
 - Repository retrieval comparison: 6/6 paired synthetic rows completed; aggregate Recall@10 improved from `0.666667` to `1.0`, while false-positive rate worsened from `0.44` to `0.495238`.
+- Real Laravel snapshot follow-up: 6/6 direct `rg` rows passed, but only 1/6 T-Search rows finalized; the other rows ended with four bounded LLM errors and one free-text loop.
 - Local stateless privacy/source/freshness/purge gates: PASS; no raw transcript or persistent search state was retained.
 - Production repository and external index build/refresh/staleness/purge lifecycle: `NOT_RUN`.
 - Upstream benchmark results: recorded as author-reported context only and excluded from AIFHub recommendation evidence.
@@ -16,7 +17,7 @@ An authorized controlled local A/B completed all six synthetic AIFHub-like pairs
 
 | Field | Value |
 |---|---|
-| Observed | 2026-09-01 |
+| Observed | 2026-09-01; real-project follow-up 2026-09-02 |
 | BF16 revision | `bf0b272e0f69921ec39040807336602758448099` |
 | FP8 revision | `03ed451626ef84848866f00b6e106c4a2e843fd3` |
 | NVFP4 revision | `ad97a604e738aebccb049d57419b59048f802953` |
@@ -62,6 +63,26 @@ The live run used one round, one server slot, an 8,192-token context/budget, at 
 All six candidate rows finalized and passed exact model identity, exact harness provenance, privacy-canary scanning, source confinement, unchanged-corpus freshness, sandbox cleanup, and zero-persistent-state gates. The loopback endpoint had zero provider charge; local electricity was not priced. Index build and refresh cost were zero only because both arms used a stateless bounded `rg` backend, so this run does not validate an external production index lifecycle. The preflight smoke row was excluded from the aggregate.
 
 The pilot decision requires a Recall@10 gain without worse false-positive rate, or an FPR gain without worse recall. The observed recall gain accompanied an aggregate FPR regression, yielding `pilot_negative`; `no_promote: true` would have prevented a policy promotion even under a positive pilot score.
+
+### Authorized real Laravel snapshot follow-up 2026-09-02
+
+The same runner was exercised against an authorized committed snapshot from a real Laravel 13 project. The project identity, revision, source, scenario catalog, queries, paths, corpus fingerprint, and raw model/server output are intentionally not committed. The deterministic temporary corpus sampled 218 safe committed files into 614 marked chunks across PHP, Vue, JavaScript/TypeScript, Markdown, JSON, and configuration sources. Six fixed Russian/English code-navigation scenarios were scored. Uncommitted working-tree files were not read into the corpus, and `.env*`, `storage/**`, `bootstrap/cache/**`, `vendor/**`, `node_modules/**`, QA/state, and generated-rule paths were excluded.
+
+| Aggregate metric | `baseline_rg` | `candidate_t_search` | Interpretation |
+|---|---:|---:|---|
+| Completed rows | 6/6 | 1/6 | Five candidate rows are incomplete and cannot receive retrieval scores. |
+| Recall@10 | 0.250000 across six rows | 1.000000 on the sole completed pair | The candidate improved that pair from 0 to 1, but this is not an aggregate six-pair comparison. |
+| Precision among returned results | 0.083333 across six rows | 0.333333 on the sole completed pair | Candidate summary quality metrics cover one pair only. |
+| False-positive rate | 0.916667 across six rows | 0.666667 on the sole completed pair | The apparent improvement cannot offset 5/6 missing candidate scores. |
+| Reciprocal rank | 0.144444 across six rows | 1.000000 on the sole completed pair | Relevant material ranked first in the one completed row. |
+| Total measured row time | 0.663 s | 495.151 s | Candidate attempts were about 746.8x slower overall. |
+| Model tokens | 0 | 154,357 | 147,022 prompt plus 7,335 completion tokens. |
+| Search calls | 6 | 30 | Candidate cost includes both successful and failed bounded rows. |
+| Failure categories | none | 4 `termination_llm_error`; 1 `termination_free_text_loop` | The 8,192-context server logged six context truncations during the run. |
+
+All candidate rows still passed exact model identity, exact harness provenance, privacy-canary scanning, source confinement, unchanged-corpus freshness, purge, and zero-persistent-state gates. Sanitized durable results contained zero canary values. The pinned Q4_K_M server's cold start took about 362 seconds on this follow-up, in addition to measured row time.
+
+This is real-source evidence, but it remains a deterministic sample using the stateless bounded `rg` search adapter rather than a production vector/BM25 index. Because five candidate rows failed to finalize, the runner records `pilot_decision: incomplete`; the permanent decision remains `reject_defer`. Candidate averages from this run must never be presented without the `1/6` completion denominator.
 
 Safe preparation and baseline commands are:
 
@@ -151,14 +172,14 @@ This spread reinforces the architectural finding: T-Search does not replace the 
 | MCP adapter | NOT FOUND. |
 | Built-in indexing or corpus ingestion | NOT FOUND. |
 | Source exclusions, redaction, freshness, or purge | NOT PROVIDED by the harness. |
-| AIFHub-like mixed code/docs/OpenSpec benchmark | 6/6 local synthetic pairs completed in a reduced profile; `pilot_negative`, not a real-repository or production-index result. |
+| AIFHub-like mixed code/docs/OpenSpec benchmark | 6/6 local synthetic pairs completed with `pilot_negative`; a real Laravel committed-snapshot sample completed only 1/6 candidate rows with `incomplete`. Neither used a production index lifecycle. |
 | H100 requirement | UNVERIFIED by the reviewed official sources. |
 | 20-50% cost reduction | UNVERIFIED by the reviewed official sources. |
 | Hosted Hugging Face inference | NOT FOUND on the observed model pages. |
 
 ## Remaining Re-evaluation Evidence
 
-The local run establishes that the bounded runner works and that the exact Q4 model can improve recall on a small mixed-language fixture. A future promotion-grade run must use the same real repository revision and answer-independent tasks for both variants:
+The local runs establish that the bounded runner works and that the exact Q4 model can improve recall on both synthetic data and one completed real-project pair. The 5/6 real-project completion failure means this is not promotion-grade evidence. A future run must use the same complete real repository revision and answer-independent tasks for both variants, while preventing context growth or structured-output failure from invalidating most candidate rows:
 
 | Variant | Required behavior |
 |---|---|

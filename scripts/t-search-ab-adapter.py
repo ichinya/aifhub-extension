@@ -37,13 +37,23 @@ ALLOWED_EXTENSIONS = {
     ".ts",
     ".tsx",
     ".py",
+    ".php",
+    ".vue",
     ".md",
     ".json",
     ".yaml",
     ".yml",
     ".toml",
 }
-EXCLUDED_SEGMENTS = {".git", "node_modules", "vendor", "dist", "build", "coverage"}
+EXCLUDED_SEGMENTS = {
+    ".git",
+    "node_modules",
+    "vendor",
+    "storage",
+    "dist",
+    "build",
+    "coverage",
+}
 STOP_WORDS = {
     "about",
     "after",
@@ -255,6 +265,7 @@ def is_excluded(relative_path: str) -> bool:
     return any(
         normalized == prefix or normalized.startswith(f"{prefix}/")
         for prefix in (
+            "bootstrap/cache",
             ".ai-factory/qa",
             ".ai-factory/state",
             ".ai-factory/rules/generated",

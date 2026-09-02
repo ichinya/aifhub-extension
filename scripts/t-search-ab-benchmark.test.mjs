@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
@@ -89,6 +89,25 @@ describe('T-Search bounded synthetic corpus', () => {
     assert.deepEqual(chunks.map((chunk) => chunk.chunk_id), ['sample.ts#one', 'sample.ts#two']);
     assert.deepEqual(chunks.map((chunk) => [chunk.start_line, chunk.end_line]), [[2, 2], [4, 5]]);
     assert.throws(() => parseMarkedChunks('unmarked.md', '# no marker'), /no chunk markers/);
+  });
+
+  it('accepts marked PHP and Vue sources for Laravel project pilots', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 't-search-laravel-corpus-test-'));
+    try {
+      await writeFile(path.join(root, 'Example.php'), '// chunk: php-source\n<?php final class Example {}\n');
+      await writeFile(path.join(root, 'Panel.vue'), '<!-- chunk: vue-source -->\n<template><main>Panel</main></template>\n');
+      await mkdir(path.join(root, 'storage', 'framework'), { recursive: true });
+      await writeFile(path.join(root, 'storage', 'framework', 'private.php'), '// chunk: private-storage\nsecret\n');
+      await mkdir(path.join(root, 'bootstrap', 'cache'), { recursive: true });
+      await writeFile(path.join(root, 'bootstrap', 'cache', 'services.php'), '// chunk: generated-cache\nsecret\n');
+      const corpus = await buildTSearchCorpus({ fixtureRoot: root });
+      assert.deepEqual(corpus.chunks.map((chunk) => chunk.chunk_id), [
+        'Example.php#php-source',
+        'Panel.vue#vue-source'
+      ]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
 
@@ -195,6 +214,10 @@ describe('T-Search candidate output boundary', () => {
     assert.match(adapter, new RegExp(T_SEARCH_HARNESS_REVISION));
     assert.match(adapter, /EXPECTED_HARNESS_FILES/);
     assert.match(adapter, /EXPECTED_HARNESS_TREE_DIGEST/);
+    assert.match(adapter, /"\.php"/);
+    assert.match(adapter, /"\.vue"/);
+    assert.match(adapter, /"storage"/);
+    assert.match(adapter, /"bootstrap\/cache"/);
     assert.doesNotMatch(adapter, /result\.to_dict\s*\(/);
     assert.match(adapter, /privacy_passed = not contains_private_material/);
     assert.match(adapter, /endpoint_not_loopback_http/);

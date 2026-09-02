@@ -4,7 +4,7 @@
 
 `t-search` is `reject_defer`. AIFHub must not recommend, install, download, probe, configure, index for, or execute T-Search in normal workflows. The candidate is not a drop-in retrieval provider: it is an agentic query planner and ranker that requires both a separately served model and a user-owned search backend over a user-owned corpus.
 
-The upstream results are promising on fixed web-search benchmarks. An authorized reduced-profile local pilot also improved Recall@10 on a synthetic AIFHub-like mixed corpus, but it regressed aggregate false-positive rate and added substantial latency/token overhead. It still does not establish a real-repository external index lifecycle, production cost, or full-context behavior. The official [T-Bank technical report](https://habr.com/ru/companies/tbank/articles/1060262/) likewise recommends validation on the consumer's own index. No `docs/retrieval-providers.md` integration guide is added because the issue's positive-evaluation gate was not met.
+The upstream results are promising on fixed web-search benchmarks. An authorized reduced-profile local pilot improved Recall@10 on a synthetic AIFHub-like mixed corpus, but it regressed aggregate false-positive rate and added substantial latency/token overhead. A follow-up on an authorized real Laravel committed-snapshot sample completed only one of six candidate rows: the one comparable pair improved, while four rows ended in bounded LLM errors and one in a free-text loop. It still does not establish a real-repository external index lifecycle, production cost, or full-context behavior. The official [T-Bank technical report](https://habr.com/ru/companies/tbank/articles/1060262/) likewise recommends validation on the consumer's own index. No `docs/retrieval-providers.md` integration guide is added because the issue's positive-evaluation gate was not met.
 
 ## Exact Identity
 
@@ -50,7 +50,7 @@ The harness provides the search loop, tool schemas, round state, and final ranki
 | vLLM | The harness example points at a vLLM-style `/v1` endpoint, and current [vLLM documentation](https://docs.vllm.ai/en/stable/serving/openai_compatible_server.html) supports OpenAI-compatible chat completions, reasoning parsing, and tool calling. The exact T-Search checkpoint/runtime combination is not validated by this evaluation. | Interface-compatible in principle; `NOT_RUN`. |
 | Hosted Hugging Face inference | None of the four observed model pages listed a deployed Hugging Face Inference Provider. | Not available at observation time. |
 
-The smallest official checkpoint is the 21.71 GB Q4_K_M GGUF. Its exact 21,713,463,136-byte file (SHA-256 `f645dce898117a1f9165dfbb014d61e5f09daec06bb64f4b91de7f103b8761bb`) exceeded the local RTX 4060 Ti's VRAM, but `llama.cpp --fit` successfully used hybrid offload with 64 GB system RAM. Model load took about 152 seconds and GPU memory reached approximately 15,820 MiB. This proves reduced-profile feasibility, not a practical default deployment.
+The smallest official checkpoint is the 21.71 GB Q4_K_M GGUF. Its exact 21,713,463,136-byte file (SHA-256 `f645dce898117a1f9165dfbb014d61e5f09daec06bb64f4b91de7f103b8761bb`) exceeded the local RTX 4060 Ti's VRAM, but `llama.cpp --fit` successfully used hybrid offload with 64 GB system RAM. Model load took about 152 seconds in the first live run and about 362 seconds on a later cold start; GPU memory reached approximately 15,820 MiB. This proves reduced-profile feasibility, not a practical default deployment.
 
 ## Runtime and Cost Surface
 
@@ -90,6 +90,14 @@ The 2026-09-01 run completed all six pairs and all safety/provenance gates. Aggr
 
 The local endpoint had no provider charge; electricity was not priced. The stateless `rg` search backend had no index build or refresh cost, so the passed freshness/purge checks cover only the bounded pilot adapter and temporary sandboxes. They do not prove a production vector/BM25 index lifecycle. Full per-scenario metrics are in [T-Search Benchmark Results](t-search-benchmark-results.md#authorized-live-result-2026-09-01).
 
+### Real Laravel snapshot follow-up
+
+On 2026-09-02, the runner used a deterministic 218-file, 614-chunk sample from an authorized committed Laravel 13 snapshot, with six fixed English/Russian tasks. PHP and Vue are now explicit corpus formats; Laravel runtime/generated locations such as `storage/**` and `bootstrap/cache/**` remain excluded alongside secrets, dependencies, QA/state, and generated rules. Project identity, revision, source, scenario details, queries, paths, fingerprint, and raw output are not committed.
+
+All six `rg` rows completed with average Recall@10 `0.25`. T-Search completed only one row; that pair improved Recall@10 from `0` to `1.0`, precision from `0` to `0.333333`, false-positive rate from `1.0` to `0.666667`, and reciprocal rank from `0` to `1.0`. The other rows ended with four `termination_llm_error` results and one `termination_free_text_loop`; the 8,192-context server logged six truncations. Candidate attempts consumed 154,357 tokens, 30 searches, and 495.151 seconds versus 0.663 seconds for all baseline rows, about 746.8x slower.
+
+Privacy, source boundary, freshness, purge, harness provenance, model identity, unchanged-corpus, and zero-persistent-state gates all passed. The follow-up is nevertheless `incomplete`, not positive: candidate quality averages describe the sole completed pair and cannot be generalized to the five failed rows. Aggregate-only evidence is in [T-Search Benchmark Results](t-search-benchmark-results.md#authorized-real-laravel-snapshot-follow-up-2026-09-02).
+
 ## Privacy, Freshness, and Storage
 
 The model endpoint receives the user question and every snippet returned by the search backend. The harness stores snippets in tool messages and exposes `messages` plus `all_round_messages`; `RetrievalResult.to_dict()` serializes the transcript. Therefore:
@@ -114,7 +122,7 @@ The recommender enforces this with explicit command-level `forbidden` entries, `
 
 ## Re-evaluation Gate
 
-The synthetic pilot satisfied the bounded mixed-language runner and local stateless safety gates, but did not satisfy promotion. Promotion still requires all of the following in a separate, explicitly authorized evaluation:
+The synthetic pilot satisfied the bounded mixed-language runner and local stateless safety gates, but did not satisfy promotion. The real Laravel snapshot follow-up also passed its local safety gates, but failed to produce comparable output for five of six candidate rows and still used a stateless search adapter rather than an external index lifecycle. Promotion still requires all of the following in a separate, explicitly authorized evaluation:
 
 1. A bounded real user-owned repository corpus and production-representative search backend with project-root confinement, symlink/path-escape protection, explicit secret/vendor/build exclusions, redaction, and deterministic chunk IDs.
 2. Verified index build, revision identity, incremental refresh, stale-entry behavior, and complete purge.
@@ -134,7 +142,7 @@ recommendation_action: do_not_suggest_install
 integration_role: user_owned_agentic_retriever_candidate
 normal_command_selection: forbidden
 source_denylist: true
-paired_aifhub_benchmark: LOCAL_SYNTHETIC_PILOT_NEGATIVE
+paired_aifhub_benchmark: LOCAL_SYNTHETIC_PILOT_NEGATIVE_AND_REAL_LARAVEL_SAMPLE_INCOMPLETE
 live_model_run: PASS_REDUCED_8192_CONTEXT
 external_index_lifecycle: NOT_RUN
 ```
