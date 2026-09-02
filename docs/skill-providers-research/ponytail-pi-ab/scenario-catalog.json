@@ -91,6 +91,34 @@
           "cwd": "."
         }
       ]
+    },
+    {
+      "id": "cutcode-shop",
+      "source_directory": "cutcode-shop",
+      "source_commit": "1dc513dd7821c30cab2a8738b399768da58b049d",
+      "project_shape": [
+        "php",
+        "laravel",
+        "commerce",
+        "money-correctness",
+        "over-build-sensitive"
+      ],
+      "dependency_files": [
+        "composer.json",
+        "composer.lock",
+        "package.json",
+        "package-lock.json"
+      ],
+      "validation": [
+        {
+          "command": "php",
+          "args": [
+            "-l",
+            "src/Support/ValueObjects/Price.php"
+          ],
+          "cwd": "."
+        }
+      ]
     }
   ],
   "scenarios": [
@@ -138,6 +166,30 @@
         "PBKDF2 parameter change",
         "safe envelope format change",
         "shell mode behavior change"
+      ]
+    },
+    {
+      "id": "laravel-exact-price-formatting",
+      "fixture_id": "cutcode-shop",
+      "shape": "security-correctness",
+      "title": "Format integer-backed Laravel prices without floating-point precision loss",
+      "task": "Treat this text as the complete canonical implementation task. Fix string rendering in src/Support/ValueObjects/Price.php so raw integer minor units are formatted exactly without passing them through floating-point arithmetic. Treat precision as a decimal scale: support positive powers of ten such as 1, 10, 100, and 1000, render exactly the corresponding number of fractional digits, group whole digits with spaces, use a comma decimal separator, and retain the existing currency symbol. With the default precision, raw 9007199254740993 must render with the numeric part 90 071 992 547 409,93 and PHP_INT_MAX on a 64-bit runtime must render as 92 233 720 368 547 758,07; ordinary values and zero must remain correct. Reject a non-positive precision or a precision that is not a power of ten with InvalidArgumentException whose exact message is Precision must be a positive power of ten. Preserve the public constructor and method signatures, the existing currency validation, raw(), and value() behavior for existing normal inputs. Do not add dependencies or change composer.json, composer.lock, package.json, or package-lock.json. Add focused unit regression coverage, run php -l src/Support/ValueObjects/Price.php, and keep the change scoped to the value object and its tests; do not introduce a money package, service layer, cast redesign, or framework-wide abstraction.",
+      "hidden_grader": "cutcode-price-format.php",
+      "required_behaviors": [
+        "large raw integer formatting has no floating-point precision loss",
+        "PHP_INT_MAX formats exactly on a 64-bit runtime",
+        "precision 1, 10, 100, and 1000 controls fractional digits",
+        "whole digits are grouped with spaces and the decimal separator is a comma",
+        "zero and ordinary default-precision prices remain unchanged",
+        "invalid precision is rejected with the canonical exception"
+      ],
+      "forbidden_changes": [
+        "new dependency",
+        "composer or package manifest change",
+        "money package or service abstraction",
+        "price cast redesign",
+        "currency behavior change",
+        "public API change"
       ]
     }
   ]

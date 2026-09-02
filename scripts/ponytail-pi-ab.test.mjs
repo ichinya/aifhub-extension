@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, it } from 'node:test';
 
 import {
   PONYTAIL_CONDITIONS,
+  buildHiddenGraderInvocation,
   buildPiInvocation,
   buildPonytailPiMatrix,
   cloneGitSnapshot,
@@ -44,10 +45,19 @@ describe('Ponytail Pi A/B catalog', () => {
     assert.deepEqual(new Set(catalog.scenarios.map((item) => item.shape)), new Set(['over-build', 'security-correctness']));
     assert.deepEqual(
       catalog.fixtures.map((item) => item.source_commit),
-      ['24a55ce21aa6a525dd3bd215b13b2af8ef2e14a8', 'd643d48ff84c098079f02576a115da3e61135579']
+      [
+        '24a55ce21aa6a525dd3bd215b13b2af8ef2e14a8',
+        'd643d48ff84c098079f02576a115da3e61135579',
+        '1dc513dd7821c30cab2a8738b399768da58b049d'
+      ]
     );
     assert.deepEqual(catalog.fixtures[0].validation[0].args, ['test', '-skip', 'OpenSSL', './...']);
     assert.match(catalog.scenarios[1].task, /external-OpenSSL interoperability tests are excluded/);
+    assert.deepEqual(catalog.fixtures[2].project_shape, [
+      'php', 'laravel', 'commerce', 'money-correctness', 'over-build-sensitive'
+    ]);
+    assert.equal(catalog.scenarios[2].fixture_id, 'cutcode-shop');
+    assert.equal(catalog.scenarios[2].hidden_grader, 'cutcode-price-format.php');
     assert.doesNotMatch(JSON.stringify(catalog), /D:\\projects|[A-Za-z]:\\Users\\|BEGIN PRIVATE KEY/i);
   });
 
@@ -58,24 +68,26 @@ describe('Ponytail Pi A/B catalog', () => {
     unsafe.defaults.repetitions = 1;
     unsafe.fixtures[0].source_directory = '../passkey';
     unsafe.scenarios[0].task = 'token=secret-value';
+    unsafe.scenarios[1].hidden_grader = 'grader.txt';
     const errors = validatePonytailPiCatalog(unsafe);
     assert.ok(errors.some((item) => item.includes('defaults.conditions')));
     assert.ok(errors.some((item) => item.includes('defaults.repetitions')));
     assert.ok(errors.some((item) => item.includes('source_directory')));
     assert.ok(errors.some((item) => item.includes('private-looking material')));
+    assert.ok(errors.some((item) => item.includes('hidden_grader')));
   });
 });
 
 describe('Ponytail Pi A/B matrix', () => {
-  it('builds sixteen paired cases with stable task/settings fingerprints and balanced arm order', async () => {
+  it('builds twenty-four paired cases with stable task/settings fingerprints and balanced arm order', async () => {
     const catalog = await loadPonytailPiCatalog({ cwd: process.cwd() });
     const matrix = buildPonytailPiMatrix({
       catalog,
       runId: 'ponytail-lq-low-test',
       generatedAt: '2026-09-01T00:00:00.000Z'
     });
-    assert.equal(matrix.cases.length, 16);
-    assert.equal(new Set(matrix.cases.map((item) => item.id)).size, 16);
+    assert.equal(matrix.cases.length, 24);
+    assert.equal(new Set(matrix.cases.map((item) => item.id)).size, 24);
     for (const pairId of new Set(matrix.cases.map((item) => item.pair_id))) {
       const pair = matrix.cases.filter((item) => item.pair_id === pairId);
       assert.equal(pair.length, 2);
@@ -129,6 +141,25 @@ describe('Ponytail Pi A/B matrix', () => {
     assert.deepEqual(summary.provider_usage, { input: 10, output: 5, cost: { total: 0.01 } });
     assert.doesNotMatch(JSON.stringify(summary), /private output/);
   });
+
+  it('runs JavaScript graders with Node and Laravel graders with PHP', () => {
+    assert.deepEqual(
+      buildHiddenGraderInvocation(
+        { hidden_grader: 'yougile-url-join.mjs' },
+        'C:\\temp\\project',
+        'C:\\temp\\grader.mjs'
+      ),
+      { command: process.execPath, args: ['C:\\temp\\grader.mjs', 'C:\\temp\\project'] }
+    );
+    assert.deepEqual(
+      buildHiddenGraderInvocation(
+        { hidden_grader: 'cutcode-price-format.php' },
+        'C:\\temp\\project',
+        'C:\\temp\\grader.php'
+      ),
+      { command: 'php', args: ['C:\\temp\\grader.php', 'C:\\temp\\project'] }
+    );
+  });
 });
 
 describe('Ponytail Pi A/B preparation safety', () => {
@@ -145,12 +176,19 @@ describe('Ponytail Pi A/B preparation safety', () => {
       'package.json': '{"type":"module"}\n',
       'package-lock.json': '{"lockfileVersion":3}\n'
     });
+    const cutcodeCommit = await createGitFixture(path.join(referencesRoot, 'cutcode-shop'), {
+      'src/Support/Traits/Makeable.php': '<?php\n',
+      'src/Support/ValueObjects/Price.php': '<?php\n',
+      'composer.json': '{}\n',
+      'composer.lock': '{}\n'
+    });
     const ponytailCommit = await createGitFixture(ponytailRoot, {
       'skills/ponytail/SKILL.md': '---\nname: ponytail\n---\n# Ponytail\n'
     });
     const catalog = await loadPonytailPiCatalog({ cwd: process.cwd() });
     catalog.fixtures[0].source_commit = passkeyCommit;
     catalog.fixtures[1].source_commit = yougileCommit;
+    catalog.fixtures[2].source_commit = cutcodeCommit;
     catalog.ponytail.source_commit = ponytailCommit;
     delete catalog.source_path;
     const catalogPath = path.join(tempDir, 'catalog.json');
@@ -168,9 +206,9 @@ describe('Ponytail Pi A/B preparation safety', () => {
       cwd: process.cwd()
     });
 
-    assert.equal(prepared.prepared_cases, 16);
+    assert.equal(prepared.prepared_cases, 24);
     const summary = JSON.parse(await readFile(path.join(outDir, 'matrix-summary.json'), 'utf8'));
-    assert.equal(summary.cases.length, 16);
+    assert.equal(summary.cases.length, 24);
     assert.match(summary.ponytail.copied_skill_sha256, /^[0-9a-f]{64}$/);
     const firstCase = summary.cases[0];
     assert.equal(
@@ -183,6 +221,7 @@ describe('Ponytail Pi A/B preparation safety', () => {
     assert.doesNotMatch(invocation, new RegExp(escapeRegex(tempDir), 'i'));
     assert.equal((await execFileAsync('git', ['-C', path.join(referencesRoot, 'passkey'), 'status', '--porcelain'])).stdout, '');
     assert.equal((await execFileAsync('git', ['-C', path.join(referencesRoot, 'yougile-mcp'), 'status', '--porcelain'])).stdout, '');
+    assert.equal((await execFileAsync('git', ['-C', path.join(referencesRoot, 'cutcode-shop'), 'status', '--porcelain'])).stdout, '');
     assert.equal((await execFileAsync('git', ['-C', ponytailRoot, 'status', '--porcelain'])).stdout, '');
   });
 
@@ -195,6 +234,30 @@ describe('Ponytail Pi A/B preparation safety', () => {
     assert.equal((await execFileAsync('git', ['-C', target, 'status', '--porcelain'])).stdout, '');
     await writeFile(path.join(target, 'src', 'value.txt'), 'target-only\n', 'utf8');
     assert.equal(await readFile(path.join(source, 'src', 'value.txt'), 'utf8'), 'source\n');
+  });
+
+  it('checks out deep Laravel-style files in long Windows case paths', async () => {
+    const source = path.join(tempDir, 'long-source');
+    const longFile = path.join(
+      'database',
+      'migrations',
+      `2026_09_02_000000_${'long_laravel_migration_'.repeat(5)}table.php`
+    );
+    const commit = await createGitFixture(source, { [longFile]: '<?php\n' });
+    const target = path.join(
+      tempDir,
+      'cases',
+      'ponytail-lq-low-test__laravel-exact-price-formatting__r01__baseline',
+      'project'
+    );
+
+    await cloneGitSnapshot(source, target, commit);
+
+    assert.equal((await readFile(path.join(target, longFile), 'utf8')).replaceAll('\r\n', '\n'), '<?php\n');
+    assert.equal(
+      (await execFileAsync('git', ['-C', target, '-c', 'core.longpaths=true', 'status', '--porcelain'])).stdout,
+      ''
+    );
   });
 
   it('does not write during dry-run and rejects dirty source copies or overlapping output', async () => {
@@ -214,10 +277,12 @@ describe('Ponytail Pi A/B preparation safety', () => {
     await mkdir(referencesRoot, { recursive: true });
     const passkeyCommit = await createGitFixture(path.join(referencesRoot, 'passkey'), { 'go/main.go': 'package main\n' });
     const yougileCommit = await createGitFixture(path.join(referencesRoot, 'yougile-mcp'), { 'src/index.ts': 'export {};\n' });
+    const cutcodeCommit = await createGitFixture(path.join(referencesRoot, 'cutcode-shop'), { 'src/price.php': '<?php\n' });
     const ponytailCommit = await createGitFixture(ponytailRoot, { 'skills/ponytail/SKILL.md': '# Ponytail\n' });
     const catalog = await loadPonytailPiCatalog({ cwd: process.cwd() });
     catalog.fixtures[0].source_commit = passkeyCommit;
     catalog.fixtures[1].source_commit = yougileCommit;
+    catalog.fixtures[2].source_commit = cutcodeCommit;
     catalog.ponytail.source_commit = ponytailCommit;
     delete catalog.source_path;
     const catalogPath = path.join(tempDir, 'catalog.json');

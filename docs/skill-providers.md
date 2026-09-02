@@ -41,7 +41,7 @@ Official Codex documentation подтверждает, что [skills могут
 | Non-Python package/hook subset | `PASS` | 35/35 selected Node tests: behavior, commands, hooks, Windows hooks, OpenCode, package, package scripts и Qoder |
 | Full upstream `npm test` | `PARTIAL` | 72/82 root tests passed; 10 Python-backed correctness/Hermes tests не смогли запуститься, потому что evaluation host не имел `python`. Subproject test tail поэтому не стартовал; full-package PASS не заявляется |
 | Upstream benchmark self-test | `NOT_RUN(local_python_unavailable)` | Published benchmark method и scorers были source-reviewed, но не reproduced |
-| Paired Pi implementation proxy | `NOT_RUN(scenarios_ready_execution_pending)` | [Runnable 16-case matrix](skill-providers-research/ponytail-pi-ab/README.md) pins `pi 0.84.4`, `omniroute/lq/qwen3.8-27b`, two real-project commits, four repetitions per arm and hidden behavioral graders; no model result is claimed before execution |
+| Paired Pi implementation proxy | `NOT_RUN(scenarios_ready_execution_pending)` | [Runnable 24-case matrix](skill-providers-research/ponytail-pi-ab/README.md) pins `pi 0.84.4`, `omniroute/lq/qwen3.8-27b`, three real-project commits (TypeScript, Go, and Laravel/PHP), four repetitions per arm and hidden behavioral graders; no model result is claimed before execution |
 | Paired AIFHub OpenSpec implementation | `NOT_RUN(dedicated_isolated_runner_required)` | Нет baseline/candidate runs на одном canonical change, поэтому AIFHub LOC/token/time benefit не заявляется |
 | AIFHub review/security/verify parity | `NOT_RUN` | Нет evidence, что findings, gate status или fix-cycle count сохраняются |
 
@@ -101,7 +101,7 @@ Standalone explicit skill без lifecycle hooks предпочтительне�
 
 Promotion возможен только если candidate даёт stable reduction без ухудшения completeness, tests, findings или gate status, без canonical mutations и без пропуска required output. Contaminated, single-run, provider-authored-only или unpinned evidence не меняет policy.
 
-[Ponytail Pi A/B Scenarios](skill-providers-research/ponytail-pi-ab/README.md) реализуют первый implementation-only proxy этого контракта: две exact-commit копии реальных проектов, четыре парных повтора на task, одинаковый Pi/Qwen envelope и независимые hidden graders. Этот набор намеренно не запускает AIFHub lifecycle sidecars, поэтому даже полный proxy PASS сам по себе не удовлетворяет promotion benchmark.
+[Ponytail Pi A/B Scenarios](skill-providers-research/ponytail-pi-ab/README.md) реализуют первый implementation-only proxy этого контракта: три exact-commit копии реальных TypeScript, Go и Laravel/PHP проектов, четыре парных повтора на task, одинаковый Pi/Qwen envelope и независимые hidden graders. Этот набор намеренно не запускает AIFHub lifecycle sidecars, поэтому даже полный proxy PASS сам по себе не удовлетворяет promotion benchmark.
 
 ## Границы AIFHub
 

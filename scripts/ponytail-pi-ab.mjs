@@ -114,7 +114,11 @@ export function validatePonytailPiCatalog(catalog = {}) {
     if (containsPrivateMaterial(`${scenario.title ?? ''}\n${scenario.task ?? ''}`)) {
       errors.push(`${prefix} contains private-looking material`);
     }
-    if (!safePathSegment(scenario.hidden_grader)) errors.push(`${prefix}.hidden_grader must be one safe filename`);
+    if (!safePathSegment(scenario.hidden_grader)) {
+      errors.push(`${prefix}.hidden_grader must be one safe filename`);
+    } else if (!supportedHiddenGrader(scenario.hidden_grader)) {
+      errors.push(`${prefix}.hidden_grader must be an .mjs, .php, or _test.go grader`);
+    }
     if (asArray(scenario.required_behaviors).length === 0) errors.push(`${prefix}.required_behaviors must not be empty`);
     if (asArray(scenario.forbidden_changes).length === 0) errors.push(`${prefix}.forbidden_changes must not be empty`);
   }
@@ -377,7 +381,7 @@ export async function executePonytailPiMatrix(prepared, { piCommand = 'pi' } = {
       }
     }
     const hiddenResult = await runHiddenGrader(matrixCase, projectRoot, caseRoot);
-    const diffCheck = await runExternal('git', ['diff', '--check', matrixCase.fixture_commit, '--'], {
+    const diffCheck = await runExternal('git', gitArgs('diff', '--check', matrixCase.fixture_commit, '--'), {
       cwd: projectRoot,
       timeoutMs: 60_000
     });
@@ -501,6 +505,16 @@ export function summarizePiJson(jsonl) {
   return { event_count: eventCount, tool_calls: toolCalls, provider_usage: usage };
 }
 
+export function buildHiddenGraderInvocation(matrixCase, projectRoot, graderPath) {
+  if (matrixCase.hidden_grader.endsWith('.php')) {
+    return { command: 'php', args: [graderPath, projectRoot] };
+  }
+  if (matrixCase.hidden_grader.endsWith('.mjs')) {
+    return { command: process.execPath, args: [graderPath, projectRoot] };
+  }
+  throw new Error(`unsupported script grader ${matrixCase.hidden_grader}`);
+}
+
 async function runHiddenGrader(matrixCase, projectRoot, caseRoot) {
   const grader = path.join(GRADER_ROOT, matrixCase.hidden_grader);
   await assertPathExists(grader, `hidden grader ${matrixCase.hidden_grader}`);
@@ -517,7 +531,8 @@ async function runHiddenGrader(matrixCase, projectRoot, caseRoot) {
       await rm(injected, { force: true });
     }
   } else {
-    result = await runExternal(process.execPath, [grader, projectRoot], {
+    const invocation = buildHiddenGraderInvocation(matrixCase, projectRoot, grader);
+    result = await runExternal(invocation.command, invocation.args, {
       cwd: projectRoot,
       timeoutMs: matrixCase.timeout_seconds * 1000
     });
@@ -528,10 +543,10 @@ async function runHiddenGrader(matrixCase, projectRoot, caseRoot) {
 
 async function collectGitMetrics(projectRoot, sourceCommit, dependencyFiles) {
   const [head, statusResult, numstatResult, namesResult] = await Promise.all([
-    runExternal('git', ['rev-parse', 'HEAD'], { cwd: projectRoot, timeoutMs: 30_000 }),
-    runExternal('git', ['status', '--porcelain=v1', '--untracked-files=all'], { cwd: projectRoot, timeoutMs: 30_000 }),
-    runExternal('git', ['diff', '--numstat', sourceCommit, '--'], { cwd: projectRoot, timeoutMs: 30_000 }),
-    runExternal('git', ['diff', '--name-only', sourceCommit, '--'], { cwd: projectRoot, timeoutMs: 30_000 })
+    runExternal('git', gitArgs('rev-parse', 'HEAD'), { cwd: projectRoot, timeoutMs: 30_000 }),
+    runExternal('git', gitArgs('status', '--porcelain=v1', '--untracked-files=all'), { cwd: projectRoot, timeoutMs: 30_000 }),
+    runExternal('git', gitArgs('diff', '--numstat', sourceCommit, '--'), { cwd: projectRoot, timeoutMs: 30_000 }),
+    runExternal('git', gitArgs('diff', '--name-only', sourceCommit, '--'), { cwd: projectRoot, timeoutMs: 30_000 })
   ]);
   const changed = new Set(namesResult.stdout.split(/\r?\n/).filter(Boolean).map(toPosix));
   const untracked = statusResult.stdout.split(/\r?\n/)
@@ -608,22 +623,22 @@ async function writeCommandLogs(caseRoot, stem, result) {
 }
 
 export async function cloneGitSnapshot(source, target, commit) {
-  const clone = await runExternal('git', ['clone', '--local', '--no-hardlinks', '--no-checkout', source, target], {
+  const clone = await runExternal('git', gitArgs('clone', '--local', '--no-hardlinks', '--no-checkout', source, target), {
     timeoutMs: 120_000
   });
   if (clone.exitCode !== 0) throw new Error(`git clone failed: ${clone.stderr.trim()}`);
-  const checkout = await runExternal('git', ['checkout', '--detach', commit], { cwd: target, timeoutMs: 60_000 });
+  const checkout = await runExternal('git', gitArgs('checkout', '--detach', commit), { cwd: target, timeoutMs: 60_000 });
   if (checkout.exitCode !== 0) throw new Error(`git checkout failed: ${checkout.stderr.trim()}`);
   await verifyGitSnapshot(target, commit, 'prepared case');
 }
 
 async function verifyGitSnapshot(repoRoot, expectedCommit, label) {
   await assertPathExists(repoRoot, label);
-  const head = await runExternal('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, timeoutMs: 30_000 });
+  const head = await runExternal('git', gitArgs('rev-parse', 'HEAD'), { cwd: repoRoot, timeoutMs: 30_000 });
   if (head.exitCode !== 0 || head.stdout.trim() !== expectedCommit) {
     throw new Error(`${label} must be at exact commit ${expectedCommit}`);
   }
-  const statusResult = await runExternal('git', ['status', '--porcelain=v1', '--untracked-files=all'], {
+  const statusResult = await runExternal('git', gitArgs('status', '--porcelain=v1', '--untracked-files=all'), {
     cwd: repoRoot,
     timeoutMs: 30_000
   });
@@ -791,6 +806,14 @@ function asArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
+function gitArgs(...args) {
+  return ['-c', 'core.longpaths=true', ...args];
+}
+
+function supportedHiddenGrader(value) {
+  return value.endsWith('.mjs') || value.endsWith('.php') || value.endsWith('_test.go');
+}
+
 function parseCliArgs(args) {
   const parsed = {};
   for (let index = 0; index < args.length; index += 1) {
@@ -820,13 +843,13 @@ function usage() {
     '',
     'Options:',
     `  --catalog <file>          Catalog JSON. Default: ${toPosix(path.relative(REPO_ROOT, DEFAULT_CATALOG))}.`,
-    '  --references-root <dir>  Root containing clean passkey and yougile-mcp snapshot copies.',
+    '  --references-root <dir>  Root containing clean passkey, yougile-mcp, and cutcode-shop snapshots.',
     '  --ponytail-root <dir>     Clean Ponytail v4.9.0 source snapshot.',
     '  --out <dir>               New disposable output directory.',
     '  --provider <id>           Override the pinned provider.',
     '  --model <id>              Override the pinned model.',
     '  --thinking <level>        Override the pinned thinking level.',
-    '  --dry-run                 Validate and build the in-memory 16-case matrix only.',
+    '  --dry-run                 Validate and build the in-memory paired matrix only.',
     '  --check-runtime            Verify pinned Pi, model, and auth without an inference call.',
     '  --execute                 Run Pi and independent graders after preparation.',
     '  --pi-command <path>       Pi executable. Default: pi.',

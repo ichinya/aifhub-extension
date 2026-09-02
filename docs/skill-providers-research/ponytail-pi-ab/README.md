@@ -13,18 +13,23 @@ This directory defines an implementation-only paired experiment for the Ponytail
 - Tools: the same bounded built-in tool allowlist in both arms
 - Order: baseline first on odd repetitions and candidate first on even repetitions
 
-The two tasks deliberately test different failure modes:
+The three tasks deliberately test different failure modes and project stacks:
 
 1. `typescript-url-join` is an over-build-shaped fix in a small TypeScript MCP server. A hidden grader checks four slash-boundary combinations and query preservation.
 2. `go-safe-decrypt-errors` is a security/correctness-sensitive fix in a small Go CLI. A hidden Go test checks malformed, truncated, unauthenticated, wrong-key, and tampered ciphertext while preserving a valid round trip.
+3. `laravel-exact-price-formatting` is a money-correctness fix in the Laravel `cutcode-shop` project. A hidden PHP grader checks exact integer-backed formatting at multiple decimal scales, including values beyond IEEE-754 integer precision, without requiring Composer dependencies, a database, or an application `.env`.
 
 The Go public command is `go test -skip OpenSSL ./...`: all native project tests and the injected hidden test run, while three pre-existing external interoperability cases are excluded because the pinned Windows benchmark host has no `openssl` executable on `PATH`. This environmental exclusion is fixed for both arms and is not reported as full upstream test coverage.
+
+The Laravel public command is `php -l src/Support/ValueObjects/Price.php`. Its hidden grader loads only the value object and its small local trait, so every arm exercises the same production PHP code without coupling the benchmark to MySQL, local secrets, or an uncommitted `.env.testing` file.
 
 The catalog records only repository names and exact commits. It does not contain source code, private paths, credentials, raw model output, or a copy of Ponytail.
 
 ## Source Safety
 
 Never point `pi` at the original projects. First make clean committed-snapshot copies outside `D:\projects`; the matrix generator verifies the exact commit and a clean Git state, then creates another disposable clone for every arm and repetition. It refuses an output directory inside either the reference-copy root or the Ponytail source root.
+
+Snapshot Git commands use command-scoped `core.longpaths=true`, which is required by deep Laravel paths inside long case IDs on Windows. The runner does not persist this setting to user or repository Git configuration.
 
 Example preparation in PowerShell:
 
@@ -34,6 +39,8 @@ git clone --local --no-hardlinks --no-checkout D:\projects\passkey (Join-Path $r
 git -C (Join-Path $referenceRoot "passkey") checkout --detach 24a55ce21aa6a525dd3bd215b13b2af8ef2e14a8
 git clone --local --no-hardlinks --no-checkout D:\projects\yougile-mcp (Join-Path $referenceRoot "yougile-mcp")
 git -C (Join-Path $referenceRoot "yougile-mcp") checkout --detach d643d48ff84c098079f02576a115da3e61135579
+git clone --local --no-hardlinks --no-checkout D:\projects\cutcode-shop (Join-Path $referenceRoot "cutcode-shop")
+git -C (Join-Path $referenceRoot "cutcode-shop") checkout --detach 1dc513dd7821c30cab2a8738b399768da58b049d
 ```
 
 Keep a separate clean checkout of Ponytail `v4.9.0` at commit `0a4dd63ad4541f4f655c4108a295916f3c1d8fda`. AIFHub does not install, clone, or trust it during normal commands; this checkout is an explicit benchmark input only.
@@ -46,7 +53,7 @@ Catalog-only dry run, with no writes and no model call:
 node scripts/ponytail-pi-ab.mjs --run-id ponytail-lq-low-01 --dry-run --json
 ```
 
-Prepare 16 disposable cases and their exact Pi invocations:
+Prepare 24 disposable cases and their exact Pi invocations:
 
 ```bash
 node scripts/ponytail-pi-ab.mjs \
