@@ -16,6 +16,7 @@ import {
   loadPonytailPiCatalog,
   preparePonytailPiMatrix,
   renderCasePrompt,
+  runExternalDirect,
   summarizePiJson,
   validatePonytailPiCatalog
 } from './ponytail-pi-ab.mjs';
@@ -140,6 +141,36 @@ describe('Ponytail Pi A/B matrix', () => {
     assert.equal(summary.tool_calls, 1);
     assert.deepEqual(summary.provider_usage, { input: 10, output: 5, cost: { total: 0.01 } });
     assert.doesNotMatch(JSON.stringify(summary), /private output/);
+  });
+
+  it('retains partial stdout and stderr when an external command times out', async () => {
+    const result = await runExternalDirect(process.execPath, [
+      '-e',
+      "process.stdout.write('partial-out\\n'); process.stderr.write('partial-err\\n'); setTimeout(() => {}, 10_000);"
+    ], {
+      cwd: tempDir,
+      timeoutMs: 1_000,
+      maxBuffer: 1024 * 1024
+    });
+
+    assert.equal(result.timedOut, true);
+    assert.match(result.stdout, /partial-out/);
+    assert.match(result.stderr, /partial-err/);
+  });
+
+  it('closes child stdin so non-interactive commands can observe EOF', async () => {
+    const result = await runExternalDirect(process.execPath, [
+      '-e',
+      "process.stdin.resume(); process.stdin.once('end', () => process.stdout.write('stdin-closed\\n'));"
+    ], {
+      cwd: tempDir,
+      timeoutMs: 5_000,
+      maxBuffer: 1024 * 1024
+    });
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.timedOut, false);
+    assert.match(result.stdout, /stdin-closed/);
   });
 
   it('runs JavaScript graders with Node and Laravel graders with PHP', () => {
@@ -307,6 +338,54 @@ describe('Ponytail Pi A/B preparation safety', () => {
       outDir: path.join(referencesRoot, 'nested-output'),
       cwd: process.cwd()
     }), /outside the reference and Ponytail source roots/);
+  });
+});
+
+describe('Ponytail Pi A/B public results', () => {
+  it('records only bounded two-model aggregate evidence and retains the manual policy', async () => {
+    const resultsPath = path.join(
+      process.cwd(),
+      'docs',
+      'skill-providers-research',
+      'ponytail-pi-ab',
+      'results.json'
+    );
+    const source = await readFile(resultsPath, 'utf8');
+    const evidence = JSON.parse(source);
+
+    assert.equal(evidence.schema, 'aifhub.ponytail_pi_ab.public_results.v1');
+    assert.equal(evidence.evidence_status, 'EXECUTED(mixed_non_promotable)');
+    assert.equal(evidence.decision, 'retain_manual_experiment_only');
+    assert.equal(evidence.runs.length, 2);
+    assert.equal(evidence.runs.reduce((sum, run) => sum + run.completed_cases, 0), 48);
+    assert.deepEqual(
+      evidence.runs.map((run) => [run.model, run.pass_by_condition]),
+      [
+        ['lq/qwen3.8-27b', { baseline: 6, ponytail_full: 8 }],
+        ['la/ornith-1.5-35b-a3b', { baseline: 11, ponytail_full: 9 }]
+      ]
+    );
+    assert.equal(evidence.excluded_comparisons.length, 1);
+    assert.equal(evidence.excluded_comparisons[0].status, 'NOT_COMPARABLE(provider_error)');
+    assert.equal(evidence.excluded_comparisons[0].tool_calls, 0);
+    assert.equal(evidence.adjusted_cross_run_summary.comparable_pairs, 23);
+    assert.deepEqual(evidence.adjusted_cross_run_summary.pass_on_comparable_pairs_by_condition, {
+      baseline: 16,
+      ponytail_full: 17
+    });
+    assert.ok(evidence.runs.every((run) => (
+      run.expected_cases === 24
+      && run.complete_pairs === 12
+      && run.integrity.source_snapshots_intact
+      && run.integrity.ponytail_source_intact
+      && run.integrity.treatment_resources_intact
+      && run.integrity.dependency_changes === 0
+    )));
+
+    assert.doesNotMatch(source, /[A-Za-z]:[\\/]/);
+    assert.doesNotMatch(source, /pi-events\.jsonl|prompt\.md|stdout\.log|stderr\.log/);
+    assert.equal(evidence.retention.raw_model_output_committed, false);
+    assert.equal(evidence.retention.private_paths_committed, false);
   });
 });
 

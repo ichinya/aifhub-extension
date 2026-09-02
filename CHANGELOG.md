@@ -7,7 +7,7 @@
 ## [В разработке]
 
 ### Добавлено
-- Exact-source evaluation для DietrichGebert/ponytail `v4.9.0` с policy `manual_experiment_only`: новый skill-provider guide фиксирует session/subagent hook scope, отличие upstream deterministic safety scorers от AIFHub gates, OpenSpec precedence, user-owned setup boundary и required paired promotion benchmark; implementation-only proxy получил reproducible 16-case `pi 0.84.4` / `omniroute/lq/qwen3.8-27b` matrix на exact-commit копиях двух real projects с hidden behavioral graders (issue #137).
+- Exact-source evaluation для DietrichGebert/ponytail `v4.9.0` с policy `manual_experiment_only`: skill-provider guide фиксирует session/subagent hook scope, отличие upstream deterministic safety scorers от AIFHub gates, OpenSpec precedence и user-owned setup boundary; implementation-only proxy получил reproducible 24-case matrix на exact-commit TypeScript, Go и Laravel projects, hidden graders и два полных `pi 0.84.4` прогона (`omniroute/lq/qwen3.8-27b` и `omniroute/la/ornith-1.5-35b-a3b`, 48 строк). Mixed stack-dependent evidence сохраняет policy без promotion; runner закрывает child stdin и сохраняет partial timeout output с regression coverage (issue #137).
 
 ## [1.5.0] - 2026-09-01
 

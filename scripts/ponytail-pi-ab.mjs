@@ -650,27 +650,38 @@ async function runExternal(command, args, { cwd, timeoutMs = 60_000, maxBuffer =
   return runExternalDirect(resolved.command, resolved.args, { cwd, timeoutMs, maxBuffer });
 }
 
-async function runExternalDirect(command, args, { cwd, timeoutMs, maxBuffer }) {
+export async function runExternalDirect(command, args, { cwd, timeoutMs, maxBuffer }) {
   const started = Date.now();
   return new Promise((resolve) => {
+    let capturedStdout = '';
+    let capturedStderr = '';
     const finish = (error, stdout = '', stderr = '') => {
       resolve({
         command,
         exitCode: error?.code === 'ETIMEDOUT' ? null : (typeof error?.code === 'number' ? error.code : error ? 1 : 0),
         timedOut: Boolean(error?.killed && error?.signal),
         durationMs: Date.now() - started,
-        stdout: String(stdout),
-        stderr: String(stderr || error?.message || '')
+        stdout: capturedStdout || String(stdout),
+        stderr: capturedStderr || String(stderr || error?.message || '')
       });
     };
     try {
-      execFile(command, args, {
+      const child = execFile(command, args, {
         cwd,
         windowsHide: true,
         timeout: timeoutMs,
         maxBuffer,
         encoding: 'utf8'
       }, finish);
+      child.stdout?.setEncoding('utf8');
+      child.stdout?.on('data', (chunk) => {
+        capturedStdout += chunk;
+      });
+      child.stderr?.setEncoding('utf8');
+      child.stderr?.on('data', (chunk) => {
+        capturedStderr += chunk;
+      });
+      child.stdin?.end();
     } catch (error) {
       finish(error);
     }
