@@ -76,7 +76,7 @@ node scripts/ponytail-pi-ab.mjs --run-id runtime-check --check-runtime --json
 
 ## Executed Results
 
-Two complete 24-case runs were executed on `2026-09-02`: the catalog-default Qwen model and an otherwise identical LA model override. See the [human-readable analysis](results.md) and [sanitized machine-readable aggregate](results.json).
+Two complete 24-case runs were executed on `2026-09-02`: the catalog-default Qwen model and an otherwise identical LA model override. See the [human-readable analysis](results.md), [sanitized summary](results.json), [Qwen row aggregate](aggregate-qwen.json), and [LA row aggregate](aggregate-la.json).
 
 The committed evidence contains only bounded aggregate metrics and hashes. Raw Pi JSONL, model prose, prompts, case copies, and private paths remain outside the repository. Pre-fix attempts are excluded: the runner originally left child stdin open, so Pi waited for EOF; the valid runs were made only after closing stdin explicitly and adding timeout/EOF regression coverage.
 

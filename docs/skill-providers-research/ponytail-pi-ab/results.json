@@ -40,6 +40,7 @@
     {
       "run_id": "ponytail-qwen-low-20260902-r4",
       "model": "lq/qwen3.8-27b",
+      "aggregate_file": "aggregate-qwen.json",
       "source_aggregate_sha256": "da0bd25e67bc6182f8973278a75ee056d9757b6ed62f7c79a60c54c47a5f3a96",
       "expected_cases": 24,
       "completed_cases": 24,
@@ -140,6 +141,7 @@
     {
       "run_id": "ponytail-la-ornith-low-20260902-r2",
       "model": "la/ornith-1.5-35b-a3b",
+      "aggregate_file": "aggregate-la.json",
       "source_aggregate_sha256": "86795c1490be8125ffa2bc669907c01d3f57a0a980b07ba6bb74463ebadfb55c",
       "expected_cases": 24,
       "completed_cases": 24,

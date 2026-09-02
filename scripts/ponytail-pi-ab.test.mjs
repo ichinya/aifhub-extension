@@ -1,6 +1,7 @@
 // ponytail-pi-ab.test.mjs - deterministic contracts for the isolated Pi benchmark
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -381,6 +382,31 @@ describe('Ponytail Pi A/B public results', () => {
       && run.integrity.treatment_resources_intact
       && run.integrity.dependency_changes === 0
     )));
+
+    for (const run of evidence.runs) {
+      const aggregateSource = await readFile(path.join(path.dirname(resultsPath), run.aggregate_file), 'utf8');
+      const aggregate = JSON.parse(aggregateSource);
+      assert.equal(
+        createHash('sha256').update(aggregateSource).digest('hex'),
+        run.source_aggregate_sha256
+      );
+      assert.equal(aggregate.run_id, run.run_id);
+      assert.equal(aggregate.model, run.model);
+      assert.equal(aggregate.expected_cases, run.expected_cases);
+      assert.equal(aggregate.completed_cases, run.completed_cases);
+      assert.equal(aggregate.complete_pairs, run.complete_pairs);
+      assert.deepEqual(aggregate.pass_by_condition, run.pass_by_condition);
+      assert.equal(aggregate.results.length, 24);
+      assert.ok(aggregate.results.every((row) => (
+        row.source_snapshot_intact
+        && row.ponytail_source_intact
+        && row.treatment_resource_intact
+        && !row.metrics.dependency_files_changed
+      )));
+      assert.doesNotMatch(aggregateSource, /[A-Za-z]:[\\/]/);
+      assert.doesNotMatch(aggregateSource, /"content"\s*:|Canonical task:|Treat this text as/);
+      assert.doesNotMatch(aggregateSource, /pi-events\.jsonl|prompt\.md|stdout\.log|stderr\.log/);
+    }
 
     assert.doesNotMatch(source, /[A-Za-z]:[\\/]/);
     assert.doesNotMatch(source, /pi-events\.jsonl|prompt\.md|stdout\.log|stderr\.log/);

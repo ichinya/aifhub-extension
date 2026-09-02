@@ -2,7 +2,7 @@
 
 Итог: `EXECUTED(mixed_non_promotable)`. Два полных implementation-only прогона не дают устойчивого преимущества Ponytail между моделями и стеками, поэтому policy остаётся `manual_experiment_only`.
 
-Машиночитаемый обезличенный aggregate находится в [results.json](results.json). Он содержит pins, SHA-256 исходных aggregate-файлов и ограниченные метрики; raw Pi JSONL, ответы модели, prompts и локальные пути в репозиторий не добавлены.
+Машиночитаемая обезличенная сводка находится в [results.json](results.json), а bounded row-level snapshots — в [Qwen aggregate](aggregate-qwen.json) и [LA aggregate](aggregate-la.json). Они содержат pins, SHA-256 и ограниченные метрики; raw Pi JSONL, ответы модели, prompts и локальные пути в репозиторий не добавлены.
 
 ## Envelope
 
