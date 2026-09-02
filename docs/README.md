@@ -17,11 +17,11 @@ OpenSpec CLI features вызываются через AIFHub wrappers и `script
 1. [Project README](../README.md) - landing page, quick start, artifact layout, compatibility summary, migration summary и troubleshooting summary.
 2. [Usage](usage.md) - полный command flow, AI Factory 2.19 session warmup, `/aif-mode` switching and sync, AI Factory 2.18 mode matrix, regular/ultra research, classic/marked-ultra verification and archive boundaries, upstream project utilities, rules/review/security gates, finalization tail, update-not-upgrade guidance, deterministic/live consumer smoke, troubleshooting и examples.
 3. [Адаптация идей Superpowers](superpowers-adaptation.md) - bounded RED/GREEN/REFACTOR, systematic debugging, two-pass review и ownership boundaries без второго workflow stack.
-4. [Context Providers](context-providers.md) - optional Graphify context, CodeGraph manual CLI context, Context7 documentation provider guidance, reviewed-note paths, degraded behavior и user-owned setup boundaries.
+4. [Context Providers](context-providers.md) - optional Graphify context, CodeGraph manual CLI context, Context7 documentation provider guidance, T-Search reject/defer boundary, reviewed-note paths, degraded behavior и user-owned setup boundaries.
 5. [Safety Providers](safety-providers.md) - optional dcg pre-execution guard, manual install references, allowed probes, degraded behavior и strict user-owned setup/hook boundaries.
 6. [Memory Tool Recommendations](memory-tool-recommendations.md) - local metadata-driven optional tool recommendations и installed wrapper commands.
 7. [Session Context Dedup](context-dedup.md) - optional `off | aifhub | sqz` context optimization, protected artifacts, ledger paths, external-tool consent, CLI и MCP surface.
-8. [Context Loading Policy](context-loading-policy.md) - Base Context, AI Factory 2.19 upstream warmup boundary, optional project glossary, review policy, optional Graphify/CodeGraph/Context7 guidance, GitHub-aware roadmap evidence, ownership boundaries, generated rules, quality gates, parent-owned commit grouping, upstream architecture/docs/QA/archive/distillation utilities, commit handoff и legacy path rules.
+8. [Context Loading Policy](context-loading-policy.md) - Base Context, AI Factory 2.19 upstream warmup boundary, optional project glossary, review policy, optional Graphify/CodeGraph/Context7 guidance, T-Search reject/defer boundary, GitHub-aware roadmap evidence, ownership boundaries, generated rules, quality gates, parent-owned commit grouping, upstream architecture/docs/QA/archive/distillation utilities, commit handoff и legacy path rules.
 9. [Project Review Policy](review-policy.md) - configurable root-default `REVIEW.md`, scaffold ownership, review-only consumers, precedence, path safety и policy/session-state boundary.
 10. [OpenSpec Compatibility](openspec-compatibility.md) - optional CLI adapter support, exact-tagged OpenSpec 1.10.0 reviewed baseline from 1.3.1, tracked Git/npm custody and CLI matrix, pinned AI Factory 2.19 source snapshot plus the 2.18.1 published-executable baseline, cumulative 2.18 classic/ultra plan and research contracts, upstream coherence ownership, revision-bound receipt, archive guard, ownership/no-op ledger, artifact sync points, rules gate, Node requirements, validation policy flags и degraded mode.
 11. [OpenSpec Artifact Validation](openspec-validation.md) - AIFHub contract validator поверх OpenSpec CLI validation.
@@ -49,11 +49,11 @@ OpenSpec CLI features вызываются через AIFHub wrappers и `script
 |---|---|
 | [Usage](usage.md) | Полный OpenSpec-native command flow, AI Factory 2.19 session warmup, AI Factory 2.18 mode/profile matrix, regular/ultra research, revision-bound legacy-ultra receipt, archive/update boundaries, optional providers, gates, finalization tail и examples |
 | [Адаптация идей Superpowers](superpowers-adaptation.md) | Bounded RED/GREEN/REFACTOR, systematic root-cause debugging, two-pass review и ownership boundaries без второго workflow stack |
-| [Context Providers](context-providers.md) | Optional Graphify context, CodeGraph manual CLI context и Context7 provider guidance, reviewed-note paths, degraded behavior, credential safety и user-owned setup boundaries |
+| [Context Providers](context-providers.md) | Optional Graphify context, CodeGraph manual CLI context, Context7 provider guidance и T-Search reject/defer boundary, reviewed-note paths, degraded behavior, credential safety и user-owned setup boundaries |
 | [Safety Providers](safety-providers.md) | Optional dcg pre-execution guard, manual user-owned setup, allowed probes, degraded behavior, hook/config boundaries и artifact safety |
 | [Memory Tool Recommendations](memory-tool-recommendations.md) | Local metadata-driven optional memory/context tool recommendations и installed wrapper commands |
 | [Session Context Dedup](context-dedup.md) | Optional `off | aifhub | sqz` context optimization: decision table, protected artifacts, ledger/purge paths, external-tool consent, CLI и MCP surface |
-| [Context Loading Policy](context-loading-policy.md) | Runtime context, AI Factory 2.19 upstream warmup, Optional Project Glossary, optional Graphify/CodeGraph/Context7 context, GitHub-aware roadmap evidence, ownership, gates, commit handoff, upstream `/aif-architecture`, `/aif-docs`, `/aif-qa`, `/aif-archive` and `/aif-distillation` boundaries и legacy boundaries |
+| [Context Loading Policy](context-loading-policy.md) | Runtime context, AI Factory 2.19 upstream warmup, Optional Project Glossary, review policy, optional Graphify/CodeGraph/Context7 context, T-Search reject/defer boundary, GitHub-aware roadmap evidence, ownership, gates, commit handoff, upstream `/aif-architecture`, `/aif-docs`, `/aif-qa`, `/aif-archive` and `/aif-distillation` boundaries и legacy boundaries |
 | [Project Review Policy](review-policy.md) | Configurable `reviews.policy_file`, root `REVIEW.md` default, scaffold lifecycle, safe read-only review consumption и policy/session-state boundary |
 | [OpenSpec Compatibility](openspec-compatibility.md) | CLI adapter policy, exact-tagged OpenSpec 1.10.0 reviewed baseline from 1.3.1, tracked Git/npm custody and CLI matrix, AI Factory 2.19 pinned source snapshot and 2.18.1 executable baseline, cumulative 2.18 plan/research/archive adapters, upstream coherence ownership, exact consumer ownership/no-ops, validation policy flags, sync points, rules gate, version support и degraded mode |
 | [OpenSpec Artifact Validation](openspec-validation.md) | Read-only AIFHub contract validator для canonical artifacts, runtime evidence, QA и generated rules |
@@ -68,6 +68,8 @@ OpenSpec CLI features вызываются через AIFHub wrappers и `script
 | [Codex Agents](codex-agents.md) | Namespaced Codex subagents и invocation contract |
 | [Claude Agents](claude-agents.md) | Namespaced Claude subagents и install target |
 | [Research по Memory Tools](memory-tools-research/README.md) | Результаты проверки local memory/retrieval кандидатов для optional context providers |
+| [T-Search Research](memory-tools-research/t-search.md) | Exact model/harness identity, compound deployment shape, authorized reduced local pilot, privacy/freshness boundary и `reject_defer` decision для issue #147 |
+| [T-Search Benchmark Results](memory-tools-research/t-search-benchmark-results.md) | Static harness checks, exact Q4 live run, 6/6 synthetic pairs, `pilot_negative` tradeoff и remaining external-index evidence |
 | [AI Tester Matrix Для Memory Tools](memory-tools-research/ai-tester-matrix.md) | Paired `rg` baseline и optional-tool matrix для dimension-aware recommendation metadata |
 | [CodeGraph Benchmark Results](memory-tools-research/codegraph-benchmark-results.md) | Видимые paired `rg`/CodeGraph test rows, token traces и 47-profile matrix summary |
 | [AI Tester Token Matrices](memory-tools-research/ai-tester-token-matrices.md) | Таблицы по skill с реальными `ai-tester` input/output/cache token traces и `NOT_RUN` строками |
@@ -86,6 +88,7 @@ OpenSpec CLI features вызываются через AIFHub wrappers и `script
 - optional Context7 documentation provider guidance
 - optional dcg safety provider guidance with user-owned install and hook boundaries
 - optional local memory/retrieval candidate research
+- T-Search agentic retrieval `reject_defer` boundary and re-evaluation requirements
 - optional session-scoped read deduplication
 - configurable durable `REVIEW.md` policy and its review-session state boundary
 - optional rules, review и security gates
@@ -139,6 +142,8 @@ npm test
 - [ADR 0003: Durable Project Review Policy](adr/0003-durable-project-review-policy.md)
 - [AIFHub MCP](aifhub-mcp.md)
 - [Research по Memory Tools](memory-tools-research/README.md)
+- [T-Search Research](memory-tools-research/t-search.md)
+- [T-Search Benchmark Results](memory-tools-research/t-search-benchmark-results.md)
 - [AI Tester Matrix Для Memory Tools](memory-tools-research/ai-tester-matrix.md)
 - [CodeGraph Benchmark Results](memory-tools-research/codegraph-benchmark-results.md)
 - [AI Tester Token Matrices](memory-tools-research/ai-tester-token-matrices.md)

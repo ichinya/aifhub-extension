@@ -1190,7 +1190,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
       'Archived-wide Validation Is Advisory',
       '`openspec validate --archived`',
       'release acceptance PASS boolean',
-      '## [В разработке]',
+      '## [1.5.0] - 2026-09-01',
       'OpenSpec `1.8.0`',
       'Baseline `1.3.1`',
       'Reviewed stable releases',
