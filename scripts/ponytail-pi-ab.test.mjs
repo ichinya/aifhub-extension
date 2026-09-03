@@ -13,6 +13,7 @@ import {
   buildHiddenGraderInvocation,
   buildPiInvocation,
   buildPonytailPiMatrix,
+  checkPonytailPiRuntime,
   cloneGitSnapshot,
   loadPonytailPiCatalog,
   preparePonytailPiMatrix,
@@ -142,6 +143,43 @@ describe('Ponytail Pi A/B matrix', () => {
     assert.equal(summary.tool_calls, 1);
     assert.deepEqual(summary.provider_usage, { input: 10, output: 5, cost: { total: 0.01 } });
     assert.doesNotMatch(JSON.stringify(summary), /private output/);
+  });
+
+  it('keeps unlisted custom models fail-closed unless the caller opts in explicitly', async () => {
+    const catalog = await loadPonytailPiCatalog({ cwd: process.cwd() });
+    const matrix = buildPonytailPiMatrix({
+      catalog,
+      runId: 'ponytail-custom-model-test',
+      provider: 'omniroute',
+      model: 'bai/glm-5.3-flash',
+      generatedAt: '2026-09-03T00:00:00.000Z'
+    });
+    const runExternalFn = async (_command, args) => {
+      if (args[0] === '--version') return { exitCode: 0, stdout: '0.84.4\n', stderr: '' };
+      if (args[0] === '--list-models') {
+        return {
+          exitCode: 0,
+          stdout: 'provider   model\nomniroute  lq/qwen3.8-27b\n',
+          stderr: ''
+        };
+      }
+      if (args[0] === 'auth') {
+        return { exitCode: 0, stdout: `${JSON.stringify({ status: 'ready' })}\n`, stderr: '' };
+      }
+      throw new Error(`unexpected Pi probe: ${args.join(' ')}`);
+    };
+
+    await assert.rejects(
+      checkPonytailPiRuntime(matrix, { runExternalFn }),
+      /pinned model omniroute\/bai\/glm-5\.3-flash is not available in pi/
+    );
+    const runtime = await checkPonytailPiRuntime(matrix, {
+      allowUnlistedModel: true,
+      runExternalFn
+    });
+    assert.equal(runtime.auth_ready, true);
+    assert.equal(runtime.model_listed, false);
+    assert.equal(runtime.unlisted_model_allowed, true);
   });
 
   it('retains partial stdout and stderr when an external command times out', async () => {
@@ -343,7 +381,7 @@ describe('Ponytail Pi A/B preparation safety', () => {
 });
 
 describe('Ponytail Pi A/B public results', () => {
-  it('records only bounded two-model aggregate evidence and retains the manual policy', async () => {
+  it('records only bounded multi-model aggregate evidence and retains the manual policy', async () => {
     const resultsPath = path.join(
       process.cwd(),
       'docs',
@@ -357,22 +395,26 @@ describe('Ponytail Pi A/B public results', () => {
     assert.equal(evidence.schema, 'aifhub.ponytail_pi_ab.public_results.v1');
     assert.equal(evidence.evidence_status, 'EXECUTED(mixed_non_promotable)');
     assert.equal(evidence.decision, 'retain_manual_experiment_only');
-    assert.equal(evidence.runs.length, 2);
-    assert.equal(evidence.runs.reduce((sum, run) => sum + run.completed_cases, 0), 48);
+    assert.equal(evidence.runs.length, 6);
+    assert.equal(evidence.runs.reduce((sum, run) => sum + run.completed_cases, 0), 144);
     assert.deepEqual(
       evidence.runs.map((run) => [run.model, run.pass_by_condition]),
       [
         ['lq/qwen3.8-27b', { baseline: 6, ponytail_full: 8 }],
-        ['la/ornith-1.5-35b-a3b', { baseline: 11, ponytail_full: 9 }]
+        ['la/ornith-1.5-35b-a3b', { baseline: 11, ponytail_full: 9 }],
+        ['bai/mimo-v2.5', { baseline: 0, ponytail_full: 1 }],
+        ['bai/glm-5.3-flash', { baseline: 11, ponytail_full: 10 }],
+        ['bai/deepseek-v4-flash', { baseline: 0, ponytail_full: 0 }],
+        ['bai/qwen3.8-flash', { baseline: 7, ponytail_full: 8 }]
       ]
     );
     assert.equal(evidence.excluded_comparisons.length, 1);
     assert.equal(evidence.excluded_comparisons[0].status, 'NOT_COMPARABLE(provider_error)');
     assert.equal(evidence.excluded_comparisons[0].tool_calls, 0);
-    assert.equal(evidence.adjusted_cross_run_summary.comparable_pairs, 23);
+    assert.equal(evidence.adjusted_cross_run_summary.comparable_pairs, 71);
     assert.deepEqual(evidence.adjusted_cross_run_summary.pass_on_comparable_pairs_by_condition, {
-      baseline: 16,
-      ponytail_full: 17
+      baseline: 34,
+      ponytail_full: 36
     });
     assert.ok(evidence.runs.every((run) => (
       run.expected_cases === 24

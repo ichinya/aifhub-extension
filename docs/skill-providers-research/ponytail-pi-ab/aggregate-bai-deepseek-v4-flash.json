@@ -1,0 +1,1544 @@
+{
+  "schema": "aifhub.ponytail_pi_ab.results.v1",
+  "run_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4",
+  "provider": "omniroute",
+  "model": "bai/deepseek-v4-flash",
+  "thinking": "low",
+  "expected_cases": 24,
+  "completed_cases": 24,
+  "complete_pairs": 12,
+  "pass_by_condition": {
+    "baseline": 0,
+    "ponytail_full": 0
+  },
+  "results": [
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__typescript-url-join__r01__baseline",
+      "pair_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__typescript-url-join__r01",
+      "scenario_id": "typescript-url-join",
+      "condition": "baseline",
+      "repetition": 1,
+      "started_at": "2026-09-03T10:03:31.891Z",
+      "duration_ms": 43707,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 32,
+          "tool_calls": 0,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "setup",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 4696
+        },
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 3240
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 904
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__typescript-url-join__r01__ponytail_full",
+      "pair_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__typescript-url-join__r01",
+      "scenario_id": "typescript-url-join",
+      "condition": "ponytail_full",
+      "repetition": 1,
+      "started_at": "2026-09-03T10:04:26.901Z",
+      "duration_ms": 1823,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 10,
+          "tool_calls": 0,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "setup",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 4521
+        },
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 2752
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 929
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__typescript-url-join__r02__ponytail_full",
+      "pair_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__typescript-url-join__r02",
+      "scenario_id": "typescript-url-join",
+      "condition": "ponytail_full",
+      "repetition": 2,
+      "started_at": "2026-09-03T10:04:38.586Z",
+      "duration_ms": 1831,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 10,
+          "tool_calls": 0,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "setup",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 4079
+        },
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 3117
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 730
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__typescript-url-join__r02__baseline",
+      "pair_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__typescript-url-join__r02",
+      "scenario_id": "typescript-url-join",
+      "condition": "baseline",
+      "repetition": 2,
+      "started_at": "2026-09-03T10:04:50.766Z",
+      "duration_ms": 1773,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 10,
+          "tool_calls": 0,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "setup",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 4581
+        },
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 5557
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 1672
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__typescript-url-join__r03__baseline",
+      "pair_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__typescript-url-join__r03",
+      "scenario_id": "typescript-url-join",
+      "condition": "baseline",
+      "repetition": 3,
+      "started_at": "2026-09-03T10:05:06.608Z",
+      "duration_ms": 2159,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 10,
+          "tool_calls": 0,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "setup",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 4548
+        },
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 2446
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 744
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__typescript-url-join__r03__ponytail_full",
+      "pair_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__typescript-url-join__r03",
+      "scenario_id": "typescript-url-join",
+      "condition": "ponytail_full",
+      "repetition": 3,
+      "started_at": "2026-09-03T10:05:18.061Z",
+      "duration_ms": 1884,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 10,
+          "tool_calls": 0,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "setup",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 4131
+        },
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 2447
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 653
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__typescript-url-join__r04__ponytail_full",
+      "pair_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__typescript-url-join__r04",
+      "scenario_id": "typescript-url-join",
+      "condition": "ponytail_full",
+      "repetition": 4,
+      "started_at": "2026-09-03T10:05:29.394Z",
+      "duration_ms": 1765,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 10,
+          "tool_calls": 0,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "setup",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 4340
+        },
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 2429
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 599
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__typescript-url-join__r04__baseline",
+      "pair_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__typescript-url-join__r04",
+      "scenario_id": "typescript-url-join",
+      "condition": "baseline",
+      "repetition": 4,
+      "started_at": "2026-09-03T10:05:40.433Z",
+      "duration_ms": 1715,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 10,
+          "tool_calls": 0,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "setup",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 4348
+        },
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 2494
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 650
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__go-safe-decrypt-errors__r01__baseline",
+      "pair_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__go-safe-decrypt-errors__r01",
+      "scenario_id": "go-safe-decrypt-errors",
+      "condition": "baseline",
+      "repetition": 1,
+      "started_at": "2026-09-03T10:05:51.466Z",
+      "duration_ms": 1713,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 10,
+          "tool_calls": 0,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "go",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 11609
+        }
+      ],
+      "hidden_grader": {
+        "command": "go",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 2892
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__go-safe-decrypt-errors__r01__ponytail_full",
+      "pair_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__go-safe-decrypt-errors__r01",
+      "scenario_id": "go-safe-decrypt-errors",
+      "condition": "ponytail_full",
+      "repetition": 1,
+      "started_at": "2026-09-03T10:06:08.755Z",
+      "duration_ms": 1861,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 10,
+          "tool_calls": 0,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "go",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 2176
+        }
+      ],
+      "hidden_grader": {
+        "command": "go",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 2222
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__go-safe-decrypt-errors__r02__ponytail_full",
+      "pair_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__go-safe-decrypt-errors__r02",
+      "scenario_id": "go-safe-decrypt-errors",
+      "condition": "ponytail_full",
+      "repetition": 2,
+      "started_at": "2026-09-03T10:06:15.733Z",
+      "duration_ms": 2674,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 10,
+          "tool_calls": 0,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "go",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 2163
+        }
+      ],
+      "hidden_grader": {
+        "command": "go",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 2275
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__go-safe-decrypt-errors__r02__baseline",
+      "pair_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__go-safe-decrypt-errors__r02",
+      "scenario_id": "go-safe-decrypt-errors",
+      "condition": "baseline",
+      "repetition": 2,
+      "started_at": "2026-09-03T10:06:23.752Z",
+      "duration_ms": 20289,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 32,
+          "tool_calls": 0,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "go",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 1976
+        }
+      ],
+      "hidden_grader": {
+        "command": "go",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 1903
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__go-safe-decrypt-errors__r03__baseline",
+      "pair_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__go-safe-decrypt-errors__r03",
+      "scenario_id": "go-safe-decrypt-errors",
+      "condition": "baseline",
+      "repetition": 3,
+      "started_at": "2026-09-03T10:06:48.636Z",
+      "duration_ms": 20276,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 32,
+          "tool_calls": 0,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "go",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 2119
+        }
+      ],
+      "hidden_grader": {
+        "command": "go",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 1948
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__go-safe-decrypt-errors__r03__ponytail_full",
+      "pair_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__go-safe-decrypt-errors__r03",
+      "scenario_id": "go-safe-decrypt-errors",
+      "condition": "ponytail_full",
+      "repetition": 3,
+      "started_at": "2026-09-03T10:07:13.809Z",
+      "duration_ms": 20237,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 32,
+          "tool_calls": 0,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "go",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 2193
+        }
+      ],
+      "hidden_grader": {
+        "command": "go",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 1918
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__go-safe-decrypt-errors__r04__ponytail_full",
+      "pair_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__go-safe-decrypt-errors__r04",
+      "scenario_id": "go-safe-decrypt-errors",
+      "condition": "ponytail_full",
+      "repetition": 4,
+      "started_at": "2026-09-03T10:07:38.858Z",
+      "duration_ms": 40161,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 25,
+          "tool_calls": 0,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "go",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 2403
+        }
+      ],
+      "hidden_grader": {
+        "command": "go",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 1985
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__go-safe-decrypt-errors__r04__baseline",
+      "pair_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__go-safe-decrypt-errors__r04",
+      "scenario_id": "go-safe-decrypt-errors",
+      "condition": "baseline",
+      "repetition": 4,
+      "started_at": "2026-09-03T10:08:24.115Z",
+      "duration_ms": 1748,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 10,
+          "tool_calls": 0,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "go",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 1823
+        }
+      ],
+      "hidden_grader": {
+        "command": "go",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 1866
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__laravel-exact-price-formatting__r01__baseline",
+      "pair_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__laravel-exact-price-formatting__r01",
+      "scenario_id": "laravel-exact-price-formatting",
+      "condition": "baseline",
+      "repetition": 1,
+      "started_at": "2026-09-03T10:08:30.210Z",
+      "duration_ms": 1792,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 10,
+          "tool_calls": 0,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "php",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 107
+        }
+      ],
+      "hidden_grader": {
+        "command": "php",
+        "exit_code": 255,
+        "timed_out": false,
+        "duration_ms": 134
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__laravel-exact-price-formatting__r01__ponytail_full",
+      "pair_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__laravel-exact-price-formatting__r01",
+      "scenario_id": "laravel-exact-price-formatting",
+      "condition": "ponytail_full",
+      "repetition": 1,
+      "started_at": "2026-09-03T10:08:32.963Z",
+      "duration_ms": 1746,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 10,
+          "tool_calls": 0,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "php",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 90
+        }
+      ],
+      "hidden_grader": {
+        "command": "php",
+        "exit_code": 255,
+        "timed_out": false,
+        "duration_ms": 99
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__laravel-exact-price-formatting__r02__ponytail_full",
+      "pair_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__laravel-exact-price-formatting__r02",
+      "scenario_id": "laravel-exact-price-formatting",
+      "condition": "ponytail_full",
+      "repetition": 2,
+      "started_at": "2026-09-03T10:08:35.530Z",
+      "duration_ms": 1758,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 10,
+          "tool_calls": 0,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "php",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 91
+        }
+      ],
+      "hidden_grader": {
+        "command": "php",
+        "exit_code": 255,
+        "timed_out": false,
+        "duration_ms": 104
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__laravel-exact-price-formatting__r02__baseline",
+      "pair_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__laravel-exact-price-formatting__r02",
+      "scenario_id": "laravel-exact-price-formatting",
+      "condition": "baseline",
+      "repetition": 2,
+      "started_at": "2026-09-03T10:08:38.392Z",
+      "duration_ms": 1747,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 10,
+          "tool_calls": 0,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "php",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 104
+        }
+      ],
+      "hidden_grader": {
+        "command": "php",
+        "exit_code": 255,
+        "timed_out": false,
+        "duration_ms": 113
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__laravel-exact-price-formatting__r03__baseline",
+      "pair_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__laravel-exact-price-formatting__r03",
+      "scenario_id": "laravel-exact-price-formatting",
+      "condition": "baseline",
+      "repetition": 3,
+      "started_at": "2026-09-03T10:08:41.077Z",
+      "duration_ms": 1692,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 10,
+          "tool_calls": 0,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "php",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 116
+        }
+      ],
+      "hidden_grader": {
+        "command": "php",
+        "exit_code": 255,
+        "timed_out": false,
+        "duration_ms": 118
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__laravel-exact-price-formatting__r03__ponytail_full",
+      "pair_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__laravel-exact-price-formatting__r03",
+      "scenario_id": "laravel-exact-price-formatting",
+      "condition": "ponytail_full",
+      "repetition": 3,
+      "started_at": "2026-09-03T10:08:43.710Z",
+      "duration_ms": 2300,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 10,
+          "tool_calls": 0,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "php",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 100
+        }
+      ],
+      "hidden_grader": {
+        "command": "php",
+        "exit_code": 255,
+        "timed_out": false,
+        "duration_ms": 96
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__laravel-exact-price-formatting__r04__ponytail_full",
+      "pair_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__laravel-exact-price-formatting__r04",
+      "scenario_id": "laravel-exact-price-formatting",
+      "condition": "ponytail_full",
+      "repetition": 4,
+      "started_at": "2026-09-03T10:08:47.047Z",
+      "duration_ms": 1680,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 10,
+          "tool_calls": 0,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "php",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 95
+        }
+      ],
+      "hidden_grader": {
+        "command": "php",
+        "exit_code": 255,
+        "timed_out": false,
+        "duration_ms": 95
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__laravel-exact-price-formatting__r04__baseline",
+      "pair_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4__laravel-exact-price-formatting__r04",
+      "scenario_id": "laravel-exact-price-formatting",
+      "condition": "baseline",
+      "repetition": 4,
+      "started_at": "2026-09-03T10:08:49.560Z",
+      "duration_ms": 3312,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 10,
+          "tool_calls": 0,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "php",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 102
+        }
+      ],
+      "hidden_grader": {
+        "command": "php",
+        "exit_code": 255,
+        "timed_out": false,
+        "duration_ms": 108
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    }
+  ]
+}

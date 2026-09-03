@@ -351,11 +351,14 @@ export async function preparePonytailPiMatrix({
   };
 }
 
-export async function executePonytailPiMatrix(prepared, { piCommand = 'pi' } = {}) {
+export async function executePonytailPiMatrix(prepared, {
+  piCommand = 'pi',
+  allowUnlistedModel = false
+} = {}) {
   if (!prepared?.out_dir || prepared.dry_run) throw new Error('a prepared matrix is required for execution');
   const matrix = prepared.matrix;
   const outDir = prepared.out_dir;
-  await checkPonytailPiRuntime(matrix, { piCommand });
+  await checkPonytailPiRuntime(matrix, { piCommand, allowUnlistedModel });
 
   const results = [];
   for (const matrixCase of matrix.cases) {
@@ -448,16 +451,27 @@ export async function executePonytailPiMatrix(prepared, { piCommand = 'pi' } = {
   return writeAggregate(outDir, matrix, results);
 }
 
-export async function checkPonytailPiRuntime(matrix, { piCommand = 'pi' } = {}) {
-  const version = (await runExternal(piCommand, ['--version'], { timeoutMs: 30_000 })).stdout.trim();
+export async function checkPonytailPiRuntime(matrix, {
+  piCommand = 'pi',
+  allowUnlistedModel = false,
+  runExternalFn = runExternal
+} = {}) {
+  const version = (await runExternalFn(piCommand, ['--version'], { timeoutMs: 30_000 })).stdout.trim();
   if (version !== matrix.runtime_version) {
     throw new Error(`pi version ${version || '<empty>'} does not match pinned ${matrix.runtime_version}`);
   }
-  const modelListing = await runExternal(piCommand, ['--list-models', matrix.model], { timeoutMs: 60_000 });
-  if (modelListing.exitCode !== 0 || !modelListing.stdout.includes(matrix.provider) || !modelListing.stdout.includes(matrix.model)) {
+  const modelListing = await runExternalFn(piCommand, ['--list-models', matrix.model], { timeoutMs: 60_000 });
+  if (modelListing.exitCode !== 0) {
+    throw new Error(`pi model catalog lookup failed for ${matrix.provider}/${matrix.model}`);
+  }
+  const modelListed = modelListing.stdout.split(/\r?\n/u).some((line) => {
+    const [provider, model] = line.trim().split(/\s+/u);
+    return provider === matrix.provider && model === matrix.model;
+  });
+  if (!modelListed && !allowUnlistedModel) {
     throw new Error(`pinned model ${matrix.provider}/${matrix.model} is not available in pi`);
   }
-  const authCheck = await runExternal(piCommand, [
+  const authCheck = await runExternalFn(piCommand, [
     'auth', 'check',
     '--provider', matrix.provider,
     '--model', matrix.model,
@@ -479,7 +493,9 @@ export async function checkPonytailPiRuntime(matrix, { piCommand = 'pi' } = {}) 
     provider: matrix.provider,
     model: matrix.model,
     available: true,
-    auth_ready: true
+    auth_ready: true,
+    model_listed: modelListed,
+    unlisted_model_allowed: !modelListed && allowUnlistedModel
   };
 }
 
@@ -840,6 +856,7 @@ function parseCliArgs(args) {
     else if (token === '--pi-command') parsed.piCommand = args[++index];
     else if (token === '--dry-run') parsed.dryRun = true;
     else if (token === '--check-runtime') parsed.checkRuntime = true;
+    else if (token === '--allow-unlisted-model') parsed.allowUnlistedModel = true;
     else if (token === '--execute') parsed.execute = true;
     else if (token === '--json') parsed.json = true;
     else if (token === '--help' || token === '-h') parsed.help = true;
@@ -862,6 +879,7 @@ function usage() {
     '  --thinking <level>        Override the pinned thinking level.',
     '  --dry-run                 Validate and build the in-memory paired matrix only.',
     '  --check-runtime            Verify pinned Pi, model, and auth without an inference call.',
+    '  --allow-unlisted-model     Allow an explicit custom model ID absent from Pi\'s static catalog.',
     '  --execute                 Run Pi and independent graders after preparation.',
     '  --pi-command <path>       Pi executable. Default: pi.',
     '  --json                    Print a machine-readable summary.',
@@ -876,18 +894,27 @@ async function main() {
     return;
   }
   if (!parsed.runId) throw new Error('--run-id is required');
+  if (parsed.allowUnlistedModel && !parsed.model) {
+    throw new Error('--allow-unlisted-model requires an explicit --model');
+  }
   if (parsed.execute && parsed.dryRun) throw new Error('--execute and --dry-run cannot be combined');
   if (parsed.execute && parsed.checkRuntime) throw new Error('--execute and --check-runtime cannot be combined');
   if (parsed.checkRuntime) {
     const checked = await preparePonytailPiMatrix({ ...parsed, dryRun: true });
-    const runtime = await checkPonytailPiRuntime(checked.matrix, { piCommand: parsed.piCommand ?? 'pi' });
+    const runtime = await checkPonytailPiRuntime(checked.matrix, {
+      piCommand: parsed.piCommand ?? 'pi',
+      allowUnlistedModel: parsed.allowUnlistedModel ?? false
+    });
     const body = { schema: PONYTAIL_PI_AB_MATRIX_SCHEMA, run_id: checked.matrix.run_id, ...runtime };
     process.stdout.write(parsed.json ? `${JSON.stringify(body, null, 2)}\n` : `${runtime.provider}/${runtime.model}: available.\n`);
     return;
   }
   const prepared = await preparePonytailPiMatrix(parsed);
   const executed = parsed.execute
-    ? await executePonytailPiMatrix(prepared, { piCommand: parsed.piCommand ?? 'pi' })
+    ? await executePonytailPiMatrix(prepared, {
+      piCommand: parsed.piCommand ?? 'pi',
+      allowUnlistedModel: parsed.allowUnlistedModel ?? false
+    })
     : null;
   const body = executed ?? {
     schema: PONYTAIL_PI_AB_MATRIX_SCHEMA,

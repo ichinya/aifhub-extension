@@ -7,7 +7,7 @@ This directory defines an implementation-only paired experiment for the Ponytail
 - Runtime: `pi 0.84.4`
 - Provider: `omniroute`
 - Catalog-default model: `lq/qwen3.8-27b`
-- Executed model override: `la/ornith-1.5-35b-a3b`
+- Executed model set includes: `lq/qwen3.8-27b`, `la/ornith-1.5-35b-a3b`, `bai/mimo-v2.5`, `bai/glm-5.3-flash`, `bai/deepseek-v4-flash`, and `bai/qwen3.8-flash`.
 - Thinking: `low`
 - Repetitions: four per arm and scenario
 - Baseline: all discovered skills, extensions, prompt templates, themes, and project context files disabled
@@ -76,7 +76,7 @@ node scripts/ponytail-pi-ab.mjs --run-id runtime-check --check-runtime --json
 
 ## Executed Results
 
-Two complete 24-case runs were executed on `2026-09-02`: the catalog-default Qwen model and an otherwise identical LA model override. See the [human-readable analysis](results.md), [sanitized summary](results.json), [Qwen row aggregate](aggregate-qwen.json), and [LA row aggregate](aggregate-la.json).
+Six complete 24-case runs were executed (`2026-09-02` for Qwen/LA, `2026-09-03` for BAI Batches): catalog-default Qwen, LA, and four BAI model variants. See the [human-readable analysis](results.md), [sanitized summary](results.json), [Qwen aggregate](aggregate-qwen.json), [LA aggregate](aggregate-la.json), [MIMO aggregate](aggregate-bai-mimo-v2-5.json), [GLM aggregate](aggregate-bai-glm-5-3-flash.json), [DeepSeek aggregate](aggregate-bai-deepseek-v4-flash.json), and [BAI Qwen aggregate](aggregate-bai-qwen3.8-flash.json).
 
 The committed evidence contains only bounded aggregate metrics and hashes. Raw Pi JSONL, model prose, prompts, case copies, and private paths remain outside the repository. Pre-fix attempts are excluded: the runner originally left child stdin open, so Pi waited for EOF; the valid runs were made only after closing stdin explicitly and adding timeout/EOF regression coverage.
 

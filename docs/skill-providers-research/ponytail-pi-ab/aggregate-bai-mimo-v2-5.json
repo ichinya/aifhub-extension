@@ -1,0 +1,1262 @@
+{
+  "schema": "aifhub.ponytail_pi_ab.results.v1",
+  "run_id": "ponytail-bai-mimo-v2-5-low-20260903-r4",
+  "provider": "omniroute",
+  "model": "bai/mimo-v2.5",
+  "thinking": "low",
+  "expected_cases": 24,
+  "completed_cases": 24,
+  "complete_pairs": 12,
+  "pass_by_condition": {
+    "baseline": 0,
+    "ponytail_full": 1
+  },
+  "results": [
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__typescript-url-join__r01__baseline",
+      "pair_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__typescript-url-join__r01",
+      "scenario_id": "typescript-url-join",
+      "condition": "baseline",
+      "repetition": 1,
+      "started_at": "2026-09-03T09:42:03.677Z",
+      "duration_ms": 79521,
+      "pi": {
+        "exit_code": 4294967295,
+        "timed_out": false,
+        "usage": {
+          "event_count": 156,
+          "tool_calls": 5,
+          "provider_usage": {
+            "input": 1047,
+            "output": 73,
+            "cacheRead": 3072,
+            "cacheWrite": 0,
+            "reasoning": 0,
+            "totalTokens": 4192,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "setup",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 6221
+        },
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 2753
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 856
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__typescript-url-join__r01__ponytail_full",
+      "pair_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__typescript-url-join__r01",
+      "scenario_id": "typescript-url-join",
+      "condition": "ponytail_full",
+      "repetition": 1,
+      "started_at": "2026-09-03T09:43:34.234Z",
+      "duration_ms": 248697,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 598,
+          "tool_calls": 12,
+          "provider_usage": {
+            "input": 587,
+            "output": 121,
+            "cacheRead": 9280,
+            "cacheWrite": 0,
+            "reasoning": 0,
+            "totalTokens": 9988,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "setup",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 6244
+        },
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 3714
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 739
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [
+          "src/common/request-helper.ts"
+        ],
+        "changed_file_count": 1,
+        "source_loc_added": 7,
+        "source_loc_deleted": 2,
+        "dependency_files_changed": false
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__typescript-url-join__r02__ponytail_full",
+      "pair_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__typescript-url-join__r02",
+      "scenario_id": "typescript-url-join",
+      "condition": "ponytail_full",
+      "repetition": 2,
+      "started_at": "2026-09-03T09:47:54.843Z",
+      "duration_ms": 608,
+      "pi": {
+        "exit_code": 1,
+        "timed_out": false,
+        "usage": {
+          "event_count": 0,
+          "tool_calls": 0,
+          "provider_usage": null
+        }
+      },
+      "commands": [
+        {
+          "kind": "setup",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 11611
+        },
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 4748
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 767
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__typescript-url-join__r02__baseline",
+      "pair_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__typescript-url-join__r02",
+      "scenario_id": "typescript-url-join",
+      "condition": "baseline",
+      "repetition": 2,
+      "started_at": "2026-09-03T09:48:13.859Z",
+      "duration_ms": 337,
+      "pi": {
+        "exit_code": 1,
+        "timed_out": false,
+        "usage": {
+          "event_count": 0,
+          "tool_calls": 0,
+          "provider_usage": null
+        }
+      },
+      "commands": [
+        {
+          "kind": "setup",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 6668
+        },
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 4111
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 721
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__typescript-url-join__r03__baseline",
+      "pair_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__typescript-url-join__r03",
+      "scenario_id": "typescript-url-join",
+      "condition": "baseline",
+      "repetition": 3,
+      "started_at": "2026-09-03T09:48:27.189Z",
+      "duration_ms": 373,
+      "pi": {
+        "exit_code": 1,
+        "timed_out": false,
+        "usage": {
+          "event_count": 0,
+          "tool_calls": 0,
+          "provider_usage": null
+        }
+      },
+      "commands": [
+        {
+          "kind": "setup",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 6493
+        },
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 3526
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 517
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__typescript-url-join__r03__ponytail_full",
+      "pair_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__typescript-url-join__r03",
+      "scenario_id": "typescript-url-join",
+      "condition": "ponytail_full",
+      "repetition": 3,
+      "started_at": "2026-09-03T09:48:39.394Z",
+      "duration_ms": 382,
+      "pi": {
+        "exit_code": 1,
+        "timed_out": false,
+        "usage": {
+          "event_count": 0,
+          "tool_calls": 0,
+          "provider_usage": null
+        }
+      },
+      "commands": [
+        {
+          "kind": "setup",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 5451
+        },
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 3741
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 602
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__typescript-url-join__r04__ponytail_full",
+      "pair_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__typescript-url-join__r04",
+      "scenario_id": "typescript-url-join",
+      "condition": "ponytail_full",
+      "repetition": 4,
+      "started_at": "2026-09-03T09:48:50.687Z",
+      "duration_ms": 412,
+      "pi": {
+        "exit_code": 1,
+        "timed_out": false,
+        "usage": {
+          "event_count": 0,
+          "tool_calls": 0,
+          "provider_usage": null
+        }
+      },
+      "commands": [
+        {
+          "kind": "setup",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 5830
+        },
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 6778
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 1131
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__typescript-url-join__r04__baseline",
+      "pair_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__typescript-url-join__r04",
+      "scenario_id": "typescript-url-join",
+      "condition": "baseline",
+      "repetition": 4,
+      "started_at": "2026-09-03T09:49:06.369Z",
+      "duration_ms": 537,
+      "pi": {
+        "exit_code": 1,
+        "timed_out": false,
+        "usage": {
+          "event_count": 0,
+          "tool_calls": 0,
+          "provider_usage": null
+        }
+      },
+      "commands": [
+        {
+          "kind": "setup",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 6440
+        },
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 3698
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 537
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__go-safe-decrypt-errors__r01__baseline",
+      "pair_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__go-safe-decrypt-errors__r01",
+      "scenario_id": "go-safe-decrypt-errors",
+      "condition": "baseline",
+      "repetition": 1,
+      "started_at": "2026-09-03T09:49:19.037Z",
+      "duration_ms": 463,
+      "pi": {
+        "exit_code": 1,
+        "timed_out": false,
+        "usage": {
+          "event_count": 0,
+          "tool_calls": 0,
+          "provider_usage": null
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "go",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 9023
+        }
+      ],
+      "hidden_grader": {
+        "command": "go",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 2355
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__go-safe-decrypt-errors__r01__ponytail_full",
+      "pair_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__go-safe-decrypt-errors__r01",
+      "scenario_id": "go-safe-decrypt-errors",
+      "condition": "ponytail_full",
+      "repetition": 1,
+      "started_at": "2026-09-03T09:49:31.750Z",
+      "duration_ms": 503,
+      "pi": {
+        "exit_code": 1,
+        "timed_out": false,
+        "usage": {
+          "event_count": 0,
+          "tool_calls": 0,
+          "provider_usage": null
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "go",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 2562
+        }
+      ],
+      "hidden_grader": {
+        "command": "go",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 2467
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__go-safe-decrypt-errors__r02__ponytail_full",
+      "pair_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__go-safe-decrypt-errors__r02",
+      "scenario_id": "go-safe-decrypt-errors",
+      "condition": "ponytail_full",
+      "repetition": 2,
+      "started_at": "2026-09-03T09:49:38.066Z",
+      "duration_ms": 324,
+      "pi": {
+        "exit_code": 1,
+        "timed_out": false,
+        "usage": {
+          "event_count": 0,
+          "tool_calls": 0,
+          "provider_usage": null
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "go",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 2155
+        }
+      ],
+      "hidden_grader": {
+        "command": "go",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 2357
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__go-safe-decrypt-errors__r02__baseline",
+      "pair_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__go-safe-decrypt-errors__r02",
+      "scenario_id": "go-safe-decrypt-errors",
+      "condition": "baseline",
+      "repetition": 2,
+      "started_at": "2026-09-03T09:49:43.718Z",
+      "duration_ms": 327,
+      "pi": {
+        "exit_code": 1,
+        "timed_out": false,
+        "usage": {
+          "event_count": 0,
+          "tool_calls": 0,
+          "provider_usage": null
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "go",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 2212
+        }
+      ],
+      "hidden_grader": {
+        "command": "go",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 2550
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__go-safe-decrypt-errors__r03__baseline",
+      "pair_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__go-safe-decrypt-errors__r03",
+      "scenario_id": "go-safe-decrypt-errors",
+      "condition": "baseline",
+      "repetition": 3,
+      "started_at": "2026-09-03T09:49:49.803Z",
+      "duration_ms": 364,
+      "pi": {
+        "exit_code": 1,
+        "timed_out": false,
+        "usage": {
+          "event_count": 0,
+          "tool_calls": 0,
+          "provider_usage": null
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "go",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 2096
+        }
+      ],
+      "hidden_grader": {
+        "command": "go",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 2244
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__go-safe-decrypt-errors__r03__ponytail_full",
+      "pair_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__go-safe-decrypt-errors__r03",
+      "scenario_id": "go-safe-decrypt-errors",
+      "condition": "ponytail_full",
+      "repetition": 3,
+      "started_at": "2026-09-03T09:49:55.383Z",
+      "duration_ms": 445,
+      "pi": {
+        "exit_code": 1,
+        "timed_out": false,
+        "usage": {
+          "event_count": 0,
+          "tool_calls": 0,
+          "provider_usage": null
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "go",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 4582
+        }
+      ],
+      "hidden_grader": {
+        "command": "go",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 4547
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__go-safe-decrypt-errors__r04__ponytail_full",
+      "pair_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__go-safe-decrypt-errors__r04",
+      "scenario_id": "go-safe-decrypt-errors",
+      "condition": "ponytail_full",
+      "repetition": 4,
+      "started_at": "2026-09-03T09:50:06.063Z",
+      "duration_ms": 539,
+      "pi": {
+        "exit_code": 1,
+        "timed_out": false,
+        "usage": {
+          "event_count": 0,
+          "tool_calls": 0,
+          "provider_usage": null
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "go",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 2766
+        }
+      ],
+      "hidden_grader": {
+        "command": "go",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 2715
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__go-safe-decrypt-errors__r04__baseline",
+      "pair_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__go-safe-decrypt-errors__r04",
+      "scenario_id": "go-safe-decrypt-errors",
+      "condition": "baseline",
+      "repetition": 4,
+      "started_at": "2026-09-03T09:50:13.219Z",
+      "duration_ms": 309,
+      "pi": {
+        "exit_code": 1,
+        "timed_out": false,
+        "usage": {
+          "event_count": 0,
+          "tool_calls": 0,
+          "provider_usage": null
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "go",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 7384
+        }
+      ],
+      "hidden_grader": {
+        "command": "go",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 2185
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__laravel-exact-price-formatting__r01__baseline",
+      "pair_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__laravel-exact-price-formatting__r01",
+      "scenario_id": "laravel-exact-price-formatting",
+      "condition": "baseline",
+      "repetition": 1,
+      "started_at": "2026-09-03T09:50:23.768Z",
+      "duration_ms": 319,
+      "pi": {
+        "exit_code": 1,
+        "timed_out": false,
+        "usage": {
+          "event_count": 0,
+          "tool_calls": 0,
+          "provider_usage": null
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "php",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 95
+        }
+      ],
+      "hidden_grader": {
+        "command": "php",
+        "exit_code": 255,
+        "timed_out": false,
+        "duration_ms": 104
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__laravel-exact-price-formatting__r01__ponytail_full",
+      "pair_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__laravel-exact-price-formatting__r01",
+      "scenario_id": "laravel-exact-price-formatting",
+      "condition": "ponytail_full",
+      "repetition": 1,
+      "started_at": "2026-09-03T09:50:25.292Z",
+      "duration_ms": 345,
+      "pi": {
+        "exit_code": 1,
+        "timed_out": false,
+        "usage": {
+          "event_count": 0,
+          "tool_calls": 0,
+          "provider_usage": null
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "php",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 101
+        }
+      ],
+      "hidden_grader": {
+        "command": "php",
+        "exit_code": 255,
+        "timed_out": false,
+        "duration_ms": 113
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__laravel-exact-price-formatting__r02__ponytail_full",
+      "pair_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__laravel-exact-price-formatting__r02",
+      "scenario_id": "laravel-exact-price-formatting",
+      "condition": "ponytail_full",
+      "repetition": 2,
+      "started_at": "2026-09-03T09:50:26.782Z",
+      "duration_ms": 377,
+      "pi": {
+        "exit_code": 1,
+        "timed_out": false,
+        "usage": {
+          "event_count": 0,
+          "tool_calls": 0,
+          "provider_usage": null
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "php",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 110
+        }
+      ],
+      "hidden_grader": {
+        "command": "php",
+        "exit_code": 255,
+        "timed_out": false,
+        "duration_ms": 94
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__laravel-exact-price-formatting__r02__baseline",
+      "pair_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__laravel-exact-price-formatting__r02",
+      "scenario_id": "laravel-exact-price-formatting",
+      "condition": "baseline",
+      "repetition": 2,
+      "started_at": "2026-09-03T09:50:28.192Z",
+      "duration_ms": 283,
+      "pi": {
+        "exit_code": 1,
+        "timed_out": false,
+        "usage": {
+          "event_count": 0,
+          "tool_calls": 0,
+          "provider_usage": null
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "php",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 100
+        }
+      ],
+      "hidden_grader": {
+        "command": "php",
+        "exit_code": 255,
+        "timed_out": false,
+        "duration_ms": 99
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__laravel-exact-price-formatting__r03__baseline",
+      "pair_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__laravel-exact-price-formatting__r03",
+      "scenario_id": "laravel-exact-price-formatting",
+      "condition": "baseline",
+      "repetition": 3,
+      "started_at": "2026-09-03T09:50:29.585Z",
+      "duration_ms": 303,
+      "pi": {
+        "exit_code": 1,
+        "timed_out": false,
+        "usage": {
+          "event_count": 0,
+          "tool_calls": 0,
+          "provider_usage": null
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "php",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 128
+        }
+      ],
+      "hidden_grader": {
+        "command": "php",
+        "exit_code": 255,
+        "timed_out": false,
+        "duration_ms": 110
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__laravel-exact-price-formatting__r03__ponytail_full",
+      "pair_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__laravel-exact-price-formatting__r03",
+      "scenario_id": "laravel-exact-price-formatting",
+      "condition": "ponytail_full",
+      "repetition": 3,
+      "started_at": "2026-09-03T09:50:31.062Z",
+      "duration_ms": 291,
+      "pi": {
+        "exit_code": 1,
+        "timed_out": false,
+        "usage": {
+          "event_count": 0,
+          "tool_calls": 0,
+          "provider_usage": null
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "php",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 100
+        }
+      ],
+      "hidden_grader": {
+        "command": "php",
+        "exit_code": 255,
+        "timed_out": false,
+        "duration_ms": 100
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__laravel-exact-price-formatting__r04__ponytail_full",
+      "pair_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__laravel-exact-price-formatting__r04",
+      "scenario_id": "laravel-exact-price-formatting",
+      "condition": "ponytail_full",
+      "repetition": 4,
+      "started_at": "2026-09-03T09:50:32.692Z",
+      "duration_ms": 275,
+      "pi": {
+        "exit_code": 1,
+        "timed_out": false,
+        "usage": {
+          "event_count": 0,
+          "tool_calls": 0,
+          "provider_usage": null
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "php",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 113
+        }
+      ],
+      "hidden_grader": {
+        "command": "php",
+        "exit_code": 255,
+        "timed_out": false,
+        "duration_ms": 255
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__laravel-exact-price-formatting__r04__baseline",
+      "pair_id": "ponytail-bai-mimo-v2-5-low-20260903-r4__laravel-exact-price-formatting__r04",
+      "scenario_id": "laravel-exact-price-formatting",
+      "condition": "baseline",
+      "repetition": 4,
+      "started_at": "2026-09-03T09:50:34.117Z",
+      "duration_ms": 338,
+      "pi": {
+        "exit_code": 1,
+        "timed_out": false,
+        "usage": {
+          "event_count": 0,
+          "tool_calls": 0,
+          "provider_usage": null
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "php",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 218
+        }
+      ],
+      "hidden_grader": {
+        "command": "php",
+        "exit_code": 255,
+        "timed_out": false,
+        "duration_ms": 174
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    }
+  ]
+}
