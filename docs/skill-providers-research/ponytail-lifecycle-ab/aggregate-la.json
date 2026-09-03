@@ -1,0 +1,2339 @@
+{
+  "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+  "run_id": "ponytail-la-lifecycle-low-20260903",
+  "provider": "omniroute",
+  "model": "la/ornith-1.5-35b-a3b",
+  "thinking": "low",
+  "expected_cases": 32,
+  "completed_cases": 32,
+  "complete_pairs": 16,
+  "pass_by_condition": {
+    "baseline": 8,
+    "ponytail_full": 8
+  },
+  "pass_by_scenario": {
+    "review-price-float-precision": {
+      "baseline": 4,
+      "ponytail_full": 4
+    },
+    "security-decrypt-auth-skip": {
+      "baseline": 4,
+      "ponytail_full": 4
+    },
+    "verify-price-float-precision": {
+      "baseline": 0,
+      "ponytail_full": 0
+    },
+    "fix-decrypt-auth-restore": {
+      "baseline": 0,
+      "ponytail_full": 0
+    }
+  },
+  "results": [
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__review-price-float-precision__r01__baseline",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__review-price-float-precision__r01",
+      "scenario_id": "review-price-float-precision",
+      "command": "review",
+      "condition": "baseline",
+      "repetition": 1,
+      "started_at": "2026-09-03T14:16:36.971Z",
+      "duration_ms": 19744,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 1934,
+          "tool_calls": 18,
+          "provider_usage": {
+            "input": 6278,
+            "output": 1434,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 619,
+            "totalTokens": 7712,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 156
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 149
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 156
+      },
+      "integrity_violation": null,
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "src/Support/ValueObjects/Price.php"
+        ],
+        "source_loc_added": 6,
+        "source_loc_deleted": 1
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__review-price-float-precision__r01__ponytail_full",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__review-price-float-precision__r01",
+      "scenario_id": "review-price-float-precision",
+      "command": "review",
+      "condition": "ponytail_full",
+      "repetition": 1,
+      "started_at": "2026-09-03T14:16:58.227Z",
+      "duration_ms": 27052,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 2221,
+          "tool_calls": 22,
+          "provider_usage": {
+            "input": 7932,
+            "output": 932,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 277,
+            "totalTokens": 8864,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 153
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 308
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 153
+      },
+      "integrity_violation": null,
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "src/Support/ValueObjects/Price.php"
+        ],
+        "source_loc_added": 6,
+        "source_loc_deleted": 1
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__review-price-float-precision__r02__ponytail_full",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__review-price-float-precision__r02",
+      "scenario_id": "review-price-float-precision",
+      "command": "review",
+      "condition": "ponytail_full",
+      "repetition": 2,
+      "started_at": "2026-09-03T14:17:26.645Z",
+      "duration_ms": 30644,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 3476,
+          "tool_calls": 20,
+          "provider_usage": {
+            "input": 11017,
+            "output": 1413,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 709,
+            "totalTokens": 12430,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 177
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 145
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 177
+      },
+      "integrity_violation": null,
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "src/Support/ValueObjects/Price.php"
+        ],
+        "source_loc_added": 6,
+        "source_loc_deleted": 1
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__review-price-float-precision__r02__baseline",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__review-price-float-precision__r02",
+      "scenario_id": "review-price-float-precision",
+      "command": "review",
+      "condition": "baseline",
+      "repetition": 2,
+      "started_at": "2026-09-03T14:17:58.727Z",
+      "duration_ms": 24240,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 1900,
+          "tool_calls": 16,
+          "provider_usage": {
+            "input": 6376,
+            "output": 951,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 18,
+            "totalTokens": 7327,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 121
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 94
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 121
+      },
+      "integrity_violation": null,
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "src/Support/ValueObjects/Price.php"
+        ],
+        "source_loc_added": 6,
+        "source_loc_deleted": 1
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__review-price-float-precision__r03__baseline",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__review-price-float-precision__r03",
+      "scenario_id": "review-price-float-precision",
+      "command": "review",
+      "condition": "baseline",
+      "repetition": 3,
+      "started_at": "2026-09-03T14:18:24.248Z",
+      "duration_ms": 30825,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 2436,
+          "tool_calls": 20,
+          "provider_usage": {
+            "input": 7066,
+            "output": 1506,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 454,
+            "totalTokens": 8572,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 188
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 195
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 188
+      },
+      "integrity_violation": null,
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "src/Support/ValueObjects/Price.php"
+        ],
+        "source_loc_added": 6,
+        "source_loc_deleted": 1
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__review-price-float-precision__r03__ponytail_full",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__review-price-float-precision__r03",
+      "scenario_id": "review-price-float-precision",
+      "command": "review",
+      "condition": "ponytail_full",
+      "repetition": 3,
+      "started_at": "2026-09-03T14:18:56.687Z",
+      "duration_ms": 205733,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 30083,
+          "tool_calls": 28,
+          "provider_usage": {
+            "input": 43381,
+            "output": 1083,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 208,
+            "totalTokens": 44464,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 194
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 109
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 194
+      },
+      "integrity_violation": null,
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "src/Support/ValueObjects/Price.php"
+        ],
+        "source_loc_added": 6,
+        "source_loc_deleted": 1
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__review-price-float-precision__r04__ponytail_full",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__review-price-float-precision__r04",
+      "scenario_id": "review-price-float-precision",
+      "command": "review",
+      "condition": "ponytail_full",
+      "repetition": 4,
+      "started_at": "2026-09-03T14:22:23.740Z",
+      "duration_ms": 30393,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 3292,
+          "tool_calls": 21,
+          "provider_usage": {
+            "input": 10161,
+            "output": 1245,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 426,
+            "totalTokens": 11406,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 222
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 174
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 222
+      },
+      "integrity_violation": null,
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "src/Support/ValueObjects/Price.php"
+        ],
+        "source_loc_added": 6,
+        "source_loc_deleted": 1
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__review-price-float-precision__r04__baseline",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__review-price-float-precision__r04",
+      "scenario_id": "review-price-float-precision",
+      "command": "review",
+      "condition": "baseline",
+      "repetition": 4,
+      "started_at": "2026-09-03T14:22:55.611Z",
+      "duration_ms": 19048,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 1665,
+          "tool_calls": 15,
+          "provider_usage": {
+            "input": 5979,
+            "output": 1065,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 449,
+            "totalTokens": 7044,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 221
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 649
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 221
+      },
+      "integrity_violation": null,
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "src/Support/ValueObjects/Price.php"
+        ],
+        "source_loc_added": 6,
+        "source_loc_deleted": 1
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__security-decrypt-auth-skip__r01__baseline",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__security-decrypt-auth-skip__r01",
+      "scenario_id": "security-decrypt-auth-skip",
+      "command": "security",
+      "condition": "baseline",
+      "repetition": 1,
+      "started_at": "2026-09-03T14:23:16.927Z",
+      "duration_ms": 18455,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 1926,
+          "tool_calls": 12,
+          "provider_usage": {
+            "input": 8325,
+            "output": 802,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 123,
+            "totalTokens": 9127,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 196
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 96
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 196
+      },
+      "integrity_violation": null,
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "go/encrypt.go"
+        ],
+        "source_loc_added": 1,
+        "source_loc_deleted": 4
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__security-decrypt-auth-skip__r01__ponytail_full",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__security-decrypt-auth-skip__r01",
+      "scenario_id": "security-decrypt-auth-skip",
+      "command": "security",
+      "condition": "ponytail_full",
+      "repetition": 1,
+      "started_at": "2026-09-03T14:23:36.755Z",
+      "duration_ms": 17533,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 1473,
+          "tool_calls": 13,
+          "provider_usage": {
+            "input": 8061,
+            "output": 903,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 168,
+            "totalTokens": 8964,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 204
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 122
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 204
+      },
+      "integrity_violation": null,
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "go/encrypt.go"
+        ],
+        "source_loc_added": 1,
+        "source_loc_deleted": 4
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__security-decrypt-auth-skip__r02__ponytail_full",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__security-decrypt-auth-skip__r02",
+      "scenario_id": "security-decrypt-auth-skip",
+      "command": "security",
+      "condition": "ponytail_full",
+      "repetition": 2,
+      "started_at": "2026-09-03T14:23:55.495Z",
+      "duration_ms": 24636,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 2426,
+          "tool_calls": 18,
+          "provider_usage": {
+            "input": 9455,
+            "output": 695,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 87,
+            "totalTokens": 10150,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 183
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 107
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 183
+      },
+      "integrity_violation": null,
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "go/encrypt.go"
+        ],
+        "source_loc_added": 1,
+        "source_loc_deleted": 4
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__security-decrypt-auth-skip__r02__baseline",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__security-decrypt-auth-skip__r02",
+      "scenario_id": "security-decrypt-auth-skip",
+      "command": "security",
+      "condition": "baseline",
+      "repetition": 2,
+      "started_at": "2026-09-03T14:24:21.546Z",
+      "duration_ms": 19742,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 1329,
+          "tool_calls": 14,
+          "provider_usage": {
+            "input": 6092,
+            "output": 652,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 87,
+            "totalTokens": 6744,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 411
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 1157
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 411
+      },
+      "integrity_violation": null,
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "go/encrypt.go"
+        ],
+        "source_loc_added": 1,
+        "source_loc_deleted": 4
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__security-decrypt-auth-skip__r03__baseline",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__security-decrypt-auth-skip__r03",
+      "scenario_id": "security-decrypt-auth-skip",
+      "command": "security",
+      "condition": "baseline",
+      "repetition": 3,
+      "started_at": "2026-09-03T14:24:45.581Z",
+      "duration_ms": 20964,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 1382,
+          "tool_calls": 18,
+          "provider_usage": {
+            "input": 6365,
+            "output": 697,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 107,
+            "totalTokens": 7062,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 137
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 115
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 137
+      },
+      "integrity_violation": null,
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "go/encrypt.go"
+        ],
+        "source_loc_added": 1,
+        "source_loc_deleted": 4
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__security-decrypt-auth-skip__r03__ponytail_full",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__security-decrypt-auth-skip__r03",
+      "scenario_id": "security-decrypt-auth-skip",
+      "command": "security",
+      "condition": "ponytail_full",
+      "repetition": 3,
+      "started_at": "2026-09-03T14:25:07.673Z",
+      "duration_ms": 24681,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 2040,
+          "tool_calls": 20,
+          "provider_usage": {
+            "input": 10868,
+            "output": 1154,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 546,
+            "totalTokens": 12022,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 124
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 109
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 124
+      },
+      "integrity_violation": null,
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "go/encrypt.go"
+        ],
+        "source_loc_added": 1,
+        "source_loc_deleted": 4
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__security-decrypt-auth-skip__r04__ponytail_full",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__security-decrypt-auth-skip__r04",
+      "scenario_id": "security-decrypt-auth-skip",
+      "command": "security",
+      "condition": "ponytail_full",
+      "repetition": 4,
+      "started_at": "2026-09-03T14:25:33.455Z",
+      "duration_ms": 21547,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 1360,
+          "tool_calls": 13,
+          "provider_usage": {
+            "input": 8179,
+            "output": 722,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 147,
+            "totalTokens": 8901,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 144
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 103
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 144
+      },
+      "integrity_violation": null,
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "go/encrypt.go"
+        ],
+        "source_loc_added": 1,
+        "source_loc_deleted": 4
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__security-decrypt-auth-skip__r04__baseline",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__security-decrypt-auth-skip__r04",
+      "scenario_id": "security-decrypt-auth-skip",
+      "command": "security",
+      "condition": "baseline",
+      "repetition": 4,
+      "started_at": "2026-09-03T14:25:56.123Z",
+      "duration_ms": 16095,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 1045,
+          "tool_calls": 13,
+          "provider_usage": {
+            "input": 6138,
+            "output": 553,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 93,
+            "totalTokens": 6691,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 120
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 134
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 120
+      },
+      "integrity_violation": null,
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "go/encrypt.go"
+        ],
+        "source_loc_added": 1,
+        "source_loc_deleted": 4
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__verify-price-float-precision__r01__baseline",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__verify-price-float-precision__r01",
+      "scenario_id": "verify-price-float-precision",
+      "command": "verify",
+      "condition": "baseline",
+      "repetition": 1,
+      "started_at": "2026-09-03T14:26:13.312Z",
+      "duration_ms": 140811,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 5545,
+          "tool_calls": 43,
+          "provider_usage": {
+            "input": 25871,
+            "output": 662,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 14,
+            "totalTokens": 26533,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 1,
+          "timed_out": false,
+          "duration_ms": 380
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 479
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 380
+      },
+      "integrity_violation": "verify added a file outside .ai-factory/qa/lifecycle-price-format/: ai-factory/qa/lifecycle-price-format/verify.md",
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "src/Support/ValueObjects/Price.php"
+        ],
+        "source_loc_added": 6,
+        "source_loc_deleted": 1
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__verify-price-float-precision__r01__ponytail_full",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__verify-price-float-precision__r01",
+      "scenario_id": "verify-price-float-precision",
+      "command": "verify",
+      "condition": "ponytail_full",
+      "repetition": 1,
+      "started_at": "2026-09-03T14:28:37.128Z",
+      "duration_ms": 73792,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 6412,
+          "tool_calls": 35,
+          "provider_usage": {
+            "input": 14074,
+            "output": 593,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 27,
+            "totalTokens": 14667,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 1,
+          "timed_out": false,
+          "duration_ms": 111
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 125
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 111
+      },
+      "integrity_violation": "verify modified tracked files",
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "src/Support/ValueObjects/Price.php"
+        ],
+        "source_loc_added": 6,
+        "source_loc_deleted": 1
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__verify-price-float-precision__r02__ponytail_full",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__verify-price-float-precision__r02",
+      "scenario_id": "verify-price-float-precision",
+      "command": "verify",
+      "condition": "ponytail_full",
+      "repetition": 2,
+      "started_at": "2026-09-03T14:29:52.385Z",
+      "duration_ms": 45769,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 3771,
+          "tool_calls": 31,
+          "provider_usage": {
+            "input": 11301,
+            "output": 1184,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 116,
+            "totalTokens": 12485,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 1,
+          "timed_out": false,
+          "duration_ms": 150
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 100
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 150
+      },
+      "integrity_violation": "verify modified tracked files",
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "src/Support/ValueObjects/Price.php"
+        ],
+        "source_loc_added": 6,
+        "source_loc_deleted": 1
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__verify-price-float-precision__r02__baseline",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__verify-price-float-precision__r02",
+      "scenario_id": "verify-price-float-precision",
+      "command": "verify",
+      "condition": "baseline",
+      "repetition": 2,
+      "started_at": "2026-09-03T14:30:39.176Z",
+      "duration_ms": 27246,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 2257,
+          "tool_calls": 15,
+          "provider_usage": {
+            "input": 6308,
+            "output": 838,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 59,
+            "totalTokens": 7146,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 1,
+          "timed_out": false,
+          "duration_ms": 131
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 123
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 131
+      },
+      "integrity_violation": "verify modified tracked files",
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "src/Support/ValueObjects/Price.php"
+        ],
+        "source_loc_added": 6,
+        "source_loc_deleted": 1
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__verify-price-float-precision__r03__baseline",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__verify-price-float-precision__r03",
+      "scenario_id": "verify-price-float-precision",
+      "command": "verify",
+      "condition": "baseline",
+      "repetition": 3,
+      "started_at": "2026-09-03T14:31:07.844Z",
+      "duration_ms": 84524,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 9345,
+          "tool_calls": 39,
+          "provider_usage": {
+            "input": 14246,
+            "output": 664,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 12,
+            "totalTokens": 14910,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 1,
+          "timed_out": false,
+          "duration_ms": 121
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 133
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 121
+      },
+      "integrity_violation": "verify modified tracked files",
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "src/Support/ValueObjects/Price.php"
+        ],
+        "source_loc_added": 6,
+        "source_loc_deleted": 1
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__verify-price-float-precision__r03__ponytail_full",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__verify-price-float-precision__r03",
+      "scenario_id": "verify-price-float-precision",
+      "command": "verify",
+      "condition": "ponytail_full",
+      "repetition": 3,
+      "started_at": "2026-09-03T14:32:33.653Z",
+      "duration_ms": 73519,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 5602,
+          "tool_calls": 35,
+          "provider_usage": {
+            "input": 12487,
+            "output": 795,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 58,
+            "totalTokens": 13282,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 1,
+          "timed_out": false,
+          "duration_ms": 120
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 118
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 120
+      },
+      "integrity_violation": "verify added a file outside .ai-factory/qa/lifecycle-price-format/: _pricecheck.php",
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "src/Support/ValueObjects/Price.php"
+        ],
+        "source_loc_added": 6,
+        "source_loc_deleted": 1
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__verify-price-float-precision__r04__ponytail_full",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__verify-price-float-precision__r04",
+      "scenario_id": "verify-price-float-precision",
+      "command": "verify",
+      "condition": "ponytail_full",
+      "repetition": 4,
+      "started_at": "2026-09-03T14:33:48.843Z",
+      "duration_ms": 47782,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 4376,
+          "tool_calls": 28,
+          "provider_usage": {
+            "input": 12788,
+            "output": 477,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 39,
+            "totalTokens": 13265,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 1,
+          "timed_out": false,
+          "duration_ms": 104
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 94
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 104
+      },
+      "integrity_violation": "verify modified tracked files",
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "src/Support/ValueObjects/Price.php"
+        ],
+        "source_loc_added": 6,
+        "source_loc_deleted": 1
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__verify-price-float-precision__r04__baseline",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__verify-price-float-precision__r04",
+      "scenario_id": "verify-price-float-precision",
+      "command": "verify",
+      "condition": "baseline",
+      "repetition": 4,
+      "started_at": "2026-09-03T14:34:37.659Z",
+      "duration_ms": 27728,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 2653,
+          "tool_calls": 20,
+          "provider_usage": {
+            "input": 7911,
+            "output": 431,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 12,
+            "totalTokens": 8342,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 1,
+          "timed_out": false,
+          "duration_ms": 110
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 89
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 110
+      },
+      "integrity_violation": "verify modified tracked files",
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "src/Support/ValueObjects/Price.php"
+        ],
+        "source_loc_added": 6,
+        "source_loc_deleted": 1
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__fix-decrypt-auth-restore__r01__baseline",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__fix-decrypt-auth-restore__r01",
+      "scenario_id": "fix-decrypt-auth-restore",
+      "command": "fix",
+      "condition": "baseline",
+      "repetition": 1,
+      "started_at": "2026-09-03T14:35:06.417Z",
+      "duration_ms": 72787,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 4572,
+          "tool_calls": 24,
+          "provider_usage": {
+            "input": 12384,
+            "output": 470,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 13,
+            "totalTokens": 12854,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 1,
+          "timed_out": false,
+          "duration_ms": 186
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 101
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 186
+      },
+      "integrity_violation": null,
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "go/encrypt.go"
+        ],
+        "source_loc_added": 1,
+        "source_loc_deleted": 1
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__fix-decrypt-auth-restore__r01__ponytail_full",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__fix-decrypt-auth-restore__r01",
+      "scenario_id": "fix-decrypt-auth-restore",
+      "command": "fix",
+      "condition": "ponytail_full",
+      "repetition": 1,
+      "started_at": "2026-09-03T14:36:20.330Z",
+      "duration_ms": 64914,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 3795,
+          "tool_calls": 25,
+          "provider_usage": {
+            "input": 13879,
+            "output": 347,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 7,
+            "totalTokens": 14226,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 1,
+          "timed_out": false,
+          "duration_ms": 1949
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 258
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 1949
+      },
+      "integrity_violation": null,
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "go/encrypt.go"
+        ],
+        "source_loc_added": 1,
+        "source_loc_deleted": 1
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__fix-decrypt-auth-restore__r02__ponytail_full",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__fix-decrypt-auth-restore__r02",
+      "scenario_id": "fix-decrypt-auth-restore",
+      "command": "fix",
+      "condition": "ponytail_full",
+      "repetition": 2,
+      "started_at": "2026-09-03T14:37:28.195Z",
+      "duration_ms": 54673,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 3360,
+          "tool_calls": 26,
+          "provider_usage": {
+            "input": 12344,
+            "output": 491,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 26,
+            "totalTokens": 12835,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 1,
+          "timed_out": false,
+          "duration_ms": 1998
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 90
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 1998
+      },
+      "integrity_violation": null,
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "go/encrypt.go"
+        ],
+        "source_loc_added": 1,
+        "source_loc_deleted": 1
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__fix-decrypt-auth-restore__r02__baseline",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__fix-decrypt-auth-restore__r02",
+      "scenario_id": "fix-decrypt-auth-restore",
+      "command": "fix",
+      "condition": "baseline",
+      "repetition": 2,
+      "started_at": "2026-09-03T14:38:25.754Z",
+      "duration_ms": 70034,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 2982,
+          "tool_calls": 29,
+          "provider_usage": {
+            "input": 11343,
+            "output": 390,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 25,
+            "totalTokens": 11733,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 1,
+          "timed_out": false,
+          "duration_ms": 2185
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 97
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 2185
+      },
+      "integrity_violation": null,
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "go/encrypt.go"
+        ],
+        "source_loc_added": 4,
+        "source_loc_deleted": 1
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__fix-decrypt-auth-restore__r03__baseline",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__fix-decrypt-auth-restore__r03",
+      "scenario_id": "fix-decrypt-auth-restore",
+      "command": "fix",
+      "condition": "baseline",
+      "repetition": 3,
+      "started_at": "2026-09-03T14:39:38.837Z",
+      "duration_ms": 56666,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 2001,
+          "tool_calls": 20,
+          "provider_usage": {
+            "input": 9692,
+            "output": 390,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 33,
+            "totalTokens": 10082,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 1,
+          "timed_out": false,
+          "duration_ms": 2141
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 83
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 2141
+      },
+      "integrity_violation": null,
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "go/encrypt.go"
+        ],
+        "source_loc_added": 1,
+        "source_loc_deleted": 1
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__fix-decrypt-auth-restore__r03__ponytail_full",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__fix-decrypt-auth-restore__r03",
+      "scenario_id": "fix-decrypt-auth-restore",
+      "command": "fix",
+      "condition": "ponytail_full",
+      "repetition": 3,
+      "started_at": "2026-09-03T14:40:38.709Z",
+      "duration_ms": 232074,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 10459,
+          "tool_calls": 76,
+          "provider_usage": {
+            "input": 25626,
+            "output": 331,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 11,
+            "totalTokens": 25957,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 1,
+          "timed_out": false,
+          "duration_ms": 2143
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 91
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 2143
+      },
+      "integrity_violation": null,
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "go/encrypt.go"
+        ],
+        "source_loc_added": 1,
+        "source_loc_deleted": 1
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__fix-decrypt-auth-restore__r04__ponytail_full",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__fix-decrypt-auth-restore__r04",
+      "scenario_id": "fix-decrypt-auth-restore",
+      "command": "fix",
+      "condition": "ponytail_full",
+      "repetition": 4,
+      "started_at": "2026-09-03T14:44:34.123Z",
+      "duration_ms": 99246,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 3021,
+          "tool_calls": 31,
+          "provider_usage": {
+            "input": 13136,
+            "output": 413,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 15,
+            "totalTokens": 13549,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 1,
+          "timed_out": false,
+          "duration_ms": 154
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 96
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 154
+      },
+      "integrity_violation": null,
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "go/encrypt.go"
+        ],
+        "source_loc_added": 1,
+        "source_loc_deleted": 1
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_lifecycle_ab.results.v1",
+      "case_id": "ponytail-la-lifecycle-low-20260903__fix-decrypt-auth-restore__r04__baseline",
+      "pair_id": "ponytail-la-lifecycle-low-20260903__fix-decrypt-auth-restore__r04",
+      "scenario_id": "fix-decrypt-auth-restore",
+      "command": "fix",
+      "condition": "baseline",
+      "repetition": 4,
+      "started_at": "2026-09-03T14:46:14.524Z",
+      "duration_ms": 67570,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 2280,
+          "tool_calls": 27,
+          "provider_usage": {
+            "input": 10584,
+            "output": 332,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 11,
+            "totalTokens": 10916,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "hidden-grader",
+          "command": "node.exe",
+          "exit_code": 1,
+          "timed_out": false,
+          "duration_ms": 1942
+        },
+        {
+          "kind": "git-diff-check",
+          "command": "git",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 79
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 1942
+      },
+      "integrity_violation": "fix edited a file outside the seeded changed scope: go/encrypt_test.go",
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "command_skill_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "dependency_files_changed": false,
+        "changed_files": [
+          "go/encrypt.go",
+          "go/encrypt_test.go"
+        ],
+        "source_loc_added": 38,
+        "source_loc_deleted": 1
+      },
+      "task_pass": false
+    }
+  ]
+}

@@ -7,6 +7,7 @@
 ## [В разработке]
 
 ### Добавлено
+- Lifecycle-parity proxy для Ponytail `v4.9.0` (issue #137): изолированный runner `ponytail-lifecycle-ab.mjs` запускает `/aif-review`, `/aif-security-checklist`, `/aif-verify` и `/aif-fix` на seeded real-project дефектах (float-precision рендеринг цены в Laravel, проглоченная AES-GCM ошибка аутентификации в Go) с canonical OpenSpec-артефактами, проверенными `openspec validate`, и детерминированными hidden-грейдерами (gate-контракт `aif-gate-result`, write-scope containment, инъекция существующего Go-теста). Полный прогон `omniroute/la/ornith-1.5-35b-a3b` (32 кейса, 16/16 пар): review и security 8/8 в обеих руках, verify и fix 0/8 с одинаковыми contract-discipline отказами; корректность между baseline и Ponytail не изменилась, зафиксирован только token overhead. Policy остаётся `manual_experiment_only`.
 - Exact-source evaluation для DietrichGebert/ponytail `v4.9.0` с policy `manual_experiment_only`: skill-provider guide фиксирует session/subagent hook scope, отличие upstream deterministic safety scorers от AIFHub gates, OpenSpec precedence и user-owned setup boundary; implementation-only proxy получил reproducible 24-case matrix на exact-commit TypeScript, Go и Laravel projects, hidden graders и два полных `pi 0.84.4` прогона (`omniroute/lq/qwen3.8-27b` и `omniroute/la/ornith-1.5-35b-a3b`, 48 строк). Mixed stack-dependent evidence сохраняет policy без promotion; runner закрывает child stdin и сохраняет partial timeout output с regression coverage (issue #137).
 
 ## [1.5.0] - 2026-09-01

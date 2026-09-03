@@ -1,0 +1,8 @@
+aifhub:
+  artifactProtocol: openspec
+  openspec:
+    root: openspec
+    installSkills: false
+paths:
+  plans: openspec/changes
+  specs: openspec/specs

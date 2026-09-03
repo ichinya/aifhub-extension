@@ -1,0 +1,21 @@
+diff --git a/src/Support/ValueObjects/Price.php b/src/Support/ValueObjects/Price.php
+index 9533471..42f524b 100644
+--- a/src/Support/ValueObjects/Price.php
++++ b/src/Support/ValueObjects/Price.php
+@@ -50,10 +50,15 @@ public function symbol(): string
+         return $this->currencies[$this->currency];
+     }
+ 
++    public function scale(): int
++    {
++        return (int) max(0, round(log10($this->precision)));
++    }
++
+     public function __toString(): string
+     {
+         return sprintf("%s %s",
+-            number_format($this->value(), 2, ',', ' '),
++            number_format($this->value / $this->precision, $this->scale(), ',', ' '),
+             $this->symbol());
+     }
+ }

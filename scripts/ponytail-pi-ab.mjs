@@ -648,7 +648,7 @@ export async function cloneGitSnapshot(source, target, commit) {
   await verifyGitSnapshot(target, commit, 'prepared case');
 }
 
-async function verifyGitSnapshot(repoRoot, expectedCommit, label) {
+export async function verifyGitSnapshot(repoRoot, expectedCommit, label) {
   await assertPathExists(repoRoot, label);
   const head = await runExternal('git', gitArgs('rev-parse', 'HEAD'), { cwd: repoRoot, timeoutMs: 30_000 });
   if (head.exitCode !== 0 || head.stdout.trim() !== expectedCommit) {
@@ -661,7 +661,7 @@ async function verifyGitSnapshot(repoRoot, expectedCommit, label) {
   if (statusResult.exitCode !== 0 || statusResult.stdout.trim()) throw new Error(`${label} must be a clean Git snapshot`);
 }
 
-async function runExternal(command, args, { cwd, timeoutMs = 60_000, maxBuffer = 16 * 1024 * 1024 } = {}) {
+export async function runExternal(command, args, { cwd, timeoutMs = 60_000, maxBuffer = 16 * 1024 * 1024 } = {}) {
   const resolved = await resolveExecutable(command, args);
   return runExternalDirect(resolved.command, resolved.args, { cwd, timeoutMs, maxBuffer });
 }
