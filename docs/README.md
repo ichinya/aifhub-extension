@@ -48,6 +48,7 @@ OpenSpec CLI features вызываются через AIFHub wrappers и `script
 | [Context Providers](context-providers.md) | Optional Graphify context, CodeGraph manual CLI context и Context7 provider guidance, reviewed-note paths, degraded behavior, credential safety и user-owned setup boundaries |
 | [Skill Providers](skill-providers.md) | Ponytail exact-source evaluation, `manual_experiment_only` decision, implementation-only scope, safety/OpenSpec boundaries и promotion benchmark |
 | [Ponytail Pi A/B Scenarios](skill-providers-research/ponytail-pi-ab/README.md) | Reproducible paired Pi proxy и [144-row multi-model results](skill-providers-research/ponytail-pi-ab/results.md) на disposable exact-commit TypeScript, Go и Laravel copies с hidden graders |
+| [Ponytail Lifecycle Pi A/B](skill-providers-research/ponytail-lifecycle-ab/README.md) | Paired lifecycle-command proxy для `/aif-review`, `/aif-security-checklist`, `/aif-verify` и `/aif-fix` и [32-row la/ornith results](skill-providers-research/ponytail-lifecycle-ab/results.md) на seeded real-project дефектах с canonical OpenSpec-артефактами и hidden graders |
 | [Memory Tool Recommendations](memory-tool-recommendations.md) | Local metadata-driven optional memory/context tool recommendations и installed wrapper commands |
 | [Session Context Dedup](context-dedup.md) | Optional `off | aifhub | sqz` context optimization: decision table, protected artifacts, ledger/purge paths, external-tool consent, CLI и MCP surface |
 | [Context Loading Policy](context-loading-policy.md) | Runtime context, AI Factory 2.19 upstream warmup, Optional Project Glossary, optional Graphify/CodeGraph/Context7 context, GitHub-aware roadmap evidence, ownership, gates, commit handoff, upstream `/aif-architecture`, `/aif-docs`, `/aif-qa`, `/aif-archive` and `/aif-distillation` boundaries и legacy boundaries |
@@ -117,6 +118,7 @@ npm test
 - [Context Providers](context-providers.md)
 - [Skill Providers](skill-providers.md)
 - [Ponytail Pi A/B Scenarios](skill-providers-research/ponytail-pi-ab/README.md)
+- [Ponytail Lifecycle Pi A/B](skill-providers-research/ponytail-lifecycle-ab/README.md)
 - [Memory Tool Recommendations](memory-tool-recommendations.md)
 - [Session Context Dedup](context-dedup.md)
 - [Context Loading Policy](context-loading-policy.md)
