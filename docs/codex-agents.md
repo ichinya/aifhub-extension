@@ -37,6 +37,9 @@ The `aifhub-*` Codex agents are extension helpers for bounded planning, implemen
 - `aifhub-rules-sidecar` keeps the upstream `rules-sidecar` contract instead of replacing it: it is namespaced for AIFHub and reads generated markdown plus trace metadata under `.ai-factory/rules/generated/*` in OpenSpec-native mode.
 - `low-write verifier`: `aifhub-verifier`. Агент может обновлять только verification artifacts, но не implementation files.
 - `bounded worker`: `aifhub-plan-polisher`, `aifhub-implement-worker`, `aifhub-fixer`. Они write-capable, но у каждого есть жёстко ограниченный рабочий scope.
+- `aifhub-implement-worker` records a bounded RED -> GREEN -> REFACTOR cycle for testable behavior changes, or an explicit no-test fallback, under runtime state only.
+- `aifhub-fixer` records direct root-cause evidence, one falsifiable hypothesis and a minimal experiment before its regression-first edit.
+- `aifhub-review-sidecar` runs plan/spec compliance before code quality and returns one combined read-only gate.
 - `finalization helper`: `aifhub-done-finalizer`. Для OpenSpec-native installed project он запускает `ai-factory aifhub-done-finalizer --change <change-id> --json`; extension-local implementation выполняет readiness и `openspec archive <change-id> --yes`. Поддерживаются `--skip-specs` и `--record-dirty-state`. Агент co-owns только одну linked row внутри marker-bounded lifecycle block; arbitrary `.ai-factory/ROADMAP.md` content и owner boundaries для `.ai-factory/RULES.md` и `.ai-factory/ARCHITECTURE.md` не обходятся.
 
 ## Как это работает
@@ -98,6 +101,8 @@ Run after code changes and before verification starts:
 - `aifhub-security-sidecar` -> `gate: "security"`
 
 All sidecars are read-only and end with final `aif-gate-result`.
+
+`aifhub-review-sidecar` additionally loads `reviews.policy_file` (`REVIEW.md` by default) through `ai-factory aifhub-review-policy load --json` and applies only the complete canonical, identity-bound `present` snapshot as read-only additive guidance. Symlink/junction escapes and managed/protected artifact collisions are skipped. Missing policy is non-blocking, and session comments or resolution state are never written back to it.
 
 ### Verification and fix loop
 

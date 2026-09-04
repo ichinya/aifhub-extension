@@ -159,6 +159,95 @@ describe('aif-plan OpenSpec-native planning contract', () => {
     }
   });
 
+  it('uses one explicit MCP work item as provider-neutral plan identity before ordinary allocation', async () => {
+    const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
+    const identity = extractSection(injection, 'MCP work-item-derived plan identity');
+
+    assertOrder(
+      injection,
+      [
+        '### Planning profile and AI Factory version gate',
+        '### MCP work-item-derived plan identity',
+        '### OpenSpec-native mode',
+        '### Legacy AI Factory-only mode'
+      ],
+      'aif-plan work-item identity routing'
+    );
+
+    for (const expected of [
+      'GitHub Issues, Linear, Jira, YouGile',
+      'structured MCP record selected for that input',
+      '`identifier`, `key`, `number`, or display ID',
+      '`mcp://<server>/<resource-kind>/<stable-record-id>`',
+      '`yougile-a1b2c3d4`',
+      'A bare number',
+      'a pull-request URL',
+      'is not identity evidence',
+      'Exactly one distinct work item selects `source_provider`, `primary_source`, and `external_id`',
+      'explicitly primary',
+      'never choose the first, lowest, or highest item implicitly',
+      '`deriveSourceBoundChangeId(external_id, request_slug)`',
+      '## AIFHub Source Binding',
+      '- Provider: <source_provider>',
+      '- Primary source: <primary_source>',
+      '- External ID: <external_id>',
+      '- Branch: <exact current git branch|none>',
+      'MUST NOT establish or replace the primary binding'
+    ]) {
+      assertIncludes(identity, expected, 'aif-plan explicit MCP work-item identity');
+    }
+  });
+
+  it('maps external work-item IDs to readable OpenSpec IDs and compatible legacy identifiers', async () => {
+    const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
+    const identity = extractSection(injection, 'MCP work-item-derived plan identity');
+    const openspec = extractSection(injection, 'OpenSpec-native mode');
+
+    for (const expected of [
+      '`<normalized-external-id>-<request-slug>`',
+      '`156-fix-login-timeout`',
+      '`eng-431-fix-login-timeout`',
+      '`proj-77-refresh-token`',
+      'set the new canonical `change-id` to `deriveSourceBoundChangeId(external_id, request_slug).changeId`',
+      'independent of `workflow.plan_id_format`',
+      'validate it with `normalizeChangeId()` before any write',
+      'use `<normalized-external-id>-<request-slug>` as the plan identifier',
+      'keep the required four-digit compatibility prefix',
+      '`0042_PROJ-77-refresh-token`',
+      '`HANDOFF_BRANCH_PREPARED=1` retains upstream precedence and disables the legacy sequential prefix',
+      'writeCurrentChangePointer(<resolved-change-id>)',
+      'One exact persisted branch binding remains higher-precedence than ordinary slug branch matching'
+    ]) {
+      assertIncludes(identity, expected, 'aif-plan source-bound mode mapping');
+    }
+
+    assertIncludes(
+      openspec,
+      'use `deriveSourceBoundChangeId(external_id, request_slug).changeId`',
+      'OpenSpec Change ID policy'
+    );
+  });
+
+  it('fails closed on source-bound ID collisions without losing the external-ID prefix', async () => {
+    const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
+    const identity = extractSection(injection, 'MCP work-item-derived plan identity');
+
+    for (const expected of [
+      'scan active source-bound artifacts',
+      '`Primary source` equal to `primary_source`',
+      'reuse its existing identifier and route to refinement even if the current request would derive a different slug',
+      'ambiguous-primary-source-binding',
+      '`openspec/changes/<derived-change-id>/` exists',
+      'equality of `Provider` / `External ID`, is insufficient',
+      'source-plan-id-collision',
+      'Never overwrite, allocate a suffix, or silently drop the external-ID prefix',
+      'persisted full primary source protects the remaining cross-provider and cross-tenant collision case',
+      'INFO [aif-plan] source-bound plan identity: provider=<provider> external-id=<bounded-id> artifact=<project-relative-path>'
+    ]) {
+      assertIncludes(identity, expected, 'aif-plan source-bound collision contract');
+    }
+  });
+
   it('requires canonical OpenSpec change artifacts without legacy plan companion files', async () => {
     const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
     const openspec = extractSection(injection, 'OpenSpec-native mode');
@@ -240,6 +329,52 @@ describe('aif-plan OpenSpec-native planning contract', () => {
       ['## Original Request', '## Roadmap Linkage', '## Why', '## What Changes', '## Capabilities', '## Impact'],
       'OpenSpec proposal template'
     );
+    assertNotIncludes(proposalTemplate, '## AIFHub Source Binding', 'universal OpenSpec proposal template');
+
+    const conditionalBinding = extractFencedBlockAfter(
+      openspec,
+      'For source-bound proposals only, insert this exact block'
+    );
+    assertIncludes(conditionalBinding, '## AIFHub Source Binding', 'conditional source-binding template');
+    assertIncludes(
+      openspec,
+      'For every ordinary plan, omit the complete heading and body',
+      'conditional source-binding template'
+    );
+  });
+
+  it('persists provider, primary source, external ID, and branch separately in OpenSpec and legacy plans', async () => {
+    const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
+    const identity = extractSection(injection, 'MCP work-item-derived plan identity');
+    const legacy = extractSection(injection, 'Legacy AI Factory-only mode');
+
+    for (const expected of [
+      'write the exact section once in `proposal.md`',
+      '`Primary source` is the single canonical collision identity',
+      '`Issues` list in `## Roadmap Linkage` remains lifecycle linkage',
+      '`parseWorkItemSourceBinding()`',
+      '`parseLegacyWorkItemSourceBinding()`',
+      '`parseSynchronizedWorkItemSourceBinding()`',
+      '`matchesPrimarySourceBinding()`',
+      'source_binding.provider',
+      'source_binding.primary_source',
+      'source_binding.external_id',
+      'source_binding.branch'
+    ]) {
+      assertIncludes(identity, expected, 'aif-plan persisted source binding');
+    }
+
+    for (const expected of [
+      'source_binding:',
+      'provider: "linear"',
+      'primary_source: "mcp://linear/issue/<stable-record-id>"',
+      'external_id: "ENG-431"',
+      'branch: "<exact current git branch|none>"',
+      'require the exact Markdown source-binding section in `index.md`',
+      'do not create or synchronize `task.md`, `context.md`, `rules.md`, `verify.md`, `status.yaml`, or `explore.md`'
+    ]) {
+      assertIncludes(legacy, expected, 'aif-plan legacy persisted source binding');
+    }
   });
 
   it('requires task intake normalization before writing OpenSpec artifacts', async () => {
@@ -341,11 +476,15 @@ describe('aif-plan OpenSpec-native planning contract', () => {
     const label = 'aif-plan standardized Roadmap Linkage contract';
 
     const proposalTemplate = extractFencedBlockAfter(openspec, '`proposal.md` should use:');
-    assertOrder(proposalTemplate, ['## Original Request', '## Roadmap Linkage', '## Why'], `${label} proposal ordering`);
+    assertOrder(
+      proposalTemplate,
+      ['## Original Request', '## Roadmap Linkage', '## Why'],
+      `${label} proposal ordering`
+    );
 
     for (const expected of [
       '#### Roadmap Linkage',
-      '- Issues: <comma-separated canonical URL(s)|none>',
+      '- Issues: <comma-separated canonical HTTPS work-item URL(s) or stable MCP resource URI(s)|none>',
       '- Milestone: <exact title|none>',
       '- Roadmap item/slice: <exact item or slice|none>',
       '- Rationale: <one bounded explanation|none>',

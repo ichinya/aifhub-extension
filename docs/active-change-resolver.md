@@ -10,10 +10,11 @@ Resolution uses this order:
 
 1. Explicit `changeId`.
 2. Current working directory under `openspec/changes/<change-id>/`.
-3. Current git branch mapped to an existing active change.
-4. `.ai-factory/state/current.yaml`.
-5. A single active change under `openspec/changes/`.
-6. A structured failure with candidates when no unique change can be selected.
+3. Current git branch matched to one exact persisted `## AIFHub Source Binding`; when several bindings name that branch, the current pointer may select one of those exact candidates.
+4. Current git branch mapped to an unbound active change by legacy slug variants.
+5. `.ai-factory/state/current.yaml`.
+6. A single active change under `openspec/changes/`.
+7. A structured failure with candidates when no unique change can be selected.
 
 Explicit IDs are authoritative. An invalid or missing explicit ID returns `invalid-change-id` or `explicit-change-not-found` and does not fall back to another source.
 
@@ -45,6 +46,12 @@ Common failure codes:
 |---|---|
 | `invalid-change-id` | The supplied ID is empty, absolute, contains path separators, contains `..`, or contains characters outside letters, numbers, `.`, `_`, and `-`. |
 | `explicit-change-not-found` | The explicit ID is safe but no matching active change directory exists. |
+| `source-binding-duplicate` / `source-binding-fields-invalid` | A reserved proposal source-binding section is duplicated or malformed. |
+| `source-binding-provider-invalid` / `source-binding-primary-source-invalid` / `source-binding-external-id-invalid` / `source-binding-branch-invalid` | A source binding contains a non-canonical provider, work-item reference, external ID, or branch value. |
+| `source-binding-sync-missing` / `source-binding-sync-mismatch` | A classic legacy plan's Markdown and status source bindings are missing or disagree. |
+| `source-binding-change-id-mismatch` | The change directory ID does not start with the normalized external ID followed by a request slug. |
+| `ambiguous-branch-binding` | More than one active source-bound change is bound to the exact current branch. |
+| `ambiguous-branch-binding-disambiguated` | Multiple exact branch bindings existed and the current pointer selected one of them. |
 | `ambiguous-branch-change` | The current branch maps to more than one active change. |
 | `current-pointer-not-found` | The current pointer references a missing or inactive change. |
 | `ambiguous-active-change` | More than one active change exists and no higher-precedence source selected one. |
@@ -96,7 +103,26 @@ A stale pointer is an error and blocks fallback, so broken runtime state is visi
 
 ## Branch Mapping
 
-Branch mapping only selects existing active changes. For a branch such as `feat/add-oauth`, the resolver checks these variants against active change IDs:
+Plans created from GitHub, Linear, Jira, YouGile, or another MCP work item persist exact identity in `proposal.md`:
+
+```markdown
+## AIFHub Source Binding
+
+- Provider: linear
+- Primary source: mcp://linear/issue/6a1f24c8
+- External ID: ENG-431
+- Branch: feature/some-request-slug
+```
+
+`parseWorkItemSourceBinding()` requires one exact active `## AIFHub Source Binding` line, a canonical lowercase provider, one canonical HTTPS work-item URL or stable `mcp://` resource URI, a bounded readable external ID, and one exact safe branch name or `none`. H1/H3 variants, leading or trailing heading whitespace, and fenced examples are intentionally ignored. `deriveSourceBoundChangeId()` normalizes `ENG-431` plus `Fix login timeout` to `eng-431-fix-login-timeout`; `matchesSourceBoundChangeId()` enforces that prefix and non-empty slug. `matchesPrimarySourceBinding()` first validates its caller-supplied primary reference and then compares the complete canonical value, so the same `156` or `PROJ-77` from another repository, tenant, or provider never matches by key alone.
+
+`parseLegacyWorkItemSourceBinding()` applies the same value contract to `source_binding.provider`, `source_binding.primary_source`, `source_binding.external_id`, and `source_binding.branch` values in legacy `status.yaml`. Writers emit the canonical two-space, double-quoted shape, while the reader also accepts consistently deeper indentation and YAML single-quoted scalars. `parseSynchronizedWorkItemSourceBinding()` verifies that a classic plan's Markdown entrypoint and companion status mapping are both present, valid, and identical before creation or an explicit branch rebind succeeds.
+
+The resolver reads active proposals concurrently after detecting the branch. One exact binding match returns source `branch-binding` before ordinary slug matching. A malformed or ID-mismatched binding that declares the current branch fails closed. An invalid binding associated with another branch is reported as a warning and excluded from legacy slug matching, so one unrelated artifact cannot block every command in the repository.
+
+When multiple valid bindings declare the exact current branch, `.ai-factory/state/current.yaml` may disambiguate only by naming one of those candidates. `/aif-plan` writes that pointer after successful artifact validation, so creating another source-bound plan on the same branch remains deterministic. A missing pointer or a pointer outside the candidate set still fails with `ambiguous-branch-binding`; there is no slug or single-change fallback.
+
+For active changes without a source binding, the legacy branch mapping remains available. For a branch such as `feat/add-oauth`, the resolver checks these variants against unbound active change IDs:
 
 - `feat/add-oauth`
 - `add-oauth`
@@ -127,6 +153,8 @@ When resolution returns `ambiguous-active-change`, pass an explicit `<change-id>
 /aif-implement <change-id>
 /aif-verify <change-id>
 ```
+
+When resolution returns `ambiguous-branch-binding`, either pass an explicit ID or update the current pointer to one of the reported exact branch-binding candidates. `/aif-plan` performs this pointer update automatically after successful source-bound creation.
 
 When resolution returns `current-pointer-not-found`, update or remove `.ai-factory/state/current.yaml`. A stale pointer blocks fallback so broken runtime state is visible.
 

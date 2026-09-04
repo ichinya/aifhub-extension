@@ -29,7 +29,7 @@ const VALID_PROJECT_SHAPES = new Set([
 const DEFAULT_TASK_SIGNAL = 'architecture_or_impact_discovery';
 const DEFAULT_COMMAND = 'aif-analyze';
 const ALWAYS_REJECTED_TOOLS = new Set(['codex-mem', 'eagle-mem', 'rohitg00-agentmemory']);
-export const SOURCE_DENYLIST_TOOL_IDS = new Set(['understand-anything']);
+export const SOURCE_DENYLIST_TOOL_IDS = new Set(['understand-anything', 't-search']);
 const MANUAL_ONLY_TASKS = new Map([
   ['agent-memory', new Set(['manual_durable_notes'])]
 ]);

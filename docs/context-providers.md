@@ -39,6 +39,8 @@ Context7 - optional documentation provider для актуальных library/A
 
 Оба provider являются только supporting context. Final plans, review findings, generated rules, verification status, done status и roadmap completion должны оставаться source-grounded в canonical OpenSpec artifacts, source files, tests, runtime state, QA evidence, generated rules trace metadata или другом direct repository evidence.
 
+Pre-execution infrastructure guards имеют другую ownership boundary. Optional `dcg` integration и его отличие от `/aif-security-checklist` описаны в [Safety Providers](safety-providers.md).
+
 ## Understand Anything
 
 `understand-anything` однозначно обозначает [`Egonex-AI/Understand-Anything`](https://github.com/Egonex-AI/Understand-Anything), reviewed release `v2.9.0` at `f08763d11d0202a8a8f52b5dedda6d1b2e2ebac8`. Текущая policy — [`reject_defer`](memory-tools-research/understand-anything.md): candidate отсутствует в normal recommendations, `selected_tools`, availability probes и safe field-run plan.
@@ -46,6 +48,14 @@ Context7 - optional documentation provider для актуальных library/A
 Pinned provider lifecycle — interactive agent skill с local dependency preparation, `.understandignore` confirmation, до пяти concurrent analysis subagents, `.ua/knowledge-graph.json`, optional hooks и dashboard. AIFHub не устанавливает, не клонирует, не индексирует, не обновляет и не запускает этот lifecycle; не создаёт symlinks/plugins, не меняет agent config/Git hooks, не запускает viewer/server/browser/daemon и не пишет `.ua/` в user project.
 
 Если пользователь независимо создал graph, владеет его lifecycle и явно передал reviewed output, AIFHub пока может рассматривать его только как noncanonical supporting context. Raw graph, source snippets и provider transcript нельзя переносить в OpenSpec, generated rules, QA, verify/done evidence или metadata. Mandatory [paired benchmark](memory-tools-research/understand-anything-benchmark-results.md) проверяет adapter contract на `synthetic_schema_fixture`; эта provenance не доказывает provider generation и не разрешает permission promotion.
+
+## T-Search
+
+[`t-tech/T-Search`](https://huggingface.co/t-tech/T-Search) и официальный [`t-search-harness`](https://github.com/turbo-llm/t-search-harness) имеют policy [`reject_defer`](memory-tools-research/t-search.md). T-Search — agentic query planner/ranker, а не самостоятельный index/search provider: для работы нужны отдельно served OpenAI-compatible model endpoint и user-owned search backend/corpus. Harness не предоставляет ingestion, chunking, embeddings, index lifecycle, exclusions/redaction, freshness, purge или MCP server.
+
+AIFHub не рекомендует, не probes/selects, не устанавливает и не запускает candidate; не скачивает weights, не стартует vLLM/SGLang/llama.cpp, не индексирует source и не меняет provider config. Harness передаёт model endpoint пользовательский вопрос и retrieved snippets; его `messages`, `all_round_messages` и serialized result могут раскрывать source content, поэтому raw output/transcripts нельзя сохранять в OpenSpec, `.ai-factory/`, generated rules, QA, docs, metadata или logs.
+
+Будущая переоценка требует bounded user-owned repository index, exact exclusions/redaction, verified refresh/purge и same-run mixed Russian/English code/Markdown/OpenSpec benchmark против `rg`. До этого author-reported fixed-web Recall@10 не является AIFHub evidence. Подробности: [benchmark results](memory-tools-research/t-search-benchmark-results.md).
 
 ## Границы AIFHub
 
@@ -58,6 +68,7 @@ AIFHub Extension не должен:
 - добавлять Context7 MCP templates в `extension.json`;
 - менять `.mcp.json`, `.cursor/mcp.json`, `.opencode.json`, agent rules, agent skills или runtime MCP settings для provider;
 - устанавливать/запускать Understand Anything, создавать `.ua/`, включать его hooks/auto-update/dashboard или принимать raw graph как canonical evidence;
+- скачивать T-Search weights, запускать harness/model/search endpoints, индексировать corpus или сохранять raw T-Search snippets/transcripts;
 - превращать provider availability в validation, verification, review, rules, security, done или commit gates.
 
 Будущие runtime features вроде metadata field `context_provider_suggestion` могут рекомендовать manual provider usage, но не должны менять user-owned setup boundary.

@@ -124,6 +124,19 @@ The project glossary is protocol-neutral Base Context for preferred terminology.
 - Glossary contents are excluded from canonical OpenSpec authority, generated-rule inputs, QA evidence, runtime traces, provider stores, status/doctor checks, verification gates, and done readiness.
 - OKF remains deferred until a concrete producer/consumer use case justifies a separate OpenSpec change and ADR.
 
+## Project Review Policy
+
+`reviews.policy_file` configures durable, protocol-neutral code review guidance and defaults to repository-root `REVIEW.md`. Unlike Base Context, the review policy is loaded only by `/aif-review` and AIFHub review sidecars through `skills/shared/REVIEW-POLICY.md`.
+
+- `/aif-analyze` creates a missing safe scaffold through `ai-factory aifhub-review-policy scaffold --json` and preserves an existing policy during ordinary bootstrap. `/aif-mode` preserves/configures the setting but never creates or inspects the file.
+- Review consumers use `ai-factory aifhub-review-policy load --json` and never reopen the configured path. The shared resolver canonicalizes the project root and nearest existing parent, binds and revalidates the opened file identity, rejects symlink/Windows junction components and canonical escapes, and blocks managed-file collisions plus canonical OpenSpec, project/generated-rules, plan/spec, archive, runtime-state, and QA roots. Missing or empty policy is non-blocking; unsafe or unreadable policy degrades custom guidance with one bounded diagnostic.
+- Policy can add focus areas, conventions, forbidden patterns, testing/security/performance expectations, ignore/deprioritization guidance, severity/output preferences, and optional human-review stages.
+- Policy is additive guidance below source/tests, canonical OpenSpec requirements, project/generated rules, and accepted architecture decisions. It cannot suppress material findings, authorize edits or tools, expand scope, install/configure providers, or replace verification/finalization/human approval.
+- Individual findings, comments, replies, resolution/stale state, reviewed revisions, session ids, provider state, and receipts never belong in `REVIEW.md`.
+- Policy contents stay out of canonical OpenSpec artifacts, generated rules, runtime/QA evidence, provider stores, receipts, diagnostics, and the final `aif-gate-result`.
+
+See [Project Review Policy](review-policy.md) and [ADR 0003](adr/0003-durable-project-review-policy.md).
+
 ## Опциональные Context Providers
 
 Optional providers - это read-only supporting context. Они не являются command prerequisites, dependency requirements, generated rules input, QA evidence, verification gates, done gates или canonical OpenSpec sources.
@@ -179,6 +192,14 @@ Safe probes ограничены `codegraph --version`, `codegraph --help` и `c
 
 AIFHub commands не должны запускать CodeGraph installer, sync, MCP server, hooks или agent configuration mutation commands. CodeGraph output не должен заменять `rg`, canonical OpenSpec artifacts, generated rules, QA evidence или verification/done gates.
 
+## T-Search Candidate
+
+T-Search имеет policy `reject_defer` и не является optional provider для normal command selection. Это agentic query planner/ranker поверх отдельно served model endpoint и user-owned search backend/index; официальный harness не предоставляет ingestion, redaction, freshness, purge или MCP lifecycle.
+
+AIFHub commands не должны рекомендовать, probe/select, устанавливать или запускать T-Search, скачивать weights, стартовать model/search endpoints, индексировать repository, менять provider config или сохранять raw provider output. Search snippets попадают в model messages и serialized transcripts, поэтому `result.documents`, `messages`, `all_round_messages`, round summaries и tool traces не являются допустимым durable context.
+
+Будущий явно авторизованный experiment может использовать только bounded user-owned index и вернуть reviewed project-relative pointers; каждое утверждение нужно проверить по direct source files. Promotion требует redaction/exclusions, revision freshness, verified purge и same-run mixed Russian/English code/Markdown/OpenSpec benchmark против `rg`. См. [T-Search research](memory-tools-research/t-search.md) и [benchmark results](memory-tools-research/t-search-benchmark-results.md).
+
 ## Опциональный Context7 Documentation Context
 
 Context7 - optional documentation provider для current library/API docs. AIFHub commands и sidecars могут использовать existing user-provided или reviewed Context7 notes как supporting context, но не должны делать Context7 required extension dependency, устанавливать `ctx7` или `@upstash/context7-mcp`, запускать `ctx7`, запускать `ctx7 setup`, добавлять Context7 manifest dependencies, добавлять Context7 MCP templates в `extension.json`, start/register Context7 MCP automatically, mutate `.mcp.json`, `.cursor/mcp.json`, `.opencode.json`, agent rules или agent skills, или превращать Context7 availability в verification gate.
@@ -231,7 +252,7 @@ This context is supporting evidence only. Closed GitHub issues, completed milest
 
 When GitHub milestones are available, `/aif-roadmap` treats milestones as roadmap phases. Closed milestones produce phase audit sections with linked issues/PRs and local evidence status. Open milestones with `open_issues = 0` produce `phase-completion drift` instead of being treated as closed. Milestone-bound issues/PRs attach to their phase, while unmilestoned issues/PRs remain in `unphased backlog/drift`.
 
-Canonical local linkage comes from the proposal's standardized `## Roadmap Linkage` fields: `Issues`, `Milestone`, `Roadmap item/slice`, and `Rationale`. Explicit `none` values are preserved and no command may infer missing linkage from remote metadata. `/aif-roadmap check` registers a linked active change as local `planned` and preserves or registers `finalized` only when durable done/archive evidence supports that state.
+Canonical local lifecycle linkage comes from the proposal's standardized `## Roadmap Linkage` fields: `Issues`, `Milestone`, `Roadmap item/slice`, and `Rationale`. MCP work-item plan identity is separate: a source-bound proposal's `## AIFHub Source Binding` stores exactly one `Provider`, `Primary source`, `External ID`, and exact creation `Branch`, while ordinary proposals omit that section; secondary roadmap references and equal external IDs never substitute for the full primary binding. The active-change resolver checks one exact source binding before slug branch variants, lets the current pointer disambiguate several exact candidates on one branch, and contains unrelated malformed bindings to warnings. Explicit `none` values are preserved and no command may infer missing linkage from remote metadata. `/aif-roadmap check` registers a linked active change as local `planned` and preserves or registers `finalized` only when durable done/archive evidence supports that state.
 
 Local state is stored in the marker-bounded `OpenSpec Change Lifecycle` block inside the configured roadmap. `/aif-roadmap` owns the complete artifact and the block's `planned` reconciliation. `/aif-done` is a bounded co-owner of one `finalized` row only after successful OpenSpec archive; it must preserve every byte outside the markers. `/aif-commit` is read-only for both the roadmap and lifecycle block.
 
@@ -246,7 +267,7 @@ GitHub access is non-blocking. If `gh`, connector data, network access, authenti
 | Command | May write canonical OpenSpec artifacts | May write runtime or QA artifacts |
 |---|---|---|
 | `/aif-mode` | skeleton only; never manual `openspec/specs/**` mutations | mode reports, generated rules, optional migration/export outputs |
-| `/aif-analyze` | Optional `openspec/` skeleton only when configured | capability/config setup; optional glossary creation or patch-update only with explicit opt-in |
+| `/aif-analyze` | Optional `openspec/` skeleton only when configured | capability/config setup; missing review-policy scaffold; optional glossary creation or patch-update only with explicit opt-in |
 | `/aif-architecture` | no | no |
 | `/aif-roadmap` | no | configured roadmap artifact, including managed local lifecycle reconciliation |
 | `/aif-docs` | no | no |
@@ -288,7 +309,7 @@ OpenSpec-native quality gates:
 | Command | Reads | Writes |
 |---|---|---|
 | `/aif-rules-check` | generated rules, project rules, changed files, optional OpenSpec context | none |
-| `/aif-review` | changed files, OpenSpec context, generated rules | none |
+| `/aif-review` | changed files, OpenSpec context, generated rules, configured review policy | none |
 | `/aif-security-checklist` | changed files, OpenSpec context, generated rules | none |
 | `/aif-verify` | canonical OpenSpec artifacts, generated rules, runtime state, gate outputs when available | `.ai-factory/qa/<change-id>/` |
 | `/aif-done` | passing verify evidence, verify gate result, OpenSpec change | final QA/state evidence, OpenSpec archive via CLI, then one managed `finalized` roadmap row when linked |
@@ -416,9 +437,12 @@ If `.ai-factory/config.yaml` is missing or incomplete:
 - [Usage](usage.md)
 - [Context Providers](context-providers.md)
 - [Skill Providers](skill-providers.md)
+- [Safety Providers](safety-providers.md)
 - [Memory Tool Recommendations](memory-tool-recommendations.md)
 - [Session Context Dedup](context-dedup.md)
 - [OpenSpec Compatibility](openspec-compatibility.md)
 - [Legacy Plan Migration](legacy-plan-migration.md)
 - [ADR 0001](adr/0001-openspec-native-artifact-protocol.md)
 - [ADR 0002: Optional Project Glossary](adr/0002-optional-project-context-glossary.md)
+- [Project Review Policy](review-policy.md)
+- [ADR 0003: Durable Project Review Policy](adr/0003-durable-project-review-policy.md)

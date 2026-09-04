@@ -234,6 +234,58 @@ describe('OpenSpec execution context API', () => {
     ]);
   });
 
+  it('resolves a newly planned MCP work-item change for implementation with multiple active changes', async () => {
+    const { buildImplementationContext } = await loadExecutionContext();
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir, 'eng-431-some-request-slug');
+    await createOpenSpecChange(rootDir, 'proj-77-second-request');
+    await createOpenSpecChange(rootDir, 'some-request-slug');
+    await createOpenSpecChange(rootDir, 'another-active-change');
+    await writeFixture(rootDir, 'openspec/changes/eng-431-some-request-slug/proposal.md', [
+      '# Proposal',
+      '',
+      '## AIFHub Source Binding',
+      '',
+      '- Provider: linear',
+      '- Primary source: mcp://linear/issue/6a1f24c8',
+      '- External ID: ENG-431',
+      '- Branch: feature/some-request-slug',
+      '',
+      '## Roadmap Linkage',
+      '',
+      '- Issues: mcp://linear/issue/6a1f24c8, https://acme.atlassian.net/browse/PROJ-77',
+      '- Milestone: none',
+      '- Roadmap item/slice: none',
+      '- Rationale: primary plus secondary linkage',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, 'openspec/changes/proj-77-second-request/proposal.md', [
+      '# Proposal',
+      '',
+      '## AIFHub Source Binding',
+      '',
+      '- Provider: jira',
+      '- Primary source: mcp://jira/issue/PROJ-77',
+      '- External ID: PROJ-77',
+      '- Branch: feature/some-request-slug',
+      ''
+    ].join('\n'));
+    await writeFixture(rootDir, '.ai-factory/state/current.yaml', 'change_id: eng-431-some-request-slug\n');
+
+    const result = await buildImplementationContext({
+      rootDir,
+      getCurrentBranch: async () => 'feature/some-request-slug',
+      detectOpenSpec: async () => missingCliDetection()
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.changeId, 'eng-431-some-request-slug');
+    assert.equal(result.resolver.source, 'current-pointer');
+    assert.deepEqual(result.resolver.candidates, ['eng-431-some-request-slug']);
+    assert.equal(result.resolver.warnings.at(-1).code, 'ambiguous-branch-binding-disambiguated');
+    assert.match(result.canonicalArtifacts.proposal.content, /Primary source: mcp:\/\/linear\/issue\/6a1f24c8/);
+  });
+
   it('reads generated rules when present and warns when fingerprints are stale', async () => {
     const { buildImplementationContext } = await loadExecutionContext();
     const rootDir = await createTempRoot();
@@ -538,6 +590,23 @@ describe('OpenSpec execution context API', () => {
       summary: 'Implemented OAuth',
       canonicalArtifactsRead: ['openspec/changes/add-oauth/tasks.md'],
       generatedRulesRead: ['.ai-factory/rules/generated/openspec-base.md'],
+      testCheck: {
+        command: 'node --test auth.test.mjs',
+        scope: 'OAuth callback behavior'
+      },
+      redResult: {
+        exitCode: 1,
+        observed: 'callback expectation failed for the intended reason'
+      },
+      greenResult: {
+        exitCode: 0,
+        observed: 'same focused check passed'
+      },
+      refactorResult: {
+        exitCode: 0,
+        observed: 'same focused check stayed green after cleanup'
+      },
+      fallbackDecision: 'Not applicable; focused automated check was available.',
       changedFiles: ['src/auth.js']
     }, {
       rootDir,
@@ -548,7 +617,14 @@ describe('OpenSpec execution context API', () => {
       summary: 'Fixed OAuth',
       canonicalArtifactsRead: ['openspec/changes/add-oauth/tasks.md'],
       generatedRulesRead: [],
+      testCheck: { command: 'must not render in a Fix trace' },
       qaEvidenceRead: ['.ai-factory/qa/add-oauth/verify.md'],
+      rootCauseEvidence: {
+        boundary: 'OAuth callback parser',
+        observed: 'state was decoded after validation'
+      },
+      hypothesis: 'Validating decoded state before lookup will reject the stale callback.',
+      experiment: 'Move only the validation boundary and rerun the focused callback check.',
       regressionCheck: {
         command: 'node --test auth.test.mjs',
         inputs: 'OAuth callback fixture',
@@ -590,6 +666,48 @@ describe('OpenSpec execution context API', () => {
         '',
         '- .ai-factory/rules/generated/openspec-base.md',
         '',
+        '## Development cycle',
+        '',
+        '### Focused automated check',
+        '',
+        '```json',
+        '{',
+        '  "command": "node --test auth.test.mjs",',
+        '  "scope": "OAuth callback behavior"',
+        '}',
+        '```',
+        '',
+        '### RED result',
+        '',
+        '```json',
+        '{',
+        '  "exitCode": 1,',
+        '  "observed": "callback expectation failed for the intended reason"',
+        '}',
+        '```',
+        '',
+        '### GREEN result',
+        '',
+        '```json',
+        '{',
+        '  "exitCode": 0,',
+        '  "observed": "same focused check passed"',
+        '}',
+        '```',
+        '',
+        '### REFACTOR result',
+        '',
+        '```json',
+        '{',
+        '  "exitCode": 0,',
+        '  "observed": "same focused check stayed green after cleanup"',
+        '}',
+        '```',
+        '',
+        '### Fallback decision',
+        '',
+        'Not applicable; focused automated check was available.',
+        '',
         '## Changed files',
         '',
         '- src/auth.js',
@@ -599,13 +717,20 @@ describe('OpenSpec execution context API', () => {
         '/aif-verify add-oauth',
         ''
       ].join('\n'),
-      'Implementation trace shape must remain byte-identical when Fix-only evidence fields are added.'
+      'Implementation trace should persist the bounded development-cycle evidence.'
     );
     const fixContent = await readFile(fix.path, 'utf8');
     for (const expected of [
       '# Fix Trace: add-oauth',
       '## QA evidence read',
       '.ai-factory/qa/add-oauth/verify.md',
+      '## Root cause evidence',
+      'OAuth callback parser',
+      'state was decoded after validation',
+      '## Hypothesis',
+      'Validating decoded state before lookup will reject the stale callback.',
+      '## Experiment',
+      'Move only the validation boundary and rerun the focused callback check.',
       '## Regression check',
       'node --test auth.test.mjs',
       'OAuth callback fixture',
@@ -621,6 +746,11 @@ describe('OpenSpec execution context API', () => {
     ]) {
       assert.match(fixContent, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `Fix trace should include ${expected}.`);
     }
+    assert.doesNotMatch(
+      fixContent,
+      /## Development cycle/,
+      'Fix traces must not render implementation evidence even when mixed-type fields are present.'
+    );
     assert.equal(await pathExists(path.join(rootDir, 'openspec', 'changes', 'add-oauth', '.ai-factory')), false);
     assert.equal(await pathExists(path.join(rootDir, '.ai-factory', 'plans', 'add-oauth')), false);
 
@@ -636,6 +766,35 @@ describe('OpenSpec execution context API', () => {
     });
 
     assert.equal(customState.relativePath, '.ai-factory/custom-state/add-oauth/implementation/custom-001.md');
+    assert.doesNotMatch(
+      await readFile(customState.path, 'utf8'),
+      /## Development cycle/,
+      'Legacy implementation trace callers without development-cycle fields should retain their compact shape.'
+    );
+
+    const fallbackExecution = await writeExecutionTrace('add-oauth', {
+      summary: 'Updated generated documentation.',
+      canonicalArtifactsRead: ['openspec/changes/add-oauth/tasks.md'],
+      generatedRulesRead: [],
+      fallbackDecision: {
+        status: 'not-applicable',
+        reason: 'documentation-only',
+        verification: 'node scripts/validate-doc-links.mjs'
+      },
+      changedFiles: ['docs/oauth.md']
+    }, {
+      rootDir,
+      runId: 'implementation-docs-only'
+    });
+    const fallbackExecutionContent = await readFile(fallbackExecution.path, 'utf8');
+    assert.match(fallbackExecutionContent, /## Development cycle/);
+    assert.match(fallbackExecutionContent, /### Fallback decision/);
+    assert.match(fallbackExecutionContent, /"reason": "documentation-only"/);
+    assert.doesNotMatch(
+      fallbackExecutionContent,
+      /### Focused automated check|### RED result|### GREEN result|### REFACTOR result/,
+      'Fallback-only implementation traces should not imply that an inapplicable test cycle was skipped.'
+    );
 
     await assert.rejects(
       () => writeExecutionTrace('add-oauth', { summary: 'bad state' }, {

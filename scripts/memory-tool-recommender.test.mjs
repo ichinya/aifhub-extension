@@ -106,7 +106,8 @@ describe('recommendation metadata parsing', () => {
       'codegraph',
       'repowise',
       'rohitg00-agentmemory',
-      'understand-anything'
+      'understand-anything',
+      't-search'
     ]);
     assert.deepEqual(metadata.project_dimensions.languages, ['php', 'go', 'js', 'python', 'rust', 'multi']);
     assert.deepEqual(metadata.project_dimensions.volume, ['mini', 'standard', 'large']);
@@ -177,6 +178,30 @@ describe('recommendation metadata parsing', () => {
       assert.ok(
         policy.forbidden.includes('understand-anything'),
         `${command}: understand-anything must be explicitly forbidden`
+      );
+    }
+    assert.equal(metadata.tools['t-search'].repository, 'https://huggingface.co/t-tech/T-Search');
+    assert.equal(metadata.tools['t-search'].harness_repository, 'https://github.com/turbo-llm/t-search-harness');
+    assert.match(metadata.tools['t-search'].tested_version, /bf0b272e0f69921ec39040807336602758448099/);
+    assert.match(metadata.tools['t-search'].tested_version, /997a0ba1685d24ad840e3e2542b59952ff3fb362/);
+    assert.match(metadata.tools['t-search'].tested_version, /f645dce898117a1f9165dfbb014d61e5f09daec06bb64f4b91de7f103b8761bb/);
+    assert.match(metadata.tools['t-search'].tested_version, /llama\.cpp b10068/);
+    assert.equal(metadata.tools['t-search'].evaluation_evidence.aifhub_paired_benchmark, '6_pair_local_synthetic_pilot_negative');
+    assert.equal(metadata.tools['t-search'].evaluation_evidence.live_model_run, 'pass_q4_k_m_reduced_8192_context');
+    assert.equal(metadata.tools['t-search'].evaluation_evidence.local_pilot_safety_gates, 'pass');
+    assert.equal(metadata.tools['t-search'].evaluation_evidence.external_index_lifecycle, 'not_run');
+    assert.equal(metadata.tools['t-search'].decision, 'reject_defer');
+    assert.equal(metadata.tools['t-search'].recommendation_action, 'do_not_suggest_install');
+    assert.equal(metadata.tools['t-search'].integration_role, 'user_owned_agentic_retriever_candidate');
+    assert.deepEqual(metadata.tools['t-search'].allowed_in, []);
+    assert.equal(metadata.tools['t-search'].normal_command_selection, 'forbidden');
+    assert.equal(metadata.tool_permissions['t-search'].default, 'forbidden');
+    assert.equal(Object.hasOwn(metadata.availability_probes, 't-search'), false);
+    assert.equal(SOURCE_DENYLIST_TOOL_IDS.has('t-search'), true);
+    for (const [command, policy] of Object.entries(metadata.skill_usage_matrix)) {
+      assert.ok(
+        policy.forbidden.includes('t-search'),
+        `${command}: t-search must be explicitly forbidden`
       );
     }
   });
@@ -1273,6 +1298,46 @@ describe('recommendation results', () => {
     assert.match(rejected.reason, /forbidden|reject/i);
     assert.equal(probeCalls, 0, 'source-denylisted tool must never reach an availability probe');
   });
+
+  it('keeps t-search denylisted for recommendations, selection, and probes', async () => {
+    const metadata = await loadRecommendationMetadata({ metadataPath: REAL_METADATA });
+    let probeCalls = 0;
+    const probeRunner = async (toolId) => {
+      if (toolId === 't-search') probeCalls += 1;
+      return { availability: 'installed', command: 't-search --help' };
+    };
+
+    const recommendation = await buildRecommendationResult({
+      metadata,
+      projectShape: 'large_framework_app',
+      taskSignals: ['architecture_or_impact_discovery'],
+      command: 'aif-explore',
+      probeRunner
+    });
+
+    assert.equal(recommendation.recommendations.some((item) => item.tool_id === 't-search'), false);
+    assert.ok(recommendation.do_not_recommend.some((item) => item.tool_id === 't-search'));
+
+    const selection = await buildSelectionResult({
+      metadata,
+      config: {
+        source_kind: 'project-config',
+        source_path: path.join(tmpDir, '.ai-factory', 'config.yaml'),
+        enabled_tools: ['t-search'],
+        warnings: []
+      },
+      projectShape: 'large_framework_app',
+      taskSignals: ['architecture_or_impact_discovery'],
+      command: 'aif-explore',
+      probeRunner
+    });
+    const rejected = selection.not_selected_tools.find((item) => item.tool_id === 't-search');
+
+    assert.equal(selection.selected_tools.some((item) => item.tool_id === 't-search'), false);
+    assert.ok(rejected);
+    assert.match(rejected.reason, /forbidden|reject/i);
+    assert.equal(probeCalls, 0, 'source-denylisted tool must never reach an availability probe');
+  });
 });
 
 function makeProvenLabelMetadataYaml() {
@@ -1471,6 +1536,31 @@ describe('CLI behavior', () => {
 
     assert.equal(result.exitCode, 0);
     assert.deepEqual(result.body.probes['understand-anything'], {
+      availability: 'unknown',
+      command: null,
+      note: 'Availability probe skipped by source denylist.'
+    });
+  });
+
+  it('uses the source-denylisted no-probe path for t-search status', async () => {
+    const result = await runMemoryToolRecommender([
+      'status',
+      '--metadata',
+      REAL_METADATA,
+      '--json'
+    ], {
+      cwd: tmpDir,
+      stdout: [],
+      stderr: [],
+      exit: false,
+      probeRunner: async (toolId) => {
+        assert.notEqual(toolId, 't-search');
+        return { availability: 'unknown', command: null };
+      }
+    });
+
+    assert.equal(result.exitCode, 0);
+    assert.deepEqual(result.body.probes['t-search'], {
       availability: 'unknown',
       command: null,
       note: 'Availability probe skipped by source denylist.'

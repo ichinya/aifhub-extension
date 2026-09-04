@@ -42,6 +42,30 @@ bundle = <research_bundles_dir>/<english-topic-slug>/
 
 Bounded diagnostics may contain only `mode`, resolved version and version `source`, safe project-relative bundle path, created artifact names, and a stable invalid-marker/collision `code`. Never include topic/research bodies, provider output, credentials, raw stdout, raw stderr, or private absolute paths.
 
+### Dependency-aware research brief interview
+
+After resolving the artifact mode, research profile, and any ultra version gate, but before the full research run or any write, map the request as a dependency-aware **design tree**.
+
+- Treat explicit decisions already present in the request or conversation as settled roots. Each unresolved user-owned decision is a node whose children are the decisions that depend on it.
+- The **frontier** is every unresolved decision whose prerequisites are settled. Ask the whole current frontier in one round, number each question, and include one concise recommended answer with its main rationale or tradeoff. Never ask a downstream question while one of its prerequisites remains open.
+- If the runtime imposes a smaller question-count limit, ask the maximum supported independent subset. Keep the remaining nodes on the same frontier; do not treat the partial batch as a completed round.
+- After each answer batch, update the design tree, preserve settled answers unless the user reopens them, recompute the frontier, and ask the next round. Do not drip questions one at a time when independent frontier questions can be asked together.
+- Repository, configuration, and tool-availability facts are the assistant's responsibility. Resolve obtainable facts with bounded read-only inspection instead of asking the user. While fact-finding is pending, keep only the dependent questions off the frontier and continue with independent questions.
+- `Bounded read-only inspection` does not grant a new read scope. In OpenSpec-native mode, constrain it to the `Allowed read context` and `Enabled optional tool use` boundaries below. In Legacy AI Factory-only mode, constrain it to `.ai-factory/config.yaml`, safe resolved configured project context and rules, the exact referenced legacy plan pair when present, directly relevant in-repository source/tests/docs/package manifests, and bounded local Git branch/revision metadata.
+- Never use the interview to read outside the project root, inspect environment or credential stores, consume raw optional-provider stores/output, scan unrelated repositories, or enable an optional provider solely for pre-confirmation fact-finding. These limits do not replace the explicit read-only ultra version gate above.
+- The user owns product, scope, risk, and tradeoff decisions. If a decision cannot be made without a prototype, measurement, or unavailable evidence, record that dependency as an open blocker and recommend the smallest evidence-producing next action; do not invent an answer.
+- Keep the tree scoped to a research brief: the target question, boundaries and non-goals, constraints, evidence standard, and desired deliverable. Do not turn `/aif-explore` into an implementation plan or canonical OpenSpec design session.
+
+The interview ends only when the frontier is empty because every user-owned brief decision node is settled, not merely because no node is currently askable. An empty frontier with any unresolved user-owned decision is blocked, not complete: report the blocked or cyclic prerequisite and the smallest evidence-producing or dependency-breaking next action, and do not present the brief for confirmation or start the full research run. Pending repository fact-finding that is a prerequisite for a user-owned decision has the same blocked status.
+
+Once the interview is complete, present one normalized research brief and wait for explicit user confirmation before starting the full research run. A request that is already precise may have an empty initial frontier because all of its brief decisions are settled, but the normalized brief still requires confirmation.
+
+This confirmation gate is intentional for every research run and is not bypassed by a precise request, assumptions, or autonomous execution. In autonomous or subagent mode, assumptions never satisfy unresolved brief decisions or confirmation: do not start the full research run. If any user-owned brief decision remains unresolved, return assumptions, blockers, and open questions to the interactive parent under the shared question-tool fallback and do not label the brief confirmation-ready. After every user-owned brief decision is settled, return the normalized brief, recorded assumptions, and remaining research questions as a `research-brief-confirmation-required` blocker.
+
+The only autonomous or subagent re-entry condition is that the interactive parent passes back both the exact normalized brief previously returned and an explicit statement that the user confirmed that exact brief without changes. That forwarded confirmation satisfies the confirmation gate for the resumed run; do not request confirmation again. If the brief content changed, the confirmation is missing, or the confirmation is not explicitly bound to that brief, recompute the affected frontier and return the appropriate unresolved-decision or `research-brief-confirmation-required` blocker instead of starting research.
+
+Before confirmation, bounded read-only fact-finding is the only permitted work: do not persist research, present a saved result, append the session, mutate a plan, or create canonical OpenSpec artifacts. Do not create a separate interview, design-tree, decision-log, or research-brief file; the confirmed brief remains conversation context for the existing regular or ultra research output. Use the question mechanism and autonomous/subagent fallback defined in `skills/shared/QUESTION-TOOL.md` and the Codex Runtime section below.
+
 ### Upstream Research Coherence Gate pass-through
 
 The AIFHub prepend owns only mode, version, path, and write boundaries. Its pass-through runs after every permitted persisted regular or ultra research write or update: continue into the upstream AI Factory 2.18.1 `#### Research Coherence Gate (all persisted modes)` before presenting the saved result or appending the current session. A successful AIFHub write is not a coherence verdict and is not completion of upstream `/aif-explore`.
@@ -62,6 +86,8 @@ Use shared vocabulary consistently: `OpenSpec-native mode`, `canonical OpenSpec 
 
 Allowed read context:
 
+- directly relevant in-repository source, tests, docs, package/manifest files, and bounded local Git branch/revision metadata
+- safe resolved configured project context and rules artifacts, including custom locations represented by the defaults below
 - `.ai-factory/config.yaml`
 - `.ai-factory/DESCRIPTION.md`
 - `.ai-factory/ARCHITECTURE.md`

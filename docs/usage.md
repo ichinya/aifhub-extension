@@ -100,6 +100,19 @@ The key is valid in OpenSpec-native and legacy AI Factory-only profiles, and a c
 
 `/aif-analyze` is the only AIFHub writer. Creation requires explicit opt-in plus concrete source-grounded terms; updates require an explicit request or accepted proposal and preserve manual/unknown sections. All other commands are read-only consumers. The glossary affects prose only and cannot override source/tests, canonical OpenSpec requirements, project rules, accepted architecture decisions, or verifiable QA facts. See [Context Loading Policy](context-loading-policy.md) and [ADR 0002](adr/0002-optional-project-context-glossary.md).
 
+## Project Review Policy
+
+Projects configure durable code review guidance independently of artifact mode:
+
+```yaml
+reviews:
+  policy_file: REVIEW.md
+```
+
+`/aif-analyze` creates a missing safe scaffold at the configured project-relative Markdown path through `ai-factory aifhub-review-policy scaffold --json`; the default is repository-root `REVIEW.md` for cross-agent discovery. Existing policy is preserved during ordinary bootstrap, and `/aif-mode` preserves the setting without creating or inspecting the file.
+
+`/aif-review` and the AIFHub review sidecars use `ai-factory aifhub-review-policy load --json` and consume only a complete `present` path/revision/content snapshot. The resolver binds and revalidates the opened file identity, rejects symlink/Windows junction components, canonical escapes, managed-file collisions, and canonical/generated/runtime/QA protected roots. It may focus review or add checks, but cannot suppress material findings, expand scope, authorize edits/tools, or replace project rules, tests, security checks, `/aif-verify`, `/aif-done`, or human approval. Per-review findings, comments, replies, resolution/stale state, revisions, provider state, and receipts do not belong in the durable policy. See [Project Review Policy](review-policy.md) and [ADR 0003](adr/0003-durable-project-review-policy.md).
+
 ## Опциональные Context Providers
 
 Context providers - ручные, user-owned research aids. AIFHub может читать reviewed provider notes как optional supporting context, но provider availability всегда degraded behavior и никогда не является validation, verification, review, rules, security, done или commit gate.
@@ -422,11 +435,13 @@ Reads:
 - project files and repository metadata
 - existing `.ai-factory/config.yaml` when present
 - existing rules/context artifacts when present
+- existing configured review policy when present
 
 Writes:
 
 - `.ai-factory/config.yaml`
 - `.ai-factory/rules/base.md`
+- missing safe `reviews.policy_file` scaffold (`REVIEW.md` by default)
 - configured `paths.context` project glossary only after explicit user opt-in
 - optional OpenSpec-native skeleton paths such as `openspec/specs/`, `openspec/changes/`, `.ai-factory/state/`, `.ai-factory/qa/`, and `.ai-factory/rules/generated/`
 
@@ -436,6 +451,7 @@ Does not write:
 - canonical change artifacts for a feature request
 - `.ai-factory/plans` in OpenSpec-native mode
 - an empty or unapproved glossary placeholder
+- an existing review policy during ordinary bootstrap
 
 Select OpenSpec-native mode explicitly by asking for it or by starting from config with:
 
@@ -596,12 +612,31 @@ When `/aif-improve` encounters a legacy `tasks.md` without inline verification, 
 
 When the request explicitly links an issue, milestone, or roadmap item, `proposal.md` also records the standardized `## Roadmap Linkage` section:
 
-- `Issues`: canonical issue URL or comma-separated URLs
+- `Issues`: canonical HTTPS work-item URL or stable MCP resource URI, optionally comma-separated
 - `Milestone`: exact GitHub milestone title or explicit `none`
 - `Roadmap item/slice`: exact local roadmap item or explicit `none`
 - `Rationale`: one bounded explanation of the linkage
 
 Planning preserves explicit `none` values and does not infer linkage from a branch name, issue title, label, or unrelated roadmap text. If any linkage field is non-`none`, the planning response returns `/aif-roadmap check`; the roadmap owner may then register the active change as local `planned`. Planning does not claim implementation, verification, finalization, merge, or issue closure.
+
+When planning input or a selected structured MCP record contains exactly one explicit primary work item, AIFHub uses its readable external ID as the plan prefix. GitHub `156`, Linear `ENG-431`, Jira `PROJ-77`, and an opaque YouGile fallback such as `yougile-a1b2c3d4` produce IDs such as `156-fix-login-timeout`, `eng-431-fix-login-timeout`, `proj-77-refresh-token`, and `yougile-a1b2c3d4-refresh-token`. The request slug keeps repeated external IDs readable while the full source binding below keeps them distinct across providers, tenants, and repositories.
+
+A source-bound OpenSpec proposal persists identity separately from the many-valued roadmap fields:
+
+```markdown
+## AIFHub Source Binding
+
+- Provider: linear
+- Primary source: mcp://linear/issue/6a1f24c8
+- External ID: ENG-431
+- Branch: feature/some-request-slug
+```
+
+`Primary source` is the only collision identity. `Provider` and `External ID` make the binding readable but cannot authorize reuse alone. A secondary reference in `Roadmap Linkage.Issues`, including the same external ID from another provider or repository, cannot replace the primary binding. Ordinary plans omit the complete reserved section. The exact attached creation branch maps the prefixed change back to downstream `/aif-improve`, `/aif-implement`, and `/aif-verify`; one exact binding is checked before ordinary slug branch variants. After successful source-bound creation or refinement, planning also writes the complete resolved change ID to the current-change pointer. If several active plans intentionally share the creation branch, that pointer selects one of the exact candidates; otherwise resolution reports `ambiguous-branch-binding`. Malformed or prefix-mismatched metadata declaring the current branch fails closed, while an unrelated invalid binding becomes a warning and is excluded from slug matching.
+
+Legacy classic plans persist the same Markdown section in the parent plan and synchronized double-quoted `source_binding.provider`, `source_binding.primary_source`, `source_binding.external_id`, and `source_binding.branch` values in companion `status.yaml`. Creation and explicit branch rebind validate both surfaces together; the tolerant reader also accepts consistently deeper indentation and single-quoted YAML scalars. Marked ultra keeps the Markdown binding in its upstream-owned `index.md` and does not gain a companion status file. Legacy `slug` identifiers use the same `<external-id>-<slug>` form. Sequential mode preserves its required four-digit prefix: numeric IDs in `1..9999` can occupy it (`0156_fix-login-timeout`), while alphanumeric IDs begin the semantic stem after an upstream ordinal (`0042_PROJ-77-refresh-token`).
+
+A bare number, PR URL, branch name, title, label, milestone, or discovered search result does not establish this binding. The planner reads structured MCP `identifier`, `key`, `number`, or display-ID fields; when only an opaque stable ID exists, it creates a provider-prefixed short key and preserves the full value in a stable `mcp://` primary source. Multiple linked items retain ordinary mode-specific IDs unless one is explicitly primary. Existing artifacts are reused only when their exact `Primary source` matches; roadmap-list membership and external-ID equality are insufficient. Otherwise planning stops with `source-plan-id-collision` and never overwrites or drops the external-ID prefix.
 
 `/aif-plan full` does not create `/aif-task-prepare`, does not create `.ai-factory/specs/<task-id>.md`, and does not create `task-prepare.md`. Raw input trace, normalization confidence, and temporary notes belong only under `.ai-factory/state/<change-id>/` when they are persisted.
 
@@ -619,8 +654,10 @@ Reads:
 
 - `.ai-factory/config.yaml`
 - project context and rules
+- directly relevant in-repository source, tests, docs, package/manifest files, and bounded local Git branch/revision metadata
 - `openspec/specs/**/spec.md`
 - `openspec/changes/<change-id>/**` when exploring an existing change
+- the exact referenced legacy plan pair in Legacy AI Factory-only mode
 
 Writes, exactly one profile per run:
 
@@ -637,6 +674,12 @@ Does not write:
 - `.ai-factory/state/<change-id>/explore.md` and `.ai-factory/qa/<change-id>/`
 
 Exploration is research-only until promoted into canonical OpenSpec artifacts by planning or refinement.
+
+Before the full research run or any write, `/aif-explore` turns the request into a dependency-aware research brief. It resolves repository and configuration facts through bounded read-only inspection, asks only user-owned decisions whose prerequisites are settled, groups independent questions into rounds with a recommendation for each, and recomputes the decision frontier after every answer batch. Confirmation becomes available only after every user-owned brief decision is settled and no prerequisite fact-finding remains pending. An empty frontier with unresolved decisions behind blocked or cyclic prerequisites is blocked, not complete: the agent reports the blocker and smallest evidence-producing or dependency-breaking next action without presenting the brief for confirmation or starting full research.
+
+Pre-confirmation inspection creates no new read permission. In OpenSpec-native mode, it is restricted to the injection's `Allowed read context` and `Enabled optional tool use` boundaries. In Legacy AI Factory-only mode, it is restricted to `.ai-factory/config.yaml`, safe resolved configured project context and rules, the exact referenced legacy plan pair, directly relevant in-repository source/tests/docs/package manifests, and bounded local Git branch/revision metadata. Neither mode may use the interview to read outside the project root, inspect environment or credential stores, consume raw optional-provider stores/output, scan unrelated repositories, or enable an optional provider solely for the interview.
+
+Once the interview is complete, research starts only after the user confirms the normalized brief; this confirmation is required even for an already precise request. In autonomous or subagent mode, assumptions satisfy neither unresolved brief decisions nor confirmation. The agent first returns unresolved decisions, assumptions, blockers, and open questions to the interactive parent. Only after every brief decision is settled does it return the normalized brief with a `research-brief-confirmation-required` blocker. The only autonomous or subagent re-entry condition is that the interactive parent passes back both the exact normalized brief previously returned and an explicit statement that the user confirmed that exact brief without changes. That forwarded confirmation satisfies the confirmation gate for the resumed run and must not trigger another confirmation request; changed brief content or confirmation not explicitly bound to that brief returns to the unresolved-decision or confirmation-blocker flow. Do not create a separate interview, design-tree, decision-log, or research-brief file; the confirmed brief remains conversation context for the existing regular or ultra research output.
 
 Regular and ultra research are mutually exclusive writes for one run. A valid ultra `INDEX.md` contains exactly one standalone `<!-- aif:research-mode:ultra -->`, one supported status, and a safe direct `RESEARCH.md` link in `## Artifact Index`. Selection precedence is an explicit safe `RESEARCH.md` path, an exact slug, then exactly one reviewed materially relevant active bundle. Ambiguity stops with `ultra-research-ambiguous`; recency and fuzzy matching never break the tie. Planning/implementation consumers bind to the selected source path, active summary, revision, and digest; sibling C4/ADR/graph rationale cannot expand scope unless reflected in the active summary.
 
@@ -731,6 +774,16 @@ Runtime todo behavior:
 - If no todo tool is available, `/aif-implement` reports a task snapshot as a capability fallback and continues from `tasks.md`.
 - Runtime todo hydration does not authorize broad task expansion; execution remains one task or one tightly coupled task group.
 
+Development cycle for a testable behavior change:
+
+- **RED**: choose or add the narrowest useful automated check and observe the intended behavioral failure before editing production code.
+- **GREEN**: make the smallest in-scope production change and rerun the same check.
+- **REFACTOR**: perform only bounded cleanup and keep the same check green.
+- Persist `testCheck`, `redResult`, `greenResult`, `refactorResult`, and `fallbackDecision` in the implementation trace under `.ai-factory/state/<change-id>/implementation/`.
+- For docs-only work, generated artifacts, explicitly authorized no-test scope, or no useful automated check, record the fallback and run the narrowest applicable non-test verification instead of fabricating RED evidence.
+
+This is supporting runtime evidence, not an authoritative QA verdict. See [Адаптация идей Superpowers](superpowers-adaptation.md).
+
 Writes:
 
 - implementation source files in the selected task scope
@@ -805,6 +858,7 @@ Reads:
 
 - changed files
 - OpenSpec context and generated rules when available
+- configured `reviews.policy_file` (`REVIEW.md` by default) when safe, readable, and non-empty
 - optional reviewed Context7 notes under `.ai-factory/references/context7/` or `.ai-factory/state/<change-id>/context7/` for version-sensitive API review
 
 Writes:
@@ -812,6 +866,10 @@ Writes:
 - none
 
 `/aif-review` is an optional read-only code review gate. It returns a final `aif-gate-result` with `gate: "review"`, is useful before `/aif-verify` or for high-risk changes, and does not write OpenSpec, runtime, or QA artifacts.
+
+The configured review policy is additional guidance, not standalone evidence that a defect exists. Missing or empty policy is non-blocking; unsafe or unreadable policy degrades custom guidance. When policy materially affects a result, the review may name only its state and normalized project-relative path in human-readable evidence and never copies the full policy into `aif-gate-result`.
+
+Review runs in two ordered passes: **plan/spec compliance** first, then **code quality** inside the validated scope. A code-quality pass cannot erase or downgrade a compliance finding; both passes contribute to one findings-first verdict and one final review gate.
 
 Review findings may use Context7 as supporting documentation context only. Findings still need changed-file evidence, canonical OpenSpec context, generated rules, runtime state, QA evidence, or other direct repository evidence; missing Context7 is degraded context, not a review failure.
 
@@ -870,6 +928,10 @@ Writes:
 
 - implementation fixes in the selected finding scope
 - `.ai-factory/state/<change-id>/fixes/`
+
+Before editing, the fixer records `rootCauseEvidence`, one falsifiable `hypothesis`, and the smallest discriminating `experiment`. It tests one hypothesis at a time, then runs the exact `regressionCheck` before and after the smallest supported root-cause fix. Three failed hypotheses trigger reassessment and a no-edit stop rather than stacked speculative changes.
+
+The fix trace records `rootCauseEvidence`, `hypothesis`, `experiment`, `regressionCheck`, `preFixResult`, `postFixResult`, and `fallbackDecision`. This remains supporting runtime evidence; `/aif-verify <change-id>` is authoritative.
 
 Does not write:
 
@@ -1198,6 +1260,8 @@ See [Codex Plan Mode](codex-plan-mode.md) for question-format guidance.
 | Ambiguous active change | More than one active change can be selected. | Pass `<change-id>` explicitly or update `.ai-factory/state/current.yaml`. |
 | Missing generated rules | Derived rules are absent. | Regenerate `.ai-factory/rules/generated/*.md` from OpenSpec specs before relying on rules guidance. |
 | Stale generated rules | Generated rules do not match canonical OpenSpec artifacts. | Regenerate them; do not edit generated rules as source of truth. |
+| Missing `REVIEW.md` | No custom durable review guidance is available. | Continue with the standard review contract, or run `/aif-analyze` to create the configured scaffold. |
+| Unsafe review policy path | `reviews.policy_file` is absolute, URI-like, escaping, non-portable, non-Markdown, a directory, linked through a symlink/junction/hard link, collides with a managed file, or falls under a canonical/generated/runtime/QA protected root. | Configure a regular unowned project-relative Markdown path; review continues without custom policy. |
 | Missing or stale coverage | `.ai-factory/qa/<change-id>/coverage.json` is absent or fingerprints no longer match source artifacts. | Rerun `/aif-verify <change-id>` to regenerate coverage before `/aif-done`. |
 | Artifact contract failure | Canonical OpenSpec artifacts, runtime state, QA evidence, or generated rules violate the AIFHub contract. | Fix the reported path or run the suggested command from `artifactContract.suggested_next`. |
 | Dirty working tree before `/aif-done` | Finalization cannot prove archive/summary scope safely. | Inspect with `git status --short`; commit or stash unrelated changes, or rerun `ai-factory aifhub-done-finalizer --change <change-id> --record-dirty-state --json` to record the dirty workspace in final QA evidence before archive. |
@@ -1258,3 +1322,5 @@ npm test
 - [Active Change Resolver](active-change-resolver.md)
 - [ADR 0001](adr/0001-openspec-native-artifact-protocol.md)
 - [ADR 0002: Optional Project Glossary](adr/0002-optional-project-context-glossary.md)
+- [Project Review Policy](review-policy.md)
+- [ADR 0003: Durable Project Review Policy](adr/0003-durable-project-review-policy.md)
