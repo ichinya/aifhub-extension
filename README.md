@@ -62,6 +62,8 @@ aifhub:
 
 On first bootstrap, when `.ai-factory/config.yaml` is missing and you did not explicitly ask for OpenSpec-native mode, `/aif-analyze` asks which artifact protocol to use: `openspec: false` or `openspec: true`; HLV and Lekalo are independent switches. Existing configs are preserved without that question. If the run is autonomous and cannot ask, it defaults to legacy AI Factory-only and reports OpenSpec-native mode as an open question.
 
+Enabled tools get missing project scaffolding during bootstrap and mode sync. After editing switches directly, run `ai-factory aifhub-mode init --json` (`--dry-run` previews). Existing HLV projects at root `project.yaml` or `.hlv/project.yaml` are reused unchanged; an uninitialized existing repository uses HLV 1.0.0 adopt mode. See [initialization and preservation](docs/validation-providers.md#lifecycle).
+
 Create and refine a change:
 
 ```text

@@ -57,7 +57,7 @@ aifhub:
       maxOutputBytes: 1048576
 ```
 
-[The configuration schema](../schemas/provider-config.schema.json) describes `aifhub.providers`. HLV defaults to verify/done; the reserved semantic provider defaults to implement/verify/done. Mode switches preserve this namespace. An explicit `executable` must be a quoted absolute native executable path; otherwise the installed `hlv` is resolved by the process environment. Shell/script wrappers are rejected. No install, update, initialization or provider-owned sync command is exposed.
+[The configuration schema](../schemas/provider-config.schema.json) describes `aifhub.providers`. HLV defaults to verify/done; the reserved semantic provider defaults to implement/verify/done. Mode switches preserve this namespace. An explicit `executable` must be a quoted absolute native executable path; otherwise the installed `hlv` is resolved by the process environment. Shell/script wrappers are rejected. Project initialization is available through `aifhub-mode init`; binary installation, updates and provider-owned sync remain outside the adapter.
 
 The namespace accepts two-space YAML mappings, scalar values and block lists or JSON-style inline lists. Tool switches must be unquoted `true` or `false`; strings such as `"false"`, numbers and nulls are errors. Duplicate keys, unknown tools/providers, unsupported YAML aliases/flow mappings, malformed policies and invalid limits fail closed. An unreadable configuration is a configuration error, not implicit disablement.
 
@@ -72,12 +72,22 @@ Unsafe configuration, evidence write failures, or project changes during executi
 ## Lifecycle
 
 ```text
+ai-factory aifhub-mode init --dry-run --json
+ai-factory aifhub-mode init --json
 ai-factory aifhub-providers status --json
 ai-factory aifhub-mode doctor --change add-feature --json
 ai-factory aifhub-providers verify --change add-feature --write --json
 ai-factory aifhub-providers done --change add-feature --write --json
 ai-factory aifhub-done-readiness --change add-feature --json
 ```
+
+After enabled tool choices are saved, `/aif-analyze`, mode switches and artifact sync initialize missing project scaffolding. Direct boolean edits can be applied with `aifhub-mode init`. Initialization is idempotent: OpenSpec creates missing config (`schema: spec-driven`) and canonical directories, preserving existing content. It works without installing OpenSpec integrations or requiring the CLI for filesystem scaffolding.
+
+HLV initialization first inspects both `project.yaml` and `.hlv/project.yaml`. Existing root HLV projects (with `human/`, `validation/`, `llm/` or custom configured paths) are reused without creating `.hlv/`. Existing adopted projects are also reused. Neither path invokes native reinit, modifies the project map, nor rewrites contracts or milestones. Both markers together, malformed maps, unsafe paths and nonempty partial `.hlv/` layouts require repair instead of automatic overwrites.
+
+With neither marker present, [HLV 1.0.0 native adopt](https://github.com/lee-to/hlv/blob/v1.0.0/src/cmd/init.rs) runs `hlv init --adopt --path <root> --project <safe-project-name> --owner <safe-project-name> --agent agents --profile standard`. It keeps existing source in place, creates `.hlv/` with native project/contract/milestone scaffolding, creates missing shared agent skills and instructions, and appends `.hlv/index/` to `.gitignore`. Closed stdin selects native initial milestone and feature defaults. Existing root instructions and skill files are preserved. A missing/unsupported HLV executable or failed initializer is reported explicitly, with raw process output excluded. No project gates run during initialization, and initialization success is not validation PASS.
+
+`init --dry-run` describes missing scaffolding without writes or provider commands; it does not claim CLI readiness. `status`, `doctor` and read-only done readiness never initialize anything. Before validation of a newly enabled tool, initialize its missing project once, then obtain the revision and run validation against that initialized state.
 
 `/aif-verify` runs configured validation after native project gates and incorporates provider blockers before the final verdict. `/aif-done` refreshes provider validation/readiness before finalization. The OpenSpec archive readiness gate independently requires current provider validation evidence, and calls only read-only HLV workflow queries. It cannot satisfy readiness from missing, malformed or stale provider evidence. Legacy plans use the same provider command with a resolved safe plan ID. An explicitly enabled provider overlay for an upstream ultra bundle remains separate from the upstream receipt and bundle verdict.
 
@@ -128,6 +138,8 @@ See also [Context Providers](context-providers.md), [Skill Providers](skill-prov
 ## Validation evidence (2026-09-05)
 
 The Windows HLV 1.0.0 release binary (`sha256:76cdb4bd29ed60b284bc0f48e934cfbba988438618fd0096db1aa8e85dd97f70`) was exercised in temporary directories against upstream fixtures at `2a817996bee04a97061669cb37d5966a17980610`. No provider was installed into the extension or updated globally.
+
+The same native binary also exercised missing-project initialization in a temporary existing Node repository with OpenSpec enabled. Adopt created `.hlv/` and inferred the existing source root; source, root instructions and a custom shared skill were preserved. A second initialization invoked no provider command and retained identical hashes for all 48 files. Root HLV layout detection was additionally checked read-only against an existing project; no private project content was copied into fixtures.
 
 | Real fixture | Check | Readiness |
 | --- | --- | --- |

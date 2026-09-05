@@ -476,6 +476,10 @@ openspec:
 
 ### Step 5: Ensure Directories Exist
 
+- After writing the accepted `aifhub.tools` switches, run `ai-factory aifhub-mode init --json`. This creates missing enabled-tool scaffolding and reuses existing HLV/OpenSpec projects. A true switch authorizes this initialization; do not stop at recommending setup when the tool is available. See [optional tools](../shared/TOOLS.md) for native HLV adopt effects and preservation rules.
+- Inspect root `project.yaml` as well as `.hlv/project.yaml`. Existing HLV projects may have root `human/`, `validation/` and `llm/` with custom paths and milestones; absence of `.hlv/` does not mean missing initialization. Preserve their contents and resolve paths from the existing project map. Do not call HLV reinit or convert their layout.
+- Report initialization as created, preserved, disabled or failed for each selected tool. A missing/unsupported HLV executable or conflicting/partial layout is an explicit setup failure, not successful bootstrap or a reason to overwrite existing files. Never install or upgrade HLV automatically.
+
 - Create only directory-valued configured paths. File-valued settings such as `paths.description`, `paths.architecture`, `paths.context`, `paths.roadmap`, `paths.research`, and `reviews.policy_file` must never be created as directories.
 
 - In legacy `ai-factory` mode, create directories from config paths if missing:

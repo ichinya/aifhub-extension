@@ -61,7 +61,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await rm(rootDir, { recursive: true, force: true });
+  await rm(rootDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 });
 });
 
 describe('context dedup policy', () => {

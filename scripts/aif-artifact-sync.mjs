@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { providerDiagnostics, runProviders } from './aifhub-providers.mjs';
 import { normalizeProviderPolicies, parseProviderConfig } from './provider-policy.mjs';
 import { parseToolConfig, toolArtifactPaths } from './tool-config.mjs';
+import { readProviderFile, safeProviderPath } from './provider-files.mjs';
+import { initializeHlvProject } from './tool-initialization.mjs';
 
 import {
   normalizeChangeId,
@@ -204,7 +206,9 @@ export async function switchToOpenSpecMode(options = {}) {
 
   const config = await writeModeConfig(MODES.openspec, { ...options, rootDir });
   if (!config.ok) return config;
-  const skeleton = await ensureOpenSpecSkeleton({ ...options, rootDir });
+  const initialization = await initializeEnabledTools({ ...options, rootDir });
+  if (!initialization.ok) return initialization;
+  const skeleton = initialization.tools.openspec ? initialization.skeleton : await ensureOpenSpecSkeleton({ ...options, rootDir });
   const migration = await maybeMigrateLegacyPlans({
     ...options,
     rootDir,
@@ -246,6 +250,7 @@ export async function switchToOpenSpecMode(options = {}) {
     mode: MODES.openspec,
     config,
     skeleton,
+    initialization,
     legacy,
     legacyPlanSourceRoot: capturedSource.legacyPlanSourceRoot,
     legacyPlanSource: capturedSource,
@@ -278,6 +283,8 @@ export async function switchToAiFactoryMode(options = {}) {
   const config = await writeModeConfig(MODES.aiFactory, { ...options, rootDir });
   if (!config.ok) return config;
   const skeleton = await ensureAiFactorySkeleton({ ...options, rootDir });
+  const initialization = await initializeEnabledTools({ ...options, rootDir });
+  if (!initialization.ok) return initialization;
   const exportResult = options.exportOpenSpec
     ? await exportOpenSpecCompatibility({ ...options, rootDir })
     : createSkippedResult('compatibility export was not requested');
@@ -301,6 +308,7 @@ export async function switchToAiFactoryMode(options = {}) {
     mode: MODES.aiFactory,
     config,
     skeleton,
+    initialization,
     export: exportResult,
     report,
     warnings: dedupeDiagnostics([
@@ -342,6 +350,26 @@ export async function syncArtifacts(options = {}) {
   };
 }
 
+export async function initializeEnabledTools(options = {}) {
+  const rootDir = resolveRootDir(options);
+  const config = await readProjectConfig(rootDir);
+  const base = { dryRun: Boolean(options.dryRun), mode: resolveMode(config), tools: config.tools,
+    operations: [], warnings: [], errors: [] };
+  if (config.error) return { ...base, ok: false, errors: [config.error] };
+  if (config.tools.openspec) {
+    try { await preflightOpenSpecSkeleton(rootDir); } catch {
+      return { ...base, ok: false, errors: [{ code: 'unsafe-openspec-layout',
+        message: 'OpenSpec initialization requires safe project-local paths.' }] };
+    }
+  }
+  const hlv = await initializeHlvProject({ ...options, rootDir });
+  if (!hlv.ok) return { ...base, ok: false, hlv, errors: hlv.errors };
+  const skeleton = config.tools.openspec ? await ensureOpenSpecSkeleton({ ...options, rootDir })
+    : { ok: true, operations: [], warnings: [], errors: [] };
+  return { ...base, ok: skeleton.ok, hlv, skeleton, operations: hlv.operations,
+    warnings: skeleton.warnings, errors: skeleton.errors };
+}
+
 export async function syncOpenSpecArtifacts(options = {}) {
   const rootDir = resolveRootDir(options);
   const dryRun = Boolean(options.dryRun);
@@ -351,8 +379,10 @@ export async function syncOpenSpecArtifacts(options = {}) {
       code: 'openspec-disabled', message: 'OpenSpec is disabled by aifhub.tools.openspec; use AI Factory artifact sync.'
     }] };
   }
+  const initialization = await initializeEnabledTools({ ...options, rootDir });
+  if (!initialization.ok) return initialization;
   const openspecSettings = getOpenSpecSettings(config);
-  const skeleton = await ensureOpenSpecSkeleton({ ...options, rootDir });
+  const skeleton = initialization.tools.openspec ? initialization.skeleton : await ensureOpenSpecSkeleton({ ...options, rootDir });
   const activeInventory = await inventoryOpenSpecChanges({
     ...options,
     rootDir,
@@ -424,6 +454,7 @@ export async function syncOpenSpecArtifacts(options = {}) {
     dryRun,
     mode: MODES.openspec,
     skeleton,
+    initialization,
     changes,
     generatedRules,
     validation,
@@ -452,6 +483,8 @@ export async function syncOpenSpecArtifacts(options = {}) {
 export async function syncAiFactoryArtifacts(options = {}) {
   const rootDir = resolveRootDir(options);
   const dryRun = Boolean(options.dryRun);
+  const initialization = await initializeEnabledTools({ ...options, rootDir });
+  if (!initialization.ok) return initialization;
   const skeleton = await ensureAiFactorySkeleton({ ...options, rootDir });
   const exportResult = options.exportOpenSpec
     ? await exportOpenSpecCompatibility({ ...options, rootDir })
@@ -476,6 +509,7 @@ export async function syncAiFactoryArtifacts(options = {}) {
     dryRun,
     mode: MODES.aiFactory,
     skeleton,
+    initialization,
     export: exportResult,
     report,
     warnings: dedupeDiagnostics([
@@ -855,6 +889,14 @@ export function renderConfigForMode(existingRaw, mode, options = {}) {
   return `${rendered.filter(Boolean).join('\n')}\n`;
 }
 
+async function preflightOpenSpecSkeleton(rootDir) {
+  for (const relative of ['openspec/specs', 'openspec/changes', '.ai-factory/state', '.ai-factory/qa', '.ai-factory/rules/generated']) {
+    const target = await safeProviderPath(rootDir, relative);
+    if (target.exists && !(await stat(target.path)).isDirectory()) throw new Error('not_directory');
+  }
+  await readProviderFile(rootDir, 'openspec/config.yaml');
+}
+
 export async function ensureOpenSpecSkeleton(options = {}) {
   const rootDir = resolveRootDir(options);
   const dryRun = Boolean(options.dryRun);
@@ -865,6 +907,12 @@ export async function ensureOpenSpecSkeleton(options = {}) {
     '.ai-factory/qa',
     '.ai-factory/rules/generated'
   ];
+  try {
+    await preflightOpenSpecSkeleton(rootDir);
+  } catch {
+    return { ok: false, dryRun, operations: [], created: [], preserved: [], warnings: [],
+      errors: [{ code: 'unsafe-openspec-layout', message: 'OpenSpec initialization requires safe project-local paths.' }] };
+  }
   const ensured = await ensureDirectories(rootDir, dirs, { dryRun });
   const configResult = await ensureOpenSpecConfig(rootDir, { dryRun });
 
@@ -1887,7 +1935,7 @@ async function ensureOpenSpecConfig(rootDir, options = {}) {
 
   if (!dryRun) {
     await mkdir(path.dirname(target), { recursive: true });
-    await writeFile(target, `project: ${projectName}\ntitle: ${titleFromId(projectName)}\n`, 'utf8');
+    await writeFile(target, `schema: spec-driven\nproject: ${JSON.stringify(projectName)}\ntitle: ${JSON.stringify(titleFromId(projectName))}\n`, { encoding: 'utf8', flag: 'wx' });
   }
 
   return {

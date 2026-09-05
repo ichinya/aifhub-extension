@@ -16,14 +16,18 @@ export async function detectHlv(rootDir, config, options = {}) {
   if (root && adopt) return { status: 'configuration_error', reason: 'ambiguous_layout', version: null, layout: null };
   const layout = root ? 'greenfield' : adopt ? 'adopt' : null;
   if (!layout) return { status: 'unavailable', reason: 'layout_missing', version: null, layout };
+  return { ...await detectHlvVersion(rootDir, config, options), layout };
+}
+
+export async function detectHlvVersion(rootDir, config, options = {}) {
   const result = await invoke(['--version'], rootDir, config, options);
   const failure = processFailure(result);
-  if (failure) return { ...failure, version: null, layout };
+  if (failure) return { ...failure, version: null };
   const match = result.stdout.trim().match(/^hlv ([0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5})$/);
-  if (result.exitCode !== 0 || !match) return { status: 'unsupported', reason: 'version_shape', version: null, layout };
+  if (result.exitCode !== 0 || !match) return { status: 'unsupported', reason: 'version_shape', version: null };
   const version = match[1];
   return { status: version === HLV_COMMAND_CONTRACT.toolVersion ? 'pass' : 'unsupported',
-    reason: version === HLV_COMMAND_CONTRACT.toolVersion ? 'detected' : 'tool_version', version, layout };
+    reason: version === HLV_COMMAND_CONTRACT.toolVersion ? 'detected' : 'tool_version', version };
 }
 
 async function invoke(args, rootDir, config, options) {

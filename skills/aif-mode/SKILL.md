@@ -1,7 +1,7 @@
 ---
 name: aif-mode
 description: Configures the optional OpenSpec tool while preserving independent HLV and Lekalo choices, synchronizes selected artifacts, checks configuration drift, and reports migration/export actions.
-argument-hint: "[status|openspec|ai-factory|sync|doctor] [--dry-run] [--all] [--change <id>] [--yes]"
+argument-hint: "[status|init|openspec|ai-factory|sync|doctor] [--dry-run] [--all] [--change <id>] [--yes]"
 disable-model-invocation: true
 allowed-tools: Read Write Grep Glob Bash(ai-factory aifhub-mode *) Bash(ai-factory aifhub-migrate-legacy-plans *) Bash(npm run validate) Bash(npm test)
 metadata:
@@ -57,6 +57,8 @@ Use runtime-specific public invocations when instructing the user: selected `cod
 Read-only. Reports current mode, config marker, OpenSpec CLI capability, OpenSpec change count, legacy plan count, generated rules state, and active change resolution.
 
 ### `openspec`
+
+Mode switches and `sync` initialize enabled tools as described by `init` before continuing.
 
 Switch to OpenSpec-native mode, ensure the OpenSpec skeleton and runtime directories, detect legacy plans, optionally run legacy migration when `--yes` is passed, run artifact sync, and write a switch report.
 
@@ -149,6 +151,10 @@ ai-factory audit-artifacts openspec .ai-factory/qa .ai-factory/state --json
 
 Use this only as supplemental diagnostic context when available. It is optional, not mandatory, not archive-blocking, and must not turn `/aif-mode doctor` into a write operation or a hard dependency on upstream AI Factory 2.12+.
 
+### `init`
+
+Run `ai-factory aifhub-mode init --json` after enabling tools, or `init --dry-run --json` to preview. It creates only missing scaffolding for true tool switches, without changing the switches. OpenSpec gets its config and canonical directories. HLV reuses root `project.yaml` or `.hlv/project.yaml` unchanged, including custom paths and active milestones. When neither exists, invoke installed HLV 1.0.0 `init --adopt` with the standard profile and shared `--agent agents` skills. Existing source, instructions and skill files are preserved; native adopt appends its generated-index ignore rule. Missing binaries and ambiguous, incomplete or unsafe layouts are setup errors. Initialization does not install or update binaries, run project validation gates or supply validation evidence. See [optional tools](../shared/TOOLS.md).
+
 ## References
 
 - Read [references/MODES.md](references/MODES.md) when changing config mode.
@@ -160,6 +166,6 @@ Use this only as supplemental diagnostic context when available. It is optional,
 
 `aif-mode` must not delete `openspec/`, delete `.ai-factory/plans/`, archive OpenSpec changes, run `/aif-done`, mutate `openspec/specs` manually, install OpenSpec skills, overwrite artifacts without an explicit option, or create runtime files inside `openspec/changes/<id>/`.
 
-Allowed writes are `.ai-factory/config.yaml`, skeleton directories, migration outputs through `scripts/migrate-legacy-plans.mjs`, compatibility export outputs, generated rules through the rules compiler, current pointer updates when requested, and reports under `.ai-factory/state/mode-switches/`.
+Allowed writes are `.ai-factory/config.yaml`, skeleton directories and missing OpenSpec config, fresh enabled HLV adopt scaffolding through `scripts/tool-initialization.mjs`, migration outputs through `scripts/migrate-legacy-plans.mjs`, compatibility export outputs, generated rules through the rules compiler, current pointer updates when requested, and reports under `.ai-factory/state/mode-switches/`.
 
 Generated cleanup is confined to `.ai-factory/rules/generated/` and only the exact direct-child patterns `openspec-change-<safe-id>.md`, `openspec-merged-<safe-id>.md`, and `openspec-rules-trace-<safe-id>.json` for absent active changes. Preserve unknown files, directories, symlinks/reparse points, canonical OpenSpec artifacts, runtime/QA evidence, and external paths. Public JSON/human/report detail is sorted, project-relative, capped at 200 entries, and paired with total/truncation metadata; a normal bounded failure report may still be written after fail-closed preflight.
