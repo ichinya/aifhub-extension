@@ -43,6 +43,12 @@ Run review in this order for both artifact modes:
 
 Do not let a code-quality pass erase or downgrade a plan/spec compliance finding. Return one combined findings-first verdict; this ordering does not create a second gate or authorize file edits.
 
+### Scoped re-review
+
+For a requested re-review after fixes, follow `skills/shared/SCOPED-REVIEW.md` in either artifact mode. Match the previous findings to the exact fix targets, reconcile every finding by ID, and inspect the complete fix diff for regressions within the existing two-pass review. An incomplete or stale bundle cannot produce PASS. Ordinary full review and user-required independent review retain their scope.
+
+Resolve the policy from the AIFHub extension root; in an installed project it is `.ai-factory/extensions/aifhub-extension/skills/shared/SCOPED-REVIEW.md`. Return the scoped evidence before the single existing gate result; keep review read-only and do not create a replacement policy in the consumer project.
+
 ### OpenSpec-native mode
 
 When `.ai-factory/config.yaml` declares `aifhub.tools.openspec: true`, `/aif-review` is an optional read-only gate for one active OpenSpec change.

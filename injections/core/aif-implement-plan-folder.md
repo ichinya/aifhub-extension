@@ -6,6 +6,10 @@ Apply this block before the upstream `aif-implement` body. When any rule below c
 
 Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
 
+Once artifact classification permits local execution, follow [test quality and readiness waits](../../skills/shared/TEST-QUALITY.md) before selecting or changing an automated check or a readiness wait. This applies to OpenSpec-native and classic legacy execution; preserve marker-first delegation and no-test fallbacks.
+
+Resolve the policy from the AIFHub extension root; in an installed project it is `.ai-factory/extensions/aifhub-extension/skills/shared/TEST-QUALITY.md`. Do not create a replacement policy in the consumer project.
+
 Resolve user-facing prose language in this order: use a usable non-empty `language.ui`; otherwise preserve the current conversation language for this response only; use English only when that language is indeterminate. This rule overrides downstream generic English defaults; do not infer from OS locale or persist the inferred choice. On that hard-English fallback, add exactly one concise setup hint only when the output contract permits human-readable prose, before any required final machine-readable block; never add it inside or after `aif-gate-result`, and never alter exact handoffs, fixed commands, paths, keys/enums, or machine-only output.
 
 ### Goal
@@ -37,6 +41,12 @@ In Legacy AI Factory-only mode, classify the normalized project-relative plan en
 - For `ultra-invalid` or `collision`, fail closed before any write and report only bounded `shape`, safe `entrypoint`, and classifier `code` values.
 - For `classic-pair` or `classic-folder-only`, continue with the classic companion rules below. An unrelated directory is not a plan.
 - Diagnostics may include only `shape`, safe project-relative `entrypoint`, and `handoff`; never include marker bodies, phase contents, request/research bodies, credentials, raw stdout, or raw stderr.
+
+### Task coordination after classification
+
+After classification permits local execution and the canonical tasks have been read, follow [task conflicts and bounded batches](../../skills/shared/TASK-COORDINATION.md) before implementation edits or first worker dispatch. Apply it to OpenSpec-native and classic legacy execution; marker-first ultra delegation and invalid/collision stops remain prior boundaries.
+
+Resolve the policy from the AIFHub extension root; in an installed project it is `.ai-factory/extensions/aifhub-extension/skills/shared/TASK-COORDINATION.md`. The coordinator owns the preflight scan, explicit batch manifest, and per-item reconciliation. Workers consume only the selected scope. Do not create a replacement policy in the consumer project.
 
 ### OpenSpec-native mode
 
@@ -84,10 +94,10 @@ Hydrate runtime todo state from canonical OpenSpec tasks before editing implemen
 
 - Treat `openspec/changes/<change-id>/tasks.md` as the source checklist.
 - If the current runtime exposes a todo or plan tool, use it before editing. In Codex, use `update_plan` when available.
-- Map checked tasks to `completed`, mark the selected unfinished task or tightly coupled task group as `in_progress`, and leave other unfinished tasks as `pending`.
+- Map checked tasks to `completed`, mark only the selected unfinished task, tightly coupled task group, or explicit small same-shape batch as `in_progress`, and leave other unfinished tasks as `pending`.
 - If no todo or plan tool is available, report a concise task snapshot in the normal response and continue from canonical `tasks.md`.
 - Report missing todo-tool support as a capability fallback, not as an implementation failure.
-- Hydrating runtime todo state does not authorize broad task expansion; `/aif-implement` still executes one task or one tightly coupled task group.
+- Hydrating runtime todo state does not authorize broad task expansion; `/aif-implement` executes one task, one tightly coupled task group, or one explicit small same-shape batch validated under `skills/shared/TASK-COORDINATION.md`. Complete each item only after reconciling its expected change with the actual diff and evidence.
 
 #### Roadmap lifecycle deferral
 
