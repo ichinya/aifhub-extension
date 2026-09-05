@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { assertSessionBriefBinding, inspectSessionBrief } from './session-brief.mjs';
 
 import {
   ensureRuntimeLayout,
@@ -35,6 +36,17 @@ export async function buildImplementationContext(options = {}) {
       warnings: resolverResult.warnings,
       errors: resolverResult.errors
     });
+  }
+
+  const sessionBrief = await inspectSessionBrief({ ...options, rootDir, changeId: resolverResult.changeId, includeBrief: true });
+  if (!sessionBrief.ok) {
+    return {
+      ...createContextFailure({ resolverResult, errors: [{
+        code: 'session-brief-not-current',
+        message: 'Return to the planning owner to compile a current SessionBrief before implementation.'
+      }] }),
+      sessionBrief
+    };
   }
 
   const layout = await ensureRuntimeLayout(resolverResult.changeId, {
@@ -72,12 +84,27 @@ export async function buildImplementationContext(options = {}) {
       qa: layout.qaPath,
       generatedRules: path.join(rootDir, GENERATED_DIR)
     },
-    canonicalArtifacts: canonical.canonicalArtifacts,
-    generatedRules: generatedRules.generatedRules,
+    canonicalArtifacts: sessionBrief.status === 'valid'
+      ? briefSourceReferences(canonical.canonicalArtifacts, sessionBrief.sources)
+      : canonical.canonicalArtifacts,
+    sessionBrief,
+    generatedRules: sessionBrief.status === 'valid'
+      ? briefSourceReferences(generatedRules.generatedRules, sessionBrief.sources)
+      : generatedRules.generatedRules,
     openspecInstructions: instructions.openspecInstructions,
     warnings,
     errors
   };
+}
+
+function briefSourceReferences(value, sources) {
+  if (Array.isArray(value)) return value.map((item) => briefSourceReferences(item, sources));
+  if (!value || typeof value !== 'object') return value;
+  if (typeof value.content === 'string' && typeof value.path === 'string') {
+    const { content: _content, ...reference } = value;
+    return { ...reference, sha256: sources.find((source) => source.path === value.path)?.sha256 ?? null, fidelity: 'full' };
+  }
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, briefSourceReferences(item, sources)]));
 }
 
 export async function buildFixContext(options = {}) {
@@ -464,6 +491,9 @@ async function writeTrace({ changeId, trace, options, type, directoryName }) {
 
   const runId = normalizeRunId(options.runId ?? createDefaultRunId(options));
   const rootDir = resolveRootDir(options);
+  if (type === 'Implementation') {
+    await assertSessionBriefBinding(normalized.changeId, trace?.sessionBriefDigest, { ...options, rootDir });
+  }
   const layout = await ensureRuntimeLayout(normalized.changeId, {
     rootDir,
     cwd: options.cwd,
@@ -528,6 +558,9 @@ function renderTraceMarkdown({ changeId, trace, type }) {
     '',
     ...renderList(trace?.canonicalArtifactsRead),
     '',
+    ...(type === 'Implementation' && trace?.sessionBriefDigest ? [
+      '## SessionBrief binding', '', `Digest: ${trace.sessionBriefDigest}`, ''
+    ] : []),
     '## Generated rules read',
     '',
     ...renderList(trace?.generatedRulesRead),
@@ -992,6 +1025,7 @@ async function collectFilePaths(directoryPath, filePaths, predicate) {
   const sortedEntries = entries.sort((left, right) => left.name.localeCompare(right.name));
 
   for (const entry of sortedEntries) {
+    if (entry.name === '.gitignore') continue;
     const childPath = path.join(directoryPath, entry.name);
 
     if (entry.isDirectory()) {

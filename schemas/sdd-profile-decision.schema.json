@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SDD profile decision v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "aifhub.sdd_profile_decision.v1"
+    },
+    "change_id": {
+      "type": "string"
+    },
+    "profile": {
+      "enum": [
+        "direct",
+        "quick",
+        "standard",
+        "expanded",
+        "ultra",
+        "tracer",
+        "research"
+      ]
+    },
+    "planning_mode": {
+      "enum": [
+        "fast",
+        "full",
+        "ultra",
+        null
+      ]
+    },
+    "recommended_planning_mode": {
+      "enum": [
+        "fast",
+        "full",
+        "ultra",
+        null
+      ]
+    },
+    "reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "risk_signals": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required_artifacts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "conditional_artifacts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required_gates": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "project_policy",
+          "tests",
+          "rules",
+          "review",
+          "security",
+          "migration_rollback",
+          "human_review",
+          "verify",
+          "done"
+        ]
+      }
+    },
+    "implementation_allowed": {
+      "type": "boolean"
+    },
+    "blocked_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "policy_revision": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_revision": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "required": [
+    "schema",
+    "change_id",
+    "profile",
+    "planning_mode",
+    "recommended_planning_mode",
+    "reasons",
+    "risk_signals",
+    "required_artifacts",
+    "conditional_artifacts",
+    "required_gates",
+    "implementation_allowed",
+    "blocked_reason",
+    "policy_revision",
+    "source_revision"
+  ]
+}

@@ -7,6 +7,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { StringDecoder } from 'node:string_decoder';
 import { pathToFileURL } from 'node:url';
+import { ensureRuntimeGitignores } from './runtime-gitignore.mjs';
 
 export const CONTEXT_DEDUP_SCHEMA_VERSION = 3;
 
@@ -223,6 +224,7 @@ export async function saveLedger(ledger, options = {}) {
   const payload = { ...ledger, sessionId, updatedAt: new Date().toISOString() };
   const tmpPath = `${ledgerPath}.${process.pid}.${randomUUID()}.tmp`;
 
+  await ensureDedupGitignores(resolveRootDir(options), resolveDedupStateDir(options));
   await mkdir(path.dirname(ledgerPath), { recursive: true });
   try {
     await writeFile(tmpPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
@@ -1145,6 +1147,7 @@ async function acquireLedgerLock(lockPath, rootDir, options = {}) {
 }
 
 async function acquireSessionTransactionLock(rootDir, stateDir, ledgerPath) {
+  await ensureDedupGitignores(rootDir, stateDir);
   const globalLockPath = resolveGlobalLockPath(rootDir, stateDir);
   const sessionLockPath = resolveSessionLockPath(ledgerPath);
 
@@ -1169,6 +1172,13 @@ async function acquireSessionTransactionLock(rootDir, stateDir, ledgerPath) {
   const error = new Error('Timed out waiting for the context dedup session lock.');
   error.code = 'CONTEXT_DEDUP_LOCK_TIMEOUT';
   throw error;
+}
+
+async function ensureDedupGitignores(rootDir, stateDir) {
+  // Explicit stateDir may point directly at the dedup store; keep its siblings visible.
+  await ensureRuntimeGitignores(rootDir, path.basename(stateDir) === 'context-dedup'
+    ? [path.dirname(stateDir)]
+    : [stateDir, path.dirname(resolveGlobalLockPath(rootDir, stateDir))]);
 }
 
 async function waitForActiveSessionLocks(rootDir, stateDir) {

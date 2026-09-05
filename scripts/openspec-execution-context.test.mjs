@@ -802,7 +802,7 @@ describe('OpenSpec execution context API', () => {
         stateDir: 'openspec/changes',
         runId: 'escape'
       }),
-      /outside canonical OpenSpec changes/
+      /outside canonical OpenSpec changes|unsafe_runtime_directory/
     );
     assert.equal(
       await pathExists(path.join(rootDir, 'openspec', 'changes', 'add-oauth', 'implementation', 'escape.md')),

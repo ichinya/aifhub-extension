@@ -22,6 +22,13 @@ const WRAPPER_COMMANDS = [
     args: ['verify', '--change', 'add-oauth', '--write', '--json']
   },
   {
+    name: 'aifhub-session-brief',
+    description: 'Compile, inspect, or show a source-bound AIFHub SessionBrief.',
+    module: './commands/aifhub-session-brief.mjs',
+    script: 'session-brief.mjs',
+    args: ['compile', '--change', 'add-oauth', '--json']
+  },
+  {
     name: 'aifhub-mode',
     description: 'Run AIFHub artifact mode status, switch, sync, and doctor commands.',
     module: './commands/aifhub-mode.mjs',
@@ -136,6 +143,10 @@ async function copyInstalledCommandLayout(userProjectDir) {
     path.join(REPO_ROOT, 'commands', 'run-installed-script.mjs'),
     path.join(extensionDir, 'commands', 'run-installed-script.mjs')
   );
+  await copyFile(
+    path.join(REPO_ROOT, 'commands', 'post-update-init.mjs'),
+    path.join(extensionDir, 'commands', 'post-update-init.mjs')
+  );
 
   for (const command of WRAPPER_COMMANDS) {
     await copyFile(
@@ -237,6 +248,7 @@ function createFakeProgram() {
   const commands = new Map();
   return {
     commands,
+    hook() { return this; },
     command(name) {
       const registered = {
         name,

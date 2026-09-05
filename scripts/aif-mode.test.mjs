@@ -366,7 +366,7 @@ describe('generated-rules reconciliation rendering', () => {
     const parsed = JSON.parse(result.stdout);
 
     assert.equal(result.exitCode, 0, 'no-active 205-orphan dry-run should succeed');
-    assert.equal(parsed.generatedRules.operation_count, 207);
+    assert.equal(parsed.generatedRules.operation_count, 208);
     assert.equal(parsed.generatedRules.operations.length, 200);
     assert.equal(parsed.generatedRules.operations_truncated, true);
     assert.equal(parsed.generatedRules.operations.every((item) => !path.isAbsolute(item.target)), true);

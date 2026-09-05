@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SDD profile inputs",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "planning_mode": {
+      "enum": [
+        "fast",
+        "full",
+        "ultra"
+      ]
+    },
+    "behavior_change": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "public_api": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "data_migration": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "reversible": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "security_sensitive": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "architecture_novelty": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "requirements_clear": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "modules": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1,
+      "maximum": 100000
+    },
+    "repositories": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1,
+      "maximum": 100000
+    },
+    "expected_files": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1,
+      "maximum": 100000
+    }
+  },
+  "required": [
+    "planning_mode"
+  ]
+}

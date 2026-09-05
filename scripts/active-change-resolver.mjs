@@ -4,6 +4,7 @@ import { access, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promi
 import path from 'node:path';
 import process from 'node:process';
 import { promisify } from 'node:util';
+import { ensureRuntimeGitignores } from './runtime-gitignore.mjs';
 
 import { findExactMarkdownH2Sections } from './markdown-structural-markers.mjs';
 import { readToolConfig, parseToolConfig, toolArtifactPaths } from './tool-config.mjs';
@@ -127,6 +128,8 @@ export async function ensureRuntimeLayout(changeId, options = {}) {
   const created = [];
   const preserved = [];
 
+  await ensureRuntimeGitignores(context.rootDir, [context.stateDir, context.qaDir]);
+
   for (const dirPath of [statePath, qaPath]) {
     if (await pathExists(dirPath)) {
       if (!await isDirectory(dirPath)) {
@@ -170,6 +173,7 @@ export async function writeCurrentChangePointer(changeId, options = {}) {
     throw new Error(normalized.error.message);
   }
 
+  await ensureRuntimeGitignores(context.rootDir, [context.stateDir]);
   await mkdir(path.dirname(context.currentPointerPath), { recursive: true });
   await writeFile(context.currentPointerPath, `change_id: ${normalized.changeId}\n`, 'utf8');
 
