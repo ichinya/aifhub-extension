@@ -96,7 +96,7 @@ describe('aif-explore and aif-improve OpenSpec-native contracts', () => {
       const openspec = extractSection(injection, 'OpenSpec-native mode');
       const legacy = extractSection(injection, legacyHeading);
 
-      assertIncludes(openspec, 'aifhub.artifactProtocol: openspec', `${relativePath} OpenSpec-native section`);
+      assertIncludes(openspec, 'aifhub.tools.openspec: true', `${relativePath} OpenSpec-native section`);
       assertIncludes(legacy, 'When OpenSpec-native mode is not enabled', `${relativePath} legacy section`);
       assertIncludes(legacy, '.ai-factory/plans/<plan-id>.md', `${relativePath} legacy section`);
       assertIncludes(legacy, '.ai-factory/plans/<plan-id>/', `${relativePath} legacy section`);

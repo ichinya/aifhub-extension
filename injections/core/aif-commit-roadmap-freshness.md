@@ -1,5 +1,7 @@
 ## AIFHub Commit Roadmap Freshness Gate
 
+Read [tool selection and artifact ownership](../../skills/shared/TOOLS.md) before choosing artifact paths or lifecycle instructions.
+
 Apply this extension guidance before the base `aif-commit` instructions. When any rule below conflicts with the upstream body, this block only wins for AIFHub roadmap/GitHub freshness boundaries; it does not override upstream commit ownership or `## Commit Plan` grouping.
 
 Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing warnings, questions, or commit summaries. Commands, file paths, code identifiers, JSON keys, and YAML keys remain in English.
@@ -19,7 +21,7 @@ Read `.ai-factory/config.yaml` first when it exists. Use it to resolve:
 - `paths.plans`
 - `paths.roadmap`
 - `workflow.plan_id_format`
-- `aifhub.artifactProtocol`
+- `aifhub.tools.openspec`
 - OpenSpec-native policy flags
 - `git.enabled`
 - `git.create_branches`
@@ -31,7 +33,7 @@ If `.ai-factory/config.yaml` is missing, do not fabricate OpenSpec context. Emit
 
 #### OpenSpec-native mode
 
-Use this mode only when `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`.
+Use this mode only when `.ai-factory/config.yaml` declares `aifhub.tools.openspec: true`.
 
 Read-only freshness inputs may include:
 

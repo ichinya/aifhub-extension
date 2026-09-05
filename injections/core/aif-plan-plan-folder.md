@@ -1,5 +1,7 @@
 ## AIFHub OpenSpec-Native Planning Override
 
+Read [tool selection and artifact ownership](../../skills/shared/TOOLS.md) before choosing artifact paths or lifecycle instructions.
+
 Apply this block before the upstream `aif-plan` body. When any rule below conflicts with the base skill text, this block wins.
 
 Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
@@ -81,7 +83,7 @@ On success, emit `INFO [aif-plan] source-bound plan identity: provider=<provider
 
 ### OpenSpec-native mode
 
-When `.ai-factory/config.yaml` has `aifhub.artifactProtocol: openspec`, OpenSpec-native instructions override legacy plan-folder instructions.
+When `.ai-factory/config.yaml` has `aifhub.tools.openspec: true`, OpenSpec-native instructions override legacy plan-folder instructions.
 
 Use shared vocabulary consistently: `OpenSpec-native mode`, `canonical OpenSpec change`, `active change`, `change-id`, `base specs`, `delta specs`, `generated rules`, `runtime state`, `QA evidence`, and `legacy AI Factory-only mode`.
 

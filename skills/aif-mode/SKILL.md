@@ -1,18 +1,20 @@
 ---
 name: aif-mode
-description: Switches AIFHub Extension projects between OpenSpec-native and legacy AI Factory artifact modes, synchronizes derived artifacts, checks mode drift, and reports migration/export actions. Use when changing artifactProtocol, syncing OpenSpec and AI Factory artifacts, or diagnosing mode/config drift.
+description: Configures the optional OpenSpec tool while preserving independent HLV and Lekalo choices, synchronizes selected artifacts, checks configuration drift, and reports migration/export actions.
 argument-hint: "[status|openspec|ai-factory|sync|doctor] [--dry-run] [--all] [--change <id>] [--yes]"
 disable-model-invocation: true
 allowed-tools: Read Write Grep Glob Bash(ai-factory aifhub-mode *) Bash(ai-factory aifhub-migrate-legacy-plans *) Bash(npm run validate) Bash(npm test)
 metadata:
   author: aifhub-extension
-  version: "1.2.0"
+  version: "1.3.0"
   category: workflow
 ---
 
 # AIF Mode
 
-Switch or inspect the artifact protocol for an AIFHub Extension project. This skill is user-invoked only because it can update `.ai-factory/config.yaml`, create runtime skeleton directories, run migration/export workflows, and write mode reports.
+Read [tool selection and artifact ownership](../shared/TOOLS.md) before choosing artifact paths or lifecycle instructions.
+
+Switch or inspect `aifhub.tools.openspec` for an AIFHub Extension project. The `hlv` and `lekalo` booleans are independent and preserved by OpenSpec switching. This skill is user-invoked only because it can update `.ai-factory/config.yaml`, create runtime skeleton directories, run migration/export workflows, and write mode reports.
 
 ## Commands
 
@@ -41,7 +43,7 @@ Use runtime-specific public invocations when instructing the user: selected `cod
 
 ## Workflow
 
-1. Read `.ai-factory/config.yaml` and resolve `aifhub.artifactProtocol`.
+1. Read `.ai-factory/config.yaml` and resolve `aifhub.tools.openspec`.
    Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
 2. Run the matching CLI subcommand through `ai-factory aifhub-mode`; do not hand-edit mode artifacts.
 3. For OpenSpec-native operations, use AIFHub orchestration plus `scripts/openspec-runner.mjs` as the OpenSpec CLI adapter. Do not install or invoke OpenSpec slash commands.
@@ -62,7 +64,10 @@ Use this config shape:
 
 ```yaml
 aifhub:
-  artifactProtocol: openspec
+  tools:
+    openspec: true
+    hlv: false
+    lekalo: false
   openspec:
     root: openspec
     installSkills: false
@@ -131,6 +136,8 @@ Refresh derived or compatibility artifacts without changing mode.
 - In AI Factory-only mode: ensure legacy paths, optionally export OpenSpec changes with `--export-openspec`, preserve OpenSpec artifacts, and write a sync report.
 
 ### `doctor`
+
+Configured `aifhub.providers` are diagnosed independently of artifact protocol, only when the provider has a true `aifhub.tools` switch. False or an omitted tool skips discovery and diagnosis. Enabled providers default to `policy: required`. HLV uses version discovery, `doctor --json` without `--fix`, and `status --json`; detection/doctor never run `hlv check`, project gates, initialization, updates, sync, or evidence writes. Required unavailable/unsupported/failed providers block doctor; optional failures are degraded warnings. See [validation providers](../../docs/validation-providers.md).
 
 Read-only diagnostics for config marker, required configured directories, OpenSpec CLI capability, Node compatibility, active change ambiguity, generated rules, coverage matrix status, legacy artifacts in OpenSpec-native mode, OpenSpec validation when available, and archive readiness for `/aif-done`. Generated-rule membership checks cover the full active inventory; the 50-change cap applies only to expensive trace/hash reads. Orphan index entries/files, missing active membership, malformed index data, or managed-name collisions remain non-green until reconciliation. Optional `paths.context` and `reviews.policy_file` file states are not doctor diagnostics.
 

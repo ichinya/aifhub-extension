@@ -1,5 +1,7 @@
 ## AIFHub Verify OpenSpec-native Override
 
+Read [tool selection and artifact ownership](../../skills/shared/TOOLS.md) before choosing artifact paths or lifecycle instructions.
+
 Apply this block before the upstream `aif-verify` body. When this guidance conflicts with the base skill text, this block wins.
 
 Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
@@ -9,6 +11,14 @@ Resolve user-facing prose language in this order: use a usable non-empty `langua
 ### Goal
 
 Use the built-in `/aif-verify` skill as the canonical verification command for OpenSpec-native changes and the extension's legacy companion plan workflow.
+
+### Configured Validation Providers
+
+`aifhub.providers` is independent of `aifhub.tools.openspec`: OpenSpec and HLV may be enabled together. Each provider is opted in by its boolean under `aifhub.tools` (`hlv: true` or `lekalo: true`); false or an omitted tool disables invocation and new evidence writes. Enabled providers default to `policy: required`; `policy: optional` changes failures to nonblocking warnings. After native project gates, before emitting the final verify verdict, run `ai-factory aifhub-providers verify --change <change-or-plan-id> --write --json`. Resolve one safe change/plan ID first. The wrapper is a no-op when no provider is enabled for verify. Apply its normalized `blocking` and provider gate statuses to final verification: required unavailable/unsupported/failed providers block PASS; optional failures produce degraded notes. Provider failures remain separate from implementation/test failures. Retain original diagnostic codes from normalized operations; never copy raw streams into `verify.md`.
+
+Provider QA files are derived evidence under `.ai-factory/qa/<id>/providers/`; no provider output may rewrite OpenSpec, HLV, or Lekalo canonical artifacts. Never install, update, initialize, or sync an external provider automatically. `hlv check` can execute project-configured gates, so it runs only in an explicitly enabled validation phase, never as detection or doctor. Lekalo remains `unsupported` until its versioned provider protocol is published.
+
+For upstream ultra bundles, preserve the bundle and upstream verification ownership. Explicitly configured provider evidence is a separate post-verification overlay: record the upstream receipt first and report a provider blocker separately without rewriting the upstream bundle or its verdict.
 
 ### Skill-Context Resolution
 
@@ -23,7 +33,7 @@ If both exist, `aif-verify` wins.
 
 Before resolving verification scope, read `.ai-factory/config.yaml` when it exists.
 
-- If the config contains `aifhub.artifactProtocol: openspec`, use **OpenSpec-native mode**.
+- If the config contains `aifhub.tools.openspec: true`, use **OpenSpec-native mode**.
 - Otherwise, use **Legacy AI Factory-only mode**.
 - If the config is missing, continue with Legacy AI Factory-only mode and state that no OpenSpec-native protocol was detected.
 
@@ -32,14 +42,14 @@ Before resolving verification scope, read `.ai-factory/config.yaml` when it exis
 In Legacy AI Factory-only mode, classify the normalized project-relative plan entrypoint with `classifyLegacyPlanShape()` from `scripts/legacy-plan-migration.mjs` before folder-only detection, companion discovery, companion plan-file creation, verification-file selection, or any `status.yaml`/`verify.md` write. Marker validation is first; known companion filenames are considered only after the classifier returns a classic shape.
 
 - For `ultra-valid`, stop all AIFHub companion logic and return the exact upstream handoff `/aif-verify <entrypoint>`. Upstream owns bundle verification atomically. After upstream verification emits its one final validated `aif-gate-result`, pass that exact structured gate outcome and the normalized entrypoint to `writeLegacyUltraVerificationReceipt()` from `scripts/legacy-ultra-verification-receipt.mjs`. Record both `pass` and non-pass outcomes; the helper binds the receipt to the current bundle, source revision, and deterministic worktree and writes only `.ai-factory/state/legacy-ultra-verification/<entrypoint-digest>.json`. A missing or invalid final gate must not create a receipt.
-- The receipt is the only AIFHub write permitted for `ultra-valid`. Do not create or synchronize a sibling `<plan-id>.md`, `task.md`, `context.md`, `rules.md`, `verify.md`, `status.yaml`, `explore.md`, any OpenSpec artifact, QA evidence, or finalization artifact. Never edit the ultra bundle while recording the receipt.
+- The receipt and explicitly configured provider overlay are the only AIFHub writes permitted for `ultra-valid`. Do not create or synchronize a sibling `<plan-id>.md`, `task.md`, `context.md`, `rules.md`, `verify.md`, `status.yaml`, `explore.md`, any OpenSpec artifact, unrelated QA evidence, or finalization artifact. Never edit the ultra bundle while recording the receipt.
 - For `ultra-invalid` or `collision`, fail closed before any write and report only bounded `shape`, safe `entrypoint`, and classifier `code` values.
 - For `classic-pair` or `classic-folder-only`, continue with the classic companion rules below. An unrelated directory is not a plan.
 - Diagnostics may include only `shape`, safe project-relative `entrypoint`, and `handoff`; never include marker bodies, phase contents, request/research bodies, credentials, raw stdout, or raw stderr.
 
 ### OpenSpec-native mode
 
-When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, `/aif-verify` verifies implementation against the active OpenSpec change.
+When `.ai-factory/config.yaml` declares `aifhub.tools.openspec: true`, `/aif-verify` verifies implementation against the active OpenSpec change.
 
 For plan content, read only the canonical OpenSpec artifacts listed below. Do not inspect or mutate `.ai-factory/plans/**` after an OpenSpec change resolves.
 

@@ -819,7 +819,7 @@ describe('mode switching', () => {
     ]) {
       assert.match(openspecConfig, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     }
-    assert.match(openspecConfig, /^  artifactProtocol: openspec$/m);
+    assert.match(openspecConfig, /^    openspec: true$/m);
     assert.match(openspecConfig, /^    validateOnPlan: true$/m);
     assert.doesNotMatch(openspecConfig, /research_bundles_dir:/);
 
@@ -836,7 +836,7 @@ describe('mode switching', () => {
     ]) {
       assert.ok(openspec.config.configKeys.preservedKeyPaths.includes(keyPath), `preserved key path: ${keyPath}`);
     }
-    assert.ok(openspec.config.configKeys.changedKeyPaths.includes('aifhub.artifactProtocol'));
+    assert.ok(openspec.config.configKeys.changedKeyPaths.includes('aifhub.tools.openspec'));
     assert.ok(openspec.config.configKeys.changedKeyPaths.includes('aifhub.openspec.validateOnPlan'));
     assert.doesNotMatch(JSON.stringify(openspec.config.configKeys), /PRIVATE-CONFIG-VALUE|cache\/data|docs\/research/);
 
@@ -846,7 +846,7 @@ describe('mode switching', () => {
     });
     assert.equal(legacy.ok, true);
     const legacyConfig = await readFixture(rootDir, '.ai-factory/config.yaml');
-    assert.match(legacyConfig, /^  artifactProtocol: ai-factory$/m);
+    assert.match(legacyConfig, /^    openspec: false$/m);
     assert.match(legacyConfig, /^  openspec:$/m);
     assert.match(legacyConfig, /^    customPolicy:$/m);
     assert.match(legacyConfig, /^      owner: user$/m);
@@ -878,7 +878,7 @@ describe('mode switching', () => {
       ''
     ].join('\n'), 'ai-factory');
 
-    assert.match(legacyConfig, /^  artifactProtocol: ai-factory$/m);
+    assert.match(legacyConfig, /^    openspec: false$/m);
     assert.doesNotMatch(legacyConfig, /^  openspec:$/m);
     assert.doesNotMatch(legacyConfig, /validateOnPlan|allowWarnOnDone/);
   });
@@ -894,7 +894,7 @@ describe('mode switching', () => {
 
     assert.equal(result.ok, true);
     const config = await readFixture(rootDir, '.ai-factory/config.yaml');
-    assert.match(config, /artifactProtocol: openspec/);
+    assert.match(config, /openspec: true/);
     for (const line of [
       'installSkills: false',
       'validateOnPlan: true',
@@ -1198,7 +1198,7 @@ describe('mode switching', () => {
 
     assert.equal(result.ok, true);
     const config = await readFixture(rootDir, '.ai-factory/config.yaml');
-    assert.match(config, /artifactProtocol: ai-factory/);
+    assert.match(config, /openspec: false/);
     for (const line of [
       'utilities:',
       'graphify:',

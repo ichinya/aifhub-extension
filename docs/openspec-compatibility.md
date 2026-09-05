@@ -144,12 +144,14 @@ This initialization is for user projects. The `aifhub-extension` package reposit
 
 ## Artifact Protocol Profiles
 
-The selected `aifhub.artifactProtocol` owns its active config profile. Legacy AI Factory-only mode does not add OpenSpec settings or OpenSpec runtime paths:
+The selected `aifhub.tools.openspec` owns its active config profile. Legacy AI Factory-only mode does not add OpenSpec settings or OpenSpec runtime paths:
 
 ```yaml
 aifhub:
-  artifactProtocol: ai-factory
-
+  tools:
+    openspec: false
+    hlv: false
+    lekalo: false
 paths:
   context: CONTEXT.md
   plans: .ai-factory/plans
@@ -183,7 +185,10 @@ OpenSpec-native mode is selected through `.ai-factory/config.yaml`:
 
 ```yaml
 aifhub:
-  artifactProtocol: openspec
+  tools:
+    openspec: true
+    hlv: false
+    lekalo: false
   openspec:
     root: openspec
     installSkills: false

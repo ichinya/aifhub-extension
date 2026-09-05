@@ -181,7 +181,7 @@ export function renderHuman(command, result) {
 function renderStatus(result) {
   return [
     `Current mode: ${result.mode}`,
-    `Config marker: aifhub.artifactProtocol=${result.configMarker ?? 'missing'}`,
+    `Tools: openspec=${result.tools.openspec}, hlv=${result.tools.hlv}, lekalo=${result.tools.lekalo}`,
     `OpenSpec CLI: ${result.openspecCli.state}`,
     `OpenSpec changes: ${result.openSpecChanges.length}`,
     `Legacy plans: ${result.legacyPlans.length}`,

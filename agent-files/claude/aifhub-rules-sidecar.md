@@ -19,7 +19,9 @@ Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses
 
 ## OpenSpec-native mode
 
-Use this mode when config declares `aifhub.artifactProtocol: openspec`.
+Use this mode when config declares `aifhub.tools.openspec: true`.
+
+Follow skills/shared/TOOLS.md: only when the entire tools mapping is absent, read the legacy artifactProtocol setting. Existing OpenSpec files never override an explicit false. HLV and Lekalo switches are independent.
 
 - Audit one active OpenSpec change or one explicitly provided changed scope.
 - Read canonical artifacts: `openspec/specs/**` plus `openspec/changes/<change-id>/proposal.md`, `design.md`, `tasks.md`, and `specs/**/spec.md`.

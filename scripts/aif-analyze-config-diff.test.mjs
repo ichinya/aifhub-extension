@@ -132,7 +132,7 @@ describe('analyze config required-keys diff', () => {
     const rootDir = await createTempRoot();
     await createConfigFixture(
       rootDir,
-      renderConfigForMode('', 'ai-factory', { analyzeSkillVersion: '0.13.0' })
+      renderConfigForMode('', 'ai-factory', { analyzeSkillVersion: '0.14.0' })
     );
 
     const result = await buildAnalyzeConfigDiff({ rootDir });

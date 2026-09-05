@@ -14,7 +14,9 @@ Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses
 
 ## OpenSpec-native mode
 
-Use this mode when config declares `aifhub.artifactProtocol: openspec`.
+Use this mode when config declares `aifhub.tools.openspec: true`.
+
+Follow skills/shared/TOOLS.md: only when the entire tools mapping is absent, read the legacy artifactProtocol setting. Existing OpenSpec files never override an explicit false. HLV and Lekalo switches are independent.
 
 - Verify exactly one active OpenSpec change.
 - Before lint, tests, review, security, or rules checks, use `scripts/openspec-verification-context.mjs` and `scripts/openspec-runner.mjs` when available.

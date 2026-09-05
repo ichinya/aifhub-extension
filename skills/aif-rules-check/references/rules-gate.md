@@ -1,10 +1,12 @@
 # Rules Gate Reference
 
+Read [tool selection and artifact ownership](../../shared/TOOLS.md) before selecting rules. Existing OpenSpec paths never override an explicit false.
+
 ## Required Inputs
 
 - `.ai-factory/config.yaml` to resolve the artifact protocol, active change or active plan, and rules paths
 - current diff and changed files
-- OpenSpec-native generated rules when `aifhub.artifactProtocol: openspec`
+- OpenSpec-native generated rules when `aifhub.tools.openspec: true`
 - `.ai-factory/RULES.md` if present
 - `.ai-factory/rules/base.md` if present
 - active plan-local `rules.md` only in Legacy AI Factory-only mode

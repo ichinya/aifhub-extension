@@ -180,7 +180,7 @@ const AI_FACTORY_218_OWNERSHIP_AUDIT = Object.freeze([
     ledgerConsumer: 'aif-analyze',
     asset: 'skills/aif-analyze/SKILL.md',
     evidence: Object.freeze([
-      'aifhub.artifactProtocol: openspec',
+      'aifhub.tools.openspec: true',
       'Preserve existing config values. Add only missing keys required by the resolved mode.'
     ])
   }),
@@ -2091,7 +2091,7 @@ describe('OpenSpec-native prompt asset contract', () => {
       const asset = await readRepoFile(relativePath);
 
       for (const expected of [
-        'version: "1.2.0"',
+        'version: "1.3.0"',
         'Generated cleanup is confined',
         'openspec-change-<safe-id>.md',
         'openspec-merged-<safe-id>.md',

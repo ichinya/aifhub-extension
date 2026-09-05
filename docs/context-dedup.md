@@ -59,7 +59,7 @@ Non-removable defaults:
 - `**/coverage.json`;
 - `**/done-readiness.json`.
 
-Consumer дополнительно выводит protected roots из `aifhub.openspec.root`, `paths.plans`, `paths.specs`, `paths.qa`, `paths.generated_rules` и `paths.state`; при отсутствии `paths.plans/specs` fallback выбирается по `aifhub.artifactProtocol`. `protectedPatterns` только расширяет список.
+Consumer дополнительно выводит protected roots из `aifhub.openspec.root`, `paths.plans`, `paths.specs`, `paths.qa`, `paths.generated_rules` и `paths.state`; при отсутствии `paths.plans/specs` fallback выбирается по `aifhub.tools.openspec`. `protectedPatterns` только расширяет список.
 
 ## Конфигурация
 

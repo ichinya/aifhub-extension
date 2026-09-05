@@ -171,7 +171,7 @@ describe('runModeCommand', () => {
 
     assert.equal(result.exitCode, 0);
     assert.match(result.stdout, /Status: OK/);
-    assert.match(await readFixture(rootDir, '.ai-factory/config.yaml'), /artifactProtocol: ai-factory/);
+    assert.match(await readFixture(rootDir, '.ai-factory/config.yaml'), /openspec: false/);
     assert.equal(await pathExists(rootDir, 'openspec/changes/add-oauth/proposal.md'), true);
   });
 
@@ -223,7 +223,7 @@ describe('runModeCommand', () => {
     const parsed = JSON.parse(result.stdout);
 
     assert.equal(result.exitCode, 0);
-    assert.ok(parsed.config.configKeys.changedKeyPaths.includes('aifhub.artifactProtocol'));
+    assert.ok(parsed.config.configKeys.changedKeyPaths.includes('aifhub.tools.openspec'));
     assert.ok(parsed.config.configKeys.preservedKeyPaths.includes('aifhub.customProfile.toggle'));
     assert.ok(parsed.config.configKeys.preservedKeyPaths.includes('custom_user.sentinel'));
     assert.equal(parsed.config.configKeys.changedKeyCount > 0, true);
@@ -232,7 +232,7 @@ describe('runModeCommand', () => {
 
     const report = await readFixture(rootDir, parsed.report.path);
     assert.match(report, /Changed key paths:/);
-    assert.match(report, /- changed: aifhub\.artifactProtocol/);
+    assert.match(report, /- changed: aifhub\.tools\.openspec/);
     assert.match(report, /- preserved: custom_user\.sentinel/);
     assert.doesNotMatch(report, /PRIVATE-CONFIG-VALUE|docs\/research\.md|process\.env|OPENAI_API_KEY/);
     assert.doesNotMatch(await readFixture(rootDir, '.ai-factory/config.yaml'), /research_bundles_dir:/);

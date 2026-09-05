@@ -3,6 +3,9 @@ import { access, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promi
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { providerDiagnostics, runProviders } from './aifhub-providers.mjs';
+import { normalizeProviderPolicies, parseProviderConfig } from './provider-policy.mjs';
+import { parseToolConfig, toolArtifactPaths } from './tool-config.mjs';
 
 import {
   normalizeChangeId,
@@ -115,24 +118,26 @@ export async function getModeStatus(options = {}) {
   const config = await readProjectConfig(rootDir);
   const effectivePolicy = resolveOpenSpecPolicy(config);
   const mode = resolveMode(config);
-  const detection = await detectOpenSpecCapability(rootDir, options);
-  const activeInventory = await inventoryOpenSpecChanges({
+  const detection = config.tools.openspec ? await detectOpenSpecCapability(rootDir, options) : { disabled: true };
+  const activeInventory = config.tools.openspec ? await inventoryOpenSpecChanges({
     ...options,
     rootDir,
     allowMissingRoot: true
-  });
+  }) : { ok: true, changes: [], changeIds: [], warnings: [], errors: [] };
   const openSpecChanges = activeInventory.ok ? activeInventory.changes : [];
   const legacy = await discoverLegacyPlansForMode(config, mode, { ...options, rootDir });
-  const activeChange = await inspectActiveChange({
+  const activeChange = config.tools.openspec ? await inspectActiveChange({
     ...options,
     rootDir,
     changeId: options.changeId
-  });
+  }) : { state: 'none', changeId: null, source: null, candidates: [], warnings: [], errors: [] };
   const generatedRuleChangeIds = options.changeId !== undefined && activeChange.state === 'resolved'
     ? [activeChange.changeId]
     : selectRuleInspectionChanges(openSpecChanges);
   const activeInventoryUnavailable = mode === MODES.openspec && !activeInventory.ok;
-  const generatedRules = activeInventoryUnavailable
+  const generatedRules = !config.tools.openspec
+    ? { state: 'disabled', warnings: [], errors: [] }
+    : activeInventoryUnavailable
     ? createUnavailableGeneratedRulesStatus(activeInventory.errors)
     : await inspectGeneratedRules({
       ...options,
@@ -143,8 +148,9 @@ export async function getModeStatus(options = {}) {
     });
 
   return {
-    ok: !activeInventoryUnavailable,
+    ok: !config.error && !activeInventoryUnavailable,
     mode,
+    tools: config.tools,
     config,
     effectivePolicy,
     configMarker: config.marker,
@@ -164,6 +170,7 @@ export async function getModeStatus(options = {}) {
       ...generatedRules.warnings
     ]),
     errors: dedupeDiagnostics([
+      ...(config.error ? [config.error] : []),
       ...(legacy.errors ?? []),
       ...(activeInventory.errors ?? []),
       ...generatedRules.errors
@@ -196,6 +203,7 @@ export async function switchToOpenSpecMode(options = {}) {
   }
 
   const config = await writeModeConfig(MODES.openspec, { ...options, rootDir });
+  if (!config.ok) return config;
   const skeleton = await ensureOpenSpecSkeleton({ ...options, rootDir });
   const migration = await maybeMigrateLegacyPlans({
     ...options,
@@ -268,6 +276,7 @@ export async function switchToAiFactoryMode(options = {}) {
   const rootDir = resolveRootDir(options);
   const dryRun = Boolean(options.dryRun);
   const config = await writeModeConfig(MODES.aiFactory, { ...options, rootDir });
+  if (!config.ok) return config;
   const skeleton = await ensureAiFactorySkeleton({ ...options, rootDir });
   const exportResult = options.exportOpenSpec
     ? await exportOpenSpecCompatibility({ ...options, rootDir })
@@ -327,7 +336,7 @@ export async function syncArtifacts(options = {}) {
     errors: [
       {
         code: 'unknown-artifact-mode',
-        message: 'Cannot sync artifacts because aifhub.artifactProtocol is missing or unknown.'
+        message: 'Cannot sync artifacts because the tool configuration is invalid or unreadable.'
       }
     ]
   };
@@ -337,6 +346,11 @@ export async function syncOpenSpecArtifacts(options = {}) {
   const rootDir = resolveRootDir(options);
   const dryRun = Boolean(options.dryRun);
   const config = await readProjectConfig(rootDir);
+  if (config.error || parseToolConfig(config.raw).explicit && !config.tools.openspec) {
+    return { ok: false, dryRun, mode: resolveMode(config), operations: [], warnings: [], errors: [config.error ?? {
+      code: 'openspec-disabled', message: 'OpenSpec is disabled by aifhub.tools.openspec; use AI Factory artifact sync.'
+    }] };
+  }
   const openspecSettings = getOpenSpecSettings(config);
   const skeleton = await ensureOpenSpecSkeleton({ ...options, rootDir });
   const activeInventory = await inventoryOpenSpecChanges({
@@ -484,10 +498,14 @@ export async function doctorAifMode(options = {}) {
   let artifactContract = null;
   let coverage = null;
   let rulesGate = null;
+  const providers = await runProviders({ ...options, rootDir, phase: 'doctor', write: false });
+  diagnostics.push(...providerDiagnostics(providers).map((item) => ({
+    ...item, level: item.blocking ? 'fail' : 'warn'
+  })));
 
   diagnostics.push(status.configExists && status.configMarker !== null
     ? pass('config-marker', `Config marker is ${status.configMarker}.`)
-    : fail('config-marker-missing', 'Missing aifhub.artifactProtocol in .ai-factory/config.yaml.'));
+    : fail('config-marker-missing', 'Missing or invalid tool configuration in .ai-factory/config.yaml.'));
 
   const pathChecks = await inspectConfiguredPaths({
     ...options,
@@ -495,6 +513,15 @@ export async function doctorAifMode(options = {}) {
     mode: status.mode
   });
   diagnostics.push(...pathChecks);
+
+  if (!status.config.tools.openspec) {
+    diagnostics.push(pass('openspec-disabled', 'OpenSpec artifacts and checks are disabled.'));
+    for (const error of status.errors) diagnostics.push(fail(error.code, error.message));
+    const errors = diagnostics.filter((item) => item.level === 'fail');
+    return { ok: errors.length === 0, mode: status.mode, tools: status.tools, status, artifactContract,
+      coverage, rulesGate, providers, effectivePolicy, diagnostics,
+      warnings: diagnostics.filter((item) => item.level === 'warn'), errors };
+  }
 
   diagnostics.push(status.openspecCli.known
     ? pass('openspec-cli-known', `OpenSpec CLI capability is ${status.openspecCli.state}.`)
@@ -615,6 +642,7 @@ export async function doctorAifMode(options = {}) {
     artifactContract,
     coverage,
     rulesGate,
+    providers,
     effectivePolicy,
     diagnostics,
     warnings,
@@ -673,22 +701,28 @@ export async function readProjectConfig(rootDir = process.cwd()) {
   try {
     const raw = await readFile(configPath, 'utf8');
     const parsed = parseSimpleYaml(raw);
-    const marker = parsed.aifhub?.artifactProtocol ?? null;
+    const selection = parseToolConfig(raw);
+    const providers = normalizeProviderPolicies(parseProviderConfig(raw));
+    const marker = selection.mode;
 
     return {
       exists: true,
       raw,
       parsed,
       marker,
-      paths: parsed.paths ?? {},
+      tools: { ...selection.tools, hlv: providers.hlv.enable, lekalo: providers.lekalo.enable },
+      paths: toolArtifactPaths(selection, parsed.paths ?? {}),
       aifhub: parsed.aifhub ?? {}
     };
-  } catch {
+  } catch (error) {
     return {
       exists: false,
       raw: '',
       parsed: {},
       marker: null,
+      tools: { openspec: false, hlv: false, lekalo: false },
+      error: error.code === 'ENOENT' ? null : {
+        code: 'tool-configuration-error', message: 'Tool configuration is invalid or unreadable.' },
       paths: {},
       aifhub: {}
     };
@@ -732,6 +766,7 @@ export async function writeModeConfig(mode, options = {}) {
   const rootDir = resolveRootDir(options);
   const dryRun = Boolean(options.dryRun);
   const config = await readProjectConfig(rootDir);
+  if (config.error) return { ok: false, dryRun, mode, operations: [], warnings: [], errors: [config.error] };
   const skill = await readAnalyzeSkillVersion(options.analyzeSkillUrl ? { analyzeSkillUrl: options.analyzeSkillUrl } : {});
   const content = renderConfigForMode(config.raw, mode, skill.ok ? { analyzeSkillVersion: skill.version } : {});
   const configKeys = summarizeConfigKeyOwnership(config.raw, content);
@@ -2141,9 +2176,13 @@ function hasTopLevelScalarValue(blockText, key) {
 function renderAifhubBlock(mode, blocks) {
   const existing = blocks.find((block) => block.key === 'aifhub')?.text.trimEnd() ?? '';
   const children = parseIndentedBlocks(existing, 2);
+  const providers = normalizeProviderPolicies(parseProviderConfig(existing));
   const rendered = [
     'aifhub:',
-    `  artifactProtocol: ${mode}`
+    '  tools:',
+    `    openspec: ${mode === MODES.openspec}`,
+    `    hlv: ${providers.hlv.enable}`,
+    `    lekalo: ${providers.lekalo.enable}`
   ];
   const existingOpenSpec = children.find((block) => block.key === 'openspec')?.text ?? '';
 
@@ -2155,8 +2194,10 @@ function renderAifhubBlock(mode, blocks) {
   }
 
   for (const child of children) {
-    if (child.key === 'artifactProtocol' || child.key === 'openspec') continue;
-    rendered.push(child.text.trimEnd());
+    if (['artifactProtocol', 'tools', 'openspec'].includes(child.key)) continue;
+    rendered.push(child.key === 'providers'
+      ? child.text.replace(/^      enable:.*\n?/gm, '').trimEnd()
+      : child.text.trimEnd());
   }
 
   return rendered.join('\n');
@@ -2287,7 +2328,7 @@ function summarizeOpenSpecDetection(detection) {
   const canArchive = Boolean(detection?.canArchive);
   return {
     known: detection !== null && detection !== undefined,
-    state: available && (canValidate || canArchive) ? 'available' : 'degraded',
+    state: detection?.disabled ? 'disabled' : available && (canValidate || canArchive) ? 'available' : 'degraded',
     available,
     canValidate,
     canArchive,

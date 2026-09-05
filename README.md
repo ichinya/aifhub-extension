@@ -24,6 +24,7 @@ AI Factory UX + OpenSpec artifact protocol
 - Supports durable project review guidance at `reviews.policy_file` (`REVIEW.md` at the project root by default), consumed read-only by `/aif-review` and AIFHub review sidecars.
 - Resolves human-readable response language as `language.ui` → current conversation → English only when indeterminate, without using OS locale or changing exact machine-output contracts. See [Usage](docs/usage.md#prompt-language-resolution).
 - Does not install OpenSpec skills or slash commands.
+- Supports composable opt-in HLV validation alongside either artifact protocol, with independent `tools.openspec`, `tools.hlv` and reserved `tools.lekalo` booleans, required checks by default, optional warning policy and revision-bound QA evidence; reserves a separate semantic model contract for future Lekalo integration. See [Validation Providers](docs/validation-providers.md).
 
 ## Quick Start
 
@@ -49,14 +50,17 @@ Inspect or switch artifact mode:
 /aif-mode sync
 ```
 
-Confirm or request OpenSpec-native mode when bootstrapping a v1 OpenSpec workflow. The expected config marker is:
+Confirm or request OpenSpec-native mode when bootstrapping a v1 OpenSpec workflow. Enable optional tools in the config:
 
 ```yaml
 aifhub:
-  artifactProtocol: openspec
+  tools:
+    openspec: true
+    hlv: false
+    lekalo: false
 ```
 
-On first bootstrap, when `.ai-factory/config.yaml` is missing and you did not explicitly ask for OpenSpec-native mode, `/aif-analyze` asks which artifact protocol to use: `legacy AI Factory-only` or `OpenSpec-native`. Existing configs are preserved without that question. If the run is autonomous and cannot ask, it defaults to legacy AI Factory-only and reports OpenSpec-native mode as an open question.
+On first bootstrap, when `.ai-factory/config.yaml` is missing and you did not explicitly ask for OpenSpec-native mode, `/aif-analyze` asks which artifact protocol to use: `openspec: false` or `openspec: true`; HLV and Lekalo are independent switches. Existing configs are preserved without that question. If the run is autonomous and cannot ask, it defaults to legacy AI Factory-only and reports OpenSpec-native mode as an open question.
 
 Create and refine a change:
 
