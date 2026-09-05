@@ -61,7 +61,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await rm(rootDir, { recursive: true, force: true });
+  await rm(rootDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 });
 });
 
 describe('context dedup policy', () => {
@@ -194,6 +194,22 @@ paths:
 
     assert.equal(policy.enabled, false);
     assert.deepEqual(policy.diagnostics, []);
+  });
+
+  it('protects tool-selected canonical paths even when dormant path settings remain', () => {
+    const policy = resolveContextDedupPolicy(`aifhub:
+  tools:
+    openspec: false
+  artifactProtocol: openspec
+  contextDedup:
+    enabled: true
+paths:
+  plans: openspec/changes
+  specs: openspec/specs
+`);
+    for (const target of ['.ai-factory/plans/demo.md', '.ai-factory/specs/auth/spec.md', 'openspec/specs/auth/spec.md']) {
+      assert.equal(isProtectedReadPath(target, policy), true, target);
+    }
   });
 
   it('falls back to defaults with diagnostics for malformed and unknown keys', () => {

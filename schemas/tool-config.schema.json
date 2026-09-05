@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/ichinya/aifhub-extension/main/schemas/tool-config.schema.json",
+  "title": "AIFHub aifhub.tools switches v1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "openspec": { "type": "boolean", "default": false,
+      "description": "Use OpenSpec canonical changes and specifications instead of AI Factory plans and specifications." },
+    "hlv": { "type": "boolean", "default": false,
+      "description": "Use HLV contracts and traceability with validation and readiness evidence." },
+    "lekalo": { "type": "boolean", "default": false,
+      "description": "Reserved semantic provider; currently reports unsupported because the upstream protocol is unpublished." }
+  }
+}

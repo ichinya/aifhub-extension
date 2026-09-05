@@ -4,6 +4,9 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { runProviders } from './aifhub-providers.mjs';
+import { runProviderProcess } from './provider-process.mjs';
 
 import {
   buildOpenSpecDoneReadiness,
@@ -233,6 +236,54 @@ afterEach(async () => {
 });
 
 describe('OpenSpec done readiness gate', () => {
+  it('binds an OpenSpec requirement to HLV evidence before allowing done readiness', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+    await writeFixture(rootDir, 'project.yaml', 'schema_version: 1\nproject: fixture\n');
+    await writeFixture(rootDir, '.ai-factory/config.yaml',
+      'aifhub:\n  tools:\n    openspec: true\n    hlv: true\n');
+    for (const args of [['init', '-q'], ['add', '--force', '.'],
+      ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'fixture']]) {
+      assert.equal((await runProviderProcess('git', args, { cwd: rootDir })).exitCode, 0);
+    }
+    const fakeHlv = fileURLToPath(new URL('../test/fixtures/validation-providers/fake-hlv.mjs', import.meta.url));
+    const calls = [];
+    const runProcess = async (executable, args, options) => {
+      calls.push(args);
+      return executable === 'hlv' ? runProviderProcess(process.execPath, [fakeHlv, ...args], options)
+        : runProviderProcess(executable, args, options);
+    };
+    const options = { rootDir, changeId: 'add-oauth', ...passingOptions({ runProcess }) };
+    const missing = await buildOpenSpecDoneReadiness(options);
+    assert.equal(missing.blocking, true);
+    assert.equal(missing.checks.providers, 'fail');
+    assert.ok(missing.suggested_next.command.includes('aifhub-providers'));
+    assert.equal(calls.some((args) => args.includes('check')), false);
+    const verified = await runProviders({ rootDir, changeId: 'add-oauth', phase: 'verify', write: true, runProcess });
+    assert.equal(verified.blocking, false);
+    const ready = await buildOpenSpecDoneReadiness(options);
+    assert.equal(ready.status, 'pass', JSON.stringify(ready));
+    assert.equal(ready.checks.providers, 'pass');
+    assert.equal(ready.providers.providers[0].revision.commit, verified.providers[0].revision.commit);
+    await writeFixture(rootDir, 'openspec/changes/add-oauth/specs/auth/spec.md', '# changed requirement\n');
+    const stale = await buildOpenSpecDoneReadiness(options);
+    assert.equal(stale.blocking, true);
+    assert.equal(stale.checks.providers, 'fail');
+    const evidencePath = path.join(rootDir, '.ai-factory/qa/add-oauth/providers/hlv-verify.json');
+    const evidence = await readFile(evidencePath, 'utf8');
+    await writeFixture(rootDir, '.ai-factory/config.yaml',
+      'aifhub:\n  tools:\n    openspec: true\n    hlv: false\n  providers:\n    hlv:\n      policy: required\n');
+    calls.length = 0;
+    const disabled = await buildOpenSpecDoneReadiness(options);
+    assert.equal(disabled.status, 'pass', JSON.stringify(disabled));
+    assert.equal(disabled.checks.providers, undefined);
+    assert.equal(calls.some((args) => args.includes('--version') || args.includes('--root')), false);
+    assert.equal(await readFile(evidencePath, 'utf8'), evidence);
+    await writeFixture(rootDir, '.ai-factory/config.yaml',
+      'aifhub:\n  tools:\n    openspec: true\n    hlv: true\n');
+    assert.equal((await buildOpenSpecDoneReadiness(options)).checks.providers, 'fail');
+  });
+
   it('builds and writes passing readiness under QA evidence', async () => {
     const rootDir = await createTempRoot();
     await createOpenSpecChange(rootDir);

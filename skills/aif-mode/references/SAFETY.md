@@ -23,6 +23,7 @@ The command may:
 - update `.ai-factory/config.yaml`
 - create skeleton directories
 - create `openspec/config.yaml` when missing
+- initialize a missing enabled HLV project through the bounded HLV 1.0.0 adopt adapter; preserve root/adopt project maps and existing source, contracts, milestones and instructions without native reinit
 - run legacy migration through `scripts/migrate-legacy-plans.mjs`
 - export compatibility legacy artifacts when explicitly requested
 - compile generated rules through `scripts/openspec-rules-compiler.mjs`
@@ -47,3 +48,7 @@ Legacy migration uses the migration script's collision policy. Compatibility exp
 ## OpenSpec CLI
 
 Treat missing or unsupported OpenSpec CLI as degraded capability for status, switching, planning, and sync. Treat archive-required `/aif-done` readiness as failed when compatible archive capability is unavailable.
+
+## HLV Project Initialization
+
+`aifhub-mode init` and mutating mode/sync commands may create missing HLV adopt scaffolding only when `aifhub.tools.hlv` is true. Inspect both `project.yaml` and `.hlv/project.yaml` first; a root layout is valid without `.hlv/`. Reuse existing configuration and paths unchanged. Native fresh adopt creates `.hlv/`, missing shared agent assets and an index ignore entry; it does not install/upgrade the executable, execute project gates, move source or reinitialize an existing project. Partial/ambiguous layouts and unsafe paths block setup. Status, doctor and dry-run never invoke native init.

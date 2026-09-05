@@ -1,0 +1,5 @@
+aifhub:
+  tools:
+    openspec: true
+    hlv: true
+    lekalo: false

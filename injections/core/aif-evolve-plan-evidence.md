@@ -1,5 +1,7 @@
 ## AIFHub Plan-Aware Evolution Override
 
+Read [tool selection and artifact ownership](../../skills/shared/TOOLS.md) before choosing artifact paths or lifecycle instructions.
+
 Apply this block before the upstream `aif-evolve` body. When this injected guidance conflicts with older patch-only assumptions in the base skill, this block wins.
 
 Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
@@ -14,13 +16,13 @@ Resolve user-facing prose language in this order: use a usable non-empty `langua
 
 Before resolving evidence selectors, read `.ai-factory/config.yaml` when it exists.
 
-- If the config contains `aifhub.artifactProtocol: openspec`, use **OpenSpec-native mode**.
+- If the config contains `aifhub.tools.openspec: true`, use **OpenSpec-native mode**.
 - Otherwise, use **Legacy AI Factory-only mode**.
 - If the config is missing, continue with Legacy AI Factory-only mode and state that no OpenSpec-native protocol was detected.
 
 ### OpenSpec-native evidence
 
-When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, `/aif-evolve` may use the active OpenSpec change and derived/runtime evidence as input.
+When `.ai-factory/config.yaml` declares `aifhub.tools.openspec: true`, `/aif-evolve` may use the active OpenSpec change and derived/runtime evidence as input.
 
 Accepted OpenSpec-native selectors:
 

@@ -26,12 +26,12 @@ AI Factory = execution runtime
 
 AI Factory-only workflows follow AI Factory's runtime support. OpenSpec validation/archive follows the OpenSpec CLI runtime requirement.
 
-## OpenSpec 1.10.0 Reviewed Baseline
+## OpenSpec 1.12.0 Reviewed Baseline
 
-AIFHub metadata records OpenSpec `1.10.0` as the latest reviewed upstream baseline while keeping the supported stable CLI range `>=1.3.1 <2.0.0`.
+AIFHub metadata records OpenSpec `1.12.0` as the latest reviewed upstream baseline while keeping the supported stable CLI range `>=1.3.1 <2.0.0`.
 
 - Baseline `1.3.1` is the first supported and reviewed release.
-- Reviewed stable releases: `1.3.1`, `1.4.0`, `1.4.1`, `1.5.0`, `1.6.0`, `1.7.0`, `1.8.0`, `1.9.0`, `1.10.0`.
+- Reviewed stable releases: `1.3.1`, `1.4.0`, `1.4.1`, `1.5.0`, `1.6.0`, `1.7.0`, `1.8.0`, `1.9.0`, `1.10.0`, `1.11.0`, `1.12.0`.
 - Reviewed prereleases: `1.6.0-beta.1`. A prerelease review does not imply production support; prerelease detection remains unavailable for production capabilities.
 
 | Release | Channel | Adapter result | Checked AIFHub surfaces | Required adaptation |
@@ -46,6 +46,18 @@ AIFHub metadata records OpenSpec `1.10.0` as the latest reviewed upstream baseli
 | `1.8.0` | stable | supported | exact CLI capability retirement, scenario-loss validation, nested task progress, non-TTY archive guidance, and standard command smoke | version-gated retirement planning plus fail-closed and nested-task regressions; agent targets remain upstream-owned |
 | `1.9.0` | stable | supported | checksum-verified extracted CLI, strict/non-strict task numbering, arbitrary nested scenario-loss, telemetry-free JSON, rootless list/validate/schemas, invalid archive no-mutation, archive serialization, and standard command smoke | advance reviewed metadata and deterministic diagnostics/docs contracts; Command Code, schemas, skills, agents, tools, Stores, and package management remain upstream-owned |
 | `1.10.0` | stable | supported | checksum-verified exact CLI version/validate/status/show/instructions matrix, Store-root specs instructions, no-spec schema scaffolding, stderr output hygiene, blocked-retirement diagnostics, and archive no-mutation | advance reviewed metadata, mirror inline task verification in AIFHub plan/refinement prompts, and preserve open envelopes, fail-closed diagnostics, native `skip_specs`, and upstream ownership |
+| `1.11.0` | stable | supported | exact CLI adapter matrix, show diff, sorted batch diagnostics, strict Purpose remediation, archive rename order, schema default rollback and Antigravity shared-root fixtures | advance reviewed metadata, author meaningful new-capability Purpose, document direct accepted-spec remediation; optional commands and generated tools stay upstream-owned |
+| `1.12.0` | stable | supported | checksum-bound adapter matrix, full/findings reports, strict INFO and archive refusal, I/O failure, .gitkeep and SourceCraft fixtures | advance reviewed metadata and ground planning in repository evidence; full per-change reports and archive failure semantics remain intact |
+
+### Exact 1.12.0 Custody and Evidence Boundary
+
+The [1.12.0 audit](openspec-1.12.0-audit.md) extends issue #171 at the user's request after the 1.11.0 checkpoint. It records exact tag/npm custody, report and archive-preflight semantics, source ownership, and reproducible CLI fixtures. The optional `--report findings` envelope differs from the default full report; AIFHub keeps full per-change validation. Archive blockers reported as `INFO` do not change validation's verdict even under strict mode, so successful validation does not imply archive eligibility. Diagnostics and the actual archive failure remain intact. Plan/improve now require proportional read-only grounding in the target repository before drafting implementation-dependent artifacts. Both release adaptations share one `/aif-analyze` bump to `0.14.0`.
+
+### Exact 1.11.0 Custody and Evidence Boundary
+
+The [1.11.0 audit](openspec-1.11.0-audit.md) records issue #171, prerequisite closure, independent Git/npm pins, the exact CLI matrix, source classification, corpus inventory and reproducible smoke command. The optional `show --diff` and `status --all` commands remain upstream-owned; existing AIFHub show arguments and per-change orchestration are unchanged. Partial batch failure exits `1` with diagnostics in the JSON envelope. Strict Purpose warnings require [bounded accepted-spec remediation](openspec-validation.md#purpose-placeholders-in-openspec-1110), preserving archived evidence.
+
+Previous sequential checkpoint:
 
 ### Exact 1.10.0 Custody and Evidence Boundary
 
@@ -58,7 +70,7 @@ Git source custody and npm executable custody were verified independently:
 
 The npm tarball was checksum-verified before its installed `.bin/openspec.cmd` shim, bound to the extracted `bin/openspec.js`, was run in disposable Windows fixtures. A PATH-resolved executable was not used as exact-package proof. The published package has no `preinstall`, `install`, or `postinstall` lifecycle script. Its dependency delta from `1.9.0` is confined to `@inquirer/core` (`^10.3.2` to `^11.2.1`) and `@inquirer/prompts` (`^7.10.1` to `^8.5.2`); the remaining runtime dependency names and ranges are unchanged. Context7 documentation for `/fission-ai/openspec` reflected current `main` and served only as supporting context, not a version-pinned `1.10.0` authority.
 
-This is local exact-package compatibility evidence. It does not constitute CI verification, deployment verification, or production verification. OpenSpec `1.11.0` was not reviewed, executed, added to the ledger, or included in compatibility/acceptance claims for this checkpoint.
+This is local exact-package compatibility evidence. It does not constitute CI verification, deployment verification, or production verification. At the 1.10.0 checkpoint, OpenSpec `1.11.0` was outside scope; its subsequent audit is recorded separately above.
 
 ### Exact 1.10.0 CLI Matrix
 
@@ -144,12 +156,14 @@ This initialization is for user projects. The `aifhub-extension` package reposit
 
 ## Artifact Protocol Profiles
 
-The selected `aifhub.artifactProtocol` owns its active config profile. Legacy AI Factory-only mode does not add OpenSpec settings or OpenSpec runtime paths:
+The selected `aifhub.tools.openspec` owns its active config profile. Legacy AI Factory-only mode does not add OpenSpec settings or OpenSpec runtime paths:
 
 ```yaml
 aifhub:
-  artifactProtocol: ai-factory
-
+  tools:
+    openspec: false
+    hlv: false
+    lekalo: false
 paths:
   context: CONTEXT.md
   plans: .ai-factory/plans
@@ -183,7 +197,10 @@ OpenSpec-native mode is selected through `.ai-factory/config.yaml`:
 
 ```yaml
 aifhub:
-  artifactProtocol: openspec
+  tools:
+    openspec: true
+    hlv: false
+    lekalo: false
   openspec:
     root: openspec
     installSkills: false
@@ -553,7 +570,7 @@ openspec:
   canArchive: boolean
   version: string | null
   supportedRange: ">=1.3.1 <2.0.0"
-  latestReviewedVersion: "1.10.0"
+  latestReviewedVersion: "1.12.0"
   versionOutdated: boolean | null
   requiresNode: ">=20.19.0"
 ```

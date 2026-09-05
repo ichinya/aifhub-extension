@@ -1,5 +1,7 @@
 ## AIFHub OpenSpec-native Archive Boundary
 
+Read [tool selection and artifact ownership](../../skills/shared/TOOLS.md) before choosing artifact paths or lifecycle instructions.
+
 Apply this block before the upstream `aif-archive` body. When this boundary conflicts with upstream plan discovery or plan mutation, this block wins only in OpenSpec-native mode.
 
 Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses.
@@ -27,7 +29,7 @@ Classify exactly one target class without filesystem discovery:
 
 ### OpenSpec-native mode
 
-Use this mode only when `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`.
+Use this mode only when `.ai-factory/config.yaml` declares `aifhub.tools.openspec: true`.
 
 #### Plan-mutating targets
 

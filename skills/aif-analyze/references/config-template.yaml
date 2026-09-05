@@ -15,16 +15,16 @@ language:
   technical_terms: keep # keep | translate | mixed
 
 # ============================================================================
-# AIFHUB ARTIFACT PROTOCOL
+# AIFHUB OPTIONAL TOOLS
 # ============================================================================
-# Legacy default is AI Factory-only.
-# First bootstrap may ask for artifact protocol before this value is written.
-# Use artifactProtocol: openspec only when the user explicitly requests or
-# selects OpenSpec-native mode, or existing config already uses
-# aifhub.artifactProtocol: openspec.
+# AI Factory is always the workflow base. Additional tools are independent.
+# Enable OpenSpec only when requested or already enabled in the project.
+# Legacy aifhub.artifactProtocol is read only when aifhub.tools is absent.
 aifhub:
-  # ai-factory | openspec
-  artifactProtocol: ai-factory
+  tools:
+    openspec: false
+    hlv: false
+    lekalo: false # reserved; upstream provider protocol is not yet supported
   # Optional session read optimization. Preserve existing values and never
   # enable automatically; mode is off | aifhub | sqz.
   contextDedup:
@@ -35,7 +35,7 @@ aifhub:
     sqz:
       command: sqz
 # OpenSpec-native mode writes its own aifhub settings profile only when
-# aifhub.artifactProtocol is openspec.
+# aifhub.tools.openspec is true.
 
 # ============================================================================
 # PATH CONFIGURATION

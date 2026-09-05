@@ -1,5 +1,7 @@
 ## AIFHub Review Context Provider Override
 
+Read [tool selection and artifact ownership](../../skills/shared/TOOLS.md) before choosing artifact paths or lifecycle instructions.
+
 Apply this block before the upstream `aif-review` body. When any rule below conflicts with the base skill text, this block wins.
 
 Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
@@ -16,7 +18,7 @@ Keep `/aif-review` read-only while applying durable project review guidance and 
 
 Before resolving review scope, read `.ai-factory/config.yaml` when it exists.
 
-- If the config contains `aifhub.artifactProtocol: openspec`, use **OpenSpec-native mode**.
+- If the config contains `aifhub.tools.openspec: true`, use **OpenSpec-native mode**.
 - Otherwise, use **Legacy AI Factory-only mode**.
 - If the config is missing, continue with Legacy AI Factory-only mode and state that no OpenSpec-native protocol was detected.
 
@@ -41,9 +43,15 @@ Run review in this order for both artifact modes:
 
 Do not let a code-quality pass erase or downgrade a plan/spec compliance finding. Return one combined findings-first verdict; this ordering does not create a second gate or authorize file edits.
 
+### Scoped re-review
+
+For a requested re-review after fixes, follow `skills/shared/SCOPED-REVIEW.md` in either artifact mode. Match the previous findings to the exact fix targets, reconcile every finding by ID, and inspect the complete fix diff for regressions within the existing two-pass review. An incomplete or stale bundle cannot produce PASS. Ordinary full review and user-required independent review retain their scope.
+
+Resolve the policy from the AIFHub extension root; in an installed project it is `.ai-factory/extensions/aifhub-extension/skills/shared/SCOPED-REVIEW.md`. Return the scoped evidence before the single existing gate result; keep review read-only and do not create a replacement policy in the consumer project.
+
 ### OpenSpec-native mode
 
-When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, `/aif-review` is an optional read-only gate for one active OpenSpec change.
+When `.ai-factory/config.yaml` declares `aifhub.tools.openspec: true`, `/aif-review` is an optional read-only gate for one active OpenSpec change.
 
 Read context may include:
 

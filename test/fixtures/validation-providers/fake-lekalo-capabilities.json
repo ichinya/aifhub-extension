@@ -1,0 +1,6 @@
+{
+  "contract": { "id": "aifhub.provider", "version": "1.0.0" },
+  "kind": "semantic_model",
+  "toolVersion": "0.0.0",
+  "operations": ["detect", "status", "doctor", "validate", "readiness", "impact", "context", "trace"]
+}

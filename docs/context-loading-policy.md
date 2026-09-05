@@ -18,7 +18,10 @@ OpenSpec-native mode is selected when `.ai-factory/config.yaml` contains:
 
 ```yaml
 aifhub:
-  artifactProtocol: openspec
+  tools:
+    openspec: true
+    hlv: false
+    lekalo: false
 ```
 
 In this mode, plan-aware commands resolve active work from `openspec/changes/<change-id>/`, not from `.ai-factory/plans/`.

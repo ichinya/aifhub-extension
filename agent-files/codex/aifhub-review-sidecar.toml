@@ -24,9 +24,17 @@ Review in two ordered passes for either artifact mode:
 2. **Pass 2 - code quality**: review correctness, regression risk, security, performance, maintainability, and test quality inside the validated scope.
 Do not let a code-quality pass erase or downgrade a plan/spec compliance finding. Return one combined findings-first verdict.
 
+## Scoped re-review
+
+For a requested re-review after fixes, follow `skills/shared/SCOPED-REVIEW.md` in either artifact mode. Match the previous findings to the exact fix targets, reconcile every finding by ID, and inspect the complete fix diff for regressions within the existing two-pass review. An incomplete or stale bundle cannot produce PASS. Ordinary full review and user-required independent review retain their scope.
+
+Resolve the policy from the AIFHub extension root; in an installed project it is `.ai-factory/extensions/aifhub-extension/skills/shared/SCOPED-REVIEW.md`. Return the scoped evidence before the single existing gate result; keep review read-only and do not create a replacement policy in the consumer project.
+
 ## OpenSpec-native mode
 
-Use this mode when config declares aifhub.artifactProtocol: openspec.
+Use this mode when config declares aifhub.tools.openspec: true.
+
+Follow skills/shared/TOOLS.md: only when the entire tools mapping is absent, read the legacy artifactProtocol setting. Existing OpenSpec files never override an explicit false. HLV and Lekalo switches are independent.
 
 - Review the changed scope for one active OpenSpec change.
 - Read canonical artifacts: openspec/specs/** plus openspec/changes/<change-id>/proposal.md, design.md, tasks.md, and specs/**/spec.md.

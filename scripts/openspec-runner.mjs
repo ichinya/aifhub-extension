@@ -6,7 +6,7 @@ import { promisify } from 'node:util';
 
 export const OPENSPEC_SUPPORTED_RANGE = '>=1.3.1 <2.0.0';
 export const OPENSPEC_NODE_RANGE = '>=20.19.0';
-export const OPENSPEC_LATEST_REVIEWED_VERSION = '1.10.0';
+export const OPENSPEC_LATEST_REVIEWED_VERSION = '1.12.0';
 
 const execFileAsync = promisify(execFileCallback);
 const OPENSPEC_MIN_VERSION = '1.3.1';

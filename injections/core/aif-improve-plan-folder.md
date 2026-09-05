@@ -1,5 +1,7 @@
 ## AIFHub Improve OpenSpec-native Override
 
+Read [tool selection and artifact ownership](../../skills/shared/TOOLS.md) before choosing artifact paths or lifecycle instructions.
+
 Apply this block before the upstream `aif-improve` body. When any rule below conflicts with the base skill text, this block wins.
 
 Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
@@ -23,7 +25,7 @@ If both exist, `aif-improve` wins.
 
 Before resolving a target, read `.ai-factory/config.yaml` when it exists.
 
-- If the config contains `aifhub.artifactProtocol: openspec`, use **OpenSpec-native mode**.
+- If the config contains `aifhub.tools.openspec: true`, use **OpenSpec-native mode**.
 - Otherwise, use **Legacy AI Factory-only mode**.
 - If the config is missing, continue with Legacy AI Factory-only mode and state that no OpenSpec-native protocol was detected.
 
@@ -38,7 +40,7 @@ In Legacy AI Factory-only mode, classify the normalized project-relative plan en
 
 ### OpenSpec-native mode
 
-When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, `/aif-improve` refines an existing OpenSpec-native change.
+When `.ai-factory/config.yaml` declares `aifhub.tools.openspec: true`, `/aif-improve` refines an existing OpenSpec-native change.
 
 For plan content, read only the canonical OpenSpec artifacts listed below. Do not inspect or mutate `.ai-factory/plans/**` after an OpenSpec change resolves.
 
@@ -69,6 +71,8 @@ Refine only these canonical OpenSpec artifacts for the active change:
 
 Legacy companion plan artifacts, including `task.md`, `context.md`, `rules.md`, `verify.md`, and `status.yaml` are not OpenSpec-native refinement targets.
 
+Before refining implementation-dependent artifacts, refresh the relevant implementation, nearby tests, configuration, and docs outside `openspec/` in a read-only pass proportional to the proposed changes. Resolve the actual target repository if it differs from `planningHome.root`; ask only when context cannot identify it. For greenfield work, inspect existing structure and setup docs. Separate observed facts, assumptions, and proposals; cite direct file evidence, disclose unavailable source, and surface conflicts between accepted specs and code before a dependent design decision. Do not defer this discovery into generic future codebase-exploration tasks.
+
 #### Task Quality Refinement
 
 When refining an OpenSpec-native change, audit normalized task quality across the canonical artifacts:
@@ -77,6 +81,8 @@ When refining an OpenSpec-native change, audit normalized task quality across th
 - `design.md` for C4 impact, ADR candidates, dependency notes, integration points, alternatives, and risks
 - `tasks.md` for an executable checklist whose task descriptions state how completion is verified
 - `specs/**/spec.md` for behavior deltas
+
+For a new capability, refine its delta's `## Purpose` into a meaningful description before first sync/archive. An existing main spec's Purpose is not replaced by a delta's Purpose: if strict validation reports a placeholder, record the affected accepted-spec path and bounded direct remediation instead of manufacturing a requirement delta. Do not rewrite archived changes to clear historical placeholders.
 
 Classify open questions as `blocker`, `warn`, or `info` when useful, without requiring classification in trivial changes or forcing a specific table format.
 

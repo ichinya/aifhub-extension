@@ -130,9 +130,11 @@ describe('analyze config required-keys diff', () => {
 
   it('keeps a legacy config up to date without OpenSpec-only required paths', async () => {
     const rootDir = await createTempRoot();
+    const skill = await readAnalyzeSkillVersion();
+    assert.equal(skill.ok, true);
     await createConfigFixture(
       rootDir,
-      renderConfigForMode('', 'ai-factory', { analyzeSkillVersion: '0.13.0' })
+      renderConfigForMode('', 'ai-factory', { analyzeSkillVersion: skill.version })
     );
 
     const result = await buildAnalyzeConfigDiff({ rootDir });

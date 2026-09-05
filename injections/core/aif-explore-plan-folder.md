@@ -1,5 +1,7 @@
 ## AIFHub OpenSpec-native Override
 
+Read [tool selection and artifact ownership](../../skills/shared/TOOLS.md) before choosing artifact paths or lifecycle instructions.
+
 Apply this block before the upstream `aif-explore` body. When any rule below conflicts with the base skill text, this block wins.
 
 Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
@@ -14,7 +16,7 @@ Keep `/aif-explore` as a research-oriented command while making the extension aw
 
 Before resolving exploration inputs, read `.ai-factory/config.yaml` when it exists.
 
-- If the config contains `aifhub.artifactProtocol: openspec`, use **OpenSpec-native mode**.
+- If the config contains `aifhub.tools.openspec: true`, use **OpenSpec-native mode**.
 - Otherwise, use **Legacy AI Factory-only mode**.
 - If the config is missing, continue with Legacy AI Factory-only mode and state that no OpenSpec-native protocol was detected.
 
@@ -80,7 +82,7 @@ Pass-through diagnostics may contain only `asset`, `runtime`, `case`, bounded ga
 
 ### OpenSpec-native mode
 
-When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, `/aif-explore` is research-oriented and must not create canonical OpenSpec change artifacts.
+When `.ai-factory/config.yaml` declares `aifhub.tools.openspec: true`, `/aif-explore` is research-oriented and must not create canonical OpenSpec change artifacts.
 
 Use shared vocabulary consistently: `OpenSpec-native mode`, `canonical OpenSpec change`, `active change`, `change-id`, `base specs`, `delta specs`, `generated rules`, `runtime state`, `QA evidence`, and `legacy AI Factory-only mode`.
 
