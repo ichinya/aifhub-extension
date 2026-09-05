@@ -83,6 +83,7 @@ rootCauseEvidence
 
 ## См. также
 
+- [Повторная проверка Superpowers и кандидаты для адаптации](superpowers-follow-up-research.md) — состояние upstream на 2026-09-05, локальные пробелы, критерии проверки и ограничения модельных отчётов; предложения ещё не реализованы.
 - [Usage](usage.md)
 - [Context Loading Policy](context-loading-policy.md)
 - [Codex Agents](codex-agents.md)
