@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { detectHlv, HLV_COMMAND_CONTRACT, runHlvOperation } from './hlv-provider.mjs';
 import { digest, providerRevision, readProviderFile, safeId, writeProviderFile } from './provider-files.mjs';
+import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
 import { normalizeProviderPolicies, PROVIDER_KINDS, providerGate, readProviderPolicies } from './provider-policy.mjs';
 
 export const PROVIDER_CONTRACT = Object.freeze({ id: 'aifhub.provider', version: '1.0.0' });
@@ -160,6 +161,7 @@ export async function runProviders(options = {}) {
     for (let index = 0; index < providers.length; index++) {
       const evidence = providers[index];
       try {
+        await ensureRuntimeGitignore(rootDir, '.ai-factory/qa');
         providers[index] = await writeProviderFile(rootDir,
           `.ai-factory/qa/${options.changeId}/providers/${evidence.provider}-${phase}.json`, evidence);
       } catch {

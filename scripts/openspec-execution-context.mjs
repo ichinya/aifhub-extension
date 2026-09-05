@@ -1025,6 +1025,7 @@ async function collectFilePaths(directoryPath, filePaths, predicate) {
   const sortedEntries = entries.sort((left, right) => left.name.localeCompare(right.name));
 
   for (const entry of sortedEntries) {
+    if (entry.name === '.gitignore') continue;
     const childPath = path.join(directoryPath, entry.name);
 
     if (entry.isDirectory()) {

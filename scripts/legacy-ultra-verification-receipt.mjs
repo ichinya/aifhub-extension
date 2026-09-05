@@ -10,6 +10,7 @@ import {
   writeFile
 } from 'node:fs/promises';
 import path from 'node:path';
+import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
 import process from 'node:process';
 import { classifyLegacyPlanShape } from './legacy-plan-migration.mjs';
 import { validateGateResult } from './aif-gate-result.mjs';
@@ -191,6 +192,7 @@ export async function writeLegacyUltraVerificationReceipt(options = {}) {
   };
   const absoluteReceiptPath = path.resolve(rootDir, fromProjectPath(receiptLocation.receiptPath));
   try {
+    await ensureRuntimeGitignore(rootDir, '.ai-factory/state');
     await mkdir(path.dirname(absoluteReceiptPath), { recursive: true });
     await writeFile(absoluteReceiptPath, `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
   } catch {

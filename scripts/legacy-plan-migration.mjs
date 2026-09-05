@@ -1,6 +1,7 @@
 // legacy-plan-migration.mjs - explicit migration from legacy AI Factory plans to OpenSpec changes
 import { access, mkdir, readdir, readFile, realpath, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
 import process from 'node:process';
 
 import {
@@ -291,6 +292,7 @@ export async function writeLegacyPlanSourceState(legacyPlanSourceRoot, options =
     reason: options.reason ?? 'migration-incomplete',
     recorded_at: options.timestamp ?? new Date().toISOString()
   }, null, 2)}\n`;
+  await ensureRuntimeGitignore(rootDir, DEFAULT_STATE_DIR);
   await mkdir(path.dirname(statePath), { recursive: true });
   await writeFile(statePath, content, 'utf8');
 
@@ -1460,6 +1462,7 @@ export async function writeMigrationReport(planId, report, options = {}) {
     };
   }
 
+  await ensureRuntimeGitignore(rootDir, paths.stateDir);
   await writeArtifact(rootDir, artifact);
 
   return {

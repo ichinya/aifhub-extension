@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { normalizeChangeId } from './active-change-resolver.mjs';
 import { getLatestGateResult, SUPPORTED_GATES } from './aif-gate-result.mjs';
+import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
 
 const DEFAULT_QA_DIR = path.join('.ai-factory', 'qa');
 
@@ -146,6 +147,7 @@ export async function writeGateEvidence(options = {}) {
     );
   }
 
+  await ensureRuntimeGitignore(rootDir, DEFAULT_QA_DIR);
   await (options.mkdir ?? mkdir)(path.dirname(targetPath), { recursive: true });
   await (options.writeFile ?? writeFile)(targetPath, markdownResult.markdown, 'utf8');
 

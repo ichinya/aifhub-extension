@@ -161,6 +161,11 @@ full`. QA artifacts such as `aif-gate-result`, `coverage.json`, `done-readiness.
 and verification receipts stay with their existing readers at full fidelity;
 they are not reserialized into the brief or claimed as compiler evidence.
 
+Before writing a brief, the compiler also ensures a missing
+`.ai-factory/state/.gitignore` with `*` and `!.gitignore`. Existing ignore rules
+are preserved. This file is storage policy, not a brief source or quality gate;
+read-only status/show do not create or repair it.
+
 Reads and outputs are bounded to 2 MiB per file, with 1,024 source files and 32 MiB
 total source bytes. Linked files, symlinks/junctions, path escapes, malformed JSON,
 duplicate decoded keys, duplicate active sections, and identifiable selected

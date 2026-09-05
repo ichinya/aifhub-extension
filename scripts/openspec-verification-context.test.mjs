@@ -1006,9 +1006,10 @@ describe('OpenSpec verification context API', () => {
         detectOpenSpec: async () => availableCliDetection(),
         validateOpenSpecChange: async () => validationResult()
       }),
-      /QA evidence path/
+      /QA evidence path|unsafe_runtime_directory/
     );
     assert.equal(await pathExists(path.join(rootDir, 'openspec', 'changes', 'add-oauth', 'openspec-validation.json')), false);
+    assert.equal(await pathExists(path.join(rootDir, 'openspec', 'changes', '.gitignore')), false);
 
     await assert.rejects(
       () => writeVerificationEvidence('add-oauth', {

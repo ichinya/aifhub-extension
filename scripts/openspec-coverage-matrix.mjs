@@ -2,6 +2,7 @@
 import { createHash } from 'node:crypto';
 import { access, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import {
@@ -162,6 +163,7 @@ export async function writeOpenSpecCoverageMatrix(changeId, matrix, options = {}
   const rootDir = resolveRootDir(options.rootDir);
   const qaPath = await resolveQaPath(rootDir, normalized.changeId, options);
   await assertSafeQaPath(rootDir, qaPath);
+  await ensureRuntimeGitignore(rootDir, options.qaPath ? qaPath : path.dirname(qaPath));
   await mkdir(qaPath, { recursive: true });
   const coveragePath = path.join(qaPath, COVERAGE_FILE);
   const payload = JSON.stringify({ ...matrix, change_id: normalized.changeId }, null, 2);

@@ -4,6 +4,7 @@ import { lstat, mkdir, open, readdir, realpath, rename, unlink } from 'node:fs/p
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { TextDecoder } from 'node:util';
+import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
 import { normalizeChangeId, resolveActiveChange } from './active-change-resolver.mjs';
 import { parseSimpleYaml } from './aif-artifact-sync.mjs';
 import { resolveAiFactoryVersion } from './ai-factory-version-resolver.mjs';
@@ -309,6 +310,7 @@ async function walkFiles(root, directory, accept, result = [], depth = 0) {
 async function writeRuntimeFile(root, file, content) {
   if (!/^\.ai-factory\/state\/[^/]+\/(?:sdd\/profile-decision\.json|context\/session-brief\.(?:md|json))$/.test(file)) throw sddError('unsafe_destination');
   const previous = await readSafeFile(root, file);
+  await ensureRuntimeGitignore(root, '.ai-factory/state');
   if (previous?.content === content) return false;
   await mkdir(path.dirname(path.join(root, file)), { recursive: true });
   await inspectPath(root, file);

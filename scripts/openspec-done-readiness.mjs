@@ -3,6 +3,7 @@
 import { execFile } from 'node:child_process';
 import { access, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
 import { providerDiagnostics, runProviders } from './aifhub-providers.mjs';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -232,6 +233,7 @@ export async function writeOpenSpecDoneReadiness(changeId, readiness, options = 
 
   const qaPath = resolveQaPath(rootDir, normalized.changeId, options);
   assertSafeRuntimePath(rootDir, qaPath, 'Done readiness QA path');
+  await ensureRuntimeGitignore(rootDir, options.qaPath !== undefined ? qaPath : path.dirname(qaPath));
   await mkdir(qaPath, { recursive: true });
 
   const readinessPath = path.join(qaPath, DONE_READINESS_FILE);

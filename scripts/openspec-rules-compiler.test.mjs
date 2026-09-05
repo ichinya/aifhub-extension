@@ -867,7 +867,7 @@ describe('generated-rules batch reconciliation', () => {
       dryRun: true
     }));
     assert.equal(dryRun.ok, true, 'no-active dry-run with 205 orphans should succeed');
-    assert.equal(dryRun.operationCount, 207, 'full internal plan should include base/index writes and 205 removals');
+    assert.equal(dryRun.operationCount, 208, 'full internal plan should include ignore/base/index writes and 205 removals');
     assert.equal(dryRun.operations.length, 200, 'public operation detail should be capped at 200');
     assert.equal(dryRun.operationsTruncated, true);
 
@@ -877,9 +877,9 @@ describe('generated-rules batch reconciliation', () => {
       selectionSource: 'none'
     }));
     assert.equal(applied.ok, true, 'no-active real cleanup with 205 orphans should succeed');
-    assert.equal(applied.operationCount, 207, 'real cleanup should retain full internal authority');
+    assert.equal(applied.operationCount, 208, 'real cleanup should retain full internal authority');
     const remaining = await readdir(path.join(rootDir, '.ai-factory', 'rules', 'generated'));
-    assert.deepEqual(remaining.sort(), ['index.json', 'openspec-base.md'], 'all recognized orphan outputs must be removed beyond public cap');
+    assert.deepEqual(remaining.sort(), ['.gitignore', 'index.json', 'openspec-base.md'], 'all recognized orphan outputs must be removed beyond public cap');
   });
 });
 

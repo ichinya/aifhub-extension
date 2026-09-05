@@ -8,6 +8,7 @@ import { normalizeProviderPolicies, parseProviderConfig } from './provider-polic
 import { parseToolConfig, toolArtifactPaths } from './tool-config.mjs';
 import { readProviderFile, safeProviderPath } from './provider-files.mjs';
 import { initializeHlvProject } from './tool-initialization.mjs';
+import { ensureRuntimeGitignore, ensureRuntimeGitignores } from './runtime-gitignore.mjs';
 
 import {
   normalizeChangeId,
@@ -356,6 +357,13 @@ export async function initializeEnabledTools(options = {}) {
   const base = { dryRun: Boolean(options.dryRun), mode: resolveMode(config), tools: config.tools,
     operations: [], warnings: [], errors: [] };
   if (config.error) return { ...base, ok: false, errors: [config.error] };
+  const runtimeDirs = configuredRuntimeDirectories(config, options);
+  try {
+    await ensureRuntimeGitignores(rootDir, runtimeDirs, { dryRun: true });
+  } catch {
+    return { ...base, ok: false, errors: [{ code: 'unsafe-runtime-layout',
+      message: 'Runtime ignore files require safe project-local directories and regular files.' }] };
+  }
   if (config.tools.openspec) {
     try { await preflightOpenSpecSkeleton(rootDir); } catch {
       return { ...base, ok: false, errors: [{ code: 'unsafe-openspec-layout',
@@ -365,8 +373,8 @@ export async function initializeEnabledTools(options = {}) {
   const hlv = await initializeHlvProject({ ...options, rootDir });
   if (!hlv.ok) return { ...base, ok: false, hlv, errors: hlv.errors };
   const skeleton = config.tools.openspec ? await ensureOpenSpecSkeleton({ ...options, rootDir })
-    : { ok: true, operations: [], warnings: [], errors: [] };
-  return { ...base, ok: skeleton.ok, hlv, skeleton, operations: hlv.operations,
+    : { ok: true, operations: await ensureRuntimeGitignores(rootDir, runtimeDirs, options), warnings: [], errors: [] };
+  return { ...base, ok: skeleton.ok, hlv, skeleton, operations: [...hlv.operations, ...skeleton.operations],
     warnings: skeleton.warnings, errors: skeleton.errors };
 }
 
@@ -900,31 +908,44 @@ async function preflightOpenSpecSkeleton(rootDir) {
 export async function ensureOpenSpecSkeleton(options = {}) {
   const rootDir = resolveRootDir(options);
   const dryRun = Boolean(options.dryRun);
+  const config = await readProjectConfig(rootDir);
+  const runtimeDirs = configuredRuntimeDirectories(config, { ...options, openspec: true });
   const dirs = [
     'openspec/specs',
-    'openspec/changes',
-    '.ai-factory/state',
-    '.ai-factory/qa',
-    '.ai-factory/rules/generated'
+    'openspec/changes'
   ];
   try {
     await preflightOpenSpecSkeleton(rootDir);
+    const preview = await ensureRuntimeGitignores(rootDir, runtimeDirs, { dryRun: true });
+    dirs.push(...preview.map((item) => path.posix.dirname(item.target)));
   } catch {
     return { ok: false, dryRun, operations: [], created: [], preserved: [], warnings: [],
       errors: [{ code: 'unsafe-openspec-layout', message: 'OpenSpec initialization requires safe project-local paths.' }] };
   }
   const ensured = await ensureDirectories(rootDir, dirs, { dryRun });
+  const ignores = await ensureRuntimeGitignores(rootDir, runtimeDirs, { dryRun });
   const configResult = await ensureOpenSpecConfig(rootDir, { dryRun });
 
   return {
     ok: ensured.ok && configResult.ok,
     dryRun,
-    operations: [...ensured.operations, ...configResult.operations],
-    created: [...ensured.created, ...configResult.created],
-    preserved: [...ensured.preserved, ...configResult.preserved],
+    operations: [...ensured.operations, ...ignores, ...configResult.operations],
+    created: [...ensured.created, ...ignores.filter((item) => item.action !== 'preserve').map((item) => item.target), ...configResult.created],
+    preserved: [...ensured.preserved, ...ignores.filter((item) => item.action === 'preserve').map((item) => item.target), ...configResult.preserved],
     warnings: dedupeDiagnostics([...ensured.warnings, ...configResult.warnings]),
     errors: [...ensured.errors, ...configResult.errors]
   };
+}
+
+function configuredRuntimeDirectories(config, options = {}) {
+  // Some existing writers still use fixed defaults; protect those as well as overrides.
+  return [...new Set([
+    '.ai-factory/state', '.ai-factory/qa',
+    options.stateDir ?? config.paths.state ?? '.ai-factory/state',
+    options.qaDir ?? config.paths.qa ?? '.ai-factory/qa',
+    ...(options.openspec || config.tools.openspec
+      ? ['.ai-factory/rules/generated', config.paths.generated_rules ?? '.ai-factory/rules/generated'] : [])
+  ])];
 }
 
 export async function ensureAiFactorySkeleton(options = {}) {
@@ -1842,6 +1863,7 @@ async function writeModeReport(kind, options = {}) {
 
   if (!dryRun) {
     const target = path.join(rootDir, reportPath);
+    await ensureRuntimeGitignore(rootDir, '.ai-factory/state');
     await mkdir(path.dirname(target), { recursive: true });
     await writeFile(target, content, 'utf8');
   }

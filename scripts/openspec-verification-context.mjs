@@ -1,6 +1,7 @@
 // openspec-verification-context.mjs - OpenSpec verify runtime context helpers
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
 import process from 'node:process';
 
 import {
@@ -222,6 +223,7 @@ export async function writeVerificationEvidence(changeId, evidence, options = {}
   assertSafeQaPath(rootDir, qaPath);
 
   const rawDir = path.join(qaPath, 'raw');
+  await ensureRuntimeGitignore(rootDir, options.qaPath !== undefined ? qaPath : path.dirname(qaPath));
   await mkdir(rawDir, { recursive: true });
 
   const files = [];

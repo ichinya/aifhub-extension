@@ -3,6 +3,7 @@
 import { execFile } from 'node:child_process';
 import { access, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -1042,6 +1043,8 @@ export async function writeDoneSummary(changeId, summary, options = {}) {
   assertSafeRuntimePath(rootDir, qaPath, 'QA evidence path');
   assertSafeRuntimePath(rootDir, statePath, 'State summary path');
 
+  await ensureRuntimeGitignore(rootDir, options.qaPath !== undefined ? qaPath : path.dirname(qaPath));
+  await ensureRuntimeGitignore(rootDir, options.statePath !== undefined ? statePath : path.dirname(statePath));
   await mkdir(qaPath, { recursive: true });
   await mkdir(statePath, { recursive: true });
 
@@ -1214,6 +1217,7 @@ async function writeArchiveEvidence(changeId, archive, options = {}) {
   assertSafeRuntimePath(rootDir, qaPath, 'QA evidence path');
 
   const rawDir = path.join(qaPath, 'raw');
+  await ensureRuntimeGitignore(rootDir, options.qaPath !== undefined ? qaPath : path.dirname(qaPath));
   await mkdir(rawDir, { recursive: true });
 
   const stdout = normalizeOutput(archive.stdout);

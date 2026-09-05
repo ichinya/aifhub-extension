@@ -13,6 +13,7 @@ import {
   writeFile
 } from 'node:fs/promises';
 import path from 'node:path';
+import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
 import process from 'node:process';
 
 import { detectOpenSpec as defaultDetectOpenSpec, showOpenSpecItem as defaultShowOpenSpecItem } from './openspec-runner.mjs';
@@ -747,7 +748,16 @@ export async function reconcileOpenSpecGeneratedRules(options = {}) {
     ...orphanedIndexIds,
     ...orphanedManaged.map((item) => item.changeId)
   ])].sort((left, right) => left.localeCompare(right));
+  let ignore;
+  try {
+    ignore = await ensureRuntimeGitignore(rootDir, layout.generatedDir, { dryRun: true });
+  } catch {
+    return createReconcileResult({ dryRun, errors: [{
+      code: 'unsafe-generated-gitignore', message: 'Generated rules require a safe local .gitignore file.'
+    }] });
+  }
   const operations = [
+    ...(ignore.action === 'would-create' ? [{ ...ignore, action: dryRun ? 'would-write' : 'write', kind: 'gitignore' }] : []),
     ...writes.map((file) => ({
       action: dryRun ? 'would-write' : 'write',
       kind: file.kind,
@@ -879,6 +889,8 @@ export async function reconcileOpenSpecGeneratedRules(options = {}) {
       );
     }
     const expectedRootIdentity = commitRoot.identity;
+    const ignoreResult = await ensureRuntimeGitignore(rootDir, layout.generatedDir);
+    if (ignoreResult.action === 'create') mutationCount += 1;
 
     for (const file of writes.filter((item) => item.kind !== 'index')) {
       await options.beforeWrite?.({
@@ -1065,6 +1077,7 @@ export async function writeGeneratedRules(changeId, rendered, options = {}) {
   }
 
   if (!options.dryRun) {
+    await ensureRuntimeGitignore(rootDir, generatedDir);
     await mkdir(generatedDir, { recursive: true });
   }
 
@@ -1153,6 +1166,7 @@ async function writeGeneratedBaseRules(content, options = {}) {
     });
   }
 
+  await ensureRuntimeGitignore(rootDir, generatedDir);
   await mkdir(generatedDir, { recursive: true });
   await writeFile(targetPath, content, 'utf8');
   const index = await writeGeneratedIndex({

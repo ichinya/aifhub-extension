@@ -112,7 +112,8 @@ describe('SessionBrief compiler and exact revision custody', () => {
     assert.equal(await exists(root, `.ai-factory/qa/${change}`), false);
     const after = await snapshot(root);
     for (const [file, hash] of Object.entries(before)) assert.equal(after[file], hash, file);
-    assert.deepEqual(Object.keys(after).filter((file) => !(file in before)).sort(), Object.values(paths).sort());
+    assert.deepEqual(Object.keys(after).filter((file) => !(file in before)).sort(),
+      [...Object.values(paths), '.ai-factory/state/.gitignore'].sort());
     const status = await inspectSessionBrief({ ...options(root), includeBrief: true });
     assert.equal(status.status, 'valid');
     for (const source of status.sources) assert.equal(source.sha256, before[source.path]);
