@@ -24,6 +24,8 @@ Before resolving review scope, read `.ai-factory/config.yaml` when it exists.
 
 ### Project Review Policy
 
+For an OpenSpec-native change with SDD inputs/policy or SDD runtime artifacts, check `ai-factory aifhub-session-brief status --change <change-id> --json` before using a SessionBrief. Missing/stale/invalid context or an unavailable helper returns a planning-owner handoff; review must not compile or repair it. Read protected canonical requirements/scenarios, rules, and validation evidence at full fidelity. Unopted changes retain canonical filesystem context. Quick planning does not weaken review/security/human-review policy or `/aif-verify`; this P0 brief consumption is not a claim of fresh-context AI review or a Crit human-review receipt.
+
 Apply this section in both artifact modes before evaluating findings.
 
 - Resolve `reviews.policy_file` from `.ai-factory/config.yaml`, defaulting to root `REVIEW.md`, exactly as defined by `skills/shared/REVIEW-POLICY.md`.

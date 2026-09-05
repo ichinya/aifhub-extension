@@ -22,6 +22,13 @@ const WRAPPER_COMMANDS = [
     args: ['verify', '--change', 'add-oauth', '--write', '--json']
   },
   {
+    name: 'aifhub-session-brief',
+    description: 'Compile, inspect, or show a source-bound AIFHub SessionBrief.',
+    module: './commands/aifhub-session-brief.mjs',
+    script: 'session-brief.mjs',
+    args: ['compile', '--change', 'add-oauth', '--json']
+  },
+  {
     name: 'aifhub-mode',
     description: 'Run AIFHub artifact mode status, switch, sync, and doctor commands.',
     module: './commands/aifhub-mode.mjs',

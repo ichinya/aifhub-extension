@@ -52,6 +52,14 @@ Resolve the policy from the AIFHub extension root; in an installed project it is
 
 When `.ai-factory/config.yaml` declares `aifhub.tools.openspec: true`, `/aif-implement` executes implementation tasks for the active OpenSpec change.
 
+#### SessionBrief binding
+
+For changes with `## SDD Profile Inputs`, `.ai-factory/sdd-policy.json`, or existing SDD runtime artifacts, validate `ai-factory aifhub-session-brief status --change <change-id> --json` before editing. `buildImplementationContext()` also checks this binding before creating runtime directories and exposes `sessionBrief` with its digest and current brief. Prefer that brief as compact execution context, then resolve its exact canonical/task/spec/rules references at full fidelity for the selected task. The brief selects context; source, policy, and permissions remain authoritative.
+
+Missing, stale, research, or invalid context stops implementation and returns the planning-owner compile handoff (or `/aif-explore` for research). Do not silently reuse the old brief or treat it as QA. Supply the exact consumed digest as `trace.sessionBriefDigest` to `writeExecutionTrace()`; its writer revalidates the binding before writes. Write the trace before marking canonical task checkboxes, then recompile after progress/sync changes before the next task or session. Material scope discoveries require the normal canonical planning-owner workflow before continuation.
+
+When helpers are unavailable for an opted-in change, return the owner handoff; do not pretend the brief was validated. Existing unopted changes with no SDD runtime artifacts retain canonical filesystem fallback. A quick profile cannot disable project-required tests/security/review/human approval, migration/rollback, `/aif-verify`, or `/aif-done`. Briefs and profile decisions stay under `.ai-factory/state/<change-id>/`; protected validation artifacts are read in full, never semantically rewritten into the brief.
+
 For plan content, read only the canonical OpenSpec artifacts listed below. Do not inspect or mutate `.ai-factory/plans/**` after an OpenSpec change resolves.
 
 Use `buildImplementationContext(options)` from `scripts/openspec-execution-context.mjs` when available before editing implementation files. Treat the returned resolver diagnostics, canonical artifacts, generated rules, OpenSpec apply instructions, runtime paths, warnings, and errors as the machine-readable implementation context. If the helper is unavailable, fall back to the explicit filesystem reads and runtime boundaries in this section.

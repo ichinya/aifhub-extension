@@ -2,6 +2,10 @@
 
 # Документация
 
+- [Аудит хранения артефактов](artifact-storage-audit.md) — текущие пути и владельцы, воспроизведённые расхождения, целевая карта хранения и правила Git/архивирования.
+- [AI Factory plans across methodologies](adr/0005-ai-factory-plan-methodologies.md) — целевая архитектура: AI Factory владеет планами, методологии задают содержание, дополнительные инструменты работают через адаптеры; интеграция ещё не реализована.
+- [SDD profiles and SessionBrief (P0)](sdd-profiles.md) — текущий прототип для OpenSpec: глубина planning, независимые quality gates, compiler/status и точный digest implementation context; [ADR 0004](adr/0004-sdd-profiles-and-session-brief.md).
+
 Эта документация описывает workflow AIFHub Extension v1:
 
 ```text

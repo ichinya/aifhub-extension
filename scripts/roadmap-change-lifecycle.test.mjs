@@ -31,7 +31,8 @@ Implement the bounded helper.
 
 afterEach(async () => {
   await Promise.all(temporaryDirectories.splice(0).map((directory) =>
-    rm(directory, { recursive: true, force: true })
+    // Windows can hold a just-written child briefly; keep cleanup bounded.
+    rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
   ));
 });
 

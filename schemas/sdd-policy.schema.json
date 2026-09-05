@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Additive SDD project policy",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "aifhub.sdd_policy.v1"
+    },
+    "minimum_profile": {
+      "enum": [
+        "quick",
+        "standard",
+        "expanded",
+        "ultra"
+      ]
+    },
+    "required_gates": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "project_policy",
+          "tests",
+          "rules",
+          "review",
+          "security",
+          "migration_rollback",
+          "human_review",
+          "verify",
+          "done"
+        ]
+      }
+    },
+    "require_design": {
+      "type": "boolean"
+    },
+    "context_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 64
+    }
+  },
+  "required": [
+    "schema"
+  ]
+}

@@ -1,0 +1,281 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SessionBrief v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "aifhub.session_brief.v1"
+    },
+    "compiler": {
+      "const": "aifhub.session_brief.compiler.v1"
+    },
+    "change_id": {
+      "type": "string"
+    },
+    "profile": {
+      "enum": [
+        "direct",
+        "quick",
+        "standard",
+        "expanded",
+        "ultra",
+        "tracer",
+        "research"
+      ]
+    },
+    "planning_mode": {
+      "enum": [
+        "fast",
+        "full",
+        "ultra"
+      ]
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "kind": {
+            "enum": [
+              "canonical",
+              "policy",
+              "protected",
+              "supporting"
+            ]
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "kind"
+        ]
+      },
+      "minItems": 1
+    },
+    "source_revision": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "policy_revision": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "scope_fingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "intent": {
+      "type": "string"
+    },
+    "target_outcome": {
+      "type": "string"
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "acceptance_examples": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "non_goals": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "change_surface": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "forbidden": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "allowed",
+        "forbidden"
+      ]
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "open_questions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "verification_plan": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "expected_artifacts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "required_checks": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "project_policy",
+              "tests",
+              "rules",
+              "review",
+              "security",
+              "migration_rollback",
+              "human_review",
+              "verify",
+              "done"
+            ]
+          }
+        },
+        "policy_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "required_checks",
+        "policy_refs"
+      ]
+    },
+    "context_manifest": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "fidelity": {
+            "enum": [
+              "selected_sections",
+              "full"
+            ]
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "fidelity"
+        ]
+      }
+    },
+    "required_capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "strategy": {
+          "const": "measured"
+        },
+        "source_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "brief_bytes": {
+          "type": "null"
+        },
+        "token_estimate": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "strategy",
+        "source_bytes",
+        "brief_bytes",
+        "token_estimate"
+      ]
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "required": [
+    "schema",
+    "compiler",
+    "change_id",
+    "profile",
+    "planning_mode",
+    "sources",
+    "source_revision",
+    "policy_revision",
+    "scope_fingerprint",
+    "intent",
+    "target_outcome",
+    "acceptance_criteria",
+    "acceptance_examples",
+    "non_goals",
+    "change_surface",
+    "constraints",
+    "assumptions",
+    "open_questions",
+    "verification_plan",
+    "expected_artifacts",
+    "verification",
+    "context_manifest",
+    "required_capabilities",
+    "budget",
+    "digest"
+  ]
+}
