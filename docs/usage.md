@@ -263,6 +263,16 @@ Ponytail `v4.9.0` имеет status `manual_experiment_only`: user может о
 
 Always-on `full`/`ultra` plugin mode не должен охватывать `/aif-explore`, `/aif-plan`, `/aif-improve`, `/aif-rules-check`, `/aif-review`, `/aif-security-checklist`, `/aif-verify`, `/aif-fix`, `/aif-done` или `/aif-commit`. Canonical OpenSpec requirements, selected tasks, project rules, required tests, artifact ownership и AIFHub output contracts всегда ограничивают minimal-solution preference. Upstream `100% safe` означает pass конкретных deterministic adversarial scorers и не заменяет AIFHub semantic security gate.
 
+## Опциональные Token Providers
+
+RTK `v0.48.0` оценён как user-owned overview tool со статусом `reject_defer` для рекомендации или automatic integration. AIFHub не устанавливает binary/hooks, не меняет agent instructions и не добавляет `rtk gain` в `/aif-analyze`. Отсутствие RTK не блокирует workflow.
+
+Для review, verification и fix нужны полные raw diffs, history, protected artifacts и test diagnostics. `rtk proxy` сохраняет raw output, но продолжает tracking аргументов; исключение команды из rewrite тоже не гарантирует отсутствия локального хранения. Полная policy, проверенная форма config, ограничения `tee`/tracking и результаты probes находятся в [Token Providers](token-providers.md).
+
+Выполнен [A/B через ai-tester и Pi](token-providers-research/rtk/ai-tester-ab.md) на трёх проектах с Ornith: baseline 12/12, RTK 9/12; суммарно −20,2% токенов при нестабильной экономии и трёх ошибках результата. Сценарии и агрегаты доступны в отчёте.
+
+Отдельный [мультирепозиторный A/B](token-providers-research/rtk/multirepo-ab.md) на трёх связанных копиях с метками дал baseline 11/12, RTK 12/12 и −15,8% токенов в 24 запусках. Восстановление полной диагностики увеличило расход этого сценария на 10,5%; ограничения хранения данных сохраняют статус `reject_defer`.
+
 ## Bug Fix Workflows
 
 OpenSpec-native mode separates new bug reports from fixes for failed verification findings.

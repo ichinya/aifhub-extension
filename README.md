@@ -399,6 +399,7 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 | [Context Providers](docs/context-providers.md) | Optional Graphify and Context7 provider guidance, reviewed-note paths, degraded behavior, and user-owned setup boundaries |
 | [Skill Providers](docs/skill-providers.md) | Ponytail exact-source evaluation, implementation-only experiment policy, safety/OpenSpec boundaries, and promotion criteria |
 | [Safety Providers](docs/safety-providers.md) | Optional dcg pre-execution guard guidance, manual user-owned setup, allowed probes, degraded behavior, and strict hook/config boundaries |
+| [Token Providers](docs/token-providers.md) | RTK pinned evaluation, raw evidence bypasses, local storage risks, user-owned controls, and reject/defer decision |
 | [Memory Tool Recommendations](docs/memory-tool-recommendations.md) | Local metadata-driven optional memory/context tool recommendations and installed wrapper commands |
 | [Context Loading Policy](docs/context-loading-policy.md) | Consumer context, AI Factory 2.19 upstream warmup, Optional Project Glossary, optional provider context, GitHub-aware roadmap evidence, command ownership, upstream utility boundaries, and legacy boundaries |
 | [Project Review Policy](docs/review-policy.md) | Configurable root-default `REVIEW.md`, scaffold ownership, safe review consumption, precedence, and session-state boundary |

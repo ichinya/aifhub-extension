@@ -1,0 +1,182 @@
+{
+  "schema": "aifhub.rtk_observation_probe.v1",
+  "provider_version": "0.48.0",
+  "provider_source_commit": "fde0a8f185945556f51718de0f4c430bb62b3df6",
+  "binary_sha256": "64c01578fec180a1b1f093e882bc8a673f0a3bf7ecf7094950fec6d897872e01",
+  "harness_sha256": "61b74fbd938d8ff97562a33d7b1ed2ebc688d7cd8bcb5e907212a0426522403f",
+  "platform": "Linux",
+  "architecture": "x86_64",
+  "python_version": "3.13.5",
+  "python_packages": {
+    "pytest": "8.4.2",
+    "pluggy": "1.6.0",
+    "packaging": "26.3",
+    "iniconfig": "2.3.0",
+    "pygments": "2.21.0"
+  },
+  "model": null,
+  "lifecycle_ab": "NOT_RUN(observation_and_privacy_gates_failed)",
+  "decision": "reject_defer",
+  "observations": {
+    "protected_reads": [
+      {
+        "raw_bytes": 3795,
+        "read_bytes": 3795,
+        "read_exact": true,
+        "cat_exact": true,
+        "proxy_exact": true
+      },
+      {
+        "raw_bytes": 41,
+        "read_bytes": 41,
+        "read_exact": true,
+        "cat_exact": true,
+        "proxy_exact": true
+      },
+      {
+        "raw_bytes": 50,
+        "read_bytes": 50,
+        "read_exact": true,
+        "cat_exact": true,
+        "proxy_exact": true
+      },
+      {
+        "raw_bytes": 35,
+        "read_bytes": 35,
+        "read_exact": true,
+        "cat_exact": true,
+        "proxy_exact": true
+      },
+      {
+        "raw_bytes": 39,
+        "read_bytes": 39,
+        "read_exact": true,
+        "cat_exact": true,
+        "proxy_exact": true
+      }
+    ],
+    "bounded_read_exact": false,
+    "cat_subcommand_supported": true,
+    "git": {
+      "diff": {
+        "raw_bytes": 4261,
+        "compressed_bytes": 1471,
+        "compressed_exact": false,
+        "proxy_exact": true
+      },
+      "log": {
+        "raw_bytes": 205,
+        "compressed_bytes": 98,
+        "compressed_exact": false,
+        "proxy_exact": true
+      },
+      "log_stat": {
+        "raw_bytes": 610,
+        "compressed_bytes": 610,
+        "compressed_exact": true,
+        "proxy_exact": true
+      },
+      "show": {
+        "raw_bytes": 7632,
+        "compressed_bytes": 6164,
+        "compressed_exact": false,
+        "proxy_exact": true
+      }
+    },
+    "pytest": {
+      "raw_exit": 1,
+      "compressed_exit": 1,
+      "proxy_exit": 1,
+      "raw_bytes": 12761,
+      "compressed_bytes": 1622,
+      "compressed_diagnostics_exact": false,
+      "proxy_diagnostics_exact": true,
+      "compressed_case_names_present": 10,
+      "total_cases": 12,
+      "tee_disabled_files": 0
+    },
+    "tee_mode_never_files": 1,
+    "tee_failures": {
+      "files": 2,
+      "synthetic_sensitive_output_persisted": true
+    },
+    "tee_env_disabled_files": 0,
+    "sensitive_exclusions": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "evidence_exclusions": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "overview_still_rewrites": true,
+    "raw_prefix_not_rewritten": true,
+    "explicit_proxy_not_rewritten": true,
+    "partial_config": {
+      "rejected": true,
+      "excluded_curl_rewritten": true
+    },
+    "tracking_disabled": {
+      "proxy_arguments_persisted": true,
+      "excluded_hook_arguments_persisted": true,
+      "hook_exit": 0,
+      "hook_left_command_raw": true
+    },
+    "gain_history": {
+      "exit": 0,
+      "synthetic_argument_fragment_exposed": true,
+      "private_project_path_exposed": false
+    },
+    "proxy_streams": {
+      "stdout_exact": true,
+      "stderr_exact": true,
+      "exit_exact": true
+    },
+    "hermes_install": {
+      "exit_codes": [
+        0,
+        0,
+        0
+      ],
+      "installed_files": [
+        "config.yaml",
+        "plugins/rtk-rewrite/__init__.py",
+        "plugins/rtk-rewrite/plugin.yaml"
+      ],
+      "config_idempotent": true,
+      "uninstall_restored_fixture_config": true,
+      "plugin_removed": true,
+      "live_host_and_subagents": "NOT_RUN"
+    },
+    "codex_install": {
+      "exit_codes": [
+        0,
+        0
+      ],
+      "installed_files": [
+        "AGENTS.md",
+        "RTK.md",
+        "config.toml"
+      ],
+      "instructions_injected": true,
+      "original_guidance_preserved": true,
+      "config_unchanged": true,
+      "live_host_and_subagents": "NOT_RUN"
+    },
+    "protected_files_unchanged": true
+  },
+  "git_version": "git version 2.47.3",
+  "temporary_state_removed": true
+}
