@@ -1335,6 +1335,56 @@ describe('complete OpenSpec workflow documentation contract', () => {
     }
   });
 
+  it('keeps Ponytail evaluation manual, implementation-only, and outside extension integration', async () => {
+    const providerGuide = await readRepoFile('docs/skill-providers.md');
+    const usage = await readRepoFile('docs/usage.md');
+    const docsIndex = await readRepoFile('docs/README.md');
+    const readme = await readRepoFile('README.md');
+    const changelog = await readRepoFile('CHANGELOG.md');
+    const extensionManifest = await readRepoFile('extension.json');
+    const packageManifest = await readRepoFile('package.json');
+    const analyzeSkill = await readRepoFile('skills/aif-analyze/SKILL.md');
+    const claudeImplementWorker = await readRepoFile('agent-files/claude/aifhub-implement-worker.md');
+    const codexImplementWorker = await readRepoFile('agent-files/codex/aifhub-implement-worker.toml');
+
+    for (const expected of [
+      'manual_experiment_only',
+      'v4.9.0',
+      '0a4dd63ad4541f4f655c4108a295916f3c1d8fda',
+      'SessionStart',
+      'SubagentStart',
+      'UserPromptSubmit',
+      'PONYTAIL_SUBAGENT_MATCHER',
+      'fails open',
+      'NOT_RUN(dedicated_isolated_runner_required)',
+      'EXECUTED(mixed_non_promotable)',
+      'skill-providers-research/ponytail-pi-ab/README.md',
+      'omniroute/lq/qwen3.8-27b',
+      'omniroute/la/ornith-1.5-35b-a3b',
+      '/aif-security-checklist',
+      'fresh isolated copies',
+      'extension/plugin/package dependencies',
+      'recommendation metadata',
+      'auto-inject Ponytail',
+      'raw hook output'
+    ]) {
+      assertIncludes(providerGuide, expected, 'docs/skill-providers.md provider boundary');
+    }
+
+    assertIncludes(usage, 'manual_experiment_only', 'docs/usage.md provider status');
+    assertIncludes(usage, 'semantic security gate', 'docs/usage.md security boundary');
+    assertIncludes(docsIndex, 'skill-providers.md', 'docs/README.md discoverability');
+    assertIncludes(readme, 'skill-providers.md', 'README.md discoverability');
+    assertIncludes(changelog, 'DietrichGebert/ponytail', 'CHANGELOG.md evaluation record');
+    assertIncludes(changelog, 'manual_experiment_only', 'CHANGELOG.md provider status');
+
+    assertNotIncludes(extensionManifest, 'ponytail', 'extension.json integration boundary');
+    assertNotIncludes(packageManifest, 'ponytail', 'package.json dependency boundary');
+    assertNotIncludes(analyzeSkill, 'ponytail', 'aif-analyze recommendation boundary');
+    assertNotIncludes(claudeImplementWorker, 'ponytail', 'Claude implementation instruction boundary');
+    assertNotIncludes(codexImplementWorker, 'ponytail', 'Codex implementation instruction boundary');
+  });
+
   it('documents provider-neutral MCP work-item IDs across OpenSpec and legacy modes', async () => {
     const readme = await readRepoFile('README.md');
     const usage = await readRepoFile('docs/usage.md');

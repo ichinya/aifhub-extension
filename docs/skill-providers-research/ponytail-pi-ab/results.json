@@ -1,0 +1,706 @@
+{
+  "schema": "aifhub.ponytail_pi_ab.public_results.v1",
+  "date": "2026-09-03",
+  "evidence_status": "EXECUTED(mixed_non_promotable)",
+  "decision": "retain_manual_experiment_only",
+  "envelope": {
+    "runtime": "pi",
+    "runtime_version": "0.84.4",
+    "provider": "omniroute",
+    "thinking": "low",
+    "conditions": [
+      "baseline",
+      "ponytail_full"
+    ],
+    "repetitions_per_condition_and_scenario": 4,
+    "scenarios": 3,
+    "timeout_seconds": 900
+  },
+  "provenance": {
+    "runner_sha256": "b230fd417e92db72c826e939e7d1d5da1eb2162c04b802d06f0f488c6941c010",
+    "catalog_sha256": "aee743a313edb68ad8a585a814ba3d1b3f66c809ef4d281c20272e38af814493",
+    "ponytail": {
+      "version": "4.9.0",
+      "source_commit": "0a4dd63ad4541f4f655c4108a295916f3c1d8fda",
+      "copied_skill_sha256": "46a57e26a2632e7fa40eae6a3cf3011ccdc4d8db19d8f8617907d6b5deef055e",
+      "loading": "explicit_skill_only_no_hooks"
+    },
+    "source_commits": {
+      "passkey": "24a55ce21aa6a525dd3bd215b13b2af8ef2e14a8",
+      "yougile-mcp": "d643d48ff84c098079f02576a115da3e61135579",
+      "cutcode-shop": "1dc513dd7821c30cab2a8738b399768da58b049d"
+    },
+    "hidden_grader_sha256": {
+      "typescript-url-join": "91c077c550ff4d86da90fd13ee266d830f3d4dc09571ccbd52c915bc0c4084a4",
+      "go-safe-decrypt-errors": "526758f09ae139aa65ffb4a22027dd362ca6e69f3f5fc244e5e5abfe5b5339bf",
+      "laravel-exact-price-formatting": "634e4aeefdb71d58a5fbfef164078705f77a7d06929f51d61de3b13cdfeb5911"
+    }
+  },
+  "runs": [
+    {
+      "run_id": "ponytail-qwen-low-20260902-r4",
+      "model": "lq/qwen3.8-27b",
+      "aggregate_file": "aggregate-qwen.json",
+      "source_aggregate_sha256": "da0bd25e67bc6182f8973278a75ee056d9757b6ed62f7c79a60c54c47a5f3a96",
+      "expected_cases": 24,
+      "completed_cases": 24,
+      "complete_pairs": 12,
+      "pass_by_condition": {
+        "baseline": 6,
+        "ponytail_full": 8
+      },
+      "timeouts_by_condition": {
+        "baseline": 6,
+        "ponytail_full": 4
+      },
+      "pair_outcomes": {
+        "both_pass": 5,
+        "ponytail_only_pass": 3,
+        "baseline_only_pass": 1,
+        "both_fail": 3
+      },
+      "by_scenario": [
+        {
+          "id": "typescript-url-join",
+          "pass_by_condition": {
+            "baseline": 4,
+            "ponytail_full": 4
+          },
+          "timeouts_by_condition": {
+            "baseline": 0,
+            "ponytail_full": 0
+          },
+          "pair_outcomes": {
+            "both_pass": 4,
+            "ponytail_only_pass": 0,
+            "baseline_only_pass": 0,
+            "both_fail": 0
+          }
+        },
+        {
+          "id": "go-safe-decrypt-errors",
+          "pass_by_condition": {
+            "baseline": 1,
+            "ponytail_full": 3
+          },
+          "timeouts_by_condition": {
+            "baseline": 3,
+            "ponytail_full": 1
+          },
+          "pair_outcomes": {
+            "both_pass": 1,
+            "ponytail_only_pass": 2,
+            "baseline_only_pass": 0,
+            "both_fail": 1
+          }
+        },
+        {
+          "id": "laravel-exact-price-formatting",
+          "pass_by_condition": {
+            "baseline": 1,
+            "ponytail_full": 1
+          },
+          "timeouts_by_condition": {
+            "baseline": 3,
+            "ponytail_full": 3
+          },
+          "pair_outcomes": {
+            "both_pass": 0,
+            "ponytail_only_pass": 1,
+            "baseline_only_pass": 1,
+            "both_fail": 2
+          }
+        }
+      ],
+      "both_pass_pair_efficiency": {
+        "scope": "only_pairs_where_both_conditions_task_pass",
+        "pairs": 5,
+        "duration_seconds_total": {
+          "baseline": 1449,
+          "ponytail_full": 1649.66,
+          "delta_percent": 13.85
+        },
+        "source_churn_lines_total": {
+          "baseline": 113,
+          "ponytail_full": 108,
+          "delta_percent": -4.42
+        },
+        "reported_tokens_total": {
+          "baseline": 36133,
+          "ponytail_full": 46454,
+          "delta_percent": 28.56
+        }
+      },
+      "integrity": {
+        "source_snapshots_intact": true,
+        "ponytail_source_intact": true,
+        "treatment_resources_intact": true,
+        "dependency_changes": 0
+      }
+    },
+    {
+      "run_id": "ponytail-la-ornith-low-20260902-r2",
+      "model": "la/ornith-1.5-35b-a3b",
+      "aggregate_file": "aggregate-la.json",
+      "source_aggregate_sha256": "86795c1490be8125ffa2bc669907c01d3f57a0a980b07ba6bb74463ebadfb55c",
+      "expected_cases": 24,
+      "completed_cases": 24,
+      "complete_pairs": 12,
+      "pass_by_condition": {
+        "baseline": 11,
+        "ponytail_full": 9
+      },
+      "timeouts_by_condition": {
+        "baseline": 0,
+        "ponytail_full": 0
+      },
+      "pair_outcomes": {
+        "both_pass": 8,
+        "ponytail_only_pass": 1,
+        "baseline_only_pass": 3,
+        "both_fail": 0
+      },
+      "by_scenario": [
+        {
+          "id": "typescript-url-join",
+          "pass_by_condition": {
+            "baseline": 4,
+            "ponytail_full": 4
+          },
+          "timeouts_by_condition": {
+            "baseline": 0,
+            "ponytail_full": 0
+          },
+          "pair_outcomes": {
+            "both_pass": 4,
+            "ponytail_only_pass": 0,
+            "baseline_only_pass": 0,
+            "both_fail": 0
+          }
+        },
+        {
+          "id": "go-safe-decrypt-errors",
+          "pass_by_condition": {
+            "baseline": 3,
+            "ponytail_full": 4
+          },
+          "timeouts_by_condition": {
+            "baseline": 0,
+            "ponytail_full": 0
+          },
+          "pair_outcomes": {
+            "both_pass": 3,
+            "ponytail_only_pass": 1,
+            "baseline_only_pass": 0,
+            "both_fail": 0
+          }
+        },
+        {
+          "id": "laravel-exact-price-formatting",
+          "pass_by_condition": {
+            "baseline": 4,
+            "ponytail_full": 1
+          },
+          "timeouts_by_condition": {
+            "baseline": 0,
+            "ponytail_full": 0
+          },
+          "pair_outcomes": {
+            "both_pass": 1,
+            "ponytail_only_pass": 0,
+            "baseline_only_pass": 3,
+            "both_fail": 0
+          }
+        }
+      ],
+      "both_pass_pair_efficiency": {
+        "scope": "only_pairs_where_both_conditions_task_pass",
+        "pairs": 8,
+        "duration_seconds_total": {
+          "baseline": 580.91,
+          "ponytail_full": 474.93,
+          "delta_percent": -18.24
+        },
+        "source_churn_lines_total": {
+          "baseline": 576,
+          "ponytail_full": 391,
+          "delta_percent": -32.12
+        },
+        "reported_tokens_total": {
+          "baseline": 97571,
+          "ponytail_full": 81611,
+          "delta_percent": -16.36
+        }
+      },
+      "integrity": {
+        "source_snapshots_intact": true,
+        "ponytail_source_intact": true,
+        "treatment_resources_intact": true,
+        "dependency_changes": 0
+      }
+    },
+    {
+      "run_id": "ponytail-bai-mimo-v2-5-low-20260903-r4",
+      "model": "bai/mimo-v2.5",
+      "aggregate_file": "aggregate-bai-mimo-v2-5.json",
+      "source_aggregate_sha256": "2978ae74be55e71750b04831c1fa513e254ebd07cb21704caa77a62d770c757d",
+      "expected_cases": 24,
+      "completed_cases": 24,
+      "complete_pairs": 12,
+      "pass_by_condition": {
+        "baseline": 0,
+        "ponytail_full": 1
+      },
+      "timeouts_by_condition": {
+        "baseline": 0,
+        "ponytail_full": 0
+      },
+      "pair_outcomes": {
+        "both_pass": 0,
+        "ponytail_only_pass": 1,
+        "baseline_only_pass": 0,
+        "both_fail": 11
+      },
+      "by_scenario": [
+        {
+          "id": "typescript-url-join",
+          "pass_by_condition": {
+            "baseline": 0,
+            "ponytail_full": 1
+          },
+          "timeouts_by_condition": {
+            "baseline": 0,
+            "ponytail_full": 0
+          },
+          "pair_outcomes": {
+            "both_pass": 0,
+            "ponytail_only_pass": 1,
+            "baseline_only_pass": 0,
+            "both_fail": 3
+          }
+        },
+        {
+          "id": "go-safe-decrypt-errors",
+          "pass_by_condition": {
+            "baseline": 0,
+            "ponytail_full": 0
+          },
+          "timeouts_by_condition": {
+            "baseline": 0,
+            "ponytail_full": 0
+          },
+          "pair_outcomes": {
+            "both_pass": 0,
+            "ponytail_only_pass": 0,
+            "baseline_only_pass": 0,
+            "both_fail": 4
+          }
+        },
+        {
+          "id": "laravel-exact-price-formatting",
+          "pass_by_condition": {
+            "baseline": 0,
+            "ponytail_full": 0
+          },
+          "timeouts_by_condition": {
+            "baseline": 0,
+            "ponytail_full": 0
+          },
+          "pair_outcomes": {
+            "both_pass": 0,
+            "ponytail_only_pass": 0,
+            "baseline_only_pass": 0,
+            "both_fail": 4
+          }
+        }
+      ],
+      "both_pass_pair_efficiency": {
+        "scope": "only_pairs_where_both_conditions_task_pass",
+        "pairs": 0,
+        "duration_seconds_total": {
+          "baseline": 0,
+          "ponytail_full": 0,
+          "delta_percent": 0
+        },
+        "source_churn_lines_total": {
+          "baseline": 0,
+          "ponytail_full": 0,
+          "delta_percent": 0
+        },
+        "reported_tokens_total": {
+          "baseline": 0,
+          "ponytail_full": 0,
+          "delta_percent": 0
+        }
+      },
+      "integrity": {
+        "source_snapshots_intact": true,
+        "ponytail_source_intact": true,
+        "treatment_resources_intact": true,
+        "dependency_changes": 0
+      }
+    },
+    {
+      "run_id": "ponytail-bai-glm-5-3-flash-low-20260903-r1",
+      "model": "bai/glm-5.3-flash",
+      "aggregate_file": "aggregate-bai-glm-5-3-flash.json",
+      "source_aggregate_sha256": "71954ef11252b6835d9f82a4c6e747f43eda9649fc35c2ec0e6ab820857f84bf",
+      "expected_cases": 24,
+      "completed_cases": 24,
+      "complete_pairs": 12,
+      "pass_by_condition": {
+        "baseline": 11,
+        "ponytail_full": 10
+      },
+      "timeouts_by_condition": {
+        "baseline": 0,
+        "ponytail_full": 0
+      },
+      "pair_outcomes": {
+        "both_pass": 9,
+        "ponytail_only_pass": 1,
+        "baseline_only_pass": 2,
+        "both_fail": 0
+      },
+      "by_scenario": [
+        {
+          "id": "typescript-url-join",
+          "pass_by_condition": {
+            "baseline": 4,
+            "ponytail_full": 4
+          },
+          "timeouts_by_condition": {
+            "baseline": 0,
+            "ponytail_full": 0
+          },
+          "pair_outcomes": {
+            "both_pass": 4,
+            "ponytail_only_pass": 0,
+            "baseline_only_pass": 0,
+            "both_fail": 0
+          }
+        },
+        {
+          "id": "go-safe-decrypt-errors",
+          "pass_by_condition": {
+            "baseline": 4,
+            "ponytail_full": 4
+          },
+          "timeouts_by_condition": {
+            "baseline": 0,
+            "ponytail_full": 0
+          },
+          "pair_outcomes": {
+            "both_pass": 4,
+            "ponytail_only_pass": 0,
+            "baseline_only_pass": 0,
+            "both_fail": 0
+          }
+        },
+        {
+          "id": "laravel-exact-price-formatting",
+          "pass_by_condition": {
+            "baseline": 3,
+            "ponytail_full": 2
+          },
+          "timeouts_by_condition": {
+            "baseline": 0,
+            "ponytail_full": 0
+          },
+          "pair_outcomes": {
+            "both_pass": 1,
+            "ponytail_only_pass": 1,
+            "baseline_only_pass": 2,
+            "both_fail": 0
+          }
+        }
+      ],
+      "both_pass_pair_efficiency": {
+        "scope": "only_pairs_where_both_conditions_task_pass",
+        "pairs": 9,
+        "duration_seconds_total": {
+          "baseline": 1831.61,
+          "ponytail_full": 1503.75,
+          "delta_percent": -17.9
+        },
+        "source_churn_lines_total": {
+          "baseline": 816,
+          "ponytail_full": 396,
+          "delta_percent": -51.47
+        },
+        "reported_tokens_total": {
+          "baseline": 56105,
+          "ponytail_full": 73319,
+          "delta_percent": 30.68
+        }
+      },
+      "integrity": {
+        "source_snapshots_intact": true,
+        "ponytail_source_intact": true,
+        "treatment_resources_intact": true,
+        "dependency_changes": 0
+      }
+    },
+    {
+      "run_id": "ponytail-bai-deepseek-v4-flash-low-20260903-r4",
+      "model": "bai/deepseek-v4-flash",
+      "aggregate_file": "aggregate-bai-deepseek-v4-flash.json",
+      "source_aggregate_sha256": "fca07d911818d2c05662b956e5f0ce62b9e5a9a175704d1da7ac7f769fd7d348",
+      "expected_cases": 24,
+      "completed_cases": 24,
+      "complete_pairs": 12,
+      "pass_by_condition": {
+        "baseline": 0,
+        "ponytail_full": 0
+      },
+      "timeouts_by_condition": {
+        "baseline": 0,
+        "ponytail_full": 0
+      },
+      "pair_outcomes": {
+        "both_pass": 0,
+        "ponytail_only_pass": 0,
+        "baseline_only_pass": 0,
+        "both_fail": 12
+      },
+      "by_scenario": [
+        {
+          "id": "typescript-url-join",
+          "pass_by_condition": {
+            "baseline": 0,
+            "ponytail_full": 0
+          },
+          "timeouts_by_condition": {
+            "baseline": 0,
+            "ponytail_full": 0
+          },
+          "pair_outcomes": {
+            "both_pass": 0,
+            "ponytail_only_pass": 0,
+            "baseline_only_pass": 0,
+            "both_fail": 4
+          }
+        },
+        {
+          "id": "go-safe-decrypt-errors",
+          "pass_by_condition": {
+            "baseline": 0,
+            "ponytail_full": 0
+          },
+          "timeouts_by_condition": {
+            "baseline": 0,
+            "ponytail_full": 0
+          },
+          "pair_outcomes": {
+            "both_pass": 0,
+            "ponytail_only_pass": 0,
+            "baseline_only_pass": 0,
+            "both_fail": 4
+          }
+        },
+        {
+          "id": "laravel-exact-price-formatting",
+          "pass_by_condition": {
+            "baseline": 0,
+            "ponytail_full": 0
+          },
+          "timeouts_by_condition": {
+            "baseline": 0,
+            "ponytail_full": 0
+          },
+          "pair_outcomes": {
+            "both_pass": 0,
+            "ponytail_only_pass": 0,
+            "baseline_only_pass": 0,
+            "both_fail": 4
+          }
+        }
+      ],
+      "both_pass_pair_efficiency": {
+        "scope": "only_pairs_where_both_conditions_task_pass",
+        "pairs": 0,
+        "duration_seconds_total": {
+          "baseline": 0,
+          "ponytail_full": 0,
+          "delta_percent": 0
+        },
+        "source_churn_lines_total": {
+          "baseline": 0,
+          "ponytail_full": 0,
+          "delta_percent": 0
+        },
+        "reported_tokens_total": {
+          "baseline": 0,
+          "ponytail_full": 0,
+          "delta_percent": 0
+        }
+      },
+      "integrity": {
+        "source_snapshots_intact": true,
+        "ponytail_source_intact": true,
+        "treatment_resources_intact": true,
+        "dependency_changes": 0
+      }
+    },
+    {
+      "run_id": "ponytail-bai-qwen3-8-flash-low-20260903-r1",
+      "model": "bai/qwen3.8-flash",
+      "aggregate_file": "aggregate-bai-qwen3.8-flash.json",
+      "source_aggregate_sha256": "8637431537aa5375e039f807c976e715f33aacb4ea030676f8f9e17c6a98db10",
+      "expected_cases": 24,
+      "completed_cases": 24,
+      "complete_pairs": 12,
+      "pass_by_condition": {
+        "baseline": 7,
+        "ponytail_full": 8
+      },
+      "timeouts_by_condition": {
+        "baseline": 0,
+        "ponytail_full": 0
+      },
+      "pair_outcomes": {
+        "both_pass": 7,
+        "ponytail_only_pass": 1,
+        "baseline_only_pass": 0,
+        "both_fail": 4
+      },
+      "by_scenario": [
+        {
+          "id": "typescript-url-join",
+          "pass_by_condition": {
+            "baseline": 0,
+            "ponytail_full": 0
+          },
+          "timeouts_by_condition": {
+            "baseline": 0,
+            "ponytail_full": 0
+          },
+          "pair_outcomes": {
+            "both_pass": 0,
+            "ponytail_only_pass": 0,
+            "baseline_only_pass": 0,
+            "both_fail": 4
+          }
+        },
+        {
+          "id": "go-safe-decrypt-errors",
+          "pass_by_condition": {
+            "baseline": 4,
+            "ponytail_full": 4
+          },
+          "timeouts_by_condition": {
+            "baseline": 0,
+            "ponytail_full": 0
+          },
+          "pair_outcomes": {
+            "both_pass": 4,
+            "ponytail_only_pass": 0,
+            "baseline_only_pass": 0,
+            "both_fail": 0
+          }
+        },
+        {
+          "id": "laravel-exact-price-formatting",
+          "pass_by_condition": {
+            "baseline": 3,
+            "ponytail_full": 4
+          },
+          "timeouts_by_condition": {
+            "baseline": 0,
+            "ponytail_full": 0
+          },
+          "pair_outcomes": {
+            "both_pass": 3,
+            "ponytail_only_pass": 1,
+            "baseline_only_pass": 0,
+            "both_fail": 0
+          }
+        }
+      ],
+      "both_pass_pair_efficiency": {
+        "scope": "only_pairs_where_both_conditions_task_pass",
+        "pairs": 7,
+        "duration_seconds_total": {
+          "baseline": 1415.49,
+          "ponytail_full": 1430.55,
+          "delta_percent": 1.06
+        },
+        "source_churn_lines_total": {
+          "baseline": 935,
+          "ponytail_full": 520,
+          "delta_percent": -44.39
+        },
+        "reported_tokens_total": {
+          "baseline": 71124,
+          "ponytail_full": 85529,
+          "delta_percent": 20.25
+        }
+      },
+      "integrity": {
+        "source_snapshots_intact": true,
+        "ponytail_source_intact": true,
+        "treatment_resources_intact": true,
+        "dependency_changes": 0
+      }
+    }
+  ],
+  "excluded_comparisons": [
+    {
+      "run_id": "ponytail-la-ornith-low-20260902-r2",
+      "scenario_id": "laravel-exact-price-formatting",
+      "repetition": 2,
+      "condition": "ponytail_full",
+      "status": "NOT_COMPARABLE(provider_error)",
+      "error_families": [
+        "http_429",
+        "http_5xx"
+      ],
+      "assistant_error_events": 4,
+      "bounded_auto_retry_attempts": 3,
+      "tool_calls": 0
+    }
+  ],
+  "adjusted_cross_run_summary": {
+    "raw_rows": 144,
+    "raw_pairs": 72,
+    "excluded_pairs": 1,
+    "comparable_pairs": 71,
+    "pass_on_comparable_pairs_by_condition": {
+      "baseline": 34,
+      "ponytail_full": 36
+    },
+    "pair_outcomes": {
+      "both_pass": 29,
+      "ponytail_only_pass": 7,
+      "baseline_only_pass": 5,
+      "both_fail": 30
+    },
+    "by_scenario": {
+      "typescript-url-join": {
+        "comparable_pairs": 24,
+        "baseline_pass": 12,
+        "ponytail_full_pass": 13
+      },
+      "go-safe-decrypt-errors": {
+        "comparable_pairs": 24,
+        "baseline_pass": 12,
+        "ponytail_full_pass": 15
+      },
+      "laravel-exact-price-formatting": {
+        "comparable_pairs": 23,
+        "baseline_pass": 10,
+        "ponytail_full_pass": 8
+      }
+    }
+  },
+  "cost_status": "NOT_COMPARABLE(provider_cost_metadata_zero)",
+  "invalid_attempts": {
+    "status": "EXCLUDED(stdin_eof_runner_bug)",
+    "included_in_public_results": false
+  },
+  "retention": {
+    "committed_artifact": "sanitized_aggregate_only",
+    "raw_model_output_committed": false,
+    "private_paths_committed": false
+  }
+}

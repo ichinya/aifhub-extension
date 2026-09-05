@@ -1,0 +1,1629 @@
+{
+  "schema": "aifhub.ponytail_pi_ab.results.v1",
+  "run_id": "ponytail-la-ornith-low-20260902-r2",
+  "provider": "omniroute",
+  "model": "la/ornith-1.5-35b-a3b",
+  "thinking": "low",
+  "expected_cases": 24,
+  "completed_cases": 24,
+  "complete_pairs": 12,
+  "pass_by_condition": {
+    "baseline": 11,
+    "ponytail_full": 9
+  },
+  "results": [
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-la-ornith-low-20260902-r2__typescript-url-join__r01__baseline",
+      "pair_id": "ponytail-la-ornith-low-20260902-r2__typescript-url-join__r01",
+      "scenario_id": "typescript-url-join",
+      "condition": "baseline",
+      "repetition": 1,
+      "started_at": "2026-09-02T11:54:42.867Z",
+      "duration_ms": 56372,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 1840,
+          "tool_calls": 18,
+          "provider_usage": {
+            "input": 7318,
+            "output": 327,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 8,
+            "totalTokens": 7645,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "setup",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 4570
+        },
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 2560
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 804
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [
+          "src/common/request-helper.ts"
+        ],
+        "changed_file_count": 1,
+        "source_loc_added": 15,
+        "source_loc_deleted": 2,
+        "dependency_files_changed": false
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-la-ornith-low-20260902-r2__typescript-url-join__r01__ponytail_full",
+      "pair_id": "ponytail-la-ornith-low-20260902-r2__typescript-url-join__r01",
+      "scenario_id": "typescript-url-join",
+      "condition": "ponytail_full",
+      "repetition": 1,
+      "started_at": "2026-09-02T11:55:48.890Z",
+      "duration_ms": 39151,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 1230,
+          "tool_calls": 13,
+          "provider_usage": {
+            "input": 7606,
+            "output": 229,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 76,
+            "totalTokens": 7835,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "setup",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 4254
+        },
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 2191
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 780
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [
+          "src/common/request-helper.ts"
+        ],
+        "changed_file_count": 1,
+        "source_loc_added": 15,
+        "source_loc_deleted": 2,
+        "dependency_files_changed": false
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-la-ornith-low-20260902-r2__typescript-url-join__r02__ponytail_full",
+      "pair_id": "ponytail-la-ornith-low-20260902-r2__typescript-url-join__r02",
+      "scenario_id": "typescript-url-join",
+      "condition": "ponytail_full",
+      "repetition": 2,
+      "started_at": "2026-09-02T11:56:37.027Z",
+      "duration_ms": 37630,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 672,
+          "tool_calls": 10,
+          "provider_usage": {
+            "input": 5469,
+            "output": 264,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 30,
+            "totalTokens": 5733,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "setup",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 4367
+        },
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 2292
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 1028
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [
+          "src/common/request-helper.ts"
+        ],
+        "changed_file_count": 1,
+        "source_loc_added": 15,
+        "source_loc_deleted": 2,
+        "dependency_files_changed": false
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-la-ornith-low-20260902-r2__typescript-url-join__r02__baseline",
+      "pair_id": "ponytail-la-ornith-low-20260902-r2__typescript-url-join__r02",
+      "scenario_id": "typescript-url-join",
+      "condition": "baseline",
+      "repetition": 2,
+      "started_at": "2026-09-02T11:57:24.228Z",
+      "duration_ms": 60640,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 3714,
+          "tool_calls": 21,
+          "provider_usage": {
+            "input": 10643,
+            "output": 321,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 9,
+            "totalTokens": 10964,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "setup",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 4522
+        },
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 2533
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 968
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [
+          "src/common/request-helper.ts"
+        ],
+        "changed_file_count": 1,
+        "source_loc_added": 15,
+        "source_loc_deleted": 2,
+        "dependency_files_changed": false
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-la-ornith-low-20260902-r2__typescript-url-join__r03__baseline",
+      "pair_id": "ponytail-la-ornith-low-20260902-r2__typescript-url-join__r03",
+      "scenario_id": "typescript-url-join",
+      "condition": "baseline",
+      "repetition": 3,
+      "started_at": "2026-09-02T11:58:34.745Z",
+      "duration_ms": 43845,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 2576,
+          "tool_calls": 17,
+          "provider_usage": {
+            "input": 8225,
+            "output": 364,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 49,
+            "totalTokens": 8589,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "setup",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 4573
+        },
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 2468
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 797
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [
+          "src/common/request-helper.ts"
+        ],
+        "changed_file_count": 1,
+        "source_loc_added": 23,
+        "source_loc_deleted": 3,
+        "dependency_files_changed": false
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-la-ornith-low-20260902-r2__typescript-url-join__r03__ponytail_full",
+      "pair_id": "ponytail-la-ornith-low-20260902-r2__typescript-url-join__r03",
+      "scenario_id": "typescript-url-join",
+      "condition": "ponytail_full",
+      "repetition": 3,
+      "started_at": "2026-09-02T11:59:28.316Z",
+      "duration_ms": 47273,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 1866,
+          "tool_calls": 17,
+          "provider_usage": {
+            "input": 7683,
+            "output": 265,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 11,
+            "totalTokens": 7948,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "setup",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 4898
+        },
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 2135
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 965
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [
+          "src/common/request-helper.ts"
+        ],
+        "changed_file_count": 1,
+        "source_loc_added": 16,
+        "source_loc_deleted": 2,
+        "dependency_files_changed": false
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-la-ornith-low-20260902-r2__typescript-url-join__r04__ponytail_full",
+      "pair_id": "ponytail-la-ornith-low-20260902-r2__typescript-url-join__r04",
+      "scenario_id": "typescript-url-join",
+      "condition": "ponytail_full",
+      "repetition": 4,
+      "started_at": "2026-09-02T12:00:24.515Z",
+      "duration_ms": 47318,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 2286,
+          "tool_calls": 16,
+          "provider_usage": {
+            "input": 8088,
+            "output": 236,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 14,
+            "totalTokens": 8324,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "setup",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 4474
+        },
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 2780
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 928
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [
+          "src/common/request-helper.ts"
+        ],
+        "changed_file_count": 1,
+        "source_loc_added": 15,
+        "source_loc_deleted": 2,
+        "dependency_files_changed": false
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-la-ornith-low-20260902-r2__typescript-url-join__r04__baseline",
+      "pair_id": "ponytail-la-ornith-low-20260902-r2__typescript-url-join__r04",
+      "scenario_id": "typescript-url-join",
+      "condition": "baseline",
+      "repetition": 4,
+      "started_at": "2026-09-02T12:01:21.751Z",
+      "duration_ms": 51974,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 2778,
+          "tool_calls": 16,
+          "provider_usage": {
+            "input": 7776,
+            "output": 334,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 12,
+            "totalTokens": 8110,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "setup",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 4123
+        },
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "node.exe",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 2305
+        }
+      ],
+      "hidden_grader": {
+        "command": "node.exe",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 1065
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [
+          "src/common/request-helper.ts"
+        ],
+        "changed_file_count": 1,
+        "source_loc_added": 28,
+        "source_loc_deleted": 3,
+        "dependency_files_changed": false
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-la-ornith-low-20260902-r2__go-safe-decrypt-errors__r01__baseline",
+      "pair_id": "ponytail-la-ornith-low-20260902-r2__go-safe-decrypt-errors__r01",
+      "scenario_id": "go-safe-decrypt-errors",
+      "condition": "baseline",
+      "repetition": 1,
+      "started_at": "2026-09-02T12:02:22.770Z",
+      "duration_ms": 133753,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 6962,
+          "tool_calls": 38,
+          "provider_usage": {
+            "input": 22184,
+            "output": 425,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 174,
+            "totalTokens": 22609,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "go",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 1732
+        }
+      ],
+      "hidden_grader": {
+        "command": "go",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 2085
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [
+          "go/encrypt.go",
+          "go/encrypt_safe_test.go"
+        ],
+        "changed_file_count": 2,
+        "source_loc_added": 186,
+        "source_loc_deleted": 5,
+        "dependency_files_changed": false
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-la-ornith-low-20260902-r2__go-safe-decrypt-errors__r01__ponytail_full",
+      "pair_id": "ponytail-la-ornith-low-20260902-r2__go-safe-decrypt-errors__r01",
+      "scenario_id": "go-safe-decrypt-errors",
+      "condition": "ponytail_full",
+      "repetition": 1,
+      "started_at": "2026-09-02T12:04:41.116Z",
+      "duration_ms": 87281,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 4202,
+          "tool_calls": 26,
+          "provider_usage": {
+            "input": 14144,
+            "output": 279,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 7,
+            "totalTokens": 14423,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "go",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 1549
+        }
+      ],
+      "hidden_grader": {
+        "command": "go",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 1818
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [
+          "go/encrypt.go",
+          "go/encrypt_test.go"
+        ],
+        "changed_file_count": 2,
+        "source_loc_added": 72,
+        "source_loc_deleted": 2,
+        "dependency_files_changed": false
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-la-ornith-low-20260902-r2__go-safe-decrypt-errors__r02__ponytail_full",
+      "pair_id": "ponytail-la-ornith-low-20260902-r2__go-safe-decrypt-errors__r02",
+      "scenario_id": "go-safe-decrypt-errors",
+      "condition": "ponytail_full",
+      "repetition": 2,
+      "started_at": "2026-09-02T12:06:12.366Z",
+      "duration_ms": 52304,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 1806,
+          "tool_calls": 14,
+          "provider_usage": {
+            "input": 12471,
+            "output": 256,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 16,
+            "totalTokens": 12727,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "go",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 1601
+        }
+      ],
+      "hidden_grader": {
+        "command": "go",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 2083
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [
+          "go/encrypt.go",
+          "go/encrypt_test.go"
+        ],
+        "changed_file_count": 2,
+        "source_loc_added": 107,
+        "source_loc_deleted": 2,
+        "dependency_files_changed": false
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-la-ornith-low-20260902-r2__go-safe-decrypt-errors__r02__baseline",
+      "pair_id": "ponytail-la-ornith-low-20260902-r2__go-safe-decrypt-errors__r02",
+      "scenario_id": "go-safe-decrypt-errors",
+      "condition": "baseline",
+      "repetition": 2,
+      "started_at": "2026-09-02T12:07:09.073Z",
+      "duration_ms": 119419,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 6350,
+          "tool_calls": 38,
+          "provider_usage": {
+            "input": 17143,
+            "output": 302,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 12,
+            "totalTokens": 17445,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "go",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 1693
+        }
+      ],
+      "hidden_grader": {
+        "command": "go",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 2044
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [
+          "go/encrypt.go",
+          "go/encrypt_test.go"
+        ],
+        "changed_file_count": 2,
+        "source_loc_added": 70,
+        "source_loc_deleted": 8,
+        "dependency_files_changed": false
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-la-ornith-low-20260902-r2__go-safe-decrypt-errors__r03__baseline",
+      "pair_id": "ponytail-la-ornith-low-20260902-r2__go-safe-decrypt-errors__r03",
+      "scenario_id": "go-safe-decrypt-errors",
+      "condition": "baseline",
+      "repetition": 3,
+      "started_at": "2026-09-02T12:09:12.835Z",
+      "duration_ms": 41953,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 1444,
+          "tool_calls": 10,
+          "provider_usage": {
+            "input": 9185,
+            "output": 369,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 8,
+            "totalTokens": 9554,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "go",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 3299
+        }
+      ],
+      "hidden_grader": {
+        "command": "go",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 5066
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [
+          "go/encrypt.go",
+          "go/encrypt_test.go"
+        ],
+        "changed_file_count": 2,
+        "source_loc_added": 119,
+        "source_loc_deleted": 6,
+        "dependency_files_changed": false
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-la-ornith-low-20260902-r2__go-safe-decrypt-errors__r03__ponytail_full",
+      "pair_id": "ponytail-la-ornith-low-20260902-r2__go-safe-decrypt-errors__r03",
+      "scenario_id": "go-safe-decrypt-errors",
+      "condition": "ponytail_full",
+      "repetition": 3,
+      "started_at": "2026-09-02T12:10:04.497Z",
+      "duration_ms": 46199,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 1750,
+          "tool_calls": 12,
+          "provider_usage": {
+            "input": 9630,
+            "output": 387,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 10,
+            "totalTokens": 10017,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "go",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 1691
+        }
+      ],
+      "hidden_grader": {
+        "command": "go",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 2189
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [
+          "go/encrypt.go",
+          "go/encrypt_test.go"
+        ],
+        "changed_file_count": 2,
+        "source_loc_added": 74,
+        "source_loc_deleted": 8,
+        "dependency_files_changed": false
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-la-ornith-low-20260902-r2__go-safe-decrypt-errors__r04__ponytail_full",
+      "pair_id": "ponytail-la-ornith-low-20260902-r2__go-safe-decrypt-errors__r04",
+      "scenario_id": "go-safe-decrypt-errors",
+      "condition": "ponytail_full",
+      "repetition": 4,
+      "started_at": "2026-09-02T12:10:55.372Z",
+      "duration_ms": 207836,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 9989,
+          "tool_calls": 47,
+          "provider_usage": {
+            "input": 30038,
+            "output": 289,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 27,
+            "totalTokens": 30327,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "go",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 1610
+        }
+      ],
+      "hidden_grader": {
+        "command": "go",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 2143
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [
+          "go/encrypt.go",
+          "go/encrypt_test.go"
+        ],
+        "changed_file_count": 2,
+        "source_loc_added": 186,
+        "source_loc_deleted": 11,
+        "dependency_files_changed": false
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-la-ornith-low-20260902-r2__go-safe-decrypt-errors__r04__baseline",
+      "pair_id": "ponytail-la-ornith-low-20260902-r2__go-safe-decrypt-errors__r04",
+      "scenario_id": "go-safe-decrypt-errors",
+      "condition": "baseline",
+      "repetition": 4,
+      "started_at": "2026-09-02T12:14:27.621Z",
+      "duration_ms": 102921,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 5277,
+          "tool_calls": 26,
+          "provider_usage": {
+            "input": 17298,
+            "output": 99,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 91,
+            "totalTokens": 17397,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "go",
+          "exit_code": 1,
+          "timed_out": false,
+          "duration_ms": 810
+        }
+      ],
+      "hidden_grader": {
+        "command": "go",
+        "exit_code": 1,
+        "timed_out": false,
+        "duration_ms": 675
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [
+          "go/debug_test.go",
+          "go/encrypt.go",
+          "go/encrypt_test.go"
+        ],
+        "changed_file_count": 3,
+        "source_loc_added": 180,
+        "source_loc_deleted": 5,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-la-ornith-low-20260902-r2__laravel-exact-price-formatting__r01__baseline",
+      "pair_id": "ponytail-la-ornith-low-20260902-r2__laravel-exact-price-formatting__r01",
+      "scenario_id": "laravel-exact-price-formatting",
+      "condition": "baseline",
+      "repetition": 1,
+      "started_at": "2026-09-02T12:16:12.743Z",
+      "duration_ms": 68266,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 6101,
+          "tool_calls": 25,
+          "provider_usage": {
+            "input": 9442,
+            "output": 431,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 7,
+            "totalTokens": 9873,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "php",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 171
+        }
+      ],
+      "hidden_grader": {
+        "command": "php",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 126
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [
+          "src/Support/ValueObjects/Price.php",
+          "tests/Unit/Support/ValueObjects/PriceTest.php"
+        ],
+        "changed_file_count": 2,
+        "source_loc_added": 93,
+        "source_loc_deleted": 3,
+        "dependency_files_changed": false
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-la-ornith-low-20260902-r2__laravel-exact-price-formatting__r01__ponytail_full",
+      "pair_id": "ponytail-la-ornith-low-20260902-r2__laravel-exact-price-formatting__r01",
+      "scenario_id": "laravel-exact-price-formatting",
+      "condition": "ponytail_full",
+      "repetition": 1,
+      "started_at": "2026-09-02T12:17:21.995Z",
+      "duration_ms": 68260,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 5811,
+          "tool_calls": 23,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "php",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 82
+        }
+      ],
+      "hidden_grader": {
+        "command": "php",
+        "exit_code": 255,
+        "timed_out": false,
+        "duration_ms": 87
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [
+          "_pricecheck.php",
+          "src/Support/ValueObjects/Price.php",
+          "tests/Unit/Support/ValueObjects/PriceTest.php"
+        ],
+        "changed_file_count": 3,
+        "source_loc_added": 158,
+        "source_loc_deleted": 2,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-la-ornith-low-20260902-r2__laravel-exact-price-formatting__r02__ponytail_full",
+      "pair_id": "ponytail-la-ornith-low-20260902-r2__laravel-exact-price-formatting__r02",
+      "scenario_id": "laravel-exact-price-formatting",
+      "condition": "ponytail_full",
+      "repetition": 2,
+      "started_at": "2026-09-02T12:18:31.361Z",
+      "duration_ms": 68944,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 32,
+          "tool_calls": 0,
+          "provider_usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "php",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 92
+        }
+      ],
+      "hidden_grader": {
+        "command": "php",
+        "exit_code": 255,
+        "timed_out": false,
+        "duration_ms": 89
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [],
+        "changed_file_count": 0,
+        "source_loc_added": 0,
+        "source_loc_deleted": 0,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-la-ornith-low-20260902-r2__laravel-exact-price-formatting__r02__baseline",
+      "pair_id": "ponytail-la-ornith-low-20260902-r2__laravel-exact-price-formatting__r02",
+      "scenario_id": "laravel-exact-price-formatting",
+      "condition": "baseline",
+      "repetition": 2,
+      "started_at": "2026-09-02T12:19:41.152Z",
+      "duration_ms": 142104,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 9375,
+          "tool_calls": 36,
+          "provider_usage": {
+            "input": 15162,
+            "output": 547,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 15,
+            "totalTokens": 15709,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "php",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 124
+        }
+      ],
+      "hidden_grader": {
+        "command": "php",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 112
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [
+          "src/Support/ValueObjects/Price.php",
+          "tests/Unit/Support/ValueObjects/PriceTest.php"
+        ],
+        "changed_file_count": 2,
+        "source_loc_added": 105,
+        "source_loc_deleted": 3,
+        "dependency_files_changed": false
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-la-ornith-low-20260902-r2__laravel-exact-price-formatting__r03__baseline",
+      "pair_id": "ponytail-la-ornith-low-20260902-r2__laravel-exact-price-formatting__r03",
+      "scenario_id": "laravel-exact-price-formatting",
+      "condition": "baseline",
+      "repetition": 3,
+      "started_at": "2026-09-02T12:22:04.343Z",
+      "duration_ms": 54064,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 6230,
+          "tool_calls": 20,
+          "provider_usage": {
+            "input": 7390,
+            "output": 467,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 14,
+            "totalTokens": 7857,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "php",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 109
+        }
+      ],
+      "hidden_grader": {
+        "command": "php",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 96
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [
+          "src/Support/ValueObjects/Price.php",
+          "tests/Unit/Support/ValueObjects/PriceTest.php"
+        ],
+        "changed_file_count": 2,
+        "source_loc_added": 87,
+        "source_loc_deleted": 3,
+        "dependency_files_changed": false
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-la-ornith-low-20260902-r2__laravel-exact-price-formatting__r03__ponytail_full",
+      "pair_id": "ponytail-la-ornith-low-20260902-r2__laravel-exact-price-formatting__r03",
+      "scenario_id": "laravel-exact-price-formatting",
+      "condition": "ponytail_full",
+      "repetition": 3,
+      "started_at": "2026-09-02T12:22:59.276Z",
+      "duration_ms": 129130,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 5849,
+          "tool_calls": 41,
+          "provider_usage": {
+            "input": 27531,
+            "output": 459,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 32,
+            "totalTokens": 27990,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "php",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 89
+        }
+      ],
+      "hidden_grader": {
+        "command": "php",
+        "exit_code": 255,
+        "timed_out": false,
+        "duration_ms": 96
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [
+          "src/Support/ValueObjects/Price.php",
+          "tests/Unit/Support/ValueObjects/PriceTest.php"
+        ],
+        "changed_file_count": 2,
+        "source_loc_added": 105,
+        "source_loc_deleted": 3,
+        "dependency_files_changed": false
+      },
+      "task_pass": false
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-la-ornith-low-20260902-r2__laravel-exact-price-formatting__r04__ponytail_full",
+      "pair_id": "ponytail-la-ornith-low-20260902-r2__laravel-exact-price-formatting__r04",
+      "scenario_id": "laravel-exact-price-formatting",
+      "condition": "ponytail_full",
+      "repetition": 4,
+      "started_at": "2026-09-02T12:25:09.317Z",
+      "duration_ms": 117775,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 11736,
+          "tool_calls": 34,
+          "provider_usage": {
+            "input": 14047,
+            "output": 557,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 74,
+            "totalTokens": 14604,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "php",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 119
+        }
+      ],
+      "hidden_grader": {
+        "command": "php",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 126
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [
+          "src/Support/ValueObjects/Price.php",
+          "tests/Unit/Support/ValueObjects/PriceTest.php"
+        ],
+        "changed_file_count": 2,
+        "source_loc_added": 54,
+        "source_loc_deleted": 3,
+        "dependency_files_changed": false
+      },
+      "task_pass": true
+    },
+    {
+      "schema": "aifhub.ponytail_pi_ab.results.v1",
+      "case_id": "ponytail-la-ornith-low-20260902-r2__laravel-exact-price-formatting__r04__baseline",
+      "pair_id": "ponytail-la-ornith-low-20260902-r2__laravel-exact-price-formatting__r04",
+      "scenario_id": "laravel-exact-price-formatting",
+      "condition": "baseline",
+      "repetition": 4,
+      "started_at": "2026-09-02T12:27:08.197Z",
+      "duration_ms": 72951,
+      "pi": {
+        "exit_code": 0,
+        "timed_out": false,
+        "usage": {
+          "event_count": 7601,
+          "tool_calls": 25,
+          "provider_usage": {
+            "input": 12175,
+            "output": 480,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 13,
+            "totalTokens": 12655,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          }
+        }
+      },
+      "commands": [
+        {
+          "kind": "validation",
+          "index": 1,
+          "command": "php",
+          "exit_code": 0,
+          "timed_out": false,
+          "duration_ms": 93
+        }
+      ],
+      "hidden_grader": {
+        "command": "php",
+        "exit_code": 0,
+        "timed_out": false,
+        "duration_ms": 84
+      },
+      "diff_check_pass": true,
+      "source_snapshot_intact": true,
+      "ponytail_source_intact": true,
+      "treatment_resource_intact": true,
+      "metrics": {
+        "head_unchanged": true,
+        "changed_files": [
+          "src/Support/ValueObjects/Price.php",
+          "tests/Unit/Support/ValueObjects/PriceTest.php"
+        ],
+        "changed_file_count": 2,
+        "source_loc_added": 86,
+        "source_loc_deleted": 5,
+        "dependency_files_changed": false
+      },
+      "task_pass": true
+    }
+  ]
+}

@@ -255,6 +255,14 @@ Context7 library IDs являются provider output и могут иметь �
 
 Не persist `CONTEXT7_API_KEY`, API keys, tokens, raw authorization headers, credential helper output, private provider diagnostics, private backend diagnostics или unreviewed sensitive output в AIFHub artifacts.
 
+## Опциональные Skill Providers
+
+External skill providers меняют decision policy агента, поэтому для них действует более строгий boundary, чем для context providers. Центральная policy и exact evaluation evidence находятся в [Skill Providers](skill-providers.md).
+
+Ponytail `v4.9.0` имеет status `manual_experiment_only`: user может отдельно проверить его на одном bounded `/aif-implement <change-id>` task в isolated implementation-only session. AIFHub не устанавливает и не bundles provider, не trusts его lifecycle hooks, не injects его instructions, не предлагает его автоматически и не считает availability или output gate evidence.
+
+Always-on `full`/`ultra` plugin mode не должен охватывать `/aif-explore`, `/aif-plan`, `/aif-improve`, `/aif-rules-check`, `/aif-review`, `/aif-security-checklist`, `/aif-verify`, `/aif-fix`, `/aif-done` или `/aif-commit`. Canonical OpenSpec requirements, selected tasks, project rules, required tests, artifact ownership и AIFHub output contracts всегда ограничивают minimal-solution preference. Upstream `100% safe` означает pass конкретных deterministic adversarial scorers и не заменяет AIFHub semantic security gate.
+
 ## Bug Fix Workflows
 
 OpenSpec-native mode separates new bug reports from fixes for failed verification findings.
@@ -1304,6 +1312,8 @@ npm test
 ## See Also
 
 - [Documentation Index](README.md)
+- [Context Providers](context-providers.md)
+- [Skill Providers](skill-providers.md)
 - [Memory Tool Recommendations](memory-tool-recommendations.md)
 - [Context Loading Policy](context-loading-policy.md)
 - [OpenSpec Compatibility](openspec-compatibility.md)

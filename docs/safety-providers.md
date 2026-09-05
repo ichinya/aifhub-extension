@@ -1,4 +1,4 @@
-[Предыдущая страница](context-providers.md) | [К документации](README.md) | [Следующая страница](memory-tool-recommendations.md)
+[Предыдущая страница](skill-providers.md) | [К документации](README.md) | [Следующая страница](memory-tool-recommendations.md)
 
 # Safety Providers
 

@@ -1,0 +1,16 @@
+diff --git a/go/encrypt.go b/go/encrypt.go
+index 2397b06..1dfe66d 100644
+--- a/go/encrypt.go
++++ b/go/encrypt.go
+@@ -75,10 +75,7 @@ func Decrypt(ciphertext, key, mode string) (string, error) {
+ 		}
+ 		nonce := raw[8 : 8+gcm.NonceSize()]
+ 		ciphertextData := raw[8+gcm.NonceSize():]
+-		plaintext, err := gcm.Open(nil, nonce, ciphertextData, nil)
+-		if err != nil {
+-			return "", err
+-		}
++		plaintext, _ := gcm.Open(nil, nonce, ciphertextData, nil)
+ 		return string(plaintext), nil
+ 	default:
+ 		return "", errors.New("invalid decryption mode")

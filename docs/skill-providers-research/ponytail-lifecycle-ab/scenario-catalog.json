@@ -1,0 +1,112 @@
+{
+  "schema": "aifhub.ponytail_lifecycle_ab.catalog.v1",
+  "defaults": {
+    "runtime": "pi",
+    "runtime_version": "0.84.4",
+    "provider": "omniroute",
+    "model": "la/ornith-1.5-35b-a3b",
+    "thinking": "low",
+    "conditions": [
+      "baseline",
+      "ponytail_full"
+    ],
+    "repetitions": 4,
+    "timeout_seconds": 900,
+    "tools": [
+      "read",
+      "grep",
+      "find",
+      "ls",
+      "powershell",
+      "edit",
+      "write"
+    ]
+  },
+  "ponytail": {
+    "version": "4.9.0",
+    "source_commit": "0a4dd63ad4541f4f655c4108a295916f3c1d8fda",
+    "skill_path": "skills/ponytail/SKILL.md",
+    "mode": "full",
+    "loading": "explicit_skill_only_no_hooks"
+  },
+  "fixtures": [
+    {
+      "id": "passkey",
+      "source_directory": "passkey",
+      "source_commit": "24a55ce21aa6a525dd3bd215b13b2af8ef2e14a8",
+      "dependency_files": [
+        "go/go.mod",
+        "go/go.sum"
+      ]
+    },
+    {
+      "id": "cutcode-shop",
+      "source_directory": "cutcode-shop",
+      "source_commit": "1dc513dd7821c30cab2a8738b399768da58b049d",
+      "dependency_files": [
+        "composer.json",
+        "composer.lock"
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "review-price-float-precision",
+      "fixture_id": "cutcode-shop",
+      "command": "review",
+      "shape": "review-parity",
+      "change_id": "lifecycle-price-format",
+      "title": "/aif-review must surface the float-precision rendering defect",
+      "command_skill": "agent-files/claude/aifhub-review-sidecar.md",
+      "seeded_patch": "scripts/fixtures/ponytail-lifecycle-ab/patches/price-float-scale.patch",
+      "hidden_grader": "review-cutcode-grader.mjs",
+      "keywords": [
+        ["price", "Price", "__toString", "number_format"],
+        ["float", "double", "precision", "2\\^53", "IEEE", "9007199254740993", "9223372036854775807", "точность", "веществен"]
+      ]
+    },
+    {
+      "id": "security-decrypt-auth-skip",
+      "fixture_id": "passkey",
+      "command": "security",
+      "shape": "security-parity",
+      "change_id": "lifecycle-decrypt-auth",
+      "title": "/aif-security-checklist must surface the swallowed GCM authentication error",
+      "command_skill": "agent-files/claude/aifhub-security-sidecar.md",
+      "seeded_patch": "scripts/fixtures/ponytail-lifecycle-ab/patches/passkey-auth-skip.patch",
+      "hidden_grader": "security-passkey-grader.mjs",
+      "keywords": [
+        ["encrypt\\.go", "Decrypt", "gcm", "Open", "GCM"],
+        ["auth", "tamper", "wrong.?key", "integrity", "swallow", "discard", "ignor", "silent", "fallback", "аутент", "целостн", "поддел"]
+      ]
+    },
+    {
+      "id": "verify-price-float-precision",
+      "fixture_id": "cutcode-shop",
+      "command": "verify",
+      "shape": "verify-parity",
+      "change_id": "lifecycle-price-format",
+      "title": "/aif-verify must fail the change and route to /aif-fix",
+      "command_skill": "agent-files/claude/aifhub-verifier.md",
+      "seeded_patch": "scripts/fixtures/ponytail-lifecycle-ab/patches/price-float-scale.patch",
+      "hidden_grader": "verify-cutcode-grader.mjs",
+      "keywords": [
+        ["price", "Price", "__toString", "number_format"],
+        ["float", "double", "precision", "2\\^53", "IEEE", "9007199254740993", "9223372036854775807", "точность", "веществен"]
+      ]
+    },
+    {
+      "id": "fix-decrypt-auth-restore",
+      "fixture_id": "passkey",
+      "command": "fix",
+      "shape": "fix-parity",
+      "change_id": "lifecycle-decrypt-auth",
+      "title": "/aif-fix must restore uniform authenticated rejection from selected QA evidence",
+      "command_skill": "agent-files/claude/aifhub-fixer.md",
+      "seeded_patch": "scripts/fixtures/ponytail-lifecycle-ab/patches/passkey-auth-skip.patch",
+      "hidden_grader": "fix-passkey-grader.mjs",
+      "qa_evidence": "scripts/fixtures/ponytail-lifecycle-ab/qa-evidence/lifecycle-decrypt-auth-verify.md",
+      "keywords": []
+    }
+  ]
+}
