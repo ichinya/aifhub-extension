@@ -36,19 +36,19 @@
     {
       "key": "aifhub.tools.openspec",
       "required": true,
-      "since": "0.14.0",
+      "since": "0.15.0",
       "purpose": "Boolean opt-in for OpenSpec changes/specifications; false uses AI Factory plans/specifications."
     },
     {
       "key": "aifhub.tools.hlv",
       "required": true,
-      "since": "0.14.0",
+      "since": "0.15.0",
       "purpose": "Boolean opt-in for HLV contracts, traceability and validation gates."
     },
     {
       "key": "aifhub.tools.lekalo",
       "required": true,
-      "since": "0.14.0",
+      "since": "0.15.0",
       "purpose": "Reserved boolean opt-in for Lekalo semantic model artifacts; keep false until a compatible provider exists."
     },
     {

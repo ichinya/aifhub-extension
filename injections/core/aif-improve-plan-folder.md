@@ -71,6 +71,8 @@ Refine only these canonical OpenSpec artifacts for the active change:
 
 Legacy companion plan artifacts, including `task.md`, `context.md`, `rules.md`, `verify.md`, and `status.yaml` are not OpenSpec-native refinement targets.
 
+Before refining implementation-dependent artifacts, refresh the relevant implementation, nearby tests, configuration, and docs outside `openspec/` in a read-only pass proportional to the proposed changes. Resolve the actual target repository if it differs from `planningHome.root`; ask only when context cannot identify it. For greenfield work, inspect existing structure and setup docs. Separate observed facts, assumptions, and proposals; cite direct file evidence, disclose unavailable source, and surface conflicts between accepted specs and code before a dependent design decision. Do not defer this discovery into generic future codebase-exploration tasks.
+
 #### Task Quality Refinement
 
 When refining an OpenSpec-native change, audit normalized task quality across the canonical artifacts:
@@ -79,6 +81,8 @@ When refining an OpenSpec-native change, audit normalized task quality across th
 - `design.md` for C4 impact, ADR candidates, dependency notes, integration points, alternatives, and risks
 - `tasks.md` for an executable checklist whose task descriptions state how completion is verified
 - `specs/**/spec.md` for behavior deltas
+
+For a new capability, refine its delta's `## Purpose` into a meaningful description before first sync/archive. An existing main spec's Purpose is not replaced by a delta's Purpose: if strict validation reports a placeholder, record the affected accepted-spec path and bounded direct remediation instead of manufacturing a requirement delta. Do not rewrite archived changes to clear historical placeholders.
 
 Classify open questions as `blocker`, `warn`, or `info` when useful, without requiring classification in trivial changes or forcing a specific table format.
 

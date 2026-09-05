@@ -84,16 +84,16 @@ function validAifhubMetadata(extra = {}) {
       },
       openspec: {
         url: 'https://github.com/Fission-AI/OpenSpec',
-        version: '1.10.0',
+        version: '1.12.0',
         baselineVersion: '1.3.1',
         supportedRange: '>=1.3.1 <2.0.0',
-        reviewedStableVersions: ['1.3.1', '1.4.0', '1.4.1', '1.5.0', '1.6.0', '1.7.0', '1.8.0', '1.9.0', '1.10.0'],
+        reviewedStableVersions: ['1.3.1', '1.4.0', '1.4.1', '1.5.0', '1.6.0', '1.7.0', '1.8.0', '1.9.0', '1.10.0', '1.11.0', '1.12.0'],
         reviewedPrereleaseVersions: ['1.6.0-beta.1'],
         lastSync: '2026-09-01',
         optional: true,
         requiresNode: '>=20.19.0',
         mode: 'optional-cli-adapter',
-        notes: 'Validated against upstream OpenSpec 1.10.0; AIFHub remains adapter-only.'
+        notes: 'Validated against upstream OpenSpec 1.12.0; AIFHub remains adapter-only.'
       }
     },
     ...extra
@@ -163,12 +163,12 @@ describe('validate-extension.mjs', () => {
     assert.equal(releaseAcceptancePass, true, 'advisory exit must not change the mandatory PASS boolean');
   });
 
-  it('keeps the OpenSpec 1.10.0 manifest, runner and immutable compatibility constraints atomic', async () => {
+  it('keeps the OpenSpec 1.12.0 manifest, runner and immutable compatibility constraints atomic', async () => {
     const metadata = JSON.parse(await readFile(join(REPO_ROOT, 'aifhub-extension.json'), 'utf-8'));
     const openspec = metadata.sources.openspec;
 
-    assert.equal(openspec.version, '1.10.0', 'sources.openspec.version');
-    assert.equal(OPENSPEC_LATEST_REVIEWED_VERSION, '1.10.0', 'runner reviewed baseline');
+    assert.equal(openspec.version, '1.12.0', 'sources.openspec.version');
+    assert.equal(OPENSPEC_LATEST_REVIEWED_VERSION, '1.12.0', 'runner reviewed baseline');
     assert.equal(openspec.version, OPENSPEC_LATEST_REVIEWED_VERSION, 'manifest/runner reviewed baseline');
     assert.deepEqual(openspec.reviewedStableVersions, [
       '1.3.1',
@@ -179,7 +179,9 @@ describe('validate-extension.mjs', () => {
       '1.7.0',
       '1.8.0',
       '1.9.0',
-      '1.10.0'
+      '1.10.0',
+      '1.11.0',
+      '1.12.0'
     ], 'ordered reviewed stable ledger');
     assert.equal(openspec.baselineVersion, '1.3.1');
     assert.equal(openspec.supportedRange, '>=1.3.1 <2.0.0');
@@ -354,8 +356,8 @@ describe('validate-extension.mjs', () => {
 
   it('fails when OpenSpec metadata advances without the runtime reviewed-version diagnostic', async () => {
     const parsed = JSON.parse(validAifhubMetadata());
-    parsed.sources.openspec.version = '1.10.1';
-    parsed.sources.openspec.reviewedStableVersions.push('1.10.1');
+    parsed.sources.openspec.version = '1.12.1';
+    parsed.sources.openspec.reviewedStableVersions.push('1.12.1');
     await writeValidProject({ metadata: JSON.stringify(parsed) });
 
     const code = await runValidatorExitCode(tmpDir);

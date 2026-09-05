@@ -1122,7 +1122,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
     );
   });
 
-  it('documents the exact-tagged OpenSpec 1.10.0 baseline, custody and adapter boundary', async () => {
+  it('documents the cumulative exact-tagged OpenSpec 1.12.0 baseline, custody and adapter boundary', async () => {
     const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
     const readme = await readRepoFile('README.md');
     const compatibility = await readRepoFile('docs/openspec-compatibility.md');
@@ -1133,13 +1133,13 @@ describe('complete OpenSpec workflow documentation contract', () => {
     const combinedDocs = [readme, compatibility, validation, docsIndex, changelog].join('\n');
     const readmeCompatibility = extractSection(readme, '## OpenSpec Compatibility');
 
-    assert.equal(openspec.version, '1.10.0');
+    assert.equal(openspec.version, '1.12.0');
     assert.equal(openspec.baselineVersion, '1.3.1');
     assert.equal(openspec.supportedRange, '>=1.3.1 <2.0.0');
-    assert.deepEqual(openspec.reviewedStableVersions, ['1.3.1', '1.4.0', '1.4.1', '1.5.0', '1.6.0', '1.7.0', '1.8.0', '1.9.0', '1.10.0']);
+    assert.deepEqual(openspec.reviewedStableVersions, ['1.3.1', '1.4.0', '1.4.1', '1.5.0', '1.6.0', '1.7.0', '1.8.0', '1.9.0', '1.10.0', '1.11.0', '1.12.0']);
     assert.deepEqual(openspec.reviewedPrereleaseVersions, ['1.6.0-beta.1']);
-    assert.equal(openspec.lastSync, '2026-09-01');
-    assertIncludes(openspec.notes, 'upstream OpenSpec 1.3.1 through 1.10.0', 'aifhub-extension.json');
+    assert.equal(openspec.lastSync, '2026-09-05');
+    assertIncludes(openspec.notes, 'upstream OpenSpec 1.3.1 through 1.12.0', 'aifhub-extension.json');
     assertIncludes(openspec.notes, 'adapter-only', 'aifhub-extension.json');
 
     assertIncludes(
@@ -1147,10 +1147,10 @@ describe('complete OpenSpec workflow documentation contract', () => {
       `The reviewed OpenSpec baseline is OpenSpec \`${openspec.version}\``,
       'README.md OpenSpec Compatibility reviewed baseline'
     );
-    assertIncludes(docsIndex, 'OpenSpec 1.10.0', 'docs/README.md');
+    assertIncludes(docsIndex, 'OpenSpec 1.12.0', 'docs/README.md');
 
     for (const expected of [
-      'OpenSpec 1.10.0 Reviewed Baseline',
+      'OpenSpec 1.12.0 Reviewed Baseline',
       'Exact 1.10.0 Custody and Evidence Boundary',
       'Exact 1.10.0 CLI Matrix',
       '1.10.0 Source Classification',
@@ -1180,7 +1180,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
       'test, command, observable behavior, or delivered artifact',
       'Zed',
       '`init --language`',
-      'OpenSpec `1.11.0` was not reviewed',
+      'Exact 1.11.0 Custody and Evidence Boundary',
       'strict task-numbering',
       'Non-strict validation',
       '`widgets/spec.md`',
