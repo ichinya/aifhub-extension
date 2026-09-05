@@ -2,11 +2,13 @@
 name: aif-analyze
 description: Bootstrap project context. Resolves localization and stack, creates/updates config.yaml, rules/base.md, and REVIEW.md, then checks DESCRIPTION and guides core skill execution.
 allowed-tools: Read Write Edit Glob Grep Bash(mkdir *) Bash(ai-factory aifhub-analyze-config-diff *) Bash(ai-factory aifhub-review-policy *) Bash(ai-factory aifhub-memory-tools *) Bash(ai-factory aifhub-mode status --json) Bash(node --input-type=module -e *openspec-runner.mjs*) Bash(rg --version) Bash(uv --version) Bash(graphify --version) Bash(graphify --help) Bash(codex-agent-mem-policy --help) Bash(codex-agent-mem-smoke --help) Bash(codegraph --version) Bash(codegraph --help) Bash(codegraph status) Bash(ctx7 --version) Bash(npx --no-install ctx7 --help) Bash(openspec init --tools none) Skill AskUserQuestion Questions
-version: 0.13.0
+version: 0.15.0
 author: ichi
 ---
 
 # AIF Analyze
+
+Read [tool selection and artifact ownership](../shared/TOOLS.md) before choosing artifact paths or lifecycle instructions.
 
 Bootstrap project context for AI Factory. This skill prepares configuration and rules, then checks core artifacts and guides the next core skills.
 
@@ -224,10 +226,10 @@ Before reading or preserving provider output, treat privacy as an explicit cavea
 Resolve the bootstrap/config mode before creating directories:
 
 - Use `openspec-native` mode when the user explicitly asks for `openspec-native`, `OpenSpec-native`, or OpenSpec artifact protocol bootstrap.
-- Use `openspec-native` mode when an existing `.ai-factory/config.yaml` has `aifhub.artifactProtocol: openspec`.
-- Preserve legacy `ai-factory` mode when an existing `.ai-factory/config.yaml` does not declare `aifhub.artifactProtocol: openspec`.
+- Use `openspec-native` mode when an existing `.ai-factory/config.yaml` has `aifhub.tools.openspec: true`.
+- Preserve the effective AI Factory artifact mode when OpenSpec is disabled. When the entire `aifhub.tools` mapping is absent, resolve the legacy marker as described in the shared tool contract before migrating settings.
 - If `.ai-factory/config.yaml` is missing and no artifact protocol was explicitly requested, ask one artifact protocol question before writing config or creating mode-specific directories.
-  - Options must be exactly `legacy AI Factory-only` and `OpenSpec-native`.
+  - Ask whether to enable OpenSpec (`openspec: true`) or leave it disabled (`openspec: false`). AI Factory remains active in both cases. Preserve independently requested HLV and Lekalo choices.
   - Codex Default mode: ask a short plain-text artifact protocol question; do not use `question(...)`, `questionnaire(...)`, or `request_user_input`.
   - Codex Plan mode: use one `request_user_input` question only when the user already switched the session into Plan mode.
   - Claude Code / Kilo CLI / OpenCode: use `question(questions: [...])`.
@@ -245,7 +247,7 @@ Resolve the bootstrap/config mode before creating directories:
 - When the diff reports `missing` entries or `version_drift`, present each missing key to the user with its manifest `purpose` text before writing it, then apply the additions through the structural patch below. When the diff reports `up_to_date: true`, take the fast path: skip config re-analysis and re-patching entirely.
 - After a successful config create/update, ensure the config records `analyze.skill_version` equal to this skill's frontmatter `version`. The config patcher preserves an existing value; update it explicitly when the skill version changed.
 - Treat an existing config update as a structural patch, not a full-file re-render. Preserve upstream/core fields such as `config_version`, `language`, `workflow`, `rules`, and `agent_profile`, plus unknown user-authored top-level and nested fields. Change only keys owned by the selected AIFHub bootstrap profile.
-- Keep AIFHub-owned profile keys explicit and namespaced under `aifhub`, including `aifhub.artifactProtocol` and the selected `aifhub.openspec.*` policy keys. Do not infer ownership of unrelated or unknown fields from their location.
+- Keep AIFHub-owned profile keys explicit and namespaced under `aifhub`, including `aifhub.tools.openspec`, `aifhub.tools.hlv`, `aifhub.tools.lekalo` and the selected `aifhub.openspec.*` policy keys. Do not infer ownership of unrelated or unknown fields from their location. Migrate a legacy marker to boolean switches without changing effective tool choices.
 - On a fresh config created with AI Factory 2.19 compatibility, include the upstream default `warmup.paths: []`. Treat `warmup.paths` as user-owned after creation: preserve existing path entries and comments without interpreting them through structural mode patches, and do not backfill the section into an existing config when it is absent. This contract does not preserve the config's original EOL style or the top-level position of the `warmup` block.
 - Do not introduce `research_bundles_dir` or any equivalent config key. Derive the ultra research bundle root at runtime as `<parent(paths.research)>/research/`, preserving the configured `paths.research` file.
 - Config diagnostics may report only sorted changed and preserved key paths plus bounded counts. Never include config values, environment data, credentials, tokens, raw provider output, or private absolute paths.
@@ -296,7 +298,10 @@ utilities:
 
 ```yaml
 aifhub:
-  artifactProtocol: ai-factory
+  tools:
+    openspec: false
+    hlv: false
+    lekalo: false
   contextDedup:
     mode: "off"
     minBytes: 2048
@@ -307,8 +312,8 @@ aifhub:
 ```
 
   - Preserve the existing AI Factory-only path defaults.
-  - Keep `paths.plans` at `.ai-factory/plans` unless an existing value says otherwise.
-  - Keep `paths.specs` at `.ai-factory/specs` unless an existing value says otherwise.
+  - With the tools mapping present, `openspec: false` selects `.ai-factory/plans` and `.ai-factory/specs`; stale OpenSpec path values do not change this choice.
+  - HLV and Lekalo choices are independent. Preserve their existing true/false values in both config profiles; false values in examples are fresh-project defaults.
   - Do not add `aifhub.openspec`, OpenSpec policy defaults, or OpenSpec runtime path defaults (`paths.state`, `paths.qa`, `paths.generated_rules`) unless OpenSpec-native mode is selected.
   - Preserve existing user-authored config values unless the user explicitly requests mode cleanup or `/aif-mode` switching.
 - In `openspec-native` mode:
@@ -316,7 +321,10 @@ aifhub:
 
 ```yaml
 aifhub:
-  artifactProtocol: openspec
+  tools:
+    openspec: true
+    hlv: false
+    lekalo: false
   contextDedup:
     mode: "off"
     minBytes: 2048
@@ -423,7 +431,7 @@ openspec:
   canArchive: boolean
   version: string | null
   supportedRange: ">=1.3.1 <2.0.0"
-  latestReviewedVersion: "1.10.0"
+  latestReviewedVersion: "1.12.0"
   versionOutdated: boolean | null
   requiresNode: ">=20.19.0"
   nodeSupported: boolean
@@ -467,6 +475,10 @@ openspec:
 - If `.ai-factory/RULES.md` exists, treat it as additional project-level rules (do not overwrite it).
 
 ### Step 5: Ensure Directories Exist
+
+- After writing the accepted `aifhub.tools` switches, run `ai-factory aifhub-mode init --json`. This creates missing enabled-tool scaffolding and reuses existing HLV/OpenSpec projects. A true switch authorizes this initialization; do not stop at recommending setup when the tool is available. See [optional tools](../shared/TOOLS.md) for native HLV adopt effects and preservation rules.
+- Inspect root `project.yaml` as well as `.hlv/project.yaml`. Existing HLV projects may have root `human/`, `validation/` and `llm/` with custom paths and milestones; absence of `.hlv/` does not mean missing initialization. Preserve their contents and resolve paths from the existing project map. Do not call HLV reinit or convert their layout.
+- Report initialization as created, preserved, disabled or failed for each selected tool. A missing/unsupported HLV executable or conflicting/partial layout is an explicit setup failure, not successful bootstrap or a reason to overwrite existing files. Never install or upgrade HLV automatically.
 
 - Create only directory-valued configured paths. File-valued settings such as `paths.description`, `paths.architecture`, `paths.context`, `paths.roadmap`, `paths.research`, and `reviews.policy_file` must never be created as directories.
 
@@ -567,8 +579,10 @@ Legacy AI Factory-only profile:
 
 ```yaml
 aifhub:
-  artifactProtocol: ai-factory
-
+  tools:
+    openspec: false
+    hlv: false
+    lekalo: false
 paths:
   description: .ai-factory/DESCRIPTION.md
   architecture: .ai-factory/ARCHITECTURE.md
@@ -587,7 +601,10 @@ OpenSpec-native profile:
 
 ```yaml
 aifhub:
-  artifactProtocol: openspec
+  tools:
+    openspec: true
+    hlv: false
+    lekalo: false
   openspec:
     root: openspec
     installSkills: false
@@ -635,7 +652,7 @@ reviews:
 
 - Use evidence over assumptions.
 - Create/update `config.yaml`, `rules/base.md`, and the missing configured review-policy scaffold first.
-- Use OpenSpec-native mode only when explicitly requested, when existing config has `aifhub.artifactProtocol: openspec`, or when the user selects `OpenSpec-native` in the first-bootstrap artifact protocol question.
+- Use OpenSpec-native mode only when explicitly requested, when existing config has `aifhub.tools.openspec: true`, or when the user selects `OpenSpec-native` in the first-bootstrap artifact protocol question.
 - Do not write a missing config with a default artifact protocol before first-bootstrap artifact protocol resolution completes.
 - In OpenSpec-native mode, use `detectOpenSpec()` from `scripts/openspec-runner.mjs` when available and treat missing or unsupported CLI as degraded capability, not failure.
 - In OpenSpec-native mode, AIFHub skills may request OpenSpec validation, status, instructions, and archive through `scripts/openspec-runner.mjs`; never install or depend on OpenSpec slash commands.

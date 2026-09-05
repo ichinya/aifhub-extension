@@ -1,5 +1,7 @@
 ## AIFHub Architecture Context Boundary
 
+Read [tool selection and artifact ownership](../../skills/shared/TOOLS.md) before choosing artifact paths or lifecycle instructions.
+
 Apply this block before the upstream `aif-architecture` body. When any rule below conflicts with the upstream body, this block wins.
 
 Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
@@ -16,7 +18,7 @@ Do not create or use an extension-owned `skills/aif-architecture/` directory. Th
 
 Before resolving architecture scope, read `.ai-factory/config.yaml` when it exists.
 
-- If the config contains `aifhub.artifactProtocol: openspec`, use **OpenSpec-native mode**.
+- If the config contains `aifhub.tools.openspec: true`, use **OpenSpec-native mode**.
 - Otherwise, use **Legacy AI Factory-only mode**.
 - If the config is missing, continue with upstream defaults and state that no AIFHub artifact protocol was detected.
 
@@ -30,7 +32,7 @@ Always respect upstream config resolution for:
 
 ### OpenSpec-native mode
 
-When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, `/aif-architecture` still writes project-level AI Factory architecture context, not canonical OpenSpec lifecycle artifacts.
+When `.ai-factory/config.yaml` declares `aifhub.tools.openspec: true`, `/aif-architecture` still writes project-level AI Factory architecture context, not canonical OpenSpec lifecycle artifacts.
 
 Allowed writes are limited to:
 

@@ -30,7 +30,9 @@ Do not let a code-quality pass erase or downgrade a plan/spec compliance finding
 
 ## OpenSpec-native mode
 
-Use this mode when config declares `aifhub.artifactProtocol: openspec`.
+Use this mode when config declares `aifhub.tools.openspec: true`.
+
+Follow skills/shared/TOOLS.md: only when the entire tools mapping is absent, read the legacy artifactProtocol setting. Existing OpenSpec files never override an explicit false. HLV and Lekalo switches are independent.
 
 - Review the changed scope for one active OpenSpec change.
 - Read canonical artifacts: `openspec/specs/**` plus `openspec/changes/<change-id>/proposal.md`, `design.md`, `tasks.md`, and `specs/**/spec.md`.

@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { parseToolConfig } from './tool-config.mjs';
 
 import {
   flattenConfigKeyPaths,
@@ -110,6 +111,7 @@ export async function buildAnalyzeConfigDiff(options = {}) {
   let configRaw = null;
   try {
     configRaw = await readFile(configPath, 'utf8');
+    parseToolConfig(configRaw);
   } catch (err) {
     if (err?.code === 'ENOENT') {
       errors.push({
@@ -152,7 +154,7 @@ export async function buildAnalyzeConfigDiff(options = {}) {
 
   const flat = flattenConfigKeyPaths(parseSimpleYaml(configRaw));
   const entries = manifest.keys;
-  const artifactProtocol = readFlatValue(flat, 'aifhub.artifactProtocol');
+  const artifactProtocol = parseToolConfig(configRaw).mode;
   const missing = entries
     .filter((entry) => (
       entry?.required === true

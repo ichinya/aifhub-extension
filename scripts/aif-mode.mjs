@@ -6,12 +6,13 @@ import path from 'node:path';
 import {
   doctorAifMode,
   getModeStatus,
+  initializeEnabledTools,
   switchToAiFactoryMode,
   switchToOpenSpecMode,
   syncArtifacts
 } from './aif-artifact-sync.mjs';
 
-const COMMANDS = new Set(['status', 'openspec', 'ai-factory', 'sync', 'doctor']);
+const COMMANDS = new Set(['status', 'init', 'openspec', 'ai-factory', 'sync', 'doctor']);
 
 export async function runModeCommand(argv, options = {}) {
   const parsed = parseArgs(argv);
@@ -39,6 +40,8 @@ export async function runModeCommand(argv, options = {}) {
 
   if (parsed.command === 'status') {
     result = await getModeStatus(runOptions);
+  } else if (parsed.command === 'init') {
+    result = await initializeEnabledTools(runOptions);
   } else if (parsed.command === 'openspec') {
     result = await switchToOpenSpecMode(runOptions);
   } else if (parsed.command === 'ai-factory') {
@@ -155,6 +158,11 @@ export function parseArgs(argv) {
     return invalid('--all cannot be combined with --change.');
   }
 
+  if (command === 'init' && (result.yes || result.exportOpenSpec || result.current || result.all
+    || result.changeId !== null || result.legacyPlanSourceRoot !== null || result.timestamp !== undefined)) {
+    return invalid('init only accepts --dry-run and --json.');
+  }
+
   if (command === 'status' && (result.yes || result.exportOpenSpec || result.current)) {
     return invalid('status is read-only and does not accept --yes, --export-openspec, or --current.');
   }
@@ -181,7 +189,7 @@ export function renderHuman(command, result) {
 function renderStatus(result) {
   return [
     `Current mode: ${result.mode}`,
-    `Config marker: aifhub.artifactProtocol=${result.configMarker ?? 'missing'}`,
+    `Tools: openspec=${result.tools.openspec}, hlv=${result.tools.hlv}, lekalo=${result.tools.lekalo}`,
     `OpenSpec CLI: ${result.openspecCli.state}`,
     `OpenSpec changes: ${result.openSpecChanges.length}`,
     `Legacy plans: ${result.legacyPlans.length}`,
@@ -235,6 +243,8 @@ function renderSummaryOperations(result) {
       target: file.relativePath
     }));
   const operations = [
+    ...(result.operations ?? []),
+    ...(result.initialization?.operations ?? []),
     ...(result.config?.operations ?? []),
     ...(result.skeleton?.operations ?? []),
     ...generatedOperations,

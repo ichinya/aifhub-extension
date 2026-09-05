@@ -1,5 +1,7 @@
 ## AIFHub OpenSpec-Native Planning Override
 
+Read [tool selection and artifact ownership](../../skills/shared/TOOLS.md) before choosing artifact paths or lifecycle instructions.
+
 Apply this block before the upstream `aif-plan` body. When any rule below conflicts with the base skill text, this block wins.
 
 Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
@@ -81,7 +83,7 @@ On success, emit `INFO [aif-plan] source-bound plan identity: provider=<provider
 
 ### OpenSpec-native mode
 
-When `.ai-factory/config.yaml` has `aifhub.artifactProtocol: openspec`, OpenSpec-native instructions override legacy plan-folder instructions.
+When `.ai-factory/config.yaml` has `aifhub.tools.openspec: true`, OpenSpec-native instructions override legacy plan-folder instructions.
 
 Use shared vocabulary consistently: `OpenSpec-native mode`, `canonical OpenSpec change`, `active change`, `change-id`, `base specs`, `delta specs`, `generated rules`, `runtime state`, `QA evidence`, and `legacy AI Factory-only mode`.
 
@@ -223,6 +225,12 @@ Context7 is optional supporting documentation context for current library/API do
 - Use or reference `normalizeChangeId()` from `scripts/active-change-resolver.mjs` when useful.
 - If `openspec/changes/<change-id>` already exists, do not overwrite silently. Apply the source-aware collision rules above for source-bound IDs; for ordinary IDs, ask for a new ID or create a deterministic suffix only in autonomous mode when asking is unavailable.
 
+#### Ground planning in the target repository
+
+Before drafting `proposal.md`, `design.md`, `tasks.md`, or delta specs, read the relevant implementation, nearby tests, configuration, and project docs outside `openspec/`, alongside accepted specs and project context/rules. Keep this discovery read-only and proportional to the requested change; do it now rather than adding generic future tasks to explore the codebase.
+
+Resolve the actual target repository when it differs from `planningHome.root`; ask for the target only when available context cannot identify it. For greenfield work, inspect the existing structure and setup docs. If source is unavailable, disclose the material limitation instead of inventing implementation facts. Distinguish observed behavior, assumptions, and proposed behavior, cite direct file evidence, and surface conflicts between accepted specs and current code for resolution before making a dependent design decision.
+
 #### Required artifact shape
 
 `proposal.md` should use:
@@ -316,6 +324,8 @@ The source-template proposal headings are exact and case-sensitive: `## Why`, `#
 ```
 
 Delta specs must use OpenSpec requirement sections:
+
+For a new capability, include a meaningful `## Purpose` in its delta before the first sync/archive; do not leave an opening `TBD`/`TODO` or the archive-generated placeholder. An existing main spec's Purpose is not replaced by a delta's Purpose. If strict validation reports that debt, record a bounded direct accepted-spec remediation in the change and preserve archived evidence; do not disguise it as a requirement delta.
 
 ```markdown
 # Delta for <Capability>

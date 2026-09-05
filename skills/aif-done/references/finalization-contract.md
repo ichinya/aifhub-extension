@@ -1,12 +1,14 @@
 # Finalization Contract
 
+Read [tool selection and artifact ownership](../../shared/TOOLS.md) before choosing artifact paths or lifecycle instructions.
+
 Reference for the `aif-done` skill and `aifhub-done-finalizer` agents.
 
 ## OpenSpec-native mode
 
 ### Entry Conditions
 
-- `.ai-factory/config.yaml` has `aifhub.artifactProtocol: openspec`.
+- `.ai-factory/config.yaml` has `aifhub.tools.openspec: true`.
 - Exactly one active change or explicit `<change-id>` is selected.
 - Effective OpenSpec policy is resolved through `scripts/openspec-policy.mjs`.
 - QA evidence exists under `.ai-factory/qa/<change-id>/`.

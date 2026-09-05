@@ -894,9 +894,11 @@ function deriveProtectedPatterns(config, diagnostics) {
       : {};
   const openspec = isPlainObject(aifhub.openspec) ? aifhub.openspec : {};
   const openspecRoot = normalizeProjectRelativeDir(openspec.root, 'openspec', diagnostics, 'aifhub.openspec.root');
+  const openspecEnabled = Object.hasOwn(aifhub, 'tools')
+    ? aifhub.tools?.openspec === true : aifhub.artifactProtocol === 'openspec';
   const defaults = {
-    plans: aifhub.artifactProtocol === 'openspec' ? `${openspecRoot}/changes` : '.ai-factory/plans',
-    specs: aifhub.artifactProtocol === 'openspec' ? `${openspecRoot}/specs` : '.ai-factory/specs',
+    plans: openspecEnabled ? `${openspecRoot}/changes` : '.ai-factory/plans',
+    specs: openspecEnabled ? `${openspecRoot}/specs` : '.ai-factory/specs',
     qa: '.ai-factory/qa',
     generated_rules: '.ai-factory/rules/generated',
     state: '.ai-factory/state'
@@ -912,6 +914,7 @@ function deriveProtectedPatterns(config, diagnostics) {
   );
   const state = normalizeProjectRelativeDir(paths.state, defaults.state, diagnostics, 'paths.state');
   return [
+    ...(Object.hasOwn(aifhub, 'tools') ? [`${defaults.plans}/**`, `${defaults.specs}/**`] : []),
     `${plans}/**`,
     `${specs}/**`,
     `${qa}/**`,

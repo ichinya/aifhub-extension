@@ -388,7 +388,7 @@ describe('OpenSpec workflow smoke: new project setup', () => {
     }
 
     const config = await readText(rootDir, '.ai-factory/config.yaml');
-    assert.match(config, /artifactProtocol:\s*openspec/, 'Scenario A expected OpenSpec-native config marker.');
+    assert.match(config, /openspec:\s*true/, 'Scenario A expected OpenSpec-native config marker.');
     assert.match(config, /installSkills:\s*false/, 'Scenario A expected OpenSpec skills installation disabled.');
     assert.equal(await pathExists(rootDir, '.codex/skills/openspec'), false, 'Scenario A must not install Codex OpenSpec skills.');
     assert.equal(await pathExists(rootDir, '.claude/commands/openspec.md'), false, 'Scenario A must not install OpenSpec slash commands.');

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/ichinya/aifhub-extension/main/schemas/provider-capabilities.schema.json",
+  "title": "AIFHub provider capability discovery v1.0.0 (not a Lekalo protocol)",
+  "type": "object", "additionalProperties": false,
+  "required": ["contract", "kind", "toolVersion", "operations"],
+  "properties": {
+    "contract": { "type": "object", "additionalProperties": false, "required": ["id", "version"],
+      "properties": { "id": { "const": "aifhub.provider" }, "version": { "const": "1.0.0" } } },
+    "kind": { "enum": ["validation", "semantic_model"] },
+    "toolVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "operations": { "type": "array", "uniqueItems": true, "items": {
+      "enum": ["detect", "status", "doctor", "sync", "validate", "readiness", "trace", "impact", "context"] } }
+  }
+}

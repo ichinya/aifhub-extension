@@ -2,12 +2,14 @@
 name: aif-done
 description: Finalize a verified OpenSpec-native change or legacy AI Factory-only plan, prepare commit/PR summaries, and drive evidence-backed follow-ups.
 argument-hint: "[change-id|plan-id] [--skip-specs] [--record-dirty-state]"
-allowed-tools: Read Write Edit Glob Grep Bash(ai-factory aifhub-done-finalizer *) Bash(git status *) Bash(git branch --show-current) Bash(git diff *) Bash(git log *) Bash(git ls-files *) Bash(git rev-parse *) Bash(gh --version)
+allowed-tools: Read Write Edit Glob Grep Bash(ai-factory aifhub-done-finalizer *) Bash(ai-factory aifhub-providers *) Bash(git status *) Bash(git branch --show-current) Bash(git diff *) Bash(git log *) Bash(git ls-files *) Bash(git rev-parse *) Bash(gh --version)
 version: 1.4.0
 author: ichi
 ---
 
 # AIF Done
+
+Read [tool selection and artifact ownership](../shared/TOOLS.md) before choosing artifact paths or lifecycle instructions.
 
 AIFHub/Handoff finalization skill. Finalizes a verified OpenSpec-native change or a legacy AI Factory-only plan, drafts commit and PR summaries, drives evidence-backed governance follow-ups, and can run or recommend evolution follow-ups.
 
@@ -16,8 +18,10 @@ This skill does not duplicate `/aif-verify` — it runs **after** a passing veri
 Resolve mode from `.ai-factory/config.yaml`:
 
 - Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
-- Use OpenSpec-native mode when `aifhub.artifactProtocol: openspec`.
+- Use OpenSpec-native mode when `aifhub.tools.openspec: true`.
 - Use Legacy AI Factory-only mode otherwise.
+
+For either artifact protocol, after selecting one safe change/plan ID and before finalization, run `ai-factory aifhub-providers done --change <id> --write --json`. Providers run only when their `aifhub.tools` switch is true; false or an omitted tool means a no-op. Enabled providers default to `policy: required`. A required provider blocker prevents finalization; optional provider failures require degraded notes. Provider failures are distinct from code/test failures. HLV validation may execute its project-configured gates; never run initialization, update, sync, or doctor `--fix`. Preserve HLV/OpenSpec/Lekalo canonical artifacts and keep provider summaries under `.ai-factory/qa/<id>/providers/`. OpenSpec readiness independently verifies current provider evidence before archive.
 
 ## OpenSpec-native mode
 

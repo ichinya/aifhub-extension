@@ -1,5 +1,7 @@
 ## AIFHub Roadmap Audit Override
 
+Read [tool selection and artifact ownership](../../skills/shared/TOOLS.md) before choosing artifact paths or lifecycle instructions.
+
 Apply this extension guidance before the base `aif-roadmap` instructions. When any rule below conflicts with the upstream body, this block wins.
 
 Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
@@ -21,7 +23,7 @@ Treat `/aif-roadmap` as an evidence-based maturity audit for this extension work
 
 ### OpenSpec-native evidence
 
-When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, roadmap audit may read OpenSpec-native evidence:
+When `.ai-factory/config.yaml` declares `aifhub.tools.openspec: true`, roadmap audit may read OpenSpec-native evidence:
 
 - `openspec/specs/**`
 - `openspec/changes/<change-id>/proposal.md`

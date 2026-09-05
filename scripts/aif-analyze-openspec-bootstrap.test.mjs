@@ -145,9 +145,9 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
 
     assertIncludes(skill, '### Step 2.5: Resolve Bootstrap Mode', 'skills/aif-analyze/SKILL.md');
     assertIncludes(skill, 'Use `openspec-native` mode when the user explicitly asks', 'skills/aif-analyze/SKILL.md');
-    assertIncludes(skill, 'aifhub.artifactProtocol: openspec', 'skills/aif-analyze/SKILL.md');
+    assertIncludes(skill, 'aifhub.tools.openspec: true', 'skills/aif-analyze/SKILL.md');
     assertIncludes(skill, 'Do not silently migrate a legacy AI Factory-only project', 'skills/aif-analyze/SKILL.md');
-    assertIncludes(template, 'artifactProtocol: ai-factory', 'skills/aif-analyze/references/config-template.yaml');
+    assertIncludes(template, 'openspec: false', 'skills/aif-analyze/references/config-template.yaml');
     assertIncludes(template, 'utilities:', 'skills/aif-analyze/references/config-template.yaml');
     assertIncludes(template, 'graphify:', 'skills/aif-analyze/references/config-template.yaml');
     assertIncludes(template, 'enabled: false', 'skills/aif-analyze/references/config-template.yaml');
@@ -162,7 +162,7 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
       '`config_version`, `language`, `workflow`, `rules`, and `agent_profile`',
       'unknown user-authored top-level and nested fields',
       'Change only keys owned by the selected AIFHub bootstrap profile',
-      '`aifhub.artifactProtocol`',
+      '`aifhub.tools.openspec`',
       '`aifhub.openspec.*`',
       'Do not introduce `research_bundles_dir` or any equivalent config key',
       '<parent(paths.research)>/research/',
@@ -213,7 +213,7 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
   it('keeps the legacy default template exclusive to the selected protocol', async () => {
     const template = await readRepoFile('skills/aif-analyze/references/config-template.yaml');
 
-    assertIncludes(template, 'artifactProtocol: ai-factory', 'skills/aif-analyze/references/config-template.yaml');
+    assertIncludes(template, 'openspec: false', 'skills/aif-analyze/references/config-template.yaml');
     assert.doesNotMatch(
       template,
       /^  openspec:\s*$/m,
@@ -253,7 +253,7 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
 
     for (const expected of [
       'If `.ai-factory/config.yaml` is missing and no artifact protocol was explicitly requested, ask one artifact protocol question before writing config or creating mode-specific directories.',
-      '`legacy AI Factory-only`',
+      '`openspec: false`',
       '`OpenSpec-native`',
       'Codex Default mode: ask a short plain-text artifact protocol question; do not use `question(...)`, `questionnaire(...)`, or `request_user_input`.',
       'Codex Plan mode: use one `request_user_input` question only when the user already switched the session into Plan mode.',
@@ -265,7 +265,7 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
 
     assertIncludes(
       template,
-      'First bootstrap may ask for artifact protocol before this value is written.',
+      'AI Factory is always the workflow base. Additional tools are independent.',
       'skills/aif-analyze/references/config-template.yaml'
     );
   });
@@ -274,7 +274,7 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
     const skill = await readRepoFile('skills/aif-analyze/SKILL.md');
 
     for (const expected of [
-      'artifactProtocol: openspec',
+      'openspec: true',
       'root: openspec',
       'installSkills: false',
       'validateOnPlan: true',
@@ -500,7 +500,7 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
     const latestReviewedVersion = metadata.sources.openspec.version;
     const combined = [skill, compatibility, usage].join('\n');
 
-    assert.equal(latestReviewedVersion, '1.10.0', 'OpenSpec analyze reviewed baseline');
+    assert.equal(latestReviewedVersion, '1.12.0', 'OpenSpec analyze reviewed baseline');
     assert.equal(metadata.sources.openspec.baselineVersion, '1.3.1');
     assert.equal(metadata.sources.openspec.supportedRange, '>=1.3.1 <2.0.0');
     assert.deepEqual(metadata.sources.openspec.reviewedPrereleaseVersions, ['1.6.0-beta.1']);
@@ -514,7 +514,9 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
       '1.7.0',
       '1.8.0',
       '1.9.0',
-      '1.10.0'
+      '1.10.0',
+      '1.11.0',
+      '1.12.0'
     ]);
 
     for (const expected of [

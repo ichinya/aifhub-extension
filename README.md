@@ -24,6 +24,7 @@ AI Factory UX + OpenSpec artifact protocol
 - Supports durable project review guidance at `reviews.policy_file` (`REVIEW.md` at the project root by default), consumed read-only by `/aif-review` and AIFHub review sidecars.
 - Resolves human-readable response language as `language.ui` → current conversation → English only when indeterminate, without using OS locale or changing exact machine-output contracts. See [Usage](docs/usage.md#prompt-language-resolution).
 - Does not install OpenSpec skills or slash commands.
+- Supports composable opt-in HLV validation alongside either artifact protocol, with independent `tools.openspec`, `tools.hlv` and reserved `tools.lekalo` booleans, required checks by default, optional warning policy and revision-bound QA evidence; reserves a separate semantic model contract for future Lekalo integration. See [Validation Providers](docs/validation-providers.md).
 
 ## Quick Start
 
@@ -49,14 +50,19 @@ Inspect or switch artifact mode:
 /aif-mode sync
 ```
 
-Confirm or request OpenSpec-native mode when bootstrapping a v1 OpenSpec workflow. The expected config marker is:
+Confirm or request OpenSpec-native mode when bootstrapping a v1 OpenSpec workflow. Enable optional tools in the config:
 
 ```yaml
 aifhub:
-  artifactProtocol: openspec
+  tools:
+    openspec: true
+    hlv: false
+    lekalo: false
 ```
 
-On first bootstrap, when `.ai-factory/config.yaml` is missing and you did not explicitly ask for OpenSpec-native mode, `/aif-analyze` asks which artifact protocol to use: `legacy AI Factory-only` or `OpenSpec-native`. Existing configs are preserved without that question. If the run is autonomous and cannot ask, it defaults to legacy AI Factory-only and reports OpenSpec-native mode as an open question.
+On first bootstrap, when `.ai-factory/config.yaml` is missing and you did not explicitly ask for OpenSpec-native mode, `/aif-analyze` asks which artifact protocol to use: `openspec: false` or `openspec: true`; HLV and Lekalo are independent switches. Existing configs are preserved without that question. If the run is autonomous and cannot ask, it defaults to legacy AI Factory-only and reports OpenSpec-native mode as an open question.
+
+Enabled tools get missing project scaffolding during bootstrap and mode sync. After editing switches directly, run `ai-factory aifhub-mode init --json` (`--dry-run` previews). Existing HLV projects at root `project.yaml` or `.hlv/project.yaml` are reused unchanged; an uninitialized existing repository uses HLV 1.0.0 adopt mode. See [initialization and preservation](docs/validation-providers.md#lifecycle).
 
 Create and refine a change:
 
@@ -313,9 +319,9 @@ OpenSpec is optional for extension install and AI Factory-only workflows.
 | OpenSpec CLI runtime | Node `>=20.19.0` |
 | OpenSpec skills/commands | Not installed by this extension |
 
-The reviewed OpenSpec baseline is OpenSpec `1.10.0`, replayed sequentially from baseline `1.3.1` and including prerelease `1.6.0-beta.1`, while the compatible stable CLI range remains `>=1.3.1 <2.0.0`. The `1.10.0` checkpoint is bound independently to official Git tag `v1.10.0` at commit `1ebddd17f40dde15dfd28289e4493c3cf05ee9df` and to checksum-verified npm package `@fission-ai/openspec@1.10.0`; this is local exact-package evidence, not CI or production evidence. See [OpenSpec Compatibility](docs/openspec-compatibility.md) for the reviewed-release ledger, exact CLI matrix, and adapter-only ownership notes.
+The reviewed OpenSpec baseline is OpenSpec `1.12.0`, replayed sequentially from baseline `1.3.1` and including prerelease `1.6.0-beta.1`, while the compatible stable CLI range remains `>=1.3.1 <2.0.0`. The `1.12.0` checkpoint is bound independently to official Git tag `v1.12.0` at commit `e062b9572be933564ba3899d059377dfa1393e32` and to checksum-verified npm package `@fission-ai/openspec@1.12.0`; this is local exact-package evidence, not CI or production evidence. See [OpenSpec Compatibility](docs/openspec-compatibility.md) for the reviewed-release ledger, exact CLI matrix, and adapter-only ownership notes.
 
-OpenSpec `validate --archived` is advisory-only. It is not part of package validation scripts, tracked CI, the shared runner's current-change validation argv, `/aif-verify`, `/aif-done`, or the release acceptance PASS boolean. OpenSpec `1.11.0` is outside this reviewed checkpoint and receives no compatibility claim here.
+OpenSpec `validate --archived` is advisory-only. It is not part of package validation scripts, tracked CI, the shared runner's current-change validation argv, `/aif-verify`, `/aif-done`, or the release acceptance PASS boolean. The [1.12.0 audit](docs/openspec-1.12.0-audit.md) adds findings reports, advisory archive preflight and repository-grounded planning. The [1.11.0 audit](docs/openspec-1.11.0-audit.md) covers optional diff/batch reads, strict Purpose remediation, archive rename ordering, schema rollback, and Antigravity shared-root migration; those optional commands and generated tools remain upstream-owned.
 
 When the OpenSpec CLI is missing or unsupported, OpenSpec-aware commands report degraded validate/archive capabilities. Planning and filesystem-based context loading can continue, but archive-required `/aif-done` fails until a compatible CLI is available.
 
@@ -396,7 +402,7 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 | [Memory Tool Recommendations](docs/memory-tool-recommendations.md) | Local metadata-driven optional memory/context tool recommendations and installed wrapper commands |
 | [Context Loading Policy](docs/context-loading-policy.md) | Consumer context, AI Factory 2.19 upstream warmup, Optional Project Glossary, optional provider context, GitHub-aware roadmap evidence, command ownership, upstream utility boundaries, and legacy boundaries |
 | [Project Review Policy](docs/review-policy.md) | Configurable root-default `REVIEW.md`, scaffold ownership, safe review consumption, precedence, and session-state boundary |
-| [OpenSpec Compatibility](docs/openspec-compatibility.md) | Optional CLI adapter policy, exact-tagged OpenSpec `1.10.0` reviewed baseline from `1.3.1`, pinned AI Factory 2.19 source snapshot, AI Factory 2.18 classic/ultra planning, research, verification, archive and ownership matrix, reviewed no-ops, and capability flags |
+| [OpenSpec Compatibility](docs/openspec-compatibility.md) | Optional CLI adapter policy, exact-tagged OpenSpec `1.12.0` reviewed baseline from `1.3.1`, pinned AI Factory 2.19 source snapshot, AI Factory 2.18 classic/ultra planning, research, verification, archive and ownership matrix, reviewed no-ops, and capability flags |
 | [OpenSpec Artifact Validation](docs/openspec-validation.md) | Read-only AIFHub contract validator for OpenSpec-native artifacts |
 | [OpenSpec Coverage Matrix](docs/spec-coverage.md) | Requirement-to-code coverage artifact and verify/done policy |
 | [Legacy Plan Migration](docs/legacy-plan-migration.md) | Explicit migration from legacy plans to OpenSpec-native changes |

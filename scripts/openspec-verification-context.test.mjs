@@ -551,6 +551,28 @@ describe('OpenSpec verification context API', () => {
     assert.deepEqual(result.errors, []);
   });
 
+  it('retains OpenSpec 1.12 strict INFO while allowing subsequent code verification', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+    await createGeneratedRules(rootDir);
+    const payload = {
+      items: [{ id: 'add-oauth', type: 'change', valid: true, issues: [{
+        level: 'INFO', path: 'widgets/spec.md', message: 'Archive would refuse this delta: missing target.'
+      }] }], summary: { totals: { items: 1, passed: 1, failed: 0 } }, version: '1.0'
+    };
+    const result = await runOpenSpecVerification('add-oauth', {
+      rootDir,
+      detectOpenSpec: async () => ({ ...availableCliDetection(), version: '1.12.0' }),
+      validateOpenSpecChange: async () => validationResult({ stdout: JSON.stringify(payload), json: payload }),
+      getOpenSpecStatus: async () => statusResult()
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.shouldRunCodeVerification, true);
+    assert.ok(result.openspec.validation.args.includes('--strict'));
+    assert.deepEqual(result.openspec.validation.parsedJson, payload);
+    assert.deepEqual(result.errors, []);
+  });
+
   it('preserves OpenSpec 1.9 scenario-loss path/message and prevents a verify false PASS', async () => {
     const rootDir = await createTempRoot();
     await createOpenSpecChange(rootDir);
