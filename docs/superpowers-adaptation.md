@@ -12,6 +12,8 @@
 | Systematic debugging | Fixer сначала записывает direct `rootCauseEvidence`, формулирует one falsifiable hypothesis и запускает минимальный experiment. Проверяется one hypothesis at a time; после трёх неудачных гипотез speculative edits прекращаются. |
 | Двухэтапное review | `/aif-review` и namespaced review sidecar сначала выполняют plan/spec compliance pass, затем code-quality pass. Результат остаётся одним read-only review gate. |
 | Evidence before completion | Development/fix traces являются supporting runtime evidence. Только `/aif-verify` создаёт authoritative QA verdict, coverage и final verify gate. |
+| Качество тестов | Перед добавлением или изменением проверки implement/fix называет обнаруживаемый дефект и получает ожидаемый результат независимо от production-кода. Бессодержательное assertion на собственном helper или наличии mock не считается достаточным доказательством поведения. |
+| Ожидание готовности | Вместо увеличения sleep используется наблюдаемое условие с конечным deadline; проверяется также отсутствие готовности. Проверки debounce, throttle и других временных требований сохраняют точные временные границы. |
 
 Implementation evidence пишется только в:
 
@@ -26,6 +28,10 @@ Fix evidence пишется только в:
 ```
 
 Эти traces не становятся canonical OpenSpec content, generated rules, QA verdict или done evidence.
+
+Качество тестов и ожидания определены в [общем файле скиллов TEST-QUALITY.md](../skills/shared/TEST-QUALITY.md). Его загружают implement/fix injections и все четыре Claude/Codex implement/fix agents после разрешения локального выполнения. Правила действуют в OpenSpec-native и classic legacy режимах; marker-first ultra delegation и существующий `fallbackDecision` сохраняются. В установленном проекте файл находится внутри `.ai-factory/extensions/aifhub-extension/`, а не в новом consumer-owned дереве правил.
+
+Для OpenSpec-native named defect и источник ожидаемого результата дополняют существующие `testCheck`/`regressionCheck`; classic legacy использует свои текущие execution/fix evidence. Новая trace schema или отдельный QA gate не создаются. Выполнение mutation check не обязательно: если оно полезно, дефект воспроизводят только в disposable fixture/copy, а рассуждение не выдают за запуск.
 
 ## Осознанные границы
 
@@ -53,6 +59,8 @@ Superpowers предлагает полный mandatory workflow с design appro
 `scripts/superpowers-discipline-contract.test.mjs` является prompt/documentation contract: он проверяет стабильные evidence-поля, их порядок, ссылки и нормализованную семантическую парность Claude/Codex-блоков. Он не заявляется как validator произвольного trace-файла.
 
 Поведение рендерера отдельно покрывает `scripts/openspec-execution-context.test.mjs`: полный development cycle, компактный fallback-only trace, fix evidence и type-scoping между Implementation/Fix. Authoritative валидация результата по-прежнему принадлежит `/aif-verify`.
+
+`scripts/superpowers-test-quality-examples.test.mjs` исполняет точные JavaScript-примеры из [shared reference](../skills/shared/references/test-quality-examples.md): правильную реализацию и два дефекта округления, немедленную/задержанную/отсутствующую готовность, границу deadline и его превышение, ошибки predicate и неподходящий async predicate. Управляемое время исключает зависимость от скорости машины. Эти проверки доказывают поведение примеров; они не являются оценкой соблюдения инструкций произвольной моделью. Contract-тест отдельно проверяет подключение shared policy во всех шести consumers и парность agents.
 
 ## Проверяемый порядок
 
@@ -83,7 +91,7 @@ rootCauseEvidence
 
 ## См. также
 
-- [Повторная проверка Superpowers и кандидаты для адаптации](superpowers-follow-up-research.md) — состояние upstream на 2026-09-05, локальные пробелы, критерии проверки и ограничения модельных отчётов; предложения ещё не реализованы.
+- [Повторная проверка Superpowers и кандидаты для адаптации](superpowers-follow-up-research.md) — состояние upstream на 2026-09-05, исходные пробелы, реализованный первый объём и оставшиеся кандидаты.
 - [Usage](usage.md)
 - [Context Loading Policy](context-loading-policy.md)
 - [Codex Agents](codex-agents.md)

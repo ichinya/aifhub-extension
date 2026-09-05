@@ -93,6 +93,42 @@ function extractMarkdownSection(source, heading) {
 }
 
 describe('Superpowers-inspired workflow discipline', () => {
+  it('loads shared test quality only after local execution is allowed in both artifact modes', async () => {
+    const guidance = [];
+    for (const relativePath of [...IMPLEMENT_PROMPTS, ...FIX_PROMPTS]) {
+      const source = await readRepoFile(relativePath);
+      const block = extractLineBlock(
+        source,
+        'Once artifact classification permits local execution',
+        'Do not create a replacement policy in the consumer project.',
+        relativePath
+      );
+      assertIncludes(block, 'skills/shared/TEST-QUALITY.md', relativePath);
+      assertIncludes(block, 'before selecting or changing an automated check or a readiness wait', relativePath);
+      assertIncludes(block, 'OpenSpec-native and classic legacy execution', relativePath);
+      assertIncludes(block, 'preserve marker-first delegation and no-test fallbacks.', relativePath);
+      assertIncludes(block, '.ai-factory/extensions/aifhub-extension/skills/shared/TEST-QUALITY.md', relativePath);
+      if (relativePath.startsWith('agent-files/')) guidance.push(normalizePromptSemantics(block));
+    }
+    assert.equal(new Set(guidance).size, 1, 'all four managed agents should load the same shared policy');
+
+    const policy = await readRepoFile('skills/shared/TEST-QUALITY.md');
+    for (const expected of [
+      'Derive the expected result independently',
+      'Reject a check that still passes for the named defect',
+      'existing `testCheck` or `regressionCheck`',
+      'not new QA verdicts or a new trace schema',
+      'reasoning-only assessment must not be reported as an executed mutation check',
+      'finite deadline',
+      'predicate that never returns',
+      'swallowing unexpected predicate errors',
+      'readiness that never arrives',
+      'debounce, throttle, expiry, and deadline boundaries',
+      'retain the existing `fallbackDecision`',
+      'references/test-quality-examples.md'
+    ]) assertIncludes(policy, expected, 'shared test quality policy');
+  });
+
   it('requires a bounded RED-GREEN-REFACTOR cycle for testable behavior changes', async () => {
     for (const relativePath of IMPLEMENT_PROMPTS) {
       const source = await readRepoFile(relativePath);

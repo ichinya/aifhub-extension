@@ -6,6 +6,10 @@ Apply this block before the upstream `aif-implement` body. When any rule below c
 
 Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
 
+Once artifact classification permits local execution, follow [test quality and readiness waits](../../skills/shared/TEST-QUALITY.md) before selecting or changing an automated check or a readiness wait. This applies to OpenSpec-native and classic legacy execution; preserve marker-first delegation and no-test fallbacks.
+
+Resolve the policy from the AIFHub extension root; in an installed project it is `.ai-factory/extensions/aifhub-extension/skills/shared/TEST-QUALITY.md`. Do not create a replacement policy in the consumer project.
+
 Resolve user-facing prose language in this order: use a usable non-empty `language.ui`; otherwise preserve the current conversation language for this response only; use English only when that language is indeterminate. This rule overrides downstream generic English defaults; do not infer from OS locale or persist the inferred choice. On that hard-English fallback, add exactly one concise setup hint only when the output contract permits human-readable prose, before any required final machine-readable block; never add it inside or after `aif-gate-result`, and never alter exact handoffs, fixed commands, paths, keys/enums, or machine-only output.
 
 ### Goal
