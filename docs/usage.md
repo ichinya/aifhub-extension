@@ -457,7 +457,10 @@ Select OpenSpec-native mode explicitly by asking for it or by starting from conf
 
 ```yaml
 aifhub:
-  artifactProtocol: openspec
+  tools:
+    openspec: true
+    hlv: false
+    lekalo: false
 ```
 
 When `.ai-factory/config.yaml` is missing and the user did not explicitly ask for a protocol, `/aif-analyze` asks one artifact protocol question before writing config or creating mode-specific directories:
@@ -469,7 +472,9 @@ Existing configs are not prompted again. Codex Default mode asks this as plain t
 
 If localization questions run first, `/aif-analyze` carries those answers forward and writes them only after the artifact protocol is selected, so language persistence does not accidentally lock in the legacy default.
 
-The selected artifact protocol owns its config profile. Legacy `artifactProtocol: ai-factory` configs do not include `aifhub.openspec` settings or OpenSpec runtime path defaults; OpenSpec-native `artifactProtocol: openspec` configs include those settings and paths explicitly.
+The OpenSpec boolean selects the artifact profile; HLV and Lekalo are independent additional tools. Legacy `tools.openspec: false` configs do not include `aifhub.openspec` settings or OpenSpec runtime path defaults; OpenSpec-native `tools.openspec: true` configs include those settings and paths explicitly.
+
+After saving tool choices, `/aif-analyze` runs `ai-factory aifhub-mode init --json`; mode switching and sync perform the same initialization. Run that command after direct flag edits, or add `--dry-run` for a preview. Enabled OpenSpec gets missing directories/config; enabled HLV reuses root `project.yaml` or `.hlv/project.yaml` without changing paths, contracts or milestones. If neither exists, installed HLV 1.0.0 initializes the existing repository with `--adopt`, keeping source in place. Existing root HLV projects do not need a `.hlv/` directory. See [provider lifecycle](validation-providers.md#lifecycle) for native scaffold effects and explicit setup failures.
 
 Config creation and mode changes structurally patch only explicit AIFHub-owned keys. They preserve upstream/core fields, unknown top-level fields, unknown nested `aifhub` fields, custom paths, and unknown user-authored fields inside a dormant profile. Known AIFHub-owned `aifhub.openspec` settings are omitted from the legacy profile, including known `allowWarnOnDone` children; the dormant block remains only when unknown fields must survive a later switch back. Diagnostics report bounded changed/preserved key paths and counts only; they do not log values, environment data, provider configuration, or credentials. Ultra research derives its root from `paths.research`; `research_bundles_dir` is not a config key.
 
@@ -479,7 +484,7 @@ The config records the aif-analyze skill version that last bootstrapped or updat
 ai-factory aifhub-analyze-config-diff --json
 ```
 
-The command is read-only, compares `.ai-factory/config.yaml` against the extension-local `skills/aif-analyze/references/config-keys.json` manifest and the installed skill's frontmatter version, and reports `missing` keys with their purpose text, deprecated keys still present (`obsolete`), `version_drift`, and `up_to_date`. Manifest entries with `modes` apply only to the matching `aifhub.artifactProtocol`, so OpenSpec-only paths do not create false drift in legacy `ai-factory` mode. Unknown user-owned keys are never reported. A config that is up to date takes the fast path and skips re-analysis; missing keys are presented to the user with their purposes before being written.
+The command is read-only, compares `.ai-factory/config.yaml` against the extension-local `skills/aif-analyze/references/config-keys.json` manifest and the installed skill's frontmatter version, and reports `missing` keys with their purpose text, deprecated keys still present (`obsolete`), `version_drift`, and `up_to_date`. Manifest entries with `modes` apply only to the effective artifact mode derived from `aifhub.tools.openspec`, so OpenSpec-only paths do not create false drift in legacy `ai-factory` mode. Unknown user-owned keys are never reported. A config that is up to date takes the fast path and skips re-analysis; missing keys are presented to the user with their purposes before being written.
 
 In OpenSpec-native mode, `/aif-analyze` also compares the selected compatible CLI with AIFHub's latest reviewed stable version. An older supported CLI remains usable for validation/archive capabilities, but the handoff recommends a user-owned update and identifies whether the selected source is `project-local`, `path`, or `explicit`. The skill never guesses a package manager, installs or updates OpenSpec, or recommends downgrading a supported version that is already equal to or newer than the reviewed baseline.
 

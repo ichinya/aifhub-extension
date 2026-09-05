@@ -1,12 +1,17 @@
 # AIFHub Artifact Modes
 
+Read [tool selection and artifact ownership](../../shared/TOOLS.md) before choosing artifact paths or lifecycle instructions.
+
 ## OpenSpec-Native Mode
 
 OpenSpec-native mode is selected by:
 
 ```yaml
 aifhub:
-  artifactProtocol: openspec
+  tools:
+    openspec: true
+    hlv: false
+    lekalo: false
   openspec:
     root: openspec
     installSkills: false
@@ -78,8 +83,10 @@ Legacy mode is selected by:
 
 ```yaml
 aifhub:
-  artifactProtocol: ai-factory
-
+  tools:
+    openspec: false
+    hlv: false
+    lekalo: false
 paths:
   context: CONTEXT.md
   plans: .ai-factory/plans
@@ -115,7 +122,7 @@ Do not delete `openspec/` when switching to legacy mode. Treat existing OpenSpec
 
 ```text
 Current mode: openspec | ai-factory | unknown
-Config marker: aifhub.artifactProtocol
+Tool switches: aifhub.tools.openspec, aifhub.tools.hlv, aifhub.tools.lekalo
 OpenSpec CLI: available/degraded
 OpenSpec changes: N
 Legacy plans: N

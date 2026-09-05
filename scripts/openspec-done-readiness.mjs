@@ -3,6 +3,7 @@
 import { execFile } from 'node:child_process';
 import { access, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { providerDiagnostics, runProviders } from './aifhub-providers.mjs';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -191,6 +192,18 @@ export async function buildOpenSpecDoneReadiness(options = {}) {
   context.verification = verification.value;
   recordCheck(checks, diagnostics, verification);
 
+  const providers = await runProviders({ ...options, rootDir, changeId: resolved.changeId,
+    phase: 'done', write: false, readOnly: true });
+  if (providers.providers.length || providers.diagnostics.length) {
+    checks.providers = providers.status;
+    context.providers = providers;
+    for (const diagnostic of providerDiagnostics(providers)) {
+      diagnostics.push({ ...diagnostic, check: 'providers', level: diagnostic.blocking ? 'fail' : 'warn',
+        suggested_next: { command: `ai-factory aifhub-providers done --change ${resolved.changeId} --write --json`,
+          reason: 'refresh configured provider evidence and resolve provider diagnostics before finalization' } });
+    }
+  }
+
   const workingTree = await inspectDirtyWorkspace({
     ...options,
     rootDir,
@@ -266,6 +279,7 @@ export function summarizeOpenSpecDoneReadiness(readiness, options = {}) {
   for (const check of CHECKS) {
     lines.push(`- ${String(checks[check] ?? 'missing').toUpperCase()} ${check}`);
   }
+  if (checks.providers !== undefined) lines.push(`- ${checks.providers.toUpperCase()} providers`);
 
   const diagnostics = Array.isArray(result.diagnostics) ? result.diagnostics : [];
   if (diagnostics.length > 0) {
@@ -939,6 +953,7 @@ function createReadinessResult({ changeId, checks, diagnostics, paths, resolver,
     paths,
     resolver
   };
+  if (context?.providers) result.providers = context.providers;
 
   if (context !== undefined) {
     Object.defineProperty(result, 'context', {

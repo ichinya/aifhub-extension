@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/ichinya/aifhub-extension/main/schemas/provider-semantic-evidence.schema.json",
+  "title": "AIFHub normalized semantic evidence and neutral trace v1.0.0",
+  "type": "object", "additionalProperties": false,
+  "required": ["status", "diagnostics", "impact", "context", "trace"],
+  "properties": {
+    "status": { "enum": ["pass", "warn", "fail"] },
+    "diagnostics": { "type": "array", "maxItems": 2000, "items": {
+      "type": "object", "additionalProperties": false, "required": ["code", "severity", "symbol"], "properties": {
+        "code": { "type": "string", "pattern": "^LEK-[A-Z]{2,12}-[0-9]{3}$" },
+        "severity": { "enum": ["error", "warning", "info"] }, "symbol": { "$ref": "#/$defs/ref" }
+      } } },
+    "impact": { "type": "array", "uniqueItems": true, "maxItems": 2000, "items": { "$ref": "#/$defs/ref" } },
+    "context": { "type": "object", "additionalProperties": false, "required": ["digest", "tokens"],
+      "properties": { "digest": { "$ref": "#/$defs/ref" }, "tokens": { "type": "integer", "minimum": 0, "maximum": 1000000 } } },
+    "trace": { "type": "object", "additionalProperties": false, "required": ["schemaVersion", "links"], "properties": {
+      "schemaVersion": { "const": "1.0.0" },
+      "links": { "type": "array", "maxItems": 2000, "items": { "type": "object", "additionalProperties": false,
+        "required": ["requirement", "semanticSymbol", "binding", "scenarioTest", "gate"], "properties": {
+          "requirement": { "$ref": "#/$defs/ref" }, "gate": { "$ref": "#/$defs/ref" },
+          "semanticSymbol": { "$ref": "#/$defs/optionalRef" }, "binding": { "$ref": "#/$defs/optionalRef" },
+          "scenarioTest": { "$ref": "#/$defs/optionalRef" }
+        } } }
+    } }
+  },
+  "$defs": {
+    "ref": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "optionalRef": { "oneOf": [{ "$ref": "#/$defs/ref" }, { "type": "null" }] }
+  }
+}

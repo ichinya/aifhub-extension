@@ -6,6 +6,7 @@ import process from 'node:process';
 import { promisify } from 'node:util';
 
 import { findExactMarkdownH2Sections } from './markdown-structural-markers.mjs';
+import { readToolConfig, parseToolConfig, toolArtifactPaths } from './tool-config.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -30,6 +31,16 @@ const MAX_NORMALIZED_EXTERNAL_ID_LENGTH = 64;
 const MAX_SOURCE_BOUND_CHANGE_ID_LENGTH = 120;
 
 export async function resolveActiveChange(options = {}) {
+  try {
+    const selection = await readToolConfig(path.resolve(options.rootDir ?? process.cwd()));
+    if (selection.explicit && !selection.tools.openspec) {
+      return createFailureResult({ source: 'tools', candidates: [], error: {
+        code: 'openspec-disabled', message: 'OpenSpec is disabled by aifhub.tools.openspec; use AI Factory artifacts.' } });
+    }
+  } catch {
+    return createFailureResult({ source: 'tools', candidates: [], error: {
+      code: 'tool-configuration-error', message: 'Tool configuration is invalid or unreadable.' } });
+  }
   const context = await createResolverContext(options);
 
   if (options.changeId !== undefined && options.changeId !== null && String(options.changeId).length > 0) {
@@ -834,7 +845,7 @@ async function readProjectConfig(rootDir) {
   try {
     const raw = await readFile(path.join(rootDir, '.ai-factory', 'config.yaml'), 'utf8');
     return {
-      paths: parseSimplePathsConfig(raw)
+      paths: toolArtifactPaths(parseToolConfig(raw), parseSimplePathsConfig(raw))
     };
   } catch {
     return {

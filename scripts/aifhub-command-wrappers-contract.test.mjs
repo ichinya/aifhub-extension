@@ -15,6 +15,13 @@ const execFileAsync = promisify(execFile);
 
 const WRAPPER_COMMANDS = [
   {
+    name: 'aifhub-providers',
+    description: 'Inspect and run configured AIFHub validation and semantic model providers.',
+    module: './commands/aifhub-providers.mjs',
+    script: 'aifhub-providers.mjs',
+    args: ['verify', '--change', 'add-oauth', '--write', '--json']
+  },
+  {
     name: 'aifhub-mode',
     description: 'Run AIFHub artifact mode status, switch, sync, and doctor commands.',
     module: './commands/aifhub-mode.mjs',

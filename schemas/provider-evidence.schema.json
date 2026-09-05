@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/ichinya/aifhub-extension/main/schemas/provider-evidence.schema.json",
+  "title": "AIFHub normalized provider evidence v1.0.0",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "provider", "kind", "policy", "phase", "changeId", "revision", "timestamp", "toolVersion", "commandContract", "provenance", "status", "reason", "operations", "gate"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "provider": { "enum": ["hlv", "lekalo"] },
+    "kind": { "enum": ["validation", "semantic_model"] },
+    "policy": { "enum": ["optional", "required"] },
+    "phase": { "enum": ["status", "doctor", "implement", "verify", "done"] },
+    "changeId": { "type": ["string", "null"], "pattern": "^[a-z0-9][a-z0-9-]{0,99}$" },
+    "revision": { "oneOf": [{ "type": "null" }, { "type": "object", "additionalProperties": false,
+      "required": ["commit", "worktree"], "properties": {
+        "commit": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
+        "worktree": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      } }] },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "toolVersion": { "type": ["string", "null"], "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "commandContract": { "oneOf": [{ "type": "null" }, { "type": "object", "additionalProperties": false,
+      "required": ["id", "version", "source"], "properties": {
+        "id": { "const": "aifhub.hlv-cli" }, "version": { "const": "1.0.0" },
+        "source": { "const": "https://github.com/lee-to/hlv/tree/v1.0.0" }
+      } }] },
+    "provenance": { "type": "object", "additionalProperties": false,
+      "required": ["boundary", "source", "policyDigest"], "properties": {
+        "boundary": { "const": "process-json" }, "source": { "enum": ["explicit-executable", "path"] },
+        "policyDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      } },
+    "layout": { "enum": ["greenfield", "adopt", null] },
+    "status": { "$ref": "#/$defs/status" },
+    "reason": { "type": "string", "pattern": "^[a-z_]+$" },
+    "operations": { "type": "array", "maxItems": 10, "items": { "type": "object", "additionalProperties": false,
+      "required": ["operation", "status", "reason", "diagnostics"], "properties": {
+        "operation": { "enum": ["detect", "status", "doctor", "sync", "validate", "readiness", "trace", "impact", "context"] },
+        "status": { "$ref": "#/$defs/status" }, "reason": { "type": "string", "pattern": "^[a-z_]+$" },
+        "diagnostics": { "type": "array", "maxItems": 2000, "items": { "type": "object", "additionalProperties": false,
+          "required": ["code", "severity"], "properties": {
+            "code": { "type": "string", "pattern": "^[A-Z]{2,5}-[0-9]{3}$" },
+            "severity": { "enum": ["error", "warning", "info"] }
+          } } },
+        "streams": { "type": "object", "additionalProperties": false, "required": ["stdout", "stderr", "exitCode"],
+          "properties": { "stdout": { "enum": ["present", "empty"] }, "stderr": { "enum": ["present", "empty"] },
+            "exitCode": { "type": ["integer", "null"] } } },
+        "summary": { "type": "object", "additionalProperties": false, "properties": {
+          "errors": { "type": "integer", "minimum": 0 }, "warnings": { "type": "integer", "minimum": 0 },
+          "infos": { "type": "integer", "minimum": 0 }, "stages": { "type": "integer", "minimum": 0 },
+          "validated": { "type": "integer", "minimum": 0 }, "milestone": { "type": "boolean" },
+          "applicable": { "type": "boolean" },
+          "history": { "type": "integer", "minimum": 0 }, "contentDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "format": { "const": "hlv-trace-1.0.0" }
+        } }
+      } } },
+    "gate": { "type": "object", "additionalProperties": false, "required": ["status", "blocking"],
+      "properties": { "status": { "enum": ["pass", "warn", "fail"] }, "blocking": { "type": "boolean" } } }
+  },
+  "$defs": { "status": { "enum": ["pass", "warn", "fail", "unavailable", "unsupported", "infrastructure_error", "configuration_error"] } }
+}

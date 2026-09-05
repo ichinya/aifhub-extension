@@ -1,5 +1,7 @@
 ## AIFHub Rules Check OpenSpec-native Override
 
+Read [tool selection and artifact ownership](../../skills/shared/TOOLS.md) before choosing artifact paths or lifecycle instructions.
+
 Apply this block before the upstream `aif-rules-check` body. When this guidance conflicts with the base skill text, this block wins.
 
 Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
@@ -14,7 +16,7 @@ Use the upstream `/aif-rules-check` read-only gate as the command owner, while a
 
 Before resolving rule sources, read `.ai-factory/config.yaml` when it exists.
 
-- If the config contains `aifhub.artifactProtocol: openspec`, use **OpenSpec-native mode**.
+- If the config contains `aifhub.tools.openspec: true`, use **OpenSpec-native mode**.
 - If the explicit scope is under `openspec/changes/<change-id>/`, use **OpenSpec-native mode**.
 - Otherwise use **Legacy AI Factory-only mode** and follow the upstream rules hierarchy.
 

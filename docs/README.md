@@ -48,6 +48,7 @@ OpenSpec CLI features вызываются через AIFHub wrappers и `script
 
 | Guide | Назначение |
 |---|---|
+| [Validation Providers](validation-providers.md) | Composable HLV validation, independent tool switches and artifact selection, required/optional policy, revision-bound evidence, read-only doctor and the separate Lekalo-ready semantic contract |
 | [Usage](usage.md) | Полный OpenSpec-native command flow, AI Factory 2.19 session warmup, AI Factory 2.18 mode/profile matrix, regular/ultra research, revision-bound legacy-ultra receipt, archive/update boundaries, optional providers, gates, finalization tail и examples |
 | [Адаптация идей Superpowers](superpowers-adaptation.md) | Bounded RED/GREEN/REFACTOR, systematic root-cause debugging, two-pass review и ownership boundaries без второго workflow stack |
 | [Context Providers](context-providers.md) | Optional Graphify context, CodeGraph manual CLI context, Context7 provider guidance и T-Search reject/defer boundary, reviewed-note paths, degraded behavior, credential safety и user-owned setup boundaries |

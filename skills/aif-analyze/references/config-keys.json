@@ -28,9 +28,28 @@
     },
     {
       "key": "aifhub.artifactProtocol",
-      "required": true,
+      "required": false,
+      "deprecated": true,
       "since": "1.0.0",
-      "purpose": "Artifact protocol switch: openspec (OpenSpec-native) or legacy AI Factory-only mode."
+      "purpose": "Legacy fallback when aifhub.tools is absent; migrate to independent tool switches."
+    },
+    {
+      "key": "aifhub.tools.openspec",
+      "required": true,
+      "since": "0.15.0",
+      "purpose": "Boolean opt-in for OpenSpec changes/specifications; false uses AI Factory plans/specifications."
+    },
+    {
+      "key": "aifhub.tools.hlv",
+      "required": true,
+      "since": "0.15.0",
+      "purpose": "Boolean opt-in for HLV contracts, traceability and validation gates."
+    },
+    {
+      "key": "aifhub.tools.lekalo",
+      "required": true,
+      "since": "0.15.0",
+      "purpose": "Reserved boolean opt-in for Lekalo semantic model artifacts; keep false until a compatible provider exists."
     },
     {
       "key": "paths.plans",

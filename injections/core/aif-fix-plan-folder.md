@@ -1,5 +1,7 @@
 ## AIFHub Fix OpenSpec-native Override
 
+Read [tool selection and artifact ownership](../../skills/shared/TOOLS.md) before choosing artifact paths or lifecycle instructions.
+
 Apply this block before the upstream `aif-fix` body. When any rule below conflicts with the base skill text, this block wins.
 
 Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
@@ -23,7 +25,7 @@ If both exist, `aif-fix` wins.
 
 Before resolving fix findings, read `.ai-factory/config.yaml` when it exists.
 
-- If the config contains `aifhub.artifactProtocol: openspec`, use **OpenSpec-native mode**.
+- If the config contains `aifhub.tools.openspec: true`, use **OpenSpec-native mode**.
 - Otherwise, use **Legacy AI Factory-only mode**.
 - If the config is missing, continue with Legacy AI Factory-only mode and state that no OpenSpec-native protocol was detected.
 
@@ -38,7 +40,7 @@ In Legacy AI Factory-only mode, classify the normalized project-relative plan en
 
 ### OpenSpec-native mode
 
-When `.ai-factory/config.yaml` declares `aifhub.artifactProtocol: openspec`, `/aif-fix` applies selected QA findings for the active OpenSpec change.
+When `.ai-factory/config.yaml` declares `aifhub.tools.openspec: true`, `/aif-fix` applies selected QA findings for the active OpenSpec change.
 
 For plan content, read only the canonical OpenSpec artifacts listed below. Do not inspect or mutate `.ai-factory/plans/**` after an OpenSpec change resolves.
 

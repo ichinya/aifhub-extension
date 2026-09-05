@@ -7,6 +7,8 @@ author: ichi
 
 # AIF Rules Check
 
+Read [tool selection and artifact ownership](../shared/TOOLS.md) before selecting rules. Existing OpenSpec paths never override an explicit false.
+
 Read-only gate for rule compliance verification. Checks changed files against the project rules hierarchy and returns a structured verdict without modifying any files.
 
 This is an **extension-owned temporary gate**. When upstream `ai-factory` adds a native `/aif-rules-check`, this skill should be deprecated in favor of the upstream version.
@@ -27,7 +29,7 @@ This is an **extension-owned temporary gate**. When upstream `ai-factory` adds a
 
 ## OpenSpec-native mode
 
-Use OpenSpec-native mode when `.ai-factory/config.yaml` contains `aifhub.artifactProtocol: openspec` or the explicit scope is under `openspec/changes/<change-id>/`.
+Use OpenSpec-native mode when `.ai-factory/config.yaml` contains `aifhub.tools.openspec: true`.
 
 Read canonical OpenSpec artifacts only as context:
 
@@ -67,7 +69,7 @@ Legacy AI Factory-only mode may cross-reference the active plan pair and plan-lo
 
 1. Read `.ai-factory/config.yaml` for path configuration and active plan resolution.
 2. Detect rules mode:
-   - OpenSpec-native mode when config contains `aifhub.artifactProtocol: openspec` or the active scope is clearly under `openspec/changes/<change-id>/`.
+   - OpenSpec-native mode when config contains `aifhub.tools.openspec: true`.
    - Legacy AI Factory-only mode otherwise.
 3. In OpenSpec-native mode, follow the `OpenSpec-native mode` hierarchy above.
 4. In Legacy AI Factory-only mode, follow the `Legacy AI Factory-only mode` hierarchy above.
