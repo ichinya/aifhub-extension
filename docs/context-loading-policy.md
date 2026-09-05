@@ -147,6 +147,8 @@ Central provider guide находится в [Context Providers](context-provide
 
 Context/compression providers не должны rewrite validation artifacts и не должны compress protected artifacts in place. Protected validation artifacts включают `aif-gate-result`, `coverage.json`, `done-readiness.json`, `openspec/specs/**`, generated-rules traces и exact evidence snippets.
 
+Command-output compression также не заменяет exact evidence: RTK допускается только для explicitly chosen overview, с полным raw чтением protected artifacts, patches/history и failing-test diagnostics до review/verify/fix conclusions. [Token Providers](token-providers.md) фиксирует `reject_defer` для RTK `v0.48.0`, raw bypasses и local-storage risks; rewrite exclusions не являются privacy boundary, а provider metrics не попадают в gates или `/aif-analyze` автоматически.
+
 Optional session dedup (см. [Session Context Dedup](context-dedup.md)) подчиняется тому же правилу. Он влияет только на ответ на повторное чтение неизменившегося файла, никогда не переписывает файлы и никогда не дедуплицирует protected validation artifacts.
 
 ## Опциональный Graphify Context
