@@ -65,7 +65,7 @@ function missingCliDetection() {
     canValidate: false,
     canArchive: false,
     version: null,
-    latestReviewedVersion: '1.10.0',
+    latestReviewedVersion: '1.12.0',
     versionOutdated: null,
     command: 'openspec',
     commandSource: 'path',
@@ -86,8 +86,8 @@ function availableCliDetection(overrides = {}) {
     canValidate: true,
     canArchive: true,
     version,
-    latestReviewedVersion: '1.10.0',
-    versionOutdated: overrides.versionOutdated ?? version.localeCompare('1.10.0', 'en', { numeric: true }) < 0,
+    latestReviewedVersion: '1.12.0',
+    versionOutdated: overrides.versionOutdated ?? version.localeCompare('1.12.0', 'en', { numeric: true }) < 0,
     command: overrides.command ?? 'openspec',
     commandSource: overrides.commandSource ?? 'path',
     nodeVersion: overrides.nodeVersion ?? '20.19.0',
@@ -139,7 +139,7 @@ describe('mode status', () => {
 
     assert.equal(status.openspecCli.state, 'available');
     assert.equal(status.openspecCli.version, '1.4.0');
-    assert.equal(status.openspecCli.latestReviewedVersion, '1.10.0');
+    assert.equal(status.openspecCli.latestReviewedVersion, '1.12.0');
     assert.equal(status.openspecCli.versionOutdated, true);
     assert.equal(status.openspecCli.canValidate, true);
     assert.equal(status.openspecCli.canArchive, true);
@@ -154,8 +154,8 @@ describe('mode status', () => {
     ].join('\n'));
 
     for (const expectation of [
-      { version: '1.10.0', versionOutdated: false },
-      { version: '1.10.1', versionOutdated: false }
+      { version: '1.12.0', versionOutdated: false },
+      { version: '1.12.1', versionOutdated: false }
     ]) {
       const status = await getModeStatus({
         rootDir,
@@ -163,7 +163,7 @@ describe('mode status', () => {
       });
 
       assert.equal(status.openspecCli.version, expectation.version);
-      assert.equal(status.openspecCli.latestReviewedVersion, '1.10.0');
+      assert.equal(status.openspecCli.latestReviewedVersion, '1.12.0');
       assert.equal(status.openspecCli.versionOutdated, false);
       assert.equal(status.openspecCli.commandSource, 'path');
     }
@@ -173,7 +173,7 @@ describe('mode status', () => {
       detectOpenSpec: async () => missingCliDetection()
     });
     assert.equal(missing.openspecCli.version, null);
-    assert.equal(missing.openspecCli.latestReviewedVersion, '1.10.0');
+    assert.equal(missing.openspecCli.latestReviewedVersion, '1.12.0');
     assert.equal(missing.openspecCli.versionOutdated, null);
   });
 
@@ -1543,6 +1543,30 @@ describe('artifact sync and export', () => {
     assert.deepEqual(validated, ['docs-only', 'nested-change']);
     assert.equal(result.validation.skippedChanges.length, 0);
     assert.ok(!result.validation.warnings.some((warning) => warning.code === 'no-delta-specs'));
+  });
+
+  it('preserves full OpenSpec 1.12 INFO reports during sync without failing valid changes', async () => {
+    const rootDir = await createTempRoot();
+    await writeFixture(rootDir, '.ai-factory/config.yaml', 'aifhub:\n  artifactProtocol: openspec\n  openspec:\n    compileRulesOnSync: false\n');
+    await writeFixture(rootDir, 'openspec/config.yaml', 'schema: spec-driven\n');
+    await writeFixture(rootDir, 'openspec/changes/info-change/proposal.md', '# Proposal\n');
+    await writeFixture(rootDir, 'openspec/changes/info-change/specs/widgets/spec.md', '## MODIFIED Requirements\n### Requirement: Missing\nThe system SHALL handle requests.\n\n#### Scenario: request\n- **WHEN** a request arrives\n- **THEN** it is handled\n');
+    const payload = {
+      items: [{ id: 'info-change', type: 'change', valid: true, issues: [{
+        level: 'INFO', path: 'widgets/spec.md', message: 'Archive would refuse this delta: missing target.'
+      }] }], summary: { totals: { items: 1, passed: 1, failed: 0 } }, version: '1.0'
+    };
+    const result = await syncOpenSpecArtifacts({
+      rootDir, all: true,
+      detectOpenSpec: async () => availableCliDetection({ version: '1.12.0' }),
+      validateOpenSpecChange: async () => ({ ok: true, exitCode: 0, stdout: JSON.stringify(payload), stderr: '', json: payload }),
+      getOpenSpecStatus: async () => ({ ok: true, stdout: '{}', stderr: '', json: {} })
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.validation.results.length, 1);
+    assert.deepEqual(result.validation.results[0].validation.json, payload);
+    assert.deepEqual(JSON.parse(result.validation.results[0].validation.stdout), payload);
+    assert.deepEqual(result.validation.errors, []);
   });
 
   it('treats numeric-leading OpenSpec status rejection as non-blocking during sync', async () => {
