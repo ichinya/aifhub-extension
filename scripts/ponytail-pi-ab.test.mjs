@@ -188,7 +188,8 @@ describe('Ponytail Pi A/B matrix', () => {
       "process.stdout.write('partial-out\\n'); process.stderr.write('partial-err\\n'); setTimeout(() => {}, 10_000);"
     ], {
       cwd: tempDir,
-      timeoutMs: 1_000,
+      // Allow Node startup on loaded workers; the fixture still runs for 10 seconds.
+      timeoutMs: 5_000,
       maxBuffer: 1024 * 1024
     });
 

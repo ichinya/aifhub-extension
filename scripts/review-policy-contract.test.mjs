@@ -88,7 +88,7 @@ describe('durable project review policy', () => {
     const configKeys = JSON.parse(await readRepoFile('skills/aif-analyze/references/config-keys.json'));
 
     for (const expected of [
-      'version: 0.13.0',
+      'version: 0.14.0',
       '### Step 3.3: Project Review Policy',
       '`reviews.policy_file`',
       'use `REVIEW.md` when the key is missing or empty',
