@@ -42,6 +42,12 @@ In Legacy AI Factory-only mode, classify the normalized project-relative plan en
 - For `classic-pair` or `classic-folder-only`, continue with the classic companion rules below. An unrelated directory is not a plan.
 - Diagnostics may include only `shape`, safe project-relative `entrypoint`, and `handoff`; never include marker bodies, phase contents, request/research bodies, credentials, raw stdout, or raw stderr.
 
+### Fix re-review handoff
+
+After classification permits a selected fix, follow the fixer handoff in `skills/shared/SCOPED-REVIEW.md` before editing and when reporting results. Preserve the original finding IDs and exact pre-fix/post-fix targets, including uncommitted changes, so a later re-review can verify the actual fix. Apply this in OpenSpec-native and classic legacy execution; marker-first delegation takes precedence.
+
+Resolve the policy from the AIFHub extension root; in an installed project it is `.ai-factory/extensions/aifhub-extension/skills/shared/SCOPED-REVIEW.md`. Keep evidence in the existing fix report/response and do not create a replacement policy in the consumer project.
+
 ### OpenSpec-native mode
 
 When `.ai-factory/config.yaml` declares `aifhub.tools.openspec: true`, `/aif-fix` applies selected QA findings for the active OpenSpec change.

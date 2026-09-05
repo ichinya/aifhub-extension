@@ -16,6 +16,12 @@ Once artifact classification permits local execution, follow `skills/shared/TEST
 
 Resolve the policy from the AIFHub extension root; in an installed project it is `.ai-factory/extensions/aifhub-extension/skills/shared/TEST-QUALITY.md`. Do not create a replacement policy in the consumer project.
 
+## Fix re-review handoff
+
+After classification permits a selected fix, follow the fixer handoff in `skills/shared/SCOPED-REVIEW.md` before editing and when reporting results. Preserve the original finding IDs and exact pre-fix/post-fix targets, including uncommitted changes, so a later re-review can verify the actual fix. Apply this in OpenSpec-native and classic legacy execution; marker-first delegation takes precedence.
+
+Resolve the policy from the AIFHub extension root; in an installed project it is `.ai-factory/extensions/aifhub-extension/skills/shared/SCOPED-REVIEW.md`. Keep evidence in the existing fix report/response and do not create a replacement policy in the consumer project.
+
 ## OpenSpec-native mode
 
 Use this mode when config declares `aifhub.tools.openspec: true`.

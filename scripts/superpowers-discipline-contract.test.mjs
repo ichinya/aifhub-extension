@@ -28,6 +28,27 @@ const REVIEW_PROMPTS = [
 
 const AGENT_SEMANTIC_PAIRS = [
   {
+    label: 'bounded batch worker scope',
+    codexPath: 'agent-files/codex/aifhub-implement-worker.toml',
+    claudePath: 'agent-files/claude/aifhub-implement-worker.md',
+    start: 'After classification permits local execution, follow the worker execution',
+    end: 'Preserve marker-first delegation and do not create a replacement policy'
+  },
+  {
+    label: 'fix re-review handoff',
+    codexPath: 'agent-files/codex/aifhub-fixer.toml',
+    claudePath: 'agent-files/claude/aifhub-fixer.md',
+    start: 'After classification permits a selected fix, follow the fixer handoff',
+    end: 'Keep evidence in the existing fix report/response'
+  },
+  {
+    label: 'scoped re-review',
+    codexPath: 'agent-files/codex/aifhub-review-sidecar.toml',
+    claudePath: 'agent-files/claude/aifhub-review-sidecar.md',
+    start: 'For a requested re-review after fixes, follow',
+    end: 'Return the scoped evidence before the single existing gate result'
+  },
+  {
     label: 'implementation discipline',
     codexPath: 'agent-files/codex/aifhub-implement-worker.toml',
     claudePath: 'agent-files/claude/aifhub-implement-worker.md',
@@ -93,6 +114,26 @@ function extractMarkdownSection(source, heading) {
 }
 
 describe('Superpowers-inspired workflow discipline', () => {
+  it('resolves extension-owned coordination and re-review policies from every consumer', async () => {
+    // Asset wiring only: this does not evaluate an agent's decisions on a real task.
+    const policies = new Map([
+      ['TASK-COORDINATION.md', IMPLEMENT_PROMPTS],
+      ['SCOPED-REVIEW.md', [...FIX_PROMPTS, ...REVIEW_PROMPTS]]
+    ]);
+    for (const [filename, consumers] of policies) {
+      const installedPrefix = '.ai-factory/extensions/aifhub-extension/';
+      for (const relativePath of consumers) {
+        const source = await readRepoFile(relativePath);
+        const installedPath = source.match(new RegExp(
+          `${installedPrefix.replaceAll('.', '\\.')}skills/shared/${filename.replaceAll('.', '\\.')}`
+        ))?.[0];
+        assert.ok(installedPath, `${relativePath} must identify the installed shared policy`);
+        const policy = await readRepoFile(installedPath.slice(installedPrefix.length));
+        assert.ok(policy.trim().length > 0, `${installedPath} must resolve to a packaged source asset`);
+      }
+    }
+  });
+
   it('loads shared test quality only after local execution is allowed in both artifact modes', async () => {
     const guidance = [];
     for (const relativePath of [...IMPLEMENT_PROMPTS, ...FIX_PROMPTS]) {

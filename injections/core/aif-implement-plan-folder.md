@@ -42,6 +42,12 @@ In Legacy AI Factory-only mode, classify the normalized project-relative plan en
 - For `classic-pair` or `classic-folder-only`, continue with the classic companion rules below. An unrelated directory is not a plan.
 - Diagnostics may include only `shape`, safe project-relative `entrypoint`, and `handoff`; never include marker bodies, phase contents, request/research bodies, credentials, raw stdout, or raw stderr.
 
+### Task coordination after classification
+
+After classification permits local execution and the canonical tasks have been read, follow [task conflicts and bounded batches](../../skills/shared/TASK-COORDINATION.md) before implementation edits or first worker dispatch. Apply it to OpenSpec-native and classic legacy execution; marker-first ultra delegation and invalid/collision stops remain prior boundaries.
+
+Resolve the policy from the AIFHub extension root; in an installed project it is `.ai-factory/extensions/aifhub-extension/skills/shared/TASK-COORDINATION.md`. The coordinator owns the preflight scan, explicit batch manifest, and per-item reconciliation. Workers consume only the selected scope. Do not create a replacement policy in the consumer project.
+
 ### OpenSpec-native mode
 
 When `.ai-factory/config.yaml` declares `aifhub.tools.openspec: true`, `/aif-implement` executes implementation tasks for the active OpenSpec change.
@@ -88,10 +94,10 @@ Hydrate runtime todo state from canonical OpenSpec tasks before editing implemen
 
 - Treat `openspec/changes/<change-id>/tasks.md` as the source checklist.
 - If the current runtime exposes a todo or plan tool, use it before editing. In Codex, use `update_plan` when available.
-- Map checked tasks to `completed`, mark the selected unfinished task or tightly coupled task group as `in_progress`, and leave other unfinished tasks as `pending`.
+- Map checked tasks to `completed`, mark only the selected unfinished task, tightly coupled task group, or explicit small same-shape batch as `in_progress`, and leave other unfinished tasks as `pending`.
 - If no todo or plan tool is available, report a concise task snapshot in the normal response and continue from canonical `tasks.md`.
 - Report missing todo-tool support as a capability fallback, not as an implementation failure.
-- Hydrating runtime todo state does not authorize broad task expansion; `/aif-implement` still executes one task or one tightly coupled task group.
+- Hydrating runtime todo state does not authorize broad task expansion; `/aif-implement` executes one task, one tightly coupled task group, or one explicit small same-shape batch validated under `skills/shared/TASK-COORDINATION.md`. Complete each item only after reconciling its expected change with the actual diff and evidence.
 
 #### Roadmap lifecycle deferral
 

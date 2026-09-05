@@ -9,7 +9,7 @@
 | `name` | Назначение | `tools` | `permissionMode` | Write boundary |
 |-------|------------|---------|-------------------|----------------|
 | `aifhub-plan-polisher` | Bounded worker для полировки одного активного плана или OpenSpec change artifacts | Read, Write, Edit, Glob, Grep, Bash | `acceptEdits` | OpenSpec canonical files or classic legacy pair only; marked ultra is read-only routing to exact `/aif-improve <entrypoint>` |
-| `aifhub-implement-worker` | Bounded worker для выполнения одной plan task или тесно связанной группы задач; mirrors OpenSpec `tasks.md` into runtime todo state when available | Read, Write, Edit, Glob, Grep, Bash | `acceptEdits` | Selected OpenSpec/classic execution scope only; marked ultra routes to exact `/aif-implement <entrypoint>`; без commit/push |
+| `aifhub-implement-worker` | Bounded worker для одной plan task, тесно связанной группы или явного небольшого batch независимых однотипных задач; поэлементный результат и runtime todo | Read, Write, Edit, Glob, Grep, Bash | `acceptEdits` | Selected OpenSpec/classic execution scope only; marked ultra routes to exact `/aif-implement <entrypoint>`; без commit/push |
 | `aifhub-review-sidecar` | Read-only sidecar для review changed scope с findings-first выводом | Read, Glob, Grep | `dontAsk` | Не пишет файлы |
 | `aifhub-security-sidecar` | Read-only sidecar для security-аудита changed scope | Read, Glob, Grep | `dontAsk` | Не пишет файлы |
 | `aifhub-verifier` | Low-write verifier для OpenSpec change or legacy plan pair и changed scope с gate result | Read, Write, Edit, Glob, Grep, Bash | `acceptEdits` | OpenSpec QA or classic `status.yaml`/`verify.md`; marked ultra delegates exact `/aif-verify <entrypoint>`, and only the command boundary may write its receipt |

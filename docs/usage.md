@@ -777,7 +777,7 @@ Runtime todo behavior:
 - When the runtime exposes a todo or plan tool, `/aif-implement` mirrors checkbox tasks into runtime todo state before editing.
 - In Codex this uses `update_plan` when available.
 - If no todo tool is available, `/aif-implement` reports a task snapshot as a capability fallback and continues from `tasks.md`.
-- Runtime todo hydration does not authorize broad task expansion; execution remains one task or one tightly coupled task group.
+- Runtime todo hydration does not authorize broad task expansion; execution covers one task, one tightly coupled task group, or one explicit small same-shape batch validated by the coordinator. Before edits/dispatch, scan task conflicts; for a batch, enumerate every task/file/change/check and reconcile completion per item. See [task coordination](../skills/shared/TASK-COORDINATION.md).
 
 Development cycle for a testable behavior change:
 

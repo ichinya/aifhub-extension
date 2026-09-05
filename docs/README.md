@@ -50,8 +50,8 @@ OpenSpec CLI features вызываются через AIFHub wrappers и `script
 |---|---|
 | [Validation Providers](validation-providers.md) | Composable HLV validation, independent tool switches and artifact selection, required/optional policy, revision-bound evidence, read-only doctor and the separate Lekalo-ready semantic contract |
 | [Usage](usage.md) | Полный OpenSpec-native command flow, AI Factory 2.19 session warmup, AI Factory 2.18 mode/profile matrix, regular/ultra research, revision-bound legacy-ultra receipt, archive/update boundaries, optional providers, gates, finalization tail и examples |
-| [Адаптация идей Superpowers](superpowers-adaptation.md) | RED/GREEN/REFACTOR, независимые test expectations, readiness waits с deadline, systematic debugging и two-pass review без второго workflow stack |
-| [Superpowers Follow-up Research](superpowers-follow-up-research.md) | Проверка upstream на 2026-09-05, пять кандидатов для #141, границы #168 и наблюдавшиеся возможности исследовательских моделей |
+| [Адаптация идей Superpowers](superpowers-adaptation.md) | Качество тестов, bounded readiness, проверка конфликтов задач, явные batches, debugging и scoped re-review |
+| [Superpowers Follow-up Research](superpowers-follow-up-research.md) | Проверка upstream на 2026-09-05, пять реализованных адаптаций для #141, границы #168 и возможности исследовательских моделей |
 | [Context Providers](context-providers.md) | Optional Graphify context, CodeGraph manual CLI context, Context7 provider guidance и T-Search reject/defer boundary, reviewed-note paths, degraded behavior, credential safety и user-owned setup boundaries |
 | [Skill Providers](skill-providers.md) | Ponytail exact-source evaluation, `manual_experiment_only` decision, implementation-only scope, safety/OpenSpec boundaries и promotion benchmark |
 | [Ponytail Pi A/B Scenarios](skill-providers-research/ponytail-pi-ab/README.md) | Reproducible paired Pi proxy и [144-row multi-model results](skill-providers-research/ponytail-pi-ab/results.md) на disposable exact-commit TypeScript, Go и Laravel copies с hidden graders |
