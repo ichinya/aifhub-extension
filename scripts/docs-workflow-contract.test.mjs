@@ -1393,7 +1393,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
     const changelog = await readRepoFile('CHANGELOG.md');
     const planUsage = extractSection(usage, '### `/aif-plan full`');
     const planPolicy = extractSection(compatibility, '## Workflow Plan ID Policy');
-    const unreleased = extractSection(changelog, '## [В разработке]');
+    const release = extractSection(changelog, '## [1.5.1] - 2026-09-06');
 
     for (const expected of [
       'GitHub, Linear, Jira, YouGile',
@@ -1475,7 +1475,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
       'primary source',
       'four-digit compatibility prefix'
     ]) {
-      assertIncludes(unreleased, expected, 'CHANGELOG.md unreleased MCP work-item plan identity');
+      assertIncludes(release, expected, 'CHANGELOG.md 1.5.1 MCP work-item plan identity');
     }
   });
 

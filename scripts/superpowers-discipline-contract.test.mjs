@@ -280,7 +280,7 @@ describe('Superpowers-inspired workflow discipline', () => {
   it('documents adopted ideas, rejected duplication, and the reviewed upstream revision', async () => {
     const source = await readRepoFile('docs/superpowers-adaptation.md');
     const changelog = await readRepoFile('CHANGELOG.md');
-    const unreleased = extractMarkdownSection(changelog, '## [В разработке]');
+    const release = extractMarkdownSection(changelog, '## [1.5.1] - 2026-09-06');
 
     for (const expected of [
       'https://github.com/obra/superpowers',
@@ -301,7 +301,7 @@ describe('Superpowers-inspired workflow discipline', () => {
     }
 
     for (const expected of ['issue #141', 'RED -> GREEN -> REFACTOR', 'Claude/Codex-пар']) {
-      assertIncludes(unreleased, expected, 'CHANGELOG.md unreleased Superpowers adaptation');
+      assertIncludes(release, expected, 'CHANGELOG.md 1.5.1 Superpowers adaptation');
     }
   });
 });

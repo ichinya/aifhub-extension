@@ -6,7 +6,11 @@
 
 ## [В разработке]
 
+## [1.5.1] - 2026-09-06
+
 ### Добавлено
+- Сохраняемое выполнение задач через `ai-factory aifhub-execution`: привязка к каноническим OpenSpec/classic-планам, индивидуальная приёмка результатов, небольшие batches, восстановление прерванных назначений и общий журнал попыток исправления. `ai-factory aifhub-evolution` добавляет проверяемые предложения изменений skill-context, применение и rollback с защитой последующих правок. Адаптация issue #148 не заменяет `/aif-verify`; host cancellation adapters, удаление orphan locks и поддержка Prime Agent runtime остаются отложенными.
+- Исследования T-Search и Prime Agent с воспроизводимыми probes и сохранёнными результатами: T-Search остаётся `reject_defer`, принятие Prime Agent как поддерживаемого runtime отложено. Исследования не добавляют установку или автоматический запуск этих инструментов.
 - После фактического обновления AIFHub через `ai-factory update` или `ai-factory extension update [aifhub-extension]` автоматически запускается обновлённый `aifhub-mode init --json`. Обработчик подключается через Commander API, не меняет установщик AI Factory и передаёт ошибку init в exit code. Для первого перехода с версии без обработчика нужен однократный ручной init; последующие обновления выполняют его сами.
 - Автоматические локальные `.gitignore` для runtime state, QA и generated rules в проекте-потребителе: bootstrap и самостоятельные writers создают `*` / `!.gitignore`, учитывают настроенные пути, сохраняют существующие правила и не меняют корневой `.gitignore` или индекс Git. Dry-run/status остаются без записи; небезопасные и канонические пути отклоняются.
 - Мультирепозиторный A/B RTK через ai-tester/Pi: четыре сценария на трёх связанных копиях с метками, 24 завершённых запуска, baseline 11/12 и RTK 12/12. Суммарная экономия 15,8% токенов зависит от сценария; полная диагностика восстанавливается raw-повтором. Добавлены скрытые проверки согласованного исправления, аудит неизменности исходников и обезличенные агрегаты; privacy blockers и `reject_defer` сохраняются. Удаление временных сырых данных отклонено автоматической проверкой разрешений.
@@ -31,8 +35,6 @@
 
 ### Исправлено
 - Review policy resolution теперь использует один installed canonical resolver для scaffold и read-only consumers: symlink/Windows junction escapes, managed-file collisions и canonical OpenSpec/project-rules/generated/runtime/QA roots fail closed до чтения или создания; реальные сценарии защищены executable regression-тестами.
-
-### Исправлено
 - `/aif-plan` теперь использует provider-neutral identity задач из GitHub, Linear, Jira, YouGile и других MCP-систем: читаемый внешний ID становится префиксом `<external-id>-<request-slug>`, а отдельный условный `AIFHub Source Binding` сохраняет provider, полный primary source, external ID и exact creation branch. Active-change resolver выбирает одну точную привязку до slug-эвристики, current pointer детерминированно разрешает несколько планов на одной ветке, а повреждённая привязка другой ветки изолируется warning-ом. Одинаковые ключи в разных provider/repository/tenant, primary + secondary linkage, opaque-ID fallback, malformed/mismatched binding и существующие коллизии обрабатываются без overwrite или потери ID-префикса. Legacy classic проверяет синхронизацию Markdown с `status.yaml`, а sequential сохраняет four-digit compatibility prefix.
 
 ## [1.5.0] - 2026-09-01
