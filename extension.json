@@ -78,6 +78,16 @@
       "name": "aifhub-context-dedup",
       "description": "Run AIFHub session context dedup checks, status, and purge.",
       "module": "./commands/aifhub-context-dedup.mjs"
+    },
+    {
+      "name": "aifhub-execution",
+      "description": "Manage source-bound execution, sealed batches, fix attempts, and interruption recovery.",
+      "module": "./commands/aifhub-execution.mjs"
+    },
+    {
+      "name": "aifhub-evolution",
+      "description": "Propose, apply, and roll back versioned skill-context changes.",
+      "module": "./commands/aifhub-evolution.mjs"
     }
   ],
   "skills": [

@@ -48,6 +48,19 @@ Follow skills/shared/TOOLS.md: only when the entire tools mapping is absent, rea
 - Report changed files, active OpenSpec change, canonical artifacts inspected, generated rules state, runtime state path, QA evidence path, blockers, and next recommended command.
 - After implementation, optional read-only gates are `/aif-rules-check`, `/aif-review`, and `/aif-security-checklist`. The authoritative final verification remains `/aif-verify <change-id>`.
 
+## Persistent execution contract
+
+This section applies to configured OpenSpec and complete classic plans after marker-first classification. A valid ultra plan returns its exact upstream handoff before local state; disabled OpenSpec directories never select a source. Follow the installed extension's `docs/workflow-mechanics.md` and the corresponding implement/fix injection for JSON payloads.
+
+- Require the parent's existing execution `run_id`, canonical task, scope, worker label, and current version before editing. Use `ai-factory aifhub-execution resume --json` with JSON on stdin on entry and re-entry. Missing assignment or stale/conflicting state returns a blocker to the parent; do not silently start a new assignment or overwrite a stale checkpoint.
+- After a meaningful in-scope step, save `checkpoint` progress and preserve the returned version. Existing implementation/fix traces remain supporting evidence. Keep HEAD and index unchanged while the assignment is active.
+- For an explicit 2-5 item implementation batch, consume the immutable manifest and preflight references under its one `run_id`. Save the final `checkpoint`, stop edits, rerun any checks affected by sibling edits, then call `batch-seal` with the exact evidence path list for every item (empty for missing evidence). Preserve the returned `seal_digest`. Submit each `batch-result` with its `task_id`, the seal digest and current shared version; use only that item's files and sealed evidence. Fix attempts remain single-task.
+- Return missing items as unfinished. The parent alone performs `batch-accept` and `batch-close`; aggregate green cannot complete omitted tasks. No worker output after interruption can revive the assignment.
+- On interruption or stale state, report to the parent. Only the parent uses historical `inspect`, `interrupt`, and `stop-confirm`. Running/unknown stop knowledge keeps files reserved. The helper does not cancel processes or remove orphan locks. Do not clear state or start a replacement yourself.
+- Submit `result` with a unique result ID, explicit completed/failed/blocked/cancelled/timed_out status, exact changed files, observed checks, and sanitized evidence paths. A delegation admission handle means started work only. A completed result remains unaccepted until the parent reviews it and calls `accept` with the exact result digest and version.
+- Never accept your own delegated result, update canonical checkboxes, or write QA/done receipts. Actor labels correlate runs; they do not authenticate another process. Return the result digest and version to the parent and preserve the existing `/aif-verify <change-id>` handoff.
+- If the helper is absent, report the missing capability to the parent before editing; the parent may use the documented local trace fallback. Do not claim durable resume or structured acceptance in that fallback. A present helper's rejection must not be bypassed.
+
 ## Legacy AI Factory-only mode
 
 Use this mode when OpenSpec-native mode is not enabled.

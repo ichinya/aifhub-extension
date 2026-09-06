@@ -1,0 +1,143 @@
+{
+  "evaluation_date": "2026-09-05",
+  "issue": 148,
+  "decision": "defer_supported_runtime",
+  "aifhub_revision": "a560e3fcf6148d9e1663c51db188f6c1491a6477",
+  "repetitions_compared": 2,
+  "aggregates_identical": true,
+  "refinement_probe": {
+    "upstream_revision": "81ae3cb34d27d38ee37f9e205a1e73694993b344",
+    "source_path": "packages/coding-agent/src/core/refinement/refinement.ts",
+    "source_sha256": "b8dfffe650a66e89672869b3d66f4625ff91e35f962a73cbd4a3671ab0cab897",
+    "node": "v24.13.0",
+    "level": "isolated_upstream_functions",
+    "provider_calls": 0,
+    "adoption_pass": false,
+    "checks": [
+      {
+        "id": "local_prompt_metadata_does_not_prevent_update",
+        "observation_verified": true
+      },
+      {
+        "id": "local_prompt_rollback_restores_content",
+        "observation_verified": true
+      },
+      {
+        "id": "local_prompt_metadata_does_not_prevent_delete",
+        "observation_verified": true
+      },
+      {
+        "id": "local_subagent_metadata_does_not_prevent_update",
+        "observation_verified": true
+      },
+      {
+        "id": "local_subagent_rollback_restores_content",
+        "observation_verified": true
+      },
+      {
+        "id": "local_subagent_metadata_does_not_prevent_delete",
+        "observation_verified": true
+      },
+      {
+        "id": "local_base_system_prompt_create_rejected",
+        "observation_verified": true
+      },
+      {
+        "id": "local_base_system_prompt_update_rejected",
+        "observation_verified": true
+      },
+      {
+        "id": "local_base_system_prompt_delete_rejected",
+        "observation_verified": true
+      },
+      {
+        "id": "global_prompt_metadata_does_not_prevent_update",
+        "observation_verified": true
+      },
+      {
+        "id": "global_prompt_rollback_restores_content",
+        "observation_verified": true
+      },
+      {
+        "id": "global_prompt_metadata_does_not_prevent_delete",
+        "observation_verified": true
+      },
+      {
+        "id": "global_subagent_metadata_does_not_prevent_update",
+        "observation_verified": true
+      },
+      {
+        "id": "global_subagent_rollback_restores_content",
+        "observation_verified": true
+      },
+      {
+        "id": "global_subagent_metadata_does_not_prevent_delete",
+        "observation_verified": true
+      },
+      {
+        "id": "global_base_system_prompt_create_rejected",
+        "observation_verified": true
+      },
+      {
+        "id": "global_base_system_prompt_update_rejected",
+        "observation_verified": true
+      },
+      {
+        "id": "global_base_system_prompt_delete_rejected",
+        "observation_verified": true
+      },
+      {
+        "id": "global_and_local_same_id_both_reach_supplemental_prompt",
+        "observation_verified": true
+      },
+      {
+        "id": "concurrent_edit_rejected",
+        "observation_verified": true
+      }
+    ]
+  },
+  "kernel_probe": {
+    "upstream_revision": "81ae3cb34d27d38ee37f9e205a1e73694993b344",
+    "python": "3.13.5",
+    "level": "real_kernel_with_synthetic_host_reply",
+    "source_sha256": {
+      "__init__.py": "8bc9a0e945e3c1ffb9b4b59b730cb9886303a0b0192b69a421aa284e90450ff3",
+      "harness.py": "de43f023279bd661993f6dd27d9e97cb670d10439c861c17b381962bb48d9e8e",
+      "repl.py": "282ac002a05448c55eb1f0c457bb163f26bca059a0df7d6d694fe5ab58063de9",
+      "bash.py": "cb8f7cc60e6a0a9c85089cc44131ffe5e5f602cc1c9b871bae0c8cd276f11aec"
+    },
+    "provider_calls": 0,
+    "real_child_agents": 0,
+    "adoption_pass": false,
+    "checks": [
+      {
+        "id": "persistent_kernel_state",
+        "observation_verified": true
+      },
+      {
+        "id": "direct_python_writes_outside_cwd_inside_fixture",
+        "observation_verified": true
+      },
+      {
+        "id": "direct_subprocess_writes_outside_cwd_inside_fixture",
+        "observation_verified": true
+      },
+      {
+        "id": "python_harness_metadata_does_not_prevent_update",
+        "observation_verified": true
+      },
+      {
+        "id": "python_harness_metadata_does_not_prevent_delete",
+        "observation_verified": true
+      },
+      {
+        "id": "spawn_bridge_returns_admission_handle_with_mock_host",
+        "observation_verified": true
+      },
+      {
+        "id": "kernel_shutdown_exit_zero",
+        "observation_verified": true
+      }
+    ]
+  }
+}

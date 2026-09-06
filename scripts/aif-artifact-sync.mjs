@@ -737,25 +737,26 @@ export async function exportOpenSpecCompatibility(options = {}) {
   };
 }
 
+// Pure parsing seam: callers with stricter filesystem boundaries can supply
+// already bounded, validated UTF-8 without going through the project reader.
+export function parseProjectConfig(raw) {
+  const parsed = parseSimpleYaml(raw);
+  const selection = parseToolConfig(raw);
+  const providers = normalizeProviderPolicies(parseProviderConfig(raw));
+  return {
+    exists: true, raw, parsed, marker: selection.mode,
+    tools: { ...selection.tools, hlv: providers.hlv.enable, lekalo: providers.lekalo.enable },
+    paths: toolArtifactPaths(selection, parsed.paths ?? {}),
+    aifhub: parsed.aifhub ?? {}
+  };
+}
+
 export async function readProjectConfig(rootDir = process.cwd()) {
   const configPath = path.join(resolveRootDir({ rootDir }), DEFAULT_CONFIG_PATH);
 
   try {
     const raw = await readFile(configPath, 'utf8');
-    const parsed = parseSimpleYaml(raw);
-    const selection = parseToolConfig(raw);
-    const providers = normalizeProviderPolicies(parseProviderConfig(raw));
-    const marker = selection.mode;
-
-    return {
-      exists: true,
-      raw,
-      parsed,
-      marker,
-      tools: { ...selection.tools, hlv: providers.hlv.enable, lekalo: providers.lekalo.enable },
-      paths: toolArtifactPaths(selection, parsed.paths ?? {}),
-      aifhub: parsed.aifhub ?? {}
-    };
+    return parseProjectConfig(raw);
   } catch (error) {
     return {
       exists: false,

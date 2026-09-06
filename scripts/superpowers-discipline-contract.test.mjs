@@ -28,6 +28,20 @@ const REVIEW_PROMPTS = [
 
 const AGENT_SEMANTIC_PAIRS = [
   {
+    label: 'source-aware execution, batch and recovery worker contract',
+    codexPath: 'agent-files/codex/aifhub-implement-worker.toml',
+    claudePath: 'agent-files/claude/aifhub-implement-worker.md',
+    start: '## Persistent execution contract',
+    end: '## Legacy AI Factory-only mode'
+  },
+  {
+    label: 'source-aware fix attempts and interruption contract',
+    codexPath: 'agent-files/codex/aifhub-fixer.toml',
+    claudePath: 'agent-files/claude/aifhub-fixer.md',
+    start: '## Persistent execution contract',
+    end: '## Legacy AI Factory-only mode'
+  },
+  {
     label: 'bounded batch worker scope',
     codexPath: 'agent-files/codex/aifhub-implement-worker.toml',
     claudePath: 'agent-files/claude/aifhub-implement-worker.md',
