@@ -1326,6 +1326,8 @@ npm test
 
 ## See Also
 
+- [Persistent Workflow Mechanics](workflow-mechanics.md) — classic/OpenSpec execution, `batch-start` → checkpoint/seal → per-item acceptance → close, exact inspection and owner interruption/stop confirmation. Use `ai-factory aifhub-execution <action> --json` with JSON on stdin; authoritative verification remains `/aif-verify`.
+
 - [Documentation Index](README.md)
 - [Context Providers](context-providers.md)
 - [Skill Providers](skill-providers.md)

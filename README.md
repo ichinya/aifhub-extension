@@ -416,6 +416,8 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 | [AIFHub MCP](docs/aifhub-mcp.md) | Optional MCP server tools, runtime-specific settings shapes, and AI Factory 2.16+ Universal / Other rendering |
 | [Codex Agents](docs/codex-agents.md) | Namespaced Codex CLI agent files |
 | [Claude Agents](docs/claude-agents.md) | Namespaced Claude agent files |
+| [Prime Agent Runtime Evaluation](docs/runtime-research/prime-agent/README.md) | Issue #148: deferred runtime adoption, pinned source/kernel evidence and compatibility blockers |
+| [Persistent Workflow Mechanics](docs/workflow-mechanics.md) | Canonical task sources, sealed batches, interruption recovery, persistent fix budgets and reversible skill-context evolution |
 
 ## Validation
 

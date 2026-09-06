@@ -22,6 +22,20 @@ const WRAPPER_COMMANDS = [
     args: ['verify', '--change', 'add-oauth', '--write', '--json']
   },
   {
+    name: 'aifhub-execution',
+    description: 'Manage source-bound execution, sealed batches, fix attempts, and interruption recovery.',
+    module: './commands/aifhub-execution.mjs',
+    script: 'execution-state.mjs',
+    args: ['resume', '--json']
+  },
+  {
+    name: 'aifhub-evolution',
+    description: 'Propose, apply, and roll back versioned skill-context changes.',
+    module: './commands/aifhub-evolution.mjs',
+    script: 'evolution-transactions.mjs',
+    args: ['show', '--json']
+  },
+  {
     name: 'aifhub-session-brief',
     description: 'Compile, inspect, or show a source-bound AIFHub SessionBrief.',
     module: './commands/aifhub-session-brief.mjs',

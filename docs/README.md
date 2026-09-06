@@ -43,6 +43,7 @@ OpenSpec CLI features вызываются через AIFHub wrappers и `script
 - [AIFHub MCP](aifhub-mcp.md)
 - [Codex Agents](codex-agents.md)
 - [Claude Agents](claude-agents.md)
+- [Prime Agent Runtime Evaluation](runtime-research/prime-agent/README.md) — issue #148, deferred adoption, pinned source/kernel probes and remaining runtime-contract requirements.
 - [Research по Memory Tools](memory-tools-research/README.md)
 - [Codex Plan Mode](codex-plan-mode.md)
 - [Handoff Naming](handoff.md)
@@ -53,6 +54,8 @@ OpenSpec CLI features вызываются через AIFHub wrappers и `script
 | Guide | Назначение |
 |---|---|
 | [Validation Providers](validation-providers.md) | Composable HLV validation, independent tool switches and artifact selection, required/optional policy, revision-bound evidence, read-only doctor and the separate Lekalo-ready semantic contract |
+| [Prime Agent Runtime Evaluation](runtime-research/prime-agent/README.md) | Runtime adoption deferred: mutable harness roles, permission boundary, admission-only delegation, distribution constraints and reproducible source/kernel probes |
+| [Persistent Workflow Mechanics](workflow-mechanics.md) | Canonical task sources, sealed batches, interruption recovery, persistent fix budgets and reversible skill-context evolution |
 | [Usage](usage.md) | Полный OpenSpec-native command flow, AI Factory 2.19 session warmup, AI Factory 2.18 mode/profile matrix, regular/ultra research, revision-bound legacy-ultra receipt, archive/update boundaries, optional providers, gates, finalization tail и examples |
 | [Адаптация идей Superpowers](superpowers-adaptation.md) | Качество тестов, bounded readiness, проверка конфликтов задач, явные batches, debugging и scoped re-review |
 | [Superpowers Follow-up Research](superpowers-follow-up-research.md) | Проверка upstream на 2026-09-05, пять реализованных адаптаций для #141, границы #168 и возможности исследовательских моделей |

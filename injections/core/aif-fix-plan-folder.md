@@ -130,6 +130,21 @@ Regression-first execution order:
 
 A passing post-fix check is supporting runtime evidence only. `/aif-fix` must not write or replace `verify.md`, `coverage.json`, rules evidence, done evidence, or archive evidence; `/aif-verify <change-id>` remains authoritative.
 
+#### Persistent fix runs and no-progress guard
+
+For both configured OpenSpec and complete classic plans after marker-first classification, use `ai-factory aifhub-execution <action> --json` with JSON on stdin; consult the installed extension's `docs/workflow-mechanics.md` for payloads. Follow the durable execution/recovery section of [task coordination](../../skills/shared/TASK-COORDINATION.md). Fix attempts remain single-task; the helper requires current finding context for an already checked task and never reopens it. Valid ultra delegates exactly to upstream before local state.
+
+- The parent calls `start` before edits with the assigned canonical task, unique run, owner/worker labels, `role: fix`, and explicit selected-finding file/directory scope. Include additional policy or external input files in `context_paths`. On re-entry, call read-only `resume` before editing; stale input requires parent reassessment and a fresh assignment, not overwriting the old checkpoint.
+- Persist meaningful progress with `checkpoint` and the current version. Existing `writeFixTrace()` remains the owner of readable root-cause and regression evidence.
+- Before editing for each hypothesis, call read-only `attempt-check` with `finding_id`, one falsifiable `hypothesis`, stable `check`, `environment_revision`, and `input_paths` for relevant ignored fixtures/external input files. Stop before edits when its failure budget is exhausted. After an allowed edit and before running its experiment or post-fix check, call `attempt-begin` with the same payload; this pins the code that the check will measure. Do not rename a check, finding, or environment merely to evade a stop.
+- Run that check once. Call `attempt-finish` with the returned `attempt_id`, observed `passed | failed | blocked` outcome, and sanitized evidence paths. Code and referenced input files must stay unchanged during the check. Use a real environment revision such as the fixture/service revision or image digest; an unmeasured environment is an explicit limitation. The helper records evidence references and never executes a command or inspects a remote service itself.
+- The expected failing pre-fix reproduction belongs in `preFixResult`; it is not a failed hypothesis and must not consume this guard's failure budget. Use the guard for experiments and post-fix failures. Passing runtime evidence remains supporting evidence, never a cached verify verdict.
+- `no-progress` stops a pending/failed identical experiment even across new sessions or run IDs. A new hypothesis label alone is insufficient. `attempt-budget-exhausted` stops after three failed hypotheses for the same task/finding/context/environment/explicit inputs, including successive code edits. Reassess the root cause and architecture; do not stack a fourth speculative change. New measured inputs or new authoritative evidence can justify a new attempt; never clear history automatically.
+- Submit a structured terminal `result` with exact changed files and evidence. The parent inspects it and calls `accept` with the exact digest and current version before calling the fix complete. Started, completed, and accepted are separate states; failed/blocked/cancelled/timed-out results cannot be accepted. Do not update canonical tasks or QA through these records.
+- In local execution owner and worker may be the same label. Preserve HEAD/index until the run finishes. Actor labels are correlation metadata. If an older installation lacks the helper, report the missing capability and retain the existing local trace/three-hypothesis discipline; a present helper's blocking response must not be bypassed.
+- `attempt-check` reports current counts and pending state, never approval of a future edit. `attempt-begin` checks the actual post-edit fingerprint and permits at most one pending v2 attempt. An identical interrupted attempt is `no-progress`; three interrupted attempts stop separately with `interruption-budget-exhausted`, without fabricating failed checks or resetting the three-failure budget.
+- On stale pending work, the parent uses exact read-only `inspect`, then owner `interrupt` with saved version, recovery ID, reason and honest stop knowledge. Historical recovery works even if current config/source is unavailable. Use the actual host's owned-worker cancellation capability when available and observe exit; otherwise `running`/`unknown` keeps scope reserved until owner `stop-confirm` supplies observed-stop evidence. Late worker output cannot revive the run. Do not delete orphan locks, clear ledgers or auto-upgrade v1; use exact journal replay and explicit quiescent `upgrade` as documented.
+
 Write fix traces only to runtime state:
 
 - Prefer `writeFixTrace(changeId, trace, options)` from `scripts/openspec-execution-context.mjs` for fix traces.
@@ -154,6 +169,8 @@ Do not redirect the user to a separate `aif-fix-plus` command.
 ### Legacy AI Factory-only mode
 
 When OpenSpec-native mode is not enabled, preserve the existing plan-folder behavior.
+
+For a complete classic pair, also apply the persistent single-task fix and recovery contract above. Preserve the existing readable fixes/status ownership; mutable execution journals stay under `.ai-factory/state/<plan-id>/execution/` and never substitute for canonical or QA artifacts.
 
 Verification source:
 

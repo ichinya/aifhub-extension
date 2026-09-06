@@ -107,6 +107,23 @@ Hydrate runtime todo state from canonical OpenSpec tasks before editing implemen
 - Report missing todo-tool support as a capability fallback, not as an implementation failure.
 - Hydrating runtime todo state does not authorize broad task expansion; `/aif-implement` executes one task, one tightly coupled task group, or one explicit small same-shape batch validated under `skills/shared/TASK-COORDINATION.md`. Complete each item only after reconciling its expected change with the actual diff and evidence.
 
+#### Persistent execution and worker result acceptance
+
+For both configured OpenSpec and complete classic plans after marker-first classification, use the installed `ai-factory aifhub-execution <action> --json` helper with a JSON object on stdin. Read the installed extension's `docs/workflow-mechanics.md` for payload contracts and follow the durable execution section of [task coordination](../../skills/shared/TASK-COORDINATION.md). This supporting execution state is separate from SessionBrief context compilation and authoritative Handoff/QA gates. The helper selects effective paths/tools, requires a complete classic pair, and delegates valid ultra before writing state.
+
+- Before editing or delegating, the parent calls `start` with one canonical `task_id`, a unique `run_id`, stable `owner` and `worker` labels, `role: implement`, and explicit project-relative file/directory `scope`. Include extra policy, ignored inputs, or an existing SessionBrief in `context_paths` when they influenced the assignment. Serialize coupled/shared-file tasks through fresh assignments. For an independent 2-5 item manifest use `batch-start` with exact files, expected changes, checks/fallbacks, dependencies and preflight references; one `run_id` owns the whole batch.
+- On re-entry, call read-only `resume` before any edits or checkpoint writes. Reuse the saved task, scope, progress, and next step only when fresh. A stale checkpoint, context, revision, or evidence stops that run; the parent must reread current inputs and explicitly create a new assignment. Never overwrite a checkpoint merely to clear a stale result.
+- After an in-scope work step, call `checkpoint` with the current `version`, worker `actor`, and `progress: {completed_steps, next_step, blocker?}`. Preserve the returned version. Keep notes concise and free of secrets or raw provider output. Write existing implementation traces through `writeExecutionTrace()` as before.
+- A delegation admission handle means only that work was admitted. The worker submits `result` with an explicit terminal status, exact `changed_files`, observed check exit codes, and existing evidence paths. `completed` is not parent acceptance, a QA verdict, or permission to finalize.
+- The parent reviews the actual diff and evidence, then calls `accept` with its actor label, the current version, and exact `result_digest`. Only a fresh completed result can become `accepted`. Worker results do not update canonical tasks; parent-owned checkbox updates happen after acceptance. Actor labels correlate assignments and do not authenticate another OS process.
+- Local execution uses the same sequence with one actor label for owner and worker. Do not stage or commit while a run is active; HEAD, branch, index, context, and file contents are pinned. Concurrent writes in a shared worktree can invalidate another run; coordinate a quiet checkpoint/acceptance boundary.
+- Failed, blocked, cancelled, or timed-out work stays terminal and unaccepted. Never infer completion from silence, a timeout, a duplicate reply, or an old successful check. Exact delivery retries are idempotent; conflicting replies fail closed.
+- For a batch, the worker saves a final `checkpoint`, stops edits, reruns affected checks, and uses `batch-seal` to freeze per-item evidence at one final snapshot. It submits `batch-result` per task with the returned seal digest and current shared version. The parent reviews each item, uses `batch-accept` sequentially, and `batch-close` before updating only accepted checkboxes. Call `resume` immediately before synchronization; changed source/worktree/evidence forbids it. Omitted items remain unfinished; historical close replay is not current completion authority.
+- A stale or interrupted dispatch is retired through exact read-only `inspect` and owner `interrupt`, preserving results and pending attempt history. Use the host's existing cancellation capability for the actual owned worker when available; record `stopped` only after observing exit with sanitized evidence. Otherwise record `running`/`unknown`, keep scope reserved, and use owner `stop-confirm` after later observation. These actions never cancel a process themselves. Do not clear orphan locks or bypass a pending journal; explicit v1 `upgrade` requires quiescent predecessor history and its inspected inventory digest.
+- If this helper is absent in an older installation, report the capability fallback and use the existing local trace workflow without claiming durable resume or structured acceptance. A present helper's stale/conflict/error response is not permission to bypass it.
+
+After parent acceptance, continue the existing read-only gates and `/aif-verify <change-id>` Handoff. These records must never replace Handoff gate summaries, QA evidence, or done receipts.
+
 #### Roadmap lifecycle deferral
 
 In OpenSpec-native mode, this section overrides the upstream roadmap completion step.
@@ -166,6 +183,8 @@ Do not route users to deprecated workflow aliases or legacy `*-plus` command nam
 ### Legacy AI Factory-only mode
 
 When OpenSpec-native mode is not enabled, preserve the existing legacy companion plan workflow.
+
+After the owning classic workflow establishes a complete pair, apply the persistent execution contract above and the shared durable task coordination rules. Ordinary status/history/current-task updates are projected out of execution identity; canonical task, policy and binding changes still invalidate it. Helper admission never repairs a missing companion or substitutes a retained OpenSpec tree.
 
 Resolve all of these inputs to one active plan pair before execution starts:
 
