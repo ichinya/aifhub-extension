@@ -252,6 +252,10 @@ async function openRun(runRoot) {
     'Node/platform changed; prepare a fresh run');
   requireThat(manifest.hiddenCheckHash === hash(await regular(path.join(canonicalRoot, 'coordinator/check-output.mjs'))),
     'hidden checker changed');
+  for (const row of manifest.rows) {
+    requireThat(hash({ rubric: manifest.graders?.[row.caseId], hiddenCheckHash: manifest.hiddenCheckHash }) === row.graderHash,
+      '[FIX:verify-eval-grader-drift] grader mismatch; prepare a fresh run');
+  }
   return { runRoot: canonicalRoot, manifest };
 }
 
@@ -323,7 +327,6 @@ export async function collect({ runRoot, executionId, report, observation } = {}
   const changedFiles = [...new Set([...Object.keys(row.inputFiles), ...Object.keys(actualFiles)])]
     .filter(p => row.inputFiles[p] !== actualFiles[p]).sort();
   const grader = manifest.graders[row.caseId];
-  requireThat(hash({ rubric: grader, hiddenCheckHash: manifest.hiddenCheckHash }) === row.graderHash, 'grader mismatch');
   const integrity = hash(instructionFiles) === hash(row.instructionFiles)
     && hash({ task: (await regular(path.join(contextRoot, 'TASK.md'))).toString('utf8'), files: row.inputFiles }) === row.inputHash
     && (await json(path.join(contextRoot, 'identity.json'))).executionId === executionId;

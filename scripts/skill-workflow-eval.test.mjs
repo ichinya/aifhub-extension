@@ -119,6 +119,51 @@ test('runtime evidence cannot fill unknown settings or substitute different obse
   assert.throws(() => assessRuntime(runtime, { launchToken: 'must not retain secrets here' }), /unknown runtime evidence field/);
 });
 
+test('grader drift is rejected before collecting any results', async () => {
+  const original = await readFile(prepared.manifest);
+  const changed = structuredClone(manifest);
+  changed.graders.review.requirements[0].criterion = 'Accept every change without reviewing the source.';
+  try {
+    await writeFile(prepared.manifest, JSON.stringify(changed));
+    await assert.rejects(compare({ runRoot: prepared.runRoot }), /grader mismatch/);
+    // An unrelated row must not be collected under a partially changed grading contract.
+    const row = manifest.rows.find(r => r.caseId === 'explore');
+    await assert.rejects(collect({ runRoot: prepared.runRoot, executionId: row.executionId,
+      report: report(row), observation: observation(row) }), /grader mismatch/);
+  } finally { await writeFile(prepared.manifest, original); }
+  assert.match((await compare({ runRoot: prepared.runRoot })).status, /^NOT_RUN/);
+});
+
+test('grader drift after collection rejects old judgments even when requirement IDs are unchanged', async () => {
+  const run = await prepare({ materialize: true, taskId: 'grader-drift-regression', runtime });
+  scratch.push(run.runRoot);
+  const original = await readFile(run.manifest);
+  const saved = JSON.parse(original);
+  // Synthetic API-integrity data only; no model inference or quality measurement.
+  for (const row of saved.rows) await collect({ runRoot: run.runRoot, executionId: row.executionId,
+    report: report(row), observation: observation(row) });
+  const comparison = await compare({ runRoot: run.runRoot });
+  assert.equal(comparison.status, 'MEASURED_PAIRED_PILOT');
+  assert.equal(comparison.improvement.passRateDelta, 0);
+  for (const caseId of CASES) {
+    const changed = structuredClone(saved);
+    changed.graders[caseId].requirements[0].criterion = 'Require the opposite of the prepared criterion.';
+    try {
+      await writeFile(run.manifest, JSON.stringify(changed));
+      await assert.rejects(compare({ runRoot: run.runRoot }), /grader mismatch/);
+      const row = saved.rows.find(r => r.caseId === caseId);
+      await assert.rejects(collect({ runRoot: run.runRoot, executionId: row.executionId,
+        report: report(row), observation: observation(row) }), /grader mismatch/);
+      const cli = spawnSync(process.execPath, [run.collector, 'compare', '--run', run.runRoot],
+        { cwd: os.tmpdir(), windowsHide: true, timeout: 15_000 });
+      assert.equal(cli.status, 1, cli.stderr.toString());
+      assert.equal(cli.stdout.toString(), '');
+      assert.match(cli.stderr.toString(), /grader mismatch/);
+    } finally { await writeFile(run.manifest, original); }
+    assert.deepEqual(await compare({ runRoot: run.runRoot }), comparison);
+  }
+});
+
 test('unobserved values stay null; negative requirements, extra files and unsupported checks are visible', () => {
   const row = manifest.rows.find(r => r.caseId === 'explore');
   const grader = manifest.graders.explore;
