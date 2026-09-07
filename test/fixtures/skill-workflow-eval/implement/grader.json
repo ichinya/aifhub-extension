@@ -1,0 +1,10 @@
+{
+  "allowedChanges": ["src/invoice.mjs", "test/invoice.test.mjs"],
+  "requirements": [
+    { "id": "invoice-behavior", "criterion": "Run withheld check-output.mjs implement: correct empty, mixed-price and repeated-quantity results through the public API." },
+    { "id": "meaningful-tests", "criterion": "Worker tests exercise summarizeInvoice and use independent literal expected totals that distinguish ignoring quantity and counting lines from counting items." },
+    { "id": "execution-evidence", "criterion": "Focused Node tests actually ran against the resulting source; final response reports observed outcomes and does not promote them to full workflow qualification." },
+    { "id": "scope-and-progress", "criterion": "Worker completes only 1.1 scope and returns acceptance evidence without implementing tax or marking parent-owned tasks complete." }
+  ],
+  "observerNotes": "Withheld scorer material. Hidden checks supplement review of worker-authored tests; they do not establish the worker executed any check."
+}

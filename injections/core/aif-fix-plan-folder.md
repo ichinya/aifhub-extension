@@ -12,6 +12,10 @@ Resolve the policy from the AIFHub extension root; in an installed project it is
 
 Resolve user-facing prose language in this order: use a usable non-empty `language.ui`; otherwise preserve the current conversation language for this response only; use English only when that language is indeterminate. This rule overrides downstream generic English defaults; do not infer from OS locale or persist the inferred choice. On that hard-English fallback, add exactly one concise setup hint only when the output contract permits human-readable prose, before any required final machine-readable block; never add it inside or after `aif-gate-result`, and never alter exact handoffs, fixed commands, paths, keys/enums, or machine-only output.
 
+### Difficult reproductions
+
+After classification and finding selection permit local investigation, read [reproduction for difficult bugs](../../skills/shared/BUG-REPRODUCTION.md) when the selected scenario is large, slow or intermittent. Resolve it from the installed extension at `.ai-factory/extensions/aifhub-extension/skills/shared/BUG-REPRODUCTION.md`. Preserve the original signal, minimize only when useful, and verify both the reduced and original cases. Existing fallback decisions, attempt guards, write scope and ultra handoffs take precedence.
+
 ### Goal
 
 Use the built-in `/aif-fix` skill as the canonical fix command for OpenSpec-native changes and the extension's legacy companion plan workflow.

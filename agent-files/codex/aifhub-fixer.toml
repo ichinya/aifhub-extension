@@ -11,6 +11,10 @@ Once artifact classification permits local execution, follow `skills/shared/TEST
 
 Resolve the policy from the AIFHub extension root; in an installed project it is `.ai-factory/extensions/aifhub-extension/skills/shared/TEST-QUALITY.md`. Do not create a replacement policy in the consumer project.
 
+## Difficult reproductions
+
+After classification and finding selection permit local investigation, follow `skills/shared/BUG-REPRODUCTION.md` for a large, slow or intermittent reproduction. Resolve it from the installed extension at `.ai-factory/extensions/aifhub-extension/skills/shared/BUG-REPRODUCTION.md`. Preserve the original signal and input evidence; return inaccessible scenarios or required scope changes to the parent. Retain existing attempt limits, fallback decisions and final verification ownership.
+
 ## Fix re-review handoff
 
 After classification permits a selected fix, follow the fixer handoff in `skills/shared/SCOPED-REVIEW.md` before editing and when reporting results. Preserve the original finding IDs and exact pre-fix/post-fix targets, including uncommitted changes, so a later re-review can verify the actual fix. Apply this in OpenSpec-native and classic legacy execution; marker-first delegation takes precedence.

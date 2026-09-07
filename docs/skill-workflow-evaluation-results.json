@@ -1,0 +1,549 @@
+{
+  "schema": "aifhub.skill-workflow-live-observations.v1",
+  "date": "2026-09-07",
+  "run_id": "run_2c7ed728166e",
+  "pilot_id": "18efe0f7-88ac-43c5-aa71-964c71c4fdd5",
+  "baseline": "bc93bda969e6dd30d54db5b9cc36953f5ca15982",
+  "scope": "instruction-only, five synthetic tasks, one execution per arm; actual local Orca/Codex workers",
+  "status": "INCOMPLETE_NO_IMPROVEMENT_CLAIM",
+  "improvement": null,
+  "execution_count": 10,
+  "worker_outcomes": {
+    "completed": 9,
+    "failed_scope": 1
+  },
+  "observed_runtime": {
+    "host": "Orca/Codex",
+    "orca": "1.4.197",
+    "node": "v24.13.0",
+    "platform": "win32",
+    "configured_defaults": {
+      "model": "gpt-6-astra",
+      "effort": "xhigh"
+    },
+    "effective_model": null,
+    "effective_effort": null,
+    "verified": false,
+    "reason": "Launch receipts leave effective model/effort null; complete host controls were not attested. Defaults in config are not execution attestation."
+  },
+  "custody": {
+    "all_instruction_task_identity_hashes_intact": true,
+    "all_workspace_changes_within_allowed_files": true,
+    "grader_copied_to_worker_context": false,
+    "scope_violations": [
+      {
+        "case": "explore",
+        "arm": "current",
+        "reason": "Worker read an installed orchestration skill outside its supplied context and explicitly reported scope failure"
+      }
+    ],
+    "worker_contexts_retained": true
+  },
+  "frozen_harness_hash": "591cd9251a280d7fb7a5e61671d505dd6479ed22c4b831ad40b3093b22d8ed91",
+  "current_matrix_validator_hash": "6bc5bd6879b4f0c5219cf1a794ae13fee0dd0f64069ceacf94541eb01265f8a0",
+  "preparation_repetitions_observed": 1,
+  "matrix_recheck": {
+    "expected_pairs": 5,
+    "actual_pairs": 5,
+    "errors": [],
+    "frozen_comparison_status": "INCOMPLETE_NO_IMPROVEMENT_CLAIM",
+    "improvement": null
+  },
+  "rows": [
+    {
+      "executionId": "b5828294-ae4c-4a0e-bf73-dcfab92f599e",
+      "case": "explore",
+      "arm": "baseline",
+      "status": "completed",
+      "valid_for_comparison": false,
+      "inputHash": "0a01a9eec2ca79a46cf8d66e0d3d269c3032a91301b56671dd2f851b4778038d",
+      "instructionHash": "18e712a01e02c0612c4a2aefab01754f77e9e296627766c120de082e7c0ce968",
+      "runtimeSourceHash": "2f02077fb84fb1105a78ca9744577fbfa7675e0d38052827cd942c02965e83ab",
+      "reportHash": "88b2ac1efb259dd533ee66091ea8a566a3f64e6322869d49beda1abe5f0cc377",
+      "observationHash": "603beb23cd7aafd67f953b7d4472e05bba23f4341a4b63af02e10a00c4fefc22",
+      "outputHash": "5f6efffb5718a5e3241d716837bcdc0a9d692fe117e243256bc465b9d8db6c58",
+      "changedFiles": [],
+      "requirements": [
+        {
+          "id": "coverage",
+          "met": true,
+          "evidence": "Actual worker_done msg_15235a76a344 grounds preview-only coverage in parse.mjs, preview.mjs and one observed passing preview test; explicitly states persistence absent."
+        },
+        {
+          "id": "decision-frontier",
+          "met": false,
+          "evidence": "Actual report msg_15235a76a344 defers storage and duplicate-ID questions after a generic four-part brief frontier; it does not return the requested concrete dependent product question."
+        },
+        {
+          "id": "research-boundary",
+          "met": true,
+          "evidence": "Report and complete bounded transcript show only local intake; no saved research, canonical writes or full research run. Parent receives unresolved decisions."
+        },
+        {
+          "id": "next-step",
+          "met": true,
+          "evidence": "Report identifies parent-owned brief resolution and explicit confirmation before full research, and limits evidence to supplied files and one existing test."
+        }
+      ],
+      "metrics": {
+        "missingRequirements": 1,
+        "unnecessaryChanges": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0,
+        "unnecessaryActions": 0,
+        "elapsedMs": null,
+        "inputTokens": null,
+        "outputTokens": null
+      }
+    },
+    {
+      "executionId": "2447c0b8-755f-4886-b75f-698bdd79abcf",
+      "case": "explore",
+      "arm": "current",
+      "status": "failed",
+      "valid_for_comparison": false,
+      "inputHash": "0a01a9eec2ca79a46cf8d66e0d3d269c3032a91301b56671dd2f851b4778038d",
+      "instructionHash": "25b753fbe2e40e8bbb0516af070e50c80ad40c6de6c130c0971aae084a93f1db",
+      "runtimeSourceHash": "ddab0f2627676cbc5202953b83e1e738350b1c8a32b802a58c799f6d06819d79",
+      "reportHash": "e26fc4583cd3d183f757a28c7f6b134af69cae51773e329e987043f5a53efa40",
+      "observationHash": "967a573001a0a4076cec5f78ec24e0e8f94619dbd6ba0733e488281b10368e57",
+      "outputHash": "5f6efffb5718a5e3241d716837bcdc0a9d692fe117e243256bc465b9d8db6c58",
+      "changedFiles": [],
+      "requirements": [
+        {
+          "id": "coverage",
+          "met": true,
+          "evidence": "Actual worker_done msg_650c52baec98 grounds preview-only coverage in parse.mjs, preview.mjs and one observed passing preview test; explicitly states persistence absent."
+        },
+        {
+          "id": "decision-frontier",
+          "met": false,
+          "evidence": "Actual report msg_650c52baec98 defers storage and duplicate-ID questions after a generic four-part brief frontier; it does not return the requested concrete dependent product question."
+        },
+        {
+          "id": "research-boundary",
+          "met": true,
+          "evidence": "Report and complete bounded transcript show only local intake; no saved research, canonical writes or full research run. Parent receives unresolved decisions."
+        },
+        {
+          "id": "next-step",
+          "met": true,
+          "evidence": "Report identifies parent-owned brief resolution and explicit confirmation before full research, and limits evidence to supplied files and one existing test."
+        }
+      ],
+      "metrics": {
+        "missingRequirements": 1,
+        "unnecessaryChanges": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0,
+        "unnecessaryActions": 1,
+        "elapsedMs": null,
+        "inputTokens": null,
+        "outputTokens": null
+      }
+    },
+    {
+      "executionId": "0ed6d146-d01d-40ec-8b5f-1da3f85b6a2e",
+      "case": "plan",
+      "arm": "current",
+      "status": "completed",
+      "valid_for_comparison": false,
+      "inputHash": "1f4c9d499b4d758d59c95028e8775bd335277e7baa34ebc3ed3b46244a57a823",
+      "instructionHash": "a8010efa2acc69212d85eb820f3fd51ddfd79450c00842f58b37f63a52944337",
+      "runtimeSourceHash": "ddab0f2627676cbc5202953b83e1e738350b1c8a32b802a58c799f6d06819d79",
+      "reportHash": "f87f2123b23e608abda144640585192f07fc2f752cb9eae3daedb827f5cdb17c",
+      "observationHash": "8386c668a3a266aae6890a4269afa21a4e467b855d4543c71691b5e47a8bba92",
+      "outputHash": "818c431f9b95764118ea6a23175c982554100d7db6b2812a3efbbe882e42006d",
+      "changedFiles": [
+        "openspec/changes/rename-record/design.md",
+        "openspec/changes/rename-record/tasks.md"
+      ],
+      "requirements": [
+        {
+          "id": "preserve-progress",
+          "met": true,
+          "evidence": "Result tasks.md retains original checked 1.1 verbatim, first, with no additional checked items; parent compared supplied line."
+        },
+        {
+          "id": "compatibility",
+          "met": true,
+          "evidence": "tasks1.2 and design Acceptance examples retain both exports; design uses independent literal {\"id\":7} output."
+        },
+        {
+          "id": "dependencies",
+          "met": true,
+          "evidence": "Result tasks/design explicitly place dual-name producer before CLI and HTTP migrations and keep the callers independent with observable compatibility checks."
+        },
+        {
+          "id": "conditional-removal",
+          "met": true,
+          "evidence": "Result task footer defers removal beyond this release until explicit compatibility approval AND supported external migration evidence; internal migration alone is insufficient."
+        },
+        {
+          "id": "validation-honesty",
+          "met": true,
+          "evidence": "Actual worker_done msg_e2ca1f03e5a6 and design separate observed file checks from unavailable OpenSpec/runtime validation and unimplemented future tests."
+        }
+      ],
+      "metrics": {
+        "missingRequirements": 0,
+        "unnecessaryChanges": 0,
+        "unsupportedChecks": null,
+        "userInterventions": 0,
+        "unnecessaryActions": null,
+        "elapsedMs": null,
+        "inputTokens": null,
+        "outputTokens": null
+      }
+    },
+    {
+      "executionId": "e8f074e4-9bf9-413f-905c-649c000e9776",
+      "case": "plan",
+      "arm": "baseline",
+      "status": "completed",
+      "valid_for_comparison": false,
+      "inputHash": "1f4c9d499b4d758d59c95028e8775bd335277e7baa34ebc3ed3b46244a57a823",
+      "instructionHash": "10039acb5a30bc2807c395015f466bed9f56f3922f8e689289fa0cfe2abfcf40",
+      "runtimeSourceHash": "2f02077fb84fb1105a78ca9744577fbfa7675e0d38052827cd942c02965e83ab",
+      "reportHash": "3da24a9ddf947fd305b3867cbdf8741e06400fa1047cbb79545c0ff4c30f8c9a",
+      "observationHash": "354cdf408d9ec345557e484be5cf0dd0dc4bac6dd4adf9bb736c53185d8dc027",
+      "outputHash": "f5aae77d72370a1d80f9a32865d7063f0cc6084c249c201df769bfdb556c3adf",
+      "changedFiles": [
+        "openspec/changes/rename-record/design.md",
+        "openspec/changes/rename-record/tasks.md"
+      ],
+      "requirements": [
+        {
+          "id": "preserve-progress",
+          "met": true,
+          "evidence": "Result tasks.md retains original checked 1.1 verbatim, first, with no additional checked items; parent compared supplied line."
+        },
+        {
+          "id": "compatibility",
+          "met": false,
+          "evidence": "tasks2.1 and design retain both exports but define expected results via current JSON.stringify behavior; no independent literal acceptance value is specified."
+        },
+        {
+          "id": "dependencies",
+          "met": true,
+          "evidence": "Result tasks/design explicitly place dual-name producer before CLI and HTTP migrations and keep the callers independent with observable compatibility checks."
+        },
+        {
+          "id": "conditional-removal",
+          "met": true,
+          "evidence": "Result task footer defers removal beyond this release until explicit compatibility approval AND supported external migration evidence; internal migration alone is insufficient."
+        },
+        {
+          "id": "validation-honesty",
+          "met": true,
+          "evidence": "Actual worker_done msg_29e63d791f6c and design separate observed file checks from unavailable OpenSpec/runtime validation and unimplemented future tests."
+        }
+      ],
+      "metrics": {
+        "missingRequirements": 1,
+        "unnecessaryChanges": 0,
+        "unsupportedChecks": null,
+        "userInterventions": 0,
+        "unnecessaryActions": null,
+        "elapsedMs": null,
+        "inputTokens": null,
+        "outputTokens": null
+      }
+    },
+    {
+      "executionId": "9aae5cea-c08e-4594-9bbd-86b26325ab15",
+      "case": "implement",
+      "arm": "baseline",
+      "status": "completed",
+      "valid_for_comparison": false,
+      "inputHash": "6a8f0468ee43a133b117ecbf6d9c8e671fba14557fce0b7efd2b9b5cced5a0c4",
+      "instructionHash": "8a781456eebc48371a4dbd58d8dcd2bef2984bb76ad5e86fc52ad6ed15853af9",
+      "runtimeSourceHash": "2f02077fb84fb1105a78ca9744577fbfa7675e0d38052827cd942c02965e83ab",
+      "reportHash": "49f61f9854923cb2eafc11eae8ef8965fb99346151de3d8f327506ecb57ca223",
+      "observationHash": "9bb99ed85e562a35f32332af3077066a776a0828ee95babfbe7ec392d812b4cc",
+      "outputHash": "5b3b882eacce69a324993cbf3ed06db2a3e95c5680d796e4114ef0a62267f9fd",
+      "changedFiles": [
+        "src/invoice.mjs",
+        "test/invoice.test.mjs"
+      ],
+      "requirements": [
+        {
+          "id": "invoice-behavior",
+          "met": true,
+          "evidence": "Parent invoked withheld check-output.mjs implement on stopped baseline workspace; observed exit0 and invoice-behavior met=true."
+        },
+        {
+          "id": "meaningful-tests",
+          "met": true,
+          "evidence": "Worker test/invoice.test.mjs uses literal total3348/items5 for mixed1299x2+250x3 and zero-priced quantity4. Public exported function exercised."
+        },
+        {
+          "id": "execution-evidence",
+          "met": true,
+          "evidence": "Transcript shows test patch, actual Node test RED exit1, production patch, same test GREEN exit0. worker_done does not claim full QA."
+        },
+        {
+          "id": "scope-and-progress",
+          "met": true,
+          "evidence": "Only invoice.mjs and invoice.test.mjs differ; worker leaves both checkboxes and tax.mjs unchanged and returns acceptance to parent."
+        }
+      ],
+      "metrics": {
+        "missingRequirements": 0,
+        "unnecessaryChanges": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0,
+        "unnecessaryActions": null,
+        "elapsedMs": null,
+        "inputTokens": null,
+        "outputTokens": null
+      }
+    },
+    {
+      "executionId": "c1a68745-1dbe-4c6e-973e-186ca1e8483e",
+      "case": "implement",
+      "arm": "current",
+      "status": "completed",
+      "valid_for_comparison": false,
+      "inputHash": "6a8f0468ee43a133b117ecbf6d9c8e671fba14557fce0b7efd2b9b5cced5a0c4",
+      "instructionHash": "cc23fc21b85185f67cd25ec10c2deb13b24982c2bec32496881df1b5c26a8851",
+      "runtimeSourceHash": "ddab0f2627676cbc5202953b83e1e738350b1c8a32b802a58c799f6d06819d79",
+      "reportHash": "0686bf9ef978f0c69aa0df02f436dccb1924dea2474a98fbaf28421751dfc89a",
+      "observationHash": "c71f444af6adf18a70ed1c10182dd1b272e219b1bf80ed0c81b9570cb4efaa00",
+      "outputHash": "a83d39914a314f66767634ffe0464ce803d184c4eab6ca04bb6b387c24009f0b",
+      "changedFiles": [
+        "src/invoice.mjs",
+        "test/invoice.test.mjs"
+      ],
+      "requirements": [
+        {
+          "id": "invoice-behavior",
+          "met": true,
+          "evidence": "Parent invoked withheld check-output.mjs implement on stopped current workspace; observed exit0 and invoice-behavior met=true."
+        },
+        {
+          "id": "meaningful-tests",
+          "met": true,
+          "evidence": "Worker test/invoice.test.mjs uses literal total697/items5 for199x3+50x2 and zero-priced quantity4; public exported function exercised."
+        },
+        {
+          "id": "execution-evidence",
+          "met": true,
+          "evidence": "Transcript shows test patch, actual Node test RED exit1, production patch, same test GREEN exit0. worker_done does not claim full QA."
+        },
+        {
+          "id": "scope-and-progress",
+          "met": true,
+          "evidence": "Only invoice.mjs and invoice.test.mjs differ; worker leaves both checkboxes and tax.mjs unchanged and returns acceptance to parent."
+        }
+      ],
+      "metrics": {
+        "missingRequirements": 0,
+        "unnecessaryChanges": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0,
+        "unnecessaryActions": null,
+        "elapsedMs": null,
+        "inputTokens": null,
+        "outputTokens": null
+      }
+    },
+    {
+      "executionId": "5fb76b66-80d9-45b2-9f4a-64571b3ee48d",
+      "case": "fix",
+      "arm": "current",
+      "status": "completed",
+      "valid_for_comparison": false,
+      "inputHash": "79d7a64d033046a12a4b9a81a1ba7cd12cd9fe36d435660964d4c312cb8a56da",
+      "instructionHash": "19aabf2f74d961077a49fcb1a7a3c005bf0904b7ca7c8af8e04b9c246fd58583",
+      "runtimeSourceHash": "ddab0f2627676cbc5202953b83e1e738350b1c8a32b802a58c799f6d06819d79",
+      "reportHash": "c0187783a4bcc08a75d59bde27ab71deb1c97f3b402221bf935be4c61725cd4f",
+      "observationHash": "f4dc16be9579f87bb36984af2998bae870c3a6ed6ad30d2274da47b396cb970d",
+      "outputHash": "ea88f6b1197c8ca5874811f7ec140c765a37f99a966629dcddd18b7cf65036bb",
+      "changedFiles": [
+        "src/load-once.mjs",
+        "test/load-once.test.mjs"
+      ],
+      "requirements": [
+        {
+          "id": "load-once-behavior",
+          "met": true,
+          "evidence": "Parent executed withheld check-output.mjs fix in stopped worker workspace; exit0, load-once-behavior met=true."
+        },
+        {
+          "id": "original-evidence",
+          "met": true,
+          "evidence": "Bounded transcript and actual msg_216e67aaef2b show unchanged original.mjs failing pre-fix with two calls, passing post-fix. Original input bytes remain unchanged; F-7 retained."
+        },
+        {
+          "id": "retained-interaction",
+          "met": true,
+          "evidence": "Worker test/load-once.test.mjs retains concurrent same-key callers with explicit promise release/rejection; five tests cover independent keys and completion/error cleanup. No sleeps/polling."
+        },
+        {
+          "id": "honest-closure",
+          "met": true,
+          "evidence": "Actual report distinguishes original control/regression results and unavailable durable runtime/immutable review target; parent retains F-7 acceptance and authoritative verify."
+        }
+      ],
+      "metrics": {
+        "missingRequirements": 0,
+        "unnecessaryChanges": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0,
+        "unnecessaryActions": null,
+        "elapsedMs": null,
+        "inputTokens": null,
+        "outputTokens": null
+      }
+    },
+    {
+      "executionId": "2d78cfe7-9818-40e1-a632-d2b0d67a4f8a",
+      "case": "fix",
+      "arm": "baseline",
+      "status": "completed",
+      "valid_for_comparison": false,
+      "inputHash": "79d7a64d033046a12a4b9a81a1ba7cd12cd9fe36d435660964d4c312cb8a56da",
+      "instructionHash": "feb0665a28ea10d996d74b95da48671687a8a2383622b0291e1b0569c48d5b61",
+      "runtimeSourceHash": "2f02077fb84fb1105a78ca9744577fbfa7675e0d38052827cd942c02965e83ab",
+      "reportHash": "6b3bc61465d190f3c985e84c3be3cf71a54a7f07069e1d48be6052940b5585f4",
+      "observationHash": "0f0498227dc8b9872a422f2d6fff28cd82e182bf4607d0df39b2e67428edf52a",
+      "outputHash": "e31fc7fe946e55d6c01cfffd0be13d30f6e7eaa70d054eb971891962c41084f3",
+      "changedFiles": [
+        "src/load-once.mjs",
+        "test/load-once.test.mjs"
+      ],
+      "requirements": [
+        {
+          "id": "load-once-behavior",
+          "met": true,
+          "evidence": "Parent executed withheld check-output.mjs fix in stopped worker workspace; exit0, load-once-behavior met=true."
+        },
+        {
+          "id": "original-evidence",
+          "met": true,
+          "evidence": "Bounded transcript and actual msg_3dd3331e6bcf show unchanged original.mjs failing pre-fix with two calls, passing post-fix. Original input bytes remain unchanged; F-7 retained."
+        },
+        {
+          "id": "retained-interaction",
+          "met": true,
+          "evidence": "Worker test/load-once.test.mjs retains concurrent same-key callers with explicit promise release/rejection; five tests cover independent keys and completion/error cleanup. No sleeps/polling."
+        },
+        {
+          "id": "honest-closure",
+          "met": true,
+          "evidence": "Actual report distinguishes original control/regression results and unavailable durable runtime/immutable review target; parent retains F-7 acceptance and authoritative verify."
+        }
+      ],
+      "metrics": {
+        "missingRequirements": 0,
+        "unnecessaryChanges": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0,
+        "unnecessaryActions": null,
+        "elapsedMs": null,
+        "inputTokens": null,
+        "outputTokens": null
+      }
+    },
+    {
+      "executionId": "82f30e71-9847-4c80-b972-6066ee284cc1",
+      "case": "review",
+      "arm": "baseline",
+      "status": "completed",
+      "valid_for_comparison": false,
+      "inputHash": "e02b0b02e179da4de84840a871e981904a7e8b6c95f4beca69651a2c09d32eb8",
+      "instructionHash": "211b545efb03a5fd9abb82085c3c465040ced826aef50874a6a3a2c2aa606b62",
+      "runtimeSourceHash": "2f02077fb84fb1105a78ca9744577fbfa7675e0d38052827cd942c02965e83ab",
+      "reportHash": "ba78c1e38fcebee8e25717079bc497787487cda5edccede9d17fb24cc9a5f0e4",
+      "observationHash": "a5b57b78d792d8604f61ff9f94513d3248ecd834ecd3199c06c72dd2cbd10e6b",
+      "outputHash": "dcc2bf41bd3b580916363d8b047b8a9f787211a6604007210d69ef3ef92a946f",
+      "changedFiles": [],
+      "requirements": [
+        {
+          "id": "authorization-finding",
+          "met": true,
+          "evidence": "Actual worker_done names target/src/export.mjs:1-2, requirements.md:1 and cross-owner exportInvoice example; blocking P1 matches direct source."
+        },
+        {
+          "id": "complete-scope",
+          "met": true,
+          "evidence": "Report and snapshot reads cover modified invoice.mjs, added export.mjs and test; earlier invoice-only helper note explicitly rejected as current independent clearance."
+        },
+        {
+          "id": "ordered-verdict",
+          "met": true,
+          "evidence": "Report leads with authorization requirement failure, then bounded correctness evidence; single combined FAIL, no invented independent reviewer or runtime gate."
+        },
+        {
+          "id": "check-limitations",
+          "met": true,
+          "evidence": "Report separates existing owner-only test1/1 from failed cross-owner assertion and earlier helper missing checks."
+        }
+      ],
+      "metrics": {
+        "missingRequirements": 0,
+        "unnecessaryChanges": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0,
+        "unnecessaryActions": null,
+        "elapsedMs": null,
+        "inputTokens": null,
+        "outputTokens": null
+      }
+    },
+    {
+      "executionId": "3a7c565c-dadc-472b-b89a-ae5405cb0495",
+      "case": "review",
+      "arm": "current",
+      "status": "completed",
+      "valid_for_comparison": false,
+      "inputHash": "e02b0b02e179da4de84840a871e981904a7e8b6c95f4beca69651a2c09d32eb8",
+      "instructionHash": "7cf1d54483e50983958c3eb4ff8ba272860d1b66eff706284f75da63fbb5a23d",
+      "runtimeSourceHash": "ddab0f2627676cbc5202953b83e1e738350b1c8a32b802a58c799f6d06819d79",
+      "reportHash": "a8f95bed5aa1d407e0915af418610b3d599c70618cf77df512ae022e1f385112",
+      "observationHash": "144f0f5740bc981a33fb4217dece4b795b9fcb715dd618b87230f6973df9dc33",
+      "outputHash": "dcc2bf41bd3b580916363d8b047b8a9f787211a6604007210d69ef3ef92a946f",
+      "changedFiles": [],
+      "requirements": [
+        {
+          "id": "authorization-finding",
+          "met": true,
+          "evidence": "Actual finalResponse identifies target/src/export.mjs:1-2 and requirements.md:1; non-owner u2 receives full u1 invoice, violating owner-only requirement."
+        },
+        {
+          "id": "complete-scope",
+          "met": true,
+          "evidence": "Actual finalResponse and complete snapshot diff include invoice.mjs plus added export and owner-only test; stale helper provides no current clearance."
+        },
+        {
+          "id": "ordered-verdict",
+          "met": true,
+          "evidence": "Report leads with authorization requirement failure, then bounded correctness evidence; single combined FAIL, no invented independent reviewer or runtime gate."
+        },
+        {
+          "id": "check-limitations",
+          "met": true,
+          "evidence": "Report separates existing owner-only test1/1 from failed cross-owner assertion and earlier helper missing checks."
+        }
+      ],
+      "metrics": {
+        "missingRequirements": 0,
+        "unnecessaryChanges": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0,
+        "unnecessaryActions": null,
+        "elapsedMs": null,
+        "inputTokens": null,
+        "outputTokens": null
+      }
+    }
+  ],
+  "limits": [
+    "All model comparison eligibility flags are false; no improvement, pass-rate, cost or speed claim",
+    "Some bounded Orca transcript fields are clipped, so unobservable check/action metrics remain null",
+    "Manual semantic rubric judgments are source-bound assessments, not statistical evidence",
+    "Frozen collector matches the prepared hash; the subsequently hardened matrix validator independently checks the actual complete five-case matrix using the recorded one-repetition launch setting",
+    "No runtime/helper gate behavior is measured by this instruction-only pilot; see separate host smoke"
+  ]
+}

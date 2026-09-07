@@ -17,6 +17,14 @@ When useful and safe, demonstrate that the check fails against the named defect 
 
 Documentation-only work, generated artifacts, user-authorized no-test work, and tasks without a useful automated check retain the existing `fallbackDecision`. Do not invent a failing test, add meaningless tests, or weaken required project checks to satisfy this policy.
 
+## Choose the observable interface
+
+Select the smallest existing public boundary that exercises the required behavior as real callers use it. This can be a module API, command, endpoint or UI flow; it does not always mean an end-to-end test. Include the real interaction when a defect depends on multiple callers, persistence, ordering or permissions. A shallow unit check that omits that interaction is insufficient even when it turns green.
+
+Prefer assertions on returned values, observable errors and required side effects over private methods, internal collaborator call order or implementation-shaped snapshots. Check persisted state directly when persistence is part of the requirement; do not forbid such checks categorically. Retain required security, timing and compatibility assertions. Reuse established test boundaries and the project's testing approach without another confirmation round for routine authorized choices.
+
+An implementation refactor that preserves behavior should not require rewriting these expectations. If the only available check couples to internals, explain the limitation and choose a useful bounded check or the existing fallback. Do not add an abstraction solely to make a mock convenient, delete a valid regression test or insist that every test move to one universal boundary.
+
 ## Wait for readiness, with a deadline
 
 When a test or fix waits for asynchronous readiness, use the project's existing event, assertion-retry, or condition-wait facility. Observe the actual readiness condition with a finite deadline and a bounded polling interval or cancellable subscription. Bound underlying asynchronous operations too; an outer loop cannot time out a predicate that never returns.

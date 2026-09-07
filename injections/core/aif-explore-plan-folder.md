@@ -48,6 +48,8 @@ Bounded diagnostics may contain only `mode`, resolved version and version `sourc
 
 After resolving the artifact mode, research profile, and any ultra version gate, but before the full research run or any write, map the request as a dependency-aware **design tree**.
 
+When independent fact-finding or a material interface comparison needs separate attention, read [research delegation and design alternatives](../../skills/shared/RESEARCH-DESIGN.md). Resolve it from the installed extension at `.ai-factory/extensions/aifhub-extension/skills/shared/RESEARCH-DESIGN.md`. Before brief confirmation, use only its bounded fact-finding path; design comparisons and full research must stay within the confirmed research brief. The coordinating parent owns dispatch and synthesis; delegated workers return their findings without writing artifacts or opening another interview. Small lookups retain the direct read-only path.
+
 - Treat explicit decisions already present in the request or conversation as settled roots. Each unresolved user-owned decision is a node whose children are the decisions that depend on it.
 - The **frontier** is every unresolved decision whose prerequisites are settled. Ask the whole current frontier in one round, number each question, and include one concise recommended answer with its main rationale or tradeoff. Never ask a downstream question while one of its prerequisites remains open.
 - If the runtime imposes a smaller question-count limit, ask the maximum supported independent subset. Keep the remaining nodes on the same frontier; do not treat the partial batch as a completed round.

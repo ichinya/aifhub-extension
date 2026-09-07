@@ -504,6 +504,8 @@ Shared protocol-neutral settings such as `utilities.context_tools.enabled`, `uti
 
 `/aif-architecture` is an upstream project-level architecture context utility. It is not an OpenSpec canonical change/spec generation command.
 
+Architecture assessment starts with the named area, or bounded change history when no area is given. Recommendations require current caller/interface evidence, preserved behavior and migration costs; frequent edits alone do not establish a defect. ADR candidates respect existing project decisions and write boundaries. See [the mattpocock adaptation](mattpocock-adaptation.md).
+
 Reads:
 
 - `.ai-factory/config.yaml`
@@ -594,6 +596,8 @@ In OpenSpec-native mode, use `/aif-verify <change-id>` for authoritative verific
 Branch-scoped `qa-check.md` alone never satisfies AIFHub `verify.md`, `coverage.json`, rules evidence, `done-readiness.json`, `done.md`, or `openspec-archive.json`; no implicit bridge exists.
 
 ### `/aif-plan full`
+
+For new task breakdowns, [executable task design](../skills/shared/TASK-DESIGN.md) favors independently verifiable scenarios and records actual dependencies. Wide migrations may use expand–migrate–contract when compatibility permits. Missing facts, unresolved requirements and external access remain prerequisites; this adds no tracker publication or parallel implementation runtime.
 
 Reads:
 
@@ -690,6 +694,8 @@ Does not write:
 
 Exploration is research-only until promoted into canonical OpenSpec artifacts by planning or refinement.
 
+Explore/plan/improve can use [research delegation and design alternatives](../skills/shared/RESEARCH-DESIGN.md) when independent facts or a material interface choice benefit from separate attention. The coordinating parent assigns distinct read-only questions or design objectives, binds their source revisions, and reconciles each answer. The calling command's authorized writer retains its existing artifact scope. Small lookups and settled designs stay direct. Before explore brief confirmation, only bounded interview fact-finding may be delegated; full research keeps the confirmation gate below. Design comparisons in plan/improve follow their existing mode/version/classification and refinement rules. Missing subagent capability uses direct analysis with the same boundaries. See [the adaptation and remaining work](mattpocock-adaptation.md).
+
 Before the full research run or any write, `/aif-explore` turns the request into a dependency-aware research brief. It resolves repository and configuration facts through bounded read-only inspection, asks only user-owned decisions whose prerequisites are settled, groups independent questions into rounds with a recommendation for each, and recomputes the decision frontier after every answer batch. Confirmation becomes available only after every user-owned brief decision is settled and no prerequisite fact-finding remains pending. An empty frontier with unresolved decisions behind blocked or cyclic prerequisites is blocked, not complete: the agent reports the blocker and smallest evidence-producing or dependency-breaking next action without presenting the brief for confirmation or starting full research.
 
 Pre-confirmation inspection creates no new read permission. In OpenSpec-native mode, it is restricted to the injection's `Allowed read context` and `Enabled optional tool use` boundaries. In Legacy AI Factory-only mode, it is restricted to `.ai-factory/config.yaml`, safe resolved configured project context and rules, the exact referenced legacy plan pair, directly relevant in-repository source/tests/docs/package manifests, and bounded local Git branch/revision metadata. Neither mode may use the interview to read outside the project root, inspect environment or credential stores, consume raw optional-provider stores/output, scan unrelated repositories, or enable an optional provider solely for the interview.
@@ -744,6 +750,8 @@ The local rows live only inside one managed block:
 `/aif-roadmap` owns the full roadmap and may create or reconcile this block. `/aif-done` co-owns only the marker-bounded transition for one linked change after successful archive. Content outside the markers remains under `/aif-roadmap` ownership and must be preserved. Missing or partial GitHub evidence does not block local reconciliation; output reports lifecycle and GitHub evidence sources separately without credentials or private diagnostics.
 
 ### `/aif-improve`
+
+Apply [task design guidance](../skills/shared/TASK-DESIGN.md) only within the assigned refinement. The existing inline-verification migration preserves task IDs, order, actions and checked state; it does not authorize restructuring the checklist.
 
 Reads:
 
@@ -869,6 +877,8 @@ If generated rules or generated trace metadata are missing or stale:
 
 ### `/aif-review`
 
+For an authorized review with separable concerns, [specialized review support](../skills/shared/REVIEW-DELEGATION.md) permits parent-owned read-only assignments within each existing pass. Reconcile exact targets, all assigned coverage and source-backed findings before the one combined verdict. Missing evidence cannot yield a complete-scope PASS; a delegated sidecar keeps its existing tools/output contract and launches no nested reviewers.
+
 Reads:
 
 - changed files
@@ -932,6 +942,8 @@ Invalid OpenSpec validation is a hard stop before code checks. Missing or unsupp
 In legacy mode, marker-first classification happens before classic companion discovery. For a valid marked ultra bundle, AIFHub returns exact `/aif-verify <entrypoint>` and upstream verifies the bundle atomically. Only after one final validated upstream `aif-gate-result` may the verify command boundary write `.ai-factory/state/legacy-ultra-verification/<entrypoint-digest>.json`. The receipt contains bounded schema/entrypoint, bundle digest, Git `HEAD` or explicit manual build id, deterministic worktree digest, timestamp, source command, and structured gate outcome; it never stores phase bodies, raw stdout/stderr, or credentials. No classic companion, QA, OpenSpec, or finalization file is written for this branch.
 
 ### `/aif-fix`
+
+For a large, slow or intermittent selected reproduction, use [difficult-bug reproduction](../skills/shared/BUG-REPRODUCTION.md): retain the original signal, reduce only while preserving it, and verify the original case after the fix. Record bounded trial results honestly for intermittent failures. Finding selection, existing fallback decisions, write scope, attempt limits and `/aif-verify` ownership still apply.
 
 Reads:
 
@@ -1327,6 +1339,7 @@ npm test
 ## See Also
 
 - [Persistent Workflow Mechanics](workflow-mechanics.md) — classic/OpenSpec execution, `batch-start` → checkpoint/seal → per-item acceptance → close, exact inspection and owner interruption/stop confirmation. Use `ai-factory aifhub-execution <action> --json` with JSON on stdin; authoritative verification remains `/aif-verify`.
+- [Isolated Execution](isolated-execution.md) — authorized parallel implementation in separate host-managed worktrees. The coordinator registers fresh worker runs with `isolation-start`, transfers and verifies results serially, then closes the group and checks freshness before synchronizing accepted tasks. Recovery preserves file images and existing worker history; the host owns worktrees and process termination.
 
 - [Documentation Index](README.md)
 - [Context Providers](context-providers.md)

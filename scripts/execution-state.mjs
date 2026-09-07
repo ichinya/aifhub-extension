@@ -86,6 +86,9 @@ function transactionId(action,input) { return digest(`${action}:${input.run_id??
 
 /** Local cooperative bookkeeping. Actor labels are correlation, not authentication. */
 export async function executionCommand(action,input,options={}) {
+  if (typeof action === 'string' && action.startsWith('isolation-')) {
+    return (await import('./isolated-execution.mjs')).isolatedExecutionCommand(action, input, options, executionCommand);
+  }
   requireValue(Object.hasOwn(contracts,action),'unknown-action'); fields(input,...contracts[action]);
   const change=executionId(input.change_id), id=input.run_id===undefined?null:identifier(input.run_id);
   const store=await storeFor(options.rootDir), folder=folderFor(change), filename=id?`${folder}/runs/${id}.json`:null;
@@ -129,6 +132,7 @@ export async function executionCommand(action,input,options={}) {
     }
     if(action==='upgrade')return upgrade(store,folder,h,input,options);
     if(starting) {
+      await (await import('./isolated-execution.mjs')).assertIsolationAdmission(store,preflight.source);
       requireValue(!run,'run-exists',true);
       requireValue(h.runs.every(r=>r.schema===RUN_SCHEMA && !r.legacy) && (!h.ledger || h.ledger.schema===LEDGER_SCHEMA),'upgrade-required',true);
       if(h.source)requireValue(same(h.source.source,sourceRecord(preflight.source)),'state-source-collision',true);
@@ -336,6 +340,7 @@ async function upgrade(store,folder,h,input,options) {
   requireValue(h.runs.every(r=>!reserves(r)) && !(h.ledger?.attempts??[]).some(a=>a.outcome==='pending'),'predecessor-not-quiescent',true);
   requireValue(h.runs.some(r=>r.schema==='aifhub.execution.v1'||r.legacy) || h.ledger?.schema==='aifhub.fix-attempts.v1','upgrade-not-required',true);
   const source=await resolveExecutionSource(store,input.change_id,'fix',[]); requireValue(!source.delegated,'ambiguous-legacy-source',true);
+  await (await import('./isolated-execution.mjs')).assertIsolationAdmission(store,source);
   if(h.source)requireValue(same(h.source.source,sourceRecord(source)),'state-source-collision',true);
   const ledger=structuredClone(h.ledger??{schema:'aifhub.fix-attempts.v1',attempts:[]}); ledger.schema=LEDGER_SCHEMA; ledger.aliases??=[];
   const writes=[[`${folder}/source.json`,{schema:SOURCE_SCHEMA,source:sourceRecord(source)}]];

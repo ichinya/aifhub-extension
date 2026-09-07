@@ -30,6 +30,14 @@ Always respect upstream config resolution for:
 - `language.artifacts`
 - `language.technical_terms`
 
+### Focused architecture assessment
+
+Apply in either artifact mode after resolving the permitted context. When the user names an area or pain point, inspect that area first. Otherwise, use bounded local change history to identify frequently changed areas, then verify the suspected friction in current source and callers. Generated files, mass formatting and commit frequency alone do not prove an architectural problem. State the inspected scope and limitations; do not imply a whole-repository audit from a few samples.
+
+For each useful candidate, identify concrete affected paths and a current caller cost: scattered invariants, repeated knowledge, leaking dependencies or a real interaction that is difficult to test. Explain what a proposed boundary would hide, which behavior and constraints must remain, how callers and tests would change, and the migration cost. Fewer files, fewer methods or a thinner wrapper is not enough evidence of improvement. Prefer a small number of supported candidates; preserve project terminology and avoid hypothetical adapters or unrelated cleanup.
+
+Read applicable accepted architecture decisions. Revisit one only with new source evidence or changed constraints, clearly naming the conflict. Consider a new ADR when reversal would be costly, the rationale would be surprising later, and real alternatives were weighed; existing project ADR requirements remain authoritative. Keep candidates in the resolved architecture context or normal response. These criteria do not add an ADR write path, automatic glossary update, HTML report, provider setup or source-code edit. Route implementation to the existing planning owner.
+
 ### OpenSpec-native mode
 
 When `.ai-factory/config.yaml` declares `aifhub.tools.openspec: true`, `/aif-architecture` still writes project-level AI Factory architecture context, not canonical OpenSpec lifecycle artifacts.

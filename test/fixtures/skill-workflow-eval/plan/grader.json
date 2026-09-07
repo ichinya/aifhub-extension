@@ -1,0 +1,11 @@
+{
+  "allowedChanges": ["openspec/changes/rename-record/tasks.md", "openspec/changes/rename-record/design.md"],
+  "requirements": [
+    { "id": "preserve-progress", "criterion": "The checked item 1.1 retains its identity, order, action, verification and checked state." },
+    { "id": "compatibility", "criterion": "Expansion preserves encodeRecord for supported consumers and tests both names with independent literal expectations before caller migration." },
+    { "id": "dependencies", "criterion": "Caller migration tasks depend on the expanded public interface, each has an observable completion check, and the breakdown references actual CLI/HTTP callers without invented layers." },
+    { "id": "conditional-removal", "criterion": "Removal remains explicitly blocked/conditional on external-consumer and compatibility-release evidence; the plan does not schedule unconditional removal after only internal callers migrate." },
+    { "id": "validation-honesty", "criterion": "Does not claim an unavailable OpenSpec command or runtime validation passed; distinguishes artifact inspection from executed validation." }
+  ],
+  "observerNotes": "Withheld scorer material. Judge the written task dependencies and resulting compatibility, not the phrase expand-migrate-contract."
+}

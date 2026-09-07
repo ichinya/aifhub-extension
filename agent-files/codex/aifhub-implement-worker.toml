@@ -45,6 +45,8 @@ Follow skills/shared/TOOLS.md: only when the entire tools mapping is absent, rea
 
 ## Persistent execution contract
 
+For an isolated assignment, also read `skills/shared/ISOLATED-EXECUTION.md` from the installed AIFHub extension root. Work only in the parent's specified worktree and existing single-task run after group admission; use ordinary `resume`, `checkpoint` and `result` there. Return the exact result digest/version and stop editing. The parent owns local acceptance, `isolation-*` transfers and combined verification in its integration root. Do not create worktrees, switch roots, commit, accept results, synchronize canonical checkboxes, clean up a worktree or dispatch nested workers.
+
 This section applies to configured OpenSpec and complete classic plans after marker-first classification. A valid ultra plan returns its exact upstream handoff before local state; disabled OpenSpec directories never select a source. Follow the installed extension's `docs/workflow-mechanics.md` and the corresponding implement/fix injection for JSON payloads.
 
 - Require the parent's existing execution `run_id`, canonical task, scope, worker label, and current version before editing. Use `ai-factory aifhub-execution resume --json` with JSON on stdin on entry and re-entry. Missing assignment or stale/conflicting state returns a blocker to the parent; do not silently start a new assignment or overwrite a stale checkpoint.

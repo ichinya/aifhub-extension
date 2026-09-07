@@ -2,6 +2,8 @@
 
 Apply after artifact classification permits local implementation and the active canonical tasks have been read. This covers OpenSpec-native and classic legacy execution; ultra-valid delegation and invalid/collision stops take precedence. The `/aif-implement` coordinator owns the scan and task selection. A worker consumes only its assigned scope; this policy does not authorize delegation or nested workers.
 
+For unclear readiness, dependency or migration boundaries, consult [executable task design](TASK-DESIGN.md) read-only during preflight. Missing facts and external access remain prerequisites; route affected plan changes to their existing owner. This does not make shared-worktree assignments safe for concurrent edits.
+
 ## Before implementation or first worker dispatch
 
 Scan the active plan's unfinished tasks and relevant completed producers before implementation edits or first worker dispatch. In the existing execution notes or normal response, identify the canonical task snapshot and record:
@@ -15,6 +17,16 @@ Before dispatching a later task, confirm its inputs still match the scanned snap
 
 ## Select one task, a coupled group, or a small same-shape batch
 
+Choose the execution shape from the actual work before dispatch. Record one short reason in existing preflight notes; no new approval or task artifact is needed.
+
+| Shape | Choose when | Cost to account for |
+| --- | --- | --- |
+| One task or a coupled group, executed serially | The change is small, shares an interface/file, needs a producer's unfinished output, or has uncertain scope | A direct run avoids repeating setup and explanation; split only after the boundary is understood |
+| Same-shape batch in one worker | Independent low-risk items share the same mechanical change and check approach | One shared context can reduce repeated orientation; each item still needs evidence and reconciliation |
+| Independent tasks in isolated worktrees | Each task has meaningful standalone implementation work, stable inputs, disjoint files, and a host able to materialize exact baselines | Include worktree/context preparation, worker orientation, combined checks and serial integration; parallel work is useful only if its expected benefit justifies these costs |
+
+Use the smallest useful number of workers, within host capacity and the existing five-task group limit. An idle slot alone is not a reason to delegate a tiny edit or duplicate investigation. Preserve selected user constraints and project policy; do not impose guessed token budgets, model switches or timeouts. Reassess the remaining work at group boundaries when observed setup/integration costs or new dependencies change the choice. Record measured time/cost only when available, and never label an estimate as observed savings.
+
 Keep the existing one-task or tightly coupled group default. The coordinator may explicitly select a small same-shape batch only when all items belong to the same active plan/change, are independently executable, have the same mechanical change and validation approach, and have comparable low risk. Dependencies within the proposed batch, different behavior/risk, or unresolved conflicts require splitting it. Do not combine unrelated work merely to reduce worker launches; a batch grants no additional write scope.
 
 Give the worker a complete manifest before editing: each canonical task ID, exact project-relative files, expected change, and applicable check or existing no-test fallback. Expand file globs into the explicit intended list. Include relevant preflight resolutions. Keep the batch small enough to inspect every item and its diff in one bounded run; otherwise split it. Use existing task IDs without renumbering or rewriting canonical task intent. If the dispatch lacks these inputs, narrow to a fully specified authorized task or return the missing information to the coordinator before edits.
@@ -26,6 +38,10 @@ Execute only the supplied manifest. Stop the affected item on a new dependency, 
 Return one result per manifest item: task ID, actual files/diff, observed check or fallback evidence, and completed, unfinished, or blocked status. Review the diff against every expected change. An aggregate green command or worker success message does not prove every item was implemented. Before marking progress, the coordinator reconciles the original manifest with the actual diff and per-item evidence; an omitted result stays unfinished. If four of five items are complete, report four of five and leave the fifth unchecked/pending (or blocked with its reason). Mark only the selected items in progress, and only evidenced completed items complete, using the existing canonical checklist and runtime progress rules.
 
 Keep `/aif-verify` authoritative and `/aif-done` responsible for finalization. Batching does not prove reduced cost or latency; make those claims only from measured runs.
+
+## Separate worktrees for parallel implementation
+
+When parallel implementation is authorized and the host supplies owned Git worktrees and worker handles, follow [isolated execution and serial integration](ISOLATED-EXECUTION.md). The coordinator admits one bounded group of independent single-task runs before worker edits, imports one accepted result at a time and verifies the combined tree. Group checkboxes stay unchanged until final closure and a fresh `isolation-resume`; ordinary worker acceptance alone cannot complete an isolated task. Preserve existing workers on resume. Missing host/helper capability keeps work serial; a present helper rejection cannot be bypassed.
 
 ## Durable execution, acceptance and interruption
 
