@@ -19,6 +19,9 @@ jobs:
         node-version: ['18.x', '20.19.x']
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Skill workflow evaluations read a historical baseline commit.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
