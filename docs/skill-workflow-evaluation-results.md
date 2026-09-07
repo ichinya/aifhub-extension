@@ -58,3 +58,8 @@ evidence, then repeated paired executions. The explore decision frontier deserve
 a focused scenario with the existing brief decisions supplied explicitly before
 changing its interaction policy. The current sample does not justify another
 mandatory workflow layer, dynamic DAG scheduler or automatic model routing.
+
+The later [focused explore follow-up](skill-workflow-explore-followup.md) supplied
+those prior answers explicitly. Both instruction arms returned the dependent
+destination question. It is a separate scenario and leaves this pilot's receipts,
+scores and comparison status unchanged.

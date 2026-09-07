@@ -84,19 +84,37 @@ function git(repo, args) {
     { cwd: repo, maxBuffer: LIMIT, windowsHide: true, timeout: 15_000 });
 }
 
-// An explicit non-secret descriptor of the actual worker environment, verified by the parent.
+// A non-secret descriptor; unavailable launch facts remain null until independently observed.
 export function validateRuntime(runtime) {
   const fields = ['host', 'hostVersion', 'model', 'effort', 'tools', 'settingsHash'];
   requireThat(runtime && Object.keys(runtime).sort().join() === fields.sort().join(),
     'runtime requires only host, hostVersion, model, effort, tools, settingsHash');
   for (const key of ['host', 'hostVersion', 'model', 'effort']) {
-    requireThat(typeof runtime[key] === 'string' && runtime[key].trim().length > 0
-      && runtime[key].length <= 160, `runtime.${key} must identify the real runtime`);
+    requireThat(runtime[key] === null || (typeof runtime[key] === 'string' && runtime[key].trim().length > 0
+      && runtime[key].length <= 160), `runtime.${key} must identify the real runtime or be null`);
   }
-  requireThat(Array.isArray(runtime.tools) && runtime.tools.length > 0
-    && runtime.tools.every(t => typeof t === 'string' && /^[\w.-]+$/.test(t)), 'runtime.tools invalid');
-  requireThat(HASH.test(runtime.settingsHash), 'runtime.settingsHash must be SHA-256 of non-secret settings');
+  requireThat(runtime.tools === null || (Array.isArray(runtime.tools) && runtime.tools.length > 0
+    && runtime.tools.every(t => typeof t === 'string' && /^[\w.-]+$/.test(t))), 'runtime.tools invalid');
+  requireThat(runtime.settingsHash === null || (typeof runtime.settingsHash === 'string' && HASH.test(runtime.settingsHash)),
+    'runtime.settingsHash must be SHA-256 of non-secret settings or null');
   return runtime;
+}
+
+export function assessRuntime(runtime, evidence = {}) {
+  validateRuntime(runtime);
+  requireThat(evidence && typeof evidence === 'object' && !Array.isArray(evidence)
+    && Object.keys(evidence).every(key => Object.hasOwn(runtime, key)), 'unknown runtime evidence field');
+  const unverifiedFields = [];
+  for (const [key, value] of Object.entries(runtime)) {
+    const item = evidence[key];
+    if (item != null) {
+      requireThat(item && Object.keys(item).sort().join() === 'evidence,value'
+        && typeof item.evidence === 'string' && item.evidence.trim(), `runtime evidence ${key} requires value and evidence`);
+      requireThat(canonical(item.value) === canonical(value), `runtime evidence ${key} mismatch`);
+    }
+    if (value === null || item == null) unverifiedFields.push(key);
+  }
+  return { verified: unverifiedFields.length === 0, unverifiedFields };
 }
 
 export async function loadCases() {
@@ -160,7 +178,8 @@ export async function prepare({ materialize = false, taskId, runtime, repetition
   requireThat(Number.isInteger(repetitions) && repetitions >= 1 && repetitions <= 5, 'repetitions must be 1..5');
   repo = await realpath(repo);
   requireThat(git(repo, ['rev-parse', `${BASELINE}^{commit}`]).toString().trim() === BASELINE, 'baseline unavailable');
-  const harnessHash = hash(await regular(SCRIPT));
+  const harnessSource = await regular(SCRIPT);
+  const harnessHash = hash(harnessSource);
   const hiddenCheck = await regular(path.join(FIXTURES, 'check-output.mjs'));
   const hiddenCheckHash = hash(hiddenCheck);
   const arms = {};
@@ -183,7 +202,7 @@ export async function prepare({ materialize = false, taskId, runtime, repetition
         const executionId = randomUUID();
         const context = `workers/${executionId}`;
         const instructions = arms[arm].instructions[item.id];
-        const workerTask = `Read the selected instruction entrypoint at instructions/${INJECTIONS[item.id]} and its provided references. Resolve installed extension references inside instructions/. This is a bounded instruction-only assignment; no extension runtime, upstream skill installation or model client is supplied. Follow the scenario's authorized scope. Do not read outside this context, launch/delegate workers, install tools, access networks or credentials, use the source checkout, or read other runs. Work only in workspace/. Do not edit instructions/, TASK.md or identity.json. Return your final response and an honest list of executed checks with their observed outcomes to the parent; the parent records your report.\n\n${item.input.task}\n`;
+        const workerTask = `Read the selected instruction entrypoint at instructions/${INJECTIONS[item.id]} and its provided references. Resolve installed extension references inside instructions/. This is a bounded instruction-only assignment; no extension runtime, upstream skill installation or model client is supplied. Follow the scenario's authorized scope. Do not read outside this context, launch/delegate workers, install tools, access networks or credentials, use the source checkout, or read other runs. The host-infrastructure exceptions are the exact lifecycle commands required by your live dispatch preamble and, if needed, orca skills get orchestration to read the version-matched guide; report these separately from project checks. These exceptions do not allow reads of installed skill files or other project contexts. Work only in workspace/. Do not edit instructions/, TASK.md or identity.json. Return your final response and an honest list of executed checks with their observed outcomes to the parent; the parent records your report.\n\n${item.input.task}\n`;
         const inputFiles = Object.fromEntries(Object.entries(item.input.files).map(([p, body]) => [p, hash(body)]));
         const row = { runId, executionId, pairId: `${runId}:${item.id}:${repetition}`, caseId: item.id,
           arm, repetition, context, inputHash: hash({ task: workerTask, files: inputFiles }),
@@ -205,9 +224,11 @@ export async function prepare({ materialize = false, taskId, runtime, repetition
     runtimeSources: Object.fromEntries(ARMS.map(a => [a, arms[a].runtimeSource])),
     graders: Object.fromEntries(cases.map(c => [c.id, c.grader])) };
   await write(runRoot, 'coordinator/manifest.json', manifest);
+  await write(runRoot, 'coordinator/collector.mjs', harnessSource);
   await write(runRoot, 'coordinator/check-output.mjs', hiddenCheck);
   await write(runRoot, 'coordinator/OWNER.json', { schema: SCHEMA, runId, taskId, repetitions, matrixHash: hash(rows) });
   return { schema: SCHEMA, status: 'NOT_RUN(scenarios_ready_execution_pending)', runRoot,
+    collector: path.join(runRoot, 'coordinator/collector.mjs'),
     manifest: path.join(runRoot, 'coordinator/manifest.json'), rows: rows.map(r => ({ ...identity(r),
       context: path.join(runRoot, r.context), task: path.join(runRoot, r.context, 'TASK.md') })) };
 }
@@ -294,6 +315,8 @@ export async function collect({ runRoot, executionId, report, observation } = {}
   requireThat(typeof observation.runtimeVerified === 'boolean', 'runtimeVerified required');
   requireThat(typeof observation.inputsVerified === 'boolean', 'inputsVerified required');
   requireThat(hash(validateRuntime(observation.runtime)) === row.runtimeHash, 'observed runtime mismatch');
+  const runtimeAssessment = assessRuntime(observation.runtime, observation.runtimeEvidence);
+  requireThat(!observation.runtimeVerified || runtimeAssessment.verified, 'runtime verification lacks field evidence');
   const contextRoot = await workerContext(runRoot, row);
   const instructionFiles = await tree(path.join(contextRoot, 'instructions'));
   const actualFiles = await tree(path.join(contextRoot, 'workspace'));
@@ -306,7 +329,7 @@ export async function collect({ runRoot, executionId, report, observation } = {}
     && (await json(path.join(contextRoot, 'identity.json'))).executionId === executionId;
   const result = { schema: SCHEMA, ...identity(row), status: report.status,
     valid: integrity && observation.runtimeVerified && observation.inputsVerified,
-    integrity, collectedAt: new Date().toISOString(), reportHash: hash(report), observationHash: hash(observation),
+    integrity, runtimeAssessment, collectedAt: new Date().toISOString(), reportHash: hash(report), observationHash: hash(observation),
     changedFiles, outputHash: hash(actualFiles), ...score({ row, grader, report, observation, changedFiles }) };
   await write(runRoot, `coordinator/results/${executionId}.json`, { result, report, observation });
   return result;
@@ -376,6 +399,12 @@ export async function compare({ runRoot } = {}) {
       const receipt = await json(path.join(opened.runRoot, 'coordinator/results', `${row.executionId}.json`));
       requireThat(receipt.result.reportHash === hash(receipt.report)
         && receipt.result.observationHash === hash(receipt.observation), 'receipt evidence changed');
+      requireThat(hash(validateRuntime(receipt.observation.runtime)) === row.runtimeHash, 'observed runtime mismatch');
+      const assessment = assessRuntime(receipt.observation.runtime, receipt.observation.runtimeEvidence);
+      requireThat(!receipt.observation.runtimeVerified || assessment.verified, 'runtime verification lacks field evidence');
+      requireThat(hash(assessment) === hash(receipt.result.runtimeAssessment)
+        && receipt.result.valid === (receipt.result.integrity && receipt.observation.runtimeVerified && receipt.observation.inputsVerified),
+      'stored runtime eligibility changed');
       const contextRoot = await workerContext(opened.runRoot, row);
       const actual = await tree(path.join(contextRoot, 'workspace'));
       requireThat(hash(actual) === receipt.result.outputHash, 'workspace changed after collection');

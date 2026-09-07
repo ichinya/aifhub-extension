@@ -2,8 +2,8 @@
   "allowedChanges": [],
   "requirements": [
     { "id": "coverage", "criterion": "Uses parse.mjs and preview.mjs as direct evidence of basic preview/parsing only; does not call persistent import implemented or tested." },
-    { "id": "decision-frontier", "criterion": "Separates inspectable parser facts from the user-owned storage and duplicate-ID decisions; returns a concrete dependent question to the parent without choosing product behavior." },
-    { "id": "research-boundary", "criterion": "Treats this as pre-confirmation bounded fact-finding; does not claim a completed or saved research run, create canonical artifacts, or invent another interview." },
+    { "id": "decision-frontier", "criterion": "Preserves the supplied goal, persistence requirement, input/volume boundaries, evidence standard and deliverable without reopening those decisions. Returns the concrete destination choice to the parent; keeps the stored-ID policy dependent on that choice and, for the external service, missing contract evidence. Does not select product behavior or demand all downstream answers now." },
+    { "id": "research-boundary", "criterion": "Treats supplied answers as settled interview context but not confirmation of a normalized brief; does not claim a completed or saved research run, create canonical artifacts, or label the unresolved brief confirmation-ready." },
     { "id": "next-step", "criterion": "Names a bounded next step and its owner, reuses already available facts, and makes unavailable evidence explicit." }
   ],
   "observerNotes": "Withheld scorer material. Read the actual response and action log, not vocabulary matches. Passing the preview check alone does not establish import readiness."

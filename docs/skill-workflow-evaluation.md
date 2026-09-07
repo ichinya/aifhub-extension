@@ -4,6 +4,8 @@ This is the small, opt-in issue #164 evaluation suite. It prepares five paired
 instruction contexts and collects real worker reports observed by a coordinator.
 The [2026-09-07 live pilot](skill-workflow-evaluation-results.md) records ten actual
 Orca worker executions and the limits that prevent an improvement claim.
+The [focused explore follow-up](skill-workflow-explore-followup.md) supplies
+explicit prior brief answers and records two additional executions.
 Preparation and unit tests are **NOT_RUN(scenarios_ready_execution_pending)** for
 behavioral evaluation. They do not establish that the adapted skills improve work.
 
@@ -17,7 +19,7 @@ launches, runtime policy changes, commits, publications, or automatic run cleanu
 
 | Case | Worker task | Evidence scored by the coordinator |
 | --- | --- | --- |
-| explore | Inspect partial CSV import capability before research confirmation | Source-grounded coverage, dependent product decisions, research boundary, next owner/action |
+| explore | Continue a CSV import interview with explicit prior user answers, before research confirmation | Source-grounded coverage, settled answers preserved, destination/conflict dependencies, research boundary, next owner/action |
 | plan | Plan a public export rename with independently deployed consumers | Existing progress preserved, compatible increments, actual dependencies, conditional removal, honest validation |
 | implement | Implement one invoice-summary task and useful tests | Public API behavior, independent expectations, actual check execution, bounded scope/progress |
 | fix | Repair duplicate in-flight loads for concurrent same-key callers | Public API behavior, original pre/post reproduction, retained interaction, scoped finding handoff |
@@ -39,8 +41,10 @@ node scripts/skill-workflow-eval.mjs prepare
 ```
 
 Before preparing a live run, the parent records a **non-secret** runtime descriptor
-in its own temporary `runtime.json`. These are actual launch settings, not inferred
-from model output. Only these six fields are accepted:
+in its own temporary `runtime.json`. Use actual launch settings when independently
+known, and `null` for unavailable fields. Configured defaults, requested overrides
+and worker self-reports do not establish effective settings. Only these six fields
+are accepted:
 
 ```json
 {
@@ -60,6 +64,13 @@ settings being hashed; both arms must use the same actual environment. If the pa
 cannot verify a runtime/input setting, collection must set its verification flag to
 false, keeping the result ineligible.
 
+For example, a host receipt that reports null model/effort supports null fields,
+not the configured model name. A terminal preview can corroborate a displayed
+model, but does not prove unchanged settings throughout an assignment or the full
+set of host controls. Keep `tools` or `settingsHash` null when that evidence is
+unavailable. An unknown value in either arm never qualifies a comparison merely
+because both arms have the same nulls.
+
 ```powershell
 node scripts/skill-workflow-eval.mjs prepare --materialize --task-id issue164-pilot --runtime C:/task-temp/runtime.json --repetitions 2
 ```
@@ -77,6 +88,7 @@ The returned `runRoot`, `manifest` and `rows` are **parent-only**. The layout is
   coordinator/
     OWNER.json
     manifest.json
+    collector.mjs                   # exact prepared harness bytes, parent-only
     check-output.mjs
     results/<executionId>.json       # written by collect
   workers/<opaque-executionId>/
@@ -112,6 +124,10 @@ manifest or dropping an entire case cannot produce an improvement claim.
    `workers/<id>` context as the allowed folder. Send its `TASK.md` and selected
    instruction references. Follow manifest row order, which counterbalances arms
    across cases/repetitions. Do not reuse prior worker conversations between arms.
+   The task explicitly permits the live preamble's lifecycle commands and
+   `orca skills get orchestration` as host infrastructure. Reads of installed skill
+   files and other contexts remain outside scope. Record infrastructure actions
+   separately and verify the same host guidance is available to both arms.
 3. Verify the actual folder, task bytes, runtime/model/settings and selected
    instructions before the worker edits. Retain the Orca task/dispatch identity
    and bounded action/interaction evidence in parent-owned temporary records.
@@ -162,7 +178,11 @@ Create the coordinator observation from that row in `coordinator/manifest.json`.
   "observerRole": "coordinator",
   "identity": { "COPY_ALL_FIELDS_LISTED_ABOVE": "from the selected manifest row" },
   "runtime": { "COPY_EXACT_DESCRIPTOR": "same six-field runtime object" },
-  "runtimeVerified": true,
+  "runtimeVerified": false,
+  "runtimeEvidence": {
+    "host": { "value": "orca/codex", "evidence": "Actual dispatch identity and host receipt reference" },
+    "model": null
+  },
   "inputsVerified": true,
   "provenance": "Actual Orca run/task/dispatch IDs and observation record location",
   "requirements": {
@@ -186,6 +206,15 @@ manifest fields and evidence. For each rubric ID, record `met: true`, `false`, o
 reference for each measured judgment. Omitted criteria stay null. Do not give the
 worker the IDs or expected answers from this observation.
 
+`runtimeEvidence` holds an independently observed `{ "value": ..., "evidence": "..." }`
+for each known runtime field; omitted or null entries remain unverified. Values
+must match the frozen descriptor exactly. Cite actual host observations, including
+their assignment coverage; requested/configured settings alone are insufficient.
+Set `runtimeVerified: true` only when all six non-null fields have that evidence
+and the coordinator has checked its adequacy. Collection rejects an unsupported
+true flag and records `runtimeAssessment.unverifiedFields`; comparison rechecks it.
+These are auditable parent judgments, not host-signed or cryptographic attestation.
+
 Measured numeric fields use `{ "value": 0, "evidence": "..." }`, not a bare number.
 Zero is valid only when the observer has complete relevant evidence:
 
@@ -202,8 +231,8 @@ Zero is valid only when the observer has complete relevant evidence:
   Do not estimate tokens from characters or turn absent telemetry into zero.
 
 ```powershell
-node scripts/skill-workflow-eval.mjs collect --run <runRoot> --execution <executionId> --report <parent-report.json> --observation <parent-observation.json>
-node scripts/skill-workflow-eval.mjs compare --run <runRoot>
+node <runRoot>/coordinator/collector.mjs collect --run <runRoot> --execution <executionId> --report <parent-report.json> --observation <parent-observation.json>
+node <runRoot>/coordinator/collector.mjs compare --run <runRoot>
 ```
 
 `collect` checks identity and the parent-observed runtime, verifies instruction/task
@@ -235,7 +264,7 @@ unmeasured, its aggregate stays null. This is descriptive evidence for these cas
 not statistical significance, causality or a recommendation to enable a policy.
 
 Exports `prepare`, `loadCases`, `collect`, `score`, `compare`, `compareResults`,
-`validateRuntime` and `hash` provide the same workflow for a parent Node script.
+`validateRuntime`, `assessRuntime` and `hash` provide the same workflow for a parent Node script.
 No external testing dependency is needed:
 
 ```powershell
@@ -244,11 +273,14 @@ node --test scripts/skill-workflow-eval.test.mjs
 
 ## Limits and custody
 
-Keep the collector source frozen for a long-running pilot. If harness code must
-change while workers run, preserve its exact prepared bytes in the parent-only
-coordinator folder and use that copy for collection; its SHA256 must match the
-manifest. Record any subsequent independent matrix validation separately. Never
-rewrite prepared hashes or existing receipts to make an old run fit new code.
+Preparation automatically freezes the collector in the parent-only coordinator
+folder and returns its path as `collector`. Use that copy for collection and
+comparison, even when the source checkout changes during a long-running pilot;
+its SHA256 must match the manifest. It supports collection/comparison without
+reading checkout fixtures. Prepare new runs from the checkout, not the frozen copy.
+Older pilots without the automatic copy keep their original manual custody
+procedure. Never rewrite prepared hashes, fixtures or existing receipts to fit new
+code. Record any subsequent independent validation separately.
 
 This covers five deliberately small synthetic tasks, selected AIFHub instruction
 references, and direct worker behavior. It does not install upstream AI Factory

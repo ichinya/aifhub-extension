@@ -1,0 +1,258 @@
+{
+  "schema": "aifhub.skill_workflow_explore_followup.v1",
+  "observedAt": "2026-09-07T10:04:27.747Z",
+  "sourceCommit": "7534e4f",
+  "baseline": "bc93bda969e6dd30d54db5b9cc36953f5ca15982",
+  "orcaRunId": "run_2c7ed728166e",
+  "evaluationRunId": "469d1b94-13f5-4eb4-9f13-d8712be23b68",
+  "scope": "Two fresh explore executions only; other eight matrix slots were not executed in this diagnostic follow-up.",
+  "preparedCollectorHash": "d4e94a57b9e3d2f4b36b75703725f7de0a8a20d1d96e69198b98e4e2e9267f1f",
+  "reviewedCollectorHash": "7c411915179aca0daec71402c67d9e214cbc8fe9ee8c342a0a64202fedc5150d",
+  "fixtureInputHash": "01adb39f2f37057b8b30a0868b48640d95b0399d0ed41dbbdc14b8c2e99b7853",
+  "graderHash": "c395936513f338eca8e9f7f60b11ac533a96f363020a69c5af821a0d5fede88b",
+  "runtime": {
+    "host": "orca/codex",
+    "hostVersion": "1.4.197",
+    "model": null,
+    "effort": null,
+    "tools": null,
+    "settingsHash": null
+  },
+  "custody": "Prepared collector retained automatically. A type-preserving runtime comparison fix was reviewed and applied after preparation. Both collections used only matching host/version evidence with model/effort/tools/settingsHash null; current assessor independently returned the same unverified fields. Historical pilot receipts and prepared files were not rewritten.",
+  "limitations": [
+    "No effective model/effort or full host-control attestation; terminal display is corroboration only.",
+    "Bounded transcript fields were clipped; inputsVerified is false and unsupportedChecks remains null.",
+    "No repeated full matrix or improvement claim; findings are manual observations tied to actual reports and file integrity."
+  ],
+  "observations": [
+    {
+      "schema": "aifhub.skill_workflow_eval.v1",
+      "runId": "469d1b94-13f5-4eb4-9f13-d8712be23b68",
+      "executionId": "4f6274d8-f597-4519-b1f1-f15db085f582",
+      "pairId": "469d1b94-13f5-4eb4-9f13-d8712be23b68:explore:1",
+      "caseId": "explore",
+      "arm": "baseline",
+      "repetition": 1,
+      "inputHash": "01adb39f2f37057b8b30a0868b48640d95b0399d0ed41dbbdc14b8c2e99b7853",
+      "instructionHash": "18e712a01e02c0612c4a2aefab01754f77e9e296627766c120de082e7c0ce968",
+      "runtimeSourceHash": "2f02077fb84fb1105a78ca9744577fbfa7675e0d38052827cd942c02965e83ab",
+      "runtimeHash": "b7a0b57798b4b44dd0e103193595b2cf2add9a3ec995b0a36ed3002e8a4e3593",
+      "harnessHash": "d4e94a57b9e3d2f4b36b75703725f7de0a8a20d1d96e69198b98e4e2e9267f1f",
+      "graderHash": "c395936513f338eca8e9f7f60b11ac533a96f363020a69c5af821a0d5fede88b",
+      "status": "completed",
+      "valid": false,
+      "integrity": true,
+      "runtimeAssessment": {
+        "verified": false,
+        "unverifiedFields": [
+          "model",
+          "effort",
+          "tools",
+          "settingsHash"
+        ]
+      },
+      "collectedAt": "2026-09-07T10:04:27.679Z",
+      "reportHash": "eff4a7eb83ec0515f0c6be39a58a69bfa66ad7a663f54357bbd7edfce7c7c61d",
+      "observationHash": "c8cdd3281e15c8f337a2e96bd4bd838baf9481f79f4eee9ffcda17e1ce7f28b2",
+      "changedFiles": [],
+      "outputHash": "e5bb4c7beb14336df557ef02c5352bd3d2879e88ac10f5aa4969ad51389cb04d",
+      "requirements": [
+        {
+          "id": "coverage",
+          "met": true,
+          "evidence": "Orca ctx_accf487ce5aa, completion msg_859f7da0cfbb: identifies parse.mjs as basic parsing and preview.mjs as JSON serialization only; existing preview test output passed 1/1. Persistence, stored-ID conflicts and the 1000-row bound are not claimed verified."
+        },
+        {
+          "id": "decision-frontier",
+          "met": true,
+          "evidence": "Orca ctx_accf487ce5aa, completion msg_859f7da0cfbb: preserves persistence goal, internal-operations CLI, unquoted id,name, 1000-row product limit, evidence and deliverable; asks external service versus local file, with conflict policy and external contract evidence conditional on that answer."
+        },
+        {
+          "id": "research-boundary",
+          "met": true,
+          "evidence": "Orca ctx_accf487ce5aa, completion msg_859f7da0cfbb: explicitly unresolved brief, no full research or artifact writing, normalized brief confirmation deferred until decisions settle; collector independently checks no workspace changes."
+        },
+        {
+          "id": "next-step",
+          "met": true,
+          "evidence": "Orca ctx_accf487ce5aa, completion msg_859f7da0cfbb: parent owns destination question and any later permitted service-contract evidence; preserves blocked evidence and exact brief confirmation, without opening another interview."
+        }
+      ],
+      "unnecessaryChanges": [],
+      "metrics": {
+        "missingRequirements": 0,
+        "unnecessaryChanges": 0,
+        "unsupportedChecks": null,
+        "userInterventions": 0,
+        "unnecessaryActions": null,
+        "elapsedMs": null,
+        "inputTokens": null,
+        "outputTokens": null
+      },
+      "pass": null,
+      "dispatchId": "ctx_accf487ce5aa",
+      "taskId": "task_11d1af4b1c43",
+      "completionMessageId": "msg_859f7da0cfbb",
+      "terminalReleased": true,
+      "launchEffective": {
+        "agent": "codex",
+        "model": null,
+        "effort": null
+      },
+      "terminalDisplay": "gpt-6-astra xhigh",
+      "structuredTranscript": {
+        "source": "transcript",
+        "limited": false,
+        "clippedBlocks": 6
+      },
+      "check": {
+        "command": "node --test test/preview.test.mjs",
+        "passed": 1,
+        "failed": 0,
+        "outputHash": "b998ade7d71855277bba918e90c5d6dd754985f7daa16de35cac62e368409465"
+      }
+    },
+    {
+      "schema": "aifhub.skill_workflow_eval.v1",
+      "runId": "469d1b94-13f5-4eb4-9f13-d8712be23b68",
+      "executionId": "d779b64b-972c-495b-a7cb-010f4ea0ac99",
+      "pairId": "469d1b94-13f5-4eb4-9f13-d8712be23b68:explore:1",
+      "caseId": "explore",
+      "arm": "current",
+      "repetition": 1,
+      "inputHash": "01adb39f2f37057b8b30a0868b48640d95b0399d0ed41dbbdc14b8c2e99b7853",
+      "instructionHash": "25b753fbe2e40e8bbb0516af070e50c80ad40c6de6c130c0971aae084a93f1db",
+      "runtimeSourceHash": "971e324e9cf767b25df0740f4ed36cd3d0cea06ce4ee760f15885da4595c0fb2",
+      "runtimeHash": "b7a0b57798b4b44dd0e103193595b2cf2add9a3ec995b0a36ed3002e8a4e3593",
+      "harnessHash": "d4e94a57b9e3d2f4b36b75703725f7de0a8a20d1d96e69198b98e4e2e9267f1f",
+      "graderHash": "c395936513f338eca8e9f7f60b11ac533a96f363020a69c5af821a0d5fede88b",
+      "status": "completed",
+      "valid": false,
+      "integrity": true,
+      "runtimeAssessment": {
+        "verified": false,
+        "unverifiedFields": [
+          "model",
+          "effort",
+          "tools",
+          "settingsHash"
+        ]
+      },
+      "collectedAt": "2026-09-07T10:04:27.728Z",
+      "reportHash": "e39a67f09fb93aeeaf7591a2713ee237d7b26dedf1319c74936f0d81cd139e66",
+      "observationHash": "3f6513fc2bc9c472fd40fe6b6c105dde85a98f2781dda4bf4c567a1e99fe8fb0",
+      "changedFiles": [],
+      "outputHash": "e5bb4c7beb14336df557ef02c5352bd3d2879e88ac10f5aa4969ad51389cb04d",
+      "requirements": [
+        {
+          "id": "coverage",
+          "met": true,
+          "evidence": "Orca ctx_2d77abfa731c, completion msg_9754f9a96e7b: identifies parse.mjs as basic parsing and preview.mjs as JSON serialization only; existing preview test output passed 1/1. Persistence, stored-ID conflicts and the 1000-row bound are not claimed verified."
+        },
+        {
+          "id": "decision-frontier",
+          "met": true,
+          "evidence": "Orca ctx_2d77abfa731c, completion msg_9754f9a96e7b: preserves persistence goal, internal-operations CLI, unquoted id,name, 1000-row product limit, evidence and deliverable; asks external service versus local file, with conflict policy and external contract evidence conditional on that answer."
+        },
+        {
+          "id": "research-boundary",
+          "met": true,
+          "evidence": "Orca ctx_2d77abfa731c, completion msg_9754f9a96e7b: explicitly unresolved brief, no full research or artifact writing, normalized brief confirmation deferred until decisions settle; collector independently checks no workspace changes."
+        },
+        {
+          "id": "next-step",
+          "met": true,
+          "evidence": "Orca ctx_2d77abfa731c, completion msg_9754f9a96e7b: parent owns destination question and any later permitted service-contract evidence; preserves blocked evidence and exact brief confirmation, without opening another interview."
+        }
+      ],
+      "unnecessaryChanges": [],
+      "metrics": {
+        "missingRequirements": 0,
+        "unnecessaryChanges": 0,
+        "unsupportedChecks": null,
+        "userInterventions": 0,
+        "unnecessaryActions": null,
+        "elapsedMs": null,
+        "inputTokens": null,
+        "outputTokens": null
+      },
+      "pass": null,
+      "dispatchId": "ctx_2d77abfa731c",
+      "taskId": "task_159670be353c",
+      "completionMessageId": "msg_9754f9a96e7b",
+      "terminalReleased": true,
+      "launchEffective": {
+        "agent": "codex",
+        "model": null,
+        "effort": null
+      },
+      "terminalDisplay": "gpt-6-astra xhigh",
+      "structuredTranscript": {
+        "source": "transcript",
+        "limited": false,
+        "clippedBlocks": 6
+      },
+      "check": {
+        "command": "node --test test/preview.test.mjs",
+        "passed": 1,
+        "failed": 0,
+        "outputHash": "907e6740820ceb02e2a2acf9f94c7598d8fc1ecd9d6e4eb655d4ca9dec143dea"
+      }
+    }
+  ],
+  "comparison": {
+    "schema": "aifhub.skill_workflow_eval.v1",
+    "status": "INCOMPLETE_NO_IMPROVEMENT_CLAIM",
+    "errors": [],
+    "pairs": [
+      {
+        "pairId": "469d1b94-13f5-4eb4-9f13-d8712be23b68:explore:1",
+        "caseId": "explore",
+        "repetition": 1,
+        "status": "incomplete_or_mismatched",
+        "delta": null,
+        "baselinePass": null,
+        "currentPass": null
+      },
+      {
+        "pairId": "469d1b94-13f5-4eb4-9f13-d8712be23b68:plan:1",
+        "caseId": "plan",
+        "repetition": 1,
+        "status": "incomplete_or_mismatched",
+        "delta": null,
+        "baselinePass": null,
+        "currentPass": null
+      },
+      {
+        "pairId": "469d1b94-13f5-4eb4-9f13-d8712be23b68:implement:1",
+        "caseId": "implement",
+        "repetition": 1,
+        "status": "incomplete_or_mismatched",
+        "delta": null,
+        "baselinePass": null,
+        "currentPass": null
+      },
+      {
+        "pairId": "469d1b94-13f5-4eb4-9f13-d8712be23b68:fix:1",
+        "caseId": "fix",
+        "repetition": 1,
+        "status": "incomplete_or_mismatched",
+        "delta": null,
+        "baselinePass": null,
+        "currentPass": null
+      },
+      {
+        "pairId": "469d1b94-13f5-4eb4-9f13-d8712be23b68:review:1",
+        "caseId": "review",
+        "repetition": 1,
+        "status": "incomplete_or_mismatched",
+        "delta": null,
+        "baselinePass": null,
+        "currentPass": null
+      }
+    ],
+    "completePairs": 0,
+    "expectedPairs": 5,
+    "improvement": null
+  }
+}

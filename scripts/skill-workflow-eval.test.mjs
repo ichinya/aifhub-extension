@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { BASELINE, CASES, collect, compare, compareResults, hash, loadCases, prepare, score } from './skill-workflow-eval.mjs';
+import { BASELINE, CASES, assessRuntime, collect, compare, compareResults, hash, loadCases, prepare, score } from './skill-workflow-eval.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const runtime = { host: 'test-only-orca', hostVersion: 'test-fixture', model: 'no-model-executed',
@@ -34,6 +34,8 @@ function observation(row, overrides = {}) {
     'instructionHash', 'runtimeSourceHash', 'runtimeHash', 'harnessHash', 'graderHash'];
   return { observerRole: 'coordinator', identity: Object.fromEntries(fields.map(k => [k, row[k]])),
     runtime, runtimeVerified: true, inputsVerified: true, provenance: 'SYNTHETIC TEST ONLY; no worker ran',
+    runtimeEvidence: Object.fromEntries(Object.entries(runtime).map(([key, value]) => [key,
+      { value, evidence: 'Synthetic host observation only; no live runtime attestation' }])),
     requirements: Object.fromEntries(manifest.graders[row.caseId].requirements.map(r => [r.id,
       { met: true, evidence: 'Synthetic test judgment; not evaluation evidence' }])),
     unsupportedChecks: { value: 0, evidence: 'Synthetic complete action log' },
@@ -84,6 +86,37 @@ test('baseline instruction bytes come from pinned Git; current bytes come from w
     assert.deepEqual(materialized, expected);
     assert.equal(hash(materialized), row.instructionFiles[relative]);
   }
+});
+
+test('prepared collector runs outside the checkout and rejects changed collector bytes', async () => {
+  const source = await readFile(prepared.collector);
+  assert.equal(hash(source), manifest.harnessHash);
+  assert.deepEqual(source, await readFile(path.join(ROOT, 'scripts/skill-workflow-eval.mjs')));
+  const run = script => spawnSync(process.execPath, [script, 'compare', '--run', prepared.runRoot],
+    { cwd: os.tmpdir(), windowsHide: true, timeout: 15_000 });
+  const frozen = run(prepared.collector);
+  assert.equal(frozen.status, 0, frozen.stderr.toString());
+  assert.match(JSON.parse(frozen.stdout).status, /^NOT_RUN/);
+  const changed = path.join(prepared.runRoot, 'coordinator/changed-collector.mjs');
+  await writeFile(changed, Buffer.concat([source, Buffer.from('\n// changed after preparation\n')]));
+  const rejected = run(changed);
+  assert.notEqual(rejected.status, 0);
+  assert.match(rejected.stderr.toString(), /harness changed/);
+  assert.equal(run(prepared.collector).status, 0);
+});
+
+test('runtime evidence cannot fill unknown settings or substitute different observed values', () => {
+  const evidence = observation(manifest.rows[0]).runtimeEvidence;
+  assert.deepEqual(assessRuntime(runtime, evidence), { verified: true, unverifiedFields: [] });
+  assert.equal(assessRuntime(runtime).verified, false);
+  const unknown = { ...runtime, model: null, effort: null, tools: null, settingsHash: null };
+  const partial = { host: evidence.host, hostVersion: evidence.hostVersion };
+  assert.deepEqual(assessRuntime(unknown, partial).unverifiedFields, ['model', 'effort', 'tools', 'settingsHash']);
+  assert.equal(assessRuntime(unknown, { ...partial, model: { value: null, evidence: 'Host explicitly returned null' } }).verified, false);
+  assert.throws(() => assessRuntime(runtime, { ...evidence, model: { value: 'different', evidence: 'Actual host receipt' } }), /model mismatch/);
+  assert.throws(() => assessRuntime(runtime, { ...evidence, tools: { value: JSON.stringify(runtime.tools), evidence: 'String is not the observed array' } }), /tools mismatch/);
+  assert.throws(() => assessRuntime(runtime, { ...evidence, model: { value: runtime.model } }), /value and evidence/);
+  assert.throws(() => assessRuntime(runtime, { launchToken: 'must not retain secrets here' }), /unknown runtime evidence field/);
 });
 
 test('unobserved values stay null; negative requirements, extra files and unsupported checks are visible', () => {
@@ -138,10 +171,13 @@ test('instruction tampering makes a result ineligible', async () => {
 
 test('unverified runtime or launch input cannot contribute improvement', async () => {
   const row = manifest.rows.find(r => r.caseId === 'explore' && r.repetition === 2);
+  await assert.rejects(collect({ runRoot: prepared.runRoot, executionId: row.executionId,
+    report: report(row), observation: observation(row, { runtimeEvidence: {} }) }), /runtime verification lacks field evidence/);
   const result = await collect({ runRoot: prepared.runRoot, executionId: row.executionId,
-    report: report(row), observation: observation(row, { inputsVerified: false, runtimeVerified: false }) });
+    report: report(row), observation: observation(row, { inputsVerified: false, runtimeVerified: false, runtimeEvidence: {} }) });
   assert.equal(result.integrity, true);
   assert.equal(result.valid, false);
+  assert.equal(result.runtimeAssessment.verified, false);
   assert.equal(compareResults(manifest, [result]).improvement, null);
 });
 
