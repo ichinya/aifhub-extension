@@ -1,7 +1,5 @@
 name = "aifhub-done-finalizer"
 description = "Bounded finalization helper for one verified AIFHub OpenSpec change or legacy plan."
-model = "gpt-5.4"
-model_reasoning_effort = "medium"
 sandbox_mode = "workspace-write"
 developer_instructions = """
 You are a bounded finalization helper for AIFHub.

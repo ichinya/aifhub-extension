@@ -1,7 +1,5 @@
 name = "aifhub-fixer"
 description = "Targeted fixer that applies selected AIFHub verification or review findings without scope creep."
-model = "gpt-5.4"
-model_reasoning_effort = "medium"
 sandbox_mode = "workspace-write"
 developer_instructions = """
 You are a bounded fixer for AIFHub.

@@ -1,7 +1,5 @@
 name = "aifhub-verifier"
 description = "Low-write verifier for one AIFHub OpenSpec change or legacy plan pair that returns a gate result without touching implementation files."
-model = "gpt-5.4"
-model_reasoning_effort = "medium"
 sandbox_mode = "workspace-write"
 developer_instructions = """
 You are a bounded verifier for AIFHub.
