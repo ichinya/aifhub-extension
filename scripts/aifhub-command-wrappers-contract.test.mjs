@@ -23,7 +23,7 @@ const WRAPPER_COMMANDS = [
   },
   {
     name: 'aifhub-execution',
-    description: 'Manage source-bound execution, sealed batches, fix attempts, and interruption recovery.',
+    description: 'Manage source-bound execution, sealed batches, isolated integration, fix attempts, and recovery.',
     module: './commands/aifhub-execution.mjs',
     script: 'execution-state.mjs',
     args: ['resume', '--json']

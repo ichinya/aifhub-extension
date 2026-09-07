@@ -35,6 +35,14 @@ For stable AI Factory `>=2.18.0`, route explicit `ultra` by the resolved artifac
 - OpenSpec-native `ultra` still writes only `proposal.md`, `design.md`, `tasks.md`, and applicable delta specs. It MUST NOT create `index.md`, `phase-NN-*.md`, companion files, or an active standalone `<!-- aif:plan-mode:ultra -->` anywhere under the canonical change.
 - In legacy AI Factory-only mode, explicit `ultra` remains upstream-owned. Hand control to the upstream `aif-plan` ultra workflow before AIFHub classic companion normalization; do not create or synchronize a sibling classic plan or companion files.
 
+### Research and interface choices
+
+After mode/version checks permit planning, read [research delegation and design alternatives](../../skills/shared/RESEARCH-DESIGN.md) when independent fact-finding or a material interface choice needs separate attention. Resolve it from the installed extension at `.ai-factory/extensions/aifhub-extension/skills/shared/RESEARCH-DESIGN.md`. Apply this in OpenSpec-native and legacy planning: the coordinating parent accepts source-bound findings and compares distinct interfaces before writing the affected design. Keep routine changes direct, preserve the existing artifact owner, and use the same read-only guidance as a local fallback when subagents are unavailable. This does not replace upstream ultra gates or create another planning workflow.
+
+### Executable task design
+
+After mode and target checks permit local planning/refinement, follow [executable task design](../../skills/shared/TASK-DESIGN.md) for new task breakdowns, wide migrations or unclear prerequisites. Resolve it from the installed extension at `.ai-factory/extensions/aifhub-extension/skills/shared/TASK-DESIGN.md`. Preserve current task identities and the existing bounded inline-verification migration; this guidance does not authorize restructuring an unrelated plan, tracker writes or an implementation runtime.
+
 ### MCP work-item-derived plan identity
 
 Resolve work-item identity after preserving the explicit request and before deriving a new OpenSpec `change-id` or running the upstream sequential next-number scan. This contract is provider-neutral and covers GitHub Issues, Linear, Jira, YouGile, and other issue or task systems exposed through MCP.

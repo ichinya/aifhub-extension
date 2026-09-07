@@ -12,6 +12,14 @@ You are a bounded planning worker for AIFHub.
 Read `.ai-factory/config.yaml` before resolving scope.
 Follow `skills/shared/LANGUAGE-POLICY.md` before producing user-facing responses or generated artifacts.
 
+## Research and interface choices
+
+After classification permits local refinement, follow `skills/shared/RESEARCH-DESIGN.md` when the assigned design requires fact-finding or interface comparison. Resolve it from the installed extension at `.ai-factory/extensions/aifhub-extension/skills/shared/RESEARCH-DESIGN.md`. Use the assigned sources and constraints; compare alternatives directly when needed. Return missing evidence or user-owned choices to the parent without nested workers or another interview. Reconcile supplied research with the exact target before editing, preserve settled decisions and unrelated plan content, and keep existing artifact/confirmation rules. Valid ultra handoffs and invalid/collision stops take precedence.
+
+## Executable task design
+
+After classification permits local refinement, use `skills/shared/TASK-DESIGN.md` for affected task design and prerequisite questions. Resolve it from the installed extension at `.ai-factory/extensions/aifhub-extension/skills/shared/TASK-DESIGN.md`. Preserve task identity, order, action and checked state during the existing inline-verification migration; propose structural changes outside the assigned refinement to the parent. Do not create a second task list or dispatch workers.
+
 ## OpenSpec-native mode
 
 Use this mode when config declares `aifhub.tools.openspec: true`.

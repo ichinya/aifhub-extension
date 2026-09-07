@@ -45,6 +45,10 @@ Run review in this order for both artifact modes:
 
 Do not let a code-quality pass erase or downgrade a plan/spec compliance finding. Return one combined findings-first verdict; this ordering does not create a second gate or authorize file edits.
 
+### Specialized review support
+
+When an authorized review benefits from independent focused questions, follow [specialized review support](../../skills/shared/REVIEW-DELEGATION.md). Resolve it from the installed extension at `.ai-factory/extensions/aifhub-extension/skills/shared/REVIEW-DELEGATION.md`. Only the coordinating parent dispatches permitted support workers. Keep the two-pass order, exact target and complete coverage; reconcile evidence before the single existing verdict. Without subagents, perform the permitted review directly and describe its actual independence.
+
 ### Scoped re-review
 
 For a requested re-review after fixes, follow `skills/shared/SCOPED-REVIEW.md` in either artifact mode. Match the previous findings to the exact fix targets, reconcile every finding by ID, and inspect the complete fix diff for regressions within the existing two-pass review. An incomplete or stale bundle cannot produce PASS. Ordinary full review and user-required independent review retain their scope.

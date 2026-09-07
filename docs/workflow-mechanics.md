@@ -10,6 +10,8 @@ The existing `/aif-implement`, `/aif-fix`, and `/aif-evolve` injections call the
 
 ## Execution checkpoint
 
+For concurrent implementation in separate host-managed worktrees, see [isolated execution and serial integration](isolated-execution.md). Its `isolation-*` actions reuse this command and ordinary single-task worker runs, add a bounded integration journal, and keep final task progress behind group closure plus freshness checks. Same-worker batches below retain their existing contract.
+
 Execution v2 runs from the root of an initialized Git repository. Effective tools and paths select the task source before admission. An explicit tools mapping overrides the legacy artifact protocol; omitted tools are false. Missing config defaults to classic AI Factory. A retained OpenSpec directory never activates OpenSpec. HLV/Lekalo selection does not choose a task source or run a provider.
 
 | Selected source | Required artifacts |

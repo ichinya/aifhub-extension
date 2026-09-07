@@ -38,6 +38,14 @@ In Legacy AI Factory-only mode, classify the normalized project-relative plan en
 - For `classic-pair` or `classic-folder-only`, continue with the classic companion rules below. An unrelated directory is not a plan.
 - Diagnostics may include only `shape`, safe project-relative `entrypoint`, and `handoff`; never include marker bodies, phase contents, request/research bodies, credentials, raw stdout, or raw stderr.
 
+### Research and interface choices
+
+After target classification permits local refinement, read [research delegation and design alternatives](../../skills/shared/RESEARCH-DESIGN.md) when an affected design needs independent fact-finding or comparison of materially different interfaces. Resolve it from the installed extension at `.ai-factory/extensions/aifhub-extension/skills/shared/RESEARCH-DESIGN.md`. Apply it to OpenSpec-native and classic legacy refinement, preserving settled decisions and unrelated plan content. The coordinating parent owns support dispatch and acceptance; the authorized refinement writer retains its assigned artifact scope and reconciles evidence before edits. A delegated polisher returns missing questions to its parent without nested workers. Small refinements remain direct. Valid legacy ultra handoffs and invalid/collision stops above take precedence.
+
+### Executable task design
+
+After mode and target checks permit local planning/refinement, follow [executable task design](../../skills/shared/TASK-DESIGN.md) for new task breakdowns, wide migrations or unclear prerequisites. Resolve it from the installed extension at `.ai-factory/extensions/aifhub-extension/skills/shared/TASK-DESIGN.md`. Preserve current task identities and the existing bounded inline-verification migration; this guidance does not authorize restructuring an unrelated plan, tracker writes or an implementation runtime.
+
 ### OpenSpec-native mode
 
 When `.ai-factory/config.yaml` declares `aifhub.tools.openspec: true`, `/aif-improve` refines an existing OpenSpec-native change.

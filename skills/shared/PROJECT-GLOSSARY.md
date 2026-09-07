@@ -26,6 +26,12 @@ Apply this policy after `.ai-factory/config.yaml` and `skills/shared/LANGUAGE-PO
 - Preserve code and API identifiers exactly, including commands, filenames, paths, JSON/YAML keys, schema fields, package names, exported symbols, and public wire values.
 - Do not use the glossary to infer behavior, requirements, permissions, architecture, task status, or acceptance criteria.
 
+## Resolve consequential ambiguity
+
+When an overloaded term changes the meaning of the assigned requirement, compare concise concrete scenarios that distinguish the concepts, then check the relevant source and accepted requirements. For example, cancellation of one item and cancellation of an entire order may be different operations. Treat hypothetical scenarios as questions or examples, not evidence of existing behavior. Use settled terminology directly when the distinction is already clear; do not add an interview for an ordinary lexical choice.
+
+Keep scenario analysis in the caller's existing conversation or permitted design output. It does not authorize a behavior change, new requirement or glossary write. Only the already opted-in `/aif-analyze` glossary owner may persist a concise source-grounded definition under the ownership rules above; do not put scenario transcripts, unresolved product decisions or implementation details into the glossary.
+
 ## Authority And Precedence
 
 Resolve material conflicts in this order:

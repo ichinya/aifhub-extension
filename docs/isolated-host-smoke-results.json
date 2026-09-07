@@ -1,0 +1,213 @@
+{
+  "schema": "aifhub.isolated-host-smoke-observation.v1",
+  "date": "2026-09-07",
+  "run_id": "run_2c7ed728166e",
+  "host": {
+    "os": "Windows",
+    "orca": "1.4.197",
+    "ai_factory": "2.18.1",
+    "openspec": "1.12.0",
+    "node": "24.13.0"
+  },
+  "fixture_head": "2e5ca1fc6137021f3bd1321322665b9caa16cfd4",
+  "verified_worktree": "50b42bd065db2532d0de75335cad5b2ff7cda58ad0e1f2b4f17be148c760337b",
+  "workers": [
+    {
+      "task": "1.1",
+      "dispatch": "ctx_2d00b4121f7e",
+      "result": "accepted",
+      "stop": "released_closed_agent_terminal"
+    },
+    {
+      "task": "1.2",
+      "dispatch": "ctx_ad7e942e9eec",
+      "result": "partial_checkpoint_retired",
+      "stop": "worker_stop_dispatch_inactive_then_exact_process_exited_observed"
+    },
+    {
+      "task": "1.2",
+      "dispatch": "ctx_14687a0aa3af",
+      "result": "recovered_in_existing_worktree_then_accepted",
+      "stop": "released_closed_agent_terminal"
+    }
+  ],
+  "groups": [
+    {
+      "id": "wave-1",
+      "version": 6,
+      "accepted": [
+        "1.1"
+      ],
+      "unfinished": [
+        "1.2"
+      ]
+    },
+    {
+      "id": "wave-2",
+      "version": 5,
+      "accepted": [
+        "1.2"
+      ],
+      "unfinished": []
+    }
+  ],
+  "canonical_progress": "Both tasks checked by parent only after each closure plus fresh resume",
+  "verification": {
+    "dispatch": "ctx_e275c6de52ce",
+    "gate": {
+      "schema_version": 1,
+      "gate": "verify",
+      "status": "warn",
+      "blocking": false,
+      "blockers": [],
+      "affected_files": [
+        "src/clamp.cjs",
+        "src/slug.cjs",
+        "test/clamp.test.cjs",
+        "test/slug.test.cjs",
+        "openspec/changes/host-smoke/proposal.md",
+        "openspec/changes/host-smoke/design.md",
+        "openspec/changes/host-smoke/tasks.md",
+        "openspec/changes/host-smoke/specs/functions/spec.md",
+        "openspec/config.yaml",
+        ".ai-factory/config.yaml",
+        "AGENTS.md",
+        "README.md",
+        "package.json"
+      ],
+      "suggested_next": null
+    },
+    "findings": {
+      "blocking": 0,
+      "important": 0,
+      "optional": 7
+    },
+    "warnings": [
+      {
+        "id": "verify-generated-rules-missing",
+        "summary": "Three generated OpenSpec rule files are absent; the installed artifact-contract warning has the same cause. Normal verify policy does not require them."
+      },
+      {
+        "id": "verify-rules-evidence-missing",
+        "summary": "No durable rules.md gate evidence exists. Direct code review and a traceability matrix do not replace a rules gate receipt."
+      },
+      {
+        "id": "verify-description-missing",
+        "summary": "DESCRIPTION.md is absent; its synchronization cannot be verified. README, package.json and canonical design supply the fixture context."
+      },
+      {
+        "id": "verify-architecture-context-missing",
+        "summary": "ARCHITECTURE.md is absent. The two-module canonical design is satisfied, but the optional architecture context gate remains WARN."
+      },
+      {
+        "id": "verify-project-rules-missing",
+        "summary": "RULES.md and rules/base.md are absent. Explicit fixture instructions were checked; a broader project rules pass is unavailable."
+      },
+      {
+        "id": "verify-roadmap-context-missing",
+        "summary": "ROADMAP.md and proposal Roadmap Linkage are absent. This is nonblocking in normal mode; no roadmap contradiction was found. Context-owner handoff, if requested: /aif-roadmap check."
+      },
+      {
+        "id": "verify-build-lint-unconfigured",
+        "summary": "No build script, compiler configuration or lint tool is configured. Syntax checks and tests passed; no separate build or lint pass is claimed."
+      }
+    ],
+    "checks": [
+      {
+        "id": "node-version",
+        "status": "pass",
+        "exit_code": 0
+      },
+      {
+        "id": "clamp-syntax",
+        "status": "pass",
+        "exit_code": 0
+      },
+      {
+        "id": "slug-syntax",
+        "status": "pass",
+        "exit_code": 0
+      },
+      {
+        "id": "clamp-test",
+        "status": "pass",
+        "exit_code": 0
+      },
+      {
+        "id": "slug-test",
+        "status": "pass",
+        "exit_code": 0
+      },
+      {
+        "id": "combined-tests",
+        "status": "pass",
+        "exit_code": 0
+      },
+      {
+        "id": "diff-check",
+        "status": "pass",
+        "exit_code": 0
+      },
+      {
+        "id": "unchanged-tests",
+        "status": "pass",
+        "exit_code": 0
+      },
+      {
+        "id": "unfinished-markers",
+        "status": "pass",
+        "exit_code": 1
+      }
+    ],
+    "probes": {
+      "passed": 65,
+      "failed": 0
+    },
+    "coverage": {
+      "covered": 2,
+      "partial": 0,
+      "missing": 0,
+      "not_applicable": 0
+    },
+    "custody": {
+      "status": "pass",
+      "compared_files": 717,
+      "changed_outside_qa": [],
+      "head_preserved": true,
+      "index_preserved": true,
+      "outside_preserved": true,
+      "index_sha256": "9807d61a31cf852120167c4107e92fd678a8afed4cdaa0e8637060dc35896531",
+      "outside_sha256": "f340d4e343a790077e58e388050face3ce93b593bd10e9676cb9d09c810108bd",
+      "revision": {
+        "commit": "2e5ca1fc6137021f3bd1321322665b9caa16cfd4",
+        "worktree": "50b42bd065db2532d0de75335cad5b2ff7cda58ad0e1f2b4f17be148c760337b"
+      }
+    },
+    "final_integrity": {
+      "checked_at": "2026-09-07T08:05:36.245Z",
+      "artifact_contract": "warn",
+      "source_revision": {
+        "commit": "2e5ca1fc6137021f3bd1321322665b9caa16cfd4",
+        "worktree": "50b42bd065db2532d0de75335cad5b2ff7cda58ad0e1f2b4f17be148c760337b"
+      },
+      "non_qa_files_unchanged": 717,
+      "head_index_outside_preserved": true,
+      "final_gate_matches_report": true,
+      "status": "warn"
+    },
+    "report_sha256": "96cbb4bfe5703a2ce7c873e148222c9c9598ab420338a175675722cf769d895e"
+  },
+  "cleanup": {
+    "worker_archives_verified_files": 1403,
+    "slug_worktree_removed": true,
+    "clamp_worktree_retained": "Additional live terminal has no proven ownership by this run; left untouched",
+    "parent_fixture_retained": true,
+    "all_test_dispatches_settled": true
+  },
+  "limitations": [
+    "Single local controlled run, no remote or performance claim",
+    "Fixture setup corrections recorded in companion Markdown",
+    "Verifier warn is not done/finalization readiness",
+    "Unrelated live terminal retained; complete removal was not attempted"
+  ]
+}

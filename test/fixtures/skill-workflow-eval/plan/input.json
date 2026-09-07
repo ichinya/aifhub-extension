@@ -1,0 +1,12 @@
+{
+  "task": "Use the plan workflow to draft a bounded task breakdown for renaming the public encodeRecord export to serializeRecord. Independently deployed external consumers still call encodeRecord and cannot all upgrade in this release. Internal CLI and HTTP callers can ship separately. Planning mode/target resolution is already complete: refine only the supplied existing OpenSpec tasks.md, preserving the completed item and its identity; write no implementation. Record any necessary design notes in the supplied design.md. No external tools are installed and no tracker writes are authorized. Return validation actually performed and remaining prerequisites.",
+  "files": {
+    ".ai-factory/config.yaml": "aifhub:\n  tools:\n    openspec: true\nlanguage:\n  ui: en\n",
+    "src/record.mjs": "export function encodeRecord(record) { return JSON.stringify(record); }\n",
+    "src/cli.mjs": "import { encodeRecord } from './record.mjs';\nexport const cliRecord = record => encodeRecord(record);\n",
+    "src/http.mjs": "import { encodeRecord } from './record.mjs';\nexport const httpRecord = record => encodeRecord(record);\n",
+    "openspec/changes/rename-record/tasks.md": "# Tasks\n\n- [x] 1.1 Inventory existing CLI and HTTP callers; verified src/cli.mjs and src/http.mjs and release-policy.md\n",
+    "openspec/changes/rename-record/design.md": "# Design: public record serialization name\n\nBoth names must retain identical JSON output during the supported migration window.\n",
+    "release-policy.md": "External integrations use the package public encodeRecord export. They deploy independently. Removal of that name requires an explicit compatibility release decision and evidence that supported external consumers have migrated; neither is available today.\n"
+  }
+}

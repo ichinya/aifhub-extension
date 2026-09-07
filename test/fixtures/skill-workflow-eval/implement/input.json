@@ -1,0 +1,10 @@
+{
+  "task": "Use the implementation workflow for selected task 1.1 only. The parent has resolved and classified the supplied OpenSpec change and authorized this local worker to implement the module and its focused tests; the parent owns runtime orchestration and checkbox acceptance. Add summarizeInvoice(lines), where each valid line contains nonnegative integer unitCents and positive integer quantity. It returns totalCents (sum of price times quantity) and itemCount (sum of quantities); empty input returns both as zero. Inputs outside that contract are out of scope. Use existing Node, with no dependencies. Return the actual changes and check evidence to the parent.",
+  "files": {
+    "src/invoice.mjs": "export function summarizeInvoice(lines) {\n  return { totalCents: 0, itemCount: 0 };\n}\n",
+    "src/tax.mjs": "// Separate future work; not part of the selected invoice summary.\nexport const taxPolicy = 'undecided';\n",
+    "test/invoice.test.mjs": "import assert from 'node:assert/strict';\nimport { test } from 'node:test';\nimport { summarizeInvoice } from '../src/invoice.mjs';\ntest('empty invoice', () => assert.deepEqual(summarizeInvoice([]), { totalCents: 0, itemCount: 0 }));\n",
+    "openspec/changes/invoice/tasks.md": "# Tasks\n\n- [ ] 1.1 Summarize invoice line values through the public module API; verify empty and multiple-quantity invoices with literal expected totals\n- [ ] 1.2 Add tax handling after the tax policy is decided; verify approved tax examples\n",
+    "openspec/changes/invoice/design.md": "# Invoice summary\nUse integer cents. No tax, persistence or UI. Implement only 1.1 in this worker; parent reconciles task progress.\n"
+  }
+}

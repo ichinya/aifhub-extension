@@ -61,7 +61,7 @@ export function resultPayload(input) {
   }
   return {...input, changed_files:[...input.changed_files].sort(), evidence:[...input.evidence].sort()};
 }
-function resultRecord(value, run, task) {
+export function resultRecord(value, run, task) {
   const extra = ['change_id','task_id','run_id','base_revision','context_digest','worktree_digest','evidence_digests','payload_digest','submitted_version','digest'];
   const payload = Object.fromEntries(Object.entries(value).filter(([k])=>!extra.includes(k)));
   resultPayload(payload);

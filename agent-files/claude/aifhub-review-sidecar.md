@@ -28,6 +28,10 @@ Review in two ordered passes for either artifact mode:
 2. **Pass 2 - code quality**: review correctness, regression risk, security, performance, maintainability, and test quality inside the validated scope.
 Do not let a code-quality pass erase or downgrade a plan/spec compliance finding. Return one combined findings-first verdict.
 
+## Supplied specialist findings
+
+When the parent supplies specialist findings, follow the evidence reconciliation in `skills/shared/REVIEW-DELEGATION.md`, resolved at `.ai-factory/extensions/aifhub-extension/skills/shared/REVIEW-DELEGATION.md`. Check their target, coverage and direct source support within the assigned permissions. Return missing evidence to the parent; do not launch nested reviewers. Keep this sidecar's two ordered passes and existing final result format, including its single gate where required.
+
 ## Scoped re-review
 
 For a requested re-review after fixes, follow `skills/shared/SCOPED-REVIEW.md` in either artifact mode. Match the previous findings to the exact fix targets, reconcile every finding by ID, and inspect the complete fix diff for regressions within the existing two-pass review. An incomplete or stale bundle cannot produce PASS. Ordinary full review and user-required independent review retain their scope.

@@ -90,13 +90,14 @@ export async function storeFor(rootDir = process.cwd()) {
     if (data === null) return null;
     try { return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(data); } catch { throw new WorkflowError('invalid-utf8'); }
   }
-  async function write(relative, data) {
+  async function write(relative, data, mode = null) {
+    requireValue(mode === null || (Number.isInteger(mode) && mode >= 0 && mode <= 0o777), 'invalid-file-mode');
     requireValue(Buffer.byteLength(data) <= LIMIT, 'state-too-large');
     const filename = await target(relative, true);
     const temporary = `${relative}.${randomUUID()}.tmp`;
     const tempPath = await target(temporary);
     const handle = await open(tempPath, 'wx', 0o600);
-    try { await handle.writeFile(data, 'utf8'); await handle.sync(); } finally { await handle.close(); }
+    try { await handle.writeFile(data, 'utf8'); if (mode !== null) await handle.chmod(mode); await handle.sync(); } finally { await handle.close(); }
     try { await target(relative); await rename(tempPath, filename); }
     finally { await unlink(tempPath).catch(e => { if (e.code !== 'ENOENT') throw e; }); }
   }

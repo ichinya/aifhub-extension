@@ -1,0 +1,9 @@
+{
+  "task": "Use the explore workflow for this initial request: 'Add customer CSV import; I think most of it is already here.' No research brief has been confirmed. Inspect the supplied small project and return the next research step to the parent. Repository reads are allowed; source, plans and research artifacts are read-only in this assignment. No interactive human is attached; any unresolved decision goes to the parent. Do not implement the request.",
+  "files": {
+    "README.md": "# Customers\nThe preview command accepts unquoted id,name rows and prints parsed records. There is no import command yet. Product decisions about saving records and duplicate customer IDs are not recorded.\n",
+    "src/parse.mjs": "export function parseRows(csv) {\n  return csv.trim().split('\\n').slice(1).map(line => {\n    const [id, name] = line.split(',');\n    return { id, name };\n  });\n}\n",
+    "src/preview.mjs": "import { parseRows } from './parse.mjs';\nexport function preview(csv) { return JSON.stringify(parseRows(csv)); }\n",
+    "test/preview.test.mjs": "import assert from 'node:assert/strict';\nimport { test } from 'node:test';\nimport { preview } from '../src/preview.mjs';\ntest('preview parses one basic record', () => assert.equal(preview('id,name\\nc1,Ada'), '[{\"id\":\"c1\",\"name\":\"Ada\"}]'));\n"
+  }
+}

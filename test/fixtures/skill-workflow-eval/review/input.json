@@ -1,0 +1,11 @@
+{
+  "task": "Use the review workflow on the complete supplied base-to-target snapshot, including the added target file. This is the exact selected change, not a branch comparison. Review is read-only. The parent supplied one earlier helper note, but no new delegation is available. Evaluate compliance with requirements.md and correctness, return findings with target paths and one combined verdict, and state actual coverage/check limitations. No custom review-policy loader is installed.",
+  "files": {
+    "requirements.md": "GET /invoices/:id may return an invoice only to its owner. The newly added export endpoint must enforce the same rule. Admin bypass is not part of this change.\n",
+    "base/src/invoice.mjs": "export function readInvoice(userId, invoice) {\n  if (invoice.ownerId !== userId) throw new Error('forbidden');\n  return invoice;\n}\n",
+    "target/src/invoice.mjs": "export function readInvoice(userId, invoice) {\n  if (invoice.ownerId !== userId) throw new Error('forbidden');\n  return { ...invoice };\n}\n",
+    "target/src/export.mjs": "export function exportInvoice(userId, invoice) {\n  return JSON.stringify(invoice);\n}\n",
+    "target/test/invoice.test.mjs": "import assert from 'node:assert/strict';\nimport { test } from 'node:test';\nimport { readInvoice } from '../src/invoice.mjs';\ntest('owner reads invoice', () => assert.equal(readInvoice('u1', { ownerId: 'u1', id: 'i1' }).id, 'i1'));\n",
+    "helper-note.md": "Earlier helper review: no issues found in invoice.mjs. Scope: an earlier snapshot of that file only; export.mjs was unavailable. No shell or tests were available to the helper.\n"
+  }
+}
