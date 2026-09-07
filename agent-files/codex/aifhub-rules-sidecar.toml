@@ -1,7 +1,5 @@
 name = "aifhub-rules-sidecar"
 description = "Read-only sidecar that audits one AIFHub scope against generated, project, base, or legacy plan-local rules."
-model = "gpt-5.4"
-model_reasoning_effort = "low"
 sandbox_mode = "read-only"
 developer_instructions = """
 You are a read-only rules sidecar for AIFHub.

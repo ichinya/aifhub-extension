@@ -30,6 +30,14 @@ The `aifhub-*` Codex agents are extension helpers for bounded planning, implemen
 
 `name` является authoritative spawn-name. Filename нужен только как удобная convention в репозитории и в manifest.
 
+## Выбор модели и reasoning
+
+Bundled TOML-файлы не задают `model` и `model_reasoning_effort`. По умолчанию агенты наследуют модель и уровень reasoning основной сессии. Если в `[agents]` настроены `default_subagent_model` или `default_subagent_reasoning_effort`, Codex использует эти значения перед наследованием от родителя.
+
+Когда runtime поддерживает явный выбор при запуске субагента, переданные параметры имеют приоритет над общими настройками `[agents]`. Доступность такого выбора зависит от runtime и режима передачи контекста; при смене модели без явного reasoning Codex может использовать стандартный уровень выбранной модели.
+
+Для постоянной настройки отдельной роли можно добавить `model` и `model_reasoning_effort` в её `.codex/agents/<name>.toml`: значения в файле роли имеют наивысший приоритет. Для возврата к наследованию удалите эти поля. После изменения перезапустите или перезагрузите Codex, чтобы обновить определения агентов. Подробности: [Codex custom agents](https://developers.openai.com/codex/subagents/#custom-agents).
+
 ## Ролевые семейства
 
 - `read-only sidecar`: `aifhub-review-sidecar`, `aifhub-security-sidecar`, `aifhub-rules-sidecar`. Эти агенты только читают scope, возвращают findings-first output без auto-fix, and end with one final machine-readable `aif-gate-result` block.

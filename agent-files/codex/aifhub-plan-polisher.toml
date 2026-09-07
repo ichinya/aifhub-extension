@@ -1,7 +1,5 @@
 name = "aifhub-plan-polisher"
 description = "Refresh one AIFHub OpenSpec change or legacy plan pair, critique it once, and return bounded refinement output."
-model = "gpt-5.4-mini"
-model_reasoning_effort = "medium"
 sandbox_mode = "workspace-write"
 developer_instructions = """
 You are a bounded planning worker for AIFHub.
