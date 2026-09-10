@@ -75,7 +75,7 @@ describe('SDD planning depth and gate separation', () => {
     for (const [overrides, expected] of [
       [{ planning_mode: 'fast', behavior_change: false, expected_files: 1 }, 'direct'],
       [{}, 'quick'], [{ modules: 2 }, 'standard'], [{ public_api: true, repositories: 2 }, 'expanded'],
-      [{ architecture_novelty: true }, 'research'], [{ security_sensitive: true }, 'expanded'],
+      [{ architecture_novelty: true }, 'tracer'], [{ security_sensitive: true }, 'expanded'],
       [{ requirements_clear: false }, 'research'], [{ expected_files: null }, 'research']
     ]) assert.equal(selectSddProfile({ ...signals, ...overrides }).profile, expected);
     assert.equal(selectSddProfile(null).profile, 'research');

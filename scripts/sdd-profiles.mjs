@@ -68,7 +68,7 @@ export function selectSddProfile(input, policyInput = {}, options = {}) {
   } else if (!signals.requirements_clear) {
     profile = 'research'; reasons.push('unclear_requirements');
   } else if (signals.architecture_novelty) {
-    profile = 'research'; reasons.push('architecture_uncertainty');
+    profile = 'tracer'; reasons.push('architecture_uncertainty');
   } else if (signals.planning_mode === 'ultra') {
     profile = 'ultra'; reasons.push('explicit_ultra');
   } else if (riskSignals.length > 0 || signals.repositories > 1) {
@@ -80,7 +80,7 @@ export function selectSddProfile(input, policyInput = {}, options = {}) {
   } else {
     profile = 'quick'; reasons.push(signals.behavior_change ? 'bounded_behavior_change' : 'bounded_non_behavioral');
   }
-  const rank = ['direct', 'quick', 'standard', 'expanded', 'ultra'];
+  const rank = ['direct', 'quick', 'tracer', 'standard', 'expanded', 'ultra'];
   // The default quick floor does not force trivial work into OpenSpec. An explicit
   // stronger project floor can require canonical planning for otherwise direct work.
   if (profile !== 'research' && policy.minimum_profile !== 'quick' && rank.indexOf(profile) < rank.indexOf(policy.minimum_profile)) {

@@ -57,6 +57,13 @@ const WRAPPER_COMMANDS = [
     args: ['prepare', '--change', 'add-oauth', '--json']
   },
   {
+    name: 'aifhub-tracer',
+    description: 'Run a tracer profile: run, promote, discard, replan, blocked, status.',
+    module: './commands/aifhub-tracer.mjs',
+    script: 'tracer.mjs',
+    args: ['run', '--change', 'add-oauth', '--json']
+  },
+  {
     name: 'aifhub-mode',
     description: 'Run AIFHub artifact mode status, switch, sync, and doctor commands.',
     module: './commands/aifhub-mode.mjs',

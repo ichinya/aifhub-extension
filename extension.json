@@ -25,6 +25,11 @@
       "module": "./commands/aifhub-fresh-context-review.mjs"
     },
     {
+      "name": "aifhub-tracer",
+      "description": "Run a tracer profile: run, promote, discard, replan, blocked, status.",
+      "module": "./commands/aifhub-tracer.mjs"
+    },
+    {
       "name": "aifhub-mcp",
       "description": "Run the AIFHub MCP server over stdio.",
       "module": "./commands/aifhub-mcp.mjs"

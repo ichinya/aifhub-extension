@@ -166,6 +166,46 @@ Exit `0` means a valid result (or a disabled overlay on an existing unopted chan
 scope, unsafe/malformed input, or an I/O failure. JSON commands emit one JSON object
 on stdout and no diagnostic stderr. An unchanged compile reports `written: false`.
 
+## Tracer profile
+
+For uncertain architecture or integration work, the SDD selector can choose the
+`tracer` profile (currently triggered by `architecture_novelty` in `## SDD Profile
+Inputs`). The tracer does not satisfy `/aif-done` and cannot finalize as production
+without an explicit promotion decision.
+
+Run a bounded tracer experiment:
+
+```bash
+ai-factory aifhub-tracer run --change 168-uncertain-integration --json \
+  --hypothesis "The new protocol fits behind a small adapter." \
+  --vertical-path "src/adapter.mjs + test/adapter.test.mjs" \
+  --question "Does the adapter isolate the external protocol?" \
+  --non-goal "Production traffic" \
+  --budget-time "4h" \
+  --expected-artifact "src/adapter.mjs"
+```
+
+This writes the runtime state area `.ai-factory/state/<change-id>/tracer/`:
+
+- `brief.json` — `aifhub.tracer_brief.v1` with hypothesis, minimum vertical path,
+  architecture questions, production non-goals, budget, and expected artifacts;
+- `findings.json` — `aifhub.tracer_findings.v1` with result evidence and invalidated
+  assumptions;
+- `decision.json` — `aifhub.tracer_decision.v1` with the explicit decision;
+- `implementation-summary.md` — human-readable summary derived from the above.
+
+Record a terminal decision:
+
+```bash
+ai-factory aifhub-tracer promote --change 168-uncertain-integration --json \
+  --reason "Vertical slice proves the hypothesis."
+```
+
+Decisions are `promote`, `discard`, `replan`, or `blocked`. Promotion writes a
+fixed promotion step list: update canonical proposal/design/tasks/specs, run
+`/aif-mode sync`, compile a new production SessionBrief, then run full
+implementation. The tracer command itself never modifies canonical artifacts.
+
 ## Source binding and implementation
 
 The compiler reads exact proposal/design/tasks/metadata and delta-spec bytes,
@@ -216,10 +256,12 @@ and rendered-brief metrics remain `null`. The compiler does not guess model limi
 
 P0 includes quick/standard/research execution contracts and selection/version
 checks for direct/expanded/ultra. P1 adds the plan compliance receipt
-(`aifhub-plan-compliance.v1`) and the fresh-context AI review package
-(`aifhub.ai_cross_context_review.v1`); tracer promotion and richer context
-metrics are not implemented here. P2 cross-project adapters and evaluation
-remain separate. Crit human review and existing QA ownership are unchanged.
+(`aifhub-plan-compliance.v1`), the fresh-context AI review package
+(`aifhub.ai_cross_context_review.v1`), and the tracer profile runtime
+(`aifhub.tracer_brief.v1`, `aifhub.tracer_findings.v1`,
+`aifhub.tracer_decision.v1`); richer context metrics are not implemented here.
+P2 cross-project adapters and evaluation remain separate. Crit human review and
+existing QA ownership are unchanged.
 
 ## Schemas
 
@@ -229,3 +271,6 @@ remain separate. Crit human review and existing QA ownership are unchanged.
 - [SessionBrief v1](../schemas/session-brief.schema.json)
 - [Plan compliance v1](../schemas/plan-compliance.schema.json)
 - [AI cross-context review v1](../schemas/ai-cross-context-review.schema.json)
+- [Tracer brief v1](../schemas/tracer-brief.schema.json)
+- [Tracer findings v1](../schemas/tracer-findings.schema.json)
+- [Tracer decision v1](../schemas/tracer-decision.schema.json)

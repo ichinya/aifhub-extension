@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Tracer decision v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "aifhub.tracer_decision.v1"
+    },
+    "change_id": {
+      "type": "string"
+    },
+    "decision": {
+      "enum": [
+        null,
+        "promote",
+        "discard",
+        "replan",
+        "blocked"
+      ]
+    },
+    "reason": {
+      "type": "string"
+    },
+    "promotion_steps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "change_id",
+    "decision",
+    "reason",
+    "promotion_steps",
+    "created_at",
+    "updated_at"
+  ]
+}

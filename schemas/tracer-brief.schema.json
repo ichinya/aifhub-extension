@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Tracer brief v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "aifhub.tracer_brief.v1"
+    },
+    "change_id": {
+      "type": "string"
+    },
+    "profile": {
+      "const": "tracer"
+    },
+    "hypothesis": {
+      "type": "string"
+    },
+    "minimum_vertical_path": {
+      "type": "string"
+    },
+    "architecture_questions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "production_non_goals": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "time": {
+          "type": "string"
+        },
+        "cost": {
+          "type": "string"
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "expected_artifacts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "canonical_sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "path",
+          "sha256"
+        ]
+      }
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "change_id",
+    "profile",
+    "hypothesis",
+    "minimum_vertical_path",
+    "architecture_questions",
+    "production_non_goals",
+    "budget",
+    "expected_artifacts",
+    "canonical_sources",
+    "created_at",
+    "updated_at"
+  ]
+}
