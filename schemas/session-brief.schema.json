@@ -233,10 +233,18 @@
           "minimum": 0
         },
         "brief_bytes": {
-          "type": "null"
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
         },
         "token_estimate": {
-          "type": "null"
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
         }
       },
       "required": [

@@ -257,9 +257,12 @@ and rendered-brief metrics remain `null`. The compiler does not guess model limi
 P0 includes quick/standard/research execution contracts and selection/version
 checks for direct/expanded/ultra. P1 adds the plan compliance receipt
 (`aifhub-plan-compliance.v1`), the fresh-context AI review package
-(`aifhub.ai_cross_context_review.v1`), and the tracer profile runtime
+(`aifhub.ai_cross_context_review.v1`), the tracer profile runtime
 (`aifhub.tracer_brief.v1`, `aifhub.tracer_findings.v1`,
-`aifhub.tracer_decision.v1`); richer context metrics are not implemented here.
+`aifhub.tracer_decision.v1`), and measured context budget/metrics
+(`budget.brief_bytes` is measured from the rendered SessionBrief,
+`token_estimate` remains `null` without model/provider metadata, and
+`context_policy` can be declared in `.ai-factory/sdd-policy.json`).
 P2 cross-project adapters and evaluation remain separate. Crit human review and
 existing QA ownership are unchanged.
 

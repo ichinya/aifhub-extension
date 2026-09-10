@@ -214,6 +214,9 @@ async function buildSnapshot(options, explicitCompile) {
         budget: { strategy: 'measured', source_bytes: totalBytes, brief_bytes: null, token_estimate: null }
       };
       brief = { ...payload, digest: hash(json(payload)) };
+      const rendered = renderSessionBrief(brief);
+      payload.budget.brief_bytes = Buffer.byteLength(rendered, 'utf8');
+      brief = { ...payload, digest: hash(json(payload)) };
     }
   }
   if (blocked.length) {
