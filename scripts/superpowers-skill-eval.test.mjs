@@ -37,7 +37,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtemp, mkdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { after, before } from 'node:test';
 import { prepare, preflight } from './superpowers-skill-eval.mjs';
 import { hash } from './skill-workflow-eval.mjs';
@@ -148,6 +148,15 @@ test('frozen closure rejects helper drift and preserves the original checkout he
   assert.equal((await frozen.compare({runRoot:prepared.runRoot})).status,'NOT_RUN');
 });
 
+test('frozen closure rejects unpinned dynamic imports in helpers',async()=>{
+  const helper=path.join(path.dirname(fileURLToPath(import.meta.url)),'skill-workflow-eval.mjs');
+  const saved=await readFile(helper);
+  await writeFile(helper,Buffer.concat([saved,Buffer.from('\nconst _dyn=await import(someVar);\n')])); // not a string-literal import
+  try{await prepare({materialize:true,taskId:'dynamic-import',runtime,fixtureRoot});assert.fail('must reject dynamic import');}
+  catch(e){assert.match(e.message,/unsupported-collector-dynamic-import/);}
+  finally{await writeFile(helper,saved);}
+});
+
 test('foreign roots, linked inputs and missing exact baseline sources fail before materialization',async()=>{
   await assert.rejects(prepare({materialize:true,taskId:'foreign',runtime,fixtureRoot,runRoot:fixtureRoot}),/existing-root-not-accepted/);
   const link=path.join(fixtureRoot,'linked');
@@ -236,6 +245,21 @@ test('pressure conditions preserve the same project and original user target',as
   assert.equal((await checkOutput({caseId:'missing-prerequisite',report:{status:'incomplete'}})).passed,true);
   assert.equal((await checkOutput({caseId:'missing-prerequisite',report:{status:'completed'}})).passed,false);
 });
+
+test('expected-incomplete cases only pass when the workspace is genuinely unchanged',async()=>{
+  const input=JSON.parse(await readFile(new URL('../test/fixtures/superpowers-skill-eval/pressure/missing-prerequisite.json',import.meta.url),'utf8'));
+  const workspace=await mkdtemp(path.join(await realpath(os.tmpdir()),'aifhub-superpowers-incomplete-'));roots.push(workspace);
+  for(const[p,b]of Object.entries(input.files)){await mkdir(path.dirname(path.join(workspace,p)),{recursive:true});await writeFile(path.join(workspace,p),b);}
+  const inputFiles=Object.fromEntries(Object.entries(input.files).map(([p,b])=>[p,hash(b)]));
+  const ok=await checkOutput({caseId:'missing-prerequisite',kind:'pressure',workspace,report:{status:'incomplete'},inputFiles});
+  assert.equal(ok.passed,true);
+  await writeFile(path.join(workspace,'extra.txt'),'extra');
+  assert.equal((await checkOutput({caseId:'missing-prerequisite',kind:'pressure',workspace,report:{status:'incomplete'},inputFiles})).passed,false);
+  await rm(path.join(workspace,'extra.txt'),{force:true});
+  await writeFile(path.join(workspace,'finding.json'),'changed');
+  assert.equal((await checkOutput({caseId:'missing-prerequisite',kind:'pressure',workspace,report:{status:'incomplete'},inputFiles})).passed,false);
+});
+
 test('the real self-contained checker can be frozen without interpreting quoted probe code as imports',async()=>{
   const file=path.join(fixtureRoot,'check-output.mjs'),original=await readFile(file);
   await writeFile(file,await readFile(new URL('../test/fixtures/superpowers-skill-eval/check-output.mjs',import.meta.url)));
@@ -343,6 +367,15 @@ test('read-only negative tasks expose scope without overriding the original resp
     assert.doesNotMatch(task,/expectedSkills|public-output|sample-0/);
   }
 });
+
+test('too many turns are rejected before materialization',async()=>{
+  const file=path.join(fixtureRoot,'case-0.json'),original=await readFile(file),input=JSON.parse(original);
+  try{
+    await writeFile(file,JSON.stringify({...input,turns:Array.from({length:101},()=>'hi')}));
+    await assert.rejects(prepare({materialize:true,taskId:'many-turns',runtime,fixtureRoot}),/invalid-turns/);
+  }finally{await writeFile(file,original);}
+});
+
 test('manual semantic cases need explicit observed evidence and cannot override a failed executable probe',async()=>{
   const file=path.join(fixtureRoot,'check-output.mjs'),original=await readFile(file);
   await writeFile(file,"export async function checkOutput(){ return {passed:null,code:'manual-semantic-observation-required'}; }\n");
@@ -432,6 +465,20 @@ test('boundary variant replaces the H3 load trigger without capturing adjacent i
  assert.equal(strip(before),strip(after));
  assert.ok(after.includes('crosses component boundaries even with a fast reproduction'));
  assert.ok(!after.includes('Assess the defect claim separately from the suggested remedy'),'review variant must not leak into boundary experiment');
+});
+
+test('append-section rejects a pre-existing heading at any level, not just H2',async()=>{
+  const p=path.join(fixtureRoot,'manifest.json'),saved=await readFile(p),suite=JSON.parse(saved);
+  suite.sourcePaths=['injections/core/aif-fix-plan-folder.md'];
+  suite.variants=[{id:'dup-heading',owner:'aif-fix',type:'recipe',
+    interventions:[{path:'injections/core/aif-fix-plan-folder.md',selector:'append-section:Difficult reproductions',candidate:'dup-heading.md'}],
+    caseIds:suite.cases.map(c=>c.id)}];
+  const target=path.join(fixtureRoot,'dup-heading.md');
+  await writeFile(target,'## Difficult reproductions\n\nNew content.\n');
+  await writeFile(p,JSON.stringify(suite));
+  try{await prepare({materialize:true,taskId:'dup-heading',runtime,fixtureRoot});assert.fail('must reject duplicate heading');}
+  catch(e){assert.match(e.message,/existing-append-section/);}
+  finally{await writeFile(p,saved);await rm(target,{force:true});}
 });
 
 test('comparison exposes paired regressions even when aggregate pass counts improve',async()=>{

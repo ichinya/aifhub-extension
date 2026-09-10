@@ -114,6 +114,16 @@ test('a self-reported check requires the matching observed start and result',()=
   assert.equal(analyzeActions(input).metrics.unsupportedChecks,0);
 });
 
+test('a statement before loading the expected skill is a premature action',()=>{
+  const input=sample();
+  input.actions.events=[input.actions.events[0]];
+  const event=(type,sequence,fields)=>({type,sequence,turn:0,record:'record-'+sequence,executionId:input.executionId,...fields});
+  input.actions.events.push(event('statement',2,{claims:[]}),event('final',3,{claims:[]}));
+  const result=analyzeActions(input);
+  assert.equal(result.metrics.prematureActions,2);
+  assert.equal(result.metrics.missedLoads,1);
+});
+
 test('intermediate statements cannot borrow check evidence from later execution',()=>{
   const input=sample(),last=input.actions.events.pop(),commandHash=hash('node --test');
   const event=(type,sequence,fields)=>({type,sequence,turn:0,record:'record-'+sequence,executionId:input.executionId,...fields});

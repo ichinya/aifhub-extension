@@ -85,7 +85,7 @@ export function analyzeActions({executionId,catalog,expectedSkills=[],invocation
       if(event.delivery!=='host-injection'&&(!expectedSkills.includes(event.skill)||autonomousForbidden))metrics.unnecessaryLoads++;
       if(valid&&!autonomousForbidden)loaded.add(event.skill);
     }
-    if(event.type==='action'||event.type==='check-start'&&!event.parentCheckId||event.type==='final'){
+    if(event.type==='action' || (event.type==='check-start' && !event.parentCheckId) || event.type==='final' || event.type==='statement'){
       // The expected skill is grader-owned, so a claimed empty dependsOn cannot bypass it.
       const needed=[...new Set([...expectedSkills,...(event.dependsOn??[])])];
       if(!firstDependent){for(const skill of expectedSkills)if(!loaded.has(skill))missed.add(skill);firstDependent=true;}

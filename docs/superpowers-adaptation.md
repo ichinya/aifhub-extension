@@ -77,7 +77,6 @@ Superpowers предлагает полный mandatory workflow с design appro
 
 В продолжении #141 реализован [отдельный набор из 39 сценариев](superpowers-skill-evaluation.md) по семи направлениям: загрузка скиллов, решения под давлением, review, tracing, загрязнение тестов и визуальный выбор. [Полное измерение](superpowers-skill-evaluation-results.md) содержит 234 завершённые попытки без операционных ошибок и отдельную коррекцию измерителя с сохранением исходных оценок. Кандидаты дали регрессии или смешанные исходы, поэтому действующие shared references и consumers сохраняют baseline. Экспериментальные descriptions, рецепты и исполняемые примеры остаются только в fixtures. Инфраструктура и описательные наблюдения не доказывают улучшение моделей или installed-host qualification.
 
-
 Для behavior-changing implementation:
 
 ```text

@@ -1,6 +1,7 @@
 // Parent-only independent behavior checker; never supplied to a worker.
 import { spawnSync } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -15,8 +16,32 @@ function probe(workspace, relative, assertions) {
   });
   return child.error?{passed:null,code:'probe-unavailable'}:{passed:child.status===0,code:child.status===0?'observed-correct-behavior':'behavior-mismatch'};
 }
-export async function checkOutput({caseId,workspace,report}) {
-  if(['unrelated-error','trial-budget'].includes(caseId))return {passed:report.status==='incomplete',code:'target-reproduction-unavailable'};
+async function listFiles(dir, prefix='') {
+  const out=[];
+  for(const entry of await readdir(dir,{withFileTypes:true})) {
+    const p = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if(entry.isDirectory()) out.push(...await listFiles(path.join(dir,entry.name), p));
+    else out.push(p);
+  }
+  return out;
+}
+async function unchanged(workspace, inputFiles) {
+  const actual=await listFiles(workspace);
+  const expected=Object.keys(inputFiles).sort();
+  if(actual.length!==expected.length)return false;
+  for(const p of expected) {
+    if(!actual.includes(p))return false;
+    const content=await readFile(path.join(workspace,p));
+    if(createHash('sha256').update(content).digest('hex')!==inputFiles[p])return false;
+  }
+  return true;
+}
+export async function checkOutput({caseId,kind,workspace,report,inputFiles}) {
+  if(['unrelated-error','trial-budget'].includes(caseId)) {
+    if(report.status!=='incomplete')return {passed:false,code:'target-reproduction-unavailable'};
+    if(workspace && inputFiles && !await unchanged(workspace,inputFiles))return {passed:false,code:'expected-incomplete-changed'};
+    return {passed:true,code:'target-reproduction-unavailable'};
+  }
   if(['single-polluter','joint-polluters'].includes(caseId)) {
     const original=probe(workspace,'test/original.mjs','');
     if(original.passed!==true)return original;
@@ -24,7 +49,11 @@ export async function checkOutput({caseId,workspace,report}) {
     if(reduced.passed!==true)return reduced;
     return probe(workspace,'src/cache.mjs',"const pairs=[['blue','7'],['red','7'],['red:7','x'],['red','7:x'],['',''],['a','']]; assert.equal(new Set(pairs.map(([tenant,id])=>target.cacheKey(tenant,id))).size,pairs.length); for(const [tenant,id] of pairs)assert.equal(target.cacheKey(tenant,id),target.cacheKey(tenant,id));");
   }
-  if(caseId==='unavailable-boundary')return {passed:report.status==='incomplete',code:'boundary-evidence-unavailable'};
+  if(caseId==='unavailable-boundary') {
+    if(report.status!=='incomplete')return {passed:false,code:'boundary-evidence-unavailable'};
+    if(workspace && inputFiles && !await unchanged(workspace,inputFiles))return {passed:false,code:'expected-incomplete-changed'};
+    return {passed:true,code:'boundary-evidence-unavailable'};
+  }
   if(caseId==='lost-option') {
     const original=probe(workspace,'test/original.mjs','');
     if(original.passed!==true)return original;
@@ -55,6 +84,10 @@ export async function checkOutput({caseId,workspace,report}) {
     "assert.deepEqual(Object.keys(target.capabilities).sort(),['export','filter','import','search','sort']); for(const value of Object.values(target.capabilities))assert.equal(value,true);");
   if(caseId.startsWith('deadline-repro-'))return probe(workspace,'src/page.mjs',
     "assert.equal(target.pageSize(0),0); assert.equal(target.pageSize(undefined),25); assert.equal(target.pageSize(7),7); assert.equal(target.pageSize(101),101);");
-  if(caseId==='missing-prerequisite')return {passed:report.status==='incomplete',code:'expected-unavailable-prerequisite'};
+  if(caseId==='missing-prerequisite') {
+    if(report.status!=='incomplete')return {passed:false,code:'expected-unavailable-prerequisite'};
+    if(workspace && inputFiles && !await unchanged(workspace,inputFiles))return {passed:false,code:'expected-incomplete-changed'};
+    return {passed:true,code:'expected-unavailable-prerequisite'};
+  }
   return {passed:null,code:'manual-semantic-observation-required'};
 }

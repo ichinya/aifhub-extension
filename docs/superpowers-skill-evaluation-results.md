@@ -40,7 +40,7 @@ CAL13: исходный разбор PowerShell ошибочно относил 
 
 ## Сравнение отдельно по вариантам
 
-| Вариант | Наблюдений | Raw outcome | Коррекция outcome | Baseline / current pass | Пар: лучше / хуже / равны |
+| Вариант | Наблюдений | Raw outcome | Коррекция outcome | Коррекция Baseline / current pass | Пар: лучше / хуже / равны |
 | --- | --- | --- | --- | --- | --- |
 | existing-discipline | 72 | mixed | mixed | 21 / 23 | 6 / 4 / 26 |
 | analyze-description | 18 | regression | regression | 3 / 2 | 0 / 1 / 8 |
@@ -51,6 +51,8 @@ CAL13: исходный разбор PowerShell ошибочно относил 
 | boundary-tracing | 12 | mixed | mixed | 1 / 2 | 1 / 0 / 5 |
 | test-pollution | 24 | mixed | mixed | 2 / 3 | 3 / 2 / 7 |
 | visual-comparison | 24 | mixed | mixed | 1 / 1 | 1 / 1 / 10 |
+
+Столбец `Baseline / current pass` отражает pass-значения после коррекции измерителя (CAL13). Raw-JSON pass-значения для двух вариантов отличаются; исходные оценки и raw-значения сохранены в [JSON](superpowers-skill-evaluation-results.json).
 
 Outcome учитывает обязательные требования, scope, загрузки и достоверность checks. Поэтому одинаковый pass/fail может сопровождаться регрессией отдельных метрик. `existing-discipline` содержит одинаковые инструкции в обеих ветках и служит контролем вариативности. Каждый variantId оценивается только на своих зарегистрированных cases; объединённый current arm не доказывает эффект отдельного description.
 
@@ -78,7 +80,7 @@ Outcome учитывает обязательные требования, scope,
 
 Source snapshot: `aa6694d22602a51def891f0808133f6943f7562ee6c5921f749248dcb8cb8b55`; baseline HEAD: `1a380ef76936ad17a0fd83b3586374cccd8b419d`; manifest: `8072ca2fb2d3c98d58952879bc465b04af0532de1310589791b3181931905e8e`; preregistration: `6446032498d0b132d31ad15749a2ee3ccfe3c0a912903e4932a47ed2e8d2c5b2`. Среда: pi-sdk 0.85.1, glm-5.3-flash, effort max. Снимки SDK и зависимостей до и после запуска совпали: `ca41ec5494721f596a3b0ba0d11ef58129b5e6cb49efeb29fead62ea51d2a2b7`.
 
-Каталог синтетический: installed discovery и совместимость с полной upstream-инструкцией и отсутствующей схемой review gate не квалифицированы. Родительская оценка незаслеплённая, независимое межэкспертное согласие не измерялось. Проверены Windows и одна конфигурация модели. Linux, другие модели, реальная UX-полезность, скорость и стоимость не квалифицированы. PowerShell ограничен инструкцией, а не OS sandbox.
+Каталог синтетический: installed discovery и совместимость с полной upstream-инструкцией и отсутствующей схемой review gate не квалифицированы. Baseline source closure подхватывает `skills/shared/**/*.md` и относительные markdown-ссылки, но не замыкает автоматически same-skill `references/` (например, `skills/aif-mode/references/` или `skills/aif-analyze/references/`); эти файлы включаются, только если они явно перечислены в `sourcePaths` манифеста. Workers могут видеть instruction trees с неразрешёнными ссылками на same-skill references — это документированное ограничение синтетического каталога, а не скрытый пропуск. Родительская оценка незаслеплённая, независимое межэкспертное согласие не измерялось. Проверены Windows и одна конфигурация модели. Linux, другие модели, реальная UX-полезность, скорость и стоимость не квалифицированы. PowerShell ограничен инструкцией, а не OS sandbox.
 
 В JSON сохранены исходные и исправленные per-case результаты, immutable identities, source/grade/receipt hashes и предыдущий отчёт v5. Сырые сессии, private paths и credentials не публикуются. Этот исследовательский отчёт не заменяет независимый review и владельческий `aif-verify` реализации.
 

@@ -80,7 +80,7 @@ Coordinator хранит manifest, критерии, checker и полную п�
 - `requirements` вида `criterionId: {met, evidence}` и независимо наблюдаемый счётчик `unsupportedChecks: {value, evidence}`;
 - нормализованные `actions` по [контракту observations](../scripts/superpowers-skill-observations.mjs); сырые транскрипты и скрытые рассуждения в формат не входят.
 
-Каждый event имеет execution ID, последовательные `sequence`, неубывающий `turn` и уникальный `record`. `request.inputHash` связывает первый запрос с замороженным текстом; `user-response` содержит `scripted` и hash дословного сценарного ответа. Внешние вмешательства учитываются отдельно. `source` фиксирует `kind: host|synthetic`, hash разрешённого исходного журнала и его полноту.
+Каждый event имеет execution ID, последовательные `sequence`, неубывающий `turn` и уникальный `record`. `request.inputHash` связывает первый запрос с замороженным текстом; `user-response` содержит `scripted` и hash дословного сценарного ответа. Внешние вмешательства учитываются отдельно. `source` фиксирует `kind: host|synthetic`, hash разрешённого исходного журнала и его полноту. Пример неполного observation с пустыми events: [test/fixtures/superpowers-skill-eval/observations/incomplete.json](../test/fixtures/superpowers-skill-eval/observations/incomplete.json).
 
 Для завершённого `final` необходимы все зарегистрированные scripted turns; наблюдаемая terminal failure может завершить проверенный префикс. Лишние поля в actions envelope, source и events отвергаются до сохранения receipt. Удалённый или повреждённый target fixture даёт отрицательную оценку поведения, а не пропуск наблюдения из-за ошибки чтения.
 
@@ -122,7 +122,7 @@ CAL13: перенаправление чтения в PowerShell `$null` оши�
 
 Предыдущий запуск v5 остаётся отдельной историей: 129 завершённых ответов, 105 ошибок, включая 102 rate-limit, и отдельный CAL12 replay. Его полный JSON и неизменённый текст отчёта сохранены в [результатах](superpowers-skill-evaluation-results.json); попытки v5 не подставлялись в v6. Пилот и историческая серия #164 также не переписаны.
 
-Synthetic catalog не квалифицирует installed discovery или отсутствующую upstream-схему review gate. Родительская оценка незаслеплённая; другие модели, Linux, пользовательское UX, скорость и стоимость не квалифицированы. Task 15 принят; решения Task 16, карта consumers/cases и точные хеши итоговых инструкций записаны в результатах. Независимый review и итоговый `aif-verify` оформляются существующим workflow плана, отдельно от экспериментальной квалификации.
+Synthetic catalog не квалифицирует installed discovery или отсутствующую upstream-схему review gate. Baseline source closure подхватывает `skills/shared/**/*.md` и относительные markdown-ссылки, но не замыкает автоматически same-skill `references/` (например, `skills/aif-mode/references/` или `skills/aif-analyze/references/`); same-skill references включаются только при явном перечислении в `sourcePaths`. Родительская оценка незаслеплённая; другие модели, Linux, пользовательское UX, скорость и стоимость не квалифицированы. Task 15 принят; решения Task 16, карта consumers/cases и точные хеши итоговых инструкций записаны в результатах. Независимый review и итоговый `aif-verify` оформляются существующим workflow плана, отдельно от экспериментальной квалификации.
 
 ## See Also
 

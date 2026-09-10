@@ -81,9 +81,21 @@ async function tree(root, prefix = '', output = {}) {
 function identity(row) { return Object.fromEntries(IDENTITY.map(k => [k, row[k]])); }
 function fingerprint(files) { return Object.fromEntries(Object.entries(files).sort().map(([p,b]) => [p,hash(b)])); }
 // Bundled helpers use static ESM imports. Match declarations, not words in errors
-// or the checker's quoted child-process probe. Runtime checker loading is pinned separately.
+// or the checker's quoted child-process probe. Dynamic imports must be pinned literals or
+// the single runtime checker load; any other expression is rejected as unpinned.
 function staticImports(source) {
   return [...source.matchAll(/(?:^|[;\n])\s*(?:import\s+(?:[^'";]*?\s+from\s+)?|export\s+[^'";]*?\s+from\s+)['"]([^'"\r\n]+)['"]/g)].map(m=>m[1]);
+}
+function dynamicImports(source) {
+  const code=source.replace(/\/\*[\s\S]*?\*\//g,'').replace(/\/\/.*$/gm,'');
+  const out=[];
+  for(const m of code.matchAll(/\bimport\s*\(/g)){
+    const after=code.slice(m.index+m[0].length);
+    const literal=after.match(/^\s*['"`]([^'"`\r\n]+)['"`]/);
+    if(literal)out.push({specifier:literal[1]});
+    else out.push({expression:true});
+  }
+  return out;
 }
 
 export function validateSuite(suite) {
@@ -138,7 +150,7 @@ export function validateSuite(suite) {
 }
 
 function validateInput(input) {
-  requireValue(Array.isArray(input.turns) && input.turns.length > 0 && input.turns.every(t=>typeof t==='string' && t.trim()), 'invalid-turns');
+  requireValue(Array.isArray(input.turns) && input.turns.length > 0 && input.turns.length <= 100 && input.turns.every(t=>typeof t==='string' && t.trim() && Buffer.byteLength(t)<=LIMIT), 'invalid-turns');
   requireValue(input.files && typeof input.files === 'object' && !Array.isArray(input.files), 'invalid-files');
   requireValue(Object.keys(input.files).length <= 100, 'file-limit');
   Object.keys(input.files).forEach(safePath);
@@ -183,7 +195,7 @@ function applyIntervention(before, candidate, selector) {
   const name=selector.slice(selector.indexOf(':')+1);
   const next=section(candidate,name);
   if(selector.startsWith('append-section:')) {
-    requireValue(!before.split('\n').some(l=>l.trimEnd()==='## '+name), 'existing-append-section');
+    requireValue(!before.split('\n').some(l=>/^#{2,6} /.test(l) && l.replace(/^#+ /,'').trimEnd()===name), 'existing-append-section');
     return before.trimEnd()+'\n\n'+next.body.trim()+'\n';
   }
   const previous=section(before,name);
@@ -202,8 +214,12 @@ async function baselineSources(repo, suite) {
     catch { throw new Error('baseline-source-unavailable'); }
     files[relative]=content;
     for(const m of content.matchAll(/skills\/shared\/[\w./-]+\.md/g))pending.push(m[0]);
-    for(const m of content.matchAll(/\]\(([^)\s]+\.md)\)/g)) {
-      const p=path.posix.normalize(path.posix.join(path.posix.dirname(relative),m[1]));
+    // Same-skill references/ are not automatically closed over unless explicitly listed in sourcePaths;
+    // see docs/superpowers-skill-evaluation.md for the documented synthetic-catalog limitation.
+    for(const m of content.matchAll(/\]\(([^)\s]+)\)/g)) {
+      let [target]=m[1].split(/[?#]/,1);
+      if(/^[a-z][a-z0-9+.-]*:/i.test(target)||target.startsWith('//'))continue;
+      const p=path.posix.normalize(path.posix.join(path.posix.dirname(relative),target));
       if(p.startsWith('skills/shared/'))pending.push(p);
     }
   }
@@ -221,6 +237,15 @@ async function codeClosure(entry, repo) {
       if(specifier.startsWith('node:'))continue;
       requireValue(specifier.startsWith('.') && specifier.endsWith('.mjs'),'unsupported-collector-import');
       pending.push(path.posix.normalize(path.posix.join(path.posix.dirname(relative),specifier)));
+    }
+    for(const d of dynamicImports(files[relative])) {
+      if(d.specifier){
+        if(d.specifier.startsWith('node:'))continue;
+        requireValue(d.specifier.startsWith('.') && d.specifier.endsWith('.mjs'),'unsupported-collector-import');
+        pending.push(path.posix.normalize(path.posix.join(path.posix.dirname(relative),d.specifier)));
+      } else {
+        requireValue(relative===entry && files[relative].includes("'coordinator/check-output.mjs'"),'unsupported-collector-dynamic-import');
+      }
     }
   }
   return files;
@@ -381,7 +406,7 @@ export async function collect({runRoot,executionId,report,observation}={}) {
   });
   requireValue(Object.keys(observation.requirements??{}).every(id=>row.grader.criteria.some(c=>c.id===id)),'unknown-requirement');
   const checker=await import(pathToFileURL(path.join(root,'coordinator/check-output.mjs')).href);
-  const behavior=await checker.checkOutput({caseId:row.caseId,kind:row.grader.kind,workspace:observed.workspace,report});
+  const behavior=await checker.checkOutput({caseId:row.caseId,kind:row.grader.kind,workspace:observed.workspace,report,inputFiles:row.inputFiles});
   requireValue(behavior&&[true,false,null].includes(behavior.passed),'invalid-behavior-result');
   let behaviorPassed=behavior.passed;
   if(behaviorPassed===null&&behavior.code==='manual-semantic-observation-required'&&observation.behavior!==undefined) {
