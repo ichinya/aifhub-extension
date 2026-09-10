@@ -81,6 +81,8 @@ ai-factory aifhub-providers done --change add-feature --write --json
 ai-factory aifhub-done-readiness --change add-feature --json
 ```
 
+The MCP server also exposes a read-only `aifhub.providers_status` tool. It accepts only `status` and `doctor` phases, returns the same normalized evidence as the CLI, and never runs `verify`, `done`, `implement`, or provider-owned `sync`.
+
 After enabled tool choices are saved, `/aif-analyze`, mode switches and artifact sync initialize missing project scaffolding. Direct boolean edits can be applied with `aifhub-mode init`. Initialization is idempotent: OpenSpec creates missing config (`schema: spec-driven`) and canonical directories, preserving existing content. It works without installing OpenSpec integrations or requiring the CLI for filesystem scaffolding.
 
 HLV initialization first inspects both `project.yaml` and `.hlv/project.yaml`. Existing root HLV projects (with `human/`, `validation/`, `llm/` or custom configured paths) are reused without creating `.hlv/`. Existing adopted projects are also reused. Neither path invokes native reinit, modifies the project map, nor rewrites contracts or milestones. Both markers together, malformed maps, unsafe paths and nonempty partial `.hlv/` layouts require repair instead of automatic overwrites.
