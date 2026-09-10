@@ -132,6 +132,32 @@ change resolver applies; unresolved or ambiguous selection performs no writes.
 For research/direct or missing canonical content it may write the decision and
 return a blocking owner handoff; it does not invent or repair canonical artifacts.
 `status` and `show` are read-only. `show` exposes brief content only when current.
+
+## Fresh-context AI review
+
+After implementation, prepare a separate AI reviewer context that does not
+contain the producing transcript, discarded attempts, or hidden reasoning:
+
+```bash
+ai-factory aifhub-fresh-context-review prepare --change 168-bounded-change --json
+```
+
+This exports a versioned review package under
+`.ai-factory/state/<change-id>/reviews/<review-id>/`:
+
+- `ai-cross-context-review.json` — `aifhub.ai_cross_context_review.v1` receipt;
+- `review-target.diff` — exact target diff against `HEAD`, with untracked files
+  included as synthetic `--- /dev/null` additions.
+
+The receipt records the target base/head/fingerprint, the exact SessionBrief
+sources consumed, `REVIEW.md` policy revision, acceptance criteria/examples, and
+allowed/forbidden change surface. The default `context_mode` is `fresh`; pass
+`--same-session` only when the producing session must also serve as the reviewer,
+which is labeled explicitly in the receipt.
+
+The helper is read-only with respect to canonical and QA artifacts. It does not
+run the AI reviewer, replace `/aif-review`, `/aif-verify`, security checks, or
+human review. Outcomes are `prepared`, `reviewed`, `blocked`, or `stale`.
 Metadata/diagnostics contain paths, hashes, and fixed reason codes, without raw
 requests, provider output, credentials, or exception messages.
 
@@ -190,10 +216,10 @@ and rendered-brief metrics remain `null`. The compiler does not guess model limi
 
 P0 includes quick/standard/research execution contracts and selection/version
 checks for direct/expanded/ultra. P1 adds the plan compliance receipt
-(`aifhub-plan-compliance.v1`); fresh-context AI reviewer execution, tracer
-promotion, and richer context metrics are not implemented here. P2 cross-project
-adapters and evaluation remain separate. Crit human review and existing QA
-ownership are unchanged.
+(`aifhub-plan-compliance.v1`) and the fresh-context AI review package
+(`aifhub.ai_cross_context_review.v1`); tracer promotion and richer context
+metrics are not implemented here. P2 cross-project adapters and evaluation
+remain separate. Crit human review and existing QA ownership are unchanged.
 
 ## Schemas
 
@@ -202,3 +228,4 @@ ownership are unchanged.
 - [Profile decision v1](../schemas/sdd-profile-decision.schema.json)
 - [SessionBrief v1](../schemas/session-brief.schema.json)
 - [Plan compliance v1](../schemas/plan-compliance.schema.json)
+- [AI cross-context review v1](../schemas/ai-cross-context-review.schema.json)

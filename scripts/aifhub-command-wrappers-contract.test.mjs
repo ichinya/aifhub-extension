@@ -50,6 +50,13 @@ const WRAPPER_COMMANDS = [
     args: ['check', '--change', 'add-oauth', '--json']
   },
   {
+    name: 'aifhub-fresh-context-review',
+    description: 'Prepare a fresh-context AI review package and receipt.',
+    module: './commands/aifhub-fresh-context-review.mjs',
+    script: 'fresh-context-review.mjs',
+    args: ['prepare', '--change', 'add-oauth', '--json']
+  },
+  {
     name: 'aifhub-mode',
     description: 'Run AIFHub artifact mode status, switch, sync, and doctor commands.',
     module: './commands/aifhub-mode.mjs',
