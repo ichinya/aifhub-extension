@@ -111,6 +111,21 @@ ai-factory aifhub-session-brief status --change 168-bounded-change --json
 ai-factory aifhub-session-brief show --change 168-bounded-change
 ```
 
+After implementation, compare the current SessionBrief, plan tasks, and changed
+scope to produce a versioned drift receipt:
+
+```bash
+ai-factory aifhub-plan-compliance check --change 168-bounded-change --json
+```
+
+This reads the current brief, the latest implementation trace (or `git status`
+when no trace is present), and canonical `tasks.md`. It writes a receipt at
+`.ai-factory/state/<change-id>/implementation/plan-compliance.json` without
+modifying canonical artifacts. Outcomes are `compliant`, `acceptable_drift`,
+`replan_required`, or `blocked`. The same exit-code convention as SessionBrief
+applies: `0` for a valid result, `1` for replan-required or stale/missing
+context, and `2` for invalid arguments or an I/O failure.
+
 Explicit `--change` is recommended for automation. Otherwise the existing active
 change resolver applies; unresolved or ambiguous selection performs no writes.
 `compile` writes only the profile decision and both brief forms in runtime state.
@@ -174,10 +189,11 @@ of a model context window. `budget.source_bytes` is measured, while unknown toke
 and rendered-brief metrics remain `null`. The compiler does not guess model limits.
 
 P0 includes quick/standard/research execution contracts and selection/version
-checks for direct/expanded/ultra. P1 compliance receipts, fresh-context AI reviewer
-execution, tracer promotion, and richer context metrics are not implemented here.
-P2 cross-project adapters and evaluation remain separate. Crit human review and
-existing QA ownership are unchanged.
+checks for direct/expanded/ultra. P1 adds the plan compliance receipt
+(`aifhub-plan-compliance.v1`); fresh-context AI reviewer execution, tracer
+promotion, and richer context metrics are not implemented here. P2 cross-project
+adapters and evaluation remain separate. Crit human review and existing QA
+ownership are unchanged.
 
 ## Schemas
 
@@ -185,3 +201,4 @@ existing QA ownership are unchanged.
 - [Project policy](../schemas/sdd-policy.schema.json)
 - [Profile decision v1](../schemas/sdd-profile-decision.schema.json)
 - [SessionBrief v1](../schemas/session-brief.schema.json)
+- [Plan compliance v1](../schemas/plan-compliance.schema.json)

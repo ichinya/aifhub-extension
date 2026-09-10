@@ -43,6 +43,13 @@ const WRAPPER_COMMANDS = [
     args: ['compile', '--change', 'add-oauth', '--json']
   },
   {
+    name: 'aifhub-plan-compliance',
+    description: 'Compare plan, SessionBrief, and changed scope to produce a drift receipt.',
+    module: './commands/aifhub-plan-compliance.mjs',
+    script: 'plan-compliance.mjs',
+    args: ['check', '--change', 'add-oauth', '--json']
+  },
+  {
     name: 'aifhub-mode',
     description: 'Run AIFHub artifact mode status, switch, sync, and doctor commands.',
     module: './commands/aifhub-mode.mjs',

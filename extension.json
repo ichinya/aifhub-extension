@@ -15,6 +15,11 @@
       "module": "./commands/aifhub-session-brief.mjs"
     },
     {
+      "name": "aifhub-plan-compliance",
+      "description": "Compare plan, SessionBrief, and changed scope to produce a drift receipt.",
+      "module": "./commands/aifhub-plan-compliance.mjs"
+    },
+    {
       "name": "aifhub-mcp",
       "description": "Run the AIFHub MCP server over stdio.",
       "module": "./commands/aifhub-mcp.mjs"
