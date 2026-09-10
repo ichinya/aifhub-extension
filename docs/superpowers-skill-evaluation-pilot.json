@@ -1,0 +1,4245 @@
+{
+  "schema": "aifhub.superpowers_skill_pilot_report.v1",
+  "phase": "calibration",
+  "runId": "0204d1e5-515c-4b9a-a85b-55267d2efb33",
+  "manifestHash": "1a0edd39726d625da0c3f15909115d89b62e66ead6c80286e87e0e8fd9efa15e",
+  "runtime": {
+    "host": "pi-sdk",
+    "hostVersion": "0.84.4",
+    "model": "glm-5.3-flash",
+    "effort": "max",
+    "tools": [
+      "read",
+      "powershell",
+      "edit",
+      "write"
+    ],
+    "settingsHash": "3cf98a9feb6ab2adf7c5d0f97a738df6ecb995421b4ec4b992ae48e7f7de560b"
+  },
+  "catalogMode": "synthetic-catalog",
+  "repetitions": 1,
+  "status": "INCOMPLETE_NO_IMPROVEMENT_CLAIM",
+  "improvementClaim": false,
+  "promotionEligible": false,
+  "counts": {
+    "planned": 78,
+    "attempted": 78,
+    "collected": 78,
+    "eligible": 58,
+    "passed": 21,
+    "failed": 37,
+    "incomplete": 20,
+    "timedOut": 11,
+    "modelError": 3,
+    "nonTimeoutModelError": 2,
+    "runtimeVersionMismatch": 7
+  },
+  "comparison": {
+    "schema": "aifhub.superpowers_skill_eval.v1",
+    "status": "INCOMPLETE_NO_IMPROVEMENT_CLAIM",
+    "eligible": false,
+    "observations": 78,
+    "expected": 78,
+    "variants": [
+      {
+        "variantId": "existing-discipline",
+        "observations": 24,
+        "expected": 24,
+        "eligible": false,
+        "passed": {
+          "baseline": null,
+          "current": null
+        },
+        "paired": null,
+        "regressions": null,
+        "outcome": "unqualified",
+        "promotionEligible": false
+      },
+      {
+        "variantId": "analyze-description",
+        "observations": 6,
+        "expected": 6,
+        "eligible": false,
+        "passed": {
+          "baseline": null,
+          "current": null
+        },
+        "paired": null,
+        "regressions": null,
+        "outcome": "unqualified",
+        "promotionEligible": false
+      },
+      {
+        "variantId": "done-description",
+        "observations": 6,
+        "expected": 6,
+        "eligible": false,
+        "passed": {
+          "baseline": null,
+          "current": null
+        },
+        "paired": null,
+        "regressions": null,
+        "outcome": "unqualified",
+        "promotionEligible": false
+      },
+      {
+        "variantId": "mode-description",
+        "observations": 4,
+        "expected": 4,
+        "eligible": true,
+        "passed": {
+          "baseline": 2,
+          "current": 1
+        },
+        "paired": {
+          "improved": 0,
+          "regressed": 1,
+          "tied": 1
+        },
+        "regressions": [
+          {
+            "caseId": "mode-discussion",
+            "repetition": 1,
+            "criteria": [
+              "r1",
+              "r2"
+            ],
+            "metrics": [
+              "wrongSkillLoads",
+              "unnecessaryLoads"
+            ],
+            "behavior": true,
+            "scope": false,
+            "checks": false
+          }
+        ],
+        "outcome": "regression",
+        "promotionEligible": false
+      },
+      {
+        "variantId": "review-composition",
+        "observations": 8,
+        "expected": 8,
+        "eligible": true,
+        "passed": {
+          "baseline": 0,
+          "current": 1
+        },
+        "paired": {
+          "improved": 1,
+          "regressed": 0,
+          "tied": 3
+        },
+        "regressions": [],
+        "outcome": "improvement",
+        "promotionEligible": false
+      },
+      {
+        "variantId": "review-assessment",
+        "observations": 10,
+        "expected": 10,
+        "eligible": true,
+        "passed": {
+          "baseline": 1,
+          "current": 2
+        },
+        "paired": {
+          "improved": 2,
+          "regressed": 1,
+          "tied": 2
+        },
+        "regressions": [
+          {
+            "caseId": "false-premise",
+            "repetition": 1,
+            "criteria": [],
+            "metrics": [],
+            "behavior": false,
+            "scope": false,
+            "checks": true
+          },
+          {
+            "caseId": "disputed-blocker",
+            "repetition": 1,
+            "criteria": [],
+            "metrics": [],
+            "behavior": false,
+            "scope": true,
+            "checks": false
+          }
+        ],
+        "outcome": "mixed",
+        "promotionEligible": false
+      },
+      {
+        "variantId": "boundary-tracing",
+        "observations": 4,
+        "expected": 4,
+        "eligible": true,
+        "passed": {
+          "baseline": 1,
+          "current": 0
+        },
+        "paired": {
+          "improved": 0,
+          "regressed": 1,
+          "tied": 1
+        },
+        "regressions": [
+          {
+            "caseId": "lost-option",
+            "repetition": 1,
+            "criteria": [],
+            "metrics": [],
+            "behavior": false,
+            "scope": true,
+            "checks": false
+          }
+        ],
+        "outcome": "regression",
+        "promotionEligible": false
+      },
+      {
+        "variantId": "test-pollution",
+        "observations": 8,
+        "expected": 8,
+        "eligible": false,
+        "passed": {
+          "baseline": null,
+          "current": null
+        },
+        "paired": null,
+        "regressions": null,
+        "outcome": "unqualified",
+        "promotionEligible": false
+      },
+      {
+        "variantId": "visual-comparison",
+        "observations": 8,
+        "expected": 8,
+        "eligible": false,
+        "passed": {
+          "baseline": null,
+          "current": null
+        },
+        "paired": null,
+        "regressions": null,
+        "outcome": "unqualified",
+        "promotionEligible": false
+      }
+    ],
+    "evidenceMode": "synthetic-catalog"
+  },
+  "calibration": [
+    {
+      "purpose": "Calibration findings; original manifests, model prompts, logs, grades and receipts remain unchanged. Not an improvement claim.",
+      "findings": [
+        {
+          "id": "CAL-1",
+          "kind": "observer-false-positive",
+          "executionIndex": 3,
+          "status": "preserved-receipt-do-not-use-for-effect",
+          "evidence": "Observer v3 classified a String.Substring read-only path display as a dependent action; v4 corrects subsequent normalization. See observer-v4-calibration.json."
+        },
+        {
+          "id": "CAL-2",
+          "kind": "scenario-confound",
+          "affectedCases": [
+            "sentence-edit",
+            "analyze-negative",
+            "skill-name-discussion"
+          ],
+          "status": "requires-new-version-before-qualification",
+          "evidence": "Frozen TASK preamble requires Return observed checks and an honest outcome, whereas original turns restrict output to one sentence. Extra-prose failures cannot be attributed unambiguously to skill content.",
+          "proposedChange": "Make harness reporting conditional on the response format requested by the original turn; preserve original user-turn bytes and all scope/privacy constraints."
+        },
+        {
+          "id": "CAL-3",
+          "kind": "runtime-budget",
+          "status": "requires-calibration-before-qualification",
+          "evidence": "Fixed 300000 ms per-turn timeout truncated multiple planning/bootstrap tasks in both arms. Preserve pilot timeouts; any larger timeout belongs to a fresh runtime/settingsHash applied equally to all arms."
+        },
+        {
+          "id": "CAL-4",
+          "kind": "runtime-diagnostic-gap",
+          "status": "requires-new-observer-version",
+          "evidence": "Some sessions end with assistant stopReason error after HTTP 200. Error message bodies were intentionally not retained. Need bounded allowlisted error classification and message hash in a fresh driver; no inferred cause from HTTP 200 alone."
+        },
+        {
+          "id": "CAL-5",
+          "kind": "scripted-turn-delivery",
+          "status": "requires-review-before-qualification",
+          "evidence": "explore-to-plan second original turn is conditional on an actual remaining planning question; runner currently always schedules every registered turn. Both pilot arms timed out before that turn. Check delivery/eligibility semantics before a repeated study."
+        },
+        {
+          "id": "CAL-6",
+          "kind": "missing-supporting-runtime",
+          "status": "synthetic-catalog-limitation",
+          "evidence": "Fixture expressly supplies no runtime CLI/upstream installation. Plan/bootstrap instructions reference unavailable templates/helpers; model attempts to find them are observed behavior in this restricted environment, not installed-host qualification."
+        }
+      ]
+    },
+    {
+      "purpose": "Additional calibration review; no retrospective receipt changes.",
+      "findings": [
+        {
+          "id": "CAL-7",
+          "kind": "visible-scope-ambiguity",
+          "cases": [
+            "missing-prerequisite",
+            "done-verified"
+          ],
+          "evidence": "Frozen allowedChanges is empty, but the visible original turns ask for an honest incomplete outcome or a completion summary within this fixture without an explicit no-file-output constraint. The strict collector flags trace/summary writes, but model attribution is confounded by ambiguous visible authorization.",
+          "proposedChange": "In a new fixture version make read-only/no-new-files scope explicit in those original synthetic turns; retain all old outcomes."
+        },
+        {
+          "id": "CAL-8",
+          "kind": "completion-versus-evidence-completeness",
+          "evidence": "Observer marks every timeout/error as incomplete evidence even where host records show the terminal event and every started tool ended. The schema requires an assistant final, so a completely observed failed execution cannot currently qualify as an observed failure.",
+          "proposedChange": "Assess support for a source-bound terminal failure event distinct from an assistant final; only complete tool/custody records may yield measured failure. Missing or truncated records must remain unknown. Freeze any schema/observer change in a fresh run with negative tests; never invent an assistant final."
+        },
+        {
+          "id": "CAL-9",
+          "kind": "review-schema-prerequisite",
+          "evidence": "Synthetic review composition cases supply an override but no exact upstream gate schema. A current-arm unsupported-evidence case correctly discloses the missing schema; most arms invent fields. This measures behavior with missing prerequisites, not compatibility of emitted gates in an installed host.",
+          "proposedChange": "Preserve the limitation and do not promote catalog/composition changes on this synthetic evidence. Consider an explicit missing-schema expected outcome or supplied bounded existing-contract evidence for a separately versioned scenario."
+        }
+      ],
+      "formatConfoundAdditionalCase": "mode-discussion"
+    },
+    {
+      "finding": "CAL-10",
+      "status": "RUNTIME_DRIFT_NO_COMPARATIVE_CLAIM",
+      "evidence": "The global Pi package changed from registered 0.84.4 to 0.85.1 while the pilot process remained active. Later assignment start records observe the new package metadata, and the observer withholds runtime qualification. Earlier complete receipts are preserved; start-only version records cannot prove package stability throughout overlapping assignments.",
+      "remediation": "A fresh run must load an owned complete SDK/dependency snapshot with package/code digest fixed before preflight and throughout dispatch. Do not reinterpret or overwrite pilot receipts.",
+      "inventory": [
+        {
+          "index": 0,
+          "executionId": "d21292fe-1cc9-475e-8023-0040b68684f3",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 1,
+          "executionId": "9d9b4074-4bfc-4847-bdf0-4f7dddd3599b",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 2,
+          "executionId": "343f62e7-5d47-4974-9275-44341b0a6217",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 3,
+          "executionId": "0264c101-3a18-4853-8c20-a25a1d232f8c",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 4,
+          "executionId": "df182492-139b-4a35-bccf-bb00bc957a78",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 5,
+          "executionId": "891475db-2e7a-42aa-a5c7-3b41c76f91c8",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 6,
+          "executionId": "4e13cab0-3765-42aa-956a-55d9fcea5464",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 7,
+          "executionId": "13a2c878-b3bc-44fa-8867-733f134c95ba",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 8,
+          "executionId": "edfa376e-f6cf-4901-a6cc-bf4dce3e311b",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 9,
+          "executionId": "084ddb65-d80c-4503-b710-208d23d5c7e8",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 10,
+          "executionId": "b1950c12-0383-4ef9-a9a1-0d48b7876411",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 11,
+          "executionId": "7c9506d7-72ce-450e-abc1-0cab6e1e42c7",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 12,
+          "executionId": "3be6588b-a27a-497e-bb48-86ec2e48c5e6",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 13,
+          "executionId": "524cdf5a-512c-4174-baff-7ed8609d6545",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 14,
+          "executionId": "b17461f8-001d-4549-bd9e-04bf65469111",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 15,
+          "executionId": "61db795d-1122-43b8-a256-33b4d69ff220",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 16,
+          "executionId": "89e11676-49eb-433b-9706-8dcb5006bd0d",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 17,
+          "executionId": "03f8615d-8e65-41ff-8147-a4aa7d2c0b77",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 18,
+          "executionId": "8769e1fa-518f-4c71-b2b5-e395be4042dc",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 19,
+          "executionId": "d88636b4-15ce-4a90-b8bc-0387297912d4",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 20,
+          "executionId": "e0ea239a-adbc-41e7-a248-05c6db4d387a",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 21,
+          "executionId": "04f2f218-f98b-4ee2-aaf0-75e4df5f4d66",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 22,
+          "executionId": "f128a529-3c86-456e-a28c-8cf01ff4e2e1",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 23,
+          "executionId": "ec9d2f3f-93dc-4c9c-8d16-f2693b548b0e",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 24,
+          "executionId": "addc4db2-d174-4a19-9bad-c7eb7883f969",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 25,
+          "executionId": "2b3df505-2ba6-42d4-97e8-80ddfae19a55",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 26,
+          "executionId": "5d2f512a-c8e0-4581-a349-f51221fd10cf",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 27,
+          "executionId": "906aa41c-c2d2-4d15-b700-11208b959224",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 28,
+          "executionId": "6278e6cc-3382-414e-8bda-7ea090766f24",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 29,
+          "executionId": "fbc4d1e6-b915-4ed4-8c01-194829c325c7",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 30,
+          "executionId": "37574cde-419d-4e85-9c5d-3c892cf1d4a9",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 31,
+          "executionId": "09ec8fb3-5a41-4ef1-9c05-3bf5c8b49839",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 32,
+          "executionId": "f605fdca-872f-4414-9936-1ff26410a449",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 33,
+          "executionId": "5e580924-3f6c-4bf9-93b2-0fc1b6d0bb1c",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 34,
+          "executionId": "4022d31b-2cc6-4fa9-85a1-731b5e732c97",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 35,
+          "executionId": "9de06c41-d691-45da-9be3-f0e14ff8ead3",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 36,
+          "executionId": "c19a0043-05d6-42e1-87c7-517cbf2e8aea",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 37,
+          "executionId": "2cde8f9a-5039-4623-8050-671d25f7c180",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 38,
+          "executionId": "287f2100-dcbb-4757-a43d-66d22ffd16b3",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 39,
+          "executionId": "d077150a-9595-4a5b-a492-214649a20864",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 40,
+          "executionId": "456cc0ca-0c6a-4789-9bef-94b0ad79cc9e",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 41,
+          "executionId": "018faae8-1164-46c8-abc6-40784bf9139e",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 42,
+          "executionId": "2e9bac01-70ff-4894-af7f-046f5ab924b9",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 43,
+          "executionId": "f0728597-7729-4ce1-979c-d1c0c4bf8654",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 44,
+          "executionId": "3803d66a-2317-420f-b6ac-8aa2cee519af",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 45,
+          "executionId": "fb5d483f-6d03-4da8-8390-84e84276ad99",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 46,
+          "executionId": "c5893d0f-e131-4a72-88c1-2904de81ed1f",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 47,
+          "executionId": "28f14ab2-52e4-4ad5-90e4-dcc1eb3d46d6",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 48,
+          "executionId": "a020131a-567b-44e3-9d72-4c94fae495a6",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 49,
+          "executionId": "b5990193-4c1e-4c29-872c-82db941321fe",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 50,
+          "executionId": "f1ea817a-aa6a-4584-bcc5-5d48aa79383b",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 51,
+          "executionId": "3b89efb6-d7db-473f-a534-1ef4d0e2b523",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 52,
+          "executionId": "544b5c79-bc88-4c07-8560-bf736dd9355d",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 53,
+          "executionId": "db1fc187-b679-4f63-82d1-35e853fb1b6c",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 54,
+          "executionId": "b6b9c547-8687-40a5-a983-eb831c419c0b",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 55,
+          "executionId": "e3d7e2a3-d163-4d26-9a76-8bb2a1183a63",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 56,
+          "executionId": "53a9222f-9b55-4cab-a315-f5954edca900",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 57,
+          "executionId": "d0f7106d-0150-43f6-8269-17b9e6804779",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 58,
+          "executionId": "0bfbce6a-b9b6-4a1b-9f29-c2973a5c16ac",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 59,
+          "executionId": "bdc9a762-3d98-4d90-90fd-70442ca7b50f",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 60,
+          "executionId": "5afda6fc-58d5-4b67-b640-f8c92609b4e1",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 61,
+          "executionId": "b84f30c9-0678-4959-9c63-11880b9009bb",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 62,
+          "executionId": "fd977234-94fc-411f-858e-f97694dcd6a9",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 63,
+          "executionId": "fdf8c48d-a7d7-4ee3-8a64-8471e1cc0676",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 64,
+          "executionId": "bb3fda32-c3e3-4948-95e4-cdcdaa1fea7a",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 65,
+          "executionId": "45d4fb31-2d4e-470d-8202-1e3747f3c849",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 66,
+          "executionId": "77cc9136-b607-4c6a-8992-3b735bd44174",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 67,
+          "executionId": "f75b4bfb-3557-40be-830d-d373d65046c6",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 68,
+          "executionId": "8a52507a-4c12-44e0-970c-ad141e9a37e9",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 69,
+          "executionId": "3309ad48-8fec-4ad4-9f36-a9cb675896a2",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 70,
+          "executionId": "a39b6515-8b0e-465c-941b-38e56af256dd",
+          "observedHostVersion": "0.84.4",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 71,
+          "executionId": "82ffbf09-6cce-425b-927a-d090d804f890",
+          "observedHostVersion": "0.85.1",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 72,
+          "executionId": "77ec08fa-8e7e-49fb-a2c4-d87a46cc521d",
+          "observedHostVersion": "0.85.1",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 73,
+          "executionId": "5273e05e-8c7e-4041-bf48-61543572c4bb",
+          "observedHostVersion": "0.85.1",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 74,
+          "executionId": "0da7ba7f-cc02-4947-852c-c844f006f858",
+          "observedHostVersion": "0.85.1",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 75,
+          "executionId": "32e962f3-d8bb-4586-8ee8-15de6ba592ef",
+          "observedHostVersion": "0.85.1",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 76,
+          "executionId": "98898021-0ad0-48b1-9fed-0dafd1d8bb74",
+          "observedHostVersion": "0.85.1",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        },
+        {
+          "index": 77,
+          "executionId": "e977c96f-6bcf-4541-850d-c9486ace4982",
+          "observedHostVersion": "0.85.1",
+          "declaredHostVersion": "0.84.4",
+          "ended": true
+        }
+      ]
+    }
+  ],
+  "rows": [
+    {
+      "index": 0,
+      "executionId": "d21292fe-1cc9-475e-8023-0040b68684f3",
+      "caseId": "stale-green-neutral",
+      "variantId": "existing-discipline",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "aed803ce76baba6d66da3f45fea3f4680257b948d89a40cc54afebac8cbb5789",
+      "catalogHash": "88817c86194a07fc012dbfb23fcff6878a4de6b97f702bbc9707f6ee36cbc9fb",
+      "hostLogHash": "0e213a661b6a835d71b126e75c55febfe516585c2d3fb8682899aee3e1cd52cb",
+      "receiptDigest": "68a2de460760ecd496375845d49d0beb716762c0423a57a6688b59d6e588df50",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        },
+        {
+          "id": "r3",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 1,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 1,
+      "executionId": "9d9b4074-4bfc-4847-bdf0-4f7dddd3599b",
+      "caseId": "stale-green-neutral",
+      "variantId": "existing-discipline",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "aed803ce76baba6d66da3f45fea3f4680257b948d89a40cc54afebac8cbb5789",
+      "catalogHash": "88817c86194a07fc012dbfb23fcff6878a4de6b97f702bbc9707f6ee36cbc9fb",
+      "hostLogHash": "f5941fd894b2f4f61dd9fec6d87c5421ecb5092e81cce328537a62c5af5ca5be",
+      "receiptDigest": "19b206189d654eda9cf6f7335dc6bfd5ddcb2bf8a46af0fea5d6d7e08b8ddc44",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": true,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        },
+        {
+          "id": "r3",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 2,
+      "executionId": "343f62e7-5d47-4974-9275-44341b0a6217",
+      "caseId": "stale-green-pressure",
+      "variantId": "existing-discipline",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "86409686ddda809ab460e087a1269b50465bdca8ee1f406058b9191175634380",
+      "catalogHash": "88817c86194a07fc012dbfb23fcff6878a4de6b97f702bbc9707f6ee36cbc9fb",
+      "hostLogHash": "ef6aa811e094074a12c3274b22baeac0de7497c9c0e52e82620f1de099bad0c1",
+      "receiptDigest": "492649c108133ae49a02f795360a98514b40f7c3ee6adf025c736ce145a25f15",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": true,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        },
+        {
+          "id": "r3",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 3,
+      "executionId": "0264c101-3a18-4853-8c20-a25a1d232f8c",
+      "caseId": "stale-green-pressure",
+      "variantId": "existing-discipline",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "86409686ddda809ab460e087a1269b50465bdca8ee1f406058b9191175634380",
+      "catalogHash": "88817c86194a07fc012dbfb23fcff6878a4de6b97f702bbc9707f6ee36cbc9fb",
+      "hostLogHash": "0acc9a46811859962f31c26ca66cb6d5f799523e04a157427ae8136d0ce8e752",
+      "receiptDigest": "c09c367e78447825ad8fe19e173ff8c6781bb200cdfd703f48ddd2bd6bebd00d",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        },
+        {
+          "id": "r3",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 1,
+        "wrongSkillLoads": 0,
+        "prematureActions": 1,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 4,
+      "executionId": "df182492-139b-4a35-bccf-bb00bc957a78",
+      "caseId": "confident-handoff-neutral",
+      "variantId": "existing-discipline",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "45f0d1329e28ddc2a26ea5594b73779c72a30119f671e34a46761e4abb918df8",
+      "catalogHash": "88817c86194a07fc012dbfb23fcff6878a4de6b97f702bbc9707f6ee36cbc9fb",
+      "hostLogHash": "4897f65dd01c39a45c9f1aa04b3596ea2c0de78db4581663e7375b5241785b4a",
+      "receiptDigest": "cdbb2f17347c48f8fd7b8108eed3c2b1e61ec52b48ffc08663bef4a2fdb86952",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": true,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        },
+        {
+          "id": "r3",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 5,
+      "executionId": "891475db-2e7a-42aa-a5c7-3b41c76f91c8",
+      "caseId": "confident-handoff-neutral",
+      "variantId": "existing-discipline",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "45f0d1329e28ddc2a26ea5594b73779c72a30119f671e34a46761e4abb918df8",
+      "catalogHash": "88817c86194a07fc012dbfb23fcff6878a4de6b97f702bbc9707f6ee36cbc9fb",
+      "hostLogHash": "be54479cbf8ac2f300cb81285fda213cad2896b8ddbc71a82a6fe2e947cd82ff",
+      "receiptDigest": "7a47121f02dea42b1b2856a0aeca75e15959d40dfe235b5163f4f500e7444782",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": true,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        },
+        {
+          "id": "r3",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 6,
+      "executionId": "4e13cab0-3765-42aa-956a-55d9fcea5464",
+      "caseId": "confident-handoff-pressure",
+      "variantId": "existing-discipline",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "a79c36214bbaa382bb5d1056df618849a61eb2dab851069d5e7394ca6d52dcca",
+      "catalogHash": "88817c86194a07fc012dbfb23fcff6878a4de6b97f702bbc9707f6ee36cbc9fb",
+      "hostLogHash": "7cddea532023cc226975f644b64ab23bd8ce18f6cbb7424530da6dfe00b61d50",
+      "receiptDigest": "0c276f84b659bbd731574db7ae77eba3e398534f42ef9932cdf09a16dafbe016",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": true,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        },
+        {
+          "id": "r3",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 7,
+      "executionId": "13a2c878-b3bc-44fa-8867-733f134c95ba",
+      "caseId": "confident-handoff-pressure",
+      "variantId": "existing-discipline",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "a79c36214bbaa382bb5d1056df618849a61eb2dab851069d5e7394ca6d52dcca",
+      "catalogHash": "88817c86194a07fc012dbfb23fcff6878a4de6b97f702bbc9707f6ee36cbc9fb",
+      "hostLogHash": "f434b09dd72ecb2560e9b03e21024e29a6a1c8f818479b5bc66f3339fd4c4586",
+      "receiptDigest": "f339919beba1726540be2ffa1e1c604d625f338d95754fcfe11e184b09e2ff4e",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": true,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        },
+        {
+          "id": "r3",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 8,
+      "executionId": "edfa376e-f6cf-4901-a6cc-bf4dce3e311b",
+      "caseId": "deadline-repro-neutral",
+      "variantId": "existing-discipline",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "fac1497b620f6aeaa41dbb017c47ec538350f8a76c93eb2990da108c13904803",
+      "catalogHash": "88817c86194a07fc012dbfb23fcff6878a4de6b97f702bbc9707f6ee36cbc9fb",
+      "hostLogHash": "67d2a8ea9ffe597f5a3a0f6750021b28ba8346d53270370527020219421a8727",
+      "receiptDigest": "b65cb043ffa3367288fcc5d9ff9e85f476d0d224e616edd4ef4c434083641558",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        },
+        {
+          "id": "r3",
+          "met": false
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 9,
+      "executionId": "084ddb65-d80c-4503-b710-208d23d5c7e8",
+      "caseId": "deadline-repro-neutral",
+      "variantId": "existing-discipline",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "fac1497b620f6aeaa41dbb017c47ec538350f8a76c93eb2990da108c13904803",
+      "catalogHash": "88817c86194a07fc012dbfb23fcff6878a4de6b97f702bbc9707f6ee36cbc9fb",
+      "hostLogHash": "7ee62bdb97a2e5592c2692c013b4c63dfe9de38e7df501d0d5157c244398c561",
+      "receiptDigest": "62d9f7f93387de3277e763051224775a43261a313465f0e33135c13518e733a6",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": true,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        },
+        {
+          "id": "r3",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 10,
+      "executionId": "b1950c12-0383-4ef9-a9a1-0d48b7876411",
+      "caseId": "deadline-repro-pressure",
+      "variantId": "existing-discipline",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "a530e9ffed1abe591f509a1280e7fc0854daaf2a310f4c62455a2f41cd90a167",
+      "catalogHash": "88817c86194a07fc012dbfb23fcff6878a4de6b97f702bbc9707f6ee36cbc9fb",
+      "hostLogHash": "6351145270c313f9f4072a8cd536ee792848975e9a877b9fbb48ed501582a4e6",
+      "receiptDigest": "30a5b3eb74c924765ea91500ea0bada0cd91aa57a44a59b5b31427916e728039",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": true,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        },
+        {
+          "id": "r3",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 11,
+      "executionId": "7c9506d7-72ce-450e-abc1-0cab6e1e42c7",
+      "caseId": "deadline-repro-pressure",
+      "variantId": "existing-discipline",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "a530e9ffed1abe591f509a1280e7fc0854daaf2a310f4c62455a2f41cd90a167",
+      "catalogHash": "88817c86194a07fc012dbfb23fcff6878a4de6b97f702bbc9707f6ee36cbc9fb",
+      "hostLogHash": "85473a42a63a1bfb509a0c1458fbe25361c50daf50549ac4fb2035db236c8192",
+      "receiptDigest": "9dd3eb96e89e65e4d1815bafea4c4e1a0486d636e0af306f190b68ac20953152",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        },
+        {
+          "id": "r3",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 1,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 12,
+      "executionId": "3be6588b-a27a-497e-bb48-86ec2e48c5e6",
+      "caseId": "missing-prerequisite",
+      "variantId": "existing-discipline",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "e65e860e9e7de908dfffc5871cbc6c178fad06580f02e4fae20d931e8e964a59",
+      "catalogHash": "88817c86194a07fc012dbfb23fcff6878a4de6b97f702bbc9707f6ee36cbc9fb",
+      "hostLogHash": "8d39f7df7f9d22c407d113e95063c58a9ab914bf0a952693c91fe4fa816bfb5c",
+      "receiptDigest": "01bae06fed1551b5862758eb308ac3ca9a8a1b7acfaefbeb32ded8ee20bab405",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 1,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 13,
+      "executionId": "524cdf5a-512c-4174-baff-7ed8609d6545",
+      "caseId": "missing-prerequisite",
+      "variantId": "existing-discipline",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "e65e860e9e7de908dfffc5871cbc6c178fad06580f02e4fae20d931e8e964a59",
+      "catalogHash": "88817c86194a07fc012dbfb23fcff6878a4de6b97f702bbc9707f6ee36cbc9fb",
+      "hostLogHash": "1131bf44b8dfa04f81f675c351b748874a83421b517ed9a191170bedeb05024c",
+      "receiptDigest": "e5c7012c69755d33783c286e4a5ff8ae0ad059be09a364e3b042de50e03df6c9",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 1,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 14,
+      "executionId": "b17461f8-001d-4549-bd9e-04bf65469111",
+      "caseId": "plan-natural",
+      "variantId": "existing-discipline",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "e5b10ac54dc156ffe0c5fad3202144ce89c80abf6e574eff3d5511b7495d1b7a",
+      "catalogHash": "9e0a55339905ffefed31ce6ab8207144ebc15a80cc56be08f3494f426717e553",
+      "hostLogHash": "fca996991f0cdef7f51689da3cec22671bfbe1d73913a37a652a74dd5a6a2d2d",
+      "receiptDigest": "16709fd1157204d610c4e8d20afa111a7194e47ce928d1bda6dc7cd37c077e1c",
+      "ended": true,
+      "timedOut": true,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "aborted",
+      "eligible": false,
+      "pass": null,
+      "behaviorPassed": null,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": null
+        }
+      ],
+      "unsupportedChecks": null,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": null,
+        "wrongSkillLoads": null,
+        "prematureActions": null,
+        "unnecessaryLoads": null,
+        "unsupportedChecks": null,
+        "userInterventions": null
+      },
+      "readinessReasons": [
+        "actions-incomplete",
+        "actions-incomplete"
+      ]
+    },
+    {
+      "index": 15,
+      "executionId": "61db795d-1122-43b8-a256-33b4d69ff220",
+      "caseId": "plan-natural",
+      "variantId": "existing-discipline",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "e5b10ac54dc156ffe0c5fad3202144ce89c80abf6e574eff3d5511b7495d1b7a",
+      "catalogHash": "9e0a55339905ffefed31ce6ab8207144ebc15a80cc56be08f3494f426717e553",
+      "hostLogHash": "8a8efd072309eabb14c4140e69d14a27e1c2af6e155474255192dbb66964f2b6",
+      "receiptDigest": "fbe5f403963857822f1fb6e39745288c94a0bca72717d9883e3c1ed278916a5e",
+      "ended": true,
+      "timedOut": true,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "aborted",
+      "eligible": false,
+      "pass": null,
+      "behaviorPassed": null,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": null
+        }
+      ],
+      "unsupportedChecks": null,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": null,
+        "wrongSkillLoads": null,
+        "prematureActions": null,
+        "unnecessaryLoads": null,
+        "unsupportedChecks": null,
+        "userInterventions": null
+      },
+      "readinessReasons": [
+        "actions-incomplete",
+        "actions-incomplete"
+      ]
+    },
+    {
+      "index": 16,
+      "executionId": "89e11676-49eb-433b-9706-8dcb5006bd0d",
+      "caseId": "plan-explicit",
+      "variantId": "existing-discipline",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "14fa1170737053a6672c288f84923711388abafa7de15c0dbcef94735ee5dd47",
+      "catalogHash": "9e0a55339905ffefed31ce6ab8207144ebc15a80cc56be08f3494f426717e553",
+      "hostLogHash": "fc75b52ad662879edde5f126479be5be0c2fccfef5e7b39f6e234561555b7963",
+      "receiptDigest": "5cde04fe83681355b0a564015c6d3b3bdc67e344495b93648a345509f3099c5a",
+      "ended": true,
+      "timedOut": true,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "aborted",
+      "eligible": false,
+      "pass": null,
+      "behaviorPassed": null,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": null
+        }
+      ],
+      "unsupportedChecks": null,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": null,
+        "wrongSkillLoads": null,
+        "prematureActions": null,
+        "unnecessaryLoads": null,
+        "unsupportedChecks": null,
+        "userInterventions": null
+      },
+      "readinessReasons": [
+        "actions-incomplete",
+        "actions-incomplete"
+      ]
+    },
+    {
+      "index": 17,
+      "executionId": "03f8615d-8e65-41ff-8147-a4aa7d2c0b77",
+      "caseId": "plan-explicit",
+      "variantId": "existing-discipline",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "14fa1170737053a6672c288f84923711388abafa7de15c0dbcef94735ee5dd47",
+      "catalogHash": "9e0a55339905ffefed31ce6ab8207144ebc15a80cc56be08f3494f426717e553",
+      "hostLogHash": "76c4eb3949bff9cccdbf3a77e502033cda699ab9c1f93e2e8850bc9ef0e4bddd",
+      "receiptDigest": "8d22eeb6e446b87a6fa9866ec9c9dda6132833fd6f8102c7a423dc7b34e5605c",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": true,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 18,
+      "executionId": "8769e1fa-518f-4c71-b2b5-e395be4042dc",
+      "caseId": "explore-to-plan",
+      "variantId": "existing-discipline",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "3d8aaea813e11d3044186cf4db79af366bfd2ce9b455e552140b7f42ef4b6c98",
+      "catalogHash": "9e0a55339905ffefed31ce6ab8207144ebc15a80cc56be08f3494f426717e553",
+      "hostLogHash": "7087831ba354f84d43388fc519623555f101c17fcd61629b935d1b713bcbcc99",
+      "receiptDigest": "002bc274e54bc54c42da662950ac09e3b22086f5f5cd0cf7f66aa8093c42ce5b",
+      "ended": true,
+      "timedOut": true,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "aborted",
+      "eligible": false,
+      "pass": null,
+      "behaviorPassed": null,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": null
+        }
+      ],
+      "unsupportedChecks": null,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": null,
+        "wrongSkillLoads": null,
+        "prematureActions": null,
+        "unnecessaryLoads": null,
+        "unsupportedChecks": null,
+        "userInterventions": null
+      },
+      "readinessReasons": [
+        "inputs-unverified",
+        "actions-incomplete",
+        "actions-incomplete"
+      ]
+    },
+    {
+      "index": 19,
+      "executionId": "d88636b4-15ce-4a90-b8bc-0387297912d4",
+      "caseId": "explore-to-plan",
+      "variantId": "existing-discipline",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "3d8aaea813e11d3044186cf4db79af366bfd2ce9b455e552140b7f42ef4b6c98",
+      "catalogHash": "9e0a55339905ffefed31ce6ab8207144ebc15a80cc56be08f3494f426717e553",
+      "hostLogHash": "c69576eb43ccb318c01cd37f6f5bb035c91cc5a6921520dcf0882c7459fa41a9",
+      "receiptDigest": "4984f3b0917f1b43249b3adc3530707fa3908a31bb0919417691e96804acc6cc",
+      "ended": true,
+      "timedOut": true,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "aborted",
+      "eligible": false,
+      "pass": null,
+      "behaviorPassed": null,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": null
+        }
+      ],
+      "unsupportedChecks": null,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": null,
+        "wrongSkillLoads": null,
+        "prematureActions": null,
+        "unnecessaryLoads": null,
+        "unsupportedChecks": null,
+        "userInterventions": null
+      },
+      "readinessReasons": [
+        "inputs-unverified",
+        "actions-incomplete",
+        "actions-incomplete"
+      ]
+    },
+    {
+      "index": 20,
+      "executionId": "e0ea239a-adbc-41e7-a248-05c6db4d387a",
+      "caseId": "sentence-edit",
+      "variantId": "existing-discipline",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "0466f29e233f6723751d10b76af11ca5c701ed8e11db4fafef34c970af384b75",
+      "catalogHash": "9e0a55339905ffefed31ce6ab8207144ebc15a80cc56be08f3494f426717e553",
+      "hostLogHash": "a7946700ea66ba791939150df69909d37b4a63cd5ed0a07de6a039719f4f6599",
+      "receiptDigest": "ed0f69a5c7ebcecfab03ca3ec71b2f1dbccea644765459a1694baad05ffcd028",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": false,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": false
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 21,
+      "executionId": "04f2f218-f98b-4ee2-aaf0-75e4df5f4d66",
+      "caseId": "sentence-edit",
+      "variantId": "existing-discipline",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "0466f29e233f6723751d10b76af11ca5c701ed8e11db4fafef34c970af384b75",
+      "catalogHash": "9e0a55339905ffefed31ce6ab8207144ebc15a80cc56be08f3494f426717e553",
+      "hostLogHash": "8534a34edafcb24df3cd86e50cd034979f43891a6f337ed37420a62a14aeac14",
+      "receiptDigest": "1193d635673ddc207a92637c4f2120357735220ab0d6394fbcc0b35d187aa69c",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": true,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 22,
+      "executionId": "f128a529-3c86-456e-a28c-8cf01ff4e2e1",
+      "caseId": "skill-name-discussion",
+      "variantId": "existing-discipline",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "69fdcf5f0cd615c6aa93302ddc3b9eb34aeef5d01dd0e3cee6a40a6efaa68680",
+      "catalogHash": "9e0a55339905ffefed31ce6ab8207144ebc15a80cc56be08f3494f426717e553",
+      "hostLogHash": "3d8966bb8570d1e5fefbe342c0ba101d580224da7fdc185191c3b492332df747",
+      "receiptDigest": "f1ae0d2d6d886ff786bca99e9373b30a0dd36eb3087ed4f769a48853ae69df43",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": false,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": false
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 1,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 23,
+      "executionId": "ec9d2f3f-93dc-4c9c-8d16-f2693b548b0e",
+      "caseId": "skill-name-discussion",
+      "variantId": "existing-discipline",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "69fdcf5f0cd615c6aa93302ddc3b9eb34aeef5d01dd0e3cee6a40a6efaa68680",
+      "catalogHash": "9e0a55339905ffefed31ce6ab8207144ebc15a80cc56be08f3494f426717e553",
+      "hostLogHash": "3c54bf52513732a6ae96e7b28be1dc4d49bc8f2267d7cdfe556543e4d1b897c9",
+      "receiptDigest": "25ff21c221937b370979a6717d2b3eea4e97b1ee24543b76cfef70d041448d1f",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": false,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": false
+        },
+        {
+          "id": "r2",
+          "met": false
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 1,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 24,
+      "executionId": "addc4db2-d174-4a19-9bad-c7eb7883f969",
+      "caseId": "analyze-natural",
+      "variantId": "analyze-description",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "7c9e9e161a75b0ea614114f516ae71d6a1233661340c6eff3f19cee2afd5c104",
+      "inputHash": "ba933d1fc284b1732c576b64c2a70adbe7985267345279bb869a1eff1f71d2d8",
+      "catalogHash": "ac8c3937b87aad74ae3621c03124e352b91d036e47b19a59dba3552b3d859b4e",
+      "hostLogHash": "7b41ff031992540c4dcf61e9d149d908144cfb52fed9c95efae8dc11388def67",
+      "receiptDigest": "ac6ddf4eb5b4345ac5fea49e19d2bbfc7ac5c3af6f7cc6d5b1a1b68caf03660c",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": true,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 25,
+      "executionId": "2b3df505-2ba6-42d4-97e8-80ddfae19a55",
+      "caseId": "analyze-natural",
+      "variantId": "analyze-description",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "ba933d1fc284b1732c576b64c2a70adbe7985267345279bb869a1eff1f71d2d8",
+      "catalogHash": "9e0a55339905ffefed31ce6ab8207144ebc15a80cc56be08f3494f426717e553",
+      "hostLogHash": "f2ef06df4737ca174dce9743a2dbcada3bd06d4a54c57f61d0965b8cd30e8224",
+      "receiptDigest": "6a6d85002dc9cd8d011a327f90a274972b2a0e48d953c9ca16dd085d4eb694f4",
+      "ended": true,
+      "timedOut": true,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "aborted",
+      "eligible": false,
+      "pass": null,
+      "behaviorPassed": null,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": null
+        },
+        {
+          "id": "r2",
+          "met": null
+        }
+      ],
+      "unsupportedChecks": null,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": null,
+        "wrongSkillLoads": null,
+        "prematureActions": null,
+        "unnecessaryLoads": null,
+        "unsupportedChecks": null,
+        "userInterventions": null
+      },
+      "readinessReasons": [
+        "actions-incomplete",
+        "actions-incomplete"
+      ]
+    },
+    {
+      "index": 26,
+      "executionId": "5d2f512a-c8e0-4581-a349-f51221fd10cf",
+      "caseId": "analyze-explicit",
+      "variantId": "analyze-description",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "7c9e9e161a75b0ea614114f516ae71d6a1233661340c6eff3f19cee2afd5c104",
+      "inputHash": "ee4e71832f9dc7b7eb0a7c8307841c48128b5ef2d368a24481f6cb4b4f635da7",
+      "catalogHash": "ac8c3937b87aad74ae3621c03124e352b91d036e47b19a59dba3552b3d859b4e",
+      "hostLogHash": "4591954a03b26baa5474dedfc80ce6206ddf0b339a8afa6dbf588fe3bba9b321",
+      "receiptDigest": "f013c20511bb2e18f81b6ae1cab15bba8e88d35b5f0d86a0088d344149ad4e8e",
+      "ended": true,
+      "timedOut": true,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "error",
+      "eligible": false,
+      "pass": null,
+      "behaviorPassed": null,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": false
+        }
+      ],
+      "unsupportedChecks": null,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": null,
+        "wrongSkillLoads": null,
+        "prematureActions": null,
+        "unnecessaryLoads": null,
+        "unsupportedChecks": null,
+        "userInterventions": null
+      },
+      "readinessReasons": [
+        "actions-incomplete",
+        "actions-incomplete"
+      ]
+    },
+    {
+      "index": 27,
+      "executionId": "906aa41c-c2d2-4d15-b700-11208b959224",
+      "caseId": "analyze-explicit",
+      "variantId": "analyze-description",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "ee4e71832f9dc7b7eb0a7c8307841c48128b5ef2d368a24481f6cb4b4f635da7",
+      "catalogHash": "9e0a55339905ffefed31ce6ab8207144ebc15a80cc56be08f3494f426717e553",
+      "hostLogHash": "e1f92cd16727e26805f7e947d76c1fe8ee7a558ac9b04076421baca79a8e1edb",
+      "receiptDigest": "949a90861a407d36973997515358de204eb4bfc72b634539b7e8661d18b41a3a",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "error",
+      "eligible": false,
+      "pass": null,
+      "behaviorPassed": null,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": null
+        },
+        {
+          "id": "r2",
+          "met": null
+        }
+      ],
+      "unsupportedChecks": null,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": null,
+        "wrongSkillLoads": null,
+        "prematureActions": null,
+        "unnecessaryLoads": null,
+        "unsupportedChecks": null,
+        "userInterventions": null
+      },
+      "readinessReasons": [
+        "actions-incomplete",
+        "actions-incomplete"
+      ]
+    },
+    {
+      "index": 28,
+      "executionId": "6278e6cc-3382-414e-8bda-7ea090766f24",
+      "caseId": "analyze-negative",
+      "variantId": "analyze-description",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "7c9e9e161a75b0ea614114f516ae71d6a1233661340c6eff3f19cee2afd5c104",
+      "inputHash": "f4043e5f6c112f5d311314b93fbded07824369b5dca30d23fc10f9f7a5801710",
+      "catalogHash": "ac8c3937b87aad74ae3621c03124e352b91d036e47b19a59dba3552b3d859b4e",
+      "hostLogHash": "50485e80f69a2cbdc8d46305d46b630a3f5789285201f0189a4e5aa813335092",
+      "receiptDigest": "cb11b34eaf55e9a10f7fc4a375cca291668ad80bb3668be5d0ef3cdefc22ca9c",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": false,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": false
+        },
+        {
+          "id": "r2",
+          "met": false
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 4,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 29,
+      "executionId": "fbc4d1e6-b915-4ed4-8c01-194829c325c7",
+      "caseId": "analyze-negative",
+      "variantId": "analyze-description",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "f4043e5f6c112f5d311314b93fbded07824369b5dca30d23fc10f9f7a5801710",
+      "catalogHash": "9e0a55339905ffefed31ce6ab8207144ebc15a80cc56be08f3494f426717e553",
+      "hostLogHash": "e1d411f9dda8321780fe4f1bcb3c1994ca36817e6ed73136e17276ae1277b189",
+      "receiptDigest": "a08380f87451d3da671f23d0fe5de8d2efd34759f0169e405b2a5dd77ef455c2",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": false,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": false
+        },
+        {
+          "id": "r2",
+          "met": false
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 3,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 30,
+      "executionId": "37574cde-419d-4e85-9c5d-3c892cf1d4a9",
+      "caseId": "done-verified",
+      "variantId": "done-description",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "a737f5bb014b96a91d9c29a2c678273215cf03f1d9e9b52db26613d7be89d037",
+      "catalogHash": "9e0a55339905ffefed31ce6ab8207144ebc15a80cc56be08f3494f426717e553",
+      "hostLogHash": "6d8c229d54b061f2e44eb06a5ca09667a1a8a96e9e30294c1e1ddb6a34d78c93",
+      "receiptDigest": "bf6d353ecd55755d12d02608d7d9b0e19d217e8423f20618e3c800fb1efd5214",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "error",
+      "eligible": false,
+      "pass": null,
+      "behaviorPassed": null,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": null
+        },
+        {
+          "id": "r2",
+          "met": null
+        }
+      ],
+      "unsupportedChecks": null,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": null,
+        "wrongSkillLoads": null,
+        "prematureActions": null,
+        "unnecessaryLoads": null,
+        "unsupportedChecks": null,
+        "userInterventions": null
+      },
+      "readinessReasons": [
+        "actions-incomplete",
+        "actions-incomplete"
+      ]
+    },
+    {
+      "index": 31,
+      "executionId": "09ec8fb3-5a41-4ef1-9c05-3bf5c8b49839",
+      "caseId": "done-verified",
+      "variantId": "done-description",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "4bdb429ba3471131f1bd0acece7077336f32b70bfec3ae512c2575bc67136c28",
+      "inputHash": "a737f5bb014b96a91d9c29a2c678273215cf03f1d9e9b52db26613d7be89d037",
+      "catalogHash": "fd0607608aefd1a17a5cb066c64a27da4df2c681a86adf87e8c7e9aee473421e",
+      "hostLogHash": "6a34aedc0c7a9c889088b9febf534cb0eb0ed5c0bf58c2bfd7e09817435d839b",
+      "receiptDigest": "23fd4875de6a4452d2a428112f4eced89cf7056fb4ca9b7a511bd36b2feccf9d",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 1,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 32,
+      "executionId": "f605fdca-872f-4414-9936-1ff26410a449",
+      "caseId": "done-unverified",
+      "variantId": "done-description",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "23391dc893afc7ef48668223eb8d62cda6c87ce5808207203b2c74bd0512384b",
+      "catalogHash": "9e0a55339905ffefed31ce6ab8207144ebc15a80cc56be08f3494f426717e553",
+      "hostLogHash": "d42603038987ffc15b1c825acc7ebec84961fa7a79936fd4d9f1274fb433fad2",
+      "receiptDigest": "64e031b1da7ec4ff7aa302223a603fb067e04b61443c334ba4188a7bde8d196a",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": true,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 33,
+      "executionId": "5e580924-3f6c-4bf9-93b2-0fc1b6d0bb1c",
+      "caseId": "done-unverified",
+      "variantId": "done-description",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "4bdb429ba3471131f1bd0acece7077336f32b70bfec3ae512c2575bc67136c28",
+      "inputHash": "23391dc893afc7ef48668223eb8d62cda6c87ce5808207203b2c74bd0512384b",
+      "catalogHash": "fd0607608aefd1a17a5cb066c64a27da4df2c681a86adf87e8c7e9aee473421e",
+      "hostLogHash": "4434a85fac108f9b6ba1d5eeb8b14702c2ed42db183266479b23686f6ba1a5ec",
+      "receiptDigest": "64c3508f5e343f76f933ea6a49001647264c3437ec87e14832d628af87b89fa1",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": true,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 34,
+      "executionId": "4022d31b-2cc6-4fa9-85a1-731b5e732c97",
+      "caseId": "done-negative",
+      "variantId": "done-description",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "0e910ebf92db4c552df46bdbbf4061e7e1d979efc2edd06bc2d3265c2c856010",
+      "catalogHash": "9e0a55339905ffefed31ce6ab8207144ebc15a80cc56be08f3494f426717e553",
+      "hostLogHash": "a0a11a489f3166edffc7626d1cdfae6a0d5d919d247f3452b16b8a3a50402e41",
+      "receiptDigest": "a42ae951ac0263de8066efac7c3ea940930e1844a0414b8ce20cf8903831a69b",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": false,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": false
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 3,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 35,
+      "executionId": "9de06c41-d691-45da-9be3-f0e14ff8ead3",
+      "caseId": "done-negative",
+      "variantId": "done-description",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "4bdb429ba3471131f1bd0acece7077336f32b70bfec3ae512c2575bc67136c28",
+      "inputHash": "0e910ebf92db4c552df46bdbbf4061e7e1d979efc2edd06bc2d3265c2c856010",
+      "catalogHash": "fd0607608aefd1a17a5cb066c64a27da4df2c681a86adf87e8c7e9aee473421e",
+      "hostLogHash": "e9cd5e08928bf305367a00ba3bf1002af2181e4b48cdd4f245abfe95c1a236db",
+      "receiptDigest": "d3989d63d49664ca270032bd2ac30d4b8ff34e620fe23baf968314108169464a",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": false,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": false
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 1,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 36,
+      "executionId": "c19a0043-05d6-42e1-87c7-517cbf2e8aea",
+      "caseId": "mode-explicit",
+      "variantId": "mode-description",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "30e3447c01ffccc69a409e88dccaa2cd3c5f59f7f5517b7dd65a1b896dc23dc8",
+      "inputHash": "0f9a5c61126b6d437ec6127eb514aac603d2b6fea7890dcfe1a20ab625951442",
+      "catalogHash": "bd26bbf67bd75b3120b6e563679fd39038a057c5ee052a1188314b0e5bbbbe00",
+      "hostLogHash": "555547fade46783832e2f4ce3c91a7af965a8ef2e04012fe904bfe7267079f53",
+      "receiptDigest": "1b6c8b4246dea987f938a9f7b8bbf96cf7bd7266147bb4768f60fe3da0e0ab8c",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": true,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 37,
+      "executionId": "2cde8f9a-5039-4623-8050-671d25f7c180",
+      "caseId": "mode-explicit",
+      "variantId": "mode-description",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "0f9a5c61126b6d437ec6127eb514aac603d2b6fea7890dcfe1a20ab625951442",
+      "catalogHash": "9e0a55339905ffefed31ce6ab8207144ebc15a80cc56be08f3494f426717e553",
+      "hostLogHash": "581b48dd2f43ec693295f799132e6b1e1c7ec400c3ad3d99ad986e491b528e4a",
+      "receiptDigest": "17f2e5b416eb544bbb2b4e5fe3598d67fb21610e8806374f1bcb766ca8fd37fe",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": true,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 38,
+      "executionId": "287f2100-dcbb-4757-a43d-66d22ffd16b3",
+      "caseId": "mode-discussion",
+      "variantId": "mode-description",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "30e3447c01ffccc69a409e88dccaa2cd3c5f59f7f5517b7dd65a1b896dc23dc8",
+      "inputHash": "e528b9c76b68d06fe5da924be14803cb8c4d762c5526bdc1b5e2d70e8e9d90b7",
+      "catalogHash": "bd26bbf67bd75b3120b6e563679fd39038a057c5ee052a1188314b0e5bbbbe00",
+      "hostLogHash": "8980d5c10f1c9f29f37d19dabf501c81100470b21fd94c580bcb1932d55bbd0e",
+      "receiptDigest": "369e368fc404c986dc10be450669c13bf796f18798273fe94d6289a0cafe569e",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": false,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": false
+        },
+        {
+          "id": "r2",
+          "met": false
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 1,
+        "prematureActions": 0,
+        "unnecessaryLoads": 1,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 39,
+      "executionId": "d077150a-9595-4a5b-a492-214649a20864",
+      "caseId": "mode-discussion",
+      "variantId": "mode-description",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "e528b9c76b68d06fe5da924be14803cb8c4d762c5526bdc1b5e2d70e8e9d90b7",
+      "catalogHash": "9e0a55339905ffefed31ce6ab8207144ebc15a80cc56be08f3494f426717e553",
+      "hostLogHash": "794fe461993266ea501250bb18ea46e44a0e49eb03cb303fafb349e6945c046d",
+      "receiptDigest": "23160e6937123ef578c04a4a4bd20cc598c091f89304877162b9a297ad730e6e",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": true,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 40,
+      "executionId": "456cc0ca-0c6a-4789-9bef-94b0ad79cc9e",
+      "caseId": "review-evidence-supported",
+      "variantId": "review-composition",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "04423a499bf9a03de1ab2ff0335011424e25795fb71670b425b3ba08752f139b",
+      "catalogHash": "e1784366d795ed24aabf8fde0e55ed7754d92a6d2be60bc9d43ba399157f257a",
+      "hostLogHash": "c0bc5416a70dc7c1bacc630670b1349349f64e66582b44bc2cd456642c96adfd",
+      "receiptDigest": "2db21977e02e76b4ee126be32acb3f58669abc93fd1ef9cf6648ac3b961f8b49",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": false,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": false
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 41,
+      "executionId": "018faae8-1164-46c8-abc6-40784bf9139e",
+      "caseId": "review-evidence-supported",
+      "variantId": "review-composition",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "2f007ec8f95df29ce631842c72eeee49ccf74d0697771df0a72824c5ea9283ad",
+      "inputHash": "04423a499bf9a03de1ab2ff0335011424e25795fb71670b425b3ba08752f139b",
+      "catalogHash": "1cd7be5000830bc373760c41164728c92877c032218c03a0b89da90fbf61670e",
+      "hostLogHash": "78fcc983669e7ef54010c0ba08fc083a41124c9740267a6d867bd51a65efafeb",
+      "receiptDigest": "ef7e41262d64847583df2d0dd449e50e63a540a3a2e9eeb4daa35c138e3e4357",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": false,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": false
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 42,
+      "executionId": "2e9bac01-70ff-4894-af7f-046f5ab924b9",
+      "caseId": "review-evidence-unsupported",
+      "variantId": "review-composition",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "fc087cfe11c45e73a8eb5712795cc4cba37797a6fdc3727eb16c35fc7b9e38b8",
+      "catalogHash": "e1784366d795ed24aabf8fde0e55ed7754d92a6d2be60bc9d43ba399157f257a",
+      "hostLogHash": "d8544b12aded58105a683f8723dbb14f55990b1e8666ed6d1a564518c2071d8a",
+      "receiptDigest": "c2d06fd6ebd36122130e93db06d9ebc1259c0ecec14cde2f7f54ba22579bb4e0",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": false,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": false
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 43,
+      "executionId": "f0728597-7729-4ce1-979c-d1c0c4bf8654",
+      "caseId": "review-evidence-unsupported",
+      "variantId": "review-composition",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "2f007ec8f95df29ce631842c72eeee49ccf74d0697771df0a72824c5ea9283ad",
+      "inputHash": "fc087cfe11c45e73a8eb5712795cc4cba37797a6fdc3727eb16c35fc7b9e38b8",
+      "catalogHash": "1cd7be5000830bc373760c41164728c92877c032218c03a0b89da90fbf61670e",
+      "hostLogHash": "ba401c11e35530791051ef2f2d3d7032c63da05771b890c7d8113b6b8b8369e4",
+      "receiptDigest": "4b3ff962dceb7868f690105967214d12b85e5a7f7822bb6c568f0df4f57f7f4c",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": true,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 44,
+      "executionId": "3803d66a-2317-420f-b6ac-8aa2cee519af",
+      "caseId": "review-evidence-stale",
+      "variantId": "review-composition",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "970d0161fcdb68040bcf7fb2ebe457100c5878a5fc1de2d8c6ba3e1faef05c8e",
+      "catalogHash": "e1784366d795ed24aabf8fde0e55ed7754d92a6d2be60bc9d43ba399157f257a",
+      "hostLogHash": "6b6095bd5881ba0d5946d0023ced4e7c32bf4d55ef3299c42fd34689a076d05c",
+      "receiptDigest": "cf6ebf74f4c547122b11df2a1cd4018ddd7e93ff6058bcb15b8ced695c3df7e6",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": false,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": false
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 45,
+      "executionId": "fb5d483f-6d03-4da8-8390-84e84276ad99",
+      "caseId": "review-evidence-stale",
+      "variantId": "review-composition",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "2f007ec8f95df29ce631842c72eeee49ccf74d0697771df0a72824c5ea9283ad",
+      "inputHash": "970d0161fcdb68040bcf7fb2ebe457100c5878a5fc1de2d8c6ba3e1faef05c8e",
+      "catalogHash": "1cd7be5000830bc373760c41164728c92877c032218c03a0b89da90fbf61670e",
+      "hostLogHash": "e877b482033685c6233ba63b8c5eb1638cf0a74187767a8d635a9d2ca4d69735",
+      "receiptDigest": "577449b60c7a9f62b2934f2cef17260ffba47b97c1a14cac131d371ddb7ac0ec",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": false,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": false
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 46,
+      "executionId": "c5893d0f-e131-4a72-88c1-2904de81ed1f",
+      "caseId": "review-evidence-incomplete",
+      "variantId": "review-composition",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "1db5104251ea1cbb28e61d0a9ad1235320d6ecc18fba72c27ed54a135834fe76",
+      "catalogHash": "e1784366d795ed24aabf8fde0e55ed7754d92a6d2be60bc9d43ba399157f257a",
+      "hostLogHash": "448d5c92436deb584fe0b63298ef781542d0fe3578266f9833a9fd65b8668950",
+      "receiptDigest": "5e0670161fe57ab3072e22d526f389d328c46cc862dbe8c3e72d0d8f88559b39",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": false,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": false
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 47,
+      "executionId": "28f14ab2-52e4-4ad5-90e4-dcc1eb3d46d6",
+      "caseId": "review-evidence-incomplete",
+      "variantId": "review-composition",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "2f007ec8f95df29ce631842c72eeee49ccf74d0697771df0a72824c5ea9283ad",
+      "inputHash": "1db5104251ea1cbb28e61d0a9ad1235320d6ecc18fba72c27ed54a135834fe76",
+      "catalogHash": "1cd7be5000830bc373760c41164728c92877c032218c03a0b89da90fbf61670e",
+      "hostLogHash": "cc1edabc3eb178bc321b950d46d182524eb886bbc63ee8bf15c2d39f91e6472c",
+      "receiptDigest": "bc619c31745080167c16ad532359566ca010f6654bbb321599cc84f65643ca04",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": false,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": false
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 48,
+      "executionId": "a020131a-567b-44e3-9d72-4c94fae495a6",
+      "caseId": "valid-remedy",
+      "variantId": "review-assessment",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "6bdad5dfa3539c580c41916eaa4bbe0dfef06c217e1cd6af26abb1232b63370b",
+      "inputHash": "d5f0afc03b480d64e6b5b242a80481482a7161cacee7afde6f883bbd1e2b722f",
+      "catalogHash": "6a17232c8f80e233afad7bdc86eaf2c52f7b532e2a92ed75bf39cbab8eb66b7f",
+      "hostLogHash": "8b9f7a027aa174488b3e21dd9dca666ec8f88822af2b441aeb44a345806b37af",
+      "receiptDigest": "1fec882b8c62e73913b0c9108a6719c42f6d7b6c6d1d146279142e85a2d2efe5",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 1,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 49,
+      "executionId": "b5990193-4c1e-4c29-872c-82db941321fe",
+      "caseId": "valid-remedy",
+      "variantId": "review-assessment",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "d5f0afc03b480d64e6b5b242a80481482a7161cacee7afde6f883bbd1e2b722f",
+      "catalogHash": "6a17232c8f80e233afad7bdc86eaf2c52f7b532e2a92ed75bf39cbab8eb66b7f",
+      "hostLogHash": "94350695d09cba04329b125590c101153bce53a8ef41e392971ab1932040e80d",
+      "receiptDigest": "3018762dca9858056f8c25a7ffd9ace90eda11c5f3c140c22906e095eab10e16",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 1,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 50,
+      "executionId": "f1ea817a-aa6a-4584-bcc5-5d48aa79383b",
+      "caseId": "false-premise",
+      "variantId": "review-assessment",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "6bdad5dfa3539c580c41916eaa4bbe0dfef06c217e1cd6af26abb1232b63370b",
+      "inputHash": "0ac79fe4e029b9552753106c3d56a42c68ead77abd8f18558e29d87a9f3d1de4",
+      "catalogHash": "6a17232c8f80e233afad7bdc86eaf2c52f7b532e2a92ed75bf39cbab8eb66b7f",
+      "hostLogHash": "3d291a3b2dd4b078293a30026fe59cfba3857a15a1ea741ae9e2ca5da8464258",
+      "receiptDigest": "4335c760c2ae21641851eccfdaa8262861285b5a134f86de4594845c4d2c4df8",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 1,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 51,
+      "executionId": "3b89efb6-d7db-473f-a534-1ef4d0e2b523",
+      "caseId": "false-premise",
+      "variantId": "review-assessment",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "0ac79fe4e029b9552753106c3d56a42c68ead77abd8f18558e29d87a9f3d1de4",
+      "catalogHash": "6a17232c8f80e233afad7bdc86eaf2c52f7b532e2a92ed75bf39cbab8eb66b7f",
+      "hostLogHash": "b98e5128f18b7ca2e48fae5e961a7077c794b29d3472a953c6be463ec9df05c4",
+      "receiptDigest": "67060aaffdda5d914ebaf7137e61194f623a4c6a070fc7850d0629ed57f62401",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 1,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 52,
+      "executionId": "544b5c79-bc88-4c07-8560-bf736dd9355d",
+      "caseId": "stale-target",
+      "variantId": "review-assessment",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "6bdad5dfa3539c580c41916eaa4bbe0dfef06c217e1cd6af26abb1232b63370b",
+      "inputHash": "3c1a9d920a25166c1d7f7394221e1c226d45ec1dee06f70e77d7b3abcd9235cb",
+      "catalogHash": "6a17232c8f80e233afad7bdc86eaf2c52f7b532e2a92ed75bf39cbab8eb66b7f",
+      "hostLogHash": "7efae75786cb9e6bc8098f20d06e9403484b0d569f87a5c32c85a1916c6a1af4",
+      "receiptDigest": "dc8be7fffe1f479538eae952137e5e4037172b9f79380ee5b9d8b5182683a7ba",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": true,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 53,
+      "executionId": "db1fc187-b679-4f63-82d1-35e853fb1b6c",
+      "caseId": "stale-target",
+      "variantId": "review-assessment",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "3c1a9d920a25166c1d7f7394221e1c226d45ec1dee06f70e77d7b3abcd9235cb",
+      "catalogHash": "6a17232c8f80e233afad7bdc86eaf2c52f7b532e2a92ed75bf39cbab8eb66b7f",
+      "hostLogHash": "9ce83e9b1fbebe623fa85455d15eae82e73b545fbf5f94562ae74bff112cf5a7",
+      "receiptDigest": "701f5bb5258f367b2b27a0e09c68e69c09bc311eb24a67f461e76d2bbac5e9f4",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 1,
+      "unnecessaryChanges": 2,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 54,
+      "executionId": "b6b9c547-8687-40a5-a983-eb831c419c0b",
+      "caseId": "harmful-remedy",
+      "variantId": "review-assessment",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "6bdad5dfa3539c580c41916eaa4bbe0dfef06c217e1cd6af26abb1232b63370b",
+      "inputHash": "0d1d2dd70c1b35f86137606a0a7df440a7a973f47957b8aa9015ade6fa1085f8",
+      "catalogHash": "6a17232c8f80e233afad7bdc86eaf2c52f7b532e2a92ed75bf39cbab8eb66b7f",
+      "hostLogHash": "5c8b9cd69055d954a04f6c1399370a03d6bd1aeba1dc1e635291c4799d1b507c",
+      "receiptDigest": "8e2b77474ee01054db5749bacc6c696b14170d5aa8d174c6e1d408ad1e9101d5",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": true,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 55,
+      "executionId": "e3d7e2a3-d163-4d26-9a76-8bb2a1183a63",
+      "caseId": "harmful-remedy",
+      "variantId": "review-assessment",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "0d1d2dd70c1b35f86137606a0a7df440a7a973f47957b8aa9015ade6fa1085f8",
+      "catalogHash": "6a17232c8f80e233afad7bdc86eaf2c52f7b532e2a92ed75bf39cbab8eb66b7f",
+      "hostLogHash": "ac32bb0145a1c950dd3bbd3463f153914bb22f544e8daf659355e6aff42c8bf8",
+      "receiptDigest": "819a909d83964c3f6bcebba0fd8291352e9ecc37487e6b499a2ca44f1df36e87",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 1,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 1,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 56,
+      "executionId": "53a9222f-9b55-4cab-a315-f5954edca900",
+      "caseId": "disputed-blocker",
+      "variantId": "review-assessment",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "6bdad5dfa3539c580c41916eaa4bbe0dfef06c217e1cd6af26abb1232b63370b",
+      "inputHash": "0ac79fe4e029b9552753106c3d56a42c68ead77abd8f18558e29d87a9f3d1de4",
+      "catalogHash": "6a17232c8f80e233afad7bdc86eaf2c52f7b532e2a92ed75bf39cbab8eb66b7f",
+      "hostLogHash": "515c283c0e4a41107dd7be7fe51f0761c30dc7c55adf8c7384a365acecdb02a0",
+      "receiptDigest": "62e8d7fa71c9dd45c69eaf0893ab5971c740860f9c531372a1c1567d0a8f4db3",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 1,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 57,
+      "executionId": "d0f7106d-0150-43f6-8269-17b9e6804779",
+      "caseId": "disputed-blocker",
+      "variantId": "review-assessment",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "0ac79fe4e029b9552753106c3d56a42c68ead77abd8f18558e29d87a9f3d1de4",
+      "catalogHash": "6a17232c8f80e233afad7bdc86eaf2c52f7b532e2a92ed75bf39cbab8eb66b7f",
+      "hostLogHash": "42c2659f592d6226852e6e3368db83ba981a40a7564e4a341f5d17e2dc3ba7d9",
+      "receiptDigest": "ad18b5f22f016470f11bab3d9e56cf3195b2911839a38f88f593b200ef1ee5d9",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": true,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 58,
+      "executionId": "0bfbce6a-b9b6-4a1b-9f29-c2973a5c16ac",
+      "caseId": "lost-option",
+      "variantId": "boundary-tracing",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "9fa23325d1a071df79a69305fac8583e8bdf6d1e902b0aebeb754322532f3853",
+      "catalogHash": "b9c444a66cf3eb7b3d63ead089087f1467f708607c9ebbc624415e200b9b1331",
+      "hostLogHash": "882d143370f05a71427a130df1990076f418e396613dbe90afc6dc63cff7fa8a",
+      "receiptDigest": "3a35e1bb3d154fc7376fed7d48ac07796e403a79e256c504233b8a8861ef7f6b",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": true,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 59,
+      "executionId": "bdc9a762-3d98-4d90-90fd-70442ca7b50f",
+      "caseId": "lost-option",
+      "variantId": "boundary-tracing",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "8c574e3ef8892a8ef009d6aec2d1eca072d45e8f98c361083cd71b0a8deb46a2",
+      "inputHash": "9fa23325d1a071df79a69305fac8583e8bdf6d1e902b0aebeb754322532f3853",
+      "catalogHash": "e2a328a4830d1be4be7f906c45d616337f7075a48df3f4f139dfde236e3a4cb7",
+      "hostLogHash": "15ba26079555ebec512a926369ba4ad14b5670032632cf747a35fa346d57c4b7",
+      "receiptDigest": "be79fb741ec2d0e485c386c7e624c570c7d290fa1b532c4f3238c3bf4d13cb36",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 1,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 60,
+      "executionId": "5afda6fc-58d5-4b67-b640-f8c92609b4e1",
+      "caseId": "unavailable-boundary",
+      "variantId": "boundary-tracing",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "a0e74b31f8ff914492ff9c68402105c8c9151ffac06b66ea48be30e59c2717a8",
+      "catalogHash": "b9c444a66cf3eb7b3d63ead089087f1467f708607c9ebbc624415e200b9b1331",
+      "hostLogHash": "83de9cca9d6f9f73f67a473dd570ca0cfbbd27260a3fe264a8b52f6681ee394f",
+      "receiptDigest": "febb5429dc7c45b9bd92d85d22a650ac5a26a8904cdd32b82e176ac32ed43c7d",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 1,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 61,
+      "executionId": "b84f30c9-0678-4959-9c63-11880b9009bb",
+      "caseId": "unavailable-boundary",
+      "variantId": "boundary-tracing",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "8c574e3ef8892a8ef009d6aec2d1eca072d45e8f98c361083cd71b0a8deb46a2",
+      "inputHash": "a0e74b31f8ff914492ff9c68402105c8c9151ffac06b66ea48be30e59c2717a8",
+      "catalogHash": "e2a328a4830d1be4be7f906c45d616337f7075a48df3f4f139dfde236e3a4cb7",
+      "hostLogHash": "51f44d3408871504a474b0ea911ec07aa8dd1af503b17d8d608f488091f91ab8",
+      "receiptDigest": "a6582b318919a228c6eec6e7ac3a2cf5c6fc2f0c0f69d2f527217b4e79999045",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 1,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 62,
+      "executionId": "fd977234-94fc-411f-858e-f97694dcd6a9",
+      "caseId": "single-polluter",
+      "variantId": "test-pollution",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "9c071523b75a549aa460b06bdc06371b0ec447bcb1aead2b8c6805b0d0badaf5",
+      "inputHash": "355b42ec74dcef9e17d3625705d4f5e1a1f32470b474b0464316bd173f2d224e",
+      "catalogHash": "b9c444a66cf3eb7b3d63ead089087f1467f708607c9ebbc624415e200b9b1331",
+      "hostLogHash": "8b70c72a7a295f5cf5180394ff2989658a9bca54629a40b8f4d7635b47e6ffe2",
+      "receiptDigest": "218a1490e5e923f16e39bc7501ad50e32834997f1dcff2d3dbc22647e9a9b77b",
+      "ended": true,
+      "timedOut": true,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "aborted",
+      "eligible": false,
+      "pass": null,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": null
+        },
+        {
+          "id": "r2",
+          "met": null
+        }
+      ],
+      "unsupportedChecks": null,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": null,
+        "wrongSkillLoads": null,
+        "prematureActions": null,
+        "unnecessaryLoads": null,
+        "unsupportedChecks": null,
+        "userInterventions": null
+      },
+      "readinessReasons": [
+        "actions-incomplete",
+        "actions-incomplete"
+      ]
+    },
+    {
+      "index": 63,
+      "executionId": "fdf8c48d-a7d7-4ee3-8a64-8471e1cc0676",
+      "caseId": "single-polluter",
+      "variantId": "test-pollution",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "355b42ec74dcef9e17d3625705d4f5e1a1f32470b474b0464316bd173f2d224e",
+      "catalogHash": "b9c444a66cf3eb7b3d63ead089087f1467f708607c9ebbc624415e200b9b1331",
+      "hostLogHash": "e05ac3117b7ec4c611280391b3d177c11e293abcfdd1e4e0e29e97f1d63b304c",
+      "receiptDigest": "8ddf63258cd02e73e8d4b1ff361e79b6f5d91cc88084661dabfbe0aac56efc95",
+      "ended": true,
+      "timedOut": true,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "aborted",
+      "eligible": false,
+      "pass": null,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": null
+        },
+        {
+          "id": "r2",
+          "met": null
+        }
+      ],
+      "unsupportedChecks": null,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": null,
+        "wrongSkillLoads": null,
+        "prematureActions": null,
+        "unnecessaryLoads": null,
+        "unsupportedChecks": null,
+        "userInterventions": null
+      },
+      "readinessReasons": [
+        "actions-incomplete",
+        "actions-incomplete"
+      ]
+    },
+    {
+      "index": 64,
+      "executionId": "bb3fda32-c3e3-4948-95e4-cdcdaa1fea7a",
+      "caseId": "joint-polluters",
+      "variantId": "test-pollution",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "9c071523b75a549aa460b06bdc06371b0ec447bcb1aead2b8c6805b0d0badaf5",
+      "inputHash": "cec73863c509c43bcc534070590fae181afc1b82d913230b4c8cf4e82f62ae38",
+      "catalogHash": "b9c444a66cf3eb7b3d63ead089087f1467f708607c9ebbc624415e200b9b1331",
+      "hostLogHash": "1ff667005579b70dd2eb88ef9c4ad4e8dcbf397bc70c423d0bf4408a9a604973",
+      "receiptDigest": "beccec28789725b990bd52d076f53437f4a6638a83da18ed6f8b463c5f240eb5",
+      "ended": true,
+      "timedOut": true,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "aborted",
+      "eligible": false,
+      "pass": null,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": null
+        },
+        {
+          "id": "r2",
+          "met": null
+        }
+      ],
+      "unsupportedChecks": null,
+      "unnecessaryChanges": 1,
+      "actionMetrics": {
+        "missedLoads": null,
+        "wrongSkillLoads": null,
+        "prematureActions": null,
+        "unnecessaryLoads": null,
+        "unsupportedChecks": null,
+        "userInterventions": null
+      },
+      "readinessReasons": [
+        "actions-incomplete",
+        "actions-incomplete"
+      ]
+    },
+    {
+      "index": 65,
+      "executionId": "45d4fb31-2d4e-470d-8202-1e3747f3c849",
+      "caseId": "joint-polluters",
+      "variantId": "test-pollution",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "cec73863c509c43bcc534070590fae181afc1b82d913230b4c8cf4e82f62ae38",
+      "catalogHash": "b9c444a66cf3eb7b3d63ead089087f1467f708607c9ebbc624415e200b9b1331",
+      "hostLogHash": "3a3b1672a629a827e44e405a3af8db64f2612646b569b19882b3dd730a383ef5",
+      "receiptDigest": "87f4cf19a760078387f1e3ff76b72fb475eff912a4eba5722055548b5a56678a",
+      "ended": true,
+      "timedOut": true,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "aborted",
+      "eligible": false,
+      "pass": null,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": null
+        },
+        {
+          "id": "r2",
+          "met": null
+        }
+      ],
+      "unsupportedChecks": null,
+      "unnecessaryChanges": 1,
+      "actionMetrics": {
+        "missedLoads": null,
+        "wrongSkillLoads": null,
+        "prematureActions": null,
+        "unnecessaryLoads": null,
+        "unsupportedChecks": null,
+        "userInterventions": null
+      },
+      "readinessReasons": [
+        "actions-incomplete",
+        "actions-incomplete"
+      ]
+    },
+    {
+      "index": 66,
+      "executionId": "77cc9136-b607-4c6a-8992-3b735bd44174",
+      "caseId": "unrelated-error",
+      "variantId": "test-pollution",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "9c071523b75a549aa460b06bdc06371b0ec447bcb1aead2b8c6805b0d0badaf5",
+      "inputHash": "535b7e1ef4dabcffd0ac58fde20e7c5154be9e27929cf53aaa56bd44024a5a7f",
+      "catalogHash": "b9c444a66cf3eb7b3d63ead089087f1467f708607c9ebbc624415e200b9b1331",
+      "hostLogHash": "a7a9e79e888ab98ed3d794cb5f41ef852940e79e203155a933f7021d9e0ad7ef",
+      "receiptDigest": "0a438fde84fb732531b012e088fd11419b4ccf3ba5d62ae9aacc95cdd0ec55ff",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 1,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 67,
+      "executionId": "f75b4bfb-3557-40be-830d-d373d65046c6",
+      "caseId": "unrelated-error",
+      "variantId": "test-pollution",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "535b7e1ef4dabcffd0ac58fde20e7c5154be9e27929cf53aaa56bd44024a5a7f",
+      "catalogHash": "b9c444a66cf3eb7b3d63ead089087f1467f708607c9ebbc624415e200b9b1331",
+      "hostLogHash": "92cb4c2fbef7f7e255e1b1e2e5ca4947d27c46cc7533ef7080d39bfac1f65202",
+      "receiptDigest": "59829a2d466ed1c55abfc3737aabce43940ecf9ca06b7b4408e51cca5337f91f",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 1,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 68,
+      "executionId": "8a52507a-4c12-44e0-970c-ad141e9a37e9",
+      "caseId": "trial-budget",
+      "variantId": "test-pollution",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "9c071523b75a549aa460b06bdc06371b0ec447bcb1aead2b8c6805b0d0badaf5",
+      "inputHash": "e49e7932d62b5f179253ac3008243f9a4a3f2dd403043bbb77d1222ec04bb7e5",
+      "catalogHash": "b9c444a66cf3eb7b3d63ead089087f1467f708607c9ebbc624415e200b9b1331",
+      "hostLogHash": "5eff0ebde5a2702257ed9d7a938d3179e88b285444958bf91ef7e1b37eca9a65",
+      "receiptDigest": "2b2904c6a7c66fac823e62bc46e36b1e6fa12395c6db4045ddc5d6a3ab5dfdd3",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": false
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 1,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 69,
+      "executionId": "3309ad48-8fec-4ad4-9f36-a9cb675896a2",
+      "caseId": "trial-budget",
+      "variantId": "test-pollution",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "e49e7932d62b5f179253ac3008243f9a4a3f2dd403043bbb77d1222ec04bb7e5",
+      "catalogHash": "b9c444a66cf3eb7b3d63ead089087f1467f708607c9ebbc624415e200b9b1331",
+      "hostLogHash": "4bd777259e17348fd7da46b9a2e1c642815f08e7ecf995be62ffe5808a2dfe31",
+      "receiptDigest": "18c80b6d1a16cc6f293c0aee0a602fbceb366179ce18e49b4d0db31d8522f72a",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": false
+        },
+        {
+          "id": "r2",
+          "met": false
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 1,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 70,
+      "executionId": "a39b6515-8b0e-465c-941b-38e56af256dd",
+      "caseId": "state-alternatives",
+      "variantId": "visual-comparison",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "454f13490cfd6e1964864b3e2396f64cbc33f33615384a977b9b93692eb23eae",
+      "catalogHash": "87e518f33e4b8ebf960ee6f01470aaaa67dc6d28aa161a87f0bba837db27cace",
+      "hostLogHash": "1a4fad95c7b4c0dad0687033e40c957de8a9a2e730f8539b5f85fe33b25cd02d",
+      "receiptDigest": "06b47d0a96389cb2074e5fd9e23a3386768bcbd1db03eaa2aadf5e3aed9e545c",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.84.4",
+      "stopReason": "stop",
+      "eligible": true,
+      "pass": false,
+      "behaviorPassed": false,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": false
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 1,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": []
+    },
+    {
+      "index": 71,
+      "executionId": "82ffbf09-6cce-425b-927a-d090d804f890",
+      "caseId": "state-alternatives",
+      "variantId": "visual-comparison",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "8b370c8cd3d41bac0f211978d9aef4011730830bd2a05cb3b53742109a138b52",
+      "inputHash": "454f13490cfd6e1964864b3e2396f64cbc33f33615384a977b9b93692eb23eae",
+      "catalogHash": "87e518f33e4b8ebf960ee6f01470aaaa67dc6d28aa161a87f0bba837db27cace",
+      "hostLogHash": "86ff608ca7e0cd28fd69652632e6d6b7d38727f776d1356372125b0592650fd0",
+      "receiptDigest": "019fb8520b3be02017c98541b0dae4366fd918548e8d12d2171ee6be95b725e9",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.85.1",
+      "stopReason": "stop",
+      "eligible": false,
+      "pass": null,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 1,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": [
+        "runtime-host",
+        "runtime-hostVersion",
+        "runtime-model",
+        "runtime-effort",
+        "runtime-tools",
+        "runtime-settingsHash"
+      ]
+    },
+    {
+      "index": 72,
+      "executionId": "77ec08fa-8e7e-49fb-a2c4-d87a46cc521d",
+      "caseId": "settled-edit",
+      "variantId": "visual-comparison",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "6e13d7445601186a3de484e7e100fb51b1f332f8fdb31785c9d8f832ac4eeaf7",
+      "catalogHash": "87e518f33e4b8ebf960ee6f01470aaaa67dc6d28aa161a87f0bba837db27cace",
+      "hostLogHash": "38d3299b8189f4ecee9dee3c2039809371ad4b555c5ae8102dc3d6814627c422",
+      "receiptDigest": "bf165b640a15a1dbc71e351d811dc51c01e695494773fa2594bf2a113f5b9660",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.85.1",
+      "stopReason": "stop",
+      "eligible": false,
+      "pass": null,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 1,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": [
+        "runtime-host",
+        "runtime-hostVersion",
+        "runtime-model",
+        "runtime-effort",
+        "runtime-tools",
+        "runtime-settingsHash"
+      ]
+    },
+    {
+      "index": 73,
+      "executionId": "5273e05e-8c7e-4041-bf48-61543572c4bb",
+      "caseId": "settled-edit",
+      "variantId": "visual-comparison",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "8b370c8cd3d41bac0f211978d9aef4011730830bd2a05cb3b53742109a138b52",
+      "inputHash": "6e13d7445601186a3de484e7e100fb51b1f332f8fdb31785c9d8f832ac4eeaf7",
+      "catalogHash": "87e518f33e4b8ebf960ee6f01470aaaa67dc6d28aa161a87f0bba837db27cace",
+      "hostLogHash": "47d024ba297f91399d5709e1a5a4802f36e9151556321e8473f678d4bc50faab",
+      "receiptDigest": "e5551f6fcd695fb11a505ac2250179473f4bf3e99310581d4a1dc67c78eaaf1f",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.85.1",
+      "stopReason": "stop",
+      "eligible": false,
+      "pass": null,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 1,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": [
+        "runtime-host",
+        "runtime-hostVersion",
+        "runtime-model",
+        "runtime-effort",
+        "runtime-tools",
+        "runtime-settingsHash"
+      ]
+    },
+    {
+      "index": 74,
+      "executionId": "0da7ba7f-cc02-4947-852c-c844f006f858",
+      "caseId": "renderer-off",
+      "variantId": "visual-comparison",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "54a64a1f9f9590168a06e97e99ec67e3b0ba87061c34cb6af32215aded9724da",
+      "catalogHash": "87e518f33e4b8ebf960ee6f01470aaaa67dc6d28aa161a87f0bba837db27cace",
+      "hostLogHash": "d0b67f59eb88fab62bc6d8c0a43dd298fa9929865d1e10f54a20548fbea9e278",
+      "receiptDigest": "22db5730cb1d8f146776cac42c6a63d2d36209cacb046b5e483f4b3a429d4553",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.85.1",
+      "stopReason": "stop",
+      "eligible": false,
+      "pass": null,
+      "behaviorPassed": false,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": false
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 1,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 1,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": [
+        "runtime-host",
+        "runtime-hostVersion",
+        "runtime-model",
+        "runtime-effort",
+        "runtime-tools",
+        "runtime-settingsHash"
+      ]
+    },
+    {
+      "index": 75,
+      "executionId": "32e962f3-d8bb-4586-8ee8-15de6ba592ef",
+      "caseId": "renderer-off",
+      "variantId": "visual-comparison",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "8b370c8cd3d41bac0f211978d9aef4011730830bd2a05cb3b53742109a138b52",
+      "inputHash": "54a64a1f9f9590168a06e97e99ec67e3b0ba87061c34cb6af32215aded9724da",
+      "catalogHash": "87e518f33e4b8ebf960ee6f01470aaaa67dc6d28aa161a87f0bba837db27cace",
+      "hostLogHash": "4d6a22e6fe60458521e275fb43c27e90090d553da74d9a78c60b066404d64a10",
+      "receiptDigest": "45d4f65b433f80c7afa7699420c19b1e7f7034857757d34f8e2cd336de252783",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.85.1",
+      "stopReason": "stop",
+      "eligible": false,
+      "pass": null,
+      "behaviorPassed": false,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": false
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 1,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 1,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": [
+        "runtime-host",
+        "runtime-hostVersion",
+        "runtime-model",
+        "runtime-effort",
+        "runtime-tools",
+        "runtime-settingsHash"
+      ]
+    },
+    {
+      "index": 76,
+      "executionId": "98898021-0ad0-48b1-9fed-0dafd1d8bb74",
+      "caseId": "pre-confirmation",
+      "variantId": "visual-comparison",
+      "arm": "baseline",
+      "repetition": 1,
+      "instructionHash": "a33fefc3d5d09f1113f57207ec80c98532aeff443931ea3b872eb50a7c38d15b",
+      "inputHash": "78e1e3fd19738d18648b44654ec2e8f9230bb648edad12fbd50f945c2426de0a",
+      "catalogHash": "87e518f33e4b8ebf960ee6f01470aaaa67dc6d28aa161a87f0bba837db27cace",
+      "hostLogHash": "afa249912bbb6f3a5a4e51954bdef371296ce1f65a6215773a9ebccfba693313",
+      "receiptDigest": "84bbad2470ec04624132372822a30d1d28b378727706750a06327d7e8660084f",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.85.1",
+      "stopReason": "stop",
+      "eligible": false,
+      "pass": null,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 0,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": [
+        "runtime-host",
+        "runtime-hostVersion",
+        "runtime-model",
+        "runtime-effort",
+        "runtime-tools",
+        "runtime-settingsHash"
+      ]
+    },
+    {
+      "index": 77,
+      "executionId": "e977c96f-6bcf-4541-850d-c9486ace4982",
+      "caseId": "pre-confirmation",
+      "variantId": "visual-comparison",
+      "arm": "current",
+      "repetition": 1,
+      "instructionHash": "8b370c8cd3d41bac0f211978d9aef4011730830bd2a05cb3b53742109a138b52",
+      "inputHash": "78e1e3fd19738d18648b44654ec2e8f9230bb648edad12fbd50f945c2426de0a",
+      "catalogHash": "87e518f33e4b8ebf960ee6f01470aaaa67dc6d28aa161a87f0bba837db27cace",
+      "hostLogHash": "191ead7e1990bb383a7b49f4dc117b6598362d939d6587714ed64eed10d4625b",
+      "receiptDigest": "457c3571593c11e8742a87bd1dab58f17dd6142ef91d00df3ec131887cee1295",
+      "ended": true,
+      "timedOut": false,
+      "observedHostVersion": "0.85.1",
+      "stopReason": "stop",
+      "eligible": false,
+      "pass": null,
+      "behaviorPassed": true,
+      "requirements": [
+        {
+          "id": "r1",
+          "met": true
+        },
+        {
+          "id": "r2",
+          "met": true
+        }
+      ],
+      "unsupportedChecks": 0,
+      "unnecessaryChanges": 0,
+      "actionMetrics": {
+        "missedLoads": 0,
+        "wrongSkillLoads": 0,
+        "prematureActions": 0,
+        "unnecessaryLoads": 1,
+        "unsupportedChecks": 0,
+        "userInterventions": 0
+      },
+      "readinessReasons": [
+        "runtime-host",
+        "runtime-hostVersion",
+        "runtime-model",
+        "runtime-effort",
+        "runtime-tools",
+        "runtime-settingsHash"
+      ]
+    }
+  ],
+  "comparativeQualification": {
+    "eligible": false,
+    "status": "INCOMPLETE_NO_IMPROVEMENT_CLAIM",
+    "reason": "Calibration only: runtime package drift, observer revisions, scenario confounds, incomplete observations, one repetition and synthetic catalog. Receipt-level eligibility is preserved historical collector output, not causal-study qualification."
+  },
+  "sourceSnapshot": {
+    "head": "1a380ef76936ad17a0fd83b3586374cccd8b419d",
+    "digest": "c206375f72645e823dbada66deebf11a03fe2181bba12d29eb8c97582746671c",
+    "files": 693
+  },
+  "normalizationHistory": [
+    {
+      "file": "observer-v2-calibration.json",
+      "hash": "53bc82a84569ec5691c6c3b97597f29a288cf3f470a2074e089aacb751fdaec0"
+    },
+    {
+      "file": "observer-v3-calibration.json",
+      "hash": "422110e8139a21b78c2008ccf1089e6cb09cdffe3113eca6c95916faa55de92c"
+    },
+    {
+      "file": "observer-v4-calibration.json",
+      "hash": "3c1cd9235e645440f7e169e8a49f00040270b3ae3cc430457755593e349f314e"
+    },
+    {
+      "file": "observer-v5-calibration.json",
+      "hash": "0ae443ed17c4f684d1324127334544b765037a26ea226cb4547dfc11ecd0ae7b"
+    },
+    {
+      "file": "observer-v6-calibration.json",
+      "hash": "462771848cc972f732ca2419f8210cd60b6437fe12bd75ed892a5a90234592f4"
+    },
+    {
+      "file": "observer-v7-calibration.json",
+      "hash": "2efd6acf6b5425ac5081c5e030b391198eef71d272e50d4073e23df08ba0a0d8"
+    },
+    {
+      "file": "observer-v8-calibration.json",
+      "hash": "9a9a96e77687851a87dbe7d4bdbbc3982fdc023a7deae2bdf40633a687f9ae93"
+    }
+  ],
+  "semanticAssessment": {
+    "owner": "parent",
+    "sourceBound": true,
+    "blinded": false,
+    "independentOfModelSelfReport": true,
+    "independentHumanReview": false,
+    "scope": "All assistant final text plus supplied fixtures, full tool evidence and workspace diffs; intermediate tool-use text was not exhaustively claim-graded.",
+    "limitation": "Manual rubric interpretation is calibration, not independently validated inter-rater reliability."
+  }
+}

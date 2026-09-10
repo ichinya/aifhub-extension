@@ -1,0 +1,1 @@
+Use when preparing or refreshing AI Factory project context, stack settings, base rules and review policy for a repository.

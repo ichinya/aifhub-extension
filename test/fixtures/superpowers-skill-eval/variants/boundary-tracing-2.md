@@ -1,0 +1,3 @@
+### Difficult reproductions
+
+After classification and finding selection permit local investigation, read [reproduction for difficult bugs](../../skills/shared/BUG-REPRODUCTION.md) when the selected scenario is large, slow or intermittent, or crosses component boundaries even with a fast reproduction. Resolve it from the installed extension at `.ai-factory/extensions/aifhub-extension/skills/shared/BUG-REPRODUCTION.md`. Preserve the original signal, minimize only when useful, and verify both the reduced and original cases. Existing fallback decisions, attempt guards, write scope and ultra handoffs take precedence.

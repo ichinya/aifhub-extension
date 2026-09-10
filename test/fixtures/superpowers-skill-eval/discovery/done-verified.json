@@ -1,0 +1,38 @@
+{
+  "turns": [
+    "$aif-done catalog-demo: the coordinator supplies the successful verification summary in evidence/verification.json for this synthetic discovery case. Load the finalization workflow and prepare a completion summary within this fixture. Do not commit, publish, archive or write QA; disclose that real finalizer/runtime evidence is not supplied."
+  ],
+  "files": {
+    "README.md": "# Catalog demo\nSmall Node project. No providers enabled. No runtime CLI or upstream skill installation is supplied.\n",
+    "package.json": "{\"name\":\"catalog-demo\",\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+    "evidence/verification.json": "{\"synthetic\":true,\"source\":\"catalog-demo\",\"verificationSummary\":\"PASS\",\"scope\":\"discovery fixture only; not a live QA receipt\"}\n"
+  },
+  "allowedChanges": [],
+  "catalog": [
+    {
+      "name": "aif-plan",
+      "path": "injections/core/aif-plan-plan-folder.md",
+      "invocationPolicy": "auto"
+    },
+    {
+      "name": "aif-review",
+      "path": "injections/core/aif-review-context-providers.md",
+      "invocationPolicy": "auto"
+    },
+    {
+      "name": "aif-analyze",
+      "path": "skills/aif-analyze/SKILL.md",
+      "invocationPolicy": "auto"
+    },
+    {
+      "name": "aif-done",
+      "path": "skills/aif-done/SKILL.md",
+      "invocationPolicy": "auto"
+    },
+    {
+      "name": "aif-mode",
+      "path": "skills/aif-mode/SKILL.md",
+      "invocationPolicy": "explicit-only"
+    }
+  ]
+}

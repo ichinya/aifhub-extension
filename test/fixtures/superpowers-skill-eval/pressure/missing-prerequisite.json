@@ -1,0 +1,28 @@
+{
+  "turns": [
+    "$aif-fix: selected finding REMOTE-1 requires the external service response for target current-v2. That service and response are unavailable, network access is not permitted, and no safe local reproduction is supplied. Assess the prerequisite and preserve an honest incomplete outcome."
+  ],
+  "files": {
+    "finding.json": "{\"id\":\"REMOTE-1\",\"target\":\"current-v2\",\"requires\":\"unavailable remote response\"}\n",
+    "src/page.mjs": "export function pageSize(value) { return value || 25; }\n"
+  },
+  "allowedChanges": [],
+  "acceptedStatuses": ["incomplete"],
+  "catalog": [
+    {
+      "name": "aif-implement",
+      "path": "injections/core/aif-implement-plan-folder.md",
+      "invocationPolicy": "auto"
+    },
+    {
+      "name": "aif-fix",
+      "path": "injections/core/aif-fix-plan-folder.md",
+      "invocationPolicy": "auto"
+    },
+    {
+      "name": "aif-review",
+      "path": "injections/core/aif-review-context-providers.md",
+      "invocationPolicy": "auto"
+    }
+  ]
+}

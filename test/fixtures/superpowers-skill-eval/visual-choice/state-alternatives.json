@@ -1,0 +1,22 @@
+{
+  "turns": [
+    "Continue the approved planning comparison for the upload flow. Show the consequential state and recovery differences on the same example; keep output in this conversation. No implementation or artifact writes are requested.",
+    "Changed decision: background jobs are now disallowed. Preserve retry safety and reconnect progress; update only choices affected by this answer and identify any remaining prerequisite."
+  ],
+  "files": {
+    "accepted-scope.md": "Settled constraints: user can retry a failed upload, retries must not create duplicate imports, progress must survive reconnect. Existing interface: synchronous POST returns final result, times out on large files. Worker-owned job state and client-owned optimistic state are possible alternatives. Representative case: connection drops after upload, before acknowledgement. Compare ownership, transitions and recovery against the existing interface; preserve the requirements.\n"
+  },
+  "allowedChanges": [],
+  "catalog": [
+    {
+      "name": "aif-plan",
+      "path": "injections/core/aif-plan-plan-folder.md",
+      "invocationPolicy": "auto"
+    },
+    {
+      "name": "aif-explore",
+      "path": "injections/core/aif-explore-plan-folder.md",
+      "invocationPolicy": "auto"
+    }
+  ]
+}

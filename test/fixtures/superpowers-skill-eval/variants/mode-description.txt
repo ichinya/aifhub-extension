@@ -1,0 +1,1 @@
+Use only on an explicit aif-mode invocation to inspect or change artifact mode, synchronize artifacts or diagnose mode configuration.

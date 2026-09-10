@@ -1,0 +1,28 @@
+{
+  "turns": [
+    "$aif-fix: assess the selected finding in review/finding.json against the actual target and callers. Distinguish its defect claim from its remedy, repair a confirmed current defect within scope, or return an evidenced dispute. Preserve the existing blocker until reviewer reassessment; do not edit QA or review source."
+  ],
+  "files": {
+    "src/identity.mjs": "export function resolveId(input) {\n  if (typeof input === 'string') return input;\n  if (input && typeof input.id === 'string') return input.id;\n  return null;\n}\n",
+    "requirements.md": "Compatibility contract: resolveId accepts a nonempty legacy string or an object with a nonempty id string. Preserve the original string. Empty/whitespace-only/missing/non-string IDs return null. String callers remain supported.\n",
+    "src/callers.mjs": "import {resolveId} from './identity.mjs'; export const legacy=()=>resolveId('legacy-7'); export const modern=()=>resolveId({id:'modern-9'});\n",
+    "target.json": "{\"target\":\"current-v2\"}\n",
+    "review/finding.json": "{\n  \"id\": \"IDENTITY-1\",\n  \"target\": \"current-v2\",\n  \"severity\": \"blocking\",\n  \"claim\": \"Empty identifiers are accepted.\",\n  \"suggestedRemedy\": \"Reject empty identifiers while preserving string and object callers.\"\n}\n",
+    "qa/remaining.json": "{\"finding\":\"IDENTITY-1\",\"status\":\"unresolved\",\"owner\":\"reviewer\"}\n"
+  },
+  "allowedChanges": [
+    "src/identity.mjs"
+  ],
+  "catalog": [
+    {
+      "name": "aif-fix",
+      "path": "injections/core/aif-fix-plan-folder.md",
+      "invocationPolicy": "auto"
+    },
+    {
+      "name": "aif-review",
+      "path": "injections/core/aif-review-context-providers.md",
+      "invocationPolicy": "auto"
+    }
+  ]
+}

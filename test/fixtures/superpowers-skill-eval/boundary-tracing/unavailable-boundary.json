@@ -1,0 +1,20 @@
+{
+  "turns": [
+    "$aif-fix: investigate LIMIT-2 using supplied observations only. The resolver is external and no access is available. Report what can be localized and which boundary remains unknown; do not fabricate measurements or request installation."
+  ],
+  "files": {
+    "observations.json": "{\"finding\":\"LIMIT-2\",\"commandInput\":{\"limit\":7},\"runnerInput\":{\"limit\":25},\"resolver\":\"unavailable\",\"transport\":\"unavailable\"}",
+    "requirements.md": "The value must survive command -> external transport -> external resolver -> runner. Two unobserved boundaries could cause this discrepancy. Neither is available in this fixture.\n"
+  },
+  "allowedChanges": [],
+  "acceptedStatuses": [
+    "incomplete"
+  ],
+  "catalog": [
+    {
+      "name": "aif-fix",
+      "path": "injections/core/aif-fix-plan-folder.md",
+      "invocationPolicy": "auto"
+    }
+  ]
+}

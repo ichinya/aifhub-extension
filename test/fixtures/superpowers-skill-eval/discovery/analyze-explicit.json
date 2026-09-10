@@ -1,0 +1,45 @@
+{
+  "turns": [
+    "$aif-analyze: prepare project context for this fixture. Keep optional providers disabled and preserve user-owned decisions."
+  ],
+  "files": {
+    "README.md": "# Catalog demo\nSmall Node project. No providers enabled. No runtime CLI or upstream skill installation is supplied.\n",
+    "package.json": "{\"name\":\"catalog-demo\",\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n"
+  },
+  "allowedChanges": [
+    ".ai-factory/config.yaml",
+    ".ai-factory/rules/base.md",
+    "REVIEW.md"
+  ],
+  "catalog": [
+    {
+      "name": "aif-plan",
+      "path": "injections/core/aif-plan-plan-folder.md",
+      "invocationPolicy": "auto"
+    },
+    {
+      "name": "aif-review",
+      "path": "injections/core/aif-review-context-providers.md",
+      "invocationPolicy": "auto"
+    },
+    {
+      "name": "aif-analyze",
+      "path": "skills/aif-analyze/SKILL.md",
+      "invocationPolicy": "auto"
+    },
+    {
+      "name": "aif-done",
+      "path": "skills/aif-done/SKILL.md",
+      "invocationPolicy": "auto"
+    },
+    {
+      "name": "aif-mode",
+      "path": "skills/aif-mode/SKILL.md",
+      "invocationPolicy": "explicit-only"
+    }
+  ],
+  "acceptedStatuses": [
+    "completed",
+    "incomplete"
+  ]
+}

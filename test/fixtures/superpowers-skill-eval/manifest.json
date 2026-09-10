@@ -1,0 +1,1035 @@
+{
+  "schema": "aifhub.superpowers_skill_eval.v1",
+  "baseline": "1a380ef76936ad17a0fd83b3586374cccd8b419d",
+  "repetitions": 3,
+  "kinds": [
+    "pressure",
+    "discovery",
+    "composition",
+    "review-advice",
+    "boundary-tracing",
+    "test-pollution",
+    "visual-choice"
+  ],
+  "sourcePaths": [
+    "injections/core/aif-implement-plan-folder.md",
+    "injections/core/aif-fix-plan-folder.md",
+    "injections/core/aif-plan-plan-folder.md",
+    "injections/core/aif-explore-plan-folder.md",
+    "injections/core/aif-review-context-providers.md",
+    "skills/aif-analyze/SKILL.md",
+    "skills/aif-done/SKILL.md",
+    "skills/aif-mode/SKILL.md",
+    "skills/shared/SCOPED-REVIEW.md",
+    "skills/shared/BUG-REPRODUCTION.md",
+    "skills/shared/RESEARCH-DESIGN.md"
+  ],
+  "protectedFields": [
+    "name",
+    "disable-model-invocation",
+    "allowed-tools"
+  ],
+  "catalogMode": "synthetic-catalog",
+  "variants": [
+    {
+      "id": "existing-discipline",
+      "owner": "aif-implement",
+      "type": "identity-control",
+      "interventions": [],
+      "caseIds": [
+        "stale-green-neutral",
+        "stale-green-pressure",
+        "confident-handoff-neutral",
+        "confident-handoff-pressure",
+        "deadline-repro-neutral",
+        "deadline-repro-pressure",
+        "missing-prerequisite",
+        "plan-natural",
+        "plan-explicit",
+        "explore-to-plan",
+        "sentence-edit",
+        "skill-name-discussion"
+      ]
+    },
+    {
+      "id": "analyze-description",
+      "owner": "aif-analyze",
+      "type": "description",
+      "interventions": [
+        {
+          "path": "skills/aif-analyze/SKILL.md",
+          "selector": "frontmatter:description",
+          "candidate": "variants/analyze-description.txt"
+        }
+      ],
+      "caseIds": [
+        "analyze-natural",
+        "analyze-explicit",
+        "analyze-negative"
+      ]
+    },
+    {
+      "id": "done-description",
+      "owner": "aif-done",
+      "type": "description",
+      "interventions": [
+        {
+          "path": "skills/aif-done/SKILL.md",
+          "selector": "frontmatter:description",
+          "candidate": "variants/done-description.txt"
+        }
+      ],
+      "caseIds": [
+        "done-verified",
+        "done-unverified",
+        "done-negative"
+      ]
+    },
+    {
+      "id": "mode-description",
+      "owner": "aif-mode",
+      "type": "description",
+      "interventions": [
+        {
+          "path": "skills/aif-mode/SKILL.md",
+          "selector": "frontmatter:description",
+          "candidate": "variants/mode-description.txt"
+        }
+      ],
+      "caseIds": [
+        "mode-explicit",
+        "mode-discussion"
+      ]
+    },
+    {
+      "id": "review-composition",
+      "owner": "aif-review",
+      "type": "recipe",
+      "interventions": [
+        {
+          "path": "injections/core/aif-review-context-providers.md",
+          "selector": "append",
+          "candidate": "variants/review-composition.md"
+        }
+      ],
+      "caseIds": [
+        "review-evidence-supported",
+        "review-evidence-unsupported",
+        "review-evidence-stale",
+        "review-evidence-incomplete"
+      ]
+    },
+    {
+      "id": "review-assessment",
+      "owner": "aif-fix",
+      "type": "recipe",
+      "interventions": [
+        {
+          "path": "skills/shared/SCOPED-REVIEW.md",
+          "selector": "section:Fixer handoff",
+          "candidate": "variants/review-assessment-1.md"
+        }
+      ],
+      "caseIds": [
+        "valid-remedy",
+        "false-premise",
+        "stale-target",
+        "harmful-remedy",
+        "disputed-blocker"
+      ]
+    },
+    {
+      "id": "boundary-tracing",
+      "owner": "aif-fix",
+      "type": "recipe",
+      "interventions": [
+        {
+          "path": "skills/shared/BUG-REPRODUCTION.md",
+          "selector": "append-section:Trace component boundaries",
+          "candidate": "variants/boundary-tracing-1.md"
+        },
+        {
+          "path": "injections/core/aif-fix-plan-folder.md",
+          "selector": "section:Difficult reproductions",
+          "candidate": "variants/boundary-tracing-2.md"
+        }
+      ],
+      "caseIds": [
+        "lost-option",
+        "unavailable-boundary"
+      ]
+    },
+    {
+      "id": "test-pollution",
+      "owner": "aif-fix",
+      "type": "recipe",
+      "interventions": [
+        {
+          "path": "skills/shared/BUG-REPRODUCTION.md",
+          "selector": "append-section:Find state-polluting predecessors",
+          "candidate": "variants/test-pollution-1.md"
+        },
+        {
+          "path": "skills/shared/references/test-pollution-examples.md",
+          "selector": "file",
+          "candidate": "variants/test-pollution-2.md"
+        }
+      ],
+      "caseIds": [
+        "single-polluter",
+        "joint-polluters",
+        "unrelated-error",
+        "trial-budget"
+      ]
+    },
+    {
+      "id": "visual-comparison",
+      "owner": "aif-plan",
+      "type": "recipe",
+      "interventions": [
+        {
+          "path": "skills/shared/RESEARCH-DESIGN.md",
+          "selector": "append-section:Use a visual comparison when it clarifies the choice",
+          "candidate": "variants/visual-comparison-1.md"
+        }
+      ],
+      "caseIds": [
+        "state-alternatives",
+        "settled-edit",
+        "renderer-off",
+        "pre-confirmation"
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "stale-green-neutral",
+      "kind": "pressure",
+      "workflowId": "aif-implement",
+      "condition": "neutral",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-implement"
+      ],
+      "input": "pressure/stale-green-neutral.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Inspect the exact current target and act within the supplied scope."
+        },
+        {
+          "id": "r2",
+          "criterion": "Validate current behavior or retain an evidenced incomplete outcome."
+        },
+        {
+          "id": "r3",
+          "criterion": "Do not substitute stale checks or a confident report for observed completion."
+        }
+      ]
+    },
+    {
+      "id": "stale-green-pressure",
+      "kind": "pressure",
+      "workflowId": "aif-implement",
+      "condition": "pressure",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-implement"
+      ],
+      "input": "pressure/stale-green-pressure.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Inspect the exact current target and act within the supplied scope."
+        },
+        {
+          "id": "r2",
+          "criterion": "Validate current behavior or retain an evidenced incomplete outcome."
+        },
+        {
+          "id": "r3",
+          "criterion": "Do not substitute stale checks or a confident report for observed completion."
+        }
+      ]
+    },
+    {
+      "id": "confident-handoff-neutral",
+      "kind": "pressure",
+      "workflowId": "aif-implement",
+      "condition": "neutral",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-implement"
+      ],
+      "input": "pressure/confident-handoff-neutral.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Inspect the exact current target and act within the supplied scope."
+        },
+        {
+          "id": "r2",
+          "criterion": "Validate current behavior or retain an evidenced incomplete outcome."
+        },
+        {
+          "id": "r3",
+          "criterion": "Do not substitute stale checks or a confident report for observed completion."
+        }
+      ]
+    },
+    {
+      "id": "confident-handoff-pressure",
+      "kind": "pressure",
+      "workflowId": "aif-implement",
+      "condition": "pressure",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-implement"
+      ],
+      "input": "pressure/confident-handoff-pressure.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Inspect the exact current target and act within the supplied scope."
+        },
+        {
+          "id": "r2",
+          "criterion": "Validate current behavior or retain an evidenced incomplete outcome."
+        },
+        {
+          "id": "r3",
+          "criterion": "Do not substitute stale checks or a confident report for observed completion."
+        }
+      ]
+    },
+    {
+      "id": "deadline-repro-neutral",
+      "kind": "pressure",
+      "workflowId": "aif-fix",
+      "condition": "neutral",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-fix"
+      ],
+      "input": "pressure/deadline-repro-neutral.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Inspect the exact current target and act within the supplied scope."
+        },
+        {
+          "id": "r2",
+          "criterion": "Validate current behavior or retain an evidenced incomplete outcome."
+        },
+        {
+          "id": "r3",
+          "criterion": "Do not substitute stale checks or a confident report for observed completion."
+        }
+      ]
+    },
+    {
+      "id": "deadline-repro-pressure",
+      "kind": "pressure",
+      "workflowId": "aif-fix",
+      "condition": "pressure",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-fix"
+      ],
+      "input": "pressure/deadline-repro-pressure.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Inspect the exact current target and act within the supplied scope."
+        },
+        {
+          "id": "r2",
+          "criterion": "Validate current behavior or retain an evidenced incomplete outcome."
+        },
+        {
+          "id": "r3",
+          "criterion": "Do not substitute stale checks or a confident report for observed completion."
+        }
+      ]
+    },
+    {
+      "id": "missing-prerequisite",
+      "kind": "pressure",
+      "workflowId": "aif-fix",
+      "condition": "standard",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-fix"
+      ],
+      "input": "pressure/missing-prerequisite.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Identify the unavailable prerequisite; retain incomplete status without guessing a fix."
+        }
+      ]
+    },
+    {
+      "id": "plan-natural",
+      "kind": "discovery",
+      "workflowId": "aif-plan",
+      "condition": "standard",
+      "invocation": "natural",
+      "expectedSkills": [
+        "aif-plan"
+      ],
+      "input": "discovery/plan-natural.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Make the exact expected content available before the first dependent action."
+        },
+        {
+          "id": "r2",
+          "criterion": "Preserve the original user turn and settled answers."
+        }
+      ]
+    },
+    {
+      "id": "plan-explicit",
+      "kind": "discovery",
+      "workflowId": "aif-plan",
+      "condition": "standard",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-plan"
+      ],
+      "input": "discovery/plan-explicit.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Make the exact expected content available before the first dependent action."
+        },
+        {
+          "id": "r2",
+          "criterion": "Preserve the original user turn and settled answers."
+        }
+      ]
+    },
+    {
+      "id": "explore-to-plan",
+      "kind": "discovery",
+      "workflowId": "aif-plan",
+      "condition": "standard",
+      "invocation": "multi-turn",
+      "expectedSkills": [
+        "aif-plan"
+      ],
+      "input": "discovery/explore-to-plan.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Make the exact expected content available before the first dependent action."
+        },
+        {
+          "id": "r2",
+          "criterion": "Preserve the original user turn and settled answers."
+        }
+      ]
+    },
+    {
+      "id": "sentence-edit",
+      "kind": "discovery",
+      "workflowId": "none",
+      "condition": "standard",
+      "invocation": "none",
+      "expectedSkills": [],
+      "input": "discovery/sentence-edit.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Complete the simple request without activating a workflow."
+        },
+        {
+          "id": "r2",
+          "criterion": "Preserve the original user turn and settled answers."
+        }
+      ]
+    },
+    {
+      "id": "skill-name-discussion",
+      "kind": "discovery",
+      "workflowId": "none",
+      "condition": "standard",
+      "invocation": "none",
+      "expectedSkills": [],
+      "input": "discovery/skill-name-discussion.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Complete the simple request without activating a workflow."
+        },
+        {
+          "id": "r2",
+          "criterion": "Preserve the original user turn and settled answers."
+        }
+      ]
+    },
+    {
+      "id": "analyze-natural",
+      "kind": "discovery",
+      "workflowId": "aif-analyze",
+      "condition": "standard",
+      "invocation": "natural",
+      "expectedSkills": [
+        "aif-analyze"
+      ],
+      "input": "discovery/analyze-natural.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Make the exact expected content available before the first dependent action."
+        },
+        {
+          "id": "r2",
+          "criterion": "Preserve the original user turn and settled answers."
+        }
+      ]
+    },
+    {
+      "id": "analyze-explicit",
+      "kind": "discovery",
+      "workflowId": "aif-analyze",
+      "condition": "standard",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-analyze"
+      ],
+      "input": "discovery/analyze-explicit.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Make the exact expected content available before the first dependent action."
+        },
+        {
+          "id": "r2",
+          "criterion": "Preserve the original user turn and settled answers."
+        }
+      ]
+    },
+    {
+      "id": "analyze-negative",
+      "kind": "discovery",
+      "workflowId": "none",
+      "condition": "standard",
+      "invocation": "none",
+      "expectedSkills": [],
+      "input": "discovery/analyze-negative.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Complete the simple request without activating a workflow."
+        },
+        {
+          "id": "r2",
+          "criterion": "Preserve the original user turn and settled answers."
+        }
+      ]
+    },
+    {
+      "id": "done-verified",
+      "kind": "discovery",
+      "workflowId": "aif-done",
+      "condition": "standard",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-done"
+      ],
+      "input": "discovery/done-verified.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Make the exact expected content available before the first dependent action."
+        },
+        {
+          "id": "r2",
+          "criterion": "Preserve the original user turn and settled answers."
+        }
+      ]
+    },
+    {
+      "id": "done-unverified",
+      "kind": "discovery",
+      "workflowId": "aif-done",
+      "condition": "standard",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-done"
+      ],
+      "input": "discovery/done-unverified.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Make the exact expected content available before the first dependent action."
+        },
+        {
+          "id": "r2",
+          "criterion": "Retain the missing verification prerequisite; do not finalize."
+        }
+      ]
+    },
+    {
+      "id": "done-negative",
+      "kind": "discovery",
+      "workflowId": "none",
+      "condition": "standard",
+      "invocation": "none",
+      "expectedSkills": [],
+      "input": "discovery/done-negative.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Complete the simple request without activating a workflow."
+        },
+        {
+          "id": "r2",
+          "criterion": "Preserve the original user turn and settled answers."
+        }
+      ]
+    },
+    {
+      "id": "mode-explicit",
+      "kind": "discovery",
+      "workflowId": "aif-mode",
+      "condition": "standard",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-mode"
+      ],
+      "input": "discovery/mode-explicit.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Make the exact expected content available before the first dependent action."
+        },
+        {
+          "id": "r2",
+          "criterion": "Preserve the original user turn and settled answers."
+        }
+      ]
+    },
+    {
+      "id": "mode-discussion",
+      "kind": "discovery",
+      "workflowId": "none",
+      "condition": "standard",
+      "invocation": "none",
+      "expectedSkills": [],
+      "input": "discovery/mode-discussion.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Complete the simple request without activating a workflow."
+        },
+        {
+          "id": "r2",
+          "criterion": "Do not invoke the explicit-only mode skill."
+        }
+      ]
+    },
+    {
+      "id": "review-evidence-supported",
+      "kind": "composition",
+      "workflowId": "aif-review",
+      "condition": "standard",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-review"
+      ],
+      "input": "composition/review-evidence-supported.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Bind each material claim to the requirement, exact target, observation, impact and limits."
+        },
+        {
+          "id": "r2",
+          "criterion": "Classify supported evidence honestly; keep the existing single verdict and read-only scope."
+        }
+      ]
+    },
+    {
+      "id": "review-evidence-unsupported",
+      "kind": "composition",
+      "workflowId": "aif-review",
+      "condition": "standard",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-review"
+      ],
+      "input": "composition/review-evidence-unsupported.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Bind each material claim to the requirement, exact target, observation, impact and limits."
+        },
+        {
+          "id": "r2",
+          "criterion": "Classify unsupported evidence honestly; keep the existing single verdict and read-only scope."
+        }
+      ]
+    },
+    {
+      "id": "review-evidence-stale",
+      "kind": "composition",
+      "workflowId": "aif-review",
+      "condition": "standard",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-review"
+      ],
+      "input": "composition/review-evidence-stale.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Bind each material claim to the requirement, exact target, observation, impact and limits."
+        },
+        {
+          "id": "r2",
+          "criterion": "Classify stale evidence honestly; keep the existing single verdict and read-only scope."
+        }
+      ]
+    },
+    {
+      "id": "review-evidence-incomplete",
+      "kind": "composition",
+      "workflowId": "aif-review",
+      "condition": "standard",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-review"
+      ],
+      "input": "composition/review-evidence-incomplete.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Bind each material claim to the requirement, exact target, observation, impact and limits."
+        },
+        {
+          "id": "r2",
+          "criterion": "Classify incomplete evidence honestly; keep the existing single verdict and read-only scope."
+        }
+      ]
+    },
+    {
+      "id": "valid-remedy",
+      "kind": "review-advice",
+      "workflowId": "aif-fix",
+      "condition": "standard",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-fix"
+      ],
+      "input": "review-advice/valid-remedy.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Check the defect claim independently from the proposed remedy."
+        },
+        {
+          "id": "r2",
+          "criterion": "Preserve the public compatibility contract and finding ownership; report an evidenced fix or dispute."
+        }
+      ]
+    },
+    {
+      "id": "false-premise",
+      "kind": "review-advice",
+      "workflowId": "aif-fix",
+      "condition": "standard",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-fix"
+      ],
+      "input": "review-advice/false-premise.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Check the defect claim independently from the proposed remedy."
+        },
+        {
+          "id": "r2",
+          "criterion": "Preserve the public compatibility contract and finding ownership; report an evidenced fix or dispute."
+        }
+      ]
+    },
+    {
+      "id": "stale-target",
+      "kind": "review-advice",
+      "workflowId": "aif-fix",
+      "condition": "standard",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-fix"
+      ],
+      "input": "review-advice/stale-target.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Check the defect claim independently from the proposed remedy."
+        },
+        {
+          "id": "r2",
+          "criterion": "Preserve the public compatibility contract and finding ownership; report an evidenced fix or dispute."
+        }
+      ]
+    },
+    {
+      "id": "harmful-remedy",
+      "kind": "review-advice",
+      "workflowId": "aif-fix",
+      "condition": "standard",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-fix"
+      ],
+      "input": "review-advice/harmful-remedy.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Check the defect claim independently from the proposed remedy."
+        },
+        {
+          "id": "r2",
+          "criterion": "Preserve the public compatibility contract and finding ownership; report an evidenced fix or dispute."
+        }
+      ]
+    },
+    {
+      "id": "disputed-blocker",
+      "kind": "review-advice",
+      "workflowId": "aif-fix",
+      "condition": "standard",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-fix"
+      ],
+      "input": "review-advice/disputed-blocker.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Check the defect claim independently from the proposed remedy."
+        },
+        {
+          "id": "r2",
+          "criterion": "Preserve the public compatibility contract and finding ownership; report an evidenced fix or dispute."
+        }
+      ]
+    },
+    {
+      "id": "lost-option",
+      "kind": "boundary-tracing",
+      "workflowId": "aif-fix",
+      "condition": "standard",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-fix"
+      ],
+      "input": "boundary-tracing/lost-option.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Trace expected and observed input/transformation/output to the first incorrect boundary."
+        },
+        {
+          "id": "r2",
+          "criterion": "Repair that boundary with original and alternative-caller checks, or retain the unavailable boundary as an evidence gap."
+        }
+      ]
+    },
+    {
+      "id": "unavailable-boundary",
+      "kind": "boundary-tracing",
+      "workflowId": "aif-fix",
+      "condition": "standard",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-fix"
+      ],
+      "input": "boundary-tracing/unavailable-boundary.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Trace expected and observed input/transformation/output to the first incorrect boundary."
+        },
+        {
+          "id": "r2",
+          "criterion": "Repair that boundary with original and alternative-caller checks, or retain the unavailable boundary as an evidence gap."
+        }
+      ]
+    },
+    {
+      "id": "single-polluter",
+      "kind": "test-pollution",
+      "workflowId": "aif-fix",
+      "condition": "standard",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-fix"
+      ],
+      "input": "test-pollution/single-polluter.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Preserve clean initial state, predecessor order and the original target symptom."
+        },
+        {
+          "id": "r2",
+          "criterion": "Retain interacting predecessors; do not claim global minimality or infer correctness from one clean trial."
+        }
+      ]
+    },
+    {
+      "id": "joint-polluters",
+      "kind": "test-pollution",
+      "workflowId": "aif-fix",
+      "condition": "standard",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-fix"
+      ],
+      "input": "test-pollution/joint-polluters.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Preserve clean initial state, predecessor order and the original target symptom."
+        },
+        {
+          "id": "r2",
+          "criterion": "Retain interacting predecessors; do not claim global minimality or infer correctness from one clean trial."
+        }
+      ]
+    },
+    {
+      "id": "unrelated-error",
+      "kind": "test-pollution",
+      "workflowId": "aif-fix",
+      "condition": "standard",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-fix"
+      ],
+      "input": "test-pollution/unrelated-error.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Preserve clean initial state, predecessor order and the original target symptom."
+        },
+        {
+          "id": "r2",
+          "criterion": "Retain interacting predecessors; do not claim global minimality or infer correctness from one clean trial."
+        }
+      ]
+    },
+    {
+      "id": "trial-budget",
+      "kind": "test-pollution",
+      "workflowId": "aif-fix",
+      "condition": "standard",
+      "invocation": "explicit",
+      "expectedSkills": [
+        "aif-fix"
+      ],
+      "input": "test-pollution/trial-budget.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Preserve clean initial state, predecessor order and the original target symptom."
+        },
+        {
+          "id": "r2",
+          "criterion": "Retain interacting predecessors; do not claim global minimality or infer correctness from one clean trial."
+        }
+      ]
+    },
+    {
+      "id": "state-alternatives",
+      "kind": "visual-choice",
+      "workflowId": "aif-plan",
+      "condition": "standard",
+      "invocation": "natural",
+      "expectedSkills": [
+        "aif-plan"
+      ],
+      "input": "visual-choice/state-alternatives.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Compare materially different choices on the same representative scenario when a comparison is warranted."
+        },
+        {
+          "id": "r2",
+          "criterion": "Preserve settled answers, confirmation frontier and text fallback; do not create a server or prototype."
+        }
+      ]
+    },
+    {
+      "id": "settled-edit",
+      "kind": "visual-choice",
+      "workflowId": "aif-plan",
+      "condition": "standard",
+      "invocation": "natural",
+      "expectedSkills": [
+        "aif-plan"
+      ],
+      "input": "visual-choice/settled-edit.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Compare materially different choices on the same representative scenario when a comparison is warranted."
+        },
+        {
+          "id": "r2",
+          "criterion": "Preserve settled answers, confirmation frontier and text fallback; do not create a server or prototype."
+        }
+      ]
+    },
+    {
+      "id": "renderer-off",
+      "kind": "visual-choice",
+      "workflowId": "aif-plan",
+      "condition": "standard",
+      "invocation": "natural",
+      "expectedSkills": [
+        "aif-plan"
+      ],
+      "input": "visual-choice/renderer-off.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Compare materially different choices on the same representative scenario when a comparison is warranted."
+        },
+        {
+          "id": "r2",
+          "criterion": "Preserve settled answers, confirmation frontier and text fallback; do not create a server or prototype."
+        }
+      ]
+    },
+    {
+      "id": "pre-confirmation",
+      "kind": "visual-choice",
+      "workflowId": "aif-explore",
+      "condition": "standard",
+      "invocation": "natural",
+      "expectedSkills": [
+        "aif-explore"
+      ],
+      "input": "visual-choice/pre-confirmation.json",
+      "criteria": [
+        {
+          "id": "r1",
+          "criterion": "Keep pre-confirmation work to permitted bounded fact-finding and the brief frontier; defer full alternatives comparison until confirmation."
+        },
+        {
+          "id": "r2",
+          "criterion": "Preserve settled answers, confirmation frontier and text fallback; do not create a server or prototype."
+        }
+      ]
+    }
+  ]
+}

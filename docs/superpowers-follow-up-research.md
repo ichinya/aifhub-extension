@@ -2,6 +2,8 @@
 
 # Superpowers: повторная проверка и идеи для адаптации
 
+Дополнение от 2026-09-07: [отдельная проверка надёжности скиллов](superpowers-skill-evaluation.md) реализует инфраструктуру и сценарии семи следующих направлений #141. Исторические наблюдения ниже сохранены; новые локальные проверки не объявляются результатом реального сравнения моделей.
+
 Дата проверки: **2026-09-05**. Этот документ дополняет [принятую адаптацию](superpowers-adaptation.md) из [PR #179](https://github.com/ichinya/aifhub-extension/pull/179) и исследование по [issue #141](https://github.com/ichinya/aifhub-extension/issues/141). Описание пробелов ниже сохраняет исследовательский снимок до изменений. Все пять предложений теперь подключены к существующим инструкциям: пункты 1 и 5 — через [TEST-QUALITY.md](../skills/shared/TEST-QUALITY.md), пункты 2 и 4 — через [TASK-COORDINATION.md](../skills/shared/TASK-COORDINATION.md), пункт 3 — через [SCOPED-REVIEW.md](../skills/shared/SCOPED-REVIEW.md). Обновлены implement/fix/review injections и парные Claude/Codex agents; владельцы gates и schemas #168 сохранены.
 
 ## Проверенные ревизии

@@ -1,0 +1,49 @@
+{
+  "turns": [
+    "$aif-plan full: plan CSV import preview from requirements.md; do not implement."
+  ],
+  "files": {
+    "requirements.md": "Add CSV import preview. Existing decisions: local files only, 1000 row limit, duplicate rows skipped. Implement nothing during planning.\nThe selected change ID is csv-preview. Authorized planning outputs are its standard classic parent plan and task/context/rules/verify/status companion files. Preserve all other files.\n",
+    "README.md": "# Catalog demo\nSmall Node project. No providers enabled. No runtime CLI or upstream skill installation is supplied.\n",
+    "package.json": "{\"name\":\"catalog-demo\",\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n"
+  },
+  "allowedChanges": [
+    ".ai-factory/plans/csv-preview.md",
+    ".ai-factory/plans/csv-preview/task.md",
+    ".ai-factory/plans/csv-preview/context.md",
+    ".ai-factory/plans/csv-preview/rules.md",
+    ".ai-factory/plans/csv-preview/verify.md",
+    ".ai-factory/plans/csv-preview/status.yaml"
+  ],
+  "catalog": [
+    {
+      "name": "aif-plan",
+      "path": "injections/core/aif-plan-plan-folder.md",
+      "invocationPolicy": "auto"
+    },
+    {
+      "name": "aif-review",
+      "path": "injections/core/aif-review-context-providers.md",
+      "invocationPolicy": "auto"
+    },
+    {
+      "name": "aif-analyze",
+      "path": "skills/aif-analyze/SKILL.md",
+      "invocationPolicy": "auto"
+    },
+    {
+      "name": "aif-done",
+      "path": "skills/aif-done/SKILL.md",
+      "invocationPolicy": "auto"
+    },
+    {
+      "name": "aif-mode",
+      "path": "skills/aif-mode/SKILL.md",
+      "invocationPolicy": "explicit-only"
+    }
+  ],
+  "acceptedStatuses": [
+    "completed",
+    "incomplete"
+  ]
+}
