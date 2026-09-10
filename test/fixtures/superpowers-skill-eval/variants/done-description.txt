@@ -1,0 +1,1 @@
+Use after passing verification when finalizing an AI Factory plan or OpenSpec change and preparing its completion summary.

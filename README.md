@@ -400,6 +400,7 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 | [Documentation Index](docs/README.md) | Reading order and docs map |
 | [Usage](docs/usage.md) | Full command flow, AI Factory 2.19 session warmup, read/write boundaries, upstream project-context utilities, examples, and troubleshooting |
 | [Superpowers Adaptation](docs/superpowers-adaptation.md) | Test quality, bounded readiness, task conflict preflight, explicit batches, debugging, and scoped re-review |
+| [Superpowers Skill Evaluation](docs/superpowers-skill-evaluation.md) | Seven reliability directions, 234 observed trials, preserved experimental variants, and the decision to retain baseline instructions |
 | [Superpowers Follow-up Research](docs/superpowers-follow-up-research.md) | Upstream recheck, five implemented adaptations, issue ownership, and research-model tool execution |
 | [Context Providers](docs/context-providers.md) | Optional Graphify and Context7 provider guidance, reviewed-note paths, degraded behavior, and user-owned setup boundaries |
 | [Skill Providers](docs/skill-providers.md) | Ponytail exact-source evaluation, implementation-only experiment policy, safety/OpenSpec boundaries, and promotion criteria |

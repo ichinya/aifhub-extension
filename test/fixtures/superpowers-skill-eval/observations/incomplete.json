@@ -1,0 +1,10 @@
+{
+  "schema": "aifhub.superpowers_skill_observations.v1",
+  "executionId": "synthetic-example",
+  "source": {
+    "kind": "synthetic",
+    "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "complete": false
+  },
+  "events": []
+}

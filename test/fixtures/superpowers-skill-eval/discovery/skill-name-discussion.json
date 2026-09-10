@@ -1,0 +1,34 @@
+{
+  "turns": [
+    "Explain what the name aif-plan suggests in one sentence. This is a naming discussion; do not invoke a workflow."
+  ],
+  "files": {},
+  "allowedChanges": [],
+  "catalog": [
+    {
+      "name": "aif-plan",
+      "path": "injections/core/aif-plan-plan-folder.md",
+      "invocationPolicy": "auto"
+    },
+    {
+      "name": "aif-review",
+      "path": "injections/core/aif-review-context-providers.md",
+      "invocationPolicy": "auto"
+    },
+    {
+      "name": "aif-analyze",
+      "path": "skills/aif-analyze/SKILL.md",
+      "invocationPolicy": "auto"
+    },
+    {
+      "name": "aif-done",
+      "path": "skills/aif-done/SKILL.md",
+      "invocationPolicy": "auto"
+    },
+    {
+      "name": "aif-mode",
+      "path": "skills/aif-mode/SKILL.md",
+      "invocationPolicy": "explicit-only"
+    }
+  ]
+}

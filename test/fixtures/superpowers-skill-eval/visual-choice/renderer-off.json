@@ -1,0 +1,22 @@
+{
+  "turns": [
+    "Compare the accepted upload-state alternatives in this conversation. A diagram renderer is unavailable. Preserve the settled behavior and show how each alternative handles the same failed acknowledgement."
+  ],
+  "files": {
+    "accepted-scope.md": "Settled constraints: user can retry a failed upload, retries must not create duplicate imports, progress must survive reconnect. Existing interface: synchronous POST returns final result, times out on large files. Worker-owned job state and client-owned optimistic state are possible alternatives. Representative case: connection drops after upload, before acknowledgement. Compare ownership, transitions and recovery against the existing interface; preserve the requirements.\n",
+    "capabilities.json": "{\"renderer\":false,\"server\":false,\"prototype\":false}"
+  },
+  "allowedChanges": [],
+  "catalog": [
+    {
+      "name": "aif-plan",
+      "path": "injections/core/aif-plan-plan-folder.md",
+      "invocationPolicy": "auto"
+    },
+    {
+      "name": "aif-explore",
+      "path": "injections/core/aif-explore-plan-folder.md",
+      "invocationPolicy": "auto"
+    }
+  ]
+}

@@ -807,6 +807,8 @@ Development cycle for a testable behavior change:
 
 This is supporting runtime evidence, not an authoritative QA verdict. See [Адаптация идей Superpowers](superpowers-adaptation.md).
 
+Developer-only reliability experiments are documented in [Superpowers Skill Evaluation](superpowers-skill-evaluation.md). The opt-in adapter prepares isolated instruction variants, checks ordered loading evidence and collects independent behavioral observations. The 39 scenarios cover pressure, discovery, report composition, review advice, component tracing, test pollution and visual choices. The completed 234-attempt study records mixed results and regressions; candidates remain in fixtures and shipped instructions retain the measured baseline. Local checks and these descriptive results do not establish model improvement or installed-host qualification.
+
 Writes:
 
 - implementation source files in the selected task scope

@@ -274,6 +274,7 @@ describe('Superpowers-inspired workflow discipline', () => {
     for (const relativePath of ['README.md', 'docs/README.md', 'docs/usage.md']) {
       const source = await readRepoFile(relativePath);
       assertIncludes(source, 'superpowers-adaptation.md', relativePath);
+      assertIncludes(source, 'superpowers-skill-evaluation.md', relativePath);
     }
   });
 

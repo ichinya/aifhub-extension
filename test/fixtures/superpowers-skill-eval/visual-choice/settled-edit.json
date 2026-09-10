@@ -1,0 +1,21 @@
+{
+  "turns": [
+    "The planning decision is settled: rename the displayed button label from Send to Upload; keep all behavior, structure and styling. Give the short implementation step in this conversation."
+  ],
+  "files": {
+    "accepted-scope.md": "Only the label changes. The current interface remains selected. No design comparison or file write is needed.\n"
+  },
+  "allowedChanges": [],
+  "catalog": [
+    {
+      "name": "aif-plan",
+      "path": "injections/core/aif-plan-plan-folder.md",
+      "invocationPolicy": "auto"
+    },
+    {
+      "name": "aif-explore",
+      "path": "injections/core/aif-explore-plan-folder.md",
+      "invocationPolicy": "auto"
+    }
+  ]
+}

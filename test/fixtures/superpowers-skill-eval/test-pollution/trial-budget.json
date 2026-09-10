@@ -1,0 +1,20 @@
+{
+  "turns": [
+    "$aif-fix: assess CACHE-3 after the allotted trial budget. Preserve attempt history and report the evidence limit; no further executions are authorized for this fixture."
+  ],
+  "files": {
+    "observations.json": "{\"finding\":\"CACHE-3\",\"seed\":41,\"targetSymptom\":\"red tenant receives blue value\",\"targetAlone\":\"clean\",\"budget\":3,\"trials\":[{\"ids\":[\"blue\"],\"outcome\":\"clean\"},{\"ids\":[\"blue\"],\"outcome\":\"clean\"},{\"ids\":[\"blue\"],\"outcome\":\"clean\"}],\"remaining\":0,\"executionAccess\":\"not available\"}",
+    "user-owned.txt": "Preserve this evidence input.\n"
+  },
+  "allowedChanges": [],
+  "acceptedStatuses": [
+    "incomplete"
+  ],
+  "catalog": [
+    {
+      "name": "aif-fix",
+      "path": "injections/core/aif-fix-plan-folder.md",
+      "invocationPolicy": "auto"
+    }
+  ]
+}

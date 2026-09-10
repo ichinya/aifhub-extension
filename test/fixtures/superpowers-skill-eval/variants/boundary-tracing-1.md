@@ -1,0 +1,7 @@
+## Trace component boundaries
+
+For the same failing interaction, trace the reported value backward from the symptom through the relevant callers. At each boundary record expected input, observed input, transformation and observed output. Compare a working caller under the same contract. A command passing an option, a resolver dropping it, a runner applying a default and evidence recording the result identify the resolver as the first incorrect transition; hard-coding the runner or rewriting evidence would hide the defect.
+
+State one falsifiable boundary hypothesis and use the narrowest permitted observation to distinguish it from its alternatives before editing. Record only relevant non-sensitive values or presence/type facts. Never dump environment variables, arbitrary options, credentials or provider payloads. Use fixture canaries when checking diagnostic redaction. An unavailable boundary is an evidence gap, not proof that its component is responsible; preserve plausible alternatives and return the missing prerequisite through the existing fallback.
+
+Repair the first supported incorrect transition within the selected finding's scope. Check the original interaction and alternative callers, including omitted and explicit zero values where meaningful. Remove this investigation's temporary instrumentation before the original and regression reruns. Retain observations in the existing root-cause/experiment/check fields, preserve attempt history, and leave final verification ownership unchanged.

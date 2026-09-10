@@ -1,0 +1,7 @@
+## Use a visual comparison when it clarifies the choice
+
+At a currently authorized decision, use a compact inline Mermaid diagram or text sketch when differences in flow, state, ownership or layout would clarify a material tradeoff. Keep the same representative scenario, settled constraints and failure/recovery case across two or three materially different choices; include the existing interface as the baseline when available. Show what changes for the caller and who owns each state transition. Equivalent diagrams with different labels are not distinct alternatives.
+
+Connect the comparison to the decision it can settle. If an answer changes a downstream choice, refresh that affected comparison and frontier while preserving all other accepted answers. Do not reopen a settled routine edit or force a visualization when prose already settles the question. Without a renderer, use a text sketch; rendering tools, a server, an executable prototype, provider activation and extra artifact paths are not prerequisites or newly authorized work.
+
+The calling command's confirmation and read boundaries still apply. Before explore brief confirmation, do only permitted bounded fact-finding and retain it in conversation; defer a full alternatives comparison to the confirmed brief. Within an accepted brief or plan scope, place the comparison in the response or the existing authorized research/design artifact. A useful diagram is supporting reasoning, not measured user speed or evidence that a model followed the workflow.

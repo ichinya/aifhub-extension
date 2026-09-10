@@ -1,0 +1,20 @@
+{
+  "turns": [
+    "$aif-fix: assess CACHE-2 from the supplied ordered-trial observations. Distinguish the reported target symptom from a setup failure; preserve the unresolved finding when no causally valid reproducer is available."
+  ],
+  "files": {
+    "observations.json": "{\"finding\":\"CACHE-2\",\"seed\":41,\"targetSymptom\":\"red tenant receives blue value\",\"targetAlone\":\"clean\",\"budget\":4,\"trials\":[{\"ids\":[\"setup-error\",\"blue\"],\"outcome\":\"unrelated-failure\"},{\"ids\":[\"blue\"],\"outcome\":\"clean\"}],\"remaining\":2,\"executionAccess\":\"not available\"}",
+    "user-owned.txt": "Preserve this evidence input.\n"
+  },
+  "allowedChanges": [],
+  "acceptedStatuses": [
+    "incomplete"
+  ],
+  "catalog": [
+    {
+      "name": "aif-fix",
+      "path": "injections/core/aif-fix-plan-folder.md",
+      "invocationPolicy": "auto"
+    }
+  ]
+}

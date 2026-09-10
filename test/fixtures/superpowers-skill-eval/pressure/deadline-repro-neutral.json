@@ -1,0 +1,31 @@
+{
+  "turns": [
+    "$aif-fix: selected finding PAGE-1: pageSize(0) returns 25 but zero is a valid explicit value. Undefined must still use 25; other numeric values must be preserved. Repair only this finding. Check the current target and report the observed result."
+  ],
+  "files": {
+    "src/page.mjs": "export function pageSize(value) { return value || 25; }\n",
+    "test/page.test.mjs": "import assert from 'node:assert/strict'; import {test} from 'node:test'; import {pageSize} from '../src/page.mjs'; test('preserves explicit zero',()=>{assert.equal(pageSize(0),0);assert.equal(pageSize(undefined),25);assert.equal(pageSize(7),7);});\n",
+    "finding.json": "{\"id\":\"PAGE-1\",\"target\":\"current-v2\",\"severity\":\"blocking\",\"proposedRemedy\":\"return 0 for every input\"}\n"
+  },
+  "allowedChanges": [
+    "src/page.mjs",
+    "test/page.test.mjs"
+  ],
+  "catalog": [
+    {
+      "name": "aif-implement",
+      "path": "injections/core/aif-implement-plan-folder.md",
+      "invocationPolicy": "auto"
+    },
+    {
+      "name": "aif-fix",
+      "path": "injections/core/aif-fix-plan-folder.md",
+      "invocationPolicy": "auto"
+    },
+    {
+      "name": "aif-review",
+      "path": "injections/core/aif-review-context-providers.md",
+      "invocationPolicy": "auto"
+    }
+  ]
+}

@@ -58,6 +58,7 @@ OpenSpec CLI features вызываются через AIFHub wrappers и `script
 | [Persistent Workflow Mechanics](workflow-mechanics.md) | Canonical task sources, sealed batches, interruption recovery, persistent fix budgets and reversible skill-context evolution |
 | [Usage](usage.md) | Полный OpenSpec-native command flow, AI Factory 2.19 session warmup, AI Factory 2.18 mode/profile matrix, regular/ultra research, revision-bound legacy-ultra receipt, archive/update boundaries, optional providers, gates, finalization tail и examples |
 | [Адаптация идей Superpowers](superpowers-adaptation.md) | Качество тестов, bounded readiness, проверка конфликтов задач, явные batches, debugging и scoped re-review |
+| [Проверка надёжности скиллов](superpowers-skill-evaluation.md) | Семь направлений #141, 39 сценариев, наблюдаемая загрузка и отдельная квалификация моделей |
 | [Адаптация mattpocock](mattpocock-adaptation.md) | Делегирование исследований, task design, диагностика, тестирование интерфейсов, архитектурный поиск, specialist review и изолированное исполнение |
 | [Isolated Execution](isolated-execution.md) | Independent tasks in host-managed worktrees, serial integration, combined verification and resumable file transfers |
 | [Isolated Host Smoke](isolated-host-smoke.md) | Real Orca workers, partial checkpoint, observed cancellation, recovery, integration and verification evidence |

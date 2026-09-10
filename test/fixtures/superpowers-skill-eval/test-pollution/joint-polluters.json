@@ -1,0 +1,22 @@
+{
+  "turns": [
+    "$aif-fix: investigate selected CACHE-1 using the original ordered scenario. Establish target-alone, reduce only while retaining its symptom, and repair the state leak within src/cache.mjs. Preserve the original interaction and unrelated files."
+  ],
+  "files": {
+    "src/cache.mjs": "export function cacheKey(tenant,id) { return id; }\n",
+    "src/sequence.mjs": "import {cacheKey} from './cache.mjs';\nexport function runSequence(ids, joint=false) {\n const state={cache:new Map(),legacy:!joint};\n for(const id of ids) {\n  if(id==='enable')state.legacy=true;\n  else if(id==='blue')state.cache.set(cacheKey('blue','7'),'blue:7');\n  else if(id==='reset')state.cache.clear();\n  else if(id==='setup-error')return 'unrelated-failure';\n  else if(id!=='noise')throw Error('unknown predecessor');\n }\n const value=state.legacy ? state.cache.get(cacheKey('red','7')) ?? 'red:7' : 'red:7';\n return value==='red:7'?'clean':'target-symptom';\n}\n",
+    "test/original.mjs": "import assert from 'node:assert/strict';\nimport {runSequence} from '../src/sequence.mjs';\nassert.equal(runSequence([\"noise\",\"enable\",\"blue\",\"noise\"],true),'clean');\n",
+    "requirements.md": "CACHE-1: red tenant receives blue tenant value after [\"noise\",\"enable\",\"blue\",\"noise\"] then target. Target alone is clean. Preserve tenant isolation for any string tenant and id (including delimiters). Use explicit in-process predecessor order and a fresh initial state each trial. A setup error is a different symptom. Maximum 12 trials; preserve existing attempt guard. node test/original.mjs is the original check.\n",
+    "user-owned.txt": "Unrelated fixture user data; preserve byte for byte.\n"
+  },
+  "allowedChanges": [
+    "src/cache.mjs"
+  ],
+  "catalog": [
+    {
+      "name": "aif-fix",
+      "path": "injections/core/aif-fix-plan-folder.md",
+      "invocationPolicy": "auto"
+    }
+  ]
+}
