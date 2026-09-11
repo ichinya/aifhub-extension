@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { SDD_PROFILE_MODES, selectSddProfile } from './sdd-profiles.mjs';
+import { SDD_PROFILE_MODES, selectSddProfile, validateSddPolicy } from './sdd-profiles.mjs';
 import { compileSessionBrief, inspectSessionBrief, parseStrictJson, sessionBriefPaths } from './session-brief.mjs';
 import { buildImplementationContext, writeExecutionTrace } from './openspec-execution-context.mjs';
 
@@ -98,6 +98,18 @@ describe('SDD planning depth and gate separation', () => {
     assert.equal(selectSddProfile({ ...signals, planning_mode: 'ultra' }, {}, { supportsUltra: true }).implementation_allowed, true);
     assert.equal(selectSddProfile(signals).conditional_artifacts.includes('design'), true);
   });
+  it('accepts only the measured context policy vocabulary and fails closed otherwise', () => {
+    validateSddPolicy({ context_policy: { strategy: 'measured', reserve_output: true, reserve_tools: false, fresh_session_on_phase_change: true, compact_supporting_context: true, protected_artifacts: 'full' } });
+    validateSddPolicy({ context_policy: { strategy: 'measured', protected_artifacts: 'selected_sections' } });
+    for (const policy of [
+      { context_policy: { strategy: 'percentage' } },
+      { context_policy: {} },
+      { context_policy: { strategy: 'measured', protected_artifacts: 'compact' } },
+      { context_policy: { strategy: 'measured', unknown: true } },
+      { context_policy: [1] }
+    ]) assert.throws(() => validateSddPolicy(policy), /invalid-sdd-policy/);
+    assert.deepEqual(validateSddPolicy({}).context_policy, { strategy: 'measured' });
+  });
 });
 
 describe('SessionBrief compiler and exact revision custody', () => {
@@ -128,6 +140,21 @@ describe('SessionBrief compiler and exact revision custody', () => {
     assert.equal(second.written, false);
     assert.equal((await lstat(path.join(root, paths.json))).mtimeMs, mtime);
     assert.deepEqual(await snapshot(root), after);
+  });
+  it('measures budget.brief_bytes from the rendered brief and keeps token_estimate null', async () => {
+    const root = await fixture();
+    await put(root, '.ai-factory/sdd-policy.json', JSON.stringify({ schema: 'aifhub.sdd_policy.v1', context_policy: { strategy: 'measured', protected_artifacts: 'full' } }));
+    const result = await compileSessionBrief(options(root));
+    assert.equal(result.ok, true, JSON.stringify(result));
+    const brief = parseStrictJson(await readFile(path.join(root, paths.json), 'utf8'));
+    const markdown = await readFile(path.join(root, paths.markdown), 'utf8');
+    assert.equal(brief.budget.brief_bytes, Buffer.byteLength(markdown, 'utf8'));
+    assert.equal(brief.budget.token_estimate, null);
+    const decision = parseStrictJson(await readFile(path.join(root, paths.decision), 'utf8'));
+    assert.deepEqual(decision.context_policy, { strategy: 'measured', protected_artifacts: 'full' });
+    const second = await compileSessionBrief(options(root));
+    assert.equal(second.digest, result.digest);
+    assert.equal(second.written, false);
   });
   it('requires behavioral delta specs and richer design without manufacturing artifacts', async () => {
     const root = await fixture({ ...signals, modules: 3 });
@@ -255,7 +282,8 @@ describe('SessionBrief safety and installed CLI contract', () => {
       { schema: 'aifhub.sdd_policy.v1', required_gates: ['skip_verify'] },
       { schema: 'aifhub.sdd_policy.v1', context_refs: ['../private.md'] },
       { schema: 'aifhub.sdd_policy.v1', context_refs: [`.ai-factory/qa/${change}/coverage.md`] },
-      { schema: 'aifhub.sdd_policy.v1', context_refs: ['docs/transcript.md'] }
+      { schema: 'aifhub.sdd_policy.v1', context_refs: ['docs/transcript.md'] },
+      { schema: 'aifhub.sdd_policy.v1', context_policy: { strategy: 'percentage' } }
     ]) {
       const root = await fixture();
       await put(root, '.ai-factory/sdd-policy.json', JSON.stringify(policy));

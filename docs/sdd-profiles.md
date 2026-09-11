@@ -253,8 +253,9 @@ Reads and outputs are bounded to 2 MiB per file, with 1,024 source files and 32 
 total source bytes. Linked files, symlinks/junctions, path escapes, malformed JSON,
 duplicate decoded keys, duplicate active sections, and identifiable selected
 credentials fail closed. These limits bound local I/O; they are not percentages
-of a model context window. `budget.source_bytes` is measured, while unknown token
-and rendered-brief metrics remain `null`. The compiler does not guess model limits.
+of a model context window. `budget.source_bytes` and `budget.brief_bytes` are
+measured from exact local bytes; `budget.token_estimate` remains `null` without
+model/provider metadata. The compiler does not guess model limits.
 
 P0 includes quick/standard/research execution contracts and selection/version
 checks for direct/expanded/ultra. P1 adds the plan compliance receipt
