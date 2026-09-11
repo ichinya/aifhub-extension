@@ -30,6 +30,11 @@
       "module": "./commands/aifhub-tracer.mjs"
     },
     {
+      "name": "aifhub-plan-context",
+      "description": "Resolve a common plan context from a methodology adapter.",
+      "module": "./commands/aifhub-plan-context.mjs"
+    },
+    {
       "name": "aifhub-mcp",
       "description": "Run the AIFHub MCP server over stdio.",
       "module": "./commands/aifhub-mcp.mjs"

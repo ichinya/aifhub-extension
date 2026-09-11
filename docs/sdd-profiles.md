@@ -4,8 +4,9 @@
 
 Implementation status: this is an OpenSpec-only prototype. The revised target in
 [ADR 0005](adr/0005-ai-factory-plan-methodologies.md) makes AI Factory the plan owner
-across methodologies and optional tools. Its common plan resolver and adapters
-are not implemented yet; the instructions below describe the existing prototype.
+across methodologies and optional tools. A v1 common plan resolver and
+methodology adapters are now implemented; SessionBrief still consumes OpenSpec
+sources directly while the resolver matures.
 
 SDD profiles choose planning depth independently of quality gates. Public planning
 tokens remain `fast | full | ultra`; `quick` and `standard` use `full` canonical
@@ -259,10 +260,12 @@ checks for direct/expanded/ultra. P1 adds the plan compliance receipt
 (`aifhub-plan-compliance.v1`), the fresh-context AI review package
 (`aifhub.ai_cross_context_review.v1`), the tracer profile runtime
 (`aifhub.tracer_brief.v1`, `aifhub.tracer_findings.v1`,
-`aifhub.tracer_decision.v1`), and measured context budget/metrics
+`aifhub.tracer_decision.v1`), measured context budget/metrics
 (`budget.brief_bytes` is measured from the rendered SessionBrief,
 `token_estimate` remains `null` without model/provider metadata, and
-`context_policy` can be declared in `.ai-factory/sdd-policy.json`).
+`context_policy` can be declared in `.ai-factory/sdd-policy.json`), and the
+common plan resolver (`aifhub.plan_context.v1`) with methodology adapters for
+OpenSpec and AI Factory native plans.
 P2 cross-project adapters and evaluation remain separate. Crit human review and
 existing QA ownership are unchanged.
 
@@ -273,6 +276,7 @@ existing QA ownership are unchanged.
 - [Profile decision v1](../schemas/sdd-profile-decision.schema.json)
 - [SessionBrief v1](../schemas/session-brief.schema.json)
 - [Plan compliance v1](../schemas/plan-compliance.schema.json)
+- [Plan context v1](../schemas/plan-context.schema.json)
 - [AI cross-context review v1](../schemas/ai-cross-context-review.schema.json)
 - [Tracer brief v1](../schemas/tracer-brief.schema.json)
 - [Tracer findings v1](../schemas/tracer-findings.schema.json)

@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Plan context v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "aifhub.plan_context.v1"
+    },
+    "plan_id": {
+      "type": "string"
+    },
+    "change_id": {
+      "type": "string"
+    },
+    "methodology": {
+      "type": "string"
+    },
+    "adapter_version": {
+      "type": "string"
+    },
+    "public_mode": {
+      "enum": [
+        "fast",
+        "full",
+        "ultra",
+        null
+      ]
+    },
+    "sdd_profile": {
+      "enum": [
+        "direct",
+        "quick",
+        "standard",
+        "expanded",
+        "ultra",
+        "tracer",
+        "research",
+        null
+      ]
+    },
+    "original_request": {
+      "type": "string"
+    },
+    "requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "intent": {
+          "type": "string"
+        },
+        "target_outcome": {
+          "type": "string"
+        },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "open_questions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "done": {
+            "type": "boolean"
+          },
+          "source_path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "done",
+          "source_path"
+        ]
+      }
+    },
+    "acceptance_examples": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "non_goals": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "change_surface": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "forbidden": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "allowed",
+        "forbidden"
+      ]
+    },
+    "documents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "kind": {
+            "enum": [
+              "canonical",
+              "policy",
+              "protected",
+              "supporting"
+            ]
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "kind"
+        ]
+      }
+    },
+    "source_revision": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      }
+    }
+  },
+  "required": [
+    "schema",
+    "plan_id",
+    "change_id",
+    "methodology",
+    "adapter_version",
+    "public_mode",
+    "sdd_profile",
+    "original_request",
+    "requirements",
+    "tasks",
+    "acceptance_examples",
+    "non_goals",
+    "change_surface",
+    "documents",
+    "source_revision",
+    "errors"
+  ]
+}

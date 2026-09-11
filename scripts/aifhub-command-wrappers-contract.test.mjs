@@ -64,6 +64,13 @@ const WRAPPER_COMMANDS = [
     args: ['run', '--change', 'add-oauth', '--json']
   },
   {
+    name: 'aifhub-plan-context',
+    description: 'Resolve a common plan context from a methodology adapter.',
+    module: './commands/aifhub-plan-context.mjs',
+    script: 'common-plan-resolver.mjs',
+    args: ['resolve', '--change', 'add-oauth', '--json']
+  },
+  {
     name: 'aifhub-mode',
     description: 'Run AIFHub artifact mode status, switch, sync, and doctor commands.',
     module: './commands/aifhub-mode.mjs',
