@@ -4,6 +4,7 @@
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { findExactMarkdownH2Sections } from '../scripts/markdown-structural-markers.mjs';
+import { parseStrictJson } from '../scripts/json-strict.mjs';
 import { readProviderFile } from '../scripts/provider-files.mjs';
 
 const ADAPTER_VERSION = '0.1.0';
@@ -58,6 +59,7 @@ async function collectSpecs(root, dir, documents, depth) {
 function section(content, heading) {
   if (!content) return null;
   const sections = findExactMarkdownH2Sections(content, heading);
+  if (sections.length > 1) throw new Error('duplicate_source_section');
   if (sections.length === 0) return null;
   return sections[0].join('\n').trim();
 }
@@ -94,8 +96,8 @@ function parseSddInputs(proposal) {
   const inputsSection = section(proposal, SDD_SIGNALS_HEADING);
   if (!inputsSection) return null;
   const match = /^```json\n([\s\S]+?)\n```$/s.exec(inputsSection);
-  if (!match) return null;
-  try { return JSON.parse(match[1]); } catch { return null; }
+  if (!match) throw new Error('invalid-sdd-inputs');
+  try { return parseStrictJson(match[1]); } catch { throw new Error('invalid-sdd-inputs'); }
 }
 
 async function readContext(root, identity) {
@@ -112,10 +114,12 @@ async function readContext(root, identity) {
   const constraints = readSections(proposal, design, 'Constraints');
   const assumptions = readSections(proposal, design, 'Assumptions');
   const openQuestions = readSections(proposal, design, 'Open Questions');
+  const acceptanceCriteria = readSections(proposal, design, 'Acceptance Criteria');
   const acceptanceExamples = readSections(proposal, design, 'Acceptance Examples');
   const nonGoals = readSections(proposal, design, 'Non-goals');
   const allowed = readSections(proposal, design, 'Allowed Change Surface');
   const forbidden = readSections(proposal, design, 'Forbidden Change Surface');
+  const verificationPlan = readSections(proposal, design, 'Verification Plan');
   const originalRequest = section(proposal, 'Original Request') ?? '';
 
   return {
@@ -128,7 +132,9 @@ async function readContext(root, identity) {
       target_outcome: targetOutcome ?? '',
       constraints,
       assumptions,
-      open_questions: openQuestions
+      open_questions: openQuestions,
+      acceptance_criteria: acceptanceCriteria,
+      verification_plan: verificationPlan
     },
     tasks,
     acceptance_examples: acceptanceExamples,

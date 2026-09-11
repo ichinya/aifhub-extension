@@ -77,7 +77,9 @@ async function readContext(root, identity) {
       target_outcome: '',
       constraints: [],
       assumptions: [],
-      open_questions: []
+      open_questions: [],
+      acceptance_criteria: [],
+      verification_plan: []
     },
     tasks,
     acceptance_examples: [],

@@ -5,8 +5,9 @@
 Implementation status: this is an OpenSpec-only prototype. The revised target in
 [ADR 0005](adr/0005-ai-factory-plan-methodologies.md) makes AI Factory the plan owner
 across methodologies and optional tools. A v1 common plan resolver and
-methodology adapters are now implemented; SessionBrief still consumes OpenSpec
-sources directly while the resolver matures.
+methodology adapters are implemented; SessionBrief now compiles from
+`aifhub.plan_context.v1` produced by the OpenSpec adapter while preserving exact
+source revision and adapter binding.
 
 SDD profiles choose planning depth independently of quality gates. Public planning
 tokens remain `fast | full | ultra`; `quick` and `standard` use `full` canonical

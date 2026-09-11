@@ -8,7 +8,6 @@ import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { resolveActiveChange, normalizeChangeId } from './active-change-resolver.mjs';
 import { readProviderFile, safeProviderPath } from './provider-files.mjs';
-import { parseStrictJson } from './session-brief.mjs';
 import { validateSddInputs, validateSddPolicy } from './sdd-profiles.mjs';
 
 const ADAPTER_DIR = new URL('../adapters/', import.meta.url);
@@ -46,25 +45,31 @@ async function loadAdapter(methodology) {
 }
 
 export async function resolvePlanContext(options = {}) {
-  const root = path.resolve(options.rootDir ?? process.cwd());
-  let changeId;
-  if (options.changeId !== undefined) {
-    const normalized = normalizeChangeId(options.changeId);
-    if (!normalized.ok) throw planResolverError('invalid-change-id');
-    changeId = normalized.changeId;
-  } else {
-    const resolution = await resolveActiveChange({ rootDir: root, cwd: options.cwd ?? root });
-    if (!resolution.ok) throw planResolverError('active_change_unresolved');
-    changeId = resolution.changeId;
+  try {
+    const root = path.resolve(options.rootDir ?? process.cwd());
+    let changeId;
+    if (options.changeId !== undefined) {
+      const normalized = normalizeChangeId(options.changeId);
+      if (!normalized.ok) throw planResolverError('invalid-change-id');
+      changeId = normalized.changeId;
+    } else {
+      const resolution = await resolveActiveChange({ rootDir: root, cwd: options.cwd ?? root });
+      if (!resolution.ok) throw planResolverError('active_change_unresolved');
+      changeId = resolution.changeId;
+    }
+    const methodology = options.methodology ?? 'openspec';
+    const adapter = await loadAdapter(methodology);
+    const identity = await adapter.resolveIdentity(root, changeId, options);
+    const rawContext = await adapter.readContext(root, identity, options);
+    const context = await normalizePlanContext(rawContext, identity, changeId, methodology);
+    context.documents = await resolveDocuments(root, identity, context, options);
+    context.source_revision = computeSourceRevision(context.documents);
+    return context;
+  } catch (error) {
+    if (error.planResolverCode) throw error;
+    const code = typeof error.message === 'string' && /^[a-z0-9_-]+$/.test(error.message) ? error.message : 'plan_resolver_failed';
+    throw planResolverError(code);
   }
-  const methodology = options.methodology ?? 'openspec';
-  const adapter = await loadAdapter(methodology);
-  const identity = await adapter.resolveIdentity(root, changeId, options);
-  const rawContext = await adapter.readContext(root, identity, options);
-  const context = await normalizePlanContext(rawContext, identity, changeId, methodology);
-  context.documents = await resolveDocuments(root, identity, context, options);
-  context.source_revision = computeSourceRevision(context.documents);
-  return context;
 }
 
 async function normalizePlanContext(raw, identity, changeId, methodology) {
@@ -95,6 +100,7 @@ async function normalizePlanContext(raw, identity, changeId, methodology) {
     },
     documents: [],
     source_revision: '0'.repeat(64),
+    sdd_inputs: raw.sdd_inputs ?? null,
     errors: Array.isArray(raw.errors) ? raw.errors : []
   };
   if (raw.sdd_inputs) {
@@ -106,7 +112,7 @@ async function normalizePlanContext(raw, identity, changeId, methodology) {
       defaults.sdd_profile = selection.profile;
       defaults.public_mode = selection.recommended_planning_mode;
     } catch (error) {
-      defaults.errors.push({ code: error.planResolverCode ?? 'invalid-sdd-profile-selection' });
+      defaults.errors.push({ code: error.sddCode ?? error.planResolverCode ?? 'invalid-sdd-profile-selection' });
     }
   }
   return defaults;

@@ -5,10 +5,12 @@
 ## Status
 
 Target architecture from the user's clarification on 2026-09-05. Adapter contracts
-and the common plan resolver are partially implemented (v1 adapters for OpenSpec
-and AI Factory native plans; `aifhub-plan-context` command; `aifhub.plan_context.v1`
-schema). SessionBrief and provider integration still consume OpenSpec sources
-directly; full runtime integration remains pending.
+and the common plan resolver are now implemented, and the SessionBrief compiler
+(`scripts/session-brief.mjs`) consumes `aifhub.plan_context.v1` produced by the
+OpenSpec adapter. The brief binds its digest to both the compiled source revision
+and the resolver's methodology/adapter/source binding. The AI Factory native
+adapter exists but is not yet used by SessionBrief; provider integration and
+legacy plan migration still target OpenSpec directly.
 
 [ADR 0004](0004-sdd-profiles-and-session-brief.md). The existing OpenSpec-native
 runtime described in ADR 0001 remains the current implementation, not the target

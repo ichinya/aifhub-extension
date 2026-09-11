@@ -170,6 +170,10 @@
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
     },
+    "sdd_inputs": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "errors": {
       "type": "array",
       "items": {
