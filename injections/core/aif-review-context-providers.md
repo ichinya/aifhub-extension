@@ -28,6 +28,8 @@ For an OpenSpec-native change with SDD inputs/policy or SDD runtime artifacts, c
 
 Apply this section in both artifact modes before evaluating findings.
 
+For SDD-managed changes, `ai-factory aifhub-plan-compliance check --change <change-id> --json` is a read-only drift receipt: treat `compliant`/`acceptable_drift` as supporting evidence only, route `replan_required`/`blocked` back to the planning owner, and never count the receipt as QA evidence; it goes stale with canonical changes. `ai-factory aifhub-fresh-context-review prepare --change <change-id> --json` exports a findings-only reviewer package under `.ai-factory/state/<change-id>/reviews/<review-id>/`; a reviewer session consumes that package without the producing transcript, discarded attempts, or hidden reasoning, and a `--same-session` receipt is labeled as such, never presented as fresh-context review.
+
 - Resolve `reviews.policy_file` from `.ai-factory/config.yaml`, defaulting to root `REVIEW.md`, exactly as defined by `skills/shared/REVIEW-POLICY.md`.
 - Load it only through `ai-factory aifhub-review-policy load --json`. Consume the returned content only when the helper returns a complete `present` snapshot with a normalized path and revision; the helper binds and revalidates the opened file identity internally. Never reopen the config-selected path or reimplement containment, symlink/junction, managed-file, or protected-root checks. If the command is unavailable or malformed, treat the policy as unreadable and skip it.
 - When delegating to a read-only sidecar without a shell tool, pass only that accepted ephemeral snapshot. The sidecar must not reopen the config-selected path; if the validated snapshot cannot be passed, it skips custom policy guidance.
