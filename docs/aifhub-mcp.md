@@ -31,6 +31,7 @@ The MCP client normally shows these with the server namespace:
 | `aifhub.read_file_deduplicated` | Read a project file once per session; identical repeat reads return a replay summary instead of the content. |
 | `aifhub.context_dedup_status` | Report session totals: reads, dedup hits, observed/served bytes, net saved bytes, estimated saved tokens. |
 | `aifhub.context_dedup_purge` | Preview deletion of this MCP connection ledger; delete it only with `confirm: true`. |
+| `aifhub.providers_status` | Report the normalized status of configured validation and semantic model providers. |
 
 ## Runtime Formats
 
@@ -91,6 +92,8 @@ GitHub Copilot uses the VS Code MCP shape with `servers` and `type: "stdio"`:
 `aifhub.read_file_deduplicated` never rewrites files and never optimizes protected validation artifacts such as `openspec/specs/**`, `openspec/changes/**`, `coverage.json`, `done-readiness.json`, `aif-gate-result*`, and generated-rules traces. `aifhub.contextDedup.mode` selects `off`, built-in `aifhub`, or an installed user-owned `sqz`; legacy `enabled: true|false` remains read-compatible as `aifhub|off`. Reads are capped at 1 MiB, diagnostics are returned separately from file content, and each MCP server process owns a fresh session ledger.
 
 MCP callers cannot select another `sessionId` or purge all ledgers. `aifhub.context_dedup_status` omits internal session/path values and reports net accounting with the invariant `observedBytes = servedBytes + savedBytes`. `aifhub.context_dedup_purge` is dry-run by default and deletes only the current MCP connection ledger after `confirm: true`. CLI retains explicit `--session` and `--all` operations for user-owned local lifecycle. See [Session Context Dedup](context-dedup.md).
+
+`aifhub.providers_status` is read-only. It accepts only the `status` and `doctor` phases and never runs validation gates, provider initialization, provider-owned sync, or evidence writes; mutating phases stay on the explicit `ai-factory aifhub-providers` CLI. The returned payload is normalized provider evidence only — diagnostic codes, severities, gate summaries, tool/contract versions and provenance — with no raw streams, project paths, or project content. See [Validation Providers](validation-providers.md).
 
 `mode: sqz` requires a separately installed third-party executable and always emits a bounded readiness/ownership warning. AIFHub does not auto-download it or run `sqz init`; runtime execution uses fixed `compress --no-cache` args, `shell: false`, bounded timeout/output and an allowlisted child environment containing only executable lookup/platform temp/locale keys plus session-owned home directories. Unknown credentials, cloud, proxy and runtime variables are not inherited. Exact repeats use the connection-scoped AIFHub ledger. Missing/failing `sqz` or unexpected state-dependent provider output serves the original content and does not expose raw stderr. The third-party CLI may still write user-owned statistics under `~/.sqz`; MCP purge does not own that state.
 

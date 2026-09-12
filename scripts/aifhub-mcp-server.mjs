@@ -13,6 +13,7 @@ import {
   resolveCanonicalTarget,
   summarizeSession
 } from './context-dedup.mjs';
+import { providerDiagnostics, runProviders } from './aifhub-providers.mjs';
 
 const SERVER_VERSION = '0.1.0';
 const PROTOCOL_VERSION = '2024-11-05';
@@ -110,6 +111,21 @@ const TOOL_DEFINITIONS = [
       additionalProperties: false,
       properties: {
         confirm: { type: 'boolean', description: 'Omitted or false previews; true deletes only this MCP session ledger.' }
+      }
+    }
+  },
+  {
+    name: 'providers_status',
+    description: 'Report the normalized status of configured AIFHub validation and semantic model providers. Read-only: never runs validation gates, initialization, or evidence writes.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        phase: {
+          type: 'string',
+          enum: ['status', 'doctor'],
+          description: 'Read-only provider phase. Defaults to status; doctor adds provider environment diagnostics.'
+        }
       }
     }
   }
@@ -453,6 +469,22 @@ async function contextDedupPurge(args, options = {}) {
   return textResult(jsonText({ dryRun: false, scope: 'current-mcp-session', removed: true }));
 }
 
+async function providersStatus(args, options = {}) {
+  assertAllowedKeys(args, ['phase']);
+  const phase = args.phase === undefined ? 'status' : args.phase;
+  if (!['status', 'doctor'].includes(phase)) {
+    throw new Error('phase must be "status" or "doctor"');
+  }
+  const rootDir = options.cwd ?? process.cwd();
+  const runner = options.providerRunner ?? runProviders;
+  const result = await runner({ rootDir, phase });
+  const text = jsonText(result);
+  if (Buffer.byteLength(text, 'utf8') > MCP_READ_LIMIT_BYTES) {
+    throw new Error('providers_status output exceeded the 1 MiB limit.');
+  }
+  return textResultWithDiagnostics(text, sanitizeDiagnostics(providerDiagnostics(result)));
+}
+
 const TOOL_HANDLERS = {
   search_skills: searchSkills,
   install_skill: installSkill,
@@ -460,7 +492,8 @@ const TOOL_HANDLERS = {
   propose_skill_improvement: proposeSkillImprovement,
   read_file_deduplicated: readFileDeduplicated,
   context_dedup_status: contextDedupStatus,
-  context_dedup_purge: contextDedupPurge
+  context_dedup_purge: contextDedupPurge,
+  providers_status: providersStatus
 };
 
 function success(id, result) {

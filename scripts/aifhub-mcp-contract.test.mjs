@@ -57,6 +57,7 @@ describe('AIFHub MCP extension contract', () => {
       'context_dedup_status',
       'install_skill',
       'propose_skill_improvement',
+      'providers_status',
       'read_file_deduplicated',
       'run_skill_tests',
       'search_skills'
@@ -361,6 +362,8 @@ describe('AIFHub MCP extension contract', () => {
     assert.deepEqual(tools.context_dedup_status.inputSchema.properties, {});
     assert.deepEqual(Object.keys(tools.context_dedup_purge.inputSchema.properties), ['confirm']);
     assert.equal(tools.context_dedup_purge.annotations, undefined);
+    assert.deepEqual(Object.keys(tools.providers_status.inputSchema.properties), ['phase']);
+    assert.deepEqual(tools.providers_status.inputSchema.properties.phase.enum, ['status', 'doctor']);
 
     const rootDir = await mkdtemp(path.join(os.tmpdir(), 'aifhub-mcp-diagnostics-'));
     try {
@@ -425,6 +428,57 @@ describe('AIFHub MCP extension contract', () => {
     }
   });
 
+  it('reports normalized provider status read-only through an injected runner', async () => {
+    const { handleMcpMessage } = await import('../scripts/aifhub-mcp-server.mjs');
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), 'aifhub-mcp-providers-'));
+
+    try {
+      const calls = [];
+      const providerRunner = async (runOptions) => {
+        calls.push(runOptions);
+        return {
+          schemaVersion: '1.0.0',
+          status: 'warn',
+          blocking: false,
+          providers: [{
+            provider: 'hlv', kind: 'validation', policy: 'required', phase: runOptions.phase,
+            status: 'unavailable', reason: 'layout_missing',
+            gate: { status: 'warn', blocking: false }
+          }],
+          diagnostics: []
+        };
+      };
+      const options = { cwd: rootDir, providerRunner };
+      const call = async (id, args) => handleMcpMessage(
+        { jsonrpc: '2.0', id, method: 'tools/call', params: { name: 'providers_status', arguments: args } },
+        options
+      );
+
+      const status = await call(12, {});
+      assert.equal(status.result.isError, undefined, JSON.stringify(status));
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].rootDir, rootDir);
+      assert.equal(calls[0].phase, 'status');
+      const payload = JSON.parse(status.result.content[0].text);
+      assert.equal(payload.status, 'warn');
+      assert.equal(payload.providers[0].provider, 'hlv');
+      assert.match(status.result.content[1].text, /provider-hlv-unavailable/);
+
+      const doctor = await call(13, { phase: 'doctor' });
+      assert.equal(doctor.result.isError, undefined, JSON.stringify(doctor));
+      assert.equal(calls[1].phase, 'doctor');
+
+      for (const phase of ['verify', 'done', 'implement', 'sync']) {
+        const rejected = await call(14, { phase });
+        assert.equal(rejected.result.isError, true, `phase ${phase} must be rejected`);
+        assert.match(rejected.result.content[0].text, /status.*doctor/);
+      }
+      assert.equal(calls.length, 2, 'mutating phases must never reach the provider runner');
+    } finally {
+      await rm(rootDir, { recursive: true, force: true });
+    }
+  });
+
   it('documents version-gated Universal MCP configuration alongside runtime-specific formats', async () => {
     const docs = await readRepoFile('docs/aifhub-mcp.md');
 
@@ -436,6 +490,7 @@ describe('AIFHub MCP extension contract', () => {
       ['aifhub.read_file_deduplicated', 'session dedup read tool'],
       ['aifhub.context_dedup_status', 'session dedup status tool'],
       ['aifhub.context_dedup_purge', 'session dedup purge tool'],
+      ['aifhub.providers_status', 'provider status tool'],
       ['Universal / Other', 'Universal / Other runtime'],
       ['.mcp.json', 'Universal / Other .mcp.json path'],
       ['mcpServers', 'standard mcpServers key'],

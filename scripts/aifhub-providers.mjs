@@ -2,6 +2,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { detectHlv, HLV_COMMAND_CONTRACT, runHlvOperation } from './hlv-provider.mjs';
+import { detectLekalo, LEKALO_COMMAND_CONTRACT, runLekaloOperation } from './lekalo-provider.mjs';
 import { digest, providerRevision, readProviderFile, safeId, writeProviderFile } from './provider-files.mjs';
 import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
 import { normalizeProviderPolicies, PROVIDER_KINDS, providerGate, readProviderPolicies } from './provider-policy.mjs';
@@ -135,9 +136,23 @@ export async function runProviders(options = {}) {
             ?? (gates.some((item) => item.status === 'warn') ? 'warn' : 'pass');
           evidence.reason = 'operations_complete';
         }
+      } else if (id === 'lekalo') {
+        const detection = await detectLekalo(rootDir, config, options);
+        evidence = { ...evidence, status: detection.status, reason: detection.reason,
+          toolVersion: detection.version, layout: detection.layout };
+        if (detection.status === 'pass') {
+          // The adapter contract is reserved; real Lekalo execution stays
+          // fail-closed until the upstream provider protocol is published.
+          for (const operation of PHASE_OPERATIONS[phase]) {
+            evidence.operations.push({ operation,
+              ...await runLekaloOperation(operation, rootDir, config, options) });
+          }
+          const gates = evidence.operations.filter((item) => item.operation !== 'trace');
+          evidence.status = gates.find((item) => !['pass', 'warn'].includes(item.status))?.status
+            ?? (gates.some((item) => item.status === 'warn') ? 'warn' : 'pass');
+          evidence.reason = 'operations_complete';
+        }
       }
-      // Lekalo deliberately has no guessed executable or capability commands.
-      // The published v0.1.10 contract marks its provider protocol unpublished.
     } catch {
       evidence.status = 'configuration_error';
       evidence.reason = 'unsafe_or_unreadable_provider_layout';
