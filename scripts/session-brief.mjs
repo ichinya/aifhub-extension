@@ -163,8 +163,6 @@ async function buildSnapshot(options, explicitCompile) {
     const item = await add(file, 'protected');
     if (!item && policy.context_refs.includes(file)) throw sddError('missing_context_reference');
   }
-  const canonicalProposal = files.get(`${base}/proposal.md`);
-  const planContextProposal = planContext.documents.find((doc) => doc.path === `${base}/proposal.md`);
   for (const document of planContext.documents) {
     const current = files.get(document.path);
     if (current && current.sha256 !== document.sha256) throw sddError('sources_changed_during_compile');
