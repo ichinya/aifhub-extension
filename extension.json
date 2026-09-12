@@ -145,6 +145,11 @@
     },
     {
       "runtime": "codex",
+      "source": "./agent-files/codex/aifhub-fresh-context-reviewer.toml",
+      "target": "aifhub-fresh-context-reviewer.toml"
+    },
+    {
+      "runtime": "codex",
       "source": "./agent-files/codex/aifhub-security-sidecar.toml",
       "target": "aifhub-security-sidecar.toml"
     },
@@ -192,6 +197,11 @@
       "runtime": "claude",
       "source": "./agent-files/claude/aifhub-review-sidecar.md",
       "target": "aifhub-review-sidecar.md"
+    },
+    {
+      "runtime": "claude",
+      "source": "./agent-files/claude/aifhub-fresh-context-reviewer.md",
+      "target": "aifhub-fresh-context-reviewer.md"
     },
     {
       "runtime": "claude",

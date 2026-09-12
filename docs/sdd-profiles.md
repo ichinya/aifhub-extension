@@ -163,6 +163,10 @@ human review. Outcomes are `prepared`, `reviewed`, `blocked`, or `stale`.
 Metadata/diagnostics contain paths, hashes, and fixed reason codes, without raw
 requests, provider output, credentials, or exception messages.
 
+Packaged Claude/Codex reviewer agents (`aifhub-fresh-context-reviewer`) consume the
+prepared package read-only and return findings only; the producing session supplies
+the package path, and outcome recording stays with the existing review flow.
+
 Exit `0` means a valid result (or a disabled overlay on an existing unopted change),
 `1` means missing/stale/blocked context, and `2` means invalid arguments, unresolved
 scope, unsafe/malformed input, or an I/O failure. JSON commands emit one JSON object
@@ -207,6 +211,9 @@ Decisions are `promote`, `discard`, `replan`, or `blocked`. Promotion writes a
 fixed promotion step list: update canonical proposal/design/tasks/specs, run
 `/aif-mode sync`, compile a new production SessionBrief, then run full
 implementation. The tracer command itself never modifies canonical artifacts.
+
+Implement workers route tracer conclusions through the owner `promote` decision and
+its fixed promotion step list; they never finalize tracer state as production.
 
 ## Source binding and implementation
 
