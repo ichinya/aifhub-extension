@@ -59,7 +59,7 @@ async function collectSpecs(root, dir, documents, depth) {
 function section(content, heading) {
   if (!content) return null;
   const sections = findExactMarkdownH2Sections(content, heading);
-  if (sections.length > 1) throw new Error('duplicate_source_section');
+  if (sections.length > 1) throw planError('duplicate_source_section');
   if (sections.length === 0) return null;
   return sections[0].join('\n').trim();
 }
@@ -75,7 +75,7 @@ function readSections(proposal, design, heading) {
 
 function parseTasks(tasksContent, sourcePath) {
   if (!tasksContent) return [];
-  const lines = tasksContent.split('\n');
+  const lines = tasksContent.split(/\r\n|\n|\r/);
   const tasks = [];
   let id = 0;
   for (const line of lines) {
@@ -96,8 +96,8 @@ function parseSddInputs(proposal) {
   const inputsSection = section(proposal, SDD_SIGNALS_HEADING);
   if (!inputsSection) return null;
   const match = /^```json\n([\s\S]+?)\n```$/s.exec(inputsSection);
-  if (!match) throw new Error('invalid-sdd-inputs');
-  try { return parseStrictJson(match[1]); } catch { throw new Error('invalid-sdd-inputs'); }
+  if (!match) throw planError('invalid-sdd-inputs');
+  try { return parseStrictJson(match[1]); } catch (error) { throw planError(error.sddCode ?? 'invalid-sdd-inputs'); }
 }
 
 async function readContext(root, identity) {

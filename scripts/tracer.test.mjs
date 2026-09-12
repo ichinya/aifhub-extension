@@ -103,6 +103,17 @@ describe('Tracer profile', () => {
     const summary = await readFile(path.join(root, paths.summary), 'utf8');
     assert.ok(summary.includes('**promote**'));
   });
+  it('reports corrupt persisted state distinctly and rejects flag values as finding/evidence arguments', async () => {
+    const root = await fixture();
+    await runTracer({ rootDir: root, changeId: change, hypothesis: 'Adapter works.', minimumVerticalPath: 'src/adapter.mjs' });
+    await writeFile(path.join(root, tracerPaths(change).decision), '{"schema":"aifhub.tracer_decision.v1","decision":null,"decision":null}');
+    const status = await statusTracer({ rootDir: root, changeId: change });
+    assert.equal(status.ok, false);
+    assert.equal(status.errors[0].code, 'corrupt_tracer_state');
+    const stdout = { written: '', write(value) { this.written += value; } };
+    assert.equal(await runTracerCommand(['run', '--change', change, '--evidence', '--hypothesis', 'x', '--json'], { rootDir: root, stdout }), 2);
+    assert.equal(await runTracerCommand(['run', '--change', change, '--finding', '--hypothesis', 'x', '--json'], { rootDir: root, stdout }), 2);
+  });
 
   it('blocks without required hypothesis and vertical path', async () => {
     const root = await fixture();

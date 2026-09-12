@@ -1,8 +1,6 @@
 // AI Factory native methodology adapter for the common plan resolver.
 // V1 supports the legacy fast/full single-file forms and reports unsupported
 // for ultra bundles; it does not replace the upstream plan lifecycle owner.
-import { createHash } from 'node:crypto';
-import path from 'node:path';
 import { parseSimpleYaml } from '../scripts/aif-artifact-sync.mjs';
 import { readProviderFile } from '../scripts/provider-files.mjs';
 
@@ -18,8 +16,6 @@ export function createAdapter() {
     proposeEdits
   };
 }
-
-function sha256(value) { return createHash('sha256').update(value).digest('hex'); }
 
 async function resolveIdentity(root, changeId, options) {
   const configFile = await readProviderFile(root, '.ai-factory/config.yaml', 2 * 1024 * 1024);
@@ -72,7 +68,7 @@ async function readContext(root, identity) {
 
 function parseTasks(content, sourcePath) {
   if (!content) return [];
-  const lines = content.split('\n');
+  const lines = content.split(/\r\n|\n|\r/);
   const tasks = [];
   let id = 0;
   for (const line of lines) {

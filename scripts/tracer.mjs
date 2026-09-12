@@ -8,6 +8,7 @@ import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
 import { resolveActiveChange, normalizeChangeId } from './active-change-resolver.mjs';
+import { parseStrictJson } from './json-strict.mjs';
 import { readProviderFile, safeProviderPath, writeProviderFile } from './provider-files.mjs';
 
 const BRIEF_SCHEMA = 'aifhub.tracer_brief.v1';
@@ -222,11 +223,11 @@ function renderSummary(snapshot) {
 }
 
 async function readJsonIfExists(root, relative) {
+  const bytes = await readProviderFile(root, relative, 4 * 1024 * 1024);
+  if (bytes === null) return null;
   try {
-    const bytes = await readProviderFile(root, relative, 4 * 1024 * 1024);
-    if (bytes === null) return null;
-    return JSON.parse(bytes.toString('utf8'));
-  } catch { return null; }
+    return parseStrictJson(bytes.toString('utf8'));
+  } catch { throw tracerError('corrupt_tracer_state'); }
 }
 
 async function writeTextFile(root, relative, text) {
@@ -291,7 +292,7 @@ export async function runTracerCommand(argv = process.argv.slice(2), options = {
     else if (flag === '--budget-tool' && args[i + 1] && !args[i + 1].startsWith('--')) { parsed.budget = parsed.budget ?? {}; parsed.budget.tools = parsed.budget.tools ?? []; parsed.budget.tools.push(args[++i]); }
     else if (flag === '--expected-artifact' && args[i + 1] && !args[i + 1].startsWith('--')) { parsed.expectedArtifacts = parsed.expectedArtifacts ?? []; parsed.expectedArtifacts.push(args[++i]); }
     else if (flag === '--reason' && args[i + 1] && !args[i + 1].startsWith('--')) parsed.reason = args[++i];
-    else if (flag === '--finding' && args[i + 1]) {
+    else if (flag === '--finding' && args[i + 1] && !args[i + 1].startsWith('--')) {
       const [category, summary] = args[i + 1].split(':', 2);
       if (!category || !summary) return invalid({ jsonOutput, stdout: options.stdout });
       parsed.findings = parsed.findings ?? [];

@@ -3,11 +3,12 @@
 // stays with the plan; this module returns a derived context bound to exact
 // source revisions.
 import { createHash } from 'node:crypto';
-import { readdir, writeFile } from 'node:fs/promises';
+import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { resolveActiveChange, normalizeChangeId } from './active-change-resolver.mjs';
-import { readProviderFile, safeProviderPath } from './provider-files.mjs';
+import { readProviderFile, safeProviderPath, writeProviderFile } from './provider-files.mjs';
+import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
 import { selectSddProfile, validateSddInputs, validateSddPolicy } from './sdd-profiles.mjs';
 
 const ADAPTER_DIR = new URL('../adapters/', import.meta.url);
@@ -32,6 +33,8 @@ export async function listAdapters() {
 
 async function loadAdapter(methodology) {
   if (typeof methodology !== 'string' || !/^[a-z][a-z0-9_-]*$/.test(methodology)) throw planResolverError('invalid-methodology');
+  const known = await listAdapters();
+  if (!known.includes(methodology)) throw planResolverError('unknown-methodology');
   const safe = methodology.replace(/[^a-z0-9_-]/g, '');
   const file = pathToFileURL(path.join(fileURLToPath(ADAPTER_DIR), `${safe}-plan-adapter.mjs`)).href;
   try {
@@ -39,8 +42,8 @@ async function loadAdapter(methodology) {
     if (!module.createAdapter) throw planResolverError('adapter_missing_factory');
     return module.createAdapter();
   } catch (error) {
-    if (error.code === 'ERR_MODULE_NOT_FOUND' || error.code === 'ENOENT') throw planResolverError('unknown-methodology');
-    throw error;
+    if (error.planResolverCode) throw error;
+    throw planResolverError('adapter_load_failed');
   }
 }
 
@@ -171,8 +174,9 @@ export async function resolvePlanContextCommand(argv = process.argv.slice(2), op
   try {
     const context = await resolvePlanContext({ ...options, changeId, methodology });
     if (outputFile) {
-      const target = await safeProviderPath(options.rootDir ?? process.cwd(), outputFile);
-      await writeFile(target.path, JSON.stringify(context, null, 2) + '\n');
+      const outputRoot = path.resolve(options.rootDir ?? process.cwd());
+      if (outputFile.replaceAll('\\', '/').startsWith('.ai-factory/state/')) await ensureRuntimeGitignore(outputRoot, '.ai-factory/state');
+      await writeProviderFile(outputRoot, outputFile, context);
     }
     const output = jsonOutput ? `${JSON.stringify(context, null, 2)}\n` : `Plan context: ${context.plan_id}\nmethodology: ${context.methodology}\nsource_revision: ${context.source_revision}\n`;
     (options.stdout ?? process.stdout).write(output);

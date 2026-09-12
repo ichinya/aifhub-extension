@@ -1,9 +1,9 @@
 import { after, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, lstat, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { listAdapters, resolvePlanContext } from './common-plan-resolver.mjs';
+import { listAdapters, resolvePlanContext, resolvePlanContextCommand } from './common-plan-resolver.mjs';
 
 const roots = [];
 
@@ -87,5 +87,38 @@ describe('Common plan resolver', () => {
   it('fails on unknown methodology', async () => {
     const { root, change } = await fixture();
     await assert.rejects(resolvePlanContext({ rootDir: root, changeId: change, methodology: 'unknown' }), /unknown-methodology/);
+  });
+  it('parses CRLF task files in both adapters without losing checkboxes', async () => {
+    const { root, change } = await fixture();
+    await writeFile(path.join(root, `openspec/changes/${change}/tasks.md`), '# Tasks\r\n\r\n- [ ] 1.1 Implement OAuth handler.\r\n- [x] 1.2 Add tests.\r\n');
+    const context = await resolvePlanContext({ rootDir: root, changeId: change, methodology: 'openspec' });
+    assert.equal(context.tasks.length, 2);
+    assert.equal(context.tasks[1].done, true);
+    const nativeRoot = await mkdtemp(path.join(os.tmpdir(), 'aifhub-resolver-'));
+    roots.push(nativeRoot);
+    await mkdir(path.join(nativeRoot, '.ai-factory/plans'), { recursive: true });
+    await writeFile(path.join(nativeRoot, `.ai-factory/plans/${change}.md`), '# Plan\r\n\r\n- [ ] 1.1 Implement auth.\r\n- [x] 1.2 Verify.\r\n');
+    const native = await resolvePlanContext({ rootDir: nativeRoot, changeId: change, methodology: 'aifactory' });
+    assert.equal(native.tasks.length, 2);
+    assert.equal(native.tasks[1].done, true);
+  });
+  it('preserves strict JSON diagnostics from SDD profile inputs', async () => {
+    const { root, change } = await fixture();
+    const proposalPath = path.join(root, `openspec/changes/${change}/proposal.md`);
+    const proposalText = await readFile(proposalPath, 'utf8');
+    await writeFile(proposalPath, proposalText.replace('  "planning_mode": "full",', '  "planning_mode": "full",\n  "planning_mode": "full",'));
+    await assert.rejects(resolvePlanContext({ rootDir: root, changeId: change, methodology: 'openspec' }), /duplicate_json_key/);
+  });
+  it('writes resolved context through the safe provider writer and rejects unsafe output paths', async () => {
+    const { root, change } = await fixture();
+    const stdout = { written: '', write(value) { this.written += value; } };
+    const output = `.ai-factory/state/${change}/plan-context.json`;
+    const exit = await resolvePlanContextCommand(['resolve', '--change', change, '--json', '--output', output], { rootDir: root, stdout });
+    assert.equal(exit, 0);
+    const stored = JSON.parse(await readFile(path.join(root, output), 'utf8'));
+    assert.equal(stored.schema, 'aifhub.plan_context.v1');
+    assert.notEqual(await lstat(path.join(root, '.ai-factory/state/.gitignore')).catch(() => null), null);
+    const unsafe = await resolvePlanContextCommand(['resolve', '--change', change, '--json', '--output', '../escape.json'], { rootDir: root, stdout });
+    assert.equal(unsafe, 2);
   });
 });

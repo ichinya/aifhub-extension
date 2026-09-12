@@ -95,6 +95,15 @@ describe('Fresh-context AI review', () => {
     assert.equal(result.outcome, 'blocked');
     assert.ok(result.receipt.blocked_reasons.includes('session_brief_not_current'));
   });
+  it('blocks an oversized target diff with target_too_large instead of failing at write time', async () => {
+    const root = await fixture();
+    await compileSessionBrief(options(root));
+    const huge = `+${'x'.repeat(16 * 1024 * 1024)}`;
+    const result = await prepareFreshContextReview({ ...options(root), reviewId: 'review-large', targetDiff: huge, changedFiles: ['src/handler.mjs'] });
+    assert.equal(result.ok, false);
+    assert.equal(result.outcome, 'blocked');
+    assert.ok(result.receipt.blocked_reasons.includes('target_too_large'));
+  });
 
   it('marks same-session fallback explicitly', async () => {
     const root = await fixture();
