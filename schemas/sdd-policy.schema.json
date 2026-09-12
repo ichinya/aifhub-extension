@@ -41,6 +41,36 @@
         "type": "string"
       },
       "maxItems": 64
+    },
+    "context_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "strategy": {
+          "const": "measured"
+        },
+        "reserve_output": {
+          "type": "boolean"
+        },
+        "reserve_tools": {
+          "type": "boolean"
+        },
+        "fresh_session_on_phase_change": {
+          "type": "boolean"
+        },
+        "compact_supporting_context": {
+          "type": "boolean"
+        },
+        "protected_artifacts": {
+          "enum": [
+            "full",
+            "selected_sections"
+          ]
+        }
+      },
+      "required": [
+        "strategy"
+      ]
     }
   },
   "required": [

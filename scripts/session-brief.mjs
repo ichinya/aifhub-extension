@@ -8,9 +8,10 @@ import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
 import { normalizeChangeId, resolveActiveChange } from './active-change-resolver.mjs';
 import { parseSimpleYaml } from './aif-artifact-sync.mjs';
 import { resolveAiFactoryVersion } from './ai-factory-version-resolver.mjs';
-import { findExactMarkdownH2Sections } from './markdown-structural-markers.mjs';
+import { resolvePlanContext } from './common-plan-resolver.mjs';
+import { parseStrictJson } from './json-strict.mjs';
 import {
-  SDD_POLICY_PATH, SDD_SIGNALS_HEADING, selectSddProfile, sddError, validateSddPolicy
+  SDD_POLICY_PATH, selectSddProfile, sddError, validateSddPolicy
 } from './sdd-profiles.mjs';
 
 const COMPILER = 'aifhub.session_brief.compiler.v1';
@@ -98,27 +99,24 @@ async function buildSnapshot(options, explicitCompile) {
   const base = `openspec/changes/${changeId}`;
   const paths = sessionBriefPaths(changeId);
   await inspectPath(root, base);
-  const proposal = await readSafeFile(root, `${base}/proposal.md`);
   const policyFile = await readSafeFile(root, SDD_POLICY_PATH);
   const existing = await readSafeFile(root, paths.json);
   const existingDecision = await readSafeFile(root, paths.decision);
   const existingMarkdown = await readSafeFile(root, paths.markdown);
-  const inputsSection = section(proposal?.content, SDD_SIGNALS_HEADING);
-  if (!explicitCompile && !inputsSection && !policyFile && !existing && !existingDecision && !existingMarkdown) return { disabled: true, root, changeId, paths };
   const configFile = await readSafeFile(root, CONFIG);
   const config = parseSimpleYaml(configFile?.content ?? '');
+  // Resolve methodology-neutral plan context (ADR 0005). Canonical ownership stays
+  // with the plan; this is a derived execution context bound to source revisions.
+  const planContext = await resolvePlanContext({ rootDir: root, changeId, methodology: 'openspec' });
+  if (planContext.errors.length > 0) throw sddError(planContext.errors[0].code ?? 'plan_context_unresolved');
+  if (!explicitCompile && !planContext.sdd_inputs && !policyFile && !existing && !existingDecision && !existingMarkdown) return { disabled: true, root, changeId, paths };
   if (config.aifhub?.artifactProtocol !== 'openspec') throw sddError('openspec_protocol_required');
   const rawPolicy = policyFile ? parseStrictJson(policyFile.content) : {};
   if (policyFile && rawPolicy.schema !== 'aifhub.sdd_policy.v1') throw sddError('invalid-sdd-policy');
   const policy = validateSddPolicy(rawPolicy);
   // Config/schema ownership remains authoritative; the overlay can only add depth.
   if (config.aifhub?.openspec?.requireDesign === true) policy.require_design = true;
-  let inputs = null;
-  if (inputsSection) {
-    const match = /^```json\n([\s\S]+)\n```$/.exec(inputsSection);
-    if (!match) throw sddError('invalid-sdd-inputs');
-    inputs = parseStrictJson(match[1]);
-  }
+  const inputs = planContext.sdd_inputs;
   const files = new Map();
   let totalBytes = 0;
   const add = async (file, kind = 'supporting') => {
@@ -166,12 +164,12 @@ async function buildSnapshot(options, explicitCompile) {
     if (!item && policy.context_refs.includes(file)) throw sddError('missing_context_reference');
   }
   const canonicalProposal = files.get(`${base}/proposal.md`);
-  if (proposal?.sha256 !== canonicalProposal?.sha256 || policyFile?.sha256 !== files.get(SDD_POLICY_PATH)?.sha256 || configFile?.sha256 !== files.get(CONFIG)?.sha256) throw sddError('sources_changed_during_compile');
+  const planContextProposal = planContext.documents.find((doc) => doc.path === `${base}/proposal.md`);
+  if (planContextProposal?.sha256 !== canonicalProposal?.sha256 || policyFile?.sha256 !== files.get(SDD_POLICY_PATH)?.sha256 || configFile?.sha256 !== files.get(CONFIG)?.sha256) throw sddError('sources_changed_during_compile');
   const version = inputs?.planning_mode === 'ultra' || policy.minimum_profile === 'ultra'
     ? await resolveAiFactoryVersion({ rootDir: root }) : { supportsUltra: false };
   const design = files.get(`${base}/design.md`);
-  const readSections = (heading) => [section(proposal?.content, heading), section(design?.content, heading)].filter(Boolean);
-  const openQuestions = readSections('Open Questions');
+  const openQuestions = planContext.requirements.open_questions;
   const selection = selectSddProfile(inputs && openQuestions.length ? { ...inputs, requirements_clear: false } : inputs, policy, version);
   const sources = [...files].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([file, item]) => ({ path: file, sha256: item.sha256, bytes: item.bytes, kind: item.kind }));
   const sourceRevision = hash(json(sources));
@@ -180,26 +178,27 @@ async function buildSnapshot(options, explicitCompile) {
   let brief = null;
   const blocked = [];
   if (selection.implementation_allowed) {
-    if (!proposal) blocked.push('missing_proposal');
+    const proposalFile = files.get(`${base}/proposal.md`);
+    if (!proposalFile) blocked.push('missing_proposal');
     if (!files.get(`${base}/tasks.md`)) blocked.push('missing_tasks');
     if (selection.required_artifacts.includes('design') && !design) blocked.push('missing_design');
     if (selection.required_artifacts.includes('delta_specs') && !sources.some((item) => item.path.startsWith(`${base}/specs/`))) blocked.push('missing_delta_specs');
-    const intent = section(proposal?.content, 'Why');
-    const targetOutcome = section(proposal?.content, 'What Changes');
-    const nonGoals = readSections('Non-goals');
-    const acceptanceExamples = readSections('Acceptance Examples');
-    const allowed = readSections('Allowed Change Surface');
-    const forbidden = readSections('Forbidden Change Surface');
+    const intent = planContext.requirements.intent;
+    const targetOutcome = planContext.requirements.target_outcome;
+    const nonGoals = planContext.non_goals;
+    const acceptanceExamples = planContext.acceptance_examples;
+    const allowed = planContext.change_surface.allowed;
+    const forbidden = planContext.change_surface.forbidden;
     if (!intent || !targetOutcome) blocked.push('missing_intent_or_outcome');
     if (!allowed.length) blocked.push('missing_allowed_change_surface');
     if (inputs?.behavior_change && (!nonGoals.length || !acceptanceExamples.length)) blocked.push('missing_behavior_acceptance_context');
     if (!blocked.length) {
       const fields = {
-        intent, target_outcome: targetOutcome, acceptance_criteria: readSections('Acceptance Criteria'),
+        intent, target_outcome: targetOutcome, acceptance_criteria: planContext.requirements.acceptance_criteria,
         acceptance_examples: acceptanceExamples, non_goals: nonGoals,
-        change_surface: { allowed, forbidden }, constraints: readSections('Constraints'),
-        assumptions: readSections('Assumptions'), open_questions: openQuestions,
-        verification_plan: readSections('Verification Plan')
+        change_surface: { allowed, forbidden }, constraints: planContext.requirements.constraints,
+        assumptions: planContext.requirements.assumptions, open_questions: openQuestions,
+        verification_plan: planContext.requirements.verification_plan
       };
       assertNoCredentials(json(fields));
       const payload = {
@@ -211,8 +210,12 @@ async function buildSnapshot(options, explicitCompile) {
         verification: { required_checks: selection.required_gates, policy_refs: sources.filter((item) => item.kind === 'policy').map((item) => item.path) },
         context_manifest: sources.map(({ path: file, sha256, kind }) => ({ path: file, sha256, fidelity: kind === 'canonical' && /(?:proposal|design)\.md$/.test(file) ? 'selected_sections' : 'full' })),
         required_capabilities: ['canonical_source_read', 'project_policy_checks'],
+        plan_context: { methodology: planContext.methodology, adapter_version: planContext.adapter_version, source_revision: planContext.source_revision },
         budget: { strategy: 'measured', source_bytes: totalBytes, brief_bytes: null, token_estimate: null }
       };
+      brief = { ...payload, digest: hash(json(payload)) };
+      const rendered = renderSessionBrief(brief);
+      payload.budget.brief_bytes = Buffer.byteLength(rendered, 'utf8');
       brief = { ...payload, digest: hash(json(payload)) };
     }
   }
@@ -231,12 +234,6 @@ function summarize(snapshot) {
     blocked_reasons: snapshot.blocked.length ? snapshot.blocked : snapshot.decision.blocked_reason ? [snapshot.decision.blocked_reason] : [],
     owner_handoff: snapshot.decision.profile === 'research' ? 'aif-explore' : snapshot.brief ? null : 'aif-plan'
   };
-}
-
-function section(content = '', heading) {
-  const sections = findExactMarkdownH2Sections(content ?? '', heading);
-  if (sections.length > 1) throw sddError('duplicate_source_section');
-  return sections[0]?.join('\n').trim() ?? '';
 }
 
 function safeReference(file) {
@@ -329,54 +326,7 @@ function inside(root, target) {
   return !path.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`);
 }
 
-// JSON.parse alone silently accepts duplicate decoded keys. Reject them at every
-// nesting level before parsing policy, signals, or stored runtime content.
-export function parseStrictJson(raw) {
-  try {
-    let index = 0;
-    const white = () => { while (/\s/.test(raw[index] ?? '') && index < raw.length) index++; };
-    const string = () => {
-      const start = index++;
-      while (index < raw.length) {
-        if (raw[index] === '\\') { index += 2; continue; }
-        if (raw[index++] === '"') return JSON.parse(raw.slice(start, index));
-      }
-      throw sddError('invalid_json');
-    };
-    const value = (depth = 0) => {
-      if (depth > 64) throw sddError('invalid_json');
-      white();
-      if (raw[index] === '"') { string(); return; }
-      if (raw[index] === '{' || raw[index] === '[') {
-        const object = raw[index++] === '{';
-        const end = object ? '}' : ']';
-        const keys = new Set();
-        white();
-        if (raw[index] === end) { index++; return; }
-        while (index < raw.length) {
-          white();
-          if (object) {
-            if (raw[index] !== '"') throw sddError('invalid_json');
-            const key = string();
-            if (keys.has(key)) throw sddError('duplicate_json_key');
-            keys.add(key); white();
-            if (raw[index++] !== ':') throw sddError('invalid_json');
-          }
-          value(depth + 1); white();
-          if (raw[index] === end) { index++; return; }
-          if (raw[index++] !== ',') throw sddError('invalid_json');
-        }
-        throw sddError('invalid_json');
-      }
-      const match = /^(?:true|false|null|-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?)/.exec(raw.slice(index));
-      if (!match) throw sddError('invalid_json');
-      index += match[0].length;
-    };
-    value(); white();
-    if (index !== raw.length) throw sddError('invalid_json');
-    return JSON.parse(raw);
-  } catch (error) { throw error.sddCode ? error : sddError('invalid_json'); }
-}
+export { parseStrictJson } from './json-strict.mjs';
 
 function assertNoCredentials(value) {
   if (/-----BEGIN [A-Z ]*PRIVATE KEY-----|\b(?:sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{16,}|AKIA[A-Z0-9]{16})\b|\bBearer\s+[A-Za-z0-9._~-]{8,}|\b(?:password|api[_ -]?key|client[_ -]?secret|access[_ -]?token)\s*[:=]\s*[^\s,}]+/i.test(value)) throw sddError('sensitive_brief_content');
@@ -403,7 +353,8 @@ export function renderSessionBrief(brief) {
 function hash(value) { return createHash('sha256').update(value).digest('hex'); }
 function json(value) { return `${JSON.stringify(value, null, 2)}\n`; }
 function failure(error) {
-  return { ok: false, status: 'blocked', errors: [{ code: error.sddCode ?? 'session_brief_io_error' }], stale_reasons: [], owner_handoff: 'aif-plan' };
+  const code = error.sddCode ?? error.planResolverCode ?? 'session_brief_io_error';
+  return { ok: false, status: 'blocked', errors: [{ code }], stale_reasons: [], owner_handoff: 'aif-plan' };
 }
 
 export async function runSessionBriefCommand(argv = process.argv.slice(2), options = {}) {

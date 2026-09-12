@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AI cross-context review v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "aifhub.ai_cross_context_review.v1"
+    },
+    "change_id": {
+      "type": "string"
+    },
+    "review_id": {
+      "type": "string"
+    },
+    "context_mode": {
+      "enum": [
+        "fresh",
+        "same_session"
+      ]
+    },
+    "execution_profile": {
+      "type": "string"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "base": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "head": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fingerprint": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "changed_files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "untracked_files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "too_large": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "base",
+        "head",
+        "fingerprint",
+        "path",
+        "changed_files",
+        "untracked_files",
+        "too_large"
+      ]
+    },
+    "session_brief_digest": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_revisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "path",
+          "sha256"
+        ]
+      }
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "acceptance_examples": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "change_surface": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "forbidden": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "allowed",
+        "forbidden"
+      ]
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "suggestion",
+              "warning",
+              "blocking"
+            ]
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "severity",
+          "summary"
+        ]
+      }
+    },
+    "finding_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "outcome": {
+      "enum": [
+        "prepared",
+        "reviewed",
+        "blocked",
+        "stale"
+      ]
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "same_session_fallback": {
+      "type": "boolean"
+    },
+    "blocked_reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "schema",
+    "change_id",
+    "review_id",
+    "context_mode",
+    "execution_profile",
+    "target",
+    "session_brief_digest",
+    "source_revisions",
+    "acceptance_criteria",
+    "acceptance_examples",
+    "change_surface",
+    "findings",
+    "finding_count",
+    "outcome",
+    "created_at",
+    "same_session_fallback",
+    "blocked_reasons"
+  ]
+}

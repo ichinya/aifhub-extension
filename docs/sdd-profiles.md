@@ -4,8 +4,10 @@
 
 Implementation status: this is an OpenSpec-only prototype. The revised target in
 [ADR 0005](adr/0005-ai-factory-plan-methodologies.md) makes AI Factory the plan owner
-across methodologies and optional tools. Its common plan resolver and adapters
-are not implemented yet; the instructions below describe the existing prototype.
+across methodologies and optional tools. A v1 common plan resolver and
+methodology adapters are implemented; SessionBrief now compiles from
+`aifhub.plan_context.v1` produced by the OpenSpec adapter while preserving exact
+source revision and adapter binding.
 
 SDD profiles choose planning depth independently of quality gates. Public planning
 tokens remain `fast | full | ultra`; `quick` and `standard` use `full` canonical
@@ -111,19 +113,107 @@ ai-factory aifhub-session-brief status --change 168-bounded-change --json
 ai-factory aifhub-session-brief show --change 168-bounded-change
 ```
 
+After implementation, compare the current SessionBrief, plan tasks, and changed
+scope to produce a versioned drift receipt:
+
+```bash
+ai-factory aifhub-plan-compliance check --change 168-bounded-change --json
+```
+
+This reads the current brief, the latest implementation trace (or `git status`
+when no trace is present), and canonical `tasks.md`. It writes a receipt at
+`.ai-factory/state/<change-id>/implementation/plan-compliance.json` without
+modifying canonical artifacts. Outcomes are `compliant`, `acceptable_drift`,
+`replan_required`, or `blocked`. The same exit-code convention as SessionBrief
+applies: `0` for a valid result, `1` for replan-required or stale/missing
+context, and `2` for invalid arguments or an I/O failure.
+
 Explicit `--change` is recommended for automation. Otherwise the existing active
 change resolver applies; unresolved or ambiguous selection performs no writes.
 `compile` writes only the profile decision and both brief forms in runtime state.
 For research/direct or missing canonical content it may write the decision and
 return a blocking owner handoff; it does not invent or repair canonical artifacts.
 `status` and `show` are read-only. `show` exposes brief content only when current.
+
+## Fresh-context AI review
+
+After implementation, prepare a separate AI reviewer context that does not
+contain the producing transcript, discarded attempts, or hidden reasoning:
+
+```bash
+ai-factory aifhub-fresh-context-review prepare --change 168-bounded-change --json
+```
+
+This exports a versioned review package under
+`.ai-factory/state/<change-id>/reviews/<review-id>/`:
+
+- `ai-cross-context-review.json` — `aifhub.ai_cross_context_review.v1` receipt;
+- `review-target.diff` — exact target diff against `HEAD`, with untracked files
+  included as synthetic `--- /dev/null` additions.
+
+The receipt records the target base/head/fingerprint, the exact SessionBrief
+sources consumed, `REVIEW.md` policy revision, acceptance criteria/examples, and
+allowed/forbidden change surface. The default `context_mode` is `fresh`; pass
+`--same-session` only when the producing session must also serve as the reviewer,
+which is labeled explicitly in the receipt.
+
+The helper is read-only with respect to canonical and QA artifacts. It does not
+run the AI reviewer, replace `/aif-review`, `/aif-verify`, security checks, or
+human review. Outcomes are `prepared`, `reviewed`, `blocked`, or `stale`.
 Metadata/diagnostics contain paths, hashes, and fixed reason codes, without raw
 requests, provider output, credentials, or exception messages.
+
+Packaged Claude/Codex reviewer agents (`aifhub-fresh-context-reviewer`) consume the
+prepared package read-only and return findings only; the producing session supplies
+the package path, and outcome recording stays with the existing review flow.
 
 Exit `0` means a valid result (or a disabled overlay on an existing unopted change),
 `1` means missing/stale/blocked context, and `2` means invalid arguments, unresolved
 scope, unsafe/malformed input, or an I/O failure. JSON commands emit one JSON object
 on stdout and no diagnostic stderr. An unchanged compile reports `written: false`.
+
+## Tracer profile
+
+For uncertain architecture or integration work, the SDD selector can choose the
+`tracer` profile (currently triggered by `architecture_novelty` in `## SDD Profile
+Inputs`). The tracer does not satisfy `/aif-done` and cannot finalize as production
+without an explicit promotion decision.
+
+Run a bounded tracer experiment:
+
+```bash
+ai-factory aifhub-tracer run --change 168-uncertain-integration --json \
+  --hypothesis "The new protocol fits behind a small adapter." \
+  --vertical-path "src/adapter.mjs + test/adapter.test.mjs" \
+  --question "Does the adapter isolate the external protocol?" \
+  --non-goal "Production traffic" \
+  --budget-time "4h" \
+  --expected-artifact "src/adapter.mjs"
+```
+
+This writes the runtime state area `.ai-factory/state/<change-id>/tracer/`:
+
+- `brief.json` — `aifhub.tracer_brief.v1` with hypothesis, minimum vertical path,
+  architecture questions, production non-goals, budget, and expected artifacts;
+- `findings.json` — `aifhub.tracer_findings.v1` with result evidence and invalidated
+  assumptions;
+- `decision.json` — `aifhub.tracer_decision.v1` with the explicit decision;
+- `implementation-summary.md` — human-readable summary derived from the above.
+
+Record a terminal decision:
+
+```bash
+ai-factory aifhub-tracer promote --change 168-uncertain-integration --json \
+  --reason "Vertical slice proves the hypothesis."
+```
+
+Decisions are `promote`, `discard`, `replan`, or `blocked`. Promotion writes a
+fixed promotion step list: update canonical proposal/design/tasks/specs, run
+`/aif-mode sync`, compile a new production SessionBrief, then run full
+implementation. The tracer command itself never modifies canonical artifacts.
+
+Implement workers route tracer conclusions through the owner `promote` decision and
+its fixed promotion step list; they never finalize tracer state as production.
 
 ## Source binding and implementation
 
@@ -170,12 +260,21 @@ Reads and outputs are bounded to 2 MiB per file, with 1,024 source files and 32 
 total source bytes. Linked files, symlinks/junctions, path escapes, malformed JSON,
 duplicate decoded keys, duplicate active sections, and identifiable selected
 credentials fail closed. These limits bound local I/O; they are not percentages
-of a model context window. `budget.source_bytes` is measured, while unknown token
-and rendered-brief metrics remain `null`. The compiler does not guess model limits.
+of a model context window. `budget.source_bytes` and `budget.brief_bytes` are
+measured from exact local bytes; `budget.token_estimate` remains `null` without
+model/provider metadata. The compiler does not guess model limits.
 
 P0 includes quick/standard/research execution contracts and selection/version
-checks for direct/expanded/ultra. P1 compliance receipts, fresh-context AI reviewer
-execution, tracer promotion, and richer context metrics are not implemented here.
+checks for direct/expanded/ultra. P1 adds the plan compliance receipt
+(`aifhub-plan-compliance.v1`), the fresh-context AI review package
+(`aifhub.ai_cross_context_review.v1`), the tracer profile runtime
+(`aifhub.tracer_brief.v1`, `aifhub.tracer_findings.v1`,
+`aifhub.tracer_decision.v1`), measured context budget/metrics
+(`budget.brief_bytes` is measured from the rendered SessionBrief,
+`token_estimate` remains `null` without model/provider metadata, and
+`context_policy` can be declared in `.ai-factory/sdd-policy.json`), and the
+common plan resolver (`aifhub.plan_context.v1`) with methodology adapters for
+OpenSpec and AI Factory native plans.
 P2 cross-project adapters and evaluation remain separate. Crit human review and
 existing QA ownership are unchanged.
 
@@ -185,3 +284,9 @@ existing QA ownership are unchanged.
 - [Project policy](../schemas/sdd-policy.schema.json)
 - [Profile decision v1](../schemas/sdd-profile-decision.schema.json)
 - [SessionBrief v1](../schemas/session-brief.schema.json)
+- [Plan compliance v1](../schemas/plan-compliance.schema.json)
+- [Plan context v1](../schemas/plan-context.schema.json)
+- [AI cross-context review v1](../schemas/ai-cross-context-review.schema.json)
+- [Tracer brief v1](../schemas/tracer-brief.schema.json)
+- [Tracer findings v1](../schemas/tracer-findings.schema.json)
+- [Tracer decision v1](../schemas/tracer-decision.schema.json)

@@ -24,11 +24,20 @@ export function sddError(code) {
 }
 
 export function validateSddPolicy(input = {}) {
-  const allowed = ['schema', 'minimum_profile', 'required_gates', 'require_design', 'context_refs'];
+  const allowed = ['schema', 'minimum_profile', 'required_gates', 'require_design', 'context_refs', 'context_policy'];
   assertRecord(input, allowed, 'invalid-sdd-policy');
   if (input.schema !== undefined && input.schema !== SDD_POLICY_SCHEMA) throw sddError('invalid-sdd-policy');
   if (input.minimum_profile !== undefined && !['quick', 'standard', 'expanded', 'ultra'].includes(input.minimum_profile)) throw sddError('invalid-sdd-policy');
   if (input.require_design !== undefined && typeof input.require_design !== 'boolean') throw sddError('invalid-sdd-policy');
+  if (input.context_policy !== undefined) {
+    const policy = input.context_policy;
+    if (!policy || typeof policy !== 'object' || Array.isArray(policy)) throw sddError('invalid-sdd-policy');
+    const policyAllowed = ['strategy', 'reserve_output', 'reserve_tools', 'fresh_session_on_phase_change', 'compact_supporting_context', 'protected_artifacts'];
+    if (policy.strategy !== 'measured') throw sddError('invalid-sdd-policy');
+    if (Object.keys(policy).some((key) => !policyAllowed.includes(key))) throw sddError('invalid-sdd-policy');
+    if (policy.protected_artifacts !== undefined && !['full', 'selected_sections'].includes(policy.protected_artifacts)) throw sddError('invalid-sdd-policy');
+    for (const key of policyAllowed.slice(1, 5)) if (policy[key] !== undefined && typeof policy[key] !== 'boolean') throw sddError('invalid-sdd-policy');
+  }
   const gates = input.required_gates ?? [];
   if (!Array.isArray(gates) || gates.some((gate) => !SDD_GATES.includes(gate))) throw sddError('invalid-sdd-policy');
   const refs = input.context_refs ?? [];
@@ -36,7 +45,8 @@ export function validateSddPolicy(input = {}) {
   return {
     schema: SDD_POLICY_SCHEMA, minimum_profile: input.minimum_profile ?? 'quick',
     required_gates: [...new Set(gates)].sort(), require_design: input.require_design ?? false,
-    context_refs: [...new Set(refs)].sort()
+    context_refs: [...new Set(refs)].sort(),
+    context_policy: input.context_policy ?? { strategy: 'measured' }
   };
 }
 
@@ -68,7 +78,7 @@ export function selectSddProfile(input, policyInput = {}, options = {}) {
   } else if (!signals.requirements_clear) {
     profile = 'research'; reasons.push('unclear_requirements');
   } else if (signals.architecture_novelty) {
-    profile = 'research'; reasons.push('architecture_uncertainty');
+    profile = 'tracer'; reasons.push('architecture_uncertainty');
   } else if (signals.planning_mode === 'ultra') {
     profile = 'ultra'; reasons.push('explicit_ultra');
   } else if (riskSignals.length > 0 || signals.repositories > 1) {
@@ -80,7 +90,7 @@ export function selectSddProfile(input, policyInput = {}, options = {}) {
   } else {
     profile = 'quick'; reasons.push(signals.behavior_change ? 'bounded_behavior_change' : 'bounded_non_behavioral');
   }
-  const rank = ['direct', 'quick', 'standard', 'expanded', 'ultra'];
+  const rank = ['direct', 'quick', 'tracer', 'standard', 'expanded', 'ultra'];
   // The default quick floor does not force trivial work into OpenSpec. An explicit
   // stronger project floor can require canonical planning for otherwise direct work.
   if (profile !== 'research' && policy.minimum_profile !== 'quick' && rank.indexOf(profile) < rank.indexOf(policy.minimum_profile)) {
@@ -105,6 +115,7 @@ export function selectSddProfile(input, policyInput = {}, options = {}) {
     risk_signals: riskSignals.sort(), required_artifacts: requiredArtifacts.sort(),
     conditional_artifacts: requiredArtifacts.length && !requireDesign ? ['design'] : [],
     required_gates: [...gates].sort(),
+    context_policy: policy.context_policy,
     implementation_allowed: !blockedReason && !['direct', 'research'].includes(profile),
     blocked_reason: blockedReason ?? (profile === 'research' ? 'research_required' : profile === 'direct' ? 'upstream_fast_handoff' : null)
   };

@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Plan compliance v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "aifhub.plan_compliance.v1"
+    },
+    "change_id": {
+      "type": "string"
+    },
+    "plan_revision": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "session_brief_digest": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "trace_run_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "completed_tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ]
+      }
+    },
+    "skipped_tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ]
+      }
+    },
+    "unplanned_changes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "scope_expansions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "new_constraints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "acceptance_impact": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "outcome": {
+      "enum": [
+        "compliant",
+        "acceptable_drift",
+        "replan_required",
+        "blocked"
+      ]
+    },
+    "replan_required": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "schema",
+    "change_id",
+    "plan_revision",
+    "session_brief_digest",
+    "trace_run_id",
+    "completed_tasks",
+    "skipped_tasks",
+    "unplanned_changes",
+    "scope_expansions",
+    "new_constraints",
+    "acceptance_impact",
+    "outcome",
+    "replan_required"
+  ]
+}

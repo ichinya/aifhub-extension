@@ -22,6 +22,7 @@ The `aifhub-*` Codex agents are extension helpers for bounded planning, implemen
 | `aifhub-plan-polisher` | Bounded worker для полировки одного активного плана или OpenSpec change artifacts | `workspace-write` | OpenSpec canonical files or classic legacy pair only; marked ultra is read-only routing to exact `/aif-improve <entrypoint>` |
 | `aifhub-implement-worker` | Bounded worker для одной plan task, тесно связанной группы или явного небольшого batch независимых однотипных задач; поэлементный результат и runtime todo | `workspace-write` | Selected OpenSpec/classic execution scope only; marked ultra routes to exact `/aif-implement <entrypoint>`; без commit/push |
 | `aifhub-review-sidecar` | Read-only sidecar для review changed scope с findings-first выводом | `read-only` | Не пишет файлы |
+| `aifhub-fresh-context-reviewer` | Read-only fresh-context reviewer для prepared cross-context review package с findings-first выводом без gate block | `read-only` | Не пишет файлы |
 | `aifhub-security-sidecar` | Read-only sidecar для security-аудита changed scope | `read-only` | Не пишет файлы |
 | `aifhub-verifier` | Low-write verifier для OpenSpec change or legacy plan pair и changed scope с gate result | `workspace-write` | OpenSpec QA or classic `status.yaml`/`verify.md`; marked ultra delegates exact `/aif-verify <entrypoint>`, and only the command boundary may write its receipt |
 | `aifhub-fixer` | Targeted fixer по выбранным verification/review findings | `workspace-write` | Selected OpenSpec/classic finding scope; marked ultra routes to exact `/aif-fix <entrypoint>`; allowlist only narrows scope |
@@ -48,6 +49,7 @@ Bundled TOML-файлы не задают `model` и `model_reasoning_effort`. �
 - `aifhub-implement-worker` records a bounded RED -> GREEN -> REFACTOR cycle for testable behavior changes, or an explicit no-test fallback, under runtime state only.
 - `aifhub-fixer` records direct root-cause evidence, one falsifiable hypothesis and a minimal experiment before its regression-first edit.
 - `aifhub-review-sidecar` runs plan/spec compliance before code quality and returns one combined read-only gate.
+- `aifhub-fresh-context-reviewer` consumes only the prepared `aifhub-fresh-context-review prepare` package (receipt + `review-target.diff`), returns a findings-first verdict without an `aif-gate-result` block, and never reads the producing transcript.
 - `finalization helper`: `aifhub-done-finalizer`. Для OpenSpec-native installed project он запускает `ai-factory aifhub-done-finalizer --change <change-id> --json`; extension-local implementation выполняет readiness и `openspec archive <change-id> --yes`. Поддерживаются `--skip-specs` и `--record-dirty-state`. Агент co-owns только одну linked row внутри marker-bounded lifecycle block; arbitrary `.ai-factory/ROADMAP.md` content и owner boundaries для `.ai-factory/RULES.md` и `.ai-factory/ARCHITECTURE.md` не обходятся.
 
 ## Как это работает

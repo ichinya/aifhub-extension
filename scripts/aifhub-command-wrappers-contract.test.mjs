@@ -43,6 +43,34 @@ const WRAPPER_COMMANDS = [
     args: ['compile', '--change', 'add-oauth', '--json']
   },
   {
+    name: 'aifhub-plan-compliance',
+    description: 'Compare plan, SessionBrief, and changed scope to produce a drift receipt.',
+    module: './commands/aifhub-plan-compliance.mjs',
+    script: 'plan-compliance.mjs',
+    args: ['check', '--change', 'add-oauth', '--json']
+  },
+  {
+    name: 'aifhub-fresh-context-review',
+    description: 'Prepare a fresh-context AI review package and receipt.',
+    module: './commands/aifhub-fresh-context-review.mjs',
+    script: 'fresh-context-review.mjs',
+    args: ['prepare', '--change', 'add-oauth', '--json']
+  },
+  {
+    name: 'aifhub-tracer',
+    description: 'Run a tracer profile: run, promote, discard, replan, blocked, status.',
+    module: './commands/aifhub-tracer.mjs',
+    script: 'tracer.mjs',
+    args: ['run', '--change', 'add-oauth', '--json']
+  },
+  {
+    name: 'aifhub-plan-context',
+    description: 'Resolve a common plan context from a methodology adapter.',
+    module: './commands/aifhub-plan-context.mjs',
+    script: 'common-plan-resolver.mjs',
+    args: ['resolve', '--change', 'add-oauth', '--json']
+  },
+  {
     name: 'aifhub-mode',
     description: 'Run AIFHub artifact mode status, switch, sync, and doctor commands.',
     module: './commands/aifhub-mode.mjs',
