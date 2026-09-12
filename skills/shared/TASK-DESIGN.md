@@ -14,7 +14,7 @@ For new behavioral work, prefer a narrow complete scenario over tasks grouped on
 
 For example, importing one valid record through the existing command and reporting its result can be an increment; adding all storage first and leaving every usable import path for later usually is not. Shared foundations can still be explicit prerequisite tasks when a complete scenario cannot reasonably own them. Tie any preparatory refactor to an evidenced obstacle and a behavior-preservation check; do not schedule speculative cleanup.
 
-Record dependencies by the actual output a consumer requires, including interface dependencies across different files. A producer is not complete merely because its worker returned success. Existing coordinator acceptance and progress synchronization remain authoritative; this guidance does not implement the reserved `tracer` profile or change an explicit fast/full/ultra mode.
+Record dependencies by the actual output a consumer requires, including interface dependencies across different files. A producer is not complete merely because its worker returned success. Existing coordinator acceptance and progress synchronization remain authoritative; this guidance does not run the `tracer` profile (`ai-factory aifhub-tracer`) or change an explicit fast/full/ultra mode.
 
 ## Wide migrations
 
