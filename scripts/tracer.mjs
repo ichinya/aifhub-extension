@@ -101,7 +101,7 @@ async function buildTracerSnapshot(options, phase) {
     if (!minimumVerticalPath) errors.push({ code: 'missing_vertical_path' });
   }
 
-  const brief = {
+  const brief = phase === 'run' ? {
     schema: BRIEF_SCHEMA,
     change_id: changeId,
     profile: 'tracer',
@@ -114,9 +114,9 @@ async function buildTracerSnapshot(options, phase) {
     canonical_sources: sources,
     created_at: now,
     updated_at: now
-  };
+  } : null;
 
-  const findings = {
+  const findings = phase === 'run' ? {
     schema: FINDINGS_SCHEMA,
     change_id: changeId,
     findings: Array.isArray(options.findings) ? options.findings : [],
@@ -124,7 +124,7 @@ async function buildTracerSnapshot(options, phase) {
     evidence: Array.isArray(options.evidence) ? options.evidence : [],
     created_at: now,
     updated_at: now
-  };
+  } : null;
 
   const decisionFile = await readJsonIfExists(root, paths.decision);
   const decision = {

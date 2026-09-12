@@ -186,4 +186,24 @@ describe('Plan compliance selection', () => {
     assert.equal(receipt.outcome, 'acceptable_drift');
     assert.equal(receipt.trace_run_id, 'run-test');
   });
+  it('matches deeply nested files under a directory glob allowed surface', async () => {
+    const root = await fixture();
+    await put(root, `${base}/proposal.md`, proposal().replace('- src/handler.mjs\n- test/handler.test.mjs', '- src/**/*'));
+    const compiled = await compileValidBrief(root, '# Tasks\n\n- [x] 1.1 Implement behavior; verify focused regression.\n');
+    const result = await checkPlanCompliance({ ...options(root), changedFiles: ['src/a/b/c.mjs', 'src/top.ts'] });
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.outcome, 'compliant');
+    assert.equal(result.receipt.scope_expansions.length, 0);
+    assert.equal(result.receipt.unplanned_changes.length, 0);
+    assert.equal(result.receipt.session_brief_digest, compiled.digest);
+  });
+  it('keeps a single-star allowed surface from crossing directory boundaries', async () => {
+    const root = await fixture();
+    await put(root, `${base}/proposal.md`, proposal().replace('- src/handler.mjs\n- test/handler.test.mjs', '- src/*'));
+    await compileSessionBrief(options(root));
+    const result = await checkPlanCompliance({ ...options(root), changedFiles: ['src/a/b.ts'] });
+    assert.equal(result.ok, true);
+    assert.equal(result.outcome, 'acceptable_drift');
+    assert.deepEqual(result.receipt.unplanned_changes, ['src/a/b.ts']);
+  });
 });

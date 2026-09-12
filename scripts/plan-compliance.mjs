@@ -239,6 +239,10 @@ function collectSurfacePatterns(sections) {
   return patterns;
 }
 
+// Glob semantics: '**/' matches zero or more whole path segments (so 'src/**/*'
+// also matches 'src/a/b/c.mjs'), a bare '**' matches anything including '/',
+// '*' stays within one segment, and '?' matches exactly one non-slash character.
+// A trailing '/' on a pattern is treated as '<dir>/**'.
 function globToRegex(pattern) {
   let regex = '^';
   let i = 0;

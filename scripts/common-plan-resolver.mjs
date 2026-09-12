@@ -8,7 +8,7 @@ import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { resolveActiveChange, normalizeChangeId } from './active-change-resolver.mjs';
 import { readProviderFile, safeProviderPath } from './provider-files.mjs';
-import { validateSddInputs, validateSddPolicy } from './sdd-profiles.mjs';
+import { selectSddProfile, validateSddInputs, validateSddPolicy } from './sdd-profiles.mjs';
 
 const ADAPTER_DIR = new URL('../adapters/', import.meta.url);
 
@@ -107,7 +107,6 @@ async function normalizePlanContext(raw, identity, changeId, methodology) {
     try {
       const inputs = validateSddInputs(raw.sdd_inputs);
       const policy = validateSddPolicy(raw.sdd_policy ?? {});
-      const { selectSddProfile } = await import('./sdd-profiles.mjs');
       const selection = selectSddProfile(inputs, policy, { supportsUltra: raw.public_mode === 'ultra' });
       defaults.sdd_profile = selection.profile;
       defaults.public_mode = selection.recommended_planning_mode;

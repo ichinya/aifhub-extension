@@ -3,6 +3,7 @@
 // for ultra bundles; it does not replace the upstream plan lifecycle owner.
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import { parseSimpleYaml } from '../scripts/aif-artifact-sync.mjs';
 import { readProviderFile } from '../scripts/provider-files.mjs';
 
 const ADAPTER_VERSION = '0.1.0';
@@ -33,26 +34,6 @@ async function resolveIdentity(root, changeId, options) {
     if (bytes !== null) files.push(file);
   }
   return { planId: changeId, changeId, documents: files, mode: files.length > 1 ? 'full' : 'fast' };
-}
-
-function parseSimpleYaml(raw) {
-  const result = {};
-  let current = result;
-  let key = null;
-  for (const line of (raw ?? '').split('\n')) {
-    if (!line.trim() || line.startsWith('#')) continue;
-    const match = /^(\s*)([\w-]+):\s*(.*)$/.exec(line);
-    if (match) {
-      const depth = match[1].length;
-      const value = match[2];
-      const rest = match[3];
-      if (depth === 0) { current = result; key = value; }
-      else if (current && key) current = result[key] = result[key] ?? {};
-      if (rest === '') current[value] = {};
-      else current[value] = rest.trim().replace(/^['"]|['"]$/g, '');
-    }
-  }
-  return result;
 }
 
 async function readContext(root, identity) {

@@ -79,6 +79,9 @@ describe('Common plan resolver', () => {
     assert.equal(context.public_mode, 'full');
     assert.equal(context.tasks.length, 2);
     assert.equal(context.errors[0].code, 'aifactory-native-plan-parsing-incomplete');
+    assert.equal(context.sdd_inputs, null);
+    assert.equal(context.sdd_profile, null);
+    assert.deepEqual(context.errors.map((error) => error.code), ['aifactory-native-plan-parsing-incomplete']);
   });
 
   it('fails on unknown methodology', async () => {
