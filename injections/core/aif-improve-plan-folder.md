@@ -96,6 +96,8 @@ For a new capability, refine its delta's `## Purpose` into a meaningful descript
 
 Classify open questions as `blocker`, `warn`, or `info` when useful, without requiring classification in trivial changes or forcing a specific table format.
 
+Also flag as task-quality findings: missing or incorrect requirement citations, unresolved source conflicts, a missing `## Requirements Reconciliation` section when the reconciliation signals apply, and missing verification of a supported behavior combination or a representative real repository artifact. Respect the plan's testing setting: add a test only when testing is enabled, otherwise add a runnable/manual verification step.
+
 Patch only affected sections and avoid whole-file regeneration unless structurally unusable.
 
 Preservation rules:
@@ -104,6 +106,7 @@ Preservation rules:
 - Treat the complete `## Original Request` heading and body as immutable raw source. Preserve its exact bytes, including line endings, whitespace, punctuation, casing, and line breaks; patch other sections around it instead of reconstructing `proposal.md`.
 - Treat an existing `## AIFHub Source Binding` as reserved identity metadata. Preserve its complete heading and body byte-for-byte during ordinary refinement; `Provider`, `Primary source`, and `External ID` are immutable, and `Branch` may change only for an explicit branch-rebind request that keeps the same primary source and passes source-binding validation. In a legacy classic plan, update the Markdown entrypoint and `status.yaml.source_binding.branch` as one logical rebind and require `parseSynchronizedWorkItemSourceBinding(markdown, status)` to pass before reporting success.
 - Treat an existing `## Research Context` body and `Source` revision metadata as the committed requirements snapshot. Do not translate, normalize, regenerate, or replace it unless the user explicitly requests a research rebase.
+- Treat an existing `## Requirements Reconciliation` as an upstream-owned compatibility record parsed by downstream workflow checks. Keep the fixed heading exact and preserve its declared authority, citations, applicable combination table, and verification evidence, updating them only to stay synchronized with refined tasks from the plan's committed evidence. Research-backed decisions stay frozen until an explicit rebase; never resolve a recorded conflict by editing the section — surface unresolved conflicts to the user or the owning workflow instead of patching around them.
 - For an embedded ultra source, pass its exact project-relative `RESEARCH.md` path to `resolveUltraResearchSource()` from `scripts/ultra-research-resolver.mjs`. Consume the structured `source`, `revision`, and `diagnostic` so the sibling marked `INDEX.md`, active status, Artifact Index link, path confinement, and normalized Active Summary digest are all revalidated centrally.
 - For an explicit research rebase, use resolver precedence: safe explicit `RESEARCH.md` path, exact slug, then exactly one caller-reviewed relevant active candidate. Ambiguity stops; recency never chooses a source.
 - When the exact regular or ultra source is missing/invalid, or its `Updated`/normalized `SHA256` differs, emit `WARN [research-drift] change-id=<change-id> source=<path> expected=<embedded revision> current=<live revision>`. Keep the embedded snapshot authoritative and do not log its full body, credentials, raw provider output, or sibling artifact bodies.
@@ -163,7 +166,7 @@ Preserved:
 ```
 
 The response must report the selected change ID, selected source, changed canonical artifact paths, preserved user-written areas, and validation status. Do not install OpenSpec skills or slash commands.
-Report `Original Request`, `AIFHub Source Binding`, and `Research Context` as preserved section names when applicable, but do not duplicate their raw bodies in output.
+Report `Original Request`, `AIFHub Source Binding`, `Research Context`, and `Requirements Reconciliation` as preserved section names when applicable, but do not duplicate their raw bodies in output.
 
 ### Legacy AI Factory-only mode
 

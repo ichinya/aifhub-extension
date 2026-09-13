@@ -886,6 +886,8 @@ describe('OpenSpec-native prompt asset contract', () => {
       'line endings, whitespace, punctuation, casing, and line breaks',
       'An existing `## Research Context` is an immutable committed snapshot',
       'unless the user explicitly requests a research rebase',
+      '`## Requirements Reconciliation` is an upstream-owned compatibility token',
+      'never resolve a recorded conflict by rewriting the section',
       '`language.artifacts` still applies to generated'
     ]) {
       assertIncludes(policy, expected, `${SHARED_LANGUAGE_POLICY_ASSET} raw-source localization contract`);
@@ -897,6 +899,7 @@ describe('OpenSpec-native prompt asset contract', () => {
         '## Original Request',
         'byte-for-byte',
         '## Research Context',
+        '## Requirements Reconciliation',
         'WARN [research-drift]',
         'expected=<embedded revision>',
         'current=<live revision>',
@@ -914,6 +917,7 @@ describe('OpenSpec-native prompt asset contract', () => {
       for (const expected of [
         '## Original Request',
         '## Research Context',
+        '## Requirements Reconciliation',
         'WARN [research-drift]',
         'change-id=<change-id>',
         'source=<path>',

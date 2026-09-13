@@ -27,7 +27,7 @@ Evaluated on 2026-09-05:
 | AIFHub local HEAD and live `origin/main` | `a560e3fcf6148d9e1663c51db188f6c1491a6477` |
 | Prime Agent latest published stable release | [`v0.9.1`](https://github.com/PrimeIntellect-ai/prime-agent/releases/tag/v0.9.1), published 2026-09-01, tag and release target `81ae3cb34d27d38ee37f9e205a1e73694993b344` |
 | Prime Agent live main | `5c2750bdc3c99cc4225c1167a3484371a7a221ab`; no diff from the release for the refinement module, autonomous module, RLM runtime documentation or skills documentation inspected here |
-| AI Factory live `2.x` source | [`3c1ddd4740d7b1c30d8ecb3dc80fa5e7b8d7ef5a`](https://github.com/lee-to/ai-factory/commit/3c1ddd4740d7b1c30d8ecb3dc80fa5e7b8d7ef5a), package `2.19.0`; source review, not an installer smoke |
+| AI Factory live `2.x` source | [`3c1ddd4740d7b1c30d8ecb3dc80fa5e7b8d7ef5a`](https://github.com/lee-to/ai-factory/commit/3c1ddd4740d7b1c30d8ecb3dc80fa5e7b8d7ef5a), package `2.19.0`; source review, not an installer smoke. The `2.19.0` release was published on 2026-09-10 as tag `v2.19.0` (`e144f95c89de0d0cb6c9b38dbe8c2907b00dc5ce`), 8 commits after this evaluation pin |
 | Execution | Windows Node `24.13.0` for isolated TypeScript functions; Debian WSL, Python `3.13.5`, Linux x86_64 for the actual kernel |
 | Model / provider / cost | None: zero inference requests and zero real child agents |
 | Issue / related PR | Issue open with zero comments; no matching Prime Agent PR found at evaluation time |

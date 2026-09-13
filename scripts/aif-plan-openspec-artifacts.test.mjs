@@ -442,7 +442,12 @@ describe('aif-plan OpenSpec-native planning contract', () => {
       'WARN [research-drift]',
       'expected=<embedded revision>',
       'current=<live revision>',
-      'unless the user explicitly requests a research rebase'
+      'unless the user explicitly requests a research rebase',
+      '## Requirements Reconciliation',
+      'Reconcile requirements before exploring an implementation',
+      'declared authority, cited decisions with source paths',
+      'never emit a placeholder section',
+      'fixed English compatibility token'
     ]) {
       assertIncludes(openspec, expected, label);
     }

@@ -11,7 +11,7 @@ setup and mode:
   /aif-mode openspec                                # required when switching modes
   /aif-mode doctor                                  # optional readiness check
 
-session startup (AI Factory 2.19 source snapshot):
+session startup (AI Factory 2.19):
   /aif-warmup                                       # optional read-only handoff
 
 optional discovery:
@@ -56,9 +56,9 @@ AIFHub commands request OpenSpec validation, status, instructions, and archive t
 
 The shared resolver selects one CLI source per operation in deterministic order: explicit non-empty extension API `options.command`, project-local `node_modules/.bin/openspec` (`openspec.cmd` on Windows), then `openspec` from `PATH`. An explicit or project-local selection is authoritative and never silently falls through after failure. AIFHub does not run `npx`, search parent projects, download, or auto-install OpenSpec. Missing or unsupported CLI remains degraded for filesystem-based planning/context loading; archive-required finalization still refuses until a compatible CLI is available. Human and JSON diagnostics expose only a safe project-relative/bounded command and `explicit`, `project-local`, or `path` source.
 
-## Session Warmup (AI Factory 2.19 Source Snapshot)
+## Session Warmup (AI Factory 2.19)
 
-The reviewed AI Factory `2.x` source snapshot declaring `2.19.0` adds upstream `/aif-warmup`. It reads configured DESCRIPTION, ARCHITECTURE, ROADMAP, RESEARCH, the scoped rules hierarchy, applicable `AGENTS.md`, and optional extra context, then stops with a compact read-only handoff. It does not plan or implement in the same invocation.
+The published AI Factory `2.19.0` release adds upstream `/aif-warmup`. It reads configured DESCRIPTION, ARCHITECTURE, ROADMAP, RESEARCH, the scoped rules hierarchy, applicable `AGENTS.md`, and optional extra context, then stops with a compact read-only handoff. It does not plan or implement in the same invocation.
 
 Fresh configs created through AIFHub mode/bootstrap tooling include the upstream empty default:
 
@@ -71,7 +71,7 @@ warmup:
 
 AIFHub adds no `/aif-warmup` skill or injection. The optional `paths.context` glossary, reviewed provider notes, canonical OpenSpec changes, QA evidence, and generated rules are not implicitly added to startup context. A user may explicitly add a safe reviewed file or directory to `warmup.paths`; raw provider output, credentials, and validation evidence remain subject to the existing context and artifact boundaries.
 
-The same upstream snapshot adds a root `apm.yml` with `type: skill` and `includes: auto`. That manifest distributes upstream AI Factory skills only; it is not evidence that the npm CLI or AIFHub extension assets were installed. Continue to use `ai-factory extension add` and `ai-factory extension update` for AIFHub wrapper commands, injections, MCP templates, and managed agent files.
+The same release adds a root `apm.yml` with `type: skill` and `includes: auto`. That manifest distributes upstream AI Factory skills only; it is not evidence that the npm CLI or AIFHub extension assets were installed. Continue to use `ai-factory extension add` and `ai-factory extension update` for AIFHub wrapper commands, injections, MCP templates, and managed agent files.
 
 ## Prompt Language Resolution
 
@@ -580,6 +580,8 @@ Writes:
 
 `/aif-qa-check` is the matching upstream branch-scoped execution utility. It consumes `paths.qa/<branch-slug>/test-cases.md` and writes `paths.qa/<branch-slug>/qa-check.md`; both commands must derive the same branch slug. In agent mode, use evidence appropriate to the case surface: backend tests, CLI output, API results, file/docs inspection, or database reads do not require browser automation when concrete non-browser evidence exists.
 
+Browser-executable cases may keep persistent Playwright-compatible replay scripts at `paths.qa/<branch-slug>/browser-replay/TC-NNN.js`, with replaced versions preserved under `browser-replay/history/`. Each script binds its case digest, target fingerprint, and script digest, supports the `AIF_BASE_URL` placeholder, and must receive one proof run before it counts as current evidence. Stateful replays restore their precondition and renew authorization per run; a bounded exploratory pass may follow replay only when concrete change-risk signals justify it. Replay failures, stale scripts, and prior evidence are preserved rather than silently overwritten.
+
 Current results in `qa-check.md` must bind to `tested_revision` and `worktree_digest` for a git worktree, or `manual_build_id` outside git, plus `source_digest` for `test-cases.md` and per-case `case_digests`. When a binding changes, affected results become unchecked `Stale`; previous comments and evidence remain history and do not count as current pass, fail, or blocked status.
 
 Reusable setup facts and cross-run lessons may be kept in `paths.qa/agent-context.md` and `paths.qa/agent-history.md` only when non-sensitive. Keep run-specific decisions and full transcripts out. Production, unknown targets, destructive actions, and external-side-effect cases require explicit authorization for the current target and action immediately before execution. Before writing any QA artifact, replace credentials, cookies, authorization values, tokens, one-time codes, private data, and sensitive URL parameters with `[REDACTED]`.
@@ -593,7 +595,7 @@ Does not write:
 - AIFHub verification or finalization evidence under `.ai-factory/qa/<change-id>/`
 
 In OpenSpec-native mode, use `/aif-verify <change-id>` for authoritative verification evidence and `/aif-done <change-id>` for finalization evidence.
-Branch-scoped `qa-check.md` alone never satisfies AIFHub `verify.md`, `coverage.json`, rules evidence, `done-readiness.json`, `done.md`, or `openspec-archive.json`; no implicit bridge exists.
+Branch-scoped `qa-check.md` and `browser-replay/` artifacts alone never satisfy AIFHub `verify.md`, `coverage.json`, rules evidence, `done-readiness.json`, `done.md`, or `openspec-archive.json`; no implicit bridge exists.
 
 ### `/aif-plan full`
 
@@ -1307,27 +1309,27 @@ The checked-in deterministic harness always runs offline through the default tes
 npm test
 ```
 
-It injects fake exact `2.17.0`/`2.18.1` executors into the production orchestration layer and covers version/provenance preflight, clean install, global update, dummy-extension isolation, stale managed-agent replacement, injection cardinality, artifact/config/unmanaged preservation, and exact transfer inventory. `2.18.0` remains a separate stable feature boundary for ultra and upstream transfer inventory (`>=2.18.0`).
+It injects fake exact `2.17.0` update-source executors plus one selectable `2.18.1` (`v218`) or `2.19.0` (`v219`) target executor into the production orchestration layer and covers version/provenance preflight, clean install, global update, dummy-extension isolation, stale managed-agent replacement, injection cardinality, artifact/config/unmanaged preservation, and exact transfer inventory. For the `v219` target it additionally asserts upstream release-surface sentinels: the `aif-implement` requirement consistency gate and `ERROR [requirement-conflict]` token, `aif-qa-check` `browser-replay` content, and the packaged `aif-warmup` skill. `2.18.0` remains a separate stable feature boundary for ultra and upstream transfer inventory (`>=2.18.0`).
 
-The live driver is opt-in and non-globbed. It accepts only caller-supplied local command-plus-argv toolchains and package roots:
+The live driver is opt-in and non-globbed. It accepts only caller-supplied local command-plus-argv toolchains and package roots. Exactly one target group is required per run — `--v218-*` binds the exact `2.18.1` target and `--v219-*` binds the exact `2.19.0` target; binding both fails closed:
 
 ```bash
-npm run smoke:ai-factory-2-18 -- --v217-command <absolute-executable> --v217-arg <absolute-2.17.0-bin-entrypoint> --v217-root <absolute-2.17.0-package-root> --v218-command <absolute-executable> --v218-arg <absolute-2.18.1-bin-entrypoint> --v218-root <absolute-2.18.1-package-root> --extension-root <absolute-local-extension-root>
+npm run smoke:ai-factory-2-18 -- --v217-command <absolute-executable> --v217-arg <absolute-2.17.0-bin-entrypoint> --v217-root <absolute-2.17.0-package-root> --v219-command <absolute-executable> --v219-arg <absolute-2.19.0-bin-entrypoint> --v219-root <absolute-2.19.0-package-root> --extension-root <absolute-local-extension-root>
 ```
 
-Exact `package.json` provenance and reported `2.17.0`/`2.18.1` are checked before a temporary consumer project is created. The existing `--v217-*` and `--v218-*` flag names are retained. The process boundary uses bounded `execFile` with `shell: false`; Windows `.cmd` uses an explicit existing ComSpec adapter. No toolchain is downloaded or resolved through `npx`. Missing command/package/extension prerequisites are `NOT_RUN`, not PASS. Add `--allow-network` only when the caller intentionally accepts a network-backed upstream update check; transport failure is reported separately from extension contract failure.
+Exact `package.json` provenance and reported `2.17.0` plus the bound target version (`2.18.1` or `2.19.0`) are checked before a temporary consumer project is created. The `--v217-*` and `--v218-*` flag names are retained for the update source and the 2.18.1 target; `--v219-*` names the published 2.19.0 target. The process boundary uses bounded `execFile` with `shell: false`; Windows `.cmd` uses an explicit existing ComSpec adapter. No toolchain is downloaded or resolved through `npx`. Missing command/package/extension prerequisites are `NOT_RUN`, not PASS. Add `--allow-network` only when the caller intentionally accepts a network-backed upstream update check; transport failure is reported separately from extension contract failure.
 
-The live flow runs three separately attributed checks:
+The live flow runs three separately attributed checks against the bound target:
 
-1. Clean 2.18.1 all-skills init plus local extension add and OpenSpec mode assertion; exactly one upstream `aif-transfer`, with no AIFHub copy. The installed skill retains exact upstream `aif-explore` bytes, its Research Coherence Gate/`Task` capability, and one AIFHub injection marker.
-2. A 2.17.0 selective project updated by exact `ai-factory update --force`; the current 2.18.1 base is refreshed before injections are reapplied. The flow preserves unknown config, unmanaged agent, classic/OpenSpec/marked-ultra artifact path sets and digests, upstream `aif-explore` bytes, and one-copy injections. Newly available `aif-transfer` is reported from observed inventory rather than claimed automatically.
+1. Clean target-version all-skills init plus local extension add and OpenSpec mode assertion; exactly one upstream `aif-transfer`, with no AIFHub copy. The installed skill retains exact upstream `aif-explore` bytes, its Research Coherence Gate/`Task` capability, and one AIFHub injection marker.
+2. A 2.17.0 selective project updated by exact `ai-factory update --force`; the current bound-target base is refreshed before injections are reapplied. The flow preserves unknown config, unmanaged agent, classic/OpenSpec/marked-ultra artifact path sets and digests, upstream `aif-explore` bytes, and one-copy injections. Newly available `aif-transfer` is reported from observed inventory rather than claimed automatically.
 3. Only after global result recording, a dummy extension is installed/snapshotted and one managed AIFHub agent is made stale; exact `ai-factory extension update aifhub-extension --force` must restore the source hash while dummy ledger/files remain byte-identical and upstream `aif-explore` bytes remain unchanged.
 
-`ai-factory upgrade` is intentionally absent: it migrates v1 skill names to v2 and is not the 2.17.0-to-2.18.1 update command.
+`ai-factory upgrade` is intentionally absent: it migrates v1 skill names to v2 and is not the 2.17.0-to-target update command.
 
 Local deterministic or live PASS proves only the isolated consumer contract. It does not prove package publication, registry availability, deployment, release readiness, or successful end-user migration.
 
-The AI Factory 2.19 review is intentionally recorded as source-snapshot evidence. Because `2.19.0` had no Git tag, GitHub release, or npm package at the review boundary, the `smoke:ai-factory-2-18` driver remains the last published-executable compatibility smoke and must not be presented as a 2.19 PASS. Default tests separately lock fresh `warmup.paths: []`, no-backfill behavior, user-owned path and comment preservation, and upstream ownership.
+The AI Factory 2.19.0 review is now recorded against the published release (`v2.19.0` tag commit `e144f95c89de0d0cb6c9b38dbe8c2907b00dc5ce`, matching the npm `gitHead`). Binding `--v219-*` makes the same driver the exact published-executable compatibility smoke for 2.19.0; `--v218-*` retains 2.18.1 coverage. Default tests separately lock fresh `warmup.paths: []`, no-backfill behavior, user-owned path and comment preservation, and upstream ownership.
 
 Run repository validation separately:
 

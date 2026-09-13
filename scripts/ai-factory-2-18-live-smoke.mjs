@@ -15,6 +15,9 @@ const VALUE_OPTIONS = new Map([
   ['--v218-command', 'v218Command'],
   ['--v218-arg', 'v218Arg'],
   ['--v218-root', 'v218Root'],
+  ['--v219-command', 'v219Command'],
+  ['--v219-arg', 'v219Arg'],
+  ['--v219-root', 'v219Root'],
   ['--extension-root', 'extensionRoot'],
   ['--timeout-ms', 'timeoutMs'],
   ['--comspec', 'comSpec']
@@ -25,11 +28,12 @@ function usage() {
     'Usage:',
     '  npm run smoke:ai-factory-2-18 -- \\',
     '    --v217-command <absolute executable> --v217-arg <local bin/ai-factory.js> --v217-root <local package root> \\',
-    '    --v218-command <absolute executable> --v218-arg <local bin/ai-factory.js> --v218-root <local package root> \\',
+    '    (--v218-command <absolute executable> --v218-arg <local bin/ai-factory.js> --v218-root <local package root> |',
+    '     --v219-command <absolute executable> --v219-arg <local bin/ai-factory.js> --v219-root <local package root>) \\',
     '    --extension-root <local aifhub-extension checkout> [--timeout-ms 120000] [--allow-network]',
     '',
-    'The existing --v218-* flags bind the exact AI Factory 2.18.1 target; --v217-* binds the 2.17.0 update source.',
-    'Repeat --v217-arg or --v218-arg for each fixed argv token. No package is downloaded.',
+    'Exactly one target group is required: --v218-* binds the exact AI Factory 2.18.1 target and --v219-* binds the exact 2.19.0 target; --v217-* binds the 2.17.0 update source.',
+    'Repeat --v217-arg, --v218-arg, or --v219-arg for each fixed argv token. No package is downloaded.',
     'On Windows a caller may instead pass a local .cmd command; the driver uses the explicit/default ComSpec adapter with shell=false.'
   ].join('\n');
 }
@@ -38,6 +42,7 @@ function parseArguments(argv) {
   const parsed = {
     v217Arg: [],
     v218Arg: [],
+    v219Arg: [],
     allowNetwork: false,
     help: false
   };
@@ -56,7 +61,7 @@ function parseArguments(argv) {
     if (index + 1 >= argv.length) throw new Error('missing-option-value');
     const value = argv[index + 1];
     index += 1;
-    if (key === 'v217Arg' || key === 'v218Arg') parsed[key].push(value);
+    if (key === 'v217Arg' || key === 'v218Arg' || key === 'v219Arg') parsed[key].push(value);
     else parsed[key] = value;
   }
   return parsed;
@@ -65,7 +70,7 @@ function parseArguments(argv) {
 function notRunResult(code, missing = []) {
   return {
     schemaVersion: SMOKE_SCHEMA_VERSION,
-    suite: 'ai-factory-2.18-consumer-compatibility',
+    suite: 'ai-factory-2.x-consumer-compatibility',
     evidence: 'live',
     status: SMOKE_STATUS.NOT_RUN,
     compatibilityScope: 'isolated-local-consumer-contract',
@@ -109,11 +114,27 @@ async function main() {
   const required = [
     ['--v217-command', parsed.v217Command],
     ['--v217-root', parsed.v217Root],
-    ['--v218-command', parsed.v218Command],
-    ['--v218-root', parsed.v218Root],
     ['--extension-root', parsed.extensionRoot]
   ];
   const missing = required.filter(([, value]) => !value).map(([name]) => name);
+  const targetGroups = [
+    ['v218', parsed.v218Command, parsed.v218Root, parsed.v218Arg],
+    ['v219', parsed.v219Command, parsed.v219Root, parsed.v219Arg]
+  ];
+  const boundTargets = targetGroups.filter(([, command, root, args]) => command || root || args.length > 0);
+  if (boundTargets.length > 1) {
+    const result = notRunResult('ambiguous-target-toolchain');
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    process.exitCode = exitCodeForStatus(result.status);
+    return;
+  }
+  if (boundTargets.length === 1) {
+    const [key, command, root] = boundTargets[0];
+    if (!command) missing.push(`--${key}-command`);
+    if (!root) missing.push(`--${key}-root`);
+  } else {
+    missing.push('--v218-command|--v219-command', '--v218-root|--v219-root');
+  }
   if (missing.length > 0) {
     const result = notRunResult('missing-live-prerequisite', missing);
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
@@ -130,11 +151,21 @@ async function main() {
         argv: parsed.v217Arg,
         provenanceRoot: parsed.v217Root
       },
-      v218: {
-        command: parsed.v218Command,
-        argv: parsed.v218Arg,
-        provenanceRoot: parsed.v218Root
-      }
+      ...(boundTargets[0][0] === 'v218'
+        ? {
+            v218: {
+              command: parsed.v218Command,
+              argv: parsed.v218Arg,
+              provenanceRoot: parsed.v218Root
+            }
+          }
+        : {
+            v219: {
+              command: parsed.v219Command,
+              argv: parsed.v219Arg,
+              provenanceRoot: parsed.v219Root
+            }
+          })
     },
     extensionRoot: parsed.extensionRoot,
     runner,

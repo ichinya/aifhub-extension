@@ -133,6 +133,16 @@ Before normalizing task content, preserve the explicit planning request as canon
 - If planning starts only from the resolved research artifact and no explicit request exists, omit `## Original Request`.
 - If both an explicit request and relevant research influence the plan, keep both `## Original Request` and `## Research Context`; they have different source and mutability contracts.
 
+Reconcile requirements before exploring an implementation:
+
+- Treat canonical specs and the committed `## Research Context` snapshot as authoritative requirement sources; generated rules are derived guidance subordinate to canonical specs, `## Original Request` is the raw intent anchor, and roadmap items and task summaries are scope indicators, not detailed behavioral contracts, unless the project explicitly declares otherwise.
+- Follow a source-priority hierarchy only when the user or project context declares one. When authoritative sources overlap, record whether they agree, one refines the other, or they conflict; when no declared hierarchy exists and an unresolved conflict would change the plan, ask the user and stop instead of silently choosing a source.
+- Do not edit source requirements while planning. Report stale or contradictory requirement artifacts and route them to their owning command or the user.
+- When behavior depends on two or more independent selectors, states, modes, or input shapes, enumerate the supported combinations before writing tasks; cover only combinations the requirements allow, not a speculative Cartesian product. For each material combination specify accepted input and validation, persisted state, returned output or next transition, side effects and invariants, and one verification scenario — a test only when testing is enabled, otherwise a runnable/manual verification step.
+- When repository data, configuration, fixtures, schemas, or content define the real contract, plan at least one representative existing artifact through the primary verification path instead of relying only on synthetic fixtures.
+
+Add an exact `## Requirements Reconciliation` section to `proposal.md` when multiple authoritative sources materially constrain the work, a conflict was resolved by an explicit user or project decision, independent behavior dimensions exist, or a representative real artifact is required. Keep it compact: declared authority, cited decisions with source paths, the applicable combination table, and verification evidence. Omit the complete heading and body for simple work where none of these signals applies; never emit a placeholder section. The heading is a fixed English compatibility token parsed by downstream workflow checks: do not translate or rename it, and preserve an existing section verbatim during replanning.
+
 After preserving the raw request, normalize the task into these fields:
 
 - task type
@@ -299,6 +309,10 @@ Affected code, APIs, dependencies, systems, assumptions, risks, and open questio
 Source: <exact selected RESEARCH.md source> (Active Summary, Updated: <timestamp>, SHA256: <digest>)
 
 <committed relevant Active Summary; omit when research did not shape the plan>
+
+## Requirements Reconciliation
+
+<declared authority, cited decisions, applicable combination table, and verification evidence; omit the complete section when no reconciliation signal applies>
 ```
 
 For source-bound proposals only, insert this exact block immediately after `## Original Request` and before `## Roadmap Linkage`. For every ordinary plan, omit the complete heading and body; never emit placeholders, `none`, or an example binding.
@@ -312,7 +326,7 @@ For source-bound proposals only, insert this exact block immediately after `## O
 - Branch: <exact current git branch|none>
 ```
 
-The source-template proposal headings are exact and case-sensitive: `## Why`, `## What Changes`, `## Capabilities`, `### New Capabilities`, `### Modified Capabilities`, and `## Impact`. Do not translate, rename, or replace them with older `Intent`, `Scope`, or `Approach` headings. AIFHub-owned `## Original Request`, conditional `## AIFHub Source Binding`, `## Roadmap Linkage`, and conditional `## Research Context` are additions; they do not replace the source headings.
+The source-template proposal headings are exact and case-sensitive: `## Why`, `## What Changes`, `## Capabilities`, `### New Capabilities`, `### Modified Capabilities`, and `## Impact`. Do not translate, rename, or replace them with older `Intent`, `Scope`, or `Approach` headings. AIFHub-owned `## Original Request`, conditional `## AIFHub Source Binding`, `## Roadmap Linkage`, and conditional `## Research Context` are additions; they do not replace the source headings. Conditional `## Requirements Reconciliation` is likewise an addition carrying the upstream reconciliation contract; its heading is a fixed compatibility token.
 
 `design.md` should use:
 

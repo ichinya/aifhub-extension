@@ -102,9 +102,10 @@ Treat planning source sections as read-only fix context:
 
 - Use `## Original Request` as the raw intent anchor for the selected QA finding; do not rewrite it or treat it as permission to widen the fix.
 - When `proposal.md` contains `## Research Context`, use the embedded snapshot and source revision as authoritative committed scope.
+- When `proposal.md` contains `## Requirements Reconciliation`, treat it as the committed requirement-consistency record for the selected finding; a fix that would contradict an authoritative requirement it cites is a requirement conflict, not a fix — report `ERROR [requirement-conflict]` and stop without edits instead of widening scope or rewriting the section.
 - For an embedded ultra source, pass its exact project-relative `RESEARCH.md` path to `resolveUltraResearchSource()` from `scripts/ultra-research-resolver.mjs` and consume only its structured `source`, `revision`, and `diagnostic`. This centrally revalidates the sibling marker/index/status/link and normalized Active Summary digest; do not implement local selection or hashing heuristics.
 - Compare the exact regular or ultra source only for drift and rationale. Missing/invalid source, changed `Updated`, or changed normalized `SHA256` emits `WARN [research-drift] change-id=<change-id> source=<path> expected=<embedded revision> current=<live revision>` and keeps the fix bounded to existing QA evidence and committed scope. Recency never selects a replacement source.
-- Do not mutate or silently rebase either source section. Keep credentials, raw provider output, and full request/research bodies out of fix messages and traces.
+- Do not mutate or silently rebase either source section or `## Requirements Reconciliation`. Keep credentials, raw provider output, and full request/research bodies out of fix messages and traces.
 
 Read generated rules as derived fix guidance when present:
 

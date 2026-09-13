@@ -735,7 +735,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
     }
   });
 
-  it('documents the AI Factory 2.19 source snapshot, cumulative 2.18.1 executable baseline, and ownership boundaries', async () => {
+  it('documents the published AI Factory 2.19.0 release, selectable 2.18.1/2.19.0 executable targets, and ownership boundaries', async () => {
     const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
     const manifest = JSON.parse(await readRepoFile('extension.json'));
     const readme = await readRepoFile('README.md');
@@ -752,12 +752,15 @@ describe('complete OpenSpec workflow documentation contract', () => {
     assert.equal(metadata.compat['ai-factory'], '>=2.11.0 <3.0.0', 'aifhub-extension.json compat.ai-factory');
     assert.equal(metadata.sources['ai-factory'].version, '2.19.0', 'aifhub-extension.json sources.ai-factory.version');
     assert.equal(metadata.sources['ai-factory'].baselineVersion, '2.19.0', 'aifhub-extension.json sources.ai-factory.baselineVersion');
-    assert.equal(metadata.sources['ai-factory'].lastSync, '2026-09-01', 'aifhub-extension.json sources.ai-factory.lastSync');
-    assertIncludes(metadata.sources['ai-factory'].notes, 'snapshot declaring 2.19.0', 'aifhub-extension.json sources.ai-factory.notes');
-    assertIncludes(metadata.sources['ai-factory'].notes, '3c1ddd4740d7b1c30d8ecb3dc80fa5e7b8d7ef5a', '2.19 source custody: exact commit');
-    assertIncludes(metadata.sources['ai-factory'].notes, '7 commits and 16 changed files', '2.19 source custody: exact comparison size');
-    assertIncludes(metadata.sources['ai-factory'].notes, 'No 2.19.0 Git tag, GitHub release, or npm package', '2.19 source custody: unpublished boundary');
-    assertIncludes(metadata.sources['ai-factory'].notes, 'last exact published-executable consumer smoke remains 2.18.1', '2.19 source custody: executable boundary');
+    assert.equal(metadata.sources['ai-factory'].lastSync, '2026-09-13', 'aifhub-extension.json sources.ai-factory.lastSync');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'published AI Factory 2.19.0 release', 'aifhub-extension.json sources.ai-factory.notes');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'e144f95c89de0d0cb6c9b38dbe8c2907b00dc5ce', '2.19 release custody: exact tag commit');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'matching the npm ai-factory@2.19.0 gitHead', '2.19 release custody: npm provenance');
+    assertIncludes(metadata.sources['ai-factory'].notes, '3c1ddd4740d7b1c30d8ecb3dc80fa5e7b8d7ef5a', '2.19 release custody: earlier pre-release snapshot commit');
+    assertIncludes(metadata.sources['ai-factory'].notes, '15 commits and 32 changed files', '2.19 release custody: exact comparison size');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'binds an exact published 2.19.0 target', '2.19 release custody: executable boundary');
+    assertIncludes(metadata.sources['ai-factory'].notes, '## Requirements Reconciliation', '2.19 release custody: reconciliation section');
+    assertIncludes(metadata.sources['ai-factory'].notes, 'browser-replay', '2.19 release custody: browser replay artifacts');
     assertIncludes(metadata.sources['ai-factory'].notes, 'upstream-owned /aif-warmup', '2.19 ownership: warmup');
     assertIncludes(metadata.sources['ai-factory'].notes, 'warmup.paths: []', '2.19 config: fresh default');
     assertIncludes(metadata.sources['ai-factory'].notes, 'without backfill', '2.19 config: preserve/no backfill');
@@ -786,7 +789,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
     assertIncludes(metadata.sources['ai-factory'].notes, 'skills.sh', '2.18 baseline: skills.sh docs no-op');
 
     for (const [source, expected, label] of [
-      [readme, '### AI Factory 2.19 Reviewed Source Snapshot', 'README.md AI Factory 2.19 source-snapshot heading'],
+      [readme, '### AI Factory 2.19 Reviewed Release', 'README.md AI Factory 2.19 release heading'],
       [readme, 'immutable `## Original Request`', 'original-request: README.md immutable source'],
       [readme, '`WARN [research-drift]`', 'research-drift: README.md warning'],
       [readme, 'same targeted regression check before and after the edit', 'fix-regression: README.md pre/post contract'],
@@ -795,23 +798,28 @@ describe('complete OpenSpec workflow documentation contract', () => {
       [mcpDocs, 'Universal / Other (`.mcp.json`)', 'universal-mcp: docs/aifhub-mcp.md runtime and path'],
       [mcpDocs, '`mcpServers`', 'universal-mcp: docs/aifhub-mcp.md standard key'],
       [readme, 'project-specific `Control Flow` base rule only when repository evidence supports it', 'control-flow: README.md evidence gate'],
-      [readme, 'source-reviewed against the AI Factory `2.x` snapshot', 'README.md AI Factory 2.19 source baseline'],
+      [readme, 'source-reviewed against the published AI Factory `2.19.0` release', 'README.md AI Factory 2.19 release baseline'],
       [readme, 'upstream-owned Research Coherence Gate', 'README.md upstream explore gate ownership'],
-      [changelog, 'Reviewed AI Factory source baseline обновлён до snapshot, declaring `2.19.0`', 'CHANGELOG.md Unreleased AI Factory source-baseline version'],
-      [docsIndex, 'pinned AI Factory 2.19 source snapshot', 'docs/README.md AI Factory source-snapshot index entry'],
-      [docsIndex, 'AI Factory 2.18.1 published-executable baseline', 'docs/README.md AI Factory executable-baseline index entry']
+      [readme, '`## Requirements Reconciliation`', 'README.md requirements reconciliation token'],
+      [readme, 'browser-replay', 'README.md browser replay artifacts'],
+      [changelog, 'Адаптация AI Factory `2.19.0` доведена до фактического релиза', 'CHANGELOG.md Unreleased AI Factory 2.19.0 release adaptation'],
+      [changelog, 'Reviewed AI Factory source baseline обновлён до snapshot, declaring `2.19.0`', 'CHANGELOG.md historical AI Factory source-baseline version'],
+      [docsIndex, 'pinned AI Factory 2.19.0 release', 'docs/README.md AI Factory release index entry'],
+      [docsIndex, 'AI Factory 2.18.1 and 2.19.0 published-executable smoke targets', 'docs/README.md AI Factory executable-target index entry']
     ]) {
       assertIncludes(source, expected, label);
     }
 
     for (const [expected, label] of [
       ['AI Factory 2.18 Reviewed Baseline', '2.18 baseline: docs/openspec-compatibility.md heading'],
-      ['AI Factory 2.19 Reviewed Source Snapshot', '2.19 source snapshot: docs/openspec-compatibility.md heading'],
-      ['7 commits and 16 changed files', '2.19 source snapshot: exact range size'],
-      ['no `2.19.0` Git tag, GitHub release, or npm package', '2.19 source snapshot: unpublished boundary'],
-      ['`/aif-warmup`', '2.19 source snapshot: upstream warmup'],
-      ['`warmup.paths` config', '2.19 source snapshot: user-owned config'],
-      ['Microsoft APM manifest', '2.19 source snapshot: upstream APM boundary'],
+      ['AI Factory 2.19 Reviewed Release', '2.19 release: docs/openspec-compatibility.md heading'],
+      ['15 commits and 32 changed files', '2.19 release: exact range size'],
+      ['matching the npm `ai-factory@2.19.0` `gitHead`', '2.19 release: npm provenance'],
+      ['`/aif-warmup`', '2.19 release: upstream warmup'],
+      ['`warmup.paths` config', '2.19 release: user-owned config'],
+      ['Microsoft APM manifest', '2.19 release: upstream APM boundary'],
+      ['## Requirements Reconciliation', '2.19 release: reconciliation section'],
+      ['browser-replay', '2.19 release: browser replay artifacts'],
       ['AI Factory 2.18 audit', '2.18 baseline: compatibility audit table'],
       ['AI Factory 2.18.1 patch audit', '2.18.1 baseline: compatibility patch audit'],
       ['AI Factory 2.18 consumer ledger', '2.18 baseline: consumer ledger'],
@@ -875,7 +883,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
       'docs/openspec-compatibility.md'
     );
     for (const expected of [
-      'AI Factory 2.19 Reviewed Source Snapshot',
+      'AI Factory 2.19 Reviewed Release',
       'AI Factory `2.19.0`',
       'warmup.paths',
       'upstream-owned `/aif-warmup`',
@@ -1108,12 +1116,15 @@ describe('complete OpenSpec workflow documentation contract', () => {
       assertIncludes(consumerSmoke, expected, `docs/usage.md Local Consumer Smoke Checks contract: ${expected}`);
     }
     for (const expected of [
-      'exact `2.17.0`/`2.18.1`',
+      'exact `2.17.0` update-source executors',
+      'one selectable `2.18.1` (`v218`) or `2.19.0` (`v219`) target executor',
+      'Exactly one target group is required per run',
+      '--v219-*',
       '`2.18.0` remains a separate stable feature boundary',
       'upstream `aif-explore` bytes',
       'Research Coherence Gate'
     ]) {
-      assertIncludes(consumerSmoke, expected, `docs/usage.md AI Factory 2.18.1 smoke contract: ${expected}`);
+      assertIncludes(consumerSmoke, expected, `docs/usage.md AI Factory consumer smoke contract: ${expected}`);
     }
     assert.equal(
       packageJson.scripts['smoke:ai-factory-2-18'],
