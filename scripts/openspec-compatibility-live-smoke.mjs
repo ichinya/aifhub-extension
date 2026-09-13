@@ -12,6 +12,7 @@ import {
   getOpenSpecStatus, showOpenSpecItem, validateOpenSpecChange
 } from './openspec-runner.mjs';
 import { smokeOpenSpec112 } from './openspec-1-12-live-cases.mjs';
+import { smokeOpenSpec113 } from './openspec-1-13-live-cases.mjs';
 
 const args = process.argv.slice(2);
 assert.equal(args.length, 2, 'Usage: node scripts/openspec-compatibility-live-smoke.mjs <installed-package-root> <verified-tarball>');
@@ -28,9 +29,13 @@ const pins = {
   '1.12.0': {
     integrity: 'sha512-oFE2Lj7WVSc87nSibk6qe9HjHIOlxhcPAXbPey44DlLvJzBl5+9BZVrNiozOwv++CQhW+MG0kuP1XLZ/uQrrWw==',
     sha1: 'c844543999f673cdd72445879b86a4abea4c07ef', files: 389
+  },
+  '1.13.0': {
+    integrity: 'sha512-1b1VbjELIUHPz8BLnkVxqPu4pAYS6BhfrLcmUIM7Bd0iJXQDvE+e/LBofE1kydegfxmG7R1xCMRXsl5VtZD+0w==',
+    sha1: '5b124e7aafb6b539701a671e1fd015dac6b8bbf0', files: 389
   }
 }[pkg.version];
-assert.ok(pins, 'Only the exact reviewed 1.11.0 and 1.12.0 packages are accepted');
+assert.ok(pins, 'Only the exact reviewed 1.11.0, 1.12.0 and 1.13.0 packages are accepted');
 assert.equal(integrity, pins.integrity);
 assert.equal(createHash('sha1').update(tarball).digest('hex'), pins.sha1);
 assert.equal(pkg.name, '@fission-ai/openspec');
@@ -151,7 +156,7 @@ try {
   // 1.12 reports the missing base as INFO; strict validation still passes.
   const missingValidation = invoke(root, ['validate', 'missing-base', '--type', 'change', '--strict', '--json']).data;
   assert.equal(missingValidation.items[0].valid, true);
-  if (pkg.version === '1.12.0') {
+  if (['1.12.0', '1.13.0'].includes(pkg.version)) {
     assert.ok(missingValidation.items[0].issues.some((issue) => issue.level === 'INFO'
       && issue.path === 'nested/missing/spec.md' && /Archive would refuse/.test(issue.message)));
   } else assert.deepEqual(missingValidation.items[0].issues, []);
@@ -284,8 +289,11 @@ try {
   invoke(agentsRoot, ['update', '--force'], 0, false);
   assert.deepEqual(readFileSync(path.join(agentsRoot, '.agents/skills/openspec-explore/SKILL.md')), sharedSkill);
   assert.equal(readFileSync(path.join(agentsRoot, '.agents/skills/aifhub-sentinel/SKILL.md'), 'utf8'), '# User-owned AIFHub sentinel\n');
-  if (pkg.version === '1.12.0') {
+  if (['1.12.0', '1.13.0'].includes(pkg.version)) {
     await smokeOpenSpec112({ project, put, change, spec, requirement, invoke, inventory, adapter, scratch });
+  }
+  if (pkg.version === '1.13.0') {
+    await smokeOpenSpec113({ project, put, change, spec, requirement, invoke, inventory, adapter });
   }
   console.log(JSON.stringify({ version: pkg.version, node: process.versions.node, platform: process.platform, integrity, passed: true, rows }, null, 2));
 } finally {

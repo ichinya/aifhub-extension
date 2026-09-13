@@ -117,6 +117,22 @@ afterEach(async () => {
 });
 
 describe('OpenSpec coverage matrix', () => {
+  it('counts repeated delta sections but ignores requirement and scenario headings inside code fences', async () => {
+    const rootDir = await createTempRoot();
+    await createChange(rootDir);
+    const requirement = (name) => `### Requirement: ${name}\nThe system SHALL support ${name}.\n#### Scenario: Usage\n- WHEN requested\n- THEN it works\n`;
+    for (const fence of ['```', '~~~~']) {
+      await writeFixture(rootDir, 'openspec/changes/add-oauth/specs/auth/spec.md', [
+        '## ADDED Requirements', requirement('First'), `${fence}markdown`,
+        '## MODIFIED Requirements', requirement('Example'),
+        `${fence}not-a-closing-fence`, requirement('Still an example'),
+        fence, '## ADDED Requirements', requirement('Second')
+      ].join('\n'));
+      const matrix = await buildOpenSpecCoverageMatrix({ rootDir, changeId: 'add-oauth' });
+      assert.deepEqual(matrix.requirements.map((item) => item.id), ['auth.first', 'auth.second']);
+    }
+  });
+
   it('builds requirement-to-nested-task-to-code coverage and writes a stable QA artifact', async () => {
     const rootDir = await createTempRoot();
     await createChange(rootDir);

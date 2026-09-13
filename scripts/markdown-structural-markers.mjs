@@ -70,7 +70,7 @@ function splitMarkdownLines(content) {
   return String(content ?? '').split(/\r\n|\n|\r/);
 }
 
-function createMarkdownCodeMask(lines) {
+export function createMarkdownCodeMask(lines) {
   const mask = [];
   let fence = null;
 
@@ -80,7 +80,8 @@ function createMarkdownCodeMask(lines) {
       const token = fenceMatch[1];
       if (fence === null) {
         fence = { char: token[0], length: token.length };
-      } else if (token[0] === fence.char && token.length >= fence.length) {
+      } else if (token[0] === fence.char && token.length >= fence.length
+        && /^\s*$/.test(line.slice(fenceMatch[0].length))) {
         fence = null;
       }
       mask.push(true);

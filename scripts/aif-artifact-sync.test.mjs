@@ -65,7 +65,7 @@ function missingCliDetection() {
     canValidate: false,
     canArchive: false,
     version: null,
-    latestReviewedVersion: '1.12.0',
+    latestReviewedVersion: '1.13.0',
     versionOutdated: null,
     command: 'openspec',
     commandSource: 'path',
@@ -86,8 +86,8 @@ function availableCliDetection(overrides = {}) {
     canValidate: true,
     canArchive: true,
     version,
-    latestReviewedVersion: '1.12.0',
-    versionOutdated: overrides.versionOutdated ?? version.localeCompare('1.12.0', 'en', { numeric: true }) < 0,
+    latestReviewedVersion: '1.13.0',
+    versionOutdated: overrides.versionOutdated ?? version.localeCompare('1.13.0', 'en', { numeric: true }) < 0,
     command: overrides.command ?? 'openspec',
     commandSource: overrides.commandSource ?? 'path',
     nodeVersion: overrides.nodeVersion ?? '20.19.0',
@@ -139,7 +139,7 @@ describe('mode status', () => {
 
     assert.equal(status.openspecCli.state, 'available');
     assert.equal(status.openspecCli.version, '1.4.0');
-    assert.equal(status.openspecCli.latestReviewedVersion, '1.12.0');
+    assert.equal(status.openspecCli.latestReviewedVersion, '1.13.0');
     assert.equal(status.openspecCli.versionOutdated, true);
     assert.equal(status.openspecCli.canValidate, true);
     assert.equal(status.openspecCli.canArchive, true);
@@ -154,8 +154,8 @@ describe('mode status', () => {
     ].join('\n'));
 
     for (const expectation of [
-      { version: '1.12.0', versionOutdated: false },
-      { version: '1.12.1', versionOutdated: false }
+      { version: '1.13.0', versionOutdated: false },
+      { version: '1.13.1', versionOutdated: false }
     ]) {
       const status = await getModeStatus({
         rootDir,
@@ -163,7 +163,7 @@ describe('mode status', () => {
       });
 
       assert.equal(status.openspecCli.version, expectation.version);
-      assert.equal(status.openspecCli.latestReviewedVersion, '1.12.0');
+      assert.equal(status.openspecCli.latestReviewedVersion, '1.13.0');
       assert.equal(status.openspecCli.versionOutdated, false);
       assert.equal(status.openspecCli.commandSource, 'path');
     }
@@ -173,7 +173,7 @@ describe('mode status', () => {
       detectOpenSpec: async () => missingCliDetection()
     });
     assert.equal(missing.openspecCli.version, null);
-    assert.equal(missing.openspecCli.latestReviewedVersion, '1.12.0');
+    assert.equal(missing.openspecCli.latestReviewedVersion, '1.13.0');
     assert.equal(missing.openspecCli.versionOutdated, null);
   });
 
@@ -1558,7 +1558,7 @@ describe('artifact sync and export', () => {
     };
     const result = await syncOpenSpecArtifacts({
       rootDir, all: true,
-      detectOpenSpec: async () => availableCliDetection({ version: '1.12.0' }),
+      detectOpenSpec: async () => availableCliDetection({ version: '1.13.0' }),
       validateOpenSpecChange: async () => ({ ok: true, exitCode: 0, stdout: JSON.stringify(payload), stderr: '', json: payload }),
       getOpenSpecStatus: async () => ({ ok: true, stdout: '{}', stderr: '', json: {} })
     });

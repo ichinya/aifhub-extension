@@ -360,6 +360,25 @@ describe('OpenSpec execution context API', () => {
     assert.equal(result.openspecInstructions.available, true);
   });
 
+  it('surfaces advisory apply warnings without blocking or losing the upstream envelope', async () => {
+    const { buildImplementationContext } = await loadExecutionContext();
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+    for (const state of ['ready', 'all_done', 'blocked']) {
+      const json = { state, warnings: ['Missing delta specs.', 'Missing delta specs.'], missingPrerequisites: ['specs'], instruction: 'Read artifacts.' };
+      const result = await buildImplementationContext({
+        rootDir, changeId: 'add-oauth',
+        detectOpenSpec: async () => availableCliDetection(),
+        getOpenSpecInstructions: async () => ({ ok: true, json, stdout: JSON.stringify(json), stderr: '' })
+      });
+      assert.equal(result.ok, true);
+      assert.deepEqual(result.openspecInstructions.json, json);
+      assert.deepEqual(result.warnings.filter((item) => item.code === 'openspec-apply-warning'), [
+        { code: 'openspec-apply-warning', message: 'Missing delta specs.' }
+      ]);
+    }
+  });
+
   it('prefers trace input hashes over markdown fingerprints for generated-rule freshness', async () => {
     const { collectGeneratedRules } = await loadExecutionContext();
     const rootDir = await createTempRoot();
