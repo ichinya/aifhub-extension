@@ -86,9 +86,11 @@ Treat planning source sections as read-only verification context:
 
 - Use `## Original Request` as the raw intent anchor, while canonical specs, design, tasks, and implemented behavior remain the verification contract.
 - When `proposal.md` contains `## Research Context`, use the embedded snapshot and source revision as authoritative committed scope.
+- When `proposal.md` contains `## Requirements Reconciliation`, verify the requirement chain it records: the cited authoritative requirements, plan decisions, implemented behavior, and verification evidence must stay consistent, including each material combination of independent selectors, states, modes, or input shapes the section enumerates. When repository data, configuration, fixtures, schemas, or content define the contract, verify at least one representative existing artifact through the primary integration path when such an artifact is available and relevant.
+- Sources conflicting without a declared authority emit `WARN [requirement-ambiguity]` in normal mode and `ERROR [requirement-ambiguity]` in strict mode; do not guess between them. A clear contradiction between the implementation and an authoritative requirement emits `ERROR [requirement-conflict]` and blocks verification even when plan, code, and tests agree with one another.
 - For an embedded ultra source, pass its exact project-relative `RESEARCH.md` path to `resolveUltraResearchSource()` from `scripts/ultra-research-resolver.mjs` and consume only its structured `source`, `revision`, and `diagnostic`. This centrally revalidates the sibling marker/index/status/link and normalized Active Summary digest; do not implement local selection or hashing heuristics.
 - Compare the exact regular or ultra source only for drift and rationale. Missing/invalid source, changed `Updated`, or changed normalized `SHA256` emits `WARN [research-drift] change-id=<change-id> source=<path> expected=<embedded revision> current=<live revision>` without expanding verification scope. Recency never selects a replacement source.
-- Do not mutate or silently rebase either source section. Keep credentials, raw provider output, and full request/research bodies out of QA diagnostics.
+- Do not mutate or silently rebase either source section or `## Requirements Reconciliation`. Keep credentials, raw provider output, and full request/research bodies out of QA diagnostics.
 
 #### Roadmap linkage validation
 

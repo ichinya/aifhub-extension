@@ -570,13 +570,16 @@ describe('aif-explore and aif-improve OpenSpec-native contracts', () => {
       '`parseSynchronizedWorkItemSourceBinding(markdown, status)`',
       'existing `## Research Context` body and `Source` revision metadata as the committed requirements snapshot',
       'unless the user explicitly requests a research rebase',
+      'existing `## Requirements Reconciliation` as an upstream-owned compatibility record',
+      'updating them only to stay synchronized with refined tasks',
+      'never resolve a recorded conflict by editing the section',
       'WARN [research-drift]',
       'expected=<embedded revision>',
       'current=<live revision>',
       'Do not apply requirements from a newer Active Summary',
       'On an explicit research rebase',
       'update the `Source` path plus `Updated` and `SHA256` metadata',
-      'Report `Original Request`, `AIFHub Source Binding`, and `Research Context` as preserved section names',
+      'Report `Original Request`, `AIFHub Source Binding`, `Research Context`, and `Requirements Reconciliation` as preserved section names',
       'do not duplicate their raw bodies in output'
     ]) {
       assertIncludes(openspec, expected, label);

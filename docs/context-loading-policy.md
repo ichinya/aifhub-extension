@@ -68,7 +68,7 @@ Consumer commands must not use bridge files such as `AGENTS.md`, `CLAUDE.md`, `Q
 
 ## AI Factory 2.19 Session Warmup
 
-The reviewed AI Factory source snapshot declaring `2.19.0` adds upstream `/aif-warmup` as a read-only session-start handoff. AIFHub does not copy, replace, or inject that skill.
+The published AI Factory `2.19.0` release adds upstream `/aif-warmup` as a read-only session-start handoff. AIFHub does not copy, replace, or inject that skill.
 
 - Upstream warmup reads the configured DESCRIPTION, ARCHITECTURE, ROADMAP, RESEARCH, top-level and area rules, applicable `AGENTS.md` instructions, selected language/git/workflow preferences, and explicit `warmup.paths` entries.
 - Applicable `AGENTS.md` files are instruction context for the handoff; they do not replace missing configured project artifacts or become canonical OpenSpec requirements.
@@ -277,7 +277,7 @@ GitHub access is non-blocking. If `gh`, connector data, network access, authenti
 | `/aif-roadmap` | no | configured roadmap artifact, including managed local lifecycle reconciliation |
 | `/aif-docs` | no | no |
 | `/aif-qa` | no | upstream manual QA artifacts under `paths.qa/<branch-slug>/`; not AIFHub `.ai-factory/qa/<change-id>/` evidence |
-| `/aif-qa-check` | no | branch-scoped `paths.qa/<branch-slug>/qa-check.md`; not AIFHub verify/done evidence |
+| `/aif-qa-check` | no | branch-scoped `paths.qa/<branch-slug>/qa-check.md` plus `browser-replay/` scripts and history; not AIFHub verify/done evidence |
 | `/aif-plan full` | `openspec/changes/<change-id>/proposal.md`, `design.md`, `tasks.md`, `specs/**/spec.md` | optional `.ai-factory/state/<change-id>/` |
 | `/aif-explore` | no | exactly one profile: resolved `paths.research` or a sibling marked ultra research bundle; never QA/change runtime notes |
 | `/aif-improve` | `proposal.md`, `design.md`, `tasks.md`, `specs/**/spec.md` | optional `.ai-factory/state/<change-id>/` |
@@ -299,13 +299,13 @@ GitHub access is non-blocking. If `gh`, connector data, network access, authenti
 
 `/aif-docs` writes documentation output only: root `README.md`, the resolved `paths.docs` directory, optional `docs-html/` output when explicitly requested, and the Documentation section in `AGENTS.md`.
 
-`/aif-qa` writes upstream manual QA artifacts under `paths.qa/<branch-slug>/`, such as `change-summary.md`, `test-plan.md`, and `test-cases.md`. `/aif-qa-check` consumes `test-cases.md` and writes branch-scoped `qa-check.md`. Both derive the same collision-resistant `<safe-prefix>-<hash8>` branch slug from the original branch name.
+`/aif-qa` writes upstream manual QA artifacts under `paths.qa/<branch-slug>/`, such as `change-summary.md`, `test-plan.md`, and `test-cases.md`. `/aif-qa-check` consumes `test-cases.md` and writes branch-scoped `qa-check.md`. Both derive the same collision-resistant `<safe-prefix>-<hash8>` branch slug from the original branch name. AI Factory 2.19 adds upstream-owned browser replay under the same slug: Playwright-compatible `browser-replay/TC-NNN.js` scripts bound by case digest, target fingerprint, and script digest, with replaced versions kept in `browser-replay/history/`, an `AIF_BASE_URL` placeholder, a one-proof-run rule, and preserved failures/stale scripts.
 
 `qa-check.md` current results bind to `tested_revision`, `worktree_digest` or `manual_build_id`, `source_digest`, and per-case `case_digests`. Binding changes mark affected results unchecked `Stale` while retaining old comments/evidence as history. Agent execution uses the least-invasive appropriate surface, so backend, CLI, API, file/docs, and database-read cases do not depend on browser automation alone.
 
 Reusable `agent-context.md` and `agent-history.md` contain only non-sensitive setup facts and cross-run lessons. Production, unknown-target, destructive, or external-side-effect execution requires explicit authorization for the current action. Persisted evidence must replace credentials, cookies, authorization values, tokens, one-time codes, private data, and sensitive URL parameters with `[REDACTED]`.
 
-These branch-scoped artifacts are distinct from AIFHub verification and finalization evidence under `.ai-factory/qa/<change-id>/`, which remains owned by `/aif-verify` and `/aif-done`. `qa-check.md` alone cannot satisfy verify, coverage, rules, done-readiness, done, or archive evidence, and no implicit bridge exists.
+These branch-scoped artifacts are distinct from AIFHub verification and finalization evidence under `.ai-factory/qa/<change-id>/`, which remains owned by `/aif-verify` and `/aif-done`. `qa-check.md` and `browser-replay/` artifacts alone cannot satisfy verify, coverage, rules, done-readiness, done, or archive evidence, and no implicit bridge exists.
 
 ## Quality Gates and Finalization Tail
 
@@ -333,7 +333,7 @@ Adjacent upstream project-context utilities:
 | `/aif-architecture` | project description, source structure, optional OpenSpec context | project architecture context only |
 | `/aif-docs` | project description, architecture, source/docs | README and docs directory |
 | `/aif-qa` | git diff, description, architecture, source/docs | upstream manual QA artifacts under `paths.qa/<branch-slug>/` |
-| `/aif-qa-check` | branch-scoped `test-cases.md`, target-specific execution context | branch-scoped `qa-check.md` plus redacted reusable agent context/history |
+| `/aif-qa-check` | branch-scoped `test-cases.md`, replay scripts and digests, target-specific execution context | branch-scoped `qa-check.md`, `browser-replay/` scripts and history, plus redacted reusable agent context/history |
 
 Upstream `/aif-archive` is not part of the OpenSpec-native quality/finalization tail. It owns legacy AI Factory-only classic cleanup and AI Factory 2.18 marked-ultra archive, plus optional roadmap snapshots under `paths.archive/roadmap/*.md`. In OpenSpec-native mode the AIFHub guard classifies arguments first: plan-mutating targets return `/aif-done <change-id>` before resolving `paths.plans`; `list` reads only archive inventories; `--roadmap` retains bounded upstream roadmap ownership. It must not write OpenSpec canonical, QA, state, or generated-rule artifacts, and it must not run `openspec archive <change-id> --yes`.
 

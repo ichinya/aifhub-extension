@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   AI_FACTORY_2181_EXPLORE_SENTINELS,
+  CONSUMER_TARGET_KEYS,
   EXPECTED_AI_FACTORY_VERSIONS,
   SMOKE_STATUS,
   aiFactoryVersionIncludesTransfer,
@@ -68,7 +69,7 @@ function escapeRegExp(value) {
 }
 
 function fakeExploreBase(version) {
-  if (version !== EXPECTED_AI_FACTORY_VERSIONS.v218) {
+  if (!CONSUMER_TARGET_KEYS.some((key) => EXPECTED_AI_FACTORY_VERSIONS[key] === version)) {
     return `---\nname: aif-explore\ndescription: Fake AI Factory ${version} base skill.\nallowed-tools: Read\n---\n\n# aif-explore\n`;
   }
   return [
@@ -303,9 +304,7 @@ function createFakeExecutor({
     const failure = failWhen?.(call);
     if (failure) return failure;
 
-    const version = request.logicalToolchain === 'v217'
-      ? EXPECTED_AI_FACTORY_VERSIONS.v217
-      : EXPECTED_AI_FACTORY_VERSIONS.v218;
+    const version = EXPECTED_AI_FACTORY_VERSIONS[request.logicalToolchain] ?? EXPECTED_AI_FACTORY_VERSIONS.v218;
     if (cliArgs.length === 1 && cliArgs[0] === '--version') {
       return successfulProcess(`${reportedVersions[request.logicalToolchain] ?? version}\n`);
     }
@@ -325,15 +324,15 @@ function createFakeExecutor({
     if (cliArgs[0] === 'update' && cliArgs[1] === '--force') {
       const ledgerPath = path.join(request.cwd, '.ai-factory.json');
       const ledger = await readJson(ledgerPath);
-      ledger.version = EXPECTED_AI_FACTORY_VERSIONS.v218;
+      ledger.version = version;
       await writeJson(ledgerPath, ledger);
       const injectionTargets = [...new Set((manifest.injections ?? []).map((entry) => entry.target))].sort();
       for (const skillName of injectionTargets) {
-        await ensureBaseSkill(request.cwd, skillName, EXPECTED_AI_FACTORY_VERSIONS.v218);
+        await ensureBaseSkill(request.cwd, skillName, version);
       }
       trace.push({
         type: 'base-refresh-complete',
-        version: EXPECTED_AI_FACTORY_VERSIONS.v218,
+        version,
         skills: injectionTargets
       });
       for (const extension of ledger.extensions) {
@@ -367,12 +366,12 @@ function createFakeExecutor({
   return runner;
 }
 
-async function createHarness({ reportedVersions, failWhen, targetedNoop = false, mutateInstalledInjection } = {}) {
+async function createHarness({ reportedVersions, failWhen, targetedNoop = false, mutateInstalledInjection, target = 'v218' } = {}) {
   const root = await createTempRoot();
   const manifest = await readJson(path.join(REPO_ROOT, 'extension.json'));
   const toolchains = {
     v217: await createFakeToolchain(root, 'v217', EXPECTED_AI_FACTORY_VERSIONS.v217),
-    v218: await createFakeToolchain(root, 'v218', EXPECTED_AI_FACTORY_VERSIONS.v218)
+    [target]: await createFakeToolchain(root, target, EXPECTED_AI_FACTORY_VERSIONS[target])
   };
   const trace = [];
   const runner = createFakeExecutor({
@@ -416,7 +415,7 @@ afterEach(async () => {
   await Promise.all(tempRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-describe('AI Factory 2.18 consumer compatibility smoke', () => {
+describe('AI Factory 2.18/2.19 consumer compatibility smoke', () => {
   it('uses injected 2.17.0/2.18.1 executors for clean, global, and exact targeted update contracts', async () => {
     const harness = await createHarness();
     const result = await runAiFactory218ConsumerSmoke({
@@ -574,15 +573,66 @@ describe('AI Factory 2.18 consumer compatibility smoke', () => {
     }
   });
 
-  it('keeps 2.18.0 as the stable transfer boundary while targeting 2.18.1', () => {
+  it('keeps 2.18.0 as the stable transfer boundary while targeting 2.18.1 or 2.19.0', () => {
     assert.equal(EXPECTED_AI_FACTORY_VERSIONS.v218Boundary, '2.18.0');
     assert.equal(EXPECTED_AI_FACTORY_VERSIONS.v218, '2.18.1');
+    assert.equal(EXPECTED_AI_FACTORY_VERSIONS.v219, '2.19.0');
+    assert.deepEqual([...CONSUMER_TARGET_KEYS], ['v218', 'v219']);
     assert.equal(aiFactoryVersionIncludesTransfer('2.17.0'), false);
     assert.equal(aiFactoryVersionIncludesTransfer('2.18.0'), true);
     assert.equal(aiFactoryVersionIncludesTransfer('2.18.1'), true);
     assert.equal(aiFactoryVersionIncludesTransfer('2.19.0'), true);
     assert.equal(aiFactoryVersionIncludesTransfer('2.18.1-rc.1'), false);
     assert.equal(aiFactoryVersionIncludesTransfer('latest'), false);
+  });
+
+  it('runs the same consumer contracts against an injected 2.19.0 target toolchain', async () => {
+    const harness = await createHarness({ target: 'v219' });
+    const result = await runAiFactory218ConsumerSmoke({
+      toolchains: harness.toolchains,
+      extensionRoot: REPO_ROOT,
+      runner: harness.runner,
+      workspaceFactory: harness.workspaceFactory,
+      timeoutMs: 5_000,
+      networkEnabled: false,
+      evidence: 'deterministic'
+    });
+
+    assert.equal(result.status, SMOKE_STATUS.PASS, `failure=${JSON.stringify(result.failure ?? null)}`);
+    assert.equal(result.versions.v217.reported, '2.17.0');
+    assert.equal(result.versions.v218, undefined);
+    assert.equal(result.versions.v219.expected, '2.19.0');
+    assert.equal(result.versions.v219.reported, '2.19.0');
+    assert.equal(result.flows.cleanInstall.version, '2.19.0');
+    assert.equal(result.flows.globalUpdate.toVersion, '2.19.0');
+    assert.equal(result.flows.cleanInstall.status, SMOKE_STATUS.PASS);
+    assert.equal(result.flows.globalUpdate.status, SMOKE_STATUS.PASS);
+    assert.equal(result.flows.targetedUpdate.status, SMOKE_STATUS.PASS);
+    assert.ok(result.events.some((entry) => entry.step === 'init-2.19'), 'v219 target must record the init-2.19 step');
+    for (const flow of ['cleanInstall', 'globalUpdate', 'targetedUpdate']) {
+      assert.equal(result.flows[flow].upstreamExplore.upstreamVersion, '2.19.0');
+      assert.equal(result.flows[flow].upstreamExplore.injectionMarkerCount, 1);
+    }
+  });
+
+  it('rejects two bound consumer target toolchains before any project mutation', async () => {
+    const harness = await createHarness();
+    harness.toolchains.v219 = await createFakeToolchain(harness.root, 'v219', EXPECTED_AI_FACTORY_VERSIONS.v219);
+    const result = await runAiFactory218ConsumerSmoke({
+      toolchains: harness.toolchains,
+      extensionRoot: REPO_ROOT,
+      runner: harness.runner,
+      workspaceFactory: harness.workspaceFactory,
+      timeoutMs: 5_000,
+      evidence: 'deterministic'
+    });
+
+    assert.equal(result.status, SMOKE_STATUS.NOT_RUN);
+    assert.equal(result.failure.flow, 'preflight');
+    assert.equal(result.failure.code, 'ambiguous-target-toolchain');
+    assert.deepEqual(result.failure.details, { candidates: ['v218', 'v219'] });
+    assert.equal(harness.trace.some((entry) => entry.type === 'workspace'), false);
+    assert.equal(harness.runner.calls.length, 0);
   });
 
   it('reports exact version mismatch as NOT_RUN before creating a consumer project', async () => {

@@ -27,8 +27,10 @@ export const SMOKE_SCHEMA_VERSION = 1;
 export const EXPECTED_AI_FACTORY_VERSIONS = Object.freeze({
   v217: '2.17.0',
   v218Boundary: AI_FACTORY_ULTRA_MIN_VERSION,
-  v218: '2.18.1'
+  v218: '2.18.1',
+  v219: '2.19.0'
 });
+export const CONSUMER_TARGET_KEYS = Object.freeze(['v218', 'v219']);
 export const AI_FACTORY_2181_EXPLORE_SENTINELS = Object.freeze({
   coherenceHeading: '#### Research Coherence Gate (all persisted modes)',
   ultraHeading: '#### Ultra mode: adaptive bundle',
@@ -431,6 +433,7 @@ async function validateBoundToolchain(toolchain, key, expectedVersion) {
     provenanceRoot: resolvedRoot,
     entrypoint,
     expectedVersion,
+    stepTag: `2.${key.slice(2)}`,
     safeProvenance: {
       packageName: 'ai-factory',
       packageVersion: packageJson.version,
@@ -439,6 +442,22 @@ async function validateBoundToolchain(toolchain, key, expectedVersion) {
       rootDigest: pathDigest(resolvedRoot)
     }
   };
+}
+
+async function resolveConsumerTargetToolchain(toolchains) {
+  const candidates = CONSUMER_TARGET_KEYS
+    .filter((key) => toolchains?.[key])
+    .map((key) => [key, toolchains[key], EXPECTED_AI_FACTORY_VERSIONS[key]]);
+  if (candidates.length > 1) {
+    throw new SmokeFailure(SMOKE_STATUS.NOT_RUN, 'preflight', 'ambiguous-target-toolchain', undefined, {
+      candidates: candidates.map(([key]) => key)
+    });
+  }
+  if (candidates.length === 0) {
+    await validateBoundToolchain(toolchains?.v218, 'v218', EXPECTED_AI_FACTORY_VERSIONS.v218);
+  }
+  const [key, toolchain, expectedVersion] = candidates[0];
+  return validateBoundToolchain(toolchain, key, expectedVersion);
 }
 
 async function validateExtensionRoot(extensionRoot) {
@@ -490,7 +509,7 @@ function safeCliArgs(cliArgs) {
 function createResult(evidence) {
   return {
     schemaVersion: SMOKE_SCHEMA_VERSION,
-    suite: 'ai-factory-2.18-consumer-compatibility',
+    suite: 'ai-factory-2.x-consumer-compatibility',
     evidence,
     status: SMOKE_STATUS.NOT_RUN,
     compatibilityScope: 'isolated-local-consumer-contract',
@@ -1094,18 +1113,18 @@ async function runCleanInstallFlow(context) {
   const workspace = await workspaceFactory('clean');
   try {
     await invokeCli({
-      toolchain: toolchains.v218,
+      toolchain: toolchains.target,
       cliArgs: ['init', '--agents', 'codex', '--skills', 'all', '--config'],
       projectDir: workspace.projectDir,
       runner,
       timeoutMs,
       flow: 'clean-install',
-      step: 'init-2.18',
+      step: `init-${toolchains.target.stepTag}`,
       networkEnabled,
       record
     });
     await invokeCli({
-      toolchain: toolchains.v218,
+      toolchain: toolchains.target,
       cliArgs: ['extension', 'add', extension.root],
       projectDir: workspace.projectDir,
       runner,
@@ -1116,7 +1135,7 @@ async function runCleanInstallFlow(context) {
       record
     });
     await invokeCli({
-      toolchain: toolchains.v218,
+      toolchain: toolchains.target,
       cliArgs: ['aifhub-mode', 'openspec', '--json'],
       projectDir: workspace.projectDir,
       runner,
@@ -1128,19 +1147,19 @@ async function runCleanInstallFlow(context) {
     });
 
     const ledger = await readConsumerLedger(workspace.projectDir);
-    assertContract(ledger.version === EXPECTED_AI_FACTORY_VERSIONS.v218, 'clean-install', 'clean-ledger-version-mismatch');
+    assertContract(ledger.version === toolchains.target.expectedVersion, 'clean-install', 'clean-ledger-version-mismatch');
     const config = await assertCanonicalOpenSpecConfig(workspace.projectDir, 'clean-install');
     const injections = await inspectInjectionContracts(workspace.projectDir, extension.manifest, 'clean-install');
     const promptLanguage = await inspectPromptLanguageContract(
       workspace.projectDir,
       extension,
-      toolchains.v218,
+      toolchains.target,
       'clean-install'
     );
     const upstreamExplore = await inspectExploreUpstreamContract(
       workspace.projectDir,
       extension,
-      toolchains.v218,
+      toolchains.target,
       'clean-install'
     );
     const transfer = await inspectTransferInventory(workspace.projectDir, 1, 'clean-install');
@@ -1226,7 +1245,7 @@ async function runUpdateFlows(context) {
     });
 
     await invokeCli({
-      toolchain: toolchains.v218,
+      toolchain: toolchains.target,
       cliArgs: ['update', '--force'],
       projectDir: workspace.projectDir,
       runner,
@@ -1238,19 +1257,19 @@ async function runUpdateFlows(context) {
     });
 
     const globalLedger = await readConsumerLedger(workspace.projectDir);
-    assertContract(globalLedger.version === EXPECTED_AI_FACTORY_VERSIONS.v218, 'global-update', 'global-ledger-version-mismatch');
+    assertContract(globalLedger.version === toolchains.target.expectedVersion, 'global-update', 'global-ledger-version-mismatch');
     const globalPreservation = await assertPreservationState(workspace.projectDir, preservationBaseline, 'global-update');
     const globalInjections = await inspectInjectionContracts(workspace.projectDir, extension.manifest, 'global-update');
     const globalPromptLanguage = await inspectPromptLanguageContract(
       workspace.projectDir,
       extension,
-      toolchains.v218,
+      toolchains.target,
       'global-update'
     );
     const globalExplore = await inspectExploreUpstreamContract(
       workspace.projectDir,
       extension,
-      toolchains.v218,
+      toolchains.target,
       'global-update'
     );
     const globalTransfer = await inspectTransferInventory(workspace.projectDir, 0, 'global-update');
@@ -1288,7 +1307,7 @@ async function runUpdateFlows(context) {
 
     const dummySource = await createDummyExtension(workspace.fixtureDir);
     await invokeCli({
-      toolchain: toolchains.v218,
+      toolchain: toolchains.target,
       cliArgs: ['extension', 'add', dummySource],
       projectDir: workspace.projectDir,
       runner,
@@ -1318,7 +1337,7 @@ async function runUpdateFlows(context) {
     });
 
     await invokeCli({
-      toolchain: toolchains.v218,
+      toolchain: toolchains.target,
       cliArgs: ['extension', 'update', EXTENSION_NAME, '--force'],
       projectDir: workspace.projectDir,
       runner,
@@ -1345,13 +1364,13 @@ async function runUpdateFlows(context) {
     const targetedPromptLanguage = await inspectPromptLanguageContract(
       workspace.projectDir,
       extension,
-      toolchains.v218,
+      toolchains.target,
       'targeted-update'
     );
     const targetedExplore = await inspectExploreUpstreamContract(
       workspace.projectDir,
       extension,
-      toolchains.v218,
+      toolchains.target,
       'targeted-update'
     );
     assertContract(
@@ -1440,7 +1459,7 @@ export async function runAiFactory218ConsumerSmoke({
     const extension = await validateExtensionRoot(extensionRoot);
     const boundToolchains = {
       v217: await validateBoundToolchain(toolchains?.v217, 'v217', EXPECTED_AI_FACTORY_VERSIONS.v217),
-      v218: await validateBoundToolchain(toolchains?.v218, 'v218', EXPECTED_AI_FACTORY_VERSIONS.v218)
+      target: await resolveConsumerTargetToolchain(toolchains)
     };
     if (typeof runner.preflight === 'function') {
       await runner.preflight({
@@ -1448,8 +1467,8 @@ export async function runAiFactory218ConsumerSmoke({
         args: [...boundToolchains.v217.argv, '--version']
       });
       await runner.preflight({
-        command: boundToolchains.v218.command,
-        args: [...boundToolchains.v218.argv, '--version']
+        command: boundToolchains.target.command,
+        args: [...boundToolchains.target.argv, '--version']
       });
     }
     record('preflight', 'local-prerequisites', SMOKE_STATUS.PASS, {
@@ -1465,8 +1484,8 @@ export async function runAiFactory218ConsumerSmoke({
       networkEnabled,
       record
     });
-    result.versions.v218 = await probeToolchain({
-      toolchain: boundToolchains.v218,
+    result.versions[boundToolchains.target.key] = await probeToolchain({
+      toolchain: boundToolchains.target,
       runner,
       timeoutMs,
       networkEnabled,

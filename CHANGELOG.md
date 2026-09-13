@@ -6,6 +6,10 @@
 
 ## [В разработке]
 
+### Изменено
+- Адаптация AI Factory `2.19.0` доведена до фактического релиза (issue #197): источник перепривязан к опубликованному tag `v2.19.0` commit `e144f95c89de0d0cb6c9b38dbe8c2907b00dc5ce` (npm `ai-factory@2.19.0` `gitHead` совпадает), `lastSync` обновлён, а запись о pre-release snapshot `3c1ddd4740d7b1c30d8ecb3dc80fa5e7b8d7ef5a` сохранена как историческая. Полный диапазон `2.18.1...2.19.0` — 15 commits и 32 changed files; consumer smoke принимает точный опубликованный target `2.19.0` через слот `--v219-*` рядом с сохранённым `--v218-*` (ровно один target на запуск, `2.17.0` остаётся источником update).
+- Requirements Reconciliation gates из 2.19 отражены в границах AIFHub: `## Requirements Reconciliation` — точный upstream compatibility token, который планирование условно пишет в `proposal.md`, а improve, plan-polisher и implement/verify/fix сохраняют verbatim и читают как committed consistency record. Stop-семантика зеркалится bounded-токенами `ERROR [requirement-conflict]` и `WARN`/`ERROR [requirement-ambiguity]`; upstream `HANDOFF_MODE`/`blocked_external` протокол субагентов остаётся upstream-owned. `/aif-qa-check` browser replay (`paths.qa/<branch-slug>/browser-replay/TC-NNN.js` + `history/`, digest bindings, one proof run) задокументирован как upstream-owned branch-scoped артефакты, не являющиеся change-scoped verify/done evidence.
+
 ## [1.6.0] - 2026-09-13
 
 ### Добавлено
