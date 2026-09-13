@@ -49,6 +49,10 @@ The commit/file inventory and relevant parser, apply, archive, schema and genera
 - **Upstream-owned:** project/store context resolution in generated propose, rootless initialization decisions, profile workflow notices, command drift repair in update, generated tool assets, schemas, Stores and package management. AIFHub retains its own filesystem artifact/bootstrap protocol and configured context boundaries; it does not transplant the generated `/opsx:propose` workflow or add automatic initialization.
 - **Compatibility residual:** upstream show JSON is incomplete for repeated sections. The real archive and AIFHub canonical-file coverage are verified independently. The exact-version regression deliberately records this limitation rather than silently accepting any delta count.
 
+PR #205 follow-up: shared fence delimiters accept only zero to three leading spaces. Four-space-indented or tab-indented markers neither open a fence nor close an existing example. Helper and coverage regressions cover both backticks and tildes, preserving real requirements after examples and excluding headings inside them. This tightens AIFHub's Markdown handling independently of the upstream CLI parser.
+
+Follow-up validation: both new regressions failed before the fix. Afterward, 162 consumer tests across 29 suites passed on Node 24.13.0, including plan resolution, migration, artifact validation and workflow consumers; all 14 helper/coverage tests also passed on Node 18.20.8. Extension validators and `git diff --check` passed.
+
 There is no tracked root accepted-spec corpus in this extension. Disposable synthetic fixtures are not accepted project requirements; no archived project evidence was rewritten.
 
 ## Reproduction and evidence limits
