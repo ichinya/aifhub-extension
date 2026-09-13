@@ -142,7 +142,7 @@ function traceAcceptanceImpact(content) {
 
 async function gitChangedFiles(root) {
   try {
-    const result = await execFileAsync('git', ['status', '--porcelain'], { cwd: root, timeout: 30000, maxBuffer: 4 * 1024 * 1024 });
+    const result = await execFileAsync('git', ['status', '--porcelain', '--untracked-files=all'], { cwd: root, timeout: 30000, maxBuffer: 4 * 1024 * 1024 });
     if (result.stderr) return null;
     const files = [];
     for (const line of result.stdout.split(/\r\n|\n|\r/)) {

@@ -163,9 +163,11 @@ async function buildSnapshot(options, explicitCompile) {
     const item = await add(file, 'protected');
     if (!item && policy.context_refs.includes(file)) throw sddError('missing_context_reference');
   }
-  const canonicalProposal = files.get(`${base}/proposal.md`);
-  const planContextProposal = planContext.documents.find((doc) => doc.path === `${base}/proposal.md`);
-  if (planContextProposal?.sha256 !== canonicalProposal?.sha256 || policyFile?.sha256 !== files.get(SDD_POLICY_PATH)?.sha256 || configFile?.sha256 !== files.get(CONFIG)?.sha256) throw sddError('sources_changed_during_compile');
+  for (const document of planContext.documents) {
+    const current = files.get(document.path);
+    if (current && current.sha256 !== document.sha256) throw sddError('sources_changed_during_compile');
+  }
+  if (policyFile?.sha256 !== files.get(SDD_POLICY_PATH)?.sha256 || configFile?.sha256 !== files.get(CONFIG)?.sha256) throw sddError('sources_changed_during_compile');
   const version = inputs?.planning_mode === 'ultra' || policy.minimum_profile === 'ultra'
     ? await resolveAiFactoryVersion({ rootDir: root }) : { supportsUltra: false };
   const design = files.get(`${base}/design.md`);

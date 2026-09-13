@@ -113,6 +113,7 @@ function buildSourceRevisions(brief, policy) {
 
 async function buildTargetDiff(root, options) {
   if (typeof options.targetDiff === 'string') {
+    if (Buffer.byteLength(options.targetDiff, 'utf8') > MAX_DIFF_BYTES) return { diff: null, changedFiles: options.changedFiles ?? [], untrackedFiles: [], base: options.targetBase ?? null, head: options.targetHead ?? 'worktree', fingerprint: null, tooLarge: true };
     return { diff: options.targetDiff, changedFiles: options.changedFiles ?? [], untrackedFiles: [], base: options.targetBase ?? null, head: options.targetHead ?? 'worktree', fingerprint: sha256(options.targetDiff), tooLarge: false };
   }
   if (Array.isArray(options.changedFiles)) {
@@ -123,6 +124,7 @@ async function buildTargetDiff(root, options) {
       parts.push(untrackedFileDiff(file, content));
     }
     const diff = parts.join('\n');
+    if (Buffer.byteLength(diff, 'utf8') > MAX_DIFF_BYTES) return { diff: null, changedFiles: options.changedFiles, untrackedFiles: options.changedFiles, base: null, head: 'worktree', fingerprint: null, tooLarge: true };
     return { diff, changedFiles: options.changedFiles, untrackedFiles: options.changedFiles, base: null, head: 'worktree', fingerprint: diff ? sha256(diff) : null, tooLarge: false };
   }
   const gitStatus = await gitStatus(root);

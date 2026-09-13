@@ -206,4 +206,14 @@ describe('Plan compliance selection', () => {
     assert.equal(result.outcome, 'acceptable_drift');
     assert.deepEqual(result.receipt.unplanned_changes, ['src/a/b.ts']);
   });
+  it('classifies a specific-pattern miss inside an allowed top-level as unplanned drift, not scope expansion', async () => {
+    const root = await fixture();
+    await put(root, `${base}/proposal.md`, proposal().replace('- src/handler.mjs\n- test/handler.test.mjs', '- src/*.mjs'));
+    await compileSessionBrief(options(root));
+    const result = await checkPlanCompliance({ ...options(root), changedFiles: ['src/a/b/c.mjs'] });
+    assert.equal(result.ok, true);
+    assert.equal(result.outcome, 'acceptable_drift');
+    assert.deepEqual(result.receipt.unplanned_changes, ['src/a/b/c.mjs']);
+    assert.equal(result.receipt.scope_expansions.length, 0);
+  });
 });
