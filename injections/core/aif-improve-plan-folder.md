@@ -79,6 +79,8 @@ Refine only these canonical OpenSpec artifacts for the active change:
 
 Legacy companion plan artifacts, including `task.md`, `context.md`, `rules.md`, `verify.md`, and `status.yaml` are not OpenSpec-native refinement targets.
 
+Before selecting or changing a capability, inventory accepted specs under `openspec/specs/**`, separately from active changes. Reuse each existing capability's exact path, including nested directories. Read relevant accepted specs in full, including scenarios, before deciding what is covered. If using the optional CLI, `openspec list --specs` inventories specs; plain `openspec list` inventories changes and cannot substitute for it. Filesystem discovery remains sufficient when the CLI is unavailable; this does not add Store selection or initialization authority.
+
 Before refining implementation-dependent artifacts, refresh the relevant implementation, nearby tests, configuration, and docs outside `openspec/` in a read-only pass proportional to the proposed changes. Resolve the actual target repository if it differs from `planningHome.root`; ask only when context cannot identify it. For greenfield work, inspect existing structure and setup docs. Separate observed facts, assumptions, and proposals; cite direct file evidence, disclose unavailable source, and surface conflicts between accepted specs and code before a dependent design decision. Do not defer this discovery into generic future codebase-exploration tasks.
 
 #### Task Quality Refinement

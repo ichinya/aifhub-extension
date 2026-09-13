@@ -15,6 +15,7 @@ import {
   collectGeneratedRules,
 } from './openspec-execution-context.mjs';
 import { getLatestGateResult } from './aif-gate-result.mjs';
+import { createMarkdownCodeMask } from './markdown-structural-markers.mjs';
 
 export const COVERAGE_SCHEMA_VERSION = 1;
 export const COVERAGE_FILE = 'coverage.json';
@@ -590,6 +591,7 @@ function parseRequirementsFromCanonical(deltaSpecs) {
 function parseRequirements(content, source) {
   const requirements = [];
   const lines = String(content ?? '').split(/\r?\n/);
+  const codeMask = createMarkdownCodeMask(lines);
   let currentSection = null;
   let currentRequirement = null;
   let scenarioIndex = 0;
@@ -611,7 +613,15 @@ function parseRequirements(content, source) {
     currentRequirement = null;
   };
 
-  for (const line of lines) {
+  for (const [index, line] of lines.entries()) {
+    // Examples remain requirement content, but their headings never create
+    // coverage obligations or change the enclosing delta section/scenario.
+    if (codeMask[index]) {
+      if (currentRequirement) {
+        (inScenario ? currentRequirement.scenarios : currentRequirement.body).push(line);
+      }
+      continue;
+    }
     const section = line.match(/^##\s+(ADDED|MODIFIED|REMOVED|DEPRECATED)\s+Requirements/i);
     if (section) {
       flush();
