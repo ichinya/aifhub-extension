@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Design context v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "aifhub.design_context.v1"
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 4000
+    },
+    "surfaces": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]{0,79}$"
+          },
+          "kind": {
+            "enum": [
+              "markdown",
+              "html",
+              "image",
+              "figma",
+              "storybook",
+              "live_url",
+              "other"
+            ]
+          },
+          "ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "ref"
+        ]
+      }
+    }
+  },
+  "required": [
+    "schema",
+    "surfaces"
+  ]
+}

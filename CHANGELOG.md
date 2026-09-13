@@ -6,6 +6,10 @@
 
 ## [В разработке]
 
+### Добавлено
+- P2 cross-project exchange для issue #203: команда `ai-factory aifhub-exchange` экспортирует три versioned артефакта — `aifhub.workflow_profile_export.v1` (registry-facing каталог профилей, capabilities и lineage vocabulary для aifhub#29 с явным маппингом `expanded → full` из ADR 0004), `aifhub.exchange_bundle.v1` (revision-bound пакет change для orchestrator import по orkora#229: plan context, SessionBrief с digest, hashed artifact inventory, lineage edges и verbatim receipts) и `aifhub.evaluation_export.v1` (обезличенная evaluation-запись с обязательным evidence class, measured-only метриками и opt-in `aifhub.runner_metrics.v1` для tokens/cost/latency). Soft-ошибки адаптеров и stale/missing SessionBrief деградируют экспорт с явными `exchange_notes`; записи только через `--output` и безопасный writer под `.ai-factory/state/`.
+- Опциональный structured design-context `openspec/changes/<id>/design.context.json` (`aifhub.design_context.v1`): ограниченный список design surfaces с refs и content hashes, инвентаризируется и хэшируется как canonical document — входит в `source_revision` и staleness detection SessionBrief, но не заменяет `design.md`, delta specs или verification evidence и не создаёт второго canonical-дерева.
+
 ### Изменено
 
 - Адаптация к OpenSpec 1.13.0 (#198): предупреждения apply отображаются в execution context, заголовки внутри fenced-примеров больше не создают требования coverage, а explore/plan/improve явно различают принятые specs и активные changes. Добавлен аудит точного npm-пакета с проверками archive и ограничением upstream `show` для повторённых delta-секций.

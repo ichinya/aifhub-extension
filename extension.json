@@ -35,6 +35,11 @@
       "module": "./commands/aifhub-plan-context.mjs"
     },
     {
+      "name": "aifhub-exchange",
+      "description": "Export workflow profile metadata, per-change exchange bundles, or anonymized evaluation records.",
+      "module": "./commands/aifhub-exchange.mjs"
+    },
+    {
       "name": "aifhub-mcp",
       "description": "Run the AIFHub MCP server over stdio.",
       "module": "./commands/aifhub-mcp.mjs"

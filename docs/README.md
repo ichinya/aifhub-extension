@@ -5,6 +5,7 @@
 - [Аудит хранения артефактов](artifact-storage-audit.md) — текущие пути и владельцы, воспроизведённые расхождения, целевая карта хранения и правила Git/архивирования.
 - [AI Factory plans across methodologies](adr/0005-ai-factory-plan-methodologies.md) — целевая архитектура: AI Factory владеет планами, методологии задают содержание, дополнительные инструменты работают через адаптеры; интеграция ещё не реализована.
 - [SDD profiles and SessionBrief (P0)](sdd-profiles.md) — текущий прототип для OpenSpec: глубина planning, независимые quality gates, compiler/status и точный digest implementation context; [ADR 0004](adr/0004-sdd-profiles-and-session-brief.md).
+- [Workflow exchange exports (P2)](workflow-exchange.md) — versioned registry/bundle/evaluation exports для кросс-проектных consumers (aifhub#29, orkora#229), lineage vocabulary, evidence classes и privacy boundaries.
 
 Эта документация описывает workflow AIFHub Extension v1:
 
@@ -80,6 +81,7 @@ OpenSpec CLI features вызываются через AIFHub wrappers и `script
 | [Legacy Plan Migration](legacy-plan-migration.md) | Explicit migration commands и artifact mapping |
 | [Active Change Resolver](active-change-resolver.md) | Active change selection и runtime paths |
 | [Handoff Validation Profile](handoff-validation-profile.md) | Read-only validation summary contract для Handoff orchestration |
+| [Workflow Exchange Exports](workflow-exchange.md) | Registry-facing profile metadata, revision-bound change bundles и anonymized evaluation records для aifhub#29/orkora#229 |
 | [ADR 0001](adr/0001-openspec-native-artifact-protocol.md) | Canonical OpenSpec и AI Factory runtime state contract |
 | [ADR 0002: Optional Project Glossary](adr/0002-optional-project-context-glossary.md) | Configurable `CONTEXT.md`, `/aif-analyze` ownership, read-only consumers и deferred OKF |
 | [ADR 0003: Durable Project Review Policy](adr/0003-durable-project-review-policy.md) | Configurable `REVIEW.md`, review-only authority, path safety и durable-policy boundary |
@@ -161,6 +163,7 @@ npm test
 - [Legacy Plan Migration](legacy-plan-migration.md)
 - [Active Change Resolver](active-change-resolver.md)
 - [Handoff Validation Profile](handoff-validation-profile.md)
+- [Workflow Exchange Exports](workflow-exchange.md)
 - [ADR 0001](adr/0001-openspec-native-artifact-protocol.md)
 - [ADR 0002: Optional Project Glossary](adr/0002-optional-project-context-glossary.md)
 - [ADR 0003: Durable Project Review Policy](adr/0003-durable-project-review-policy.md)

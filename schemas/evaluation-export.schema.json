@@ -1,0 +1,470 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Evaluation export v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "aifhub.evaluation_export.v1"
+    },
+    "export_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "exporter": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "const": "aifhub-extension"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "version"
+      ]
+    },
+    "generated_at": {
+      "type": "string"
+    },
+    "evidence_class": {
+      "enum": [
+        "synthetic_fixture",
+        "public_real_repository",
+        "maintainer_controlled",
+        "private_anonymized_aggregate",
+        "community_submission"
+      ]
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "methodology": {
+          "type": "string"
+        },
+        "adapter_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sdd_profile": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "planning_mode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "change_fingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "source_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "methodology",
+        "adapter_version",
+        "sdd_profile",
+        "planning_mode",
+        "change_fingerprint",
+        "source_revision"
+      ]
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "brief_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "context_manifest_entries": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "sources_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "tasks_total": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "tasks_completed": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "tokens_input": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "tokens_output": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "tokens_total": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "tokens_cache_read": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "tokens_cache_write": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cost": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "amount": {
+              "type": "number",
+              "minimum": 0
+            },
+            "currency": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            }
+          },
+          "required": [
+            "amount",
+            "currency"
+          ]
+        },
+        "latency_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "retries": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "changed_loc": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "unrelated_changes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "human_review_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      },
+      "required": [
+        "source_bytes",
+        "brief_bytes",
+        "context_manifest_entries",
+        "sources_count",
+        "tasks_total",
+        "tasks_completed",
+        "tokens_input",
+        "tokens_output",
+        "tokens_total",
+        "tokens_cache_read",
+        "tokens_cache_write",
+        "cost",
+        "latency_ms",
+        "retries",
+        "changed_loc",
+        "unrelated_changes",
+        "human_review_ms"
+      ]
+    },
+    "outcomes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "session_brief_status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "plan_compliance": {
+          "enum": [
+            "compliant",
+            "acceptable_drift",
+            "replan_required",
+            "blocked",
+            null
+          ]
+        },
+        "replan_required": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "drift": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "unplanned_changes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "scope_expansions": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "skipped_tasks": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "unplanned_changes",
+            "scope_expansions",
+            "skipped_tasks"
+          ]
+        },
+        "reviews": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "context_mode": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "outcome": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "finding_count": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "same_session_fallback": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "context_mode",
+              "outcome",
+              "finding_count",
+              "same_session_fallback"
+            ]
+          }
+        },
+        "tracer": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "decision": {
+              "enum": [
+                "promote",
+                "discard",
+                "replan",
+                "blocked",
+                null
+              ]
+            }
+          },
+          "required": [
+            "decision"
+          ]
+        },
+        "verified_success": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "session_brief_status",
+        "plan_compliance",
+        "replan_required",
+        "drift",
+        "reviews",
+        "tracer",
+        "verified_success"
+      ]
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "harness": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "run_id",
+        "model",
+        "harness"
+      ]
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contains_paths": {
+          "const": false
+        },
+        "contains_prompts": {
+          "const": false
+        },
+        "contains_source_content": {
+          "const": false
+        },
+        "contains_transcripts": {
+          "const": false
+        },
+        "contains_change_id": {
+          "const": false
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contains_paths",
+        "contains_prompts",
+        "contains_source_content",
+        "contains_transcripts",
+        "contains_change_id",
+        "note"
+      ]
+    },
+    "exchange_notes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code"
+        ]
+      }
+    }
+  },
+  "required": [
+    "schema",
+    "export_id",
+    "exporter",
+    "generated_at",
+    "evidence_class",
+    "subject",
+    "metrics",
+    "outcomes",
+    "runtime",
+    "privacy",
+    "exchange_notes"
+  ]
+}

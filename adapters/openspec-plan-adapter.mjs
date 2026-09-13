@@ -32,7 +32,7 @@ function sha256(value) { return createHash('sha256').update(value).digest('hex')
 async function resolveIdentity(root, changeId) {
   const base = `openspec/changes/${changeId}`;
   const documents = [`${base}/proposal.md`, `${base}/tasks.md`];
-  const optional = [`${base}/design.md`, `${base}/.openspec.yaml`];
+  const optional = [`${base}/design.md`, `${base}/.openspec.yaml`, `${base}/design.context.json`];
   for (const file of optional) {
     const bytes = await readProviderFile(root, file, 4 * 1024 * 1024);
     if (bytes !== null) documents.push(file);

@@ -1,0 +1,293 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Workflow profile export v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "aifhub.workflow_profile_export.v1"
+    },
+    "exporter": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "const": "aifhub-extension"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "version"
+      ]
+    },
+    "generated_at": {
+      "type": "string"
+    },
+    "framework": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "adapter_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "adapter_version"
+      ]
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "support": {
+            "enum": [
+              "yes",
+              "no",
+              "partial",
+              "unknown"
+            ]
+          },
+          "provenance": {
+            "enum": [
+              "declared",
+              "detected",
+              "probed",
+              "user-confirmed"
+            ]
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "support",
+          "provenance"
+        ]
+      }
+    },
+    "artifact_vocabulary": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "native": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "extension": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "native"
+        ]
+      }
+    },
+    "profiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "registry_depth": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recommended_mode": {
+            "enum": [
+              "fast",
+              "full",
+              "ultra",
+              null
+            ]
+          },
+          "intended_scope": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "risk_classes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "required_artifacts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "conditional_artifacts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "contract": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "registry_depth",
+          "recommended_mode",
+          "intended_scope",
+          "risk_classes",
+          "required_artifacts",
+          "conditional_artifacts"
+        ]
+      }
+    },
+    "profile_mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "expanded": {
+          "const": "full"
+        }
+      },
+      "required": [
+        "expanded"
+      ]
+    },
+    "quality_gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "conditional": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "required",
+        "conditional"
+      ]
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context_modes": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "fresh",
+              "same_session"
+            ]
+          }
+        },
+        "default_context_mode": {
+          "enum": [
+            "fresh",
+            "same_session"
+          ]
+        },
+        "human_review": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "context_modes",
+        "default_context_mode",
+        "human_review",
+        "note"
+      ]
+    },
+    "adapters": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "context_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "strategy": {
+          "const": "measured"
+        },
+        "protected_artifacts": {
+          "type": "string"
+        },
+        "declared_flags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "execution": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "strategy",
+        "protected_artifacts",
+        "declared_flags",
+        "execution"
+      ]
+    },
+    "resolved_decision": {
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "schema",
+    "exporter",
+    "generated_at",
+    "framework",
+    "capabilities",
+    "artifact_vocabulary",
+    "profiles",
+    "profile_mapping",
+    "quality_gates",
+    "review",
+    "adapters",
+    "context_policy",
+    "resolved_decision"
+  ]
+}
