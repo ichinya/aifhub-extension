@@ -409,7 +409,11 @@ async function collectOpenSpecInstructions(changeId, options) {
       stderr: instructions.stderr ?? '',
       raw: instructions
     },
-    warnings: [],
+    warnings: Array.isArray(instructions.json?.warnings)
+      ? instructions.json.warnings
+        .filter((message) => typeof message === 'string' && message.trim())
+        .map((message) => ({ code: 'openspec-apply-warning', message }))
+      : [],
     errors: []
   };
 }

@@ -259,6 +259,8 @@ Context7 is optional supporting documentation context for current library/API do
 
 #### Ground planning in the target repository
 
+Before selecting or changing a capability, inventory accepted specs under `openspec/specs/**`, separately from active changes. Reuse each existing capability's exact path, including nested directories. Read relevant accepted specs in full, including scenarios, before deciding what is covered. If using the optional CLI, `openspec list --specs` inventories specs; plain `openspec list` inventories changes and cannot substitute for it. Filesystem discovery remains sufficient when the CLI is unavailable; this does not add Store selection or initialization authority.
+
 Before drafting `proposal.md`, `design.md`, `tasks.md`, or delta specs, read the relevant implementation, nearby tests, configuration, and project docs outside `openspec/`, alongside accepted specs and project context/rules. Keep this discovery read-only and proportional to the requested change; do it now rather than adding generic future tasks to explore the codebase.
 
 Resolve the actual target repository when it differs from `planningHome.root`; ask for the target only when available context cannot identify it. For greenfield work, inspect the existing structure and setup docs. If source is unavailable, disclose the material limitation instead of inventing implementation facts. Distinguish observed behavior, assumptions, and proposed behavior, cite direct file evidence, and surface conflicts between accepted specs and current code for resolution before making a dependent design decision.

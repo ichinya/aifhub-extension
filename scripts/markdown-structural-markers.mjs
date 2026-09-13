@@ -70,17 +70,20 @@ function splitMarkdownLines(content) {
   return String(content ?? '').split(/\r\n|\n|\r/);
 }
 
-function createMarkdownCodeMask(lines) {
+export function createMarkdownCodeMask(lines) {
   const mask = [];
   let fence = null;
 
   for (const line of lines) {
-    const fenceMatch = line.match(/^\s*(`{3,}|~{3,})/);
+    // Four spaces (or a tab) are code indentation, not a fence delimiter.
+    // In an open fence they must not expose example headings to consumers.
+    const fenceMatch = line.match(/^ {0,3}(`{3,}|~{3,})/);
     if (fenceMatch) {
       const token = fenceMatch[1];
       if (fence === null) {
         fence = { char: token[0], length: token.length };
-      } else if (token[0] === fence.char && token.length >= fence.length) {
+      } else if (token[0] === fence.char && token.length >= fence.length
+        && /^\s*$/.test(line.slice(fenceMatch[0].length))) {
         fence = null;
       }
       mask.push(true);

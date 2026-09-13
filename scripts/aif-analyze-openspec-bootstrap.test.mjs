@@ -500,7 +500,7 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
     const latestReviewedVersion = metadata.sources.openspec.version;
     const combined = [skill, compatibility, usage].join('\n');
 
-    assert.equal(latestReviewedVersion, '1.12.0', 'OpenSpec analyze reviewed baseline');
+    assert.equal(latestReviewedVersion, '1.13.0', 'OpenSpec analyze reviewed baseline');
     assert.equal(metadata.sources.openspec.baselineVersion, '1.3.1');
     assert.equal(metadata.sources.openspec.supportedRange, '>=1.3.1 <2.0.0');
     assert.deepEqual(metadata.sources.openspec.reviewedPrereleaseVersions, ['1.6.0-beta.1']);
@@ -516,7 +516,8 @@ describe('aif-analyze OpenSpec-native bootstrap contract', () => {
       '1.9.0',
       '1.10.0',
       '1.11.0',
-      '1.12.0'
+      '1.12.0',
+      '1.13.0'
     ]);
 
     for (const expected of [
