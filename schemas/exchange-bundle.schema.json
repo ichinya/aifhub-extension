@@ -1,0 +1,353 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Exchange bundle v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "aifhub.exchange_bundle.v1"
+    },
+    "exporter": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "const": "aifhub-extension"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "version"
+      ]
+    },
+    "generated_at": {
+      "type": "string"
+    },
+    "change_id": {
+      "type": "string"
+    },
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "plan_id": {
+          "type": "string"
+        },
+        "methodology": {
+          "type": "string"
+        },
+        "adapter_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "public_mode": {
+          "enum": [
+            "fast",
+            "full",
+            "ultra",
+            null
+          ]
+        },
+        "sdd_profile": {
+          "enum": [
+            "direct",
+            "quick",
+            "standard",
+            "expanded",
+            "ultra",
+            "tracer",
+            "research",
+            null
+          ]
+        },
+        "source_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "original_request": {
+          "type": "string"
+        },
+        "requirements": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "tasks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "done": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "text",
+              "done"
+            ]
+          }
+        },
+        "acceptance_examples": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "non_goals": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "change_surface": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allowed": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "forbidden": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "allowed",
+            "forbidden"
+          ]
+        }
+      },
+      "required": [
+        "plan_id",
+        "methodology",
+        "adapter_version",
+        "public_mode",
+        "sdd_profile",
+        "source_revision",
+        "original_request",
+        "requirements",
+        "tasks",
+        "acceptance_examples",
+        "non_goals",
+        "change_surface"
+      ]
+    },
+    "session_brief": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ref": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "project_intent",
+              "product_brief",
+              "capability_spec",
+              "change_spec",
+              "work_item_spec",
+              "session_brief",
+              "implementation_receipt",
+              "plan_compliance_receipt",
+              "review_receipt",
+              "verification_receipt",
+              "tracer_result",
+              "design_context"
+            ]
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          }
+        },
+        "required": [
+          "ref",
+          "kind",
+          "sha256"
+        ]
+      }
+    },
+    "references": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "sha256"
+        ]
+      }
+    },
+    "lineage": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "relation": {
+            "enum": [
+              "derives_from",
+              "refines",
+              "implements",
+              "verifies",
+              "supersedes"
+            ]
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "relation",
+          "to"
+        ]
+      }
+    },
+    "receipts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "plan_compliance": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "reviews": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "receipt": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "path",
+              "receipt"
+            ]
+          }
+        },
+        "tracer": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "plan_compliance",
+        "reviews",
+        "tracer"
+      ]
+    },
+    "design_context": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "vocabulary_extensions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "exchange_notes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code"
+        ]
+      }
+    }
+  },
+  "required": [
+    "schema",
+    "exporter",
+    "generated_at",
+    "change_id",
+    "plan",
+    "session_brief",
+    "artifacts",
+    "references",
+    "lineage",
+    "receipts",
+    "design_context",
+    "vocabulary_extensions",
+    "exchange_notes"
+  ]
+}

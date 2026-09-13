@@ -135,7 +135,7 @@ async function buildSnapshot(options, explicitCompile) {
   await add('openspec/config.yaml', 'policy');
   // Local schema/template edits can change the canonical artifact contract.
   for (const file of await walkFiles(root, 'openspec/schemas', (file) => /\.(?:md|yaml|yml|json)$/.test(file))) await add(file, 'policy');
-  for (const file of ['proposal.md', 'design.md', 'tasks.md', '.openspec.yaml']) await add(`${base}/${file}`, 'canonical');
+  for (const file of ['proposal.md', 'design.md', 'design.context.json', 'tasks.md', '.openspec.yaml']) await add(`${base}/${file}`, 'canonical');
   for (const dir of [`${base}/specs`, 'openspec/specs']) {
     for (const file of await walkFiles(root, dir, (file) => file.endsWith('.md'))) await add(file, 'protected');
   }
