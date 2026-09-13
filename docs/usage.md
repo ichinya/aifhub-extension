@@ -1309,7 +1309,7 @@ The checked-in deterministic harness always runs offline through the default tes
 npm test
 ```
 
-It injects fake exact `2.17.0` update-source executors plus one selectable `2.18.1` (`v218`) or `2.19.0` (`v219`) target executor into the production orchestration layer and covers version/provenance preflight, clean install, global update, dummy-extension isolation, stale managed-agent replacement, injection cardinality, artifact/config/unmanaged preservation, and exact transfer inventory. `2.18.0` remains a separate stable feature boundary for ultra and upstream transfer inventory (`>=2.18.0`).
+It injects fake exact `2.17.0` update-source executors plus one selectable `2.18.1` (`v218`) or `2.19.0` (`v219`) target executor into the production orchestration layer and covers version/provenance preflight, clean install, global update, dummy-extension isolation, stale managed-agent replacement, injection cardinality, artifact/config/unmanaged preservation, and exact transfer inventory. For the `v219` target it additionally asserts upstream release-surface sentinels: the `aif-implement` requirement consistency gate and `ERROR [requirement-conflict]` token, `aif-qa-check` `browser-replay` content, and the packaged `aif-warmup` skill. `2.18.0` remains a separate stable feature boundary for ultra and upstream transfer inventory (`>=2.18.0`).
 
 The live driver is opt-in and non-globbed. It accepts only caller-supplied local command-plus-argv toolchains and package roots. Exactly one target group is required per run — `--v218-*` binds the exact `2.18.1` target and `--v219-*` binds the exact `2.19.0` target; binding both fails closed:
 

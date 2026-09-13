@@ -31,6 +31,12 @@ export const EXPECTED_AI_FACTORY_VERSIONS = Object.freeze({
   v219: '2.19.0'
 });
 export const CONSUMER_TARGET_KEYS = Object.freeze(['v218', 'v219']);
+export const AI_FACTORY_2190_RELEASE_SENTINELS = Object.freeze({
+  implementReconciliationGate: 'Run the requirement consistency gate',
+  implementConflictToken: 'ERROR [requirement-conflict]',
+  qaCheckBrowserReplay: 'browser-replay',
+  warmupSkillPath: 'skills/aif-warmup/SKILL.md'
+});
 export const AI_FACTORY_2181_EXPLORE_SENTINELS = Object.freeze({
   coherenceHeading: '#### Research Coherence Gate (all persisted modes)',
   ultraHeading: '#### Ultra mode: adaptive bundle',
@@ -454,7 +460,9 @@ async function resolveConsumerTargetToolchain(toolchains) {
     });
   }
   if (candidates.length === 0) {
-    await validateBoundToolchain(toolchains?.v218, 'v218', EXPECTED_AI_FACTORY_VERSIONS.v218);
+    throw new SmokeFailure(SMOKE_STATUS.NOT_RUN, 'preflight', 'missing-target-toolchain', undefined, {
+      candidates: [...CONSUMER_TARGET_KEYS]
+    });
   }
   const [key, toolchain, expectedVersion] = candidates[0];
   return validateBoundToolchain(toolchain, key, expectedVersion);
@@ -910,6 +918,81 @@ async function inspectExploreUpstreamContract(projectDir, extension, toolchain, 
   };
 }
 
+async function inspectImplementUpstreamContract(projectDir, extension, toolchain, flow) {
+  const implementInjections = (extension.manifest.injections ?? []).filter((entry) => entry.target === 'aif-implement');
+  assertContract(
+    implementInjections.length === 1 && implementInjections[0].position === 'prepend',
+    flow,
+    'implement-injection-contract-mismatch',
+    { count: implementInjections.length, position: implementInjections[0]?.position ?? null }
+  );
+
+  const upstreamPath = path.resolve(toolchain.provenanceRoot, 'skills', 'aif-implement', 'SKILL.md');
+  assertContract(isWithin(toolchain.provenanceRoot, upstreamPath), flow, 'unsafe-upstream-implement-source');
+  assertContract(await exists(upstreamPath), flow, 'missing-upstream-implement-source');
+  const installedPath = path.join(projectDir, '.codex', 'skills', 'aif-implement', 'SKILL.md');
+  assertContract(await exists(installedPath), flow, 'missing-installed-implement-skill');
+
+  const [upstreamBytes, installedBytes] = await Promise.all([
+    readFile(upstreamPath),
+    readFile(installedPath)
+  ]);
+  const retainedBytes = installedBytes.subarray(Math.max(0, installedBytes.byteLength - upstreamBytes.byteLength));
+  assertContract(
+    installedBytes.byteLength >= upstreamBytes.byteLength && retainedBytes.equals(upstreamBytes),
+    flow,
+    'upstream-implement-bytes-changed',
+    { upstreamVersion: toolchain.expectedVersion }
+  );
+
+  const upstream = upstreamBytes.toString('utf8');
+  const installed = installedBytes.toString('utf8');
+  const injectionMarker = `<!-- aif-ext:${EXTENSION_NAME}:aif-implement:prepend:start -->`;
+  const injectionMarkerCount = countOccurrences(installed, injectionMarker);
+  assertContract(injectionMarkerCount === 1, flow, 'implement-injection-marker-cardinality-mismatch', {
+    count: injectionMarkerCount
+  });
+
+  let reconciliationGateCount = null;
+  let conflictTokenCount = null;
+  if (toolchain.key === 'v219') {
+    reconciliationGateCount = countOccurrences(upstream, AI_FACTORY_2190_RELEASE_SENTINELS.implementReconciliationGate);
+    conflictTokenCount = countOccurrences(upstream, AI_FACTORY_2190_RELEASE_SENTINELS.implementConflictToken);
+    assertContract(reconciliationGateCount === 1, flow, 'upstream-implement-reconciliation-gate-mismatch', {
+      count: reconciliationGateCount
+    });
+    assertContract(conflictTokenCount >= 1, flow, 'upstream-implement-conflict-token-mismatch', {
+      count: conflictTokenCount
+    });
+  }
+
+  return {
+    upstreamVersion: toolchain.expectedVersion,
+    injectionMarkerCount,
+    reconciliationGateCount,
+    conflictTokenCount,
+    upstreamDigest: sha256(upstreamBytes)
+  };
+}
+
+async function inspect219ReleaseSurface(toolchain, flow) {
+  const qaCheckPath = path.resolve(toolchain.provenanceRoot, 'skills', 'aif-qa-check', 'SKILL.md');
+  const warmupPath = path.resolve(toolchain.provenanceRoot, AI_FACTORY_2190_RELEASE_SENTINELS.warmupSkillPath);
+  assertContract(
+    isWithin(toolchain.provenanceRoot, qaCheckPath) && isWithin(toolchain.provenanceRoot, warmupPath),
+    flow,
+    'unsafe-upstream-release-surface'
+  );
+  assertContract(await exists(qaCheckPath), flow, 'missing-upstream-qa-check-skill');
+  assertContract(await exists(warmupPath), flow, 'missing-upstream-warmup-skill');
+  const qaCheck = (await readFile(qaCheckPath)).toString('utf8');
+  const browserReplayCount = countOccurrences(qaCheck, AI_FACTORY_2190_RELEASE_SENTINELS.qaCheckBrowserReplay);
+  assertContract(browserReplayCount >= 1, flow, 'upstream-qa-check-browser-replay-missing', {
+    count: browserReplayCount
+  });
+  return { browserReplayCount, warmupSkillPresent: true };
+}
+
 async function inspectTransferInventory(projectDir, expectedCount, flow) {
   const ledger = await readConsumerLedger(projectDir);
   const codexAgent = findCodexAgent(ledger, flow);
@@ -1162,6 +1245,15 @@ async function runCleanInstallFlow(context) {
       toolchains.target,
       'clean-install'
     );
+    const upstreamImplement = await inspectImplementUpstreamContract(
+      workspace.projectDir,
+      extension,
+      toolchains.target,
+      'clean-install'
+    );
+    const releaseSurface = toolchains.target.key === 'v219'
+      ? await inspect219ReleaseSurface(toolchains.target, 'clean-install')
+      : null;
     const transfer = await inspectTransferInventory(workspace.projectDir, 1, 'clean-install');
     const adapters = await assertAdapterInventory(workspace.projectDir, extension.manifest, 'clean-install');
     const agents = await assertManagedAgentsMatchSource(workspace.projectDir, extension, 'clean-install');
@@ -1173,6 +1265,7 @@ async function runCleanInstallFlow(context) {
       promptLanguageUpstreamDigest: promptLanguage.upstreamDigest,
       packagedPolicyDigest: promptLanguage.packagedPolicyDigest,
       exploreUpstreamDigest: upstreamExplore.upstreamDigest,
+      implementUpstreamDigest: upstreamImplement.upstreamDigest,
       transferCount: transfer.fileCount,
       adapterCount: adapters.length,
       managedAgentCount: agents.count
@@ -1184,6 +1277,8 @@ async function runCleanInstallFlow(context) {
       injections: { count: injections.count, digest: injections.digest },
       promptLanguage,
       upstreamExplore,
+      upstreamImplement,
+      releaseSurface,
       transfer,
       adapters,
       managedAgents: { count: agents.count, digest: agents.digest }
@@ -1272,6 +1367,15 @@ async function runUpdateFlows(context) {
       toolchains.target,
       'global-update'
     );
+    const globalImplement = await inspectImplementUpstreamContract(
+      workspace.projectDir,
+      extension,
+      toolchains.target,
+      'global-update'
+    );
+    const globalReleaseSurface = toolchains.target.key === 'v219'
+      ? await inspect219ReleaseSurface(toolchains.target, 'global-update')
+      : null;
     const globalTransfer = await inspectTransferInventory(workspace.projectDir, 0, 'global-update');
     const globalAgents = await assertManagedAgentsMatchSource(workspace.projectDir, extension, 'global-update');
     record('global-update', 'contract-assertions-recorded', SMOKE_STATUS.PASS, {
@@ -1300,6 +1404,8 @@ async function runUpdateFlows(context) {
       injections: { count: globalInjections.count, digest: globalInjections.digest },
       promptLanguage: globalPromptLanguage,
       upstreamExplore: globalExplore,
+      upstreamImplement: globalImplement,
+      releaseSurface: globalReleaseSurface,
       transfer: globalTransfer,
       managedAgents: { count: globalAgents.count, digest: globalAgents.digest }
     };
@@ -1373,6 +1479,15 @@ async function runUpdateFlows(context) {
       toolchains.target,
       'targeted-update'
     );
+    const targetedImplement = await inspectImplementUpstreamContract(
+      workspace.projectDir,
+      extension,
+      toolchains.target,
+      'targeted-update'
+    );
+    const targetedReleaseSurface = toolchains.target.key === 'v219'
+      ? await inspect219ReleaseSurface(toolchains.target, 'targeted-update')
+      : null;
     assertContract(
       targetedInjections.digest === targetedInjectionBaseline.digest,
       'targeted-update',
@@ -1413,6 +1528,8 @@ async function runUpdateFlows(context) {
         injections: { count: targetedInjections.count, digest: targetedInjections.digest },
         promptLanguage: targetedPromptLanguage,
         upstreamExplore: targetedExplore,
+        upstreamImplement: targetedImplement,
+        releaseSurface: targetedReleaseSurface,
         transfer: targetedTransfer,
         managedAgents: { count: targetedAgents.count, digest: targetedAgents.digest }
       }

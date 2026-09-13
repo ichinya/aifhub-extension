@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   AI_FACTORY_2181_EXPLORE_SENTINELS,
+  AI_FACTORY_2190_RELEASE_SENTINELS,
   CONSUMER_TARGET_KEYS,
   EXPECTED_AI_FACTORY_VERSIONS,
   SMOKE_STATUS,
@@ -91,6 +92,28 @@ function fakeExploreBase(version) {
   ].join('\n');
 }
 
+function fakeImplementBase(version) {
+  const base = [
+    '---',
+    'name: aif-implement',
+    `description: Fake AI Factory ${version} implement skill.`,
+    'allowed-tools: Read Edit',
+    '---',
+    '',
+    '# aif-implement',
+    ''
+  ];
+  if (version === EXPECTED_AI_FACTORY_VERSIONS.v219) {
+    base.push(
+      `**3.1.1: ${AI_FACTORY_2190_RELEASE_SENTINELS.implementReconciliationGate}**`,
+      '',
+      `On a clear unresolved conflict emit \`${AI_FACTORY_2190_RELEASE_SENTINELS.implementConflictToken}\` and stop.`,
+      ''
+    );
+  }
+  return base.join('\n');
+}
+
 function fakeReviewBase(version) {
   return [
     '---',
@@ -122,6 +145,19 @@ async function createFakeToolchain(root, key, version) {
   });
   await writeFixture(packageRoot, 'skills/aif-explore/SKILL.md', fakeExploreBase(version));
   await writeFixture(packageRoot, 'skills/aif-review/SKILL.md', fakeReviewBase(version));
+  await writeFixture(packageRoot, 'skills/aif-implement/SKILL.md', fakeImplementBase(version));
+  if (version === EXPECTED_AI_FACTORY_VERSIONS.v219) {
+    await writeFixture(
+      packageRoot,
+      'skills/aif-qa-check/SKILL.md',
+      `---\nname: aif-qa-check\ndescription: Fake AI Factory ${version} QA check skill.\n---\n\n# aif-qa-check\n\nBranch-scoped ${AI_FACTORY_2190_RELEASE_SENTINELS.qaCheckBrowserReplay}/TC-NNN.js scripts with history.\n`
+    );
+    await writeFixture(
+      packageRoot,
+      AI_FACTORY_2190_RELEASE_SENTINELS.warmupSkillPath,
+      `---\nname: aif-warmup\ndescription: Fake AI Factory ${version} warmup skill.\n---\n\n# aif-warmup\n`
+    );
+  }
   return {
     key,
     command: process.execPath,
@@ -139,6 +175,8 @@ async function ensureBaseSkill(projectDir, skillName, version) {
     ? fakeExploreBase(version)
     : skillName === 'aif-review'
       ? fakeReviewBase(version)
+    : skillName === 'aif-implement'
+      ? fakeImplementBase(version)
     : `---\nname: ${skillName}\ndescription: Fake AI Factory ${version} base skill.\n---\n\n# ${skillName}\n`;
   await writeFixture(
     projectDir,
@@ -612,6 +650,12 @@ describe('AI Factory 2.18/2.19 consumer compatibility smoke', () => {
     for (const flow of ['cleanInstall', 'globalUpdate', 'targetedUpdate']) {
       assert.equal(result.flows[flow].upstreamExplore.upstreamVersion, '2.19.0');
       assert.equal(result.flows[flow].upstreamExplore.injectionMarkerCount, 1);
+      assert.equal(result.flows[flow].upstreamImplement.upstreamVersion, '2.19.0');
+      assert.equal(result.flows[flow].upstreamImplement.injectionMarkerCount, 1);
+      assert.equal(result.flows[flow].upstreamImplement.reconciliationGateCount, 1);
+      assert.ok(result.flows[flow].upstreamImplement.conflictTokenCount >= 1);
+      assert.ok(result.flows[flow].releaseSurface.browserReplayCount >= 1);
+      assert.equal(result.flows[flow].releaseSurface.warmupSkillPresent, true);
     }
   });
 
@@ -630,6 +674,26 @@ describe('AI Factory 2.18/2.19 consumer compatibility smoke', () => {
     assert.equal(result.status, SMOKE_STATUS.NOT_RUN);
     assert.equal(result.failure.flow, 'preflight');
     assert.equal(result.failure.code, 'ambiguous-target-toolchain');
+    assert.deepEqual(result.failure.details, { candidates: ['v218', 'v219'] });
+    assert.equal(harness.trace.some((entry) => entry.type === 'workspace'), false);
+    assert.equal(harness.runner.calls.length, 0);
+  });
+
+  it('fails closed with an explicit code when no consumer target toolchain is bound', async () => {
+    const harness = await createHarness();
+    delete harness.toolchains.v218;
+    const result = await runAiFactory218ConsumerSmoke({
+      toolchains: harness.toolchains,
+      extensionRoot: REPO_ROOT,
+      runner: harness.runner,
+      workspaceFactory: harness.workspaceFactory,
+      timeoutMs: 5_000,
+      evidence: 'deterministic'
+    });
+
+    assert.equal(result.status, SMOKE_STATUS.NOT_RUN);
+    assert.equal(result.failure.flow, 'preflight');
+    assert.equal(result.failure.code, 'missing-target-toolchain');
     assert.deepEqual(result.failure.details, { candidates: ['v218', 'v219'] });
     assert.equal(harness.trace.some((entry) => entry.type === 'workspace'), false);
     assert.equal(harness.runner.calls.length, 0);
