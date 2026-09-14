@@ -46,6 +46,7 @@ OpenSpec CLI features вызываются через AIFHub wrappers и `script
 - [Claude Agents](claude-agents.md)
 - [Prime Agent Runtime Evaluation](runtime-research/prime-agent/README.md) — issue #148, deferred adoption, pinned source/kernel probes and remaining runtime-contract requirements.
 - [Research по Memory Tools](memory-tools-research/README.md)
+- [Исследование совместимости с Agent Plugins 1.0](agent-plugins-research/README.md) — issue #200, решение export subset, mapping поверхностей, план fixtures и триггеры пересмотра.
 - [Codex Plan Mode](codex-plan-mode.md)
 - [Handoff Naming](handoff.md)
 - [Handoff Validation Profile](handoff-validation-profile.md)
@@ -56,6 +57,7 @@ OpenSpec CLI features вызываются через AIFHub wrappers и `script
 |---|---|
 | [Validation Providers](validation-providers.md) | Composable HLV validation, independent tool switches and artifact selection, required/optional policy, revision-bound evidence, read-only doctor and the separate Lekalo-ready semantic contract |
 | [Prime Agent Runtime Evaluation](runtime-research/prime-agent/README.md) | Runtime adoption deferred: mutable harness roles, permission boundary, admission-only delegation, distribution constraints and reproducible source/kernel probes |
+| [Исследование совместимости с Agent Plugins 1.0](agent-plugins-research/README.md) | Исследование issue #200: mapping поверхностей Agent Plugins 1.0.0, уровни совместимости, план минимального экспорта, fixtures read-only инспектора и триггеры пересмотра |
 | [Persistent Workflow Mechanics](workflow-mechanics.md) | Canonical task sources, sealed batches, interruption recovery, persistent fix budgets and reversible skill-context evolution |
 | [Usage](usage.md) | Полный OpenSpec-native command flow, AI Factory 2.19 session warmup, AI Factory 2.18 mode/profile matrix, regular/ultra research, revision-bound legacy-ultra receipt, archive/update boundaries, optional providers, gates, finalization tail и examples |
 | [Адаптация идей Superpowers](superpowers-adaptation.md) | Качество тестов, bounded readiness, проверка конфликтов задач, явные batches, debugging и scoped re-review |

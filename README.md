@@ -423,6 +423,7 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 | [Codex Agents](docs/codex-agents.md) | Namespaced Codex CLI agent files |
 | [Claude Agents](docs/claude-agents.md) | Namespaced Claude agent files |
 | [Prime Agent Runtime Evaluation](docs/runtime-research/prime-agent/README.md) | Issue #148: deferred runtime adoption, pinned source/kernel evidence and compatibility blockers |
+| [Agent Plugins 1.0 Compatibility Research](docs/agent-plugins-research/README.md) | Issue #200: Agent Plugins 1.0.0 surface mapping, compatibility levels, minimal export plan, and revisit triggers |
 | [Persistent Workflow Mechanics](docs/workflow-mechanics.md) | Canonical task sources, sealed batches, interruption recovery, persistent fix budgets and reversible skill-context evolution |
 
 ## Validation
