@@ -32,6 +32,19 @@ completed 24 attempts on three related, labelled copies: baseline 11/12, RTK
 tokens; savings fell to 7.9% without the largest baseline pair. This is bounded
 evidence and does not resolve the persistence failures above.
 
+The [cross-project evidence/privacy matrix](token-providers-research/rtk/cross-project-ab.md)
+ran five agent phases once per pair across six different projects (60 primary
+runs): baseline passed 23/30 pairs versus 18/30 for RTK with 0.9% MORE tokens.
+Protected artifacts survived the compressed read path byte-exact in 12/12 runs,
+the synthetic secret never reached the local store, tee or `rtk gain` output,
+and the sensitive command was never rewritten. The phase-by-stack split shows
+where RTK helped (archaeology and diagnostics on large repositories: −28…−58%
+tokens with quality preserved; ops checks: −19%) and where it did not (Flutter
+snapshot +102…+173% across phases; small repositories +36…+268%; exact aggregate
+counting during research fails in both arms). The RTK group produced malformed
+final answers in 6 of its 12 failures. Cleanup of raw attempts remains blocked
+by approval review.
+
 > Use RTK to answer “what is happening?”; use raw commands to answer “show all evidence without loss.”
 
 ## Evidence must have a raw path

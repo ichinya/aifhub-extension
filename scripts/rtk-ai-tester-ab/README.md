@@ -114,3 +114,58 @@ Only aggregate.json is eligible for publication after inspection. The temporary
 root contains raw ai-tester traces, model text, project copies and RTK SQLite
 stores. Remove those after grading with verified, native filesystem operations;
 report cleanup failures rather than claiming deletion. Do not publish the root.
+
+## Evidence and privacy matrix (`scenarios-evidence.mjs`)
+
+Issue #138 added acceptance criteria the four scenarios above do not cover. A
+second, read-only matrix addresses them; arms, prompts and fixture protocol are
+identical across scenarios (repetition count is chosen by the runner).
+
+| Scenario | Acceptance criterion from issue #138 | Pass requires |
+| --- | --- | --- |
+| `code-explore-fidelity` (phase: explore ≈ aif-explore) | Research-phase fidelity over `rg` output | Exact total match count of a computed common term, top-3 files with exact per-file counts, every match (file:line) of a computed rare term; terms and ground truth are computed from the pinned snapshot per project and stored outside the sandbox |
+| `gate-artifact-fidelity` | Protected validation artifacts (`aif-gate-result`, `coverage.json`, `done-readiness.json`, `openspec/**`) must never depend only on compressed output | Byte-exact verdict, gate, failing-test name, two-decimal coverage, blocker list and `#### Scenario:` heading; `complete` asserted true |
+| `pytest-traceback-fidelity` | Failing-test tracebacks and exact assertion context survive the compressed path, or verification automatically uses raw output | All 12 failing subtests with exact runtime operands, exact first assertion message, failure/passed counts, nonzero exit; whether the compressed path alone sufficed is recorded as an observation, not a gate |
+| `raw-escape-archaeology` | A documented raw bypass exists for full diffs, logs, history | Exact deleted source line, per-file insertion/deletion counts of the full working-tree diff, oldest of the last three subjects, exact HEAD `Gate:` trailer |
+| `sensitive-command-bypass` | Sensitive commands are excluded from rewriting; tee disabled; `rtk gain` without arguments/secrets | Status JSON with exact token echo, exact failing exit code, honest gain-visibility report **and** a clean deterministic `privacyPostCheck` (no synthetic marker in the SQLite store including `-wal`/`-shm`, the tee tree, or the captured gain output); a rewritten sensitive top-level command fails by itself |
+
+Fixtures are deterministic and synthetic. The pytest operands and the
+`AB-SYNTH-*` token come from the run environment / constants, so source
+inspection cannot reveal answers, and no real credential exists in the matrix.
+
+Runner glue differs from the original matrix in documented points (module
+docblock of `scenarios-evidence.mjs`): `commandEnv.RTK_AB_PYTEST`, additional
+`cat`, `pytest` and `rg` executables in the config, a per-run `privacyPostCheck`,
+computed explore ground truth stored outside the sandbox, and the pytest pattern
+added to the extension's test-command regex. Grade with
+`gradeEvidence(case, stats, { answer, privacy, expected })`; unit tests cover
+every scenario and the privacy post-check:
+
+```powershell
+node --test scripts/rtk-ai-tester-ab/scenarios-evidence.test.mjs
+```
+
+### Cross-project matrix runner (`run-evidence.mjs`)
+
+Executes the evidence scenarios in every labelled project of the private config
+(one repetition per pair by default), both arms, through the same ai-tester +
+ACP + Pi runtime. Labels and their role/commit metadata are published; the
+label-to-path map stays in the private inputs JSON. Tracked credential-named
+files are excluded from every copy; dirty source trees are allowed and recorded,
+never modified; HEAD must match the pinned commit before and after.
+
+```powershell
+node --test scripts/rtk-ai-tester-ab/scenarios-evidence.test.mjs
+node scripts/rtk-ai-tester-ab/run-evidence.mjs --config <private-inputs.json> --prepare-only
+node scripts/rtk-ai-tester-ab/run-evidence.mjs --config <private-inputs.json> --stage smoke
+node scripts/rtk-ai-tester-ab/run-evidence.mjs --config <private-inputs.json> --stage pilot
+node scripts/rtk-ai-tester-ab/run-evidence.mjs --config <private-inputs.json> --stage matrix [--repeats 1] [--projects <label,...>] [--scenarios <id,...>]
+```
+
+Config needs the tool fields above plus `cat`, `pytest` (standalone executable),
+`rg` (ripgrep), `provider`, `model` and `projects: { label: { path, commit, role? } }`.
+`--turn-timeout <seconds>` (default 300) overrides the ACP turn limit for heavy
+scenarios. Existing runs are never overwritten; repeated invocations skip them.
+Scenario grading uses `gradeEvidence` plus a deterministic `privacyPostCheck`
+(SQLite store including `-wal`/`-shm`, tee tree, captured `rtk gain` output).
+Executed evidence: [cross-project report](../../docs/token-providers-research/rtk/cross-project-ab.md).
