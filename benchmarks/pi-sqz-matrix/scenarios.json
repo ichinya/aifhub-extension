@@ -1,0 +1,191 @@
+{
+  "$comment": "Pi SQZ benchmark matrix scenarios. Each task: prompt for the agent, assertions checked against the final assistant message (research), verify checks run against the working tree after execution tasks. Facts verified against the repos on 2026-09-14.",
+  "model": {
+    "provider": "omniroute",
+    "model": "la/ornith-1.5-35b-a3b",
+    "thinking": "low"
+  },
+  "projects": [
+    {
+      "id": "idshka",
+      "label": "laravel-php",
+      "path": "C:/test/idshka",
+      "description": "Laravel modular monolith (identity provider / OIDC issuer)",
+      "tasks": [
+        {
+          "id": "research-issuer-domain",
+          "kind": "research",
+          "prompt": "Исследуй домен Issuer в этом Laravel-проекте и выдай точный отчёт: 1) перечисли точные имена всех классов в app/Domain/Issuer/Services, app/Domain/Issuer/Actions, app/Domain/Issuer/ValueObjects и app/Domain/Issuer/Exceptions; 2) назови точное имя фабричного метода класса CanonicalIssuer; 3) назови минимум два кода ошибки (аргумент метода because), которые выдаёт IssuerConfigurationException; 4) какой класс-сервис резолвит canonical issuer. Изучай реальные файлы инструментом read, не угадывай.",
+          "assertions": [
+            "CanonicalIssuerResolver",
+            "TokenIssuer",
+            "CanonicalIssuer",
+            "fromConfiguredValue",
+            "IssuerFlowException",
+            "IssueUserApiTokenAction|RevokeWebAccessTokenAction",
+            "invalid_url|unsupported_scheme|missing"
+          ]
+        },
+        {
+          "id": "exec-issuer-constant",
+          "kind": "execution",
+          "prompt": "В файле app/Domain/Issuer/ValueObjects/CanonicalIssuer.php добавь публичную константу класса ALLOWED_SCHEMES со значением ['http', 'https'] и используй её в существующей проверке in_array вместо литерального массива. Больше ничего не меняй.",
+          "verify": [
+            { "type": "grep", "file": "app/Domain/Issuer/ValueObjects/CanonicalIssuer.php", "pattern": "ALLOWED_SCHEMES" },
+            { "type": "grep", "file": "app/Domain/Issuer/ValueObjects/CanonicalIssuer.php", "pattern": "in_array\\(\\$scheme, self::ALLOWED_SCHEMES|in_array\\(\\$scheme, ALLOWED_SCHEMES" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "flutter_plane",
+      "label": "flutter-dart",
+      "path": "C:/test/flutter_plane",
+      "description": "Flutter application (riverpod, dio, feature-first layout)",
+      "tasks": [
+        {
+          "id": "research-features-layer",
+          "kind": "research",
+          "prompt": "Исследуй feature-слой lib/features этого Flutter-проекта и выдай точный отчёт: 1) перечисли все фича-каталоги; 2) назови точные имена классов репозиториев фичи projects и файл, где они объявлены; 3) какой HTTP-клиент (пакет) используется в DioProjectsRepository; 4) назови точный путь к файлу экрана настроек и имя его виджета-класса. Изучай реальные файлы инструментом read, не угадывай.",
+          "assertions": [
+            "DioProjectsRepository",
+            "ProjectsRepositoryException",
+            "projects_repository\\.dart",
+            "dio",
+            "settings_screen\\.dart",
+            "SettingsScreen",
+            "auth|reference|settings|tasks"
+          ]
+        },
+        {
+          "id": "exec-settings-version-note",
+          "kind": "execution",
+          "prompt": "В lib/features/settings/presentation/settings_screen.dart найди класс _SettingsScreenState и добавь его приватному полю _version комментарий в стиле // BENCH-VERSION-FIELD на той же строке или строкой выше. Больше ничего не меняй.",
+          "verify": [
+            { "type": "grep", "file": "lib/features/settings/presentation/settings_screen.dart", "pattern": "BENCH-VERSION-FIELD" },
+            { "type": "grep", "file": "lib/features/settings/presentation/settings_screen.dart", "pattern": "String\\? _version;" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "anthill",
+      "label": "unity-csharp",
+      "path": "C:/test/anthill",
+      "description": "Unity 2D game (ant colony simulation, C# domain model)",
+      "tasks": [
+        {
+          "id": "research-domain-model",
+          "kind": "research",
+          "prompt": "Исследуй доменную модель этой Unity-игры в Assets/Anthill/Domain и выдай точный отчёт: 1) перечисли точные имена всех классов состояния в GameModel.cs (FixedMath не считается); 2) перечисли все поля класса ChamberState с их типами; 3) что представляет класс RouteState и какие у него поля; 4) назови файлы домена и число строк в Simulation.cs. Изучай реальные файлы инструментом read, не угадывай.",
+          "assertions": [
+            "IdAmount",
+            "GridCellState",
+            "ResourceNodeState",
+            "ChamberState",
+            "EntranceBufferState",
+            "RouteState",
+            "flooded",
+            "productionEnabled",
+            "assignedWorkers"
+          ]
+        },
+        {
+          "id": "exec-chamber-field",
+          "kind": "execution",
+          "prompt": "В файле Assets/Anthill/Domain/GameModel.cs добавь в класс ChamberState публичное поле `public bool benchmarkTag;` сразу после поля blocked. Больше ничего не меняй.",
+          "verify": [
+            { "type": "grep", "file": "Assets/Anthill/Domain/GameModel.cs", "pattern": "public bool benchmarkTag;" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "icde",
+      "label": "react-typescript",
+      "path": "C:/test/icde",
+      "description": "React + TypeScript + Tailwind landing page",
+      "tasks": [
+        {
+          "id": "research-landing",
+          "kind": "research",
+          "prompt": "Исследуй этот React-проект и выдай точный отчёт: 1) точный текст заголовка h1 и подзаголовка на главной странице (файл App.tsx); 2) перечисли файлы компонентов в каталоге components; 3) назови точное поле name из metadata.json; 4) какой инструмент сборки указан в package.json (сценарий build). Изучай реальные файлы инструментом read, не угадывай.",
+          "assertions": [
+            "I CoDE",
+            "logic meets creativity",
+            "icde\\.pro - Placeholder"
+          ]
+        },
+        {
+          "id": "exec-subtitle-swap",
+          "kind": "execution",
+          "prompt": "В файле App.tsx замени английский текст подзаголовка 'Crafting digital experiences where logic meets creativity.' на 'Benchmark subtitle replacement was applied here.' Остальную часть подзаголовка и всё остальное не трогай.",
+          "verify": [
+            { "type": "grep", "file": "App.tsx", "pattern": "Benchmark subtitle replacement was applied here\\." },
+            { "type": "grep", "file": "App.tsx", "pattern": "logic meets creativity", "negate": true }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lorawrite",
+      "label": "python-ts-monorepo",
+      "path": "C:/test/lorawrite",
+      "description": "AI book-writing assistant monorepo (Python backend, TS frontend)",
+      "tasks": [
+        {
+          "id": "research-architecture",
+          "kind": "research",
+          "prompt": "Исследуй структуру этого монорепозитория и выдай точный отчёт: 1) какие приложения в apps/ и какие пакеты в packages/; 2) точный путь к файлу с классом LLMService; 3) точное имя метода, который загружает промпт-шаблон, и как формируется путь к нему (структура каталогов промптов, роли); 4) какие роли поддерживает _load_prompt. Изучай реальные файлы инструментом read, не угадывай.",
+          "assertions": [
+            "llm_service\\.py",
+            "_load_prompt",
+            "second_pilot",
+            "writer|editor",
+            "canon|outline",
+            "prompts"
+          ]
+        },
+        {
+          "id": "exec-prompt-error-msg",
+          "kind": "execution",
+          "prompt": "В файле apps/backend/second_pilot/core/llm_service.py найди в методе _load_prompt вызов исключения FileNotFoundError и измени его сообщение на 'Prompt template missing: ' с путём после него (сохрани интерполяцию пути). Больше ничего не меняй.",
+          "verify": [
+            { "type": "grep", "file": "apps/backend/second_pilot/core/llm_service.py", "pattern": "Prompt template missing" },
+            { "type": "grep", "file": "apps/backend/second_pilot/core/llm_service.py", "pattern": "Prompt template not found", "negate": true }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "secret-santa",
+      "label": "fastapi-react",
+      "path": "C:/test/secret-santa",
+      "description": "Secret Santa platform (FastAPI + SQLAlchemy backend, React frontend)",
+      "tasks": [
+        {
+          "id": "research-backend-models",
+          "kind": "research",
+          "prompt": "Исследуй backend этого проекта (FastAPI) и выдай точный отчёт: 1) перечисли все классы моделей в backend/app/models и их точные значения __tablename__; 2) у модели Participant перечисли точные значения enum ParticipantStatus; 3) назови точные поля Participant с их типами и максимальными длинами строк; 4) какой движок БД configured в app/core или app/db. Изучай реальные файлы инструментом read, не угадывай.",
+          "assertions": [
+            "ParticipantStatus",
+            "invited",
+            "locked",
+            "participants",
+            "display_name",
+            "String\\(255\\)"
+          ]
+        },
+        {
+          "id": "exec-participant-length",
+          "kind": "execution",
+          "prompt": "В файле backend/app/models/participant.py измени максимальную длину поля display_name со String(255) на String(512). Больше ничего не меняй.",
+          "verify": [
+            { "type": "grep", "file": "backend/app/models/participant.py", "pattern": "String\\(512\\)" },
+            { "type": "grep", "file": "backend/app/models/participant.py", "pattern": "display_name.*String\\(255\\)", "negate": true }
+          ]
+        }
+      ]
+    }
+  ]
+}
