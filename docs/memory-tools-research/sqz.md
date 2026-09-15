@@ -6,6 +6,9 @@
 
 Результаты замеров: [sqz-benchmark-results.md](sqz-benchmark-results.md).
 
+Live-матрица с агентом pi (байты против токенов, рекомендации по профилям репозиториев, включая Laravel и мультирепо):
+[sqz-pi-live-matrix.md](sqz-pi-live-matrix.md).
+
 Этот документ описывает variant B для issue #133: baseline без dedup, собственный [Session Context Dedup](../context-dedup.md) и optional user-owned `sqz`.
 
 ## Проверенный Контракт
