@@ -46,6 +46,12 @@ counting during research fails in both arms). The RTK group produced malformed
 final answers in 6 of its 12 failures. Cleanup of raw attempts remains blocked
 by approval review.
 
+Machine-readable decision, benefit and anti-scope metadata lives in
+[recommendation-metadata.yaml](token-providers-research/recommendation-metadata.yaml)
+(schema `aifhub.token_providers.recommendation.v1`). It is durable research
+metadata: the extension runtime does not consume it, and it never gates or
+installs anything.
+
 > Use RTK to answer “what is happening?”; use raw commands to answer “show all evidence without loss.”
 
 ## Proven benefits and when to enable (user-owned)
