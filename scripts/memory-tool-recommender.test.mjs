@@ -107,7 +107,8 @@ describe('recommendation metadata parsing', () => {
       'repowise',
       'rohitg00-agentmemory',
       'understand-anything',
-      't-search'
+      't-search',
+      'tencentdb-agent-memory'
     ]);
     assert.deepEqual(metadata.project_dimensions.languages, ['php', 'go', 'js', 'python', 'rust', 'multi']);
     assert.deepEqual(metadata.project_dimensions.volume, ['mini', 'standard', 'large']);
