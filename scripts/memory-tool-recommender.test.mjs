@@ -107,7 +107,8 @@ describe('recommendation metadata parsing', () => {
       'repowise',
       'rohitg00-agentmemory',
       'understand-anything',
-      't-search'
+      't-search',
+      'tencentdb-agent-memory'
     ]);
     assert.deepEqual(metadata.project_dimensions.languages, ['php', 'go', 'js', 'python', 'rust', 'multi']);
     assert.deepEqual(metadata.project_dimensions.volume, ['mini', 'standard', 'large']);
@@ -354,7 +355,8 @@ describe('recommendation results', () => {
       'codex-agent-mem',
       'context-mode',
       'codegraph',
-      'repowise'
+      'repowise',
+      'tencentdb-agent-memory'
     ]);
     assert.equal(result.body.tool_permissions.graphify['aif-implement'], 'forbidden');
     assert.equal(result.body.tool_permissions.codegraph['aif-analyze'], 'recommend_only');
@@ -1583,7 +1585,10 @@ describe('CLI behavior', () => {
     assert.equal(result.project_shape, 'large_framework_app');
     assert.deepEqual(result.task_signals, ['architecture_or_impact_discovery']);
     assert.equal(result.recommendations.some((item) => item.tool_id === 'graphify'), false);
-    assert.deepEqual(probedTools, ['repowise']);
+    // tencentdb-agent-memory now has an exact screening policy match for large framework
+    // architecture discovery (screening benchmark 2026-09-14/15); availability stays gated
+    // on the user-owned gateway health probe.
+    assert.deepEqual(probedTools, ['tencentdb-agent-memory', 'repowise']);
   });
 
   it('keeps command permissions while excluding Repowise outside its smoke-backed shapes', async () => {
