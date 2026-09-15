@@ -1591,6 +1591,72 @@ describe('CLI behavior', () => {
     assert.deepEqual(probedTools, ['tencentdb-agent-memory', 'repowise']);
   });
 
+  it('keeps tencentdb-agent-memory behind its screening gate even for matching volumes', async () => {
+    // Regression: small_microservice must stay excluded even when volume/repo-shape
+    // would match, because the conditional case pins project_shape explicitly.
+    const small = await runJsonWithDeterministicProbes([
+      'recommend',
+      '--shape',
+      'small_microservice',
+      '--language',
+      'multi',
+      '--volume',
+      'standard',
+      '--repo-shape',
+      'single_repo',
+      '--task',
+      'resume_previous_work',
+      '--metadata',
+      REAL_METADATA,
+      '--json'
+    ]);
+    assert.equal(
+      small.body.recommendations.some((item) => item.tool_id === 'tencentdb-agent-memory'),
+      false
+    );
+
+    // The untested shapes never pass screening either.
+    for (const shape of ['go_service', 'large_legacy']) {
+      const result = await runJsonWithDeterministicProbes([
+        'recommend',
+        '--shape',
+        shape,
+        '--volume',
+        'large',
+        '--repo-shape',
+        'single_repo',
+        '--task',
+        'resume_previous_work',
+        '--metadata',
+        REAL_METADATA,
+        '--json'
+      ]);
+      assert.equal(
+        result.body.recommendations.some((item) => item.tool_id === 'tencentdb-agent-memory'),
+        false,
+        `${shape} must not receive tencentdb-agent-memory recommendations`
+      );
+    }
+
+    // Probe coverage: the recommend path must probe the new tool when screening matches
+    // (the probe branch reports the user-owned gateway health on 127.0.0.1:8420).
+    const withProbe = await runJsonWithDeterministicProbes([
+      'recommend',
+      '--shape',
+      'large_framework_app',
+      '--volume',
+      'large',
+      '--repo-shape',
+      'single_repo',
+      '--task',
+      'resume_previous_work',
+      '--metadata',
+      REAL_METADATA,
+      '--json'
+    ]);
+    assert.ok(withProbe.probedTools.includes('tencentdb-agent-memory'));
+  });
+
   it('keeps command permissions while excluding Repowise outside its smoke-backed shapes', async () => {
     const { body: result, probedTools } = await runJsonWithDeterministicProbes([
       'recommend',

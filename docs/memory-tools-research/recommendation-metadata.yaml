@@ -320,7 +320,7 @@ availability_probes:
     - repowise --version
     - repowise doctor
   tencentdb-agent-memory:
-    - "curl -s --max-time 2 http://127.0.0.1:8431/health"
+    - "curl -fsS --max-time 2 http://127.0.0.1:8420/health"
 forbidden_operations:
   - auto_install
   - auto_run_setup
@@ -1022,7 +1022,7 @@ tools:
       project_shapes:
         - large_framework_app
         - multirepo
-      condition: "Только en/ASCII кодовые базы объёма standard/large, когда пользователь сам держит запущенный user-owned Gateway (HTTP /health отвечает) и явно просит continuity/research-контекст из прошлых сессий. Экономия подтверждена для research-follow-up (−20%..−67%) и impl-continuity на самом большом репо (−53%..−64%); малые проекты, narrow-вопрос после broad-обзора и impl в средних репо — убыток (воспроизведено в обеих конфигурациях, см. benchmark)."
+      condition: "Только en/ASCII кодовые базы объёма standard/large и формы large_framework_app/multirepo, когда пользователь сам держит запущенный user-owned Gateway (upstream-дефолт http://127.0.0.1:8420/health; в benchmark использовался порт-оверрайд 8431) и явно просит continuity/research-контекст из прошлых сессий. Экономия подтверждена для research-follow-up (−20%..−67%) и impl-continuity на самом большом репо (−53%..−64%); малые проекты, narrow-вопрос после broad-обзора и impl в средних репо — убыток (воспроизведено в обеих конфигурациях, см. benchmark). Кириллический контент не покрыт evidence: без remote-embeddings keyword-FTS не ищет кириллицу."
     do_not_recommend_for:
       project_shapes:
         - small_microservice
@@ -1042,9 +1042,10 @@ tools:
           skills: [aif-analyze, aif-explore, aif-review]
           tasks: [resume_previous_work, compact_handoff_context, architecture_or_impact_discovery]
           match:
+            project_shape: [large_framework_app, multirepo]
             volume: [standard, large]
             repo_shape: [single_repo, monorepo, multirepo]
-          recommendation_gate: "User explicitly runs their own gateway (health probe passes) and asks for dialog-history continuity; en/ASCII codebase; not a small project; not a narrow follow-up to a broad overview."
+          recommendation_gate: "User explicitly runs their own gateway (health probe on http://127.0.0.1:8420/health must pass) and asks for dialog-history continuity; en/ASCII codebase; the prior session must have covered the topic — a narrow follow-up after a broad overview loses to baseline (reproduced twice); not a small project."
     execution:
       default:
         mode: read_existing_reviewed_output

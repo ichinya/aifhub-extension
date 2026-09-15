@@ -1091,6 +1091,27 @@ async function runProbeForTool(toolId, options = {}) {
       ['repowise', ['doctor']]
     ]);
   }
+  if (toolId === 'tencentdb-agent-memory') {
+    // User-owned gateway health probe: the tool is only usable while the
+    // user's own TencentDB Agent Memory gateway is running (upstream default
+    // port 8420). AIFHub never starts or installs it — only probes.
+    const commandLabel = 'curl -fsS --max-time 2 http://127.0.0.1:8420/health';
+    try {
+      await execFileAsync('curl', ['-fsS', '--max-time', '2', 'http://127.0.0.1:8420/health'], {
+        windowsHide: true,
+        timeout: 5000,
+        maxBuffer: 64 * 1024
+      });
+      return { availability: 'installed', command: commandLabel };
+    } catch (err) {
+      return {
+        availability: 'not_installed',
+        command: commandLabel,
+        reason: err?.code === 'ENOENT' ? 'curl_missing' : 'gateway_not_reachable',
+        note: 'User-owned gateway is not reachable on http://127.0.0.1:8420/health; the user must start it before continuity recall is proposed.'
+      };
+    }
+  }
 
   return {
     availability: 'unknown',
