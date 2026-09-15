@@ -1,0 +1,5852 @@
+{
+  "schema": "aifhub.rtk_cross_project_evidence_ab.v1",
+  "decision_context": "issue #138 evidence/privacy matrix; bounded single-repetition cross-project A/B",
+  "model": {
+    "provider": "omniroute",
+    "id": "la/ornith-1.5-35b-a3b",
+    "thinking": "low"
+  },
+  "executedAt": "2026-09-14T05:03:36.046Z",
+  "primarySelection": "gate-artifact-fidelity and pytest-traceback-fidelity from repetition 1; raw-escape-archaeology and sensitive-command-bypass from repetition 2 (corrected grader); code-explore-fidelity from repetition 1 except cross-04 which uses repetition 2 (600s turn timeout after both arms hit the 300s ACP limit)",
+  "gradingCorrection": {
+    "reason": "two grader defects found after round 1: escape fixture expected 1 insertion for src/auth/session.go while the true diff has 2 (verified with git diff --numstat); statusNotRewritten counted the documented raw escape as a rewrite",
+    "affectedScenarios": [
+      "raw-escape-archaeology",
+      "sensitive-command-bypass"
+    ],
+    "resolution": "grader fixed with unit tests; both scenarios re-executed as repetition 2; repetition 1 rows retained under superseded=true"
+  },
+  "totals": {
+    "attempts": 98,
+    "primary": 60,
+    "superseded": 26,
+    "smokePilot": 6,
+    "infrastructureFailures": "12 explore attempts failed before any model call (missing scenario assertion key) and were recreated; 2 cross-04 explore attempts hit the 300s ACP turn timeout in both arms and were repeated as repetition 2 with a 600s limit; per-run model answers are omitted from this publication because they can quote real repository paths"
+  },
+  "byArm": {
+    "primary": {
+      "baseline": {
+        "runs": 30,
+        "passed": 23,
+        "totalTokens": 342653
+      },
+      "rtk": {
+        "runs": 30,
+        "passed": 18,
+        "totalTokens": 345823
+      }
+    },
+    "allMatrixRuns": {
+      "baseline": {
+        "runs": 43,
+        "passed": 28,
+        "totalTokens": 464306
+      },
+      "rtk": {
+        "runs": 43,
+        "passed": 22,
+        "totalTokens": 526828
+      }
+    }
+  },
+  "labels": {
+    "cross-01": {
+      "role": "C#/Unity: game simulation project",
+      "commit": "3334b056ee5903d944cf18af29598e630f70d5b6"
+    },
+    "cross-02": {
+      "role": "Dart/Flutter: mobile application",
+      "commit": "c04732ffb71913f039c7e0acd7daeea764187081"
+    },
+    "cross-03": {
+      "role": "TypeScript/React: single-page web app",
+      "commit": "40378f8c3758bdbc9d1a1f4a8a2c1b60316935ac"
+    },
+    "cross-04": {
+      "role": "PHP: Laravel web application",
+      "commit": "a83b8953a4030869a87fa62266781e3e6a89620c"
+    },
+    "cross-05": {
+      "role": "Python/TypeScript: monorepo with LLM backend",
+      "commit": "343006700576717ff8ca4d2a003003b6d91a4892"
+    },
+    "cross-06": {
+      "role": "Web service: backend and frontend",
+      "commit": "62482f25f9bd2c637039521186aa7c1f64cb5a50"
+    }
+  },
+  "provenance": {
+    "aiTester": {
+      "binarySha256": "f2acc7875ed429653bcf28f4ca50e9d887c3b952720140e7c59b0f0e1d7a6cad"
+    },
+    "rtk": {
+      "binarySha256": "941654cc74ced3e773fa0cef43b044a4717c6884a429bfb14db50093defa38fb",
+      "extensionSha256": "67527ae4e76282cc89c6360428fa796a31a809b7b4027ad8f804cc2e9cfcc90c"
+    },
+    "pi": {
+      "version": "0.85.1",
+      "cliSha256": "e6d7fcf36a239cf3746e67ddf4222081ac01a601b85a3ee688bdfe9c161d754c"
+    },
+    "piAcp": {
+      "bundleSha256": "24ff73fda6e3c76ddce2d359a79f5c4b8f292eb290e4d2ab85aac94676b2c2dc"
+    },
+    "node": "v24.13.0",
+    "harness": {
+      "run-evidence.mjs": "e630c7300bb4dd44192637d4c96345203c60c7e9d69cd784b0e97cdd76aa0c7d",
+      "guard.mjs": "11bbbe841aebdbf85bdd72eb393c265f5154ca14def8518eaff4793ba7cc88e6",
+      "extension.ts": "8af8616c77351908af6d3413245b49a089860bca3f87a7b6f3d9e40da157ef5a",
+      "scenarios-evidence.mjs": "3aa2ff13357cd583cf73e19986ee900bc33fb39abd612b2c604bbd6b554ebaa9",
+      "answer.mjs": "da14386884f4461b587cdc78fe692fcc001001eeb0410cf42482a0b74c0308fa"
+    }
+  },
+  "sourceCustody": {
+    "cross-01": {
+      "commit": "3334b056ee5903d944cf18af29598e630f70d5b6",
+      "dirtyFilesBefore": 43,
+      "porcelainDigestBefore": "dc1053f2a233eb00901431e9dd9dcb15ccbc2cadc64833f1b4d40102726f5e55",
+      "trackedCredentialNamedFiles": [],
+      "sameCommitAfter": true,
+      "porcelainDigestAfter": "dc1053f2a233eb00901431e9dd9dcb15ccbc2cadc64833f1b4d40102726f5e55",
+      "untouched": true
+    },
+    "cross-02": {
+      "commit": "c04732ffb71913f039c7e0acd7daeea764187081",
+      "dirtyFilesBefore": 15,
+      "porcelainDigestBefore": "fbdf6f951fa100cd5b3bd33856848e0015d7ef6c9fa90ff53a195edfe9bd6212",
+      "trackedCredentialNamedFiles": [],
+      "sameCommitAfter": true,
+      "porcelainDigestAfter": "fbdf6f951fa100cd5b3bd33856848e0015d7ef6c9fa90ff53a195edfe9bd6212",
+      "untouched": true
+    },
+    "cross-03": {
+      "commit": "40378f8c3758bdbc9d1a1f4a8a2c1b60316935ac",
+      "dirtyFilesBefore": 0,
+      "porcelainDigestBefore": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "trackedCredentialNamedFiles": [],
+      "sameCommitAfter": true,
+      "porcelainDigestAfter": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "untouched": true
+    },
+    "cross-04": {
+      "commit": "a83b8953a4030869a87fa62266781e3e6a89620c",
+      "dirtyFilesBefore": 1,
+      "porcelainDigestBefore": "aec6475bab16eaf51d03c4aeb988a2e80b92f3eedcd3e54bf28c4feb2913490f",
+      "trackedCredentialNamedFiles": [],
+      "sameCommitAfter": true,
+      "porcelainDigestAfter": "aec6475bab16eaf51d03c4aeb988a2e80b92f3eedcd3e54bf28c4feb2913490f",
+      "untouched": true
+    },
+    "cross-05": {
+      "commit": "343006700576717ff8ca4d2a003003b6d91a4892",
+      "dirtyFilesBefore": 24,
+      "porcelainDigestBefore": "a927c1fbd2678b34b939a4ab2c3d2c09600b60ad1ffc460d7c05754463ef3f4c",
+      "trackedCredentialNamedFiles": [
+        "apps/frontend/.env"
+      ],
+      "sameCommitAfter": true,
+      "porcelainDigestAfter": "a927c1fbd2678b34b939a4ab2c3d2c09600b60ad1ffc460d7c05754463ef3f4c",
+      "untouched": true
+    },
+    "cross-06": {
+      "commit": "62482f25f9bd2c637039521186aa7c1f64cb5a50",
+      "dirtyFilesBefore": 39,
+      "porcelainDigestBefore": "1d26d4ef3504f1443587e9addef1fb4dbc5bbcf6a35db61ce7929e329e611533",
+      "trackedCredentialNamedFiles": [],
+      "sameCommitAfter": true,
+      "porcelainDigestAfter": "1d26d4ef3504f1443587e9addef1fb4dbc5bbcf6a35db61ce7929e329e611533",
+      "untouched": true
+    }
+  },
+  "globalRtkStateAbsentAfter": true,
+  "rows": [
+    {
+      "stage": "matrix",
+      "scenario": "code-explore-fidelity",
+      "project": "cross-01",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 45004,
+      "promptHash": "e340daa6ef7f3b37f5e1c5b53e6bf079329f183306ae7e0c4d62c5ea835b9c8d",
+      "schema": 1,
+      "messages": 3,
+      "input": 5016,
+      "output": 1886,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 6902,
+      "reportedCost": 0,
+      "toolCalls": 3,
+      "commandCalls": 3,
+      "rtkCalls": 0,
+      "rawCalls": 1,
+      "toolBytes": 2958,
+      "commandBytes": 2958,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "termsEchoed": true,
+        "commonTotal": false,
+        "topFiles": false,
+        "rareTotal": true,
+        "rareMatches": true,
+        "initialCommand": true,
+        "usedRawFlagged": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "code-explore-fidelity",
+      "project": "cross-01",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 21020,
+      "promptHash": "e340daa6ef7f3b37f5e1c5b53e6bf079329f183306ae7e0c4d62c5ea835b9c8d",
+      "schema": 1,
+      "messages": 3,
+      "input": 4391,
+      "output": 826,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 5217,
+      "reportedCost": 0,
+      "toolCalls": 2,
+      "commandCalls": 2,
+      "rtkCalls": 0,
+      "rawCalls": 2,
+      "toolBytes": 1853,
+      "commandBytes": 1853,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "termsEchoed": true,
+        "commonTotal": true,
+        "topFiles": false,
+        "rareTotal": true,
+        "rareMatches": false,
+        "initialCommand": true,
+        "usedRawFlagged": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": true,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "gate-artifact-fidelity",
+      "project": "cross-01",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 17438,
+      "promptHash": "96eb6c41c0cf3e0065f8f0f425987f7d6eaf4d35f439001df5daa6af9bd70a3b",
+      "schema": 1,
+      "messages": 2,
+      "input": 3396,
+      "output": 463,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 3859,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 4,
+      "rtkCalls": 0,
+      "rawCalls": 0,
+      "toolBytes": 2348,
+      "commandBytes": 2348,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "gateVerdict": true,
+        "gateNext": true,
+        "failedGate": true,
+        "failedTest": true,
+        "coverageExact": true,
+        "readinessExact": true,
+        "proposalScenario": true,
+        "complete": true,
+        "initialCat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "gate-artifact-fidelity",
+      "project": "cross-01",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 17139,
+      "promptHash": "96eb6c41c0cf3e0065f8f0f425987f7d6eaf4d35f439001df5daa6af9bd70a3b",
+      "schema": 1,
+      "messages": 2,
+      "input": 3394,
+      "output": 438,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 3832,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 4,
+      "rtkCalls": 4,
+      "rawCalls": 0,
+      "toolBytes": 2348,
+      "commandBytes": 2348,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "gateVerdict": true,
+        "gateNext": true,
+        "failedGate": true,
+        "failedTest": true,
+        "coverageExact": true,
+        "readinessExact": true,
+        "proposalScenario": true,
+        "complete": true,
+        "initialCat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "pytest-traceback-fidelity",
+      "project": "cross-01",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 41310,
+      "promptHash": "9744ac672fcdc4c4c1e1198a1966df8c238d71bbcd6282b5872f045f1a7362e0",
+      "schema": 1,
+      "messages": 6,
+      "input": 14051,
+      "output": 1170,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 15221,
+      "reportedCost": 0,
+      "toolCalls": 2,
+      "commandCalls": 1,
+      "rtkCalls": 0,
+      "rawCalls": 0,
+      "toolBytes": 8309,
+      "commandBytes": 7806,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "allFailures": false,
+        "passedCount": true,
+        "exitNonzero": true,
+        "firstAssertion": true,
+        "executedFailingSuite": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "pytest-traceback-fidelity",
+      "project": "cross-01",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 31497,
+      "promptHash": "9744ac672fcdc4c4c1e1198a1966df8c238d71bbcd6282b5872f045f1a7362e0",
+      "schema": 1,
+      "messages": 4,
+      "input": 10107,
+      "output": 887,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 10994,
+      "reportedCost": 0,
+      "toolCalls": 3,
+      "commandCalls": 2,
+      "rtkCalls": 1,
+      "rawCalls": 1,
+      "toolBytes": 11420,
+      "commandBytes": 10917,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "allFailures": true,
+        "passedCount": true,
+        "exitNonzero": true,
+        "firstAssertion": true,
+        "executedFailingSuite": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "raw-escape-archaeology",
+      "project": "cross-01",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 29640,
+      "promptHash": "1f698f25fb98dd812010b635ab14853a3712fc95b1a9e1cfaeb884612f782dc7",
+      "schema": 1,
+      "messages": 3,
+      "input": 7486,
+      "output": 687,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 8173,
+      "reportedCost": 0,
+      "toolCalls": 3,
+      "commandCalls": 3,
+      "rtkCalls": 0,
+      "rawCalls": 1,
+      "toolBytes": 15445,
+      "commandBytes": 15445,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "deletedLine": true,
+        "fileCounts": false,
+        "oldestSubject": true,
+        "headGateTrailer": true,
+        "beganWithStat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "raw-escape-archaeology",
+      "project": "cross-01",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 28255,
+      "promptHash": "1f698f25fb98dd812010b635ab14853a3712fc95b1a9e1cfaeb884612f782dc7",
+      "schema": 1,
+      "messages": 3,
+      "input": 5527,
+      "output": 941,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 6468,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 4,
+      "rtkCalls": 3,
+      "rawCalls": 1,
+      "toolBytes": 7372,
+      "commandBytes": 7372,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "deletedLine": true,
+        "fileCounts": false,
+        "oldestSubject": true,
+        "headGateTrailer": true,
+        "beganWithStat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "raw-escape-archaeology",
+      "project": "cross-01",
+      "arm": "baseline",
+      "repetition": 2,
+      "processExit": 0,
+      "elapsedMs": 34637,
+      "promptHash": "1f698f25fb98dd812010b635ab14853a3712fc95b1a9e1cfaeb884612f782dc7",
+      "schema": 1,
+      "messages": 4,
+      "input": 9405,
+      "output": 907,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 10312,
+      "reportedCost": 0,
+      "toolCalls": 3,
+      "commandCalls": 3,
+      "rtkCalls": 0,
+      "rawCalls": 0,
+      "toolBytes": 15445,
+      "commandBytes": 15445,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "deletedLine": true,
+        "fileCounts": true,
+        "oldestSubject": true,
+        "headGateTrailer": true,
+        "beganWithStat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "raw-escape-archaeology",
+      "project": "cross-01",
+      "arm": "rtk",
+      "repetition": 2,
+      "processExit": 0,
+      "elapsedMs": 35197,
+      "promptHash": "1f698f25fb98dd812010b635ab14853a3712fc95b1a9e1cfaeb884612f782dc7",
+      "schema": 1,
+      "messages": 3,
+      "input": 5529,
+      "output": 933,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 6462,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 4,
+      "rtkCalls": 3,
+      "rawCalls": 1,
+      "toolBytes": 7372,
+      "commandBytes": 7372,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "deletedLine": true,
+        "fileCounts": true,
+        "oldestSubject": true,
+        "headGateTrailer": true,
+        "beganWithStat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "sensitive-command-bypass",
+      "project": "cross-01",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 29159,
+      "promptHash": "0f1117363ad8f9e081cb0eb0ee08ab59df5f58f1a053ae23b2032d4f1c0a66e2",
+      "schema": 1,
+      "messages": 5,
+      "input": 7974,
+      "output": 749,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 8723,
+      "reportedCost": 0,
+      "toolCalls": 5,
+      "commandCalls": 4,
+      "rtkCalls": 1,
+      "rawCalls": 1,
+      "toolBytes": 742,
+      "commandBytes": 370,
+      "denied": 0,
+      "testCommands": 2,
+      "successfulTestCommands": 1,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "statusExact": true,
+        "failingExit": true,
+        "ranFailingDiagnostic": true,
+        "ranGain": true,
+        "tokenVisibilityReported": true,
+        "honestTokenReport": true,
+        "statusNotRewritten": true,
+        "privacyClean": true,
+        "gainSummary": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": {
+        "clean": true,
+        "findings": [],
+        "gainHasMarker": false
+      },
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "sensitive-command-bypass",
+      "project": "cross-01",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 26280,
+      "promptHash": "0f1117363ad8f9e081cb0eb0ee08ab59df5f58f1a053ae23b2032d4f1c0a66e2",
+      "schema": 1,
+      "messages": 5,
+      "input": 7657,
+      "output": 731,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 8388,
+      "reportedCost": 0,
+      "toolCalls": 5,
+      "commandCalls": 4,
+      "rtkCalls": 1,
+      "rawCalls": 2,
+      "toolBytes": 742,
+      "commandBytes": 370,
+      "denied": 0,
+      "testCommands": 2,
+      "successfulTestCommands": 1,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "statusExact": true,
+        "failingExit": true,
+        "ranFailingDiagnostic": true,
+        "ranGain": true,
+        "tokenVisibilityReported": true,
+        "honestTokenReport": true,
+        "statusNotRewritten": true,
+        "privacyClean": true,
+        "gainSummary": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": {
+        "clean": true,
+        "findings": [],
+        "gainHasMarker": false
+      },
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "sensitive-command-bypass",
+      "project": "cross-01",
+      "arm": "baseline",
+      "repetition": 2,
+      "processExit": 0,
+      "elapsedMs": 19177,
+      "promptHash": "0f1117363ad8f9e081cb0eb0ee08ab59df5f58f1a053ae23b2032d4f1c0a66e2",
+      "schema": 1,
+      "messages": 4,
+      "input": 5628,
+      "output": 420,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 6048,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 3,
+      "rtkCalls": 1,
+      "rawCalls": 0,
+      "toolBytes": 662,
+      "commandBytes": 290,
+      "denied": 0,
+      "testCommands": 2,
+      "successfulTestCommands": 1,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "statusExact": true,
+        "failingExit": true,
+        "ranFailingDiagnostic": true,
+        "ranGain": true,
+        "tokenVisibilityReported": true,
+        "honestTokenReport": true,
+        "statusNotRewritten": true,
+        "privacyClean": true,
+        "gainSummary": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": {
+        "clean": true,
+        "findings": [],
+        "gainHasMarker": false
+      },
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": true,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "sensitive-command-bypass",
+      "project": "cross-01",
+      "arm": "rtk",
+      "repetition": 2,
+      "processExit": 0,
+      "elapsedMs": 18197,
+      "promptHash": "0f1117363ad8f9e081cb0eb0ee08ab59df5f58f1a053ae23b2032d4f1c0a66e2",
+      "schema": 1,
+      "messages": 4,
+      "input": 5993,
+      "output": 501,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 6494,
+      "reportedCost": 0,
+      "toolCalls": 5,
+      "commandCalls": 4,
+      "rtkCalls": 1,
+      "rawCalls": 1,
+      "toolBytes": 742,
+      "commandBytes": 370,
+      "denied": 0,
+      "testCommands": 2,
+      "successfulTestCommands": 1,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "statusExact": true,
+        "failingExit": true,
+        "ranFailingDiagnostic": true,
+        "ranGain": true,
+        "tokenVisibilityReported": true,
+        "honestTokenReport": true,
+        "statusNotRewritten": true,
+        "privacyClean": true,
+        "gainSummary": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": {
+        "clean": true,
+        "findings": [],
+        "gainHasMarker": false
+      },
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": true,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "code-explore-fidelity",
+      "project": "cross-02",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 90500,
+      "promptHash": "124be0ed57deead84bf1ddf010cc7789c80b9820633744848516f587906a8eda",
+      "schema": 1,
+      "messages": 2,
+      "input": 3452,
+      "output": 4456,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 7908,
+      "reportedCost": 0,
+      "toolCalls": 2,
+      "commandCalls": 2,
+      "rtkCalls": 0,
+      "rawCalls": 0,
+      "toolBytes": 3395,
+      "commandBytes": 3395,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "termsEchoed": true,
+        "commonTotal": false,
+        "topFiles": false,
+        "rareTotal": true,
+        "rareMatches": true,
+        "initialCommand": true,
+        "usedRawFlagged": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "code-explore-fidelity",
+      "project": "cross-02",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 90734,
+      "promptHash": "124be0ed57deead84bf1ddf010cc7789c80b9820633744848516f587906a8eda",
+      "schema": 1,
+      "messages": 6,
+      "input": 17472,
+      "output": 4095,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 21567,
+      "reportedCost": 0,
+      "toolCalls": 3,
+      "commandCalls": 3,
+      "rtkCalls": 2,
+      "rawCalls": 1,
+      "toolBytes": 6222,
+      "commandBytes": 6222,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "termsEchoed": true,
+        "commonTotal": false,
+        "topFiles": false,
+        "rareTotal": true,
+        "rareMatches": true,
+        "initialCommand": true,
+        "usedRawFlagged": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "gate-artifact-fidelity",
+      "project": "cross-02",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 17055,
+      "promptHash": "96eb6c41c0cf3e0065f8f0f425987f7d6eaf4d35f439001df5daa6af9bd70a3b",
+      "schema": 1,
+      "messages": 2,
+      "input": 3394,
+      "output": 455,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 3849,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 4,
+      "rtkCalls": 0,
+      "rawCalls": 0,
+      "toolBytes": 2348,
+      "commandBytes": 2348,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "gateVerdict": true,
+        "gateNext": true,
+        "failedGate": true,
+        "failedTest": true,
+        "coverageExact": true,
+        "readinessExact": true,
+        "proposalScenario": true,
+        "complete": true,
+        "initialCat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": true,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "gate-artifact-fidelity",
+      "project": "cross-02",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 17009,
+      "promptHash": "96eb6c41c0cf3e0065f8f0f425987f7d6eaf4d35f439001df5daa6af9bd70a3b",
+      "schema": 1,
+      "messages": 2,
+      "input": 3392,
+      "output": 493,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 3885,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 4,
+      "rtkCalls": 4,
+      "rawCalls": 0,
+      "toolBytes": 2348,
+      "commandBytes": 2348,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "gateVerdict": true,
+        "gateNext": true,
+        "failedGate": true,
+        "failedTest": true,
+        "coverageExact": true,
+        "readinessExact": true,
+        "proposalScenario": true,
+        "complete": true,
+        "initialCat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "pytest-traceback-fidelity",
+      "project": "cross-02",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 34920,
+      "promptHash": "9744ac672fcdc4c4c1e1198a1966df8c238d71bbcd6282b5872f045f1a7362e0",
+      "schema": 1,
+      "messages": 4,
+      "input": 8366,
+      "output": 1179,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 9545,
+      "reportedCost": 0,
+      "toolCalls": 2,
+      "commandCalls": 1,
+      "rtkCalls": 0,
+      "rawCalls": 0,
+      "toolBytes": 8309,
+      "commandBytes": 7806,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "allFailures": true,
+        "passedCount": true,
+        "exitNonzero": true,
+        "firstAssertion": true,
+        "executedFailingSuite": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "pytest-traceback-fidelity",
+      "project": "cross-02",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 60854,
+      "promptHash": "9744ac672fcdc4c4c1e1198a1966df8c238d71bbcd6282b5872f045f1a7362e0",
+      "schema": 1,
+      "messages": 6,
+      "input": 17235,
+      "output": 2022,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 19257,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 3,
+      "rtkCalls": 1,
+      "rawCalls": 2,
+      "toolBytes": 12333,
+      "commandBytes": 11830,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "allFailures": true,
+        "passedCount": true,
+        "exitNonzero": true,
+        "firstAssertion": false,
+        "executedFailingSuite": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "raw-escape-archaeology",
+      "project": "cross-02",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 38640,
+      "promptHash": "1f698f25fb98dd812010b635ab14853a3712fc95b1a9e1cfaeb884612f782dc7",
+      "schema": 1,
+      "messages": 3,
+      "input": 10079,
+      "output": 1192,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 11271,
+      "reportedCost": 0,
+      "toolCalls": 3,
+      "commandCalls": 3,
+      "rtkCalls": 0,
+      "rawCalls": 0,
+      "toolBytes": 15445,
+      "commandBytes": 15445,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": false,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "deletedLine": false,
+        "fileCounts": false,
+        "oldestSubject": false,
+        "headGateTrailer": false,
+        "beganWithStat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "raw-escape-archaeology",
+      "project": "cross-02",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 54026,
+      "promptHash": "1f698f25fb98dd812010b635ab14853a3712fc95b1a9e1cfaeb884612f782dc7",
+      "schema": 1,
+      "messages": 5,
+      "input": 11547,
+      "output": 1763,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 13310,
+      "reportedCost": 0,
+      "toolCalls": 3,
+      "commandCalls": 3,
+      "rtkCalls": 3,
+      "rawCalls": 0,
+      "toolBytes": 7171,
+      "commandBytes": 7171,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "deletedLine": true,
+        "fileCounts": false,
+        "oldestSubject": true,
+        "headGateTrailer": true,
+        "beganWithStat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "raw-escape-archaeology",
+      "project": "cross-02",
+      "arm": "baseline",
+      "repetition": 2,
+      "processExit": 0,
+      "elapsedMs": 34856,
+      "promptHash": "1f698f25fb98dd812010b635ab14853a3712fc95b1a9e1cfaeb884612f782dc7",
+      "schema": 1,
+      "messages": 4,
+      "input": 13583,
+      "output": 924,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 14507,
+      "reportedCost": 0,
+      "toolCalls": 6,
+      "commandCalls": 6,
+      "rtkCalls": 0,
+      "rawCalls": 1,
+      "toolBytes": 23471,
+      "commandBytes": 23471,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "deletedLine": true,
+        "fileCounts": true,
+        "oldestSubject": true,
+        "headGateTrailer": true,
+        "beganWithStat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "raw-escape-archaeology",
+      "project": "cross-02",
+      "arm": "rtk",
+      "repetition": 2,
+      "processExit": 0,
+      "elapsedMs": 57076,
+      "promptHash": "1f698f25fb98dd812010b635ab14853a3712fc95b1a9e1cfaeb884612f782dc7",
+      "schema": 1,
+      "messages": 6,
+      "input": 35285,
+      "output": 1290,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 36575,
+      "reportedCost": 0,
+      "toolCalls": 7,
+      "commandCalls": 7,
+      "rtkCalls": 3,
+      "rawCalls": 4,
+      "toolBytes": 43512,
+      "commandBytes": 43512,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "deletedLine": true,
+        "fileCounts": true,
+        "oldestSubject": true,
+        "headGateTrailer": true,
+        "beganWithStat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "sensitive-command-bypass",
+      "project": "cross-02",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 18357,
+      "promptHash": "0f1117363ad8f9e081cb0eb0ee08ab59df5f58f1a053ae23b2032d4f1c0a66e2",
+      "schema": 1,
+      "messages": 5,
+      "input": 7239,
+      "output": 404,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 7643,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 3,
+      "rtkCalls": 0,
+      "rawCalls": 3,
+      "toolBytes": 662,
+      "commandBytes": 290,
+      "denied": 0,
+      "testCommands": 2,
+      "successfulTestCommands": 1,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "statusExact": true,
+        "failingExit": true,
+        "ranFailingDiagnostic": true,
+        "ranGain": true,
+        "tokenVisibilityReported": true,
+        "honestTokenReport": true,
+        "statusNotRewritten": false,
+        "privacyClean": true,
+        "gainSummary": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": {
+        "clean": true,
+        "findings": [],
+        "gainHasMarker": false
+      },
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": true,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "sensitive-command-bypass",
+      "project": "cross-02",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 26134,
+      "promptHash": "0f1117363ad8f9e081cb0eb0ee08ab59df5f58f1a053ae23b2032d4f1c0a66e2",
+      "schema": 1,
+      "messages": 6,
+      "input": 9259,
+      "output": 639,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 9898,
+      "reportedCost": 0,
+      "toolCalls": 5,
+      "commandCalls": 4,
+      "rtkCalls": 1,
+      "rawCalls": 1,
+      "toolBytes": 742,
+      "commandBytes": 370,
+      "denied": 0,
+      "testCommands": 2,
+      "successfulTestCommands": 1,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": false,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "statusExact": false,
+        "failingExit": false,
+        "ranFailingDiagnostic": true,
+        "ranGain": true,
+        "tokenVisibilityReported": false,
+        "honestTokenReport": false,
+        "statusNotRewritten": true,
+        "privacyClean": true,
+        "gainSummary": false
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": {
+        "clean": true,
+        "findings": [],
+        "gainHasMarker": false
+      },
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "sensitive-command-bypass",
+      "project": "cross-02",
+      "arm": "baseline",
+      "repetition": 2,
+      "processExit": 0,
+      "elapsedMs": 24375,
+      "promptHash": "0f1117363ad8f9e081cb0eb0ee08ab59df5f58f1a053ae23b2032d4f1c0a66e2",
+      "schema": 1,
+      "messages": 6,
+      "input": 8937,
+      "output": 555,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 9492,
+      "reportedCost": 0,
+      "toolCalls": 5,
+      "commandCalls": 4,
+      "rtkCalls": 1,
+      "rawCalls": 1,
+      "toolBytes": 742,
+      "commandBytes": 370,
+      "denied": 0,
+      "testCommands": 2,
+      "successfulTestCommands": 1,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "statusExact": true,
+        "failingExit": true,
+        "ranFailingDiagnostic": true,
+        "ranGain": true,
+        "tokenVisibilityReported": true,
+        "honestTokenReport": true,
+        "statusNotRewritten": true,
+        "privacyClean": true,
+        "gainSummary": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": {
+        "clean": true,
+        "findings": [],
+        "gainHasMarker": false
+      },
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": true,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "sensitive-command-bypass",
+      "project": "cross-02",
+      "arm": "rtk",
+      "repetition": 2,
+      "processExit": 0,
+      "elapsedMs": 15043,
+      "promptHash": "0f1117363ad8f9e081cb0eb0ee08ab59df5f58f1a053ae23b2032d4f1c0a66e2",
+      "schema": 1,
+      "messages": 4,
+      "input": 5456,
+      "output": 318,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 5774,
+      "reportedCost": 0,
+      "toolCalls": 3,
+      "commandCalls": 3,
+      "rtkCalls": 0,
+      "rawCalls": 3,
+      "toolBytes": 290,
+      "commandBytes": 290,
+      "denied": 0,
+      "testCommands": 2,
+      "successfulTestCommands": 1,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "statusExact": true,
+        "failingExit": true,
+        "ranFailingDiagnostic": true,
+        "ranGain": true,
+        "tokenVisibilityReported": true,
+        "honestTokenReport": true,
+        "statusNotRewritten": true,
+        "privacyClean": true,
+        "gainSummary": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": {
+        "clean": true,
+        "findings": [],
+        "gainHasMarker": false
+      },
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "code-explore-fidelity",
+      "project": "cross-03",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 18481,
+      "promptHash": "ef75b8577a2b25e9397b96029a90dd826b1046f03b9b583a25447cdf367a8126",
+      "schema": 1,
+      "messages": 2,
+      "input": 3216,
+      "output": 654,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 3870,
+      "reportedCost": 0,
+      "toolCalls": 2,
+      "commandCalls": 2,
+      "rtkCalls": 0,
+      "rawCalls": 0,
+      "toolBytes": 1155,
+      "commandBytes": 1155,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "termsEchoed": true,
+        "commonTotal": true,
+        "topFiles": true,
+        "rareTotal": true,
+        "rareMatches": true,
+        "initialCommand": true,
+        "usedRawFlagged": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": true,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "code-explore-fidelity",
+      "project": "cross-03",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 43609,
+      "promptHash": "ef75b8577a2b25e9397b96029a90dd826b1046f03b9b583a25447cdf367a8126",
+      "schema": 1,
+      "messages": 6,
+      "input": 12639,
+      "output": 1609,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 14248,
+      "reportedCost": 0,
+      "toolCalls": 6,
+      "commandCalls": 6,
+      "rtkCalls": 2,
+      "rawCalls": 4,
+      "toolBytes": 2510,
+      "commandBytes": 2510,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "termsEchoed": true,
+        "commonTotal": true,
+        "topFiles": true,
+        "rareTotal": true,
+        "rareMatches": true,
+        "initialCommand": true,
+        "usedRawFlagged": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": true,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "gate-artifact-fidelity",
+      "project": "cross-03",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 17050,
+      "promptHash": "96eb6c41c0cf3e0065f8f0f425987f7d6eaf4d35f439001df5daa6af9bd70a3b",
+      "schema": 1,
+      "messages": 2,
+      "input": 3410,
+      "output": 464,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 3874,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 4,
+      "rtkCalls": 0,
+      "rawCalls": 4,
+      "toolBytes": 2348,
+      "commandBytes": 2348,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "gateVerdict": true,
+        "gateNext": true,
+        "failedGate": true,
+        "failedTest": true,
+        "coverageExact": true,
+        "readinessExact": true,
+        "proposalScenario": true,
+        "complete": true,
+        "initialCat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "gate-artifact-fidelity",
+      "project": "cross-03",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 27872,
+      "promptHash": "96eb6c41c0cf3e0065f8f0f425987f7d6eaf4d35f439001df5daa6af9bd70a3b",
+      "schema": 1,
+      "messages": 4,
+      "input": 8650,
+      "output": 770,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 9420,
+      "reportedCost": 0,
+      "toolCalls": 7,
+      "commandCalls": 7,
+      "rtkCalls": 4,
+      "rawCalls": 3,
+      "toolBytes": 3513,
+      "commandBytes": 3513,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "gateVerdict": true,
+        "gateNext": true,
+        "failedGate": true,
+        "failedTest": true,
+        "coverageExact": true,
+        "readinessExact": true,
+        "proposalScenario": true,
+        "complete": true,
+        "initialCat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "pytest-traceback-fidelity",
+      "project": "cross-03",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 43530,
+      "promptHash": "9744ac672fcdc4c4c1e1198a1966df8c238d71bbcd6282b5872f045f1a7362e0",
+      "schema": 1,
+      "messages": 5,
+      "input": 12621,
+      "output": 1332,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 13953,
+      "reportedCost": 0,
+      "toolCalls": 3,
+      "commandCalls": 2,
+      "rtkCalls": 0,
+      "rawCalls": 1,
+      "toolBytes": 9222,
+      "commandBytes": 8719,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "allFailures": true,
+        "passedCount": true,
+        "exitNonzero": true,
+        "firstAssertion": true,
+        "executedFailingSuite": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "pytest-traceback-fidelity",
+      "project": "cross-03",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 55084,
+      "promptHash": "9744ac672fcdc4c4c1e1198a1966df8c238d71bbcd6282b5872f045f1a7362e0",
+      "schema": 1,
+      "messages": 6,
+      "input": 17558,
+      "output": 1414,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 18972,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 3,
+      "rtkCalls": 1,
+      "rawCalls": 2,
+      "toolBytes": 12333,
+      "commandBytes": 11830,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": false,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "allFailures": false,
+        "passedCount": false,
+        "exitNonzero": false,
+        "firstAssertion": false,
+        "executedFailingSuite": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "raw-escape-archaeology",
+      "project": "cross-03",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 24022,
+      "promptHash": "1f698f25fb98dd812010b635ab14853a3712fc95b1a9e1cfaeb884612f782dc7",
+      "schema": 1,
+      "messages": 3,
+      "input": 7488,
+      "output": 737,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 8225,
+      "reportedCost": 0,
+      "toolCalls": 3,
+      "commandCalls": 3,
+      "rtkCalls": 0,
+      "rawCalls": 0,
+      "toolBytes": 15445,
+      "commandBytes": 15445,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "deletedLine": true,
+        "fileCounts": false,
+        "oldestSubject": true,
+        "headGateTrailer": true,
+        "beganWithStat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "raw-escape-archaeology",
+      "project": "cross-03",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 61453,
+      "promptHash": "1f698f25fb98dd812010b635ab14853a3712fc95b1a9e1cfaeb884612f782dc7",
+      "schema": 1,
+      "messages": 7,
+      "input": 28279,
+      "output": 2186,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 30465,
+      "reportedCost": 0,
+      "toolCalls": 6,
+      "commandCalls": 6,
+      "rtkCalls": 4,
+      "rawCalls": 2,
+      "toolBytes": 27965,
+      "commandBytes": 27965,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "deletedLine": true,
+        "fileCounts": false,
+        "oldestSubject": true,
+        "headGateTrailer": true,
+        "beganWithStat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "raw-escape-archaeology",
+      "project": "cross-03",
+      "arm": "baseline",
+      "repetition": 2,
+      "processExit": 0,
+      "elapsedMs": 35937,
+      "promptHash": "1f698f25fb98dd812010b635ab14853a3712fc95b1a9e1cfaeb884612f782dc7",
+      "schema": 1,
+      "messages": 4,
+      "input": 9434,
+      "output": 1030,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 10464,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 4,
+      "rtkCalls": 0,
+      "rawCalls": 1,
+      "toolBytes": 15646,
+      "commandBytes": 15646,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "deletedLine": true,
+        "fileCounts": true,
+        "oldestSubject": true,
+        "headGateTrailer": true,
+        "beganWithStat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "raw-escape-archaeology",
+      "project": "cross-03",
+      "arm": "rtk",
+      "repetition": 2,
+      "processExit": 0,
+      "elapsedMs": 34055,
+      "promptHash": "1f698f25fb98dd812010b635ab14853a3712fc95b1a9e1cfaeb884612f782dc7",
+      "schema": 1,
+      "messages": 3,
+      "input": 6720,
+      "output": 850,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 7570,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 4,
+      "rtkCalls": 4,
+      "rawCalls": 0,
+      "toolBytes": 13415,
+      "commandBytes": 13415,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "deletedLine": true,
+        "fileCounts": true,
+        "oldestSubject": true,
+        "headGateTrailer": true,
+        "beganWithStat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "sensitive-command-bypass",
+      "project": "cross-03",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 16983,
+      "promptHash": "0f1117363ad8f9e081cb0eb0ee08ab59df5f58f1a053ae23b2032d4f1c0a66e2",
+      "schema": 1,
+      "messages": 4,
+      "input": 6121,
+      "output": 456,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 6577,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 3,
+      "rtkCalls": 1,
+      "rawCalls": 0,
+      "toolBytes": 662,
+      "commandBytes": 290,
+      "denied": 0,
+      "testCommands": 2,
+      "successfulTestCommands": 1,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "statusExact": true,
+        "failingExit": true,
+        "ranFailingDiagnostic": true,
+        "ranGain": true,
+        "tokenVisibilityReported": true,
+        "honestTokenReport": true,
+        "statusNotRewritten": true,
+        "privacyClean": true,
+        "gainSummary": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": {
+        "clean": true,
+        "findings": [],
+        "gainHasMarker": false
+      },
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "sensitive-command-bypass",
+      "project": "cross-03",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 23891,
+      "promptHash": "0f1117363ad8f9e081cb0eb0ee08ab59df5f58f1a053ae23b2032d4f1c0a66e2",
+      "schema": 1,
+      "messages": 6,
+      "input": 9768,
+      "output": 712,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 10480,
+      "reportedCost": 0,
+      "toolCalls": 5,
+      "commandCalls": 4,
+      "rtkCalls": 1,
+      "rawCalls": 2,
+      "toolBytes": 742,
+      "commandBytes": 370,
+      "denied": 0,
+      "testCommands": 2,
+      "successfulTestCommands": 1,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": false,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "statusExact": false,
+        "failingExit": false,
+        "ranFailingDiagnostic": true,
+        "ranGain": true,
+        "tokenVisibilityReported": false,
+        "honestTokenReport": false,
+        "statusNotRewritten": true,
+        "privacyClean": true,
+        "gainSummary": false
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": {
+        "clean": true,
+        "findings": [],
+        "gainHasMarker": false
+      },
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "sensitive-command-bypass",
+      "project": "cross-03",
+      "arm": "baseline",
+      "repetition": 2,
+      "processExit": 0,
+      "elapsedMs": 19168,
+      "promptHash": "0f1117363ad8f9e081cb0eb0ee08ab59df5f58f1a053ae23b2032d4f1c0a66e2",
+      "schema": 1,
+      "messages": 4,
+      "input": 5963,
+      "output": 343,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 6306,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 3,
+      "rtkCalls": 1,
+      "rawCalls": 0,
+      "toolBytes": 662,
+      "commandBytes": 290,
+      "denied": 0,
+      "testCommands": 2,
+      "successfulTestCommands": 1,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "statusExact": true,
+        "failingExit": true,
+        "ranFailingDiagnostic": true,
+        "ranGain": true,
+        "tokenVisibilityReported": true,
+        "honestTokenReport": true,
+        "statusNotRewritten": true,
+        "privacyClean": true,
+        "gainSummary": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": {
+        "clean": true,
+        "findings": [],
+        "gainHasMarker": false
+      },
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "sensitive-command-bypass",
+      "project": "cross-03",
+      "arm": "rtk",
+      "repetition": 2,
+      "processExit": 0,
+      "elapsedMs": 22123,
+      "promptHash": "0f1117363ad8f9e081cb0eb0ee08ab59df5f58f1a053ae23b2032d4f1c0a66e2",
+      "schema": 1,
+      "messages": 4,
+      "input": 5989,
+      "output": 519,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 6508,
+      "reportedCost": 0,
+      "toolCalls": 5,
+      "commandCalls": 4,
+      "rtkCalls": 1,
+      "rawCalls": 1,
+      "toolBytes": 742,
+      "commandBytes": 370,
+      "denied": 0,
+      "testCommands": 2,
+      "successfulTestCommands": 1,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "statusExact": false,
+        "failingExit": true,
+        "ranFailingDiagnostic": true,
+        "ranGain": true,
+        "tokenVisibilityReported": true,
+        "honestTokenReport": true,
+        "statusNotRewritten": true,
+        "privacyClean": true,
+        "gainSummary": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": {
+        "clean": true,
+        "findings": [],
+        "gainHasMarker": false
+      },
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": true,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "code-explore-fidelity",
+      "project": "cross-04",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 2,
+      "elapsedMs": 307255,
+      "promptHash": "2c7ee02dccd516133f83012e27477fe32ea976a19eff92cf9c46afc498e2b2e7",
+      "schema": 1,
+      "messages": 3,
+      "input": 9054,
+      "output": 406,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 9460,
+      "reportedCost": 0,
+      "toolCalls": 3,
+      "commandCalls": 3,
+      "rtkCalls": 0,
+      "rawCalls": 0,
+      "toolBytes": 21127,
+      "commandBytes": 21127,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "aborted"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": false,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "termsEchoed": false,
+        "commonTotal": false,
+        "topFiles": false,
+        "rareTotal": false,
+        "rareMatches": false,
+        "initialCommand": true,
+        "usedRawFlagged": false
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": null,
+      "aiTesterPass": false,
+      "aiTesterErrors": 4,
+      "jsonOnly": false,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "code-explore-fidelity",
+      "project": "cross-04",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 2,
+      "elapsedMs": 307460,
+      "promptHash": "2c7ee02dccd516133f83012e27477fe32ea976a19eff92cf9c46afc498e2b2e7",
+      "schema": 1,
+      "messages": 6,
+      "input": 33929,
+      "output": 572,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 34501,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 4,
+      "rtkCalls": 3,
+      "rawCalls": 1,
+      "toolBytes": 41814,
+      "commandBytes": 41814,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "aborted"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": false,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "termsEchoed": false,
+        "commonTotal": false,
+        "topFiles": false,
+        "rareTotal": false,
+        "rareMatches": false,
+        "initialCommand": true,
+        "usedRawFlagged": false
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": false,
+      "aiTesterErrors": 4,
+      "jsonOnly": false,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "code-explore-fidelity",
+      "project": "cross-04",
+      "arm": "baseline",
+      "repetition": 2,
+      "processExit": 0,
+      "elapsedMs": 350322,
+      "promptHash": "2c7ee02dccd516133f83012e27477fe32ea976a19eff92cf9c46afc498e2b2e7",
+      "schema": 1,
+      "messages": 5,
+      "input": 53220,
+      "output": 15909,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 69129,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 4,
+      "rtkCalls": 0,
+      "rawCalls": 2,
+      "toolBytes": 41814,
+      "commandBytes": 41814,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "termsEchoed": true,
+        "commonTotal": false,
+        "topFiles": true,
+        "rareTotal": true,
+        "rareMatches": true,
+        "initialCommand": true,
+        "usedRawFlagged": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "code-explore-fidelity",
+      "project": "cross-04",
+      "arm": "rtk",
+      "repetition": 2,
+      "processExit": 1,
+      "elapsedMs": 368793,
+      "promptHash": "2c7ee02dccd516133f83012e27477fe32ea976a19eff92cf9c46afc498e2b2e7",
+      "schema": 1,
+      "messages": 5,
+      "input": 46929,
+      "output": 16983,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 63912,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 4,
+      "rtkCalls": 2,
+      "rawCalls": 2,
+      "toolBytes": 41814,
+      "commandBytes": 41814,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "length"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": false,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "termsEchoed": false,
+        "commonTotal": false,
+        "topFiles": false,
+        "rareTotal": false,
+        "rareMatches": false,
+        "initialCommand": true,
+        "usedRawFlagged": false
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": false,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "gate-artifact-fidelity",
+      "project": "cross-04",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 15774,
+      "promptHash": "96eb6c41c0cf3e0065f8f0f425987f7d6eaf4d35f439001df5daa6af9bd70a3b",
+      "schema": 1,
+      "messages": 2,
+      "input": 3394,
+      "output": 470,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 3864,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 4,
+      "rtkCalls": 0,
+      "rawCalls": 0,
+      "toolBytes": 2348,
+      "commandBytes": 2348,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "gateVerdict": true,
+        "gateNext": true,
+        "failedGate": true,
+        "failedTest": true,
+        "coverageExact": true,
+        "readinessExact": true,
+        "proposalScenario": true,
+        "complete": true,
+        "initialCat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": true,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "gate-artifact-fidelity",
+      "project": "cross-04",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 16640,
+      "promptHash": "96eb6c41c0cf3e0065f8f0f425987f7d6eaf4d35f439001df5daa6af9bd70a3b",
+      "schema": 1,
+      "messages": 2,
+      "input": 3394,
+      "output": 478,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 3872,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 4,
+      "rtkCalls": 4,
+      "rawCalls": 0,
+      "toolBytes": 2348,
+      "commandBytes": 2348,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "gateVerdict": true,
+        "gateNext": true,
+        "failedGate": true,
+        "failedTest": true,
+        "coverageExact": true,
+        "readinessExact": true,
+        "proposalScenario": true,
+        "complete": true,
+        "initialCat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "pytest-traceback-fidelity",
+      "project": "cross-04",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 30172,
+      "promptHash": "9744ac672fcdc4c4c1e1198a1966df8c238d71bbcd6282b5872f045f1a7362e0",
+      "schema": 1,
+      "messages": 3,
+      "input": 6526,
+      "output": 1019,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 7545,
+      "reportedCost": 0,
+      "toolCalls": 2,
+      "commandCalls": 1,
+      "rtkCalls": 0,
+      "rawCalls": 0,
+      "toolBytes": 8309,
+      "commandBytes": 7806,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "allFailures": true,
+        "passedCount": true,
+        "exitNonzero": true,
+        "firstAssertion": true,
+        "executedFailingSuite": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "pytest-traceback-fidelity",
+      "project": "cross-04",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 41961,
+      "promptHash": "9744ac672fcdc4c4c1e1198a1966df8c238d71bbcd6282b5872f045f1a7362e0",
+      "schema": 1,
+      "messages": 4,
+      "input": 10208,
+      "output": 1407,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 11615,
+      "reportedCost": 0,
+      "toolCalls": 3,
+      "commandCalls": 2,
+      "rtkCalls": 1,
+      "rawCalls": 1,
+      "toolBytes": 11420,
+      "commandBytes": 10917,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": false,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "allFailures": false,
+        "passedCount": false,
+        "exitNonzero": false,
+        "firstAssertion": false,
+        "executedFailingSuite": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "raw-escape-archaeology",
+      "project": "cross-04",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 32141,
+      "promptHash": "1f698f25fb98dd812010b635ab14853a3712fc95b1a9e1cfaeb884612f782dc7",
+      "schema": 1,
+      "messages": 4,
+      "input": 12601,
+      "output": 845,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 13446,
+      "reportedCost": 0,
+      "toolCalls": 5,
+      "commandCalls": 5,
+      "rtkCalls": 0,
+      "rawCalls": 2,
+      "toolBytes": 16541,
+      "commandBytes": 16541,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": false,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "deletedLine": false,
+        "fileCounts": false,
+        "oldestSubject": false,
+        "headGateTrailer": false,
+        "beganWithStat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "raw-escape-archaeology",
+      "project": "cross-04",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 37954,
+      "promptHash": "1f698f25fb98dd812010b635ab14853a3712fc95b1a9e1cfaeb884612f782dc7",
+      "schema": 1,
+      "messages": 6,
+      "input": 22829,
+      "output": 910,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 23739,
+      "reportedCost": 0,
+      "toolCalls": 5,
+      "commandCalls": 5,
+      "rtkCalls": 2,
+      "rawCalls": 3,
+      "toolBytes": 22919,
+      "commandBytes": 22919,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": false,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "deletedLine": false,
+        "fileCounts": false,
+        "oldestSubject": false,
+        "headGateTrailer": false,
+        "beganWithStat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "raw-escape-archaeology",
+      "project": "cross-04",
+      "arm": "baseline",
+      "repetition": 2,
+      "processExit": 0,
+      "elapsedMs": 54202,
+      "promptHash": "1f698f25fb98dd812010b635ab14853a3712fc95b1a9e1cfaeb884612f782dc7",
+      "schema": 1,
+      "messages": 4,
+      "input": 12232,
+      "output": 1532,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 13764,
+      "reportedCost": 0,
+      "toolCalls": 5,
+      "commandCalls": 5,
+      "rtkCalls": 0,
+      "rawCalls": 2,
+      "toolBytes": 16541,
+      "commandBytes": 16541,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": false,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "deletedLine": false,
+        "fileCounts": false,
+        "oldestSubject": false,
+        "headGateTrailer": false,
+        "beganWithStat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "raw-escape-archaeology",
+      "project": "cross-04",
+      "arm": "rtk",
+      "repetition": 2,
+      "processExit": 0,
+      "elapsedMs": 48482,
+      "promptHash": "1f698f25fb98dd812010b635ab14853a3712fc95b1a9e1cfaeb884612f782dc7",
+      "schema": 1,
+      "messages": 4,
+      "input": 10336,
+      "output": 1163,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 11499,
+      "reportedCost": 0,
+      "toolCalls": 5,
+      "commandCalls": 5,
+      "rtkCalls": 3,
+      "rawCalls": 2,
+      "toolBytes": 21721,
+      "commandBytes": 21721,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": false,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "deletedLine": false,
+        "fileCounts": false,
+        "oldestSubject": false,
+        "headGateTrailer": false,
+        "beganWithStat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "sensitive-command-bypass",
+      "project": "cross-04",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 28030,
+      "promptHash": "0f1117363ad8f9e081cb0eb0ee08ab59df5f58f1a053ae23b2032d4f1c0a66e2",
+      "schema": 1,
+      "messages": 7,
+      "input": 11409,
+      "output": 753,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 12162,
+      "reportedCost": 0,
+      "toolCalls": 5,
+      "commandCalls": 4,
+      "rtkCalls": 1,
+      "rawCalls": 1,
+      "toolBytes": 742,
+      "commandBytes": 370,
+      "denied": 0,
+      "testCommands": 2,
+      "successfulTestCommands": 1,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "statusExact": true,
+        "failingExit": true,
+        "ranFailingDiagnostic": true,
+        "ranGain": true,
+        "tokenVisibilityReported": true,
+        "honestTokenReport": true,
+        "statusNotRewritten": true,
+        "privacyClean": true,
+        "gainSummary": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": {
+        "clean": true,
+        "findings": [],
+        "gainHasMarker": false
+      },
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "sensitive-command-bypass",
+      "project": "cross-04",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 22197,
+      "promptHash": "0f1117363ad8f9e081cb0eb0ee08ab59df5f58f1a053ae23b2032d4f1c0a66e2",
+      "schema": 1,
+      "messages": 5,
+      "input": 7720,
+      "output": 509,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 8229,
+      "reportedCost": 0,
+      "toolCalls": 5,
+      "commandCalls": 4,
+      "rtkCalls": 1,
+      "rawCalls": 1,
+      "toolBytes": 742,
+      "commandBytes": 370,
+      "denied": 0,
+      "testCommands": 2,
+      "successfulTestCommands": 1,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "statusExact": true,
+        "failingExit": true,
+        "ranFailingDiagnostic": true,
+        "ranGain": true,
+        "tokenVisibilityReported": true,
+        "honestTokenReport": true,
+        "statusNotRewritten": true,
+        "privacyClean": true,
+        "gainSummary": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": {
+        "clean": true,
+        "findings": [],
+        "gainHasMarker": false
+      },
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "sensitive-command-bypass",
+      "project": "cross-04",
+      "arm": "baseline",
+      "repetition": 2,
+      "processExit": 0,
+      "elapsedMs": 31542,
+      "promptHash": "0f1117363ad8f9e081cb0eb0ee08ab59df5f58f1a053ae23b2032d4f1c0a66e2",
+      "schema": 1,
+      "messages": 6,
+      "input": 9422,
+      "output": 771,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 10193,
+      "reportedCost": 0,
+      "toolCalls": 5,
+      "commandCalls": 4,
+      "rtkCalls": 1,
+      "rawCalls": 1,
+      "toolBytes": 742,
+      "commandBytes": 370,
+      "denied": 0,
+      "testCommands": 2,
+      "successfulTestCommands": 1,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "statusExact": true,
+        "failingExit": true,
+        "ranFailingDiagnostic": true,
+        "ranGain": true,
+        "tokenVisibilityReported": true,
+        "honestTokenReport": true,
+        "statusNotRewritten": true,
+        "privacyClean": true,
+        "gainSummary": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": {
+        "clean": true,
+        "findings": [],
+        "gainHasMarker": false
+      },
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "sensitive-command-bypass",
+      "project": "cross-04",
+      "arm": "rtk",
+      "repetition": 2,
+      "processExit": 0,
+      "elapsedMs": 19567,
+      "promptHash": "0f1117363ad8f9e081cb0eb0ee08ab59df5f58f1a053ae23b2032d4f1c0a66e2",
+      "schema": 1,
+      "messages": 3,
+      "input": 4348,
+      "output": 504,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 4852,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 3,
+      "rtkCalls": 1,
+      "rawCalls": 0,
+      "toolBytes": 662,
+      "commandBytes": 290,
+      "denied": 0,
+      "testCommands": 2,
+      "successfulTestCommands": 1,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "statusExact": true,
+        "failingExit": true,
+        "ranFailingDiagnostic": true,
+        "ranGain": true,
+        "tokenVisibilityReported": true,
+        "honestTokenReport": true,
+        "statusNotRewritten": true,
+        "privacyClean": true,
+        "gainSummary": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": {
+        "clean": true,
+        "findings": [],
+        "gainHasMarker": false
+      },
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "code-explore-fidelity",
+      "project": "cross-05",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 71743,
+      "promptHash": "63d029d56fc898b07e75100b1e81d9b8f7d999922e4526da1c50be85e0bd99cf",
+      "schema": 1,
+      "messages": 6,
+      "input": 19419,
+      "output": 2996,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 22415,
+      "reportedCost": 0,
+      "toolCalls": 5,
+      "commandCalls": 5,
+      "rtkCalls": 0,
+      "rawCalls": 2,
+      "toolBytes": 8503,
+      "commandBytes": 8503,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "termsEchoed": true,
+        "commonTotal": false,
+        "topFiles": true,
+        "rareTotal": true,
+        "rareMatches": true,
+        "initialCommand": true,
+        "usedRawFlagged": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "code-explore-fidelity",
+      "project": "cross-05",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 42072,
+      "promptHash": "63d029d56fc898b07e75100b1e81d9b8f7d999922e4526da1c50be85e0bd99cf",
+      "schema": 1,
+      "messages": 3,
+      "input": 5794,
+      "output": 1683,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 7477,
+      "reportedCost": 0,
+      "toolCalls": 2,
+      "commandCalls": 2,
+      "rtkCalls": 2,
+      "rawCalls": 0,
+      "toolBytes": 3093,
+      "commandBytes": 3093,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "termsEchoed": true,
+        "commonTotal": false,
+        "topFiles": false,
+        "rareTotal": true,
+        "rareMatches": true,
+        "initialCommand": true,
+        "usedRawFlagged": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "gate-artifact-fidelity",
+      "project": "cross-05",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 18818,
+      "promptHash": "96eb6c41c0cf3e0065f8f0f425987f7d6eaf4d35f439001df5daa6af9bd70a3b",
+      "schema": 1,
+      "messages": 2,
+      "input": 3394,
+      "output": 543,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 3937,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 4,
+      "rtkCalls": 0,
+      "rawCalls": 0,
+      "toolBytes": 2348,
+      "commandBytes": 2348,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "gateVerdict": true,
+        "gateNext": true,
+        "failedGate": true,
+        "failedTest": true,
+        "coverageExact": true,
+        "readinessExact": true,
+        "proposalScenario": true,
+        "complete": true,
+        "initialCat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "gate-artifact-fidelity",
+      "project": "cross-05",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 16088,
+      "promptHash": "96eb6c41c0cf3e0065f8f0f425987f7d6eaf4d35f439001df5daa6af9bd70a3b",
+      "schema": 1,
+      "messages": 2,
+      "input": 3394,
+      "output": 522,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 3916,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 4,
+      "rtkCalls": 4,
+      "rawCalls": 0,
+      "toolBytes": 2348,
+      "commandBytes": 2348,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "gateVerdict": true,
+        "gateNext": true,
+        "failedGate": true,
+        "failedTest": true,
+        "coverageExact": true,
+        "readinessExact": true,
+        "proposalScenario": true,
+        "complete": true,
+        "initialCat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "pytest-traceback-fidelity",
+      "project": "cross-05",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 38384,
+      "promptHash": "9744ac672fcdc4c4c1e1198a1966df8c238d71bbcd6282b5872f045f1a7362e0",
+      "schema": 1,
+      "messages": 5,
+      "input": 14437,
+      "output": 1264,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 15701,
+      "reportedCost": 0,
+      "toolCalls": 3,
+      "commandCalls": 2,
+      "rtkCalls": 0,
+      "rawCalls": 2,
+      "toolBytes": 16115,
+      "commandBytes": 15612,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "allFailures": true,
+        "passedCount": true,
+        "exitNonzero": true,
+        "firstAssertion": true,
+        "executedFailingSuite": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "pytest-traceback-fidelity",
+      "project": "cross-05",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 32940,
+      "promptHash": "9744ac672fcdc4c4c1e1198a1966df8c238d71bbcd6282b5872f045f1a7362e0",
+      "schema": 1,
+      "messages": 4,
+      "input": 10118,
+      "output": 991,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 11109,
+      "reportedCost": 0,
+      "toolCalls": 3,
+      "commandCalls": 2,
+      "rtkCalls": 1,
+      "rawCalls": 1,
+      "toolBytes": 11420,
+      "commandBytes": 10917,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "allFailures": true,
+        "passedCount": true,
+        "exitNonzero": true,
+        "firstAssertion": true,
+        "executedFailingSuite": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "raw-escape-archaeology",
+      "project": "cross-05",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 24041,
+      "promptHash": "1f698f25fb98dd812010b635ab14853a3712fc95b1a9e1cfaeb884612f782dc7",
+      "schema": 1,
+      "messages": 3,
+      "input": 7493,
+      "output": 679,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 8172,
+      "reportedCost": 0,
+      "toolCalls": 3,
+      "commandCalls": 3,
+      "rtkCalls": 0,
+      "rawCalls": 1,
+      "toolBytes": 15445,
+      "commandBytes": 15445,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "deletedLine": true,
+        "fileCounts": false,
+        "oldestSubject": true,
+        "headGateTrailer": true,
+        "beganWithStat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "raw-escape-archaeology",
+      "project": "cross-05",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 38335,
+      "promptHash": "1f698f25fb98dd812010b635ab14853a3712fc95b1a9e1cfaeb884612f782dc7",
+      "schema": 1,
+      "messages": 4,
+      "input": 11485,
+      "output": 1278,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 12763,
+      "reportedCost": 0,
+      "toolCalls": 5,
+      "commandCalls": 5,
+      "rtkCalls": 3,
+      "rawCalls": 2,
+      "toolBytes": 21721,
+      "commandBytes": 21721,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": false,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "deletedLine": false,
+        "fileCounts": false,
+        "oldestSubject": false,
+        "headGateTrailer": false,
+        "beganWithStat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "raw-escape-archaeology",
+      "project": "cross-05",
+      "arm": "baseline",
+      "repetition": 2,
+      "processExit": 0,
+      "elapsedMs": 46707,
+      "promptHash": "1f698f25fb98dd812010b635ab14853a3712fc95b1a9e1cfaeb884612f782dc7",
+      "schema": 1,
+      "messages": 5,
+      "input": 19540,
+      "output": 1012,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 20552,
+      "reportedCost": 0,
+      "toolCalls": 6,
+      "commandCalls": 6,
+      "rtkCalls": 0,
+      "rawCalls": 3,
+      "toolBytes": 30196,
+      "commandBytes": 30196,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "deletedLine": true,
+        "fileCounts": true,
+        "oldestSubject": true,
+        "headGateTrailer": true,
+        "beganWithStat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "raw-escape-archaeology",
+      "project": "cross-05",
+      "arm": "rtk",
+      "repetition": 2,
+      "processExit": 0,
+      "elapsedMs": 43923,
+      "promptHash": "1f698f25fb98dd812010b635ab14853a3712fc95b1a9e1cfaeb884612f782dc7",
+      "schema": 1,
+      "messages": 4,
+      "input": 7239,
+      "output": 1291,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 8530,
+      "reportedCost": 0,
+      "toolCalls": 3,
+      "commandCalls": 3,
+      "rtkCalls": 3,
+      "rawCalls": 0,
+      "toolBytes": 7171,
+      "commandBytes": 7171,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": false,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "deletedLine": false,
+        "fileCounts": false,
+        "oldestSubject": false,
+        "headGateTrailer": false,
+        "beganWithStat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "sensitive-command-bypass",
+      "project": "cross-05",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 14322,
+      "promptHash": "0f1117363ad8f9e081cb0eb0ee08ab59df5f58f1a053ae23b2032d4f1c0a66e2",
+      "schema": 1,
+      "messages": 3,
+      "input": 4295,
+      "output": 358,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 4653,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 3,
+      "rtkCalls": 1,
+      "rawCalls": 0,
+      "toolBytes": 662,
+      "commandBytes": 290,
+      "denied": 0,
+      "testCommands": 2,
+      "successfulTestCommands": 1,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "statusExact": true,
+        "failingExit": true,
+        "ranFailingDiagnostic": true,
+        "ranGain": true,
+        "tokenVisibilityReported": true,
+        "honestTokenReport": true,
+        "statusNotRewritten": true,
+        "privacyClean": true,
+        "gainSummary": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": {
+        "clean": true,
+        "findings": [],
+        "gainHasMarker": false
+      },
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": true,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "sensitive-command-bypass",
+      "project": "cross-05",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 22372,
+      "promptHash": "0f1117363ad8f9e081cb0eb0ee08ab59df5f58f1a053ae23b2032d4f1c0a66e2",
+      "schema": 1,
+      "messages": 5,
+      "input": 7423,
+      "output": 606,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 8029,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 3,
+      "rtkCalls": 1,
+      "rawCalls": 0,
+      "toolBytes": 662,
+      "commandBytes": 290,
+      "denied": 0,
+      "testCommands": 2,
+      "successfulTestCommands": 1,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "statusExact": true,
+        "failingExit": true,
+        "ranFailingDiagnostic": true,
+        "ranGain": true,
+        "tokenVisibilityReported": true,
+        "honestTokenReport": true,
+        "statusNotRewritten": true,
+        "privacyClean": true,
+        "gainSummary": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": {
+        "clean": true,
+        "findings": [],
+        "gainHasMarker": false
+      },
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "sensitive-command-bypass",
+      "project": "cross-05",
+      "arm": "baseline",
+      "repetition": 2,
+      "processExit": 0,
+      "elapsedMs": 33115,
+      "promptHash": "0f1117363ad8f9e081cb0eb0ee08ab59df5f58f1a053ae23b2032d4f1c0a66e2",
+      "schema": 1,
+      "messages": 5,
+      "input": 8152,
+      "output": 833,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 8985,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 3,
+      "rtkCalls": 1,
+      "rawCalls": 0,
+      "toolBytes": 662,
+      "commandBytes": 290,
+      "denied": 0,
+      "testCommands": 2,
+      "successfulTestCommands": 1,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "statusExact": true,
+        "failingExit": true,
+        "ranFailingDiagnostic": true,
+        "ranGain": true,
+        "tokenVisibilityReported": true,
+        "honestTokenReport": true,
+        "statusNotRewritten": true,
+        "privacyClean": true,
+        "gainSummary": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": {
+        "clean": true,
+        "findings": [],
+        "gainHasMarker": false
+      },
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "sensitive-command-bypass",
+      "project": "cross-05",
+      "arm": "rtk",
+      "repetition": 2,
+      "processExit": 0,
+      "elapsedMs": 29083,
+      "promptHash": "0f1117363ad8f9e081cb0eb0ee08ab59df5f58f1a053ae23b2032d4f1c0a66e2",
+      "schema": 1,
+      "messages": 6,
+      "input": 9213,
+      "output": 641,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 9854,
+      "reportedCost": 0,
+      "toolCalls": 5,
+      "commandCalls": 4,
+      "rtkCalls": 1,
+      "rawCalls": 3,
+      "toolBytes": 742,
+      "commandBytes": 370,
+      "denied": 0,
+      "testCommands": 2,
+      "successfulTestCommands": 1,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "statusExact": true,
+        "failingExit": true,
+        "ranFailingDiagnostic": true,
+        "ranGain": true,
+        "tokenVisibilityReported": true,
+        "honestTokenReport": true,
+        "statusNotRewritten": true,
+        "privacyClean": true,
+        "gainSummary": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": {
+        "clean": true,
+        "findings": [],
+        "gainHasMarker": false
+      },
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": true,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "code-explore-fidelity",
+      "project": "cross-06",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 28549,
+      "promptHash": "83945e7b4168752932c7904d5409c7720d9f8f019e9cc7a8c52d775e819ae5db",
+      "schema": 1,
+      "messages": 4,
+      "input": 5695,
+      "output": 789,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 6484,
+      "reportedCost": 0,
+      "toolCalls": 3,
+      "commandCalls": 3,
+      "rtkCalls": 0,
+      "rawCalls": 1,
+      "toolBytes": 1273,
+      "commandBytes": 1273,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "termsEchoed": true,
+        "commonTotal": true,
+        "topFiles": true,
+        "rareTotal": true,
+        "rareMatches": true,
+        "initialCommand": true,
+        "usedRawFlagged": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "code-explore-fidelity",
+      "project": "cross-06",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 14597,
+      "promptHash": "83945e7b4168752932c7904d5409c7720d9f8f019e9cc7a8c52d775e819ae5db",
+      "schema": 1,
+      "messages": 2,
+      "input": 2653,
+      "output": 505,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 3158,
+      "reportedCost": 0,
+      "toolCalls": 2,
+      "commandCalls": 2,
+      "rtkCalls": 2,
+      "rawCalls": 0,
+      "toolBytes": 906,
+      "commandBytes": 906,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "termsEchoed": true,
+        "commonTotal": true,
+        "topFiles": true,
+        "rareTotal": true,
+        "rareMatches": true,
+        "initialCommand": true,
+        "usedRawFlagged": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "gate-artifact-fidelity",
+      "project": "cross-06",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 16024,
+      "promptHash": "96eb6c41c0cf3e0065f8f0f425987f7d6eaf4d35f439001df5daa6af9bd70a3b",
+      "schema": 1,
+      "messages": 2,
+      "input": 3394,
+      "output": 480,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 3874,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 4,
+      "rtkCalls": 0,
+      "rawCalls": 0,
+      "toolBytes": 2348,
+      "commandBytes": 2348,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "gateVerdict": true,
+        "gateNext": true,
+        "failedGate": true,
+        "failedTest": true,
+        "coverageExact": true,
+        "readinessExact": true,
+        "proposalScenario": true,
+        "complete": true,
+        "initialCat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "gate-artifact-fidelity",
+      "project": "cross-06",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 14409,
+      "promptHash": "96eb6c41c0cf3e0065f8f0f425987f7d6eaf4d35f439001df5daa6af9bd70a3b",
+      "schema": 1,
+      "messages": 2,
+      "input": 3394,
+      "output": 447,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 3841,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 4,
+      "rtkCalls": 4,
+      "rawCalls": 0,
+      "toolBytes": 2348,
+      "commandBytes": 2348,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "gateVerdict": true,
+        "gateNext": true,
+        "failedGate": true,
+        "failedTest": true,
+        "coverageExact": true,
+        "readinessExact": true,
+        "proposalScenario": true,
+        "complete": true,
+        "initialCat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "pytest-traceback-fidelity",
+      "project": "cross-06",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 36573,
+      "promptHash": "9744ac672fcdc4c4c1e1198a1966df8c238d71bbcd6282b5872f045f1a7362e0",
+      "schema": 1,
+      "messages": 3,
+      "input": 6542,
+      "output": 1305,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 7847,
+      "reportedCost": 0,
+      "toolCalls": 2,
+      "commandCalls": 1,
+      "rtkCalls": 0,
+      "rawCalls": 0,
+      "toolBytes": 8309,
+      "commandBytes": 7806,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "allFailures": true,
+        "passedCount": true,
+        "exitNonzero": true,
+        "firstAssertion": false,
+        "executedFailingSuite": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "pytest-traceback-fidelity",
+      "project": "cross-06",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 28928,
+      "promptHash": "9744ac672fcdc4c4c1e1198a1966df8c238d71bbcd6282b5872f045f1a7362e0",
+      "schema": 1,
+      "messages": 3,
+      "input": 8066,
+      "output": 896,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 8962,
+      "reportedCost": 0,
+      "toolCalls": 2,
+      "commandCalls": 2,
+      "rtkCalls": 1,
+      "rawCalls": 1,
+      "toolBytes": 10917,
+      "commandBytes": 10917,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "allFailures": true,
+        "passedCount": true,
+        "exitNonzero": true,
+        "firstAssertion": true,
+        "executedFailingSuite": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "raw-escape-archaeology",
+      "project": "cross-06",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 34939,
+      "promptHash": "1f698f25fb98dd812010b635ab14853a3712fc95b1a9e1cfaeb884612f782dc7",
+      "schema": 1,
+      "messages": 5,
+      "input": 12202,
+      "output": 1169,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 13371,
+      "reportedCost": 0,
+      "toolCalls": 5,
+      "commandCalls": 5,
+      "rtkCalls": 0,
+      "rawCalls": 2,
+      "toolBytes": 16541,
+      "commandBytes": 16541,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "deletedLine": true,
+        "fileCounts": false,
+        "oldestSubject": true,
+        "headGateTrailer": true,
+        "beganWithStat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "raw-escape-archaeology",
+      "project": "cross-06",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 31136,
+      "promptHash": "1f698f25fb98dd812010b635ab14853a3712fc95b1a9e1cfaeb884612f782dc7",
+      "schema": 1,
+      "messages": 4,
+      "input": 8894,
+      "output": 1027,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 9921,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 4,
+      "rtkCalls": 2,
+      "rawCalls": 2,
+      "toolBytes": 15295,
+      "commandBytes": 15295,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "deletedLine": true,
+        "fileCounts": false,
+        "oldestSubject": true,
+        "headGateTrailer": true,
+        "beganWithStat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "raw-escape-archaeology",
+      "project": "cross-06",
+      "arm": "baseline",
+      "repetition": 2,
+      "processExit": 0,
+      "elapsedMs": 38346,
+      "promptHash": "1f698f25fb98dd812010b635ab14853a3712fc95b1a9e1cfaeb884612f782dc7",
+      "schema": 1,
+      "messages": 4,
+      "input": 12234,
+      "output": 1244,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 13478,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 4,
+      "rtkCalls": 0,
+      "rawCalls": 1,
+      "toolBytes": 15646,
+      "commandBytes": 15646,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "deletedLine": true,
+        "fileCounts": true,
+        "oldestSubject": true,
+        "headGateTrailer": true,
+        "beganWithStat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "raw-escape-archaeology",
+      "project": "cross-06",
+      "arm": "rtk",
+      "repetition": 2,
+      "processExit": 0,
+      "elapsedMs": 31485,
+      "promptHash": "1f698f25fb98dd812010b635ab14853a3712fc95b1a9e1cfaeb884612f782dc7",
+      "schema": 1,
+      "messages": 4,
+      "input": 8605,
+      "output": 1167,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 9772,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 4,
+      "rtkCalls": 3,
+      "rawCalls": 1,
+      "toolBytes": 7372,
+      "commandBytes": 7372,
+      "denied": 0,
+      "testCommands": 0,
+      "successfulTestCommands": 0,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "deletedLine": true,
+        "fileCounts": false,
+        "oldestSubject": true,
+        "headGateTrailer": true,
+        "beganWithStat": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": null,
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "sensitive-command-bypass",
+      "project": "cross-06",
+      "arm": "baseline",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 21907,
+      "promptHash": "0f1117363ad8f9e081cb0eb0ee08ab59df5f58f1a053ae23b2032d4f1c0a66e2",
+      "schema": 1,
+      "messages": 6,
+      "input": 9163,
+      "output": 614,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 9777,
+      "reportedCost": 0,
+      "toolCalls": 5,
+      "commandCalls": 4,
+      "rtkCalls": 1,
+      "rawCalls": 1,
+      "toolBytes": 742,
+      "commandBytes": 370,
+      "denied": 0,
+      "testCommands": 2,
+      "successfulTestCommands": 1,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "statusExact": true,
+        "failingExit": true,
+        "ranFailingDiagnostic": true,
+        "ranGain": true,
+        "tokenVisibilityReported": true,
+        "honestTokenReport": true,
+        "statusNotRewritten": true,
+        "privacyClean": true,
+        "gainSummary": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": {
+        "clean": true,
+        "findings": [],
+        "gainHasMarker": false
+      },
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "sensitive-command-bypass",
+      "project": "cross-06",
+      "arm": "rtk",
+      "repetition": 1,
+      "processExit": 0,
+      "elapsedMs": 16906,
+      "promptHash": "0f1117363ad8f9e081cb0eb0ee08ab59df5f58f1a053ae23b2032d4f1c0a66e2",
+      "schema": 1,
+      "messages": 3,
+      "input": 4295,
+      "output": 519,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 4814,
+      "reportedCost": 0,
+      "toolCalls": 4,
+      "commandCalls": 3,
+      "rtkCalls": 1,
+      "rawCalls": 0,
+      "toolBytes": 662,
+      "commandBytes": 290,
+      "denied": 0,
+      "testCommands": 2,
+      "successfulTestCommands": 1,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "statusExact": true,
+        "failingExit": true,
+        "ranFailingDiagnostic": true,
+        "ranGain": true,
+        "tokenVisibilityReported": true,
+        "honestTokenReport": true,
+        "statusNotRewritten": true,
+        "privacyClean": true,
+        "gainSummary": true
+      },
+      "observation": {
+        "rawRecoveryUsed": false,
+        "compressedPathSufficient": true
+      },
+      "privacy": {
+        "clean": true,
+        "findings": [],
+        "gainHasMarker": false
+      },
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": true,
+      "superseded": true
+    },
+    {
+      "stage": "matrix",
+      "scenario": "sensitive-command-bypass",
+      "project": "cross-06",
+      "arm": "baseline",
+      "repetition": 2,
+      "processExit": 0,
+      "elapsedMs": 26844,
+      "promptHash": "0f1117363ad8f9e081cb0eb0ee08ab59df5f58f1a053ae23b2032d4f1c0a66e2",
+      "schema": 1,
+      "messages": 5,
+      "input": 8097,
+      "output": 678,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 8775,
+      "reportedCost": 0,
+      "toolCalls": 5,
+      "commandCalls": 4,
+      "rtkCalls": 1,
+      "rawCalls": 1,
+      "toolBytes": 742,
+      "commandBytes": 370,
+      "denied": 0,
+      "testCommands": 2,
+      "successfulTestCommands": 1,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": true,
+      "checks": {
+        "validJson": true,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "statusExact": true,
+        "failingExit": true,
+        "ranFailingDiagnostic": true,
+        "ranGain": true,
+        "tokenVisibilityReported": true,
+        "honestTokenReport": true,
+        "statusNotRewritten": true,
+        "privacyClean": true,
+        "gainSummary": true
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": {
+        "clean": true,
+        "findings": [],
+        "gainHasMarker": false
+      },
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    },
+    {
+      "stage": "matrix",
+      "scenario": "sensitive-command-bypass",
+      "project": "cross-06",
+      "arm": "rtk",
+      "repetition": 2,
+      "processExit": 0,
+      "elapsedMs": 20449,
+      "promptHash": "0f1117363ad8f9e081cb0eb0ee08ab59df5f58f1a053ae23b2032d4f1c0a66e2",
+      "schema": 1,
+      "messages": 4,
+      "input": 6101,
+      "output": 578,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 6679,
+      "reportedCost": 0,
+      "toolCalls": 5,
+      "commandCalls": 4,
+      "rtkCalls": 1,
+      "rawCalls": 1,
+      "toolBytes": 742,
+      "commandBytes": 370,
+      "denied": 0,
+      "testCommands": 2,
+      "successfulTestCommands": 1,
+      "limitReached": false,
+      "stopReasons": [
+        "toolUse",
+        "toolUse",
+        "toolUse",
+        "stop"
+      ],
+      "model": {
+        "provider": "omniroute",
+        "id": "la/ornith-1.5-35b-a3b"
+      },
+      "pass": false,
+      "checks": {
+        "validJson": false,
+        "actualCommand": true,
+        "noDeniedCalls": true,
+        "withinBudget": true,
+        "statusExact": false,
+        "failingExit": false,
+        "ranFailingDiagnostic": true,
+        "ranGain": true,
+        "tokenVisibilityReported": false,
+        "honestTokenReport": false,
+        "statusNotRewritten": true,
+        "privacyClean": true,
+        "gainSummary": false
+      },
+      "observation": {
+        "rawRecoveryUsed": true,
+        "compressedPathSufficient": false
+      },
+      "privacy": {
+        "clean": true,
+        "findings": [],
+        "gainHasMarker": false
+      },
+      "aiTesterPass": true,
+      "aiTesterErrors": 0,
+      "jsonOnly": false,
+      "superseded": false
+    }
+  ],
+  "whenToUse": {
+    "explore": {
+      "cross-01": {
+        "baseline": {
+          "pass": false,
+          "tokens": 6902
+        },
+        "rtk": {
+          "pass": false,
+          "tokens": 5217
+        },
+        "tokenDeltaPct": -24
+      },
+      "cross-02": {
+        "baseline": {
+          "pass": false,
+          "tokens": 7908
+        },
+        "rtk": {
+          "pass": false,
+          "tokens": 21567
+        },
+        "tokenDeltaPct": 173
+      },
+      "cross-03": {
+        "baseline": {
+          "pass": true,
+          "tokens": 3870
+        },
+        "rtk": {
+          "pass": true,
+          "tokens": 14248
+        },
+        "tokenDeltaPct": 268
+      },
+      "cross-04": {
+        "baseline": {
+          "pass": false,
+          "tokens": 69129
+        },
+        "rtk": {
+          "pass": false,
+          "tokens": 63912
+        },
+        "tokenDeltaPct": -8
+      },
+      "cross-05": {
+        "baseline": {
+          "pass": false,
+          "tokens": 22415
+        },
+        "rtk": {
+          "pass": false,
+          "tokens": 7477
+        },
+        "tokenDeltaPct": -67
+      },
+      "cross-06": {
+        "baseline": {
+          "pass": true,
+          "tokens": 6484
+        },
+        "rtk": {
+          "pass": true,
+          "tokens": 3158
+        },
+        "tokenDeltaPct": -51
+      }
+    },
+    "plan-gates": {
+      "cross-01": {
+        "baseline": {
+          "pass": true,
+          "tokens": 3859
+        },
+        "rtk": {
+          "pass": true,
+          "tokens": 3832
+        },
+        "tokenDeltaPct": -1
+      },
+      "cross-02": {
+        "baseline": {
+          "pass": true,
+          "tokens": 3849
+        },
+        "rtk": {
+          "pass": true,
+          "tokens": 3885
+        },
+        "tokenDeltaPct": 1
+      },
+      "cross-03": {
+        "baseline": {
+          "pass": true,
+          "tokens": 3874
+        },
+        "rtk": {
+          "pass": true,
+          "tokens": 9420
+        },
+        "tokenDeltaPct": 143
+      },
+      "cross-04": {
+        "baseline": {
+          "pass": true,
+          "tokens": 3864
+        },
+        "rtk": {
+          "pass": true,
+          "tokens": 3872
+        },
+        "tokenDeltaPct": 0
+      },
+      "cross-05": {
+        "baseline": {
+          "pass": true,
+          "tokens": 3937
+        },
+        "rtk": {
+          "pass": true,
+          "tokens": 3916
+        },
+        "tokenDeltaPct": -1
+      },
+      "cross-06": {
+        "baseline": {
+          "pass": true,
+          "tokens": 3874
+        },
+        "rtk": {
+          "pass": true,
+          "tokens": 3841
+        },
+        "tokenDeltaPct": -1
+      }
+    },
+    "diagnostics": {
+      "cross-01": {
+        "baseline": {
+          "pass": false,
+          "tokens": 15221
+        },
+        "rtk": {
+          "pass": true,
+          "tokens": 10994
+        },
+        "tokenDeltaPct": -28
+      },
+      "cross-02": {
+        "baseline": {
+          "pass": true,
+          "tokens": 9545
+        },
+        "rtk": {
+          "pass": false,
+          "tokens": 19257
+        },
+        "tokenDeltaPct": 102
+      },
+      "cross-03": {
+        "baseline": {
+          "pass": true,
+          "tokens": 13953
+        },
+        "rtk": {
+          "pass": false,
+          "tokens": 18972
+        },
+        "tokenDeltaPct": 36
+      },
+      "cross-04": {
+        "baseline": {
+          "pass": true,
+          "tokens": 7545
+        },
+        "rtk": {
+          "pass": false,
+          "tokens": 11615
+        },
+        "tokenDeltaPct": 54
+      },
+      "cross-05": {
+        "baseline": {
+          "pass": true,
+          "tokens": 15701
+        },
+        "rtk": {
+          "pass": true,
+          "tokens": 11109
+        },
+        "tokenDeltaPct": -29
+      },
+      "cross-06": {
+        "baseline": {
+          "pass": false,
+          "tokens": 7847
+        },
+        "rtk": {
+          "pass": true,
+          "tokens": 8962
+        },
+        "tokenDeltaPct": 14
+      }
+    },
+    "fix-archaeology": {
+      "cross-01": {
+        "baseline": {
+          "pass": true,
+          "tokens": 10312
+        },
+        "rtk": {
+          "pass": true,
+          "tokens": 6462
+        },
+        "tokenDeltaPct": -37
+      },
+      "cross-02": {
+        "baseline": {
+          "pass": true,
+          "tokens": 14507
+        },
+        "rtk": {
+          "pass": true,
+          "tokens": 36575
+        },
+        "tokenDeltaPct": 152
+      },
+      "cross-03": {
+        "baseline": {
+          "pass": true,
+          "tokens": 10464
+        },
+        "rtk": {
+          "pass": true,
+          "tokens": 7570
+        },
+        "tokenDeltaPct": -28
+      },
+      "cross-04": {
+        "baseline": {
+          "pass": false,
+          "tokens": 13764
+        },
+        "rtk": {
+          "pass": false,
+          "tokens": 11499
+        },
+        "tokenDeltaPct": -16
+      },
+      "cross-05": {
+        "baseline": {
+          "pass": true,
+          "tokens": 20552
+        },
+        "rtk": {
+          "pass": false,
+          "tokens": 8530
+        },
+        "tokenDeltaPct": -58
+      },
+      "cross-06": {
+        "baseline": {
+          "pass": true,
+          "tokens": 13478
+        },
+        "rtk": {
+          "pass": false,
+          "tokens": 9772
+        },
+        "tokenDeltaPct": -27
+      }
+    },
+    "ops-safety": {
+      "cross-01": {
+        "baseline": {
+          "pass": true,
+          "tokens": 6048
+        },
+        "rtk": {
+          "pass": true,
+          "tokens": 6494
+        },
+        "tokenDeltaPct": 7
+      },
+      "cross-02": {
+        "baseline": {
+          "pass": true,
+          "tokens": 9492
+        },
+        "rtk": {
+          "pass": true,
+          "tokens": 5774
+        },
+        "tokenDeltaPct": -39
+      },
+      "cross-03": {
+        "baseline": {
+          "pass": true,
+          "tokens": 6306
+        },
+        "rtk": {
+          "pass": false,
+          "tokens": 6508
+        },
+        "tokenDeltaPct": 3
+      },
+      "cross-04": {
+        "baseline": {
+          "pass": true,
+          "tokens": 10193
+        },
+        "rtk": {
+          "pass": true,
+          "tokens": 4852
+        },
+        "tokenDeltaPct": -52
+      },
+      "cross-05": {
+        "baseline": {
+          "pass": true,
+          "tokens": 8985
+        },
+        "rtk": {
+          "pass": true,
+          "tokens": 9854
+        },
+        "tokenDeltaPct": 10
+      },
+      "cross-06": {
+        "baseline": {
+          "pass": true,
+          "tokens": 8775
+        },
+        "rtk": {
+          "pass": false,
+          "tokens": 6679
+        },
+        "tokenDeltaPct": -24
+      }
+    }
+  }
+}
