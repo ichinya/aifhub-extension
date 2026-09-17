@@ -1491,11 +1491,11 @@ tools:
         research_delta_percent: -33.8
         implement_delta_percent: 29.4
       candidate_cases_needing_harness_confirmation:
-        - "research on medium/large frameworks: flutter -75.9%, icde -23.8%, lorawrite -20.5%, anthill -10.2% (FTS)"
+        - "research on medium/large frameworks: dart/flutter medium -75.9%, typescript/react tiny -23.8%, py+ts monorepo medium -20.5%, csharp/unity large -10.2% (FTS)"
         - "targeted edits in large tangled repos: laravel implement -64.3% FTS / -53.4% EMB"
       negative_cases:
         - "implement point edits with embeddings: unity +332.6%, flutter +202.5% (EMB)"
-        - "tiny projects: secret-santa research +10.2%, implement +30.3%"
+        - "tiny projects: py+ts fullstack small research +10.2%, implement +30.3%"
         - "narrow questions outside prior sessions: laravel research +47.3% FTS / +126.6% EMB"
     promotion_requirements:
       - "Rerun through scripts/memory-tool-ai-tester-evaluate-tool.mjs with accepted_evidence scenarios before any proven_label_evidence entry."

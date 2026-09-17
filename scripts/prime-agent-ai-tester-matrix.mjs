@@ -232,8 +232,26 @@ export function validatePrimeAgentMatrix(matrix = {}) {
   if (matrix.schema !== PRIME_AGENT_MATRIX_SCHEMA) {
     errors.push(`schema must be ${PRIME_AGENT_MATRIX_SCHEMA}`);
   }
+  if (matrix.catalog_schema !== PRIME_AGENT_CATALOG_SCHEMA) {
+    errors.push(`catalog_schema must be ${PRIME_AGENT_CATALOG_SCHEMA}`);
+  }
+  if (matrix.issue !== PRIME_AGENT_ISSUE) errors.push(`issue must be ${PRIME_AGENT_ISSUE}`);
   if (matrix.decision !== PRIME_AGENT_DECISION) {
     errors.push(`decision must be ${PRIME_AGENT_DECISION}`);
+  }
+  const identity = matrix.pinned_identity ?? {};
+  for (const [key, expected] of Object.entries(PRIME_AGENT_PINNED_IDENTITY)) {
+    if (identity[key] !== expected) errors.push(`pinned_identity.${key} must be ${expected}`);
+  }
+  if (!sameValues(Object.keys(identity), Object.keys(PRIME_AGENT_PINNED_IDENTITY))) {
+    errors.push(`pinned_identity keys must be exactly ${Object.keys(PRIME_AGENT_PINNED_IDENTITY).join(', ')}`);
+  }
+  const contract = matrix.boundary_contract ?? {};
+  for (const [key, expected] of Object.entries(PRIME_AGENT_BOUNDARY_CONTRACT)) {
+    if (contract[key] !== expected) errors.push(`boundary_contract.${key} must be ${expected}`);
+  }
+  if (!sameValues(Object.keys(contract), Object.keys(PRIME_AGENT_BOUNDARY_CONTRACT))) {
+    errors.push(`boundary_contract keys must be exactly ${Object.keys(PRIME_AGENT_BOUNDARY_CONTRACT).join(', ')}`);
   }
   if (matrix.prepared_only !== true) errors.push('prepared_only must be true');
   if (matrix.no_promote !== true) errors.push('no_promote must be true');

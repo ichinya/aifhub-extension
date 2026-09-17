@@ -190,7 +190,14 @@ describe('Prime Agent ai-tester prepared matrix', () => {
     };
 
     expectError((value) => { value.schema = PRIME_AGENT_CATALOG_SCHEMA; }, 'schema');
+    expectError((value) => { value.catalog_schema = PRIME_AGENT_MATRIX_SCHEMA; }, 'catalog_schema');
+    expectError((value) => { value.issue = 149; }, 'issue');
     expectError((value) => { value.decision = 'adopt'; }, 'decision');
+    expectError((value) => { value.pinned_identity.prime_agent_release = 'v0.9.2'; }, 'pinned_identity.prime_agent_release');
+    expectError((value) => { value.pinned_identity.provider_calls = 3; }, 'pinned_identity.provider_calls');
+    expectError((value) => { value.pinned_identity.extra = true; }, 'pinned_identity keys');
+    expectError((value) => { value.boundary_contract.no_runtime_adoption = false; }, 'boundary_contract.no_runtime_adoption');
+    expectError((value) => { delete value.boundary_contract.no_evolve_harness_delta_export; }, 'boundary_contract keys');
     expectError((value) => { value.prepared_only = false; }, 'prepared_only');
     expectError((value) => { value.no_promote = false; }, 'no_promote');
     expectError((value) => { value.adoption_gate = 'open'; }, 'adoption_gate');
@@ -228,6 +235,14 @@ describe('Prime Agent ai-tester prepared matrix', () => {
     assert.equal(containsPrivateMaterial(markdown), false);
 
     assert.throws(() => renderPrimeAgentMarkdown({ ...matrix, cases: [] }), /Invalid Prime Agent matrix/);
+    assert.throws(
+      () => renderPrimeAgentMarkdown({ ...matrix, pinned_identity: { ...matrix.pinned_identity, provider_calls: 3 } }),
+      /Invalid Prime Agent matrix/
+    );
+    assert.throws(
+      () => renderPrimeAgentMarkdown({ ...matrix, boundary_contract: { ...matrix.boundary_contract, no_runtime_adoption: false } }),
+      /Invalid Prime Agent matrix/
+    );
   });
 });
 
