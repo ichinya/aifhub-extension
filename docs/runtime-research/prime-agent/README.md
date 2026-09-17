@@ -33,7 +33,11 @@ Evaluated on 2026-09-05:
 | Issue / related PR | Issue open with zero comments; no matching Prime Agent PR found at evaluation time |
 
 [Observed probe results](results.json) contain source hashes and 27 verified
-observations. `observation_verified: true` means the described behavior was
+observations. The remaining-experiments matrix below is also encoded as a
+prepared-only [ai-tester scenario catalog](scenario-catalog.json) with a
+[validation harness](../../../scripts/prime-agent-ai-tester-matrix.mjs) and
+[tests](../../../scripts/prime-agent-ai-tester-matrix.test.mjs) that keep every
+row NOT_RUN until both adoption blockers are resolved. `observation_verified: true` means the described behavior was
 reproduced; **it does not mean the runtime passed adoption criteria**.
 
 The TypeScript probe loads the exact upstream Git blob, removes types and stubs
