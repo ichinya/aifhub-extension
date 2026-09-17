@@ -1,6 +1,8 @@
 # Research По Memory Tools
 
-Этот каталог фиксирует выводы по инструментам локальной памяти и retrieval для issue #85, отдельную policy evaluation candidate из issue #114 и agentic-retrieval evaluation из issue #147. Документы описывают результаты установки, static review и полевых проверок без названий приватных проектов.
+Этот каталог фиксирует выводы по инструментам локальной памяти и retrieval для issue #85, отдельную policy evaluation candidate из issue #114, agentic-retrieval evaluation из issue #147 и static review из issue #201. Документы описывают результаты установки, static review и полевых проверок без названий приватных проектов.
+
+Static review candidate из issue #201 — [TencentCloud/TencentDB-Agent-Memory](tencentdb-agent-memory.md): layered memory + Mermaid context offload; integration surface ограничен OpenClaw/Hermes, npm `postinstall` патчит host runtime, поэтому AIFHub не устанавливает и не запускает. Screening-бенчмарк (pi + OmniRoute, 6 проектов × 2 конфигурации FTS/embeddings, 24 paired runs): [результаты](tencentdb-agent-memory-benchmark-results.md) — устойчивая экономия только на research-follow-up средних/больших en-репо и impl-continuity самых больших; малые проекты и narrow-после-broad — убыток; L1/L2/L3 для проектного контента не срабатывают. С 2026-09-15 внесён в metadata как `conditional_external_runtime_only` (avoid_by_default + exact screening gate: en/ASCII, standard/large, user-owned gateway health-probe).
 
 Отдельный трек — dedup повторных чтений из issue #133. Текущий кандидат
 [ojuschugh1/sqz](sqz.md) проверяется в [AI Tester сравнении](sqz-benchmark-results.md)

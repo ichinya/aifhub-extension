@@ -1,5 +1,5 @@
 schema: aifhub.memory_tools.recommendation.v1
-updated: "2026-09-01"
+updated: "2026-09-15"
 purpose: "Метаданные для этапа анализа проекта: какие memory/retrieval инструменты можно предлагать пользователю, когда и с какими ограничениями."
 default_policy:
   install_policy: explicit_user_opt_in_only
@@ -18,6 +18,7 @@ skill_usage_matrix:
       - context-mode
       - codegraph
       - repowise
+      - tencentdb-agent-memory
     forbidden:
       - codex-mem
       - eagle-mem
@@ -34,6 +35,7 @@ skill_usage_matrix:
       - context-mode
       - codegraph
       - repowise
+      - tencentdb-agent-memory
     forbidden:
       - codex-mem
       - eagle-mem
@@ -56,6 +58,7 @@ skill_usage_matrix:
       - rohitg00-agentmemory
       - understand-anything
       - t-search
+      - tencentdb-agent-memory
     notes: "Project-level architecture context only; optional provider output is supporting reviewed context and must not drive OpenSpec writes."
   aif-plan:
     allowed:
@@ -71,6 +74,7 @@ skill_usage_matrix:
       - rohitg00-agentmemory
       - understand-anything
       - t-search
+      - tencentdb-agent-memory
     notes: "Optional supporting context before writing canonical OpenSpec artifacts; final plan must use direct repository evidence."
   aif-review:
     allowed:
@@ -79,6 +83,7 @@ skill_usage_matrix:
       - context7
       - codex-agent-mem
       - repowise
+      - tencentdb-agent-memory
     forbidden:
       - context-mode
       - codex-mem
@@ -102,6 +107,7 @@ skill_usage_matrix:
       - rohitg00-agentmemory
       - understand-anything
       - t-search
+      - tencentdb-agent-memory
     notes: "Context7 may support version-sensitive external docs only; generated rules and source evidence remain authoritative."
   aif-implement:
     allowed:
@@ -117,6 +123,7 @@ skill_usage_matrix:
       - rohitg00-agentmemory
       - understand-anything
       - t-search
+      - tencentdb-agent-memory
     notes: "Implementation commands must not use optional context providers by default."
   aif-fix:
     allowed:
@@ -132,6 +139,7 @@ skill_usage_matrix:
       - rohitg00-agentmemory
       - understand-anything
       - t-search
+      - tencentdb-agent-memory
     notes: "Fix commands must use QA evidence, source files, and canonical OpenSpec context."
   aif-verify:
     allowed:
@@ -147,6 +155,7 @@ skill_usage_matrix:
       - rohitg00-agentmemory
       - understand-anything
       - t-search
+      - tencentdb-agent-memory
     notes: "Verification must stay source-grounded and provider-independent."
   aif-done:
     allowed:
@@ -162,6 +171,7 @@ skill_usage_matrix:
       - rohitg00-agentmemory
       - understand-anything
       - t-search
+      - tencentdb-agent-memory
     notes: "Done/finalization must not depend on optional provider availability or output."
   aif-commit:
     allowed:
@@ -177,6 +187,7 @@ skill_usage_matrix:
       - rohitg00-agentmemory
       - understand-anything
       - t-search
+      - tencentdb-agent-memory
     notes: "Commit freshness checks may use direct repository and local artifact evidence only."
 permissions:
   recommend_only:
@@ -270,6 +281,18 @@ tool_permissions:
     aif-explore: manual_purged_cli_execution
     aif-review: recommend_only
     default: forbidden
+  tencentdb-agent-memory:
+    aif-analyze: recommend_only
+    aif-explore: read_existing_reviewed_output
+    aif-review: read_existing_reviewed_output
+    aif-architecture: forbidden
+    aif-plan: forbidden
+    aif-rules-check: forbidden
+    aif-implement: forbidden
+    aif-fix: forbidden
+    aif-verify: forbidden
+    aif-done: forbidden
+    aif-commit: forbidden
   understand-anything:
     default: forbidden
   t-search:
@@ -296,6 +319,8 @@ availability_probes:
   repowise:
     - repowise --version
     - repowise doctor
+  tencentdb-agent-memory:
+    - "curl -fsS --max-time 2 http://127.0.0.1:8420/health"
 forbidden_operations:
   - auto_install
   - auto_run_setup
@@ -502,13 +527,16 @@ task_signals:
       - context-mode
   architecture_or_impact_discovery:
     recommend: []
-    conditional: []
+    conditional:
+      - tencentdb-agent-memory
   multirepo_surface_mapping:
     recommend: []
     conditional: []
   resume_previous_work:
     recommend:
       - codex-agent-mem
+    conditional:
+      - tencentdb-agent-memory
   open_work_or_completion_check:
     recommend:
       - codex-agent-mem
@@ -958,6 +986,71 @@ tools:
       default:
         mode: forbidden
         notes: "AIFHub must not run or probe the provider. Only explicit user-owned reviewed output may be considered in a future promoted policy."
+  tencentdb-agent-memory:
+    display_name: TencentDB Agent Memory
+    doc: tencentdb-agent-memory.md
+    results_doc: tencentdb-agent-memory-benchmark-results.md
+    repository: "https://github.com/TencentCloud/TencentDB-Agent-Memory"
+    tested_version: "@tencentdb-agent-memory/memory-tencentdb 1.0.2 (repo release v2.0.1); screening benchmark 2026-09-14/15"
+    decision: conditional_external_runtime_only
+    recommendation_action: suggest_when_en_continuity_or_research
+    integration_role: user_owned_continuity_memory_gateway
+    install_policy: explicit_user_opt_in_only
+    stable_cli: false
+    mcp_status: none_http_gateway_and_openclaw_hermes_plugins_only
+    read_scope: user_owned_gateway_recall_of_captured_dialog_history
+    purge_path: "stop user-owned gateway process and delete TDAI_DATA_DIR directory (all L0/L1/vector state lives there; verified 2026-09-15)"
+    allowed_in:
+      - aif-analyze
+      - aif-explore
+      - aif-review
+    forbidden_in:
+      - aif-architecture
+      - aif-plan
+      - aif-rules-check
+      - aif-implement
+      - aif-fix
+      - aif-verify
+      - aif-done
+      - aif-commit
+    privacy_caveat: "Пользовательский runtime захватывает диалоги и производные в user-owned data dir; remote-embeddings отправляют контент диалогов во внешний API (локальный Ollama-инференс приватен). Recall output — производное истории диалогов: использовать только как reviewed supporting input. AIFHub не устанавливает и не запускает gateway: npm postinstall патчит host-рантайм OpenClaw, автоматическая установка запрещена."
+    recommended_for:
+      tasks:
+        - resume_previous_work
+        - compact_handoff_context
+    conditional_for:
+      project_shapes:
+        - large_framework_app
+        - multirepo
+      condition: "Только en/ASCII кодовые базы объёма standard/large и формы large_framework_app/multirepo, когда пользователь сам держит запущенный user-owned Gateway (upstream-дефолт http://127.0.0.1:8420/health; в benchmark использовался порт-оверрайд 8431) и явно просит continuity/research-контекст из прошлых сессий. Экономия подтверждена для research-follow-up (−20%..−67%) и impl-continuity на самом большом репо (−53%..−64%); малые проекты, narrow-вопрос после broad-обзора и impl в средних репо — убыток (воспроизведено в обеих конфигурациях, см. benchmark). Кириллический контент не покрыт evidence: без remote-embeddings keyword-FTS не ищет кириллицу."
+    do_not_recommend_for:
+      project_shapes:
+        - small_microservice
+      tasks:
+        - initial_code_discovery
+        - exact_file_or_symbol_lookup
+        - manual_durable_notes
+    suggestion_text: "Если проект en/ASCII объёма standard/large и у пользователя уже запущен собственный TencentDB Agent Memory Gateway, можно предложить его recall (search/memories + search/conversations) как reviewed supporting input для continuity/research — только explicit opt-in; install/setup/purge остаются user-owned. Кириллические запросы требуют remote-embeddings (keyword-FTS кириллицу не ищет)."
+    screening_policy:
+      evidence: tencentdb-agent-memory-benchmark-results.md
+      default_decision: avoid_by_default
+      baseline: rg
+      require_baseline_first: true
+      do_not_select_by: [language_only, small_repo_only, ru_content_without_remote_embeddings]
+      conditional_cases:
+        - id: en_project_continuity_research
+          skills: [aif-analyze, aif-explore, aif-review]
+          tasks: [resume_previous_work, compact_handoff_context, architecture_or_impact_discovery]
+          match:
+            project_shape: [large_framework_app, multirepo]
+            volume: [standard, large]
+            repo_shape: [single_repo, monorepo, multirepo]
+          recommendation_gate: "User explicitly runs their own gateway (health probe on http://127.0.0.1:8420/health must pass) and asks for dialog-history continuity; en/ASCII codebase; the prior session must have covered the topic — a narrow follow-up after a broad overview loses to baseline (reproduced twice); not a small project."
+    execution:
+      default:
+        mode: read_existing_reviewed_output
+        requires_explicit_path: true
+        notes: "Только чтение пользовательского Gateway HTTP API (POST /search/memories, /search/conversations) или проверенных экспортов; AIFHub не вызывает /capture, не управляет жизненным циклом gateway и не чистит данные без явной команды пользователя."
   t-search:
     display_name: T-Search
     doc: t-search.md
