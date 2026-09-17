@@ -1,0 +1,35 @@
+{
+  "date": "2026-09-15",
+  "aifhub_commit": "02d3f68538abc9ac1712e3396eb69eca74f9e830",
+  "skills_ref": {
+    "repository": "https://github.com/agentskills/agentskills",
+    "commit": "69ef37e9424c0a7ea9dd2293b559e43ec8176379",
+    "version": "0.1.0",
+    "files": {
+      "pyproject.toml": "d6c383b33ede77b0fe26a9881171ab7f7a45744cf8b23d1cbb11001605cf49e3",
+      "uv.lock": "4a9c377bb45ad4ec00d9e9f1cbffd969333df73f763d1a9c137f88e116bddaf1",
+      "src/skills_ref/parser.py": "7c4161c0ebbde8fa8ea37441d8213b16be4533310d3cfde9c982b1c20857d1f9",
+      "src/skills_ref/validator.py": "44da48d29a89c1bb540ecd629b5bafd9d7e6c13c124cb31c33f7d0bf95b648a0"
+    }
+  },
+  "client": {
+    "version": "1.137.0",
+    "commit": "645f29cc3176500b4b5762ba887cf2a7f0ffdf2c",
+    "copilot_version": "0.65.0",
+    "copilot_vscode_commit": "94c8e2adc50e26ef70af85a0de3a9efed757acaa",
+    "desktop_bundle_sha256": "e416416b1a6db5f181dc90d0096686532a9f57cf08691b8b3a8c5f8d93f47185",
+    "bundle_contains_agent_plugins_schema": true,
+    "bundle_contains_invocation_attribute": true,
+    "evidence_level": "installed-metadata-and-exact-source-kernel",
+    "full_ui_smoke": "NOT_RUN",
+    "reason": "candidate loses invocation restriction after strict frontmatter normalization; no candidate admitted to runtime"
+  },
+  "tools": {
+    "node": "v24.13.0",
+    "python": "3.12.11",
+    "skills_ref": "0.1.0",
+    "strictyaml": "1.7.3",
+    "markdown_it_py": "4.0.0",
+    "mdurl": "0.1.2"
+  }
+}

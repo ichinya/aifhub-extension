@@ -1,0 +1,98 @@
+{
+  "python": "3.12.11",
+  "skills_ref": "0.1.0",
+  "strictyaml": "1.7.3",
+  "rows": [
+    {
+      "skill": "aif-analyze",
+      "variant": "original",
+      "moved_fields": [],
+      "sha256": "22257e2a3af320e393ed5185035e07836bc43b48736afc337bc6cf27fe7d8de2",
+      "errors": [
+        "Unexpected fields in frontmatter: author, version. Only ['allowed-tools', 'compatibility', 'description', 'license', 'metadata', 'name'] are allowed."
+      ],
+      "cli_exit": 1,
+      "stdout": "",
+      "stderr": "Validation failed for <skill>:\n  - Unexpected fields in frontmatter: author, version. Only ['allowed-tools', 'compatibility', 'description', 'license', 'metadata', 'name'] are allowed."
+    },
+    {
+      "skill": "aif-analyze",
+      "variant": "normalized",
+      "moved_fields": [
+        "author",
+        "version"
+      ],
+      "sha256": "4eebfadb6722f3704898f1b17997165af2a45171f9f1546ca4e64f1b853caae9",
+      "errors": [],
+      "cli_exit": 0,
+      "stdout": "Valid skill: <skill>",
+      "stderr": ""
+    },
+    {
+      "skill": "aif-done",
+      "variant": "original",
+      "moved_fields": [],
+      "sha256": "f1183d9a3b0dd5521eace7a68d3b6b8b7e6586b824aafdad6ca6f5cea355e492",
+      "errors": [
+        "Unexpected fields in frontmatter: argument-hint, author, version. Only ['allowed-tools', 'compatibility', 'description', 'license', 'metadata', 'name'] are allowed."
+      ],
+      "cli_exit": 1,
+      "stdout": "",
+      "stderr": "Validation failed for <skill>:\n  - Unexpected fields in frontmatter: argument-hint, author, version. Only ['allowed-tools', 'compatibility', 'description', 'license', 'metadata', 'name'] are allowed."
+    },
+    {
+      "skill": "aif-done",
+      "variant": "normalized",
+      "moved_fields": [
+        "argument-hint",
+        "author",
+        "version"
+      ],
+      "sha256": "c7f079fd6cae396229c8c9b5c3252b2511be30a0911c71b74e5ce5e7df5d5e39",
+      "errors": [],
+      "cli_exit": 0,
+      "stdout": "Valid skill: <skill>",
+      "stderr": ""
+    },
+    {
+      "skill": "aif-mode",
+      "variant": "original",
+      "moved_fields": [],
+      "sha256": "810f35a98170011b11ac7cbb3f6d00c56957bf3816da663dfc252e45bc3ad0d4",
+      "errors": [
+        "Unexpected fields in frontmatter: argument-hint, disable-model-invocation. Only ['allowed-tools', 'compatibility', 'description', 'license', 'metadata', 'name'] are allowed."
+      ],
+      "cli_exit": 1,
+      "stdout": "",
+      "stderr": "Validation failed for <skill>:\n  - Unexpected fields in frontmatter: argument-hint, disable-model-invocation. Only ['allowed-tools', 'compatibility', 'description', 'license', 'metadata', 'name'] are allowed."
+    },
+    {
+      "skill": "aif-mode",
+      "variant": "normalized",
+      "moved_fields": [
+        "argument-hint",
+        "disable-model-invocation"
+      ],
+      "sha256": "3b2a87cc3a132dcd1fe110935dc601938202e25be12260cc61ee5c9c09b287b0",
+      "errors": [],
+      "cli_exit": 0,
+      "stdout": "Valid skill: <skill>",
+      "stderr": ""
+    },
+    {
+      "skill": "aif-mode",
+      "variant": "preserve_invocation",
+      "moved_fields": [
+        "argument-hint",
+        "disable-model-invocation"
+      ],
+      "sha256": "fd5df24025eb08839fa920e6eacbda6025c5bdefe65d4acdd2ee83ba275383bb",
+      "errors": [
+        "Unexpected fields in frontmatter: disable-model-invocation. Only ['allowed-tools', 'compatibility', 'description', 'license', 'metadata', 'name'] are allowed."
+      ],
+      "cli_exit": 1,
+      "stdout": "",
+      "stderr": "Validation failed for <skill>:\n  - Unexpected fields in frontmatter: disable-model-invocation. Only ['allowed-tools', 'compatibility', 'description', 'license', 'metadata', 'name'] are allowed."
+    }
+  ]
+}

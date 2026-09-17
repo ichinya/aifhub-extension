@@ -1,0 +1,57 @@
+{
+  "vscode_commit": "645f29cc3176500b4b5762ba887cf2a7f0ffdf2c",
+  "node": "v24.13.0",
+  "source_sha256": {
+    "yaml.ts": "6a1b91e893b0ae191cd218956170a6477f6fe3dcd25df36b1b40f59805f1fbe8",
+    "agentPluginParser.ts": "74ac06b34f3cfaf14310b71a1758be36ce813440ce6f1a1ba36db9c837eacd35",
+    "pluginParsers.ts": "b9d8442f6a35e3ec620cff516bf92833a5e373d6b8a53f204f8062e7938cb21f"
+  },
+  "kind": "selected-source-kernel-with-filesystem-adapter",
+  "full_client_loads": "NOT_RUN",
+  "rows": [
+    {
+      "variant": "original",
+      "manifest_recognized": true,
+      "skills": [
+        {
+          "name": "aif-analyze",
+          "description": "Bootstrap project context. Resolves localization and stack, creates/updates config.yaml, rules/base.md, and REVIEW.md, then checks DESCRIPTION and guides core skill execution."
+        },
+        {
+          "name": "aif-done",
+          "description": "Finalize a verified OpenSpec-native change or legacy AI Factory-only plan, prepare commit/PR summaries, and drive evidence-backed follow-ups."
+        },
+        {
+          "name": "aif-mode",
+          "description": "Configures the optional OpenSpec tool while preserving independent HLV and Lekalo choices, synchronizes selected artifacts, checks configuration drift, and reports migration/export actions.",
+          "disableModelInvocation": true
+        }
+      ]
+    },
+    {
+      "variant": "normalized",
+      "manifest_recognized": true,
+      "skills": [
+        {
+          "name": "aif-analyze",
+          "description": "Bootstrap project context. Resolves localization and stack, creates/updates config.yaml, rules/base.md, and REVIEW.md, then checks DESCRIPTION and guides core skill execution."
+        },
+        {
+          "name": "aif-done",
+          "description": "Finalize a verified OpenSpec-native change or legacy AI Factory-only plan, prepare commit/PR summaries, and drive evidence-backed follow-ups."
+        },
+        {
+          "name": "aif-mode",
+          "description": "Configures the optional OpenSpec tool while preserving independent HLV and Lekalo choices, synchronizes selected artifacts, checks configuration drift, and reports migration/export actions."
+        }
+      ]
+    },
+    {
+      "variant": "preserve_invocation",
+      "skill": "aif-mode",
+      "flags": {
+        "disableModelInvocation": true
+      }
+    }
+  ]
+}
