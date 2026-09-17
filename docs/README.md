@@ -93,8 +93,8 @@ OpenSpec CLI features вызываются через AIFHub wrappers и `script
 | [T-Search Benchmark Results](memory-tools-research/t-search-benchmark-results.md) | Static harness checks, exact Q4 live run, 6/6 synthetic pairs, `pilot_negative` tradeoff и remaining external-index evidence |
 | [AI Tester Matrix Для Memory Tools](memory-tools-research/ai-tester-matrix.md) | Paired `rg` baseline и optional-tool matrix для dimension-aware recommendation metadata |
 | [CodeGraph Benchmark Results](memory-tools-research/codegraph-benchmark-results.md) | Видимые paired `rg`/CodeGraph test rows, token traces и 47-profile matrix summary |
-| [TencentDB Agent Memory Research](memory-tools-research/tencentdb-agent-memory.md) | User-owned gateway memory candidate: identity boundary, paired pi/omniroute screening и `reject_default` policy |
-| [TencentDB Agent Memory Benchmark Results](memory-tools-research/tencentdb-agent-memory-benchmark-results.md) | 24 paired runs на 6 проектах (FTS/EMB): research −26…−34%, implement смешанный, качество 24/24, границы purge/daemon `NOT_RUN` |
+| [TencentDB Agent Memory Research](memory-tools-research/tencentdb-agent-memory.md) | Static review + screening issue #201: OpenClaw/Hermes-only поверхность, npm `postinstall` патчит host runtime, `conditional_external_runtime_only` metadata gate |
+| [TencentDB Agent Memory Benchmark Results](memory-tools-research/tencentdb-agent-memory-benchmark-results.md) | Paired pi + OmniRoute runs (6 проектов, FTS/embeddings): устойчиво только research-follow-up средних/больших en-репо; малые проекты и narrow-после-broad — убыток |
 | [AI Tester Token Matrices](memory-tools-research/ai-tester-token-matrices.md) | Таблицы по skill с реальными `ai-tester` input/output/cache token traces и `NOT_RUN` строками |
 | [Codex Plan Mode](codex-plan-mode.md) | Codex mode и question-format guidance |
 | [Handoff Naming](handoff.md) | Stage vocabulary versus public CLI commands |

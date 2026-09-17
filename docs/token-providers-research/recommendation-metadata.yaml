@@ -1,0 +1,93 @@
+schema: aifhub.token_providers.recommendation.v1
+updated: "2026-09-14"
+purpose: >
+  Machine-readable decision and usage metadata for token providers (issue #138).
+  Durable research metadata only: it is not consumed by the extension runtime,
+  never gates plan/implement/verify/review/done/archive/commit, never installs,
+  configures or prefers a tool, and never becomes provider selection metadata.
+  Full phase-by-stack data lives in token-providers-research/rtk/cross-project-ab-results.json.
+default_policy:
+  install_policy: explicit_user_opt_in_only
+  never_auto_install: true
+  baseline: raw_commands
+  raw_path_rule: "Use RTK to answer 'what is happening?'; use raw commands to answer 'show all evidence without loss.'"
+  protected_artifacts:
+    - openspec/changes/**
+    - openspec/specs/**
+    - .ai-factory/aif-gate-result.json
+    - .ai-factory/coverage.json
+    - .ai-factory/done-readiness.json
+    - generated-rules traces
+  protected_artifact_rule: >
+    Overview reads through a compressed path are acceptable only because the
+    pinned release preserved these files byte-exact; the complete raw path
+    remains required for the full evidence contract (fenced JSON, exact
+    snippets, full tracebacks).
+providers:
+  rtk:
+    decision: reject_defer
+    decision_scope: >
+      AIFHub integration/recommendation remains rejected-deferred. Explicit
+      user-owned use is recommended for the proven scopes below and
+      discouraged for the listed anti-scopes.
+    pinned_version: "0.48.0"
+    source_commit: fde0a8f185945556f51718de0f4c430bb62b3df6
+    license: Apache-2.0
+    evidence:
+      observation_probe:
+        path: docs/token-providers-research/rtk/README.md
+        results: docs/token-providers-research/rtk/results.json
+        outcome: reject_defer
+        blockers:
+          - excluded commands still logged by the Claude hook
+          - tracking.enabled=false did not prevent command storage
+          - issue's partial TOML config fails to parse
+      single_ab:
+        path: docs/token-providers-research/rtk/ai-tester-ab.md
+        runs: 24
+        outcome: "baseline 12/12 vs RTK 9/12; tokens -20.2% (unstable)"
+      multirepo_ab:
+        path: docs/token-providers-research/rtk/multirepo-ab.md
+        runs: 24
+        outcome: "baseline 11/12 vs RTK 12/12; tokens -15.8% (-7.9% without the largest baseline pair)"
+      cross_project_matrix:
+        path: docs/token-providers-research/rtk/cross-project-ab.md
+        results: docs/token-providers-research/rtk/cross-project-ab-results.json
+        runs: 60
+        outcome: "baseline 23/30 pairs vs RTK 18/30; tokens +0.9% aggregate"
+        privacy_postcheck: "clean in all primary sensitive runs; sensitive command never rewritten"
+    proven_benefits:
+      - scope: overview_and_search_on_large_repositories
+        commands: ["rg", "git log", "git status", "git diff --stat"]
+        token_delta_pct: -24..-58
+        quality: preserved
+        evidence: cross-project cross-01/cross-05/cross-06; single security-diff -39.0%; multirepo contract -24.8%, security -41.8%
+      - scope: ops_and_status_checks
+        token_delta_pct: -24..-52
+        quality: "preserved in 4 of 6 pairs; 2 RTK malformed-JSON failures"
+        evidence: cross-project sensitive-command-bypass
+      - scope: protected_artifact_overview_reads
+        token_delta_pct: null
+        quality: "byte-exact 12/12; raw path still required for the full contract"
+        evidence: cross-project gate-artifact-fidelity; probe 5/5
+      - scope: history_and_diff_proxy_views
+        quality: "overview pass before the raw evidence pass"
+        evidence: probe proxy streams exact; cross-project fix-archaeology -3% aggregate
+    anti_scopes:
+      small_repositories:
+        token_delta_pct: +36..+268
+        reason: "nothing to compress; indirection overhead dominates"
+      flutter_snapshot:
+        token_delta_pct: +102..+173
+        reason: "compressed views mislead the model into raw re-reads"
+      exact_aggregate_counting:
+        reason: "fails in both arms; model limit, not the filter"
+      verification_and_fix_runners:
+        reason: "pytest filter dropped case names and tracebacks; use raw runners"
+      sensitive_sessions:
+        reason: "v0.48.0 storage blockers (excluded-command logging, ineffective tracking.enabled) remain"
+    boundaries:
+      - never install, bundle, auto-configure or repair hooks
+      - never treat availability or savings as a gate
+      - never prefer RTK in prompts or add runtime selection metadata
+      - subagent hook inheritance unverified

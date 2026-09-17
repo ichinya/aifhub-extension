@@ -28,7 +28,7 @@ const VALID_PROJECT_SHAPES = new Set([
 ]);
 const DEFAULT_TASK_SIGNAL = 'architecture_or_impact_discovery';
 const DEFAULT_COMMAND = 'aif-analyze';
-const ALWAYS_REJECTED_TOOLS = new Set(['codex-mem', 'eagle-mem', 'rohitg00-agentmemory', 'tencentdb-agent-memory']);
+const ALWAYS_REJECTED_TOOLS = new Set(['codex-mem', 'eagle-mem', 'rohitg00-agentmemory']);
 export const SOURCE_DENYLIST_TOOL_IDS = new Set(['understand-anything', 't-search']);
 const MANUAL_ONLY_TASKS = new Map([
   ['agent-memory', new Set(['manual_durable_notes'])]
@@ -1090,6 +1090,27 @@ async function runProbeForTool(toolId, options = {}) {
       ['repowise', ['--version']],
       ['repowise', ['doctor']]
     ]);
+  }
+  if (toolId === 'tencentdb-agent-memory') {
+    // User-owned gateway health probe: the tool is only usable while the
+    // user's own TencentDB Agent Memory gateway is running (upstream default
+    // port 8420). AIFHub never starts or installs it — only probes.
+    const commandLabel = 'curl -fsS --max-time 2 http://127.0.0.1:8420/health';
+    try {
+      await execFileAsync('curl', ['-fsS', '--max-time', '2', 'http://127.0.0.1:8420/health'], {
+        windowsHide: true,
+        timeout: 5000,
+        maxBuffer: 64 * 1024
+      });
+      return { availability: 'installed', command: commandLabel };
+    } catch (err) {
+      return {
+        availability: 'not_installed',
+        command: commandLabel,
+        reason: err?.code === 'ENOENT' ? 'curl_missing' : 'gateway_not_reachable',
+        note: 'User-owned gateway is not reachable on http://127.0.0.1:8420/health; the user must start it before continuity recall is proposed.'
+      };
+    }
   }
 
   return {

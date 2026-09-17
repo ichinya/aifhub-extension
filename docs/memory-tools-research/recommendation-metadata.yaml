@@ -18,13 +18,13 @@ skill_usage_matrix:
       - context-mode
       - codegraph
       - repowise
+      - tencentdb-agent-memory
     forbidden:
       - codex-mem
       - eagle-mem
       - rohitg00-agentmemory
       - understand-anything
       - t-search
-      - tencentdb-agent-memory
     notes: "Recommend only; do not install, setup, index, register MCP, mutate provider config, or treat provider output as evidence."
   aif-explore:
     allowed:
@@ -35,13 +35,13 @@ skill_usage_matrix:
       - context-mode
       - codegraph
       - repowise
+      - tencentdb-agent-memory
     forbidden:
       - codex-mem
       - eagle-mem
       - rohitg00-agentmemory
       - understand-anything
       - t-search
-      - tencentdb-agent-memory
     notes: "Read existing reviewed provider output, or use explicitly enabled tools only when metadata grants command-specific permission and purge is defined."
   aif-architecture:
     allowed:
@@ -83,6 +83,7 @@ skill_usage_matrix:
       - context7
       - codex-agent-mem
       - repowise
+      - tencentdb-agent-memory
     forbidden:
       - context-mode
       - codex-mem
@@ -91,7 +92,6 @@ skill_usage_matrix:
       - rohitg00-agentmemory
       - understand-anything
       - t-search
-      - tencentdb-agent-memory
     notes: "Optional supporting context for impact/docs/closure checks only."
   aif-rules-check:
     allowed:
@@ -281,11 +281,21 @@ tool_permissions:
     aif-explore: manual_purged_cli_execution
     aif-review: recommend_only
     default: forbidden
+  tencentdb-agent-memory:
+    aif-analyze: recommend_only
+    aif-explore: read_existing_reviewed_output
+    aif-review: read_existing_reviewed_output
+    aif-architecture: forbidden
+    aif-plan: forbidden
+    aif-rules-check: forbidden
+    aif-implement: forbidden
+    aif-fix: forbidden
+    aif-verify: forbidden
+    aif-done: forbidden
+    aif-commit: forbidden
   understand-anything:
     default: forbidden
   t-search:
-    default: forbidden
-  tencentdb-agent-memory:
     default: forbidden
 availability_probes:
   rg:
@@ -309,7 +319,8 @@ availability_probes:
   repowise:
     - repowise --version
     - repowise doctor
-  tencentdb-agent-memory: []
+  tencentdb-agent-memory:
+    - "curl -fsS --max-time 2 http://127.0.0.1:8420/health"
 forbidden_operations:
   - auto_install
   - auto_run_setup
@@ -516,13 +527,16 @@ task_signals:
       - context-mode
   architecture_or_impact_discovery:
     recommend: []
-    conditional: []
+    conditional:
+      - tencentdb-agent-memory
   multirepo_surface_mapping:
     recommend: []
     conditional: []
   resume_previous_work:
     recommend:
       - codex-agent-mem
+    conditional:
+      - tencentdb-agent-memory
   open_work_or_completion_check:
     recommend:
       - codex-agent-mem
@@ -972,6 +986,71 @@ tools:
       default:
         mode: forbidden
         notes: "AIFHub must not run or probe the provider. Only explicit user-owned reviewed output may be considered in a future promoted policy."
+  tencentdb-agent-memory:
+    display_name: TencentDB Agent Memory
+    doc: tencentdb-agent-memory.md
+    results_doc: tencentdb-agent-memory-benchmark-results.md
+    repository: "https://github.com/TencentCloud/TencentDB-Agent-Memory"
+    tested_version: "@tencentdb-agent-memory/memory-tencentdb 1.0.2 (repo release v2.0.1); screening benchmark 2026-09-14/15"
+    decision: conditional_external_runtime_only
+    recommendation_action: suggest_when_en_continuity_or_research
+    integration_role: user_owned_continuity_memory_gateway
+    install_policy: explicit_user_opt_in_only
+    stable_cli: false
+    mcp_status: none_http_gateway_and_openclaw_hermes_plugins_only
+    read_scope: user_owned_gateway_recall_of_captured_dialog_history
+    purge_path: "stop user-owned gateway process and delete TDAI_DATA_DIR directory (all L0/L1/vector state lives there; verified 2026-09-15)"
+    allowed_in:
+      - aif-analyze
+      - aif-explore
+      - aif-review
+    forbidden_in:
+      - aif-architecture
+      - aif-plan
+      - aif-rules-check
+      - aif-implement
+      - aif-fix
+      - aif-verify
+      - aif-done
+      - aif-commit
+    privacy_caveat: "Пользовательский runtime захватывает диалоги и производные в user-owned data dir; remote-embeddings отправляют контент диалогов во внешний API (локальный Ollama-инференс приватен). Recall output — производное истории диалогов: использовать только как reviewed supporting input. AIFHub не устанавливает и не запускает gateway: npm postinstall патчит host-рантайм OpenClaw, автоматическая установка запрещена."
+    recommended_for:
+      tasks:
+        - resume_previous_work
+        - compact_handoff_context
+    conditional_for:
+      project_shapes:
+        - large_framework_app
+        - multirepo
+      condition: "Только en/ASCII кодовые базы объёма standard/large и формы large_framework_app/multirepo, когда пользователь сам держит запущенный user-owned Gateway (upstream-дефолт http://127.0.0.1:8420/health; в benchmark использовался порт-оверрайд 8431) и явно просит continuity/research-контекст из прошлых сессий. Экономия подтверждена для research-follow-up (−20%..−67%) и impl-continuity на самом большом репо (−53%..−64%); малые проекты, narrow-вопрос после broad-обзора и impl в средних репо — убыток (воспроизведено в обеих конфигурациях, см. benchmark). Кириллический контент не покрыт evidence: без remote-embeddings keyword-FTS не ищет кириллицу."
+    do_not_recommend_for:
+      project_shapes:
+        - small_microservice
+      tasks:
+        - initial_code_discovery
+        - exact_file_or_symbol_lookup
+        - manual_durable_notes
+    suggestion_text: "Если проект en/ASCII объёма standard/large и у пользователя уже запущен собственный TencentDB Agent Memory Gateway, можно предложить его recall (search/memories + search/conversations) как reviewed supporting input для continuity/research — только explicit opt-in; install/setup/purge остаются user-owned. Кириллические запросы требуют remote-embeddings (keyword-FTS кириллицу не ищет)."
+    screening_policy:
+      evidence: tencentdb-agent-memory-benchmark-results.md
+      default_decision: avoid_by_default
+      baseline: rg
+      require_baseline_first: true
+      do_not_select_by: [language_only, small_repo_only, ru_content_without_remote_embeddings]
+      conditional_cases:
+        - id: en_project_continuity_research
+          skills: [aif-analyze, aif-explore, aif-review]
+          tasks: [resume_previous_work, compact_handoff_context, architecture_or_impact_discovery]
+          match:
+            project_shape: [large_framework_app, multirepo]
+            volume: [standard, large]
+            repo_shape: [single_repo, monorepo, multirepo]
+          recommendation_gate: "User explicitly runs their own gateway (health probe on http://127.0.0.1:8420/health must pass) and asks for dialog-history continuity; en/ASCII codebase; the prior session must have covered the topic — a narrow follow-up after a broad overview loses to baseline (reproduced twice); not a small project."
+    execution:
+      default:
+        mode: read_existing_reviewed_output
+        requires_explicit_path: true
+        notes: "Только чтение пользовательского Gateway HTTP API (POST /search/memories, /search/conversations) или проверенных экспортов; AIFHub не вызывает /capture, не управляет жизненным циклом gateway и не чистит данные без явной команды пользователя."
   t-search:
     display_name: T-Search
     doc: t-search.md
@@ -1438,75 +1517,6 @@ tools:
           - repowise hook install
           - repowise generate-claude-md
         pre_existing_state: "If .repowise/ already exists, treat it as user-owned and do not delete or reinitialize it silently."
-  tencentdb-agent-memory:
-    display_name: "TencentDB Agent Memory (tdai-gateway)"
-    doc: tencentdb-agent-memory.md
-    results_doc: tencentdb-agent-memory-benchmark-results.md
-    packages: ["@tencentdb-agent-memory/memory-tencentdb"]
-    tested_version: "memory-tencentdb 1.0.2 local gateway; paired pi screening 2026-09-15"
-    decision: reject_default
-    recommendation_action: do_not_suggest_as_aifhub_provider
-    integration_role: user_owned_local_gateway_continuity_candidate
-    install_policy: user_owned_outside_aifhub_only
-    stable_cli: local_http_gateway_only_no_cli_verified
-    mcp_status: not_evaluated
-    read_scope: captured_user_and_assistant_session_content
-    storage_scope: user_owned_gateway_store_local_http_plus_optional_ollama_embeddings
-    purge_path: unverified_delete_lifecycle_not_tested
-    purge_status: unverified
-    allowed_in: []
-    forbidden_in:
-      - aif-analyze
-      - aif-explore
-      - aif-architecture
-      - aif-plan
-      - aif-review
-      - aif-rules-check
-      - aif-implement
-      - aif-fix
-      - aif-verify
-      - aif-done
-      - aif-commit
-    privacy_caveat: "The gateway captures user and assistant session content into a long-lived local store; the screening never exercised deletion, cross-project store isolation or residual-state cleanup, and the embeddings mode adds an Ollama background dependency."
-    avoid_reason: "Paired pi (omniroute la/ornith-1.5-35b-a3b) screening on six local projects: research totals -25.9% FTS / -33.8% EMB with zero quality loss, but implement totals +12.6% FTS / +29.4% EMB (worst cell +332.6%), tiny-project pairs were negative, and the run lived entirely outside the AIFHub ai-tester harness, so no label evidence is promotable."
-    screening_evidence:
-      run: pi-omniroute-ornith-memlab-paired-screening-2026-09-15
-      runner: "pi 0.85.1 headless json, provider omniroute, model la/ornith-1.5-35b-a3b, thinking medium"
-      design: "phase A seed sessions with memory capture, phase B paired tool-vs-baseline runs in throwaway git worktrees"
-      pairs_total: 24
-      pairs_per_search_mode: 12
-      rows_total: 48
-      failed_rows: 0
-      pass_pairs: 24
-      useful_pairs: 0
-      promoted_entries: 0
-      quality_violations: 0
-      fts_totals:
-        research_delta_percent: -25.9
-        implement_delta_percent: -25.1
-        implement_delta_percent_without_laravel: 12.6
-        tool_calls_per_pair_tool_vs_baseline: [2.6, 4.3]
-        wall_seconds_per_pair_tool_vs_baseline: [19, 27]
-      emb_totals:
-        research_delta_percent: -33.8
-        implement_delta_percent: 29.4
-      candidate_cases_needing_harness_confirmation:
-        - "research on medium/large frameworks: dart/flutter medium -75.9%, typescript/react tiny -23.8%, py+ts monorepo medium -20.5%, csharp/unity large -10.2% (FTS)"
-        - "targeted edits in large tangled repos: laravel implement -64.3% FTS / -53.4% EMB"
-      negative_cases:
-        - "implement point edits with embeddings: unity +332.6%, flutter +202.5% (EMB)"
-        - "tiny projects: py+ts fullstack small research +10.2%, implement +30.3%"
-        - "narrow questions outside prior sessions: laravel research +47.3% FTS / +126.6% EMB"
-    promotion_requirements:
-      - "Rerun through scripts/memory-tool-ai-tester-evaluate-tool.mjs with accepted_evidence scenarios before any proven_label_evidence entry."
-      - "Verify delete/purge lifecycle and cross-project store isolation on a user-owned deployment."
-      - "Define daemon ownership and background-service boundary; AIFHub must not start, own or auto-start the gateway."
-    forbidden_operations:
-      - auto_install
-      - auto_run_setup
-      - auto_sync_memory
-      - auto_register_mcp
-      - start_background_daemons
 proven_label_evidence:
   - id: codegraph-js-mini-framework-small-microservice-2d6a0d2c-2026-05-27
     source_evidence: historical-codegraph-screening-gpt54mini-2026-05-27
@@ -1658,34 +1668,6 @@ proven_label_evidence:
       report: .ai-factory/state/ai-tester-tool-evaluations/graphify-project-8d97432e6d7a-architecture-explore-plan-20260611t1821z/ai-tester-token-matrices.json
       generated_at: "2026-06-11T18:27:36.160Z"
 evidence_runs:
-  - id: pi-omniroute-ornith-memlab-paired-screening-2026-09-15
-    date: "2026-09-15"
-    scope: "User-owned local bench: paired pi agent screening of tencentdb-agent-memory across six local projects, research/implement skills, memory-vs-baseline arms, FTS and embeddings search modes."
-    privacy: "Durable record keeps aggregate per-project/per-skill metrics and generic framework labels only; no session transcripts, no private project paths, no captured memory contents."
-    harness:
-      runner: "pi 0.85.1 headless --mode json; read-only tools for research, full tools for implement"
-      provider: omniroute
-      model: la/ornith-1.5-35b-a3b
-      memory_modes: [fts_only, embeddings_bge_m3_ollama]
-      baseline: "identical prompt without the memory preamble"
-      isolation: "throwaway git worktrees at HEAD; user trees untouched"
-    outcomes:
-      tencentdb-agent-memory:
-        run_id: memlab-paired-screening-2026-09-15
-        rows_executed: 48
-        failed_rows: 0
-        pass_pairs: 24
-        useful_pairs: 0
-        quality_violations: 0
-        average_pair_deltas:
-          total_tokens_percent: -25.5
-        fts_aggregate:
-          research_delta_percent: -25.9
-          implement_delta_percent: -25.1
-        emb_aggregate:
-          research_delta_percent: -33.8
-          implement_delta_percent: 29.4
-        recommendation_update: "Keep reject_default; record research-profile candidate cases (medium/large frameworks, tangled large-repo edits) as harness-confirmation prerequisites, not recommendations."
   - id: live-ai-tester-path-hash-tool-batch-2026-06-11
     date: "2026-06-11"
     scope: "Catalog-driven one-shot ai-tester runs across three path-hash local project profiles and four candidate tools."

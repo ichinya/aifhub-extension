@@ -71,7 +71,7 @@ Protected validation artifacts:
 | `agent-memory` | [`jayzeng/agentmemory`](https://github.com/jayzeng/agentmemory), `myagentmemory 0.4.12` | Manual notes только по явному запросу. |
 | `codex-agent-mem` | [`MarceloCaporale/codex-agent-mem`](https://github.com/MarceloCaporale/codex-agent-mem), Python package `1.0.2` | Optional read-only continuity с explicit SQLite DB. |
 | `rohitg00-agentmemory` | [`rohitg00/agentmemory`](https://github.com/rohitg00/agentmemory), `@agentmemory/agentmemory`, `@agentmemory/mcp` | [`reject_default`](memory-tools-research/agentmemory-rohitg00.md); isolated safety [`PASS`](memory-tools-research/agentmemory-rohitg00-benchmark-results.md), full-product runtime `NOT_RUN`, runtime decision `avoid`. |
-| `tencentdb-agent-memory` | [`@tencentdb-agent-memory/memory-tencentdb`](https://www.npmjs.com/package/@tencentdb-agent-memory/memory-tencentdb) `1.0.2` + локальный `tdai-gateway` | [`reject_default`](memory-tools-research/tencentdb-agent-memory.md); user-owned paired pi screening [`PASS`](memory-tools-research/tencentdb-agent-memory-benchmark-results.md) (research −26…−34%, implement +13…+29%), purge/daemon границы `NOT_RUN`. |
+| `tencentdb-agent-memory` | [`TencentCloud/TencentDB-Agent-Memory`](https://github.com/TencentCloud/TencentDB-Agent-Memory), npm [`@tencentdb-agent-memory/memory-tencentdb`](https://www.npmjs.com/package/@tencentdb-agent-memory/memory-tencentdb) `1.0.2` | [`conditional_external_runtime_only`](memory-tools-research/tencentdb-agent-memory.md) (issue #201); screening [`результаты`](memory-tools-research/tencentdb-agent-memory-benchmark-results.md) 2026-09-14/15, runtime `NOT_RUN`, exact screening gate в metadata. |
 | `understand-anything` | [`Egonex-AI/Understand-Anything`](https://github.com/Egonex-AI/Understand-Anything), `v2.9.0` at `f08763d11d0202a8a8f52b5dedda6d1b2e2ebac8` | [`reject_defer`](memory-tools-research/understand-anything.md); provider lifecycle `NOT_RUN(lifecycle_unavailable)`, reviewed-output contract matrix synthetic/non-promotable. |
 
 Разрешенные рекомендации:
@@ -80,6 +80,7 @@ Protected validation artifacts:
 - Graphify: optional repo graph для large framework, legacy и multirepo impact discovery после baseline `rg`.
 - `codex-agent-mem`: optional read-only continuity memory с explicit SQLite DB path; это Python source package из GitHub repo, не npm package.
 - `context-mode`: manual temporary index для explicit generated output или large command output.
+- `tencentdb-agent-memory`: `conditional_external_runtime_only` — recall user-owned Gateway только explicit opt-in для research-follow-up на en/ASCII standard/large проектах и impl-continuity самых больших репо; install/setup/purge остаются user-owned, AIFHub не устанавливает и не запускает gateway (npm `postinstall` патчит host runtime).
 - Context7: optional docs provider для version-sensitive library/API questions.
 - `agent-memory`: manual notes только когда пользователь явно просит durable notes.
 - CodeGraph: `manual_cli_only` + `avoid_by_default`; CLI scoped read и purge прошли explicit real-root testing. Selector может рекомендовать его только при exact `screening_policy` или `proven_label_evidence` match по skill + task + project labels; broad repo graph question, language или multirepo label сами по себе недостаточны. Уже готовый индекс можно переиспользовать только после `rg` и только если `files/query/context` дает полезную непустую выборку.
@@ -89,7 +90,7 @@ Protected validation artifacts:
 - `codex-mem`: default scope может ingest broad Codex history.
 - `eagle-mem`: scoped read и purge behavior не доказаны.
 - `rohitg00-agentmemory`: normal tasks, explicit config enablement и continuity/manual-notes signals не переопределяют `reject_default`; 2/2 isolated safety pairs прошли, но обе дали `avoid`, а full-product lifecycle не проверен. Допустим только явно переданный и проверенный user-owned output как supporting context.
-- `tencentdb-agent-memory`: не предлагать — gateway захватывает содержимое сессий в долгоживущий store, delete/purge и store isolation не проверены, а screening-выгода нестабильна по скиллам (research −26…−34%, implement +13…+29% FTS/EMB, до +333% на отдельных ячейках). Допустим только как user-owned experiment вне AIFHub command ownership.
+- `tencentdb-agent-memory`: conditional-случаи не переопределяют external-runtime границу: не запускать install/index/update/hooks/daemon/config lifecycle и не предлагать для малых проектов, кириллического контента без remote-embeddings, narrow-вопросов после broad-обзора или impl в средних репо; допустим только как reviewed supporting input при явном запросе пользователя.
 - `understand-anything`: normal tasks и explicit config не переопределяют `reject_defer`; не запускать install/index/update/hooks/viewer/daemon/config lifecycle. Даже PASS synthetic adapter matrix не является `provider_generated` provenance и не разрешает provider permission.
 
 AIFHub по-прежнему не принимает CodeGraph `install`, MCP serving, hooks/background services или agent configuration mutation.

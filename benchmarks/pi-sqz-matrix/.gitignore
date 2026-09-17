@@ -1,0 +1,6 @@
+bin/
+run*/
+out/
+smoke/
+dbg/
+*.log

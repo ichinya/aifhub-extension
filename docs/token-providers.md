@@ -9,8 +9,9 @@ evidence: deterministic filters can remove assertions, patches and historical fa
 ## RTK decision
 
 [`rtk-ai/rtk`](https://github.com/rtk-ai/rtk) **v0.48.0** is `reject_defer` for an
-AIFHub recommendation or automatic integration. Explicit, user-owned overview use
-remains possible. This is not a claim of universal safety or a security PASS.
+AIFHub recommendation or automatic integration. Explicit, user-owned use is
+recommended for the proven scopes listed below and discouraged elsewhere. This
+is not a claim of universal safety or a security PASS.
 
 The [pinned evaluation](token-providers-research/rtk/README.md) found useful output
 reduction, but failed exact diagnostic and local persistence checks. In particular,
@@ -32,7 +33,65 @@ completed 24 attempts on three related, labelled copies: baseline 11/12, RTK
 tokens; savings fell to 7.9% without the largest baseline pair. This is bounded
 evidence and does not resolve the persistence failures above.
 
+The [cross-project evidence/privacy matrix](token-providers-research/rtk/cross-project-ab.md)
+ran five agent phases once per pair across six different projects (60 primary
+runs): baseline passed 23/30 pairs versus 18/30 for RTK with 0.9% MORE tokens.
+Protected artifacts survived the compressed read path byte-exact in 12/12 runs,
+the synthetic secret never reached the local store, tee or `rtk gain` output,
+and the sensitive command was never rewritten. The phase-by-stack split shows
+where RTK helped (archaeology and diagnostics on large repositories: −28…−58%
+tokens with quality preserved; ops checks: −19%) and where it did not (Flutter
+snapshot +102…+173% across phases; small repositories +36…+268%; exact aggregate
+counting during research fails in both arms). The RTK group produced malformed
+final answers in 6 of its 12 failures. Cleanup of raw attempts remains blocked
+by approval review.
+
+Machine-readable decision, benefit and anti-scope metadata lives in
+[recommendation-metadata.yaml](token-providers-research/recommendation-metadata.yaml)
+(schema `aifhub.token_providers.recommendation.v1`). It is durable research
+metadata: the extension runtime does not consume it, and it never gates or
+installs anything.
+
 > Use RTK to answer “what is happening?”; use raw commands to answer “show all evidence without loss.”
+
+## Proven benefits and when to enable (user-owned)
+
+The bounded evidence above does support real, repeatable benefits for explicit
+user-owned sessions. Based on all three ai-tester series and the pinned probe,
+RTK v0.48.0 is worth enabling for:
+
+- **Overview and search on large repositories.** `rg`, `git log`, `git status`,
+  `git diff --stat` in the cross-project matrix saved 24–58% tokens with quality
+  preserved on the Unity (−28…−37% in diagnostics/archaeology), Python/TS
+  monorepo (−29…−58%) and web-service (−24…−51%) snapshots. The single-project
+  series measured −39.0% on a diff review; the multirepository series −24.8% on
+  contract review and −41.8% on security review.
+- **Ops and status checks.** The sensitive status/gain workflow cost 52% fewer
+  tokens on the Laravel snapshot and 24% fewer on the web-service snapshot,
+  with the synthetic secret never reaching the SQLite store, tee files or
+  `rtk gain` output, and the credential-bearing command never rewritten.
+- **Reading protected validation artifacts.** Compressed `rtk read` preserved
+  `aif-gate-result`, `coverage.json`, `done-readiness.json` and OpenSpec
+  markdown byte-exact in 12/12 matrix runs (and 5/5 probe reads). They remain
+  on the raw-path list for the full contract, but an overview read is safe.
+- **Filtered views of history and diffs** (`rtk proxy git diff`,
+  `rtk proxy git log --stat -n 50`) as the “what is happening?” pass before
+  any raw evidence pass.
+
+Do not enable it for:
+
+- **Small repositories** (+36…+268% tokens: nothing to compress, indirection
+  overhead dominates);
+- **stacks where compression misleads the model** — the Flutter snapshot cost
+  +102…+173% across three phases because raw re-reads followed compressed views;
+- **tasks requiring exact aggregate counts over long lists** (sums, per-file
+  totals during research) — this failed in both arms and is a model limit, but
+  RTK neither helps nor pays for it;
+- **verification and fix runners** — use the raw test runner from the start
+  (RTK's pytest filter dropped case names and tracebacks in the probe);
+- **sensitive sessions** — see the storage blockers below; the matrix privacy
+  result does not overturn the probe's findings about excluded-command logging
+  and ineffective `[tracking]` settings in v0.48.0.
 
 ## Evidence must have a raw path
 
