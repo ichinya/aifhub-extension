@@ -1,0 +1,148 @@
+{
+  "source_revision": "02d3f68538abc9ac1712e3396eb69eca74f9e830",
+  "node": "v24.13.0",
+  "platform": "win32",
+  "ai_factory": "2.19.0",
+  "no_override": {
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: unknown command 'aifhub-mcp'"
+  },
+  "project_override": {
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: unknown command 'aifhub-mcp'"
+  },
+  "missing_links": [
+    {
+      "file": "skills/aif-mode/SKILL.md",
+      "link": "../../docs/validation-providers.md"
+    },
+    {
+      "file": "skills/shared/ISOLATED-EXECUTION.md",
+      "link": "../../docs/isolated-execution.md"
+    },
+    {
+      "file": "skills/shared/TASK-COORDINATION.md",
+      "link": "../../docs/workflow-mechanics.md"
+    }
+  ],
+  "copied_files": [
+    {
+      "file": "skills/aif-analyze/SKILL.md",
+      "sha256": "22257e2a3af320e393ed5185035e07836bc43b48736afc337bc6cf27fe7d8de2"
+    },
+    {
+      "file": "skills/aif-analyze/references/config-keys.json",
+      "sha256": "1e6bcad355ba8506c3dd9d88c1a7f43f591544ef15031a776433542be7e75bcf"
+    },
+    {
+      "file": "skills/aif-analyze/references/config-template.yaml",
+      "sha256": "adf934a395026b0b486070d2a3a9adcbf980b03db8bb0245c5e0d2e405668d46"
+    },
+    {
+      "file": "skills/aif-analyze/references/description-template.md",
+      "sha256": "4aae4df333b8dd3fde0389b5785b39fdfde8cf2ebc55213053952603d5aed1f0"
+    },
+    {
+      "file": "skills/aif-analyze/references/project-glossary-template.md",
+      "sha256": "9d044241dcc4f6d0441a1d4bcedbbbd3369fd714432b0ac171649baf67cddd9e"
+    },
+    {
+      "file": "skills/aif-analyze/references/project-scan-checklist.md",
+      "sha256": "df4744ba55da7c3d862807303b904d9d761fd5e6baafc977c850aac52bc22eb4"
+    },
+    {
+      "file": "skills/aif-analyze/references/review-policy-template.md",
+      "sha256": "cc8a6d9823c77fb8e7abccdcfa486ea0767596285e834163ae5c0a9137e20208"
+    },
+    {
+      "file": "skills/aif-analyze/references/rules-base-template.md",
+      "sha256": "ebb4d1287218a21dc7a692cb5d0999478ee278c6a8d5860bbe6c386339a33b3e"
+    },
+    {
+      "file": "skills/aif-done/SKILL.md",
+      "sha256": "f1183d9a3b0dd5521eace7a68d3b6b8b7e6586b824aafdad6ca6f5cea355e492"
+    },
+    {
+      "file": "skills/aif-done/references/finalization-contract.md",
+      "sha256": "358720fff318d6d4966722e19f875afce2ad2db13dee41c28a86287bb113a7c1"
+    },
+    {
+      "file": "skills/aif-mode/SKILL.md",
+      "sha256": "810f35a98170011b11ac7cbb3f6d00c56957bf3816da663dfc252e45bc3ad0d4"
+    },
+    {
+      "file": "skills/aif-mode/references/ARTIFACT-SYNC.md",
+      "sha256": "91b87404efcc59852a292bec38ffff23e10df2d236f421fdd3ceb9d30ad4672e"
+    },
+    {
+      "file": "skills/aif-mode/references/MODES.md",
+      "sha256": "48e79bc26245e29c3152a76619b0ce8fe19aed77c357269bf35010ac836e3130"
+    },
+    {
+      "file": "skills/aif-mode/references/SAFETY.md",
+      "sha256": "40043f2a13cede565e72e12066078d6b0e1f0816ec8023e825e2bc9a9e5a7753"
+    },
+    {
+      "file": "skills/aif-mode/templates/mode-switch-report.md",
+      "sha256": "eb2e2f378f149fcc9fd9ecc3f1ccc8d8cb02bac37dc5ffa9ff001f98e16ab16a"
+    },
+    {
+      "file": "skills/shared/BUG-REPRODUCTION.md",
+      "sha256": "c3a72a40c79dd494412ffea715a0ceb2b58d9c19ec15bb6ea4739671b4d69b6b"
+    },
+    {
+      "file": "skills/shared/ISOLATED-EXECUTION.md",
+      "sha256": "c62c92d5a499d3996f267cd27d82750f34eab113d1fa93dd4a3d87695bc26c73"
+    },
+    {
+      "file": "skills/shared/LANGUAGE-POLICY.md",
+      "sha256": "7d78b05016ac26f6d7ce6cdce0cfd624d3d1e277874ea169fa8a78e650e2e958"
+    },
+    {
+      "file": "skills/shared/PROJECT-GLOSSARY.md",
+      "sha256": "fec6286318eec9f6183e372aabdddb02d7c631393d3812b5871488a4c8826315"
+    },
+    {
+      "file": "skills/shared/QUESTION-TOOL.md",
+      "sha256": "5090554a27ea2f273793bef1a22fb94d0dd34fa6e56ad90242a89e28f1ec642e"
+    },
+    {
+      "file": "skills/shared/RESEARCH-DESIGN.md",
+      "sha256": "a6ecbacd94560ba3f83c5cd694ad25520558bc576da0b847f8f517ed0cc37e86"
+    },
+    {
+      "file": "skills/shared/REVIEW-DELEGATION.md",
+      "sha256": "079914c8f22489245ee2978488e39fada7c0aa1381ded4e74fc3bbe5357e936d"
+    },
+    {
+      "file": "skills/shared/REVIEW-POLICY.md",
+      "sha256": "9cd7ff45495069cd2339252e3769580cfe4ecab68b4183689b109af6ace45f31"
+    },
+    {
+      "file": "skills/shared/SCOPED-REVIEW.md",
+      "sha256": "3f18face90341306229a8aa1ba9d6aa58f34724266176688ff6724d349f24fce"
+    },
+    {
+      "file": "skills/shared/TASK-COORDINATION.md",
+      "sha256": "17701bfe038f45a4a1bbb08e96177e017d3dcbc262d07528bafbd45671d9fc56"
+    },
+    {
+      "file": "skills/shared/TASK-DESIGN.md",
+      "sha256": "99d83b9c659972a8ed4088965d4fafacfa068e1c5ff6cb368579377cecb9da19"
+    },
+    {
+      "file": "skills/shared/TEST-QUALITY.md",
+      "sha256": "1f648f2f66cc8dddc439691e223188aec3f12bf8ecda75dc1c95219bd26371d1"
+    },
+    {
+      "file": "skills/shared/TOOLS.md",
+      "sha256": "0ee5dd0dc71174b51ab7fe33e3982e852b6016e679a901b9ada59a5bd20e67b8"
+    },
+    {
+      "file": "skills/shared/references/test-quality-examples.md",
+      "sha256": "81d963411c8499d81ae879dd1ea0a606f1f0388c3fe1572528e98f86c8ff3525"
+    }
+  ]
+}

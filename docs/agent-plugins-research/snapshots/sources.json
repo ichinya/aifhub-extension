@@ -1,0 +1,16 @@
+{
+  "retrieved_at": "2026-09-15T05:32:23.766Z",
+  "spec_version": "1.0.0",
+  "schemas": [
+    {
+      "url": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+      "sha256": "0a4aad95ce337878ad38802ebf0daa3fde76abe3f65400c86bcbb1ec0b3ab883",
+      "bytes": 1805
+    },
+    {
+      "url": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+      "sha256": "6539175bfcdf43085855183e86da40ea94b166547a72b47ae9a0a390516d3acb",
+      "bytes": 3408
+    }
+  ]
+}

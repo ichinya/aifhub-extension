@@ -1,0 +1,6183 @@
+{
+  "algorithm": "commonmark-link-closure-v1",
+  "seed_files": 29,
+  "closure_files": 188,
+  "closure_bytes": 4516056,
+  "inventory": [
+    {
+      "file": "README.md",
+      "bytes": 39876,
+      "sha256": "17e1f250b8ffcdfd98b36da795cc08336e58a20d4145a2e4b3e39a0476cdedac"
+    },
+    {
+      "file": "agent-files/claude/aifhub-implement-worker.md",
+      "bytes": 12654,
+      "sha256": "20511c9402efab772f307a0a2801fe883fdb8ec6a0209aa443d22f4885dfe7ed"
+    },
+    {
+      "file": "agent-files/claude/aifhub-plan-polisher.md",
+      "bytes": 6037,
+      "sha256": "a87f846741fead64b6af798adb78bbb3e968990edee5e485ffb1ad9ddb8875b1"
+    },
+    {
+      "file": "agent-files/claude/aifhub-review-sidecar.md",
+      "bytes": 9089,
+      "sha256": "88d7108673646bd5ec6fe6e845216db9b6d2143e12846c985dcc0b008e5dfdd1"
+    },
+    {
+      "file": "agent-files/codex/aifhub-implement-worker.toml",
+      "bytes": 12433,
+      "sha256": "f21f45f40d3f13efba257634f8c936f9af6ba1fc3e426782b801737e7c00492f"
+    },
+    {
+      "file": "agent-files/codex/aifhub-plan-polisher.toml",
+      "bytes": 5901,
+      "sha256": "44bac92d5b4122584ad7b51cab85e744c79c71b173e03e886a5ff40641448b7b"
+    },
+    {
+      "file": "agent-files/codex/aifhub-review-sidecar.toml",
+      "bytes": 8848,
+      "sha256": "c5513b029a1bbdb03bf57e442ff1749407959cc3e2f3bca3375404614b6034cb"
+    },
+    {
+      "file": "commands/post-update-init.mjs",
+      "bytes": 3300,
+      "sha256": "0e747dce94bec11374d4a81be8db264a9b96bdb5742378673d723537cd47b3bd"
+    },
+    {
+      "file": "docs/README.md",
+      "bytes": 21454,
+      "sha256": "d773cefa60c58dbbf422c0bb2012ccbafcb389bd0ffe140ecf8ae0d2302e7e6f"
+    },
+    {
+      "file": "docs/active-change-resolver.md",
+      "bytes": 10771,
+      "sha256": "f7c78a80448536717acc95710833036687fefbdad3a33e8ff9ba8c6654e46966"
+    },
+    {
+      "file": "docs/adr/0001-openspec-native-artifact-protocol.md",
+      "bytes": 14676,
+      "sha256": "78fcdc4825202ee35000931fb5889afdc0d929a81dfcfd8529614547cdd945fb"
+    },
+    {
+      "file": "docs/adr/0002-optional-project-context-glossary.md",
+      "bytes": 2600,
+      "sha256": "7ac780160aeb7d8e0f92c6a138648581aaba806e5227a5220a96744ff31a8ba1"
+    },
+    {
+      "file": "docs/adr/0003-durable-project-review-policy.md",
+      "bytes": 3297,
+      "sha256": "159a622e27daec6638082f79363676a6b7f4ac84ae179b976b4b545c9fec9abc"
+    },
+    {
+      "file": "docs/adr/0004-sdd-profiles-and-session-brief.md",
+      "bytes": 6175,
+      "sha256": "5c7cb95e3832e5a278d36b2c5c2f426b20ba067cbde18e1a6fec6fa78376ecff"
+    },
+    {
+      "file": "docs/adr/0005-ai-factory-plan-methodologies.md",
+      "bytes": 9411,
+      "sha256": "759bc915d0a17739f9058c86d19e3239f5523cb24481e56687384ee132665cb2"
+    },
+    {
+      "file": "docs/agent-plugins-research/README.md",
+      "bytes": 26494,
+      "sha256": "f7b8c46c0fe0ed3f2b6fcf74b6cf288d9545d65ff553a53a1ea814a6d6ecd50c"
+    },
+    {
+      "file": "docs/aifhub-mcp.md",
+      "bytes": 5628,
+      "sha256": "581895d5d95f529ae30fbbdcf8fb52c270aa96e4276ac590718745b030f07e7d"
+    },
+    {
+      "file": "docs/artifact-storage-audit.md",
+      "bytes": 35796,
+      "sha256": "aceaccda9f97fa01260ab6c1738403855845091ee4ff06acf260f38c9b850811"
+    },
+    {
+      "file": "docs/claude-agents.md",
+      "bytes": 16612,
+      "sha256": "e4f85abd0e919f4fc9fe6d5318b9392fec9dc4119efe1b6dd7bf5d5e0a54036a"
+    },
+    {
+      "file": "docs/codex-agents.md",
+      "bytes": 17699,
+      "sha256": "47402c672a9e8765adcb97f6bd71c7f9b9398c494a00d7f7320faef4bc21f1cf"
+    },
+    {
+      "file": "docs/codex-plan-mode.md",
+      "bytes": 3496,
+      "sha256": "7d10b33d67da6adda0fb1b4dae83639a2c177cb2858f73ebc8723c99ae840077"
+    },
+    {
+      "file": "docs/context-dedup.md",
+      "bytes": 11638,
+      "sha256": "601da13d42650b54f4a00f131bf83f67f81468170e289996467ccbb091478571"
+    },
+    {
+      "file": "docs/context-loading-policy.md",
+      "bytes": 43914,
+      "sha256": "f35485b021f8681c1e63e674433565759fbcab37db227d8f54716aca1ac93824"
+    },
+    {
+      "file": "docs/context-providers.md",
+      "bytes": 24857,
+      "sha256": "2d720930a5afcf36d82dbb5b07fa7f699bf3e08d51bbbefc1506af0e58605050"
+    },
+    {
+      "file": "docs/handoff-validation-profile.md",
+      "bytes": 6584,
+      "sha256": "7f83eeb71bdd6d36429b72293011f267191fa31d248c97a86c57f89a30584324"
+    },
+    {
+      "file": "docs/handoff.md",
+      "bytes": 15020,
+      "sha256": "e065e0d7811f722e2c19d6b15816bd04246217c2db0dd35e89da0e254eed59a0"
+    },
+    {
+      "file": "docs/isolated-execution.md",
+      "bytes": 12603,
+      "sha256": "b12f623327c1896e9ee692392ab9bc0149089b1ceb253bc5d85f532eaaee23a2"
+    },
+    {
+      "file": "docs/isolated-host-smoke-results.json",
+      "bytes": 6489,
+      "sha256": "01ef228334706b64838fcf2740fa9c6791d83ffdcf4f6760fdd5c7394592d2e1"
+    },
+    {
+      "file": "docs/isolated-host-smoke.md",
+      "bytes": 6391,
+      "sha256": "2cb45b7c6b20ccb681dc52772776d4994d9ee953bd8b3a38d9b2790d1be2f0db"
+    },
+    {
+      "file": "docs/legacy-plan-migration.md",
+      "bytes": 9055,
+      "sha256": "8e3050fb8be409b467e20f61edf308f378c0ae847e202aaa560186086dac727e"
+    },
+    {
+      "file": "docs/mattpocock-adaptation.md",
+      "bytes": 28257,
+      "sha256": "7d6e858f1f7b47bfc25e34ad3ebba0d6816fedd7740b1b0225c968ebea35ce53"
+    },
+    {
+      "file": "docs/memory-tool-recommendations.md",
+      "bytes": 23341,
+      "sha256": "546efe3b4c586bdae63c19713cb98b5ae6464f1a09fa95f4f4d7fe28d738f911"
+    },
+    {
+      "file": "docs/memory-tools-research/README.md",
+      "bytes": 36064,
+      "sha256": "49e6fdc45f00591d38a395b43aaad2d380793781d6c26be0a3235a1b7b4de498"
+    },
+    {
+      "file": "docs/memory-tools-research/agent-memory-benchmark-results.md",
+      "bytes": 5629,
+      "sha256": "8f48da966db5830e24ecf17f9f7561dfed5cb00325e1b4bc77fe98889d91b29d"
+    },
+    {
+      "file": "docs/memory-tools-research/agent-memory.md",
+      "bytes": 3159,
+      "sha256": "6ad39c29df0fb62aeaf240ecfdfefa1ee6397d1d4fc778332ad9e4f2590aa092"
+    },
+    {
+      "file": "docs/memory-tools-research/agentmemory-rohitg00-benchmark-results.md",
+      "bytes": 8248,
+      "sha256": "e828d6ce17b443359e500a879a8f8799c9684e8fa739841a4a12d58e0ee66afe"
+    },
+    {
+      "file": "docs/memory-tools-research/agentmemory-rohitg00.md",
+      "bytes": 9590,
+      "sha256": "7a0bf10a9771875a5509ff881fced3390cff8846a81ebc98196ad1ed932b4179"
+    },
+    {
+      "file": "docs/memory-tools-research/ai-tester-matrix.md",
+      "bytes": 18492,
+      "sha256": "7a871ac41c75f42e8b656ed71cc521b439a2011e3e87fe4db5671027760024ed"
+    },
+    {
+      "file": "docs/memory-tools-research/ai-tester-scenarios.yaml",
+      "bytes": 7108,
+      "sha256": "70b5cad2eb2c05a204b1647332b8381abbe70312afb27c1e7d4526d9738e0d39"
+    },
+    {
+      "file": "docs/memory-tools-research/ai-tester-token-matrices-python-openspec-all-tools.md",
+      "bytes": 5245,
+      "sha256": "d42cb37d2bae2c18fd9bde1fb3ed4e3c5d08992bd87c911baa59b0603c0a1f2c"
+    },
+    {
+      "file": "docs/memory-tools-research/ai-tester-token-matrices-screening-codegraph.md",
+      "bytes": 76899,
+      "sha256": "a91c5e8e69eeb052d787ea722916ee3500911dffaf28f64ee8880a6120664641"
+    },
+    {
+      "file": "docs/memory-tools-research/ai-tester-token-matrices.md",
+      "bytes": 150398,
+      "sha256": "65d3bc6f1bfca34c9524b8850d8a09fd43fa1d0c89dd39b017902252f8d557ab"
+    },
+    {
+      "file": "docs/memory-tools-research/codegraph-benchmark-results.md",
+      "bytes": 20025,
+      "sha256": "de59a60794be9d4f756ec28c4b84482b3c3605db359296454dc2c88a39d9c972"
+    },
+    {
+      "file": "docs/memory-tools-research/codegraph.md",
+      "bytes": 4778,
+      "sha256": "8eca4b0ce0ff7eb9c3562f32e99cef990739c0a3637d78017addee4956db18f0"
+    },
+    {
+      "file": "docs/memory-tools-research/codex-agent-mem-benchmark-results.md",
+      "bytes": 7407,
+      "sha256": "07c95b5326f650309419adff01987f6392a0aa596a429e9e9e274389d634c3c2"
+    },
+    {
+      "file": "docs/memory-tools-research/codex-agent-mem.md",
+      "bytes": 3551,
+      "sha256": "76f8b9348ff5a93773c616a875504bce349a3a241a11ad8e44e42c3654ba92af"
+    },
+    {
+      "file": "docs/memory-tools-research/codex-mem-benchmark-results.md",
+      "bytes": 5290,
+      "sha256": "eac9e376cec9f3283d818e644601f90f7a5711de7708bc4f67b0920072c42516"
+    },
+    {
+      "file": "docs/memory-tools-research/codex-mem.md",
+      "bytes": 3180,
+      "sha256": "0bbd073f468fb70a4c73caf2426f522e8e80fb68d0f394202adb4056f1da7155"
+    },
+    {
+      "file": "docs/memory-tools-research/context-dedup-ai-tester/baseline-no-dedup.yaml",
+      "bytes": 1692,
+      "sha256": "b89b037a53b947c4110fd1867c033ced800eb93975b45b79db7cd346cf943157"
+    },
+    {
+      "file": "docs/memory-tools-research/context-dedup-ai-tester/variant-a-aifhub-context-dedup.yaml",
+      "bytes": 2407,
+      "sha256": "a6e383fe83848bdf7b23799ae4e1eb9d60c88f5133242bc2f51aa6a1448b14ff"
+    },
+    {
+      "file": "docs/memory-tools-research/context-dedup-ai-tester/variant-b-squeez.yaml",
+      "bytes": 2207,
+      "sha256": "42c8b38b5d407393a048e674467966ad306ebf2c886c100092b91451b9440862"
+    },
+    {
+      "file": "docs/memory-tools-research/context-mode-benchmark-results.md",
+      "bytes": 16408,
+      "sha256": "c5c763ff83d7db22db5e95e7d476ecc7fd0e291420466e6ef85de9ecf0e53714"
+    },
+    {
+      "file": "docs/memory-tools-research/context-mode-codex-ai-tester/live-authorized-evidence.json",
+      "bytes": 6016,
+      "sha256": "1d8e5c966f8ff03c0ecb3db511f73011a117210831838d4fe29f06874a3ad543"
+    },
+    {
+      "file": "docs/memory-tools-research/context-mode.md",
+      "bytes": 9121,
+      "sha256": "51906dadf78dda716469017ed1532868762232f686bc087753e031a0787baf80"
+    },
+    {
+      "file": "docs/memory-tools-research/context7-benchmark-results.md",
+      "bytes": 11712,
+      "sha256": "0a4e35dd6fc94c9cf4bece76a319a403db2b2a984397d40af8cfda66e1fd8ecc"
+    },
+    {
+      "file": "docs/memory-tools-research/context7.md",
+      "bytes": 2870,
+      "sha256": "9b1c1c8c2474b13b6b9821ef169fbbc7269069511116e360a02d910691a560b4"
+    },
+    {
+      "file": "docs/memory-tools-research/eagle-mem-benchmark-results.md",
+      "bytes": 3977,
+      "sha256": "2d9e236fa05f5a3c754726a12692603e6a29edfc07a34147b00cc08a0a9ea8bc"
+    },
+    {
+      "file": "docs/memory-tools-research/eagle-mem.md",
+      "bytes": 2674,
+      "sha256": "43364a13eb24b40f3194344aa8991f66e8629637b6c3516c8729535f74ec2f2a"
+    },
+    {
+      "file": "docs/memory-tools-research/graphify-benchmark-results.md",
+      "bytes": 16689,
+      "sha256": "fd47fedc3835d08fcf9bba641a5988754d3c8051b665e34f5c92ee231d426a2b"
+    },
+    {
+      "file": "docs/memory-tools-research/graphify.md",
+      "bytes": 4492,
+      "sha256": "ef5f00a258478fe163b1c05a307346f6dec4ca1b924dbd201aec624837ccd398"
+    },
+    {
+      "file": "docs/memory-tools-research/recommendation-metadata.yaml",
+      "bytes": 123117,
+      "sha256": "b58a43931999d767feff362968727d9c3663983cbcba375468cae9bd6c690c24"
+    },
+    {
+      "file": "docs/memory-tools-research/repowise-benchmark-results.md",
+      "bytes": 15912,
+      "sha256": "85dbcd1f690eeb5324949b0bdf5fdc88270d459645ad3c283a1759d0e298b76c"
+    },
+    {
+      "file": "docs/memory-tools-research/repowise.md",
+      "bytes": 7225,
+      "sha256": "4f5059f7e28acfe3a53d347c7d272e5361110362c5a2e3401f2e7bc8173c9e63"
+    },
+    {
+      "file": "docs/memory-tools-research/squeez-benchmark-results.md",
+      "bytes": 8094,
+      "sha256": "feb4b9b088d5d403b8cea6665b3d5e906ea4e8cf08c58431cbefc1f24bfe7f0d"
+    },
+    {
+      "file": "docs/memory-tools-research/squeez.md",
+      "bytes": 6065,
+      "sha256": "4a2fe67f1cbcb47eec624c9e54511c78071357045288a3b9c65b7610dd8318b7"
+    },
+    {
+      "file": "docs/memory-tools-research/sqz-benchmark-results.md",
+      "bytes": 8274,
+      "sha256": "e23ef1e1e1fe7f4f958f6bacc839bf30eb305a6c62401a829f9e9123c13facb5"
+    },
+    {
+      "file": "docs/memory-tools-research/sqz.md",
+      "bytes": 5866,
+      "sha256": "1a6ed8d5afb2f699dc308169615670aba432433ce492de6ab39109b0a8460de5"
+    },
+    {
+      "file": "docs/memory-tools-research/t-search-ab-scenarios.json",
+      "bytes": 3231,
+      "sha256": "78ed9268544105936b583fc24eb09d0aead7365df9aca730fd9c460845984160"
+    },
+    {
+      "file": "docs/memory-tools-research/t-search-benchmark-results.md",
+      "bytes": 22605,
+      "sha256": "f56344689b5f8ba8f26c1db10091f39f23a9e0127f0978b1e2c65b152529867d"
+    },
+    {
+      "file": "docs/memory-tools-research/t-search.md",
+      "bytes": 18367,
+      "sha256": "059e2dfdf753bf6578ae6baf6a491680f9ed91dd5fe30fbb79ce37fb77a20f87"
+    },
+    {
+      "file": "docs/memory-tools-research/understand-anything-benchmark-results.md",
+      "bytes": 7050,
+      "sha256": "4cfacdb40972b9b56b46786e6315e116c567264b5ce5d97c4b20e46468bf3376"
+    },
+    {
+      "file": "docs/memory-tools-research/understand-anything.md",
+      "bytes": 7015,
+      "sha256": "af061215fd14dfc20e57502fac220d8200ad6cb887b06f7aa7085eb09c5260f7"
+    },
+    {
+      "file": "docs/openspec-1.11.0-audit.md",
+      "bytes": 12201,
+      "sha256": "b39e638f8d828d45bb57a49329b92acded979b506076864245188b4cd3da3cec"
+    },
+    {
+      "file": "docs/openspec-1.12.0-audit.md",
+      "bytes": 11847,
+      "sha256": "10bcda236456b9ebd93d0cdf74487be9d15eb6751175076f5025781c165c031d"
+    },
+    {
+      "file": "docs/openspec-1.13.0-audit.md",
+      "bytes": 8702,
+      "sha256": "fc1aa826431978e785b46513ccbce79edf212a41de3a39f00d0e949c9d4b2374"
+    },
+    {
+      "file": "docs/openspec-compatibility.md",
+      "bytes": 65598,
+      "sha256": "9797fcb3d4f794e709db6667d33a0436afa71dcb1867acb69e561dad0291b3d6"
+    },
+    {
+      "file": "docs/openspec-validation.md",
+      "bytes": 16535,
+      "sha256": "97be16243279a8067bd3244781ab49ad5b076d5d84411c62fd434df4b8e0b894"
+    },
+    {
+      "file": "docs/review-policy.md",
+      "bytes": 7550,
+      "sha256": "9e1f31bb756c4b07be86986c40e03c6e289583de7617d981a10b9bb7a5093117"
+    },
+    {
+      "file": "docs/runtime-research/prime-agent/README.md",
+      "bytes": 20618,
+      "sha256": "e1c467d619c41ff0c2c259a1b87e11a9b1fc2c782226a163ced1cead9a8581eb"
+    },
+    {
+      "file": "docs/runtime-research/prime-agent/results.json",
+      "bytes": 4366,
+      "sha256": "7d83c4cad8a568b47d14a7b5efa3fe96a1f8e00135ebfc703d0cea9481875dc3"
+    },
+    {
+      "file": "docs/safety-providers.md",
+      "bytes": 8297,
+      "sha256": "557d10020d60ce8b13132bd899097ae1aef77f04a0eee5ac1c6cb40b9218cf7c"
+    },
+    {
+      "file": "docs/sdd-profiles.md",
+      "bytes": 13869,
+      "sha256": "d2345f9b4eb80c10726db4ac2ff01f8c1503db39fac75d8a7502f50b7529b825"
+    },
+    {
+      "file": "docs/skill-providers-research/ponytail-lifecycle-ab/README.md",
+      "bytes": 4884,
+      "sha256": "481038fbf0461ede81325aa79b4c39842b4b3573303fc687ab70858495d4ae0f"
+    },
+    {
+      "file": "docs/skill-providers-research/ponytail-lifecycle-ab/aggregate-la.json",
+      "bytes": 66070,
+      "sha256": "c12c8c97811dd88390f1c462ba316228578fb88d1b9f9ac261f991f59cde24ed"
+    },
+    {
+      "file": "docs/skill-providers-research/ponytail-lifecycle-ab/results.md",
+      "bytes": 3623,
+      "sha256": "aff2910b4315e7a7ccdf759ffeb0cd42dcaf8847ef518cbe268f2965ca0b9d19"
+    },
+    {
+      "file": "docs/skill-providers-research/ponytail-pi-ab/README.md",
+      "bytes": 6933,
+      "sha256": "727e2347915feae9f7771bb650fe7e937ac7ac9c99c55047de98683f2834a99a"
+    },
+    {
+      "file": "docs/skill-providers-research/ponytail-pi-ab/aggregate-bai-deepseek-v4-flash.json",
+      "bytes": 43306,
+      "sha256": "fca07d911818d2c05662b956e5f0ce62b9e5a9a175704d1da7ac7f769fd7d348"
+    },
+    {
+      "file": "docs/skill-providers-research/ponytail-pi-ab/aggregate-bai-glm-5-3-flash.json",
+      "bytes": 46031,
+      "sha256": "71954ef11252b6835d9f82a4c6e747f43eda9649fc35c2ec0e6ab820857f84bf"
+    },
+    {
+      "file": "docs/skill-providers-research/ponytail-pi-ab/aggregate-bai-mimo-v2-5.json",
+      "bytes": 35960,
+      "sha256": "2978ae74be55e71750b04831c1fa513e254ebd07cb21704caa77a62d770c757d"
+    },
+    {
+      "file": "docs/skill-providers-research/ponytail-pi-ab/aggregate-bai-qwen3.8-flash.json",
+      "bytes": 45329,
+      "sha256": "8637431537aa5375e039f807c976e715f33aacb4ea030676f8f9e17c6a98db10"
+    },
+    {
+      "file": "docs/skill-providers-research/ponytail-pi-ab/aggregate-la.json",
+      "bytes": 45448,
+      "sha256": "86795c1490be8125ffa2bc669907c01d3f57a0a980b07ba6bb74463ebadfb55c"
+    },
+    {
+      "file": "docs/skill-providers-research/ponytail-pi-ab/aggregate-qwen.json",
+      "bytes": 44309,
+      "sha256": "da0bd25e67bc6182f8973278a75ee056d9757b6ed62f7c79a60c54c47a5f3a96"
+    },
+    {
+      "file": "docs/skill-providers-research/ponytail-pi-ab/results.json",
+      "bytes": 19778,
+      "sha256": "f00f53160e92d28505525cfb8449c5ed5163edbc56f14df1db14ecb515c9ca37"
+    },
+    {
+      "file": "docs/skill-providers-research/ponytail-pi-ab/results.md",
+      "bytes": 5151,
+      "sha256": "c73f5c58d740af8ff76382bd7a52c2690821cd9ca3bd1f4e8d3cf0051b8b9009"
+    },
+    {
+      "file": "docs/skill-providers.md",
+      "bytes": 15540,
+      "sha256": "b66af9e884711296ae0f1e4973e985a5944a6fc6812139949c58be7ce7cd7905"
+    },
+    {
+      "file": "docs/skill-workflow-evaluation-results.json",
+      "bytes": 24413,
+      "sha256": "bd9751a5304f00b67aa7e8e1c2c718594061710eb01f9890e4478ac959049a2a"
+    },
+    {
+      "file": "docs/skill-workflow-evaluation-results.md",
+      "bytes": 4642,
+      "sha256": "4fd5ca66e56467829e880f2b64624ba258d59b7acf7dc32a9b856668a8ba2cc6"
+    },
+    {
+      "file": "docs/skill-workflow-evaluation.md",
+      "bytes": 17193,
+      "sha256": "f94cfe026e8a6ffc814643abcd46757e6781a3cf7b2514c4ddb04a58cff470f8"
+    },
+    {
+      "file": "docs/skill-workflow-explore-followup-results.json",
+      "bytes": 11051,
+      "sha256": "66834947087caa2199bd0c228ed0d8fc9e7597539d38db2894a9d192fccf1283"
+    },
+    {
+      "file": "docs/skill-workflow-explore-followup.md",
+      "bytes": 3667,
+      "sha256": "8b264d685f7a6b3a5386ee2ad2ba92c26ff64dba949c1977d1af9540bfe63de5"
+    },
+    {
+      "file": "docs/spec-coverage.md",
+      "bytes": 4626,
+      "sha256": "115fe5b5d675c9746c9a3f18c251d1f01ea0d5a8dcc558dd0748ca04672e2d6b"
+    },
+    {
+      "file": "docs/superpowers-adaptation.md",
+      "bytes": 15372,
+      "sha256": "5c5994d3b4950ac170c4efb0bdeb6cc10c23cd6da1d5076f7795eb898625a7ff"
+    },
+    {
+      "file": "docs/superpowers-follow-up-research.md",
+      "bytes": 19017,
+      "sha256": "9dc57b62fee8aa1a5e985890f74b6592528e88b9eef60808ea3c51336f7d202d"
+    },
+    {
+      "file": "docs/superpowers-skill-evaluation-pilot.json",
+      "bytes": 136832,
+      "sha256": "061132001b614b890539c8d87da6c645e38aa02c75ae25faa69d59998a520dd3"
+    },
+    {
+      "file": "docs/superpowers-skill-evaluation-pilot.md",
+      "bytes": 12507,
+      "sha256": "092d44f6ddc6c22676bde653677d32cac56407ecd1407407be39890aa3a4c240"
+    },
+    {
+      "file": "docs/superpowers-skill-evaluation-results.json",
+      "bytes": 1510397,
+      "sha256": "2691e94293f336ae5ad4532ef50cd62ad9f9057ae26a212128976fb4308a846a"
+    },
+    {
+      "file": "docs/superpowers-skill-evaluation-results.md",
+      "bytes": 24028,
+      "sha256": "1a2ee551d0c2fdb8bd3a63c3a005fca028aeb550e5bddc0b7fbe51b9a583a5fc"
+    },
+    {
+      "file": "docs/superpowers-skill-evaluation.md",
+      "bytes": 24653,
+      "sha256": "52f64423dd2ee9bb6266bd88ac7da8d08d5f3ad17ed882f799c30fad77f34908"
+    },
+    {
+      "file": "docs/token-providers-research/rtk/README.md",
+      "bytes": 14138,
+      "sha256": "609cdcd75827a41a880b4e034d0c31dcdef525c47208a4d881d680fd8f5abb4b"
+    },
+    {
+      "file": "docs/token-providers-research/rtk/ai-tester-ab-results.json",
+      "bytes": 98601,
+      "sha256": "d1a307c1c81bcc6ada0db0cde7e3ae1b4713ddb284fc2e87209fb47def871b36"
+    },
+    {
+      "file": "docs/token-providers-research/rtk/ai-tester-ab.md",
+      "bytes": 9887,
+      "sha256": "6edbde69543112222f5b031988b08a9ed7ba75cb849aad6643e9587132a17434"
+    },
+    {
+      "file": "docs/token-providers-research/rtk/multirepo-ab-results.json",
+      "bytes": 132607,
+      "sha256": "227fe7a2d88041ca3aa42de2896a90cf03acbab4ac2e28b25c3e37e63601f4c8"
+    },
+    {
+      "file": "docs/token-providers-research/rtk/multirepo-ab.md",
+      "bytes": 14092,
+      "sha256": "1566b941cc01cc4229e9c36a7e94703a07f36d78915e36918d3514bdda9e9d8b"
+    },
+    {
+      "file": "docs/token-providers-research/rtk/probe.py",
+      "bytes": 17732,
+      "sha256": "61b74fbd938d8ff97562a33d7b1ed2ebc688d7cd8bcb5e907212a0426522403f"
+    },
+    {
+      "file": "docs/token-providers-research/rtk/results.json",
+      "bytes": 4415,
+      "sha256": "698f4a556d1f94b308c8100398dbc9a131cc7e4dedf4baf1081a85177b4793d5"
+    },
+    {
+      "file": "docs/token-providers.md",
+      "bytes": 11618,
+      "sha256": "f3f17afc3021501b08af3e690c0471b61d584a8482d2b3c4ca67e7d14ff8d16c"
+    },
+    {
+      "file": "docs/usage.md",
+      "bytes": 101146,
+      "sha256": "6567b85bc03f67adfc9c9b0f8ad8a5e4301f29b28ddac11b80cf3231b1e30593"
+    },
+    {
+      "file": "docs/validation-providers.md",
+      "bytes": 16444,
+      "sha256": "161737224e99f7997f55a07afe3d47e3d996854748c1268e6b3a20a10f83c8df"
+    },
+    {
+      "file": "docs/workflow-exchange.md",
+      "bytes": 8766,
+      "sha256": "81475e73876d79bbd8ecb0037a294724359e04113bf666873fb6dd3d48ceb8c3"
+    },
+    {
+      "file": "docs/workflow-mechanics.md",
+      "bytes": 28355,
+      "sha256": "cc98669a74d793bf3a76f8f6126962bbb986fa09e9eb336d811d250f5d73d158"
+    },
+    {
+      "file": "injections/core/aif-architecture-context-boundary.md",
+      "bytes": 6854,
+      "sha256": "34739bb57b0daf2da5f31b4472d354e95eebf2b07a3ee0b9453e5230de0796a3"
+    },
+    {
+      "file": "injections/core/aif-explore-plan-folder.md",
+      "bytes": 22650,
+      "sha256": "0a12482879f57ac3054252406334354f2fbf815f1c94fb284f69c78c4c3e5f20"
+    },
+    {
+      "file": "injections/core/aif-fix-plan-folder.md",
+      "bytes": 19177,
+      "sha256": "088d34bad6338a77d2a7ee7bf48608212277fc4921afda158a5bf32d9b11ee8e"
+    },
+    {
+      "file": "injections/core/aif-implement-plan-folder.md",
+      "bytes": 25043,
+      "sha256": "6cdbe706f19d7661cc34d2c99d4ac1656d34b4aaa293d35a006b62d6f82c7a2b"
+    },
+    {
+      "file": "injections/core/aif-improve-plan-folder.md",
+      "bytes": 18314,
+      "sha256": "21129b86583840451acfead0adf8cd0d34250c0fd2049d695749ce2a92a0cc09"
+    },
+    {
+      "file": "injections/core/aif-plan-plan-folder.md",
+      "bytes": 46871,
+      "sha256": "1f02ef442e2d57d8199be101459aa5b7003643d2ed669deadff3c6fe036a22cd"
+    },
+    {
+      "file": "injections/core/aif-review-context-providers.md",
+      "bytes": 11420,
+      "sha256": "6ccdf3410a9bc7ce82aed65933602b970d2fbe9d19dca3f5bca996ca85682a00"
+    },
+    {
+      "file": "schemas/ai-cross-context-review.schema.json",
+      "bytes": 4158,
+      "sha256": "79865a98cd7fc3c0347f4fc0085794c64996515b95a4f871be32d50c4af24081"
+    },
+    {
+      "file": "schemas/plan-compliance.schema.json",
+      "bytes": 2280,
+      "sha256": "c312bc8f719ecb79b853861c43a4aba39bf9abc3213950b54cd33acf18e40e69"
+    },
+    {
+      "file": "schemas/plan-context.schema.json",
+      "bytes": 5660,
+      "sha256": "cd41c34084717ae05e8ebfe729e7ff1618238fb554872e1add9e3307138b291c"
+    },
+    {
+      "file": "schemas/provider-capabilities.schema.json",
+      "bytes": 919,
+      "sha256": "d3f7f9fec408ce9f5307eda35222419df8c4037708292f3cc552d453b5ebc5fa"
+    },
+    {
+      "file": "schemas/provider-config.schema.json",
+      "bytes": 1238,
+      "sha256": "ef252074f41003cddd88e4c7c834bcc47a2fbcaa67e5f197d33cff5f92f6a70d"
+    },
+    {
+      "file": "schemas/provider-evidence.schema.json",
+      "bytes": 4217,
+      "sha256": "52f68f738e83af181a447abaeef5d22bd6c45da6e696376b0d5872326421c8d2"
+    },
+    {
+      "file": "schemas/provider-semantic-evidence.schema.json",
+      "bytes": 1999,
+      "sha256": "35886d066525aa39947517647b4164f6dcd6ffebf9d372e066b48ff3ee9ae331"
+    },
+    {
+      "file": "schemas/sdd-policy.schema.json",
+      "bytes": 1575,
+      "sha256": "35530e840bc48317816d0d9f39b82e2a8dd54ab7dd29a87acaadce3900a12c0c"
+    },
+    {
+      "file": "schemas/sdd-profile-decision.schema.json",
+      "bytes": 2788,
+      "sha256": "6eeeeb6b0053e5480fbf48973cf4df8d7903a2bf26053a35d594856c73a11cfd"
+    },
+    {
+      "file": "schemas/sdd-profile-inputs.schema.json",
+      "bytes": 1338,
+      "sha256": "a1169fed773b8ef3f7360c87763c16e18947032fe23fcc7c3a43a908d034636f"
+    },
+    {
+      "file": "schemas/session-brief.schema.json",
+      "bytes": 6167,
+      "sha256": "bdedfd31fe831f608e384aa749f13cc967e0486f2f7b012c94841d4182c42226"
+    },
+    {
+      "file": "schemas/tool-config.schema.json",
+      "bytes": 810,
+      "sha256": "dca4761b534d86cf268a95095ad4bcb3cac6afe50972527fa3d42ebcf4cdcd1d"
+    },
+    {
+      "file": "schemas/tracer-brief.schema.json",
+      "bytes": 1903,
+      "sha256": "e90588f9c0e99dc3bc3781dd9d2a38a9c332a0557f90274ad4883c439d578256"
+    },
+    {
+      "file": "schemas/tracer-decision.schema.json",
+      "bytes": 815,
+      "sha256": "726ccd5c6065af9e807d5b0c104b5f5fc75cc59d0d9c6c2e985895927b92c082"
+    },
+    {
+      "file": "schemas/tracer-findings.schema.json",
+      "bytes": 1693,
+      "sha256": "07166a26552c76c2baa10e571b9217519e1d1b8a14348bea278b3aab263b44a7"
+    },
+    {
+      "file": "scripts/aifhub-providers.mjs",
+      "bytes": 14645,
+      "sha256": "874172d25740e33107ec45fa002bca5c9d959894a134e34c87c7b98fed249e75"
+    },
+    {
+      "file": "scripts/openspec-1-12-live-cases.mjs",
+      "bytes": 9454,
+      "sha256": "a0c18ede4e08708e5636925938745114dffe30028ea1aa385cfccdbfd627ca99"
+    },
+    {
+      "file": "scripts/openspec-1-13-live-cases.mjs",
+      "bytes": 5324,
+      "sha256": "2fe2203c89925bf268518c26cce485b630310e3443fe1eca681a167afbdb3241"
+    },
+    {
+      "file": "scripts/openspec-compatibility-live-smoke.mjs",
+      "bytes": 19924,
+      "sha256": "0b03aaaec994fad181128ded856a42b360ed8dd529013663add50b9c3b803794"
+    },
+    {
+      "file": "scripts/provider-files.mjs",
+      "bytes": 5854,
+      "sha256": "41a719f282a6a90e01d6073843726acf1a0c1565075364ed1450bd3d54b8e585"
+    },
+    {
+      "file": "scripts/rtk-ai-tester-ab/README.md",
+      "bytes": 6866,
+      "sha256": "978288b538f428e262b87af2a8b83962276936fdbd4bf799876ebce0f9dce0d7"
+    },
+    {
+      "file": "scripts/rtk-ai-tester-ab/cleanup.ps1",
+      "bytes": 1910,
+      "sha256": "8a4ee37d8aeaec947aad128275fe06d8d305005f61cec8319afdee9d4117ee06"
+    },
+    {
+      "file": "scripts/rtk-ai-tester-multi/README.md",
+      "bytes": 5174,
+      "sha256": "0600d2256683ec0fd784e174bf56ba4ee7f525fa323af324edfe2f49784ab690"
+    },
+    {
+      "file": "scripts/runtime-gitignore.mjs",
+      "bytes": 2467,
+      "sha256": "05b6410faa79d8e51a921dd271203928565244af851c13cafc1fd4608a2c7369"
+    },
+    {
+      "file": "scripts/session-brief.mjs",
+      "bytes": 22978,
+      "sha256": "bc9286da990c0bdcf2a47c3ef28aadc1bc4ee70eb9f1dd2648971275c28cf9ed"
+    },
+    {
+      "file": "scripts/superpowers-skill-observations.mjs",
+      "bytes": 8631,
+      "sha256": "a6768b6bc4e20f6f0c20240ffcea01d91aeb4136af9b3d3edd5735f809da48b8"
+    },
+    {
+      "file": "scripts/tool-config.mjs",
+      "bytes": 3536,
+      "sha256": "272fad02a9854f32ee91fe83c1ad1664a5468d5c2f278649135d2dd8ed8167c3"
+    },
+    {
+      "file": "scripts/validate-extension.mjs",
+      "bytes": 24598,
+      "sha256": "d0cd9324ae00ca0d6fa472d19586758cb3bea970eaa254304e6631f7142b650d"
+    },
+    {
+      "file": "skills/aif-analyze/SKILL.md",
+      "bytes": 47739,
+      "sha256": "22257e2a3af320e393ed5185035e07836bc43b48736afc337bc6cf27fe7d8de2"
+    },
+    {
+      "file": "skills/aif-analyze/references/config-keys.json",
+      "bytes": 4266,
+      "sha256": "1e6bcad355ba8506c3dd9d88c1a7f43f591544ef15031a776433542be7e75bcf"
+    },
+    {
+      "file": "skills/aif-analyze/references/config-template.yaml",
+      "bytes": 6138,
+      "sha256": "adf934a395026b0b486070d2a3a9adcbf980b03db8bb0245c5e0d2e405668d46"
+    },
+    {
+      "file": "skills/aif-analyze/references/description-template.md",
+      "bytes": 569,
+      "sha256": "4aae4df333b8dd3fde0389b5785b39fdfde8cf2ebc55213053952603d5aed1f0"
+    },
+    {
+      "file": "skills/aif-analyze/references/project-glossary-template.md",
+      "bytes": 485,
+      "sha256": "9d044241dcc4f6d0441a1d4bcedbbbd3369fd714432b0ac171649baf67cddd9e"
+    },
+    {
+      "file": "skills/aif-analyze/references/project-scan-checklist.md",
+      "bytes": 3080,
+      "sha256": "df4744ba55da7c3d862807303b904d9d761fd5e6baafc977c850aac52bc22eb4"
+    },
+    {
+      "file": "skills/aif-analyze/references/review-policy-template.md",
+      "bytes": 1137,
+      "sha256": "cc8a6d9823c77fb8e7abccdcfa486ea0767596285e834163ae5c0a9137e20208"
+    },
+    {
+      "file": "skills/aif-analyze/references/rules-base-template.md",
+      "bytes": 2307,
+      "sha256": "ebb4d1287218a21dc7a692cb5d0999478ee278c6a8d5860bbe6c386339a33b3e"
+    },
+    {
+      "file": "skills/aif-done/SKILL.md",
+      "bytes": 19786,
+      "sha256": "f1183d9a3b0dd5521eace7a68d3b6b8b7e6586b824aafdad6ca6f5cea355e492"
+    },
+    {
+      "file": "skills/aif-done/references/finalization-contract.md",
+      "bytes": 14603,
+      "sha256": "358720fff318d6d4966722e19f875afce2ad2db13dee41c28a86287bb113a7c1"
+    },
+    {
+      "file": "skills/aif-mode/SKILL.md",
+      "bytes": 12795,
+      "sha256": "810f35a98170011b11ac7cbb3f6d00c56957bf3816da663dfc252e45bc3ad0d4"
+    },
+    {
+      "file": "skills/aif-mode/references/ARTIFACT-SYNC.md",
+      "bytes": 5341,
+      "sha256": "91b87404efcc59852a292bec38ffff23e10df2d236f421fdd3ceb9d30ad4672e"
+    },
+    {
+      "file": "skills/aif-mode/references/MODES.md",
+      "bytes": 3637,
+      "sha256": "48e79bc26245e29c3152a76619b0ce8fe19aed77c357269bf35010ac836e3130"
+    },
+    {
+      "file": "skills/aif-mode/references/SAFETY.md",
+      "bytes": 3661,
+      "sha256": "40043f2a13cede565e72e12066078d6b0e1f0816ec8023e825e2bc9a9e5a7753"
+    },
+    {
+      "file": "skills/aif-mode/templates/mode-switch-report.md",
+      "bytes": 784,
+      "sha256": "eb2e2f378f149fcc9fd9ecc3f1ccc8d8cb02bac37dc5ffa9ff001f98e16ab16a"
+    },
+    {
+      "file": "skills/shared/BUG-REPRODUCTION.md",
+      "bytes": 4140,
+      "sha256": "c3a72a40c79dd494412ffea715a0ceb2b58d9c19ec15bb6ea4739671b4d69b6b"
+    },
+    {
+      "file": "skills/shared/ISOLATED-EXECUTION.md",
+      "bytes": 6248,
+      "sha256": "c62c92d5a499d3996f267cd27d82750f34eab113d1fa93dd4a3d87695bc26c73"
+    },
+    {
+      "file": "skills/shared/LANGUAGE-POLICY.md",
+      "bytes": 4184,
+      "sha256": "7d78b05016ac26f6d7ce6cdce0cfd624d3d1e277874ea169fa8a78e650e2e958"
+    },
+    {
+      "file": "skills/shared/PROJECT-GLOSSARY.md",
+      "bytes": 4515,
+      "sha256": "fec6286318eec9f6183e372aabdddb02d7c631393d3812b5871488a4c8826315"
+    },
+    {
+      "file": "skills/shared/QUESTION-TOOL.md",
+      "bytes": 8284,
+      "sha256": "5090554a27ea2f273793bef1a22fb94d0dd34fa6e56ad90242a89e28f1ec642e"
+    },
+    {
+      "file": "skills/shared/RESEARCH-DESIGN.md",
+      "bytes": 9609,
+      "sha256": "a6ecbacd94560ba3f83c5cd694ad25520558bc576da0b847f8f517ed0cc37e86"
+    },
+    {
+      "file": "skills/shared/REVIEW-DELEGATION.md",
+      "bytes": 4009,
+      "sha256": "079914c8f22489245ee2978488e39fada7c0aa1381ded4e74fc3bbe5357e936d"
+    },
+    {
+      "file": "skills/shared/REVIEW-POLICY.md",
+      "bytes": 6567,
+      "sha256": "9cd7ff45495069cd2339252e3769580cfe4ecab68b4183689b109af6ace45f31"
+    },
+    {
+      "file": "skills/shared/SCOPED-REVIEW.md",
+      "bytes": 5239,
+      "sha256": "3f18face90341306229a8aa1ba9d6aa58f34724266176688ff6724d349f24fce"
+    },
+    {
+      "file": "skills/shared/TASK-COORDINATION.md",
+      "bytes": 11133,
+      "sha256": "17701bfe038f45a4a1bbb08e96177e017d3dcbc262d07528bafbd45671d9fc56"
+    },
+    {
+      "file": "skills/shared/TASK-DESIGN.md",
+      "bytes": 4697,
+      "sha256": "99d83b9c659972a8ed4088965d4fafacfa068e1c5ff6cb368579377cecb9da19"
+    },
+    {
+      "file": "skills/shared/TEST-QUALITY.md",
+      "bytes": 5145,
+      "sha256": "1f648f2f66cc8dddc439691e223188aec3f12bf8ecda75dc1c95219bd26371d1"
+    },
+    {
+      "file": "skills/shared/TOOLS.md",
+      "bytes": 4285,
+      "sha256": "0ee5dd0dc71174b51ab7fe33e3982e852b6016e679a901b9ada59a5bd20e67b8"
+    },
+    {
+      "file": "skills/shared/references/test-quality-examples.md",
+      "bytes": 2821,
+      "sha256": "81d963411c8499d81ae879dd1ea0a606f1f0388c3fe1572528e98f86c8ff3525"
+    },
+    {
+      "file": "test/fixtures/superpowers-skill-eval/manifest.json",
+      "bytes": 29293,
+      "sha256": "26bc34fd31c3305ac210767abeb672e517a89a473f98570a7ce7a234cc690433"
+    },
+    {
+      "file": "test/fixtures/superpowers-skill-eval/observations/incomplete.json",
+      "bytes": 259,
+      "sha256": "994f259b6930361b7a9a787f6f9487c37fae5d956237a89f08e7dfe01795f474"
+    },
+    {
+      "file": "test/fixtures/superpowers-skill-eval/variants/test-pollution-2.md",
+      "bytes": 3138,
+      "sha256": "b27a191e3febcdc62acc1f1b07bfd6aa163ed56fdd3e66434138aa569f82dbde"
+    },
+    {
+      "file": "test/fixtures/validation-providers/fake-lekalo-capabilities.json",
+      "bytes": 223,
+      "sha256": "2ad9359f6b89d7f2509c1c61cdfcc43efdaa4215ab578dc3d8e967fa26b763b2"
+    }
+  ],
+  "edges": [
+    {
+      "from": "skills/aif-analyze/SKILL.md",
+      "target": "skills/shared/TOOLS.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "skills/aif-analyze/SKILL.md",
+      "target": "skills/aif-analyze/references/project-scan-checklist.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "skills/aif-analyze/SKILL.md",
+      "target": "skills/aif-analyze/references/config-template.yaml",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "skills/aif-analyze/SKILL.md",
+      "target": "skills/aif-analyze/references/project-glossary-template.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "skills/aif-analyze/SKILL.md",
+      "target": "skills/aif-analyze/references/review-policy-template.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "skills/aif-analyze/SKILL.md",
+      "target": "skills/aif-analyze/references/rules-base-template.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "skills/aif-analyze/SKILL.md",
+      "target": "skills/shared/TOOLS.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "skills/aif-done/SKILL.md",
+      "target": "skills/shared/TOOLS.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "skills/aif-done/references/finalization-contract.md",
+      "target": "skills/shared/TOOLS.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "skills/aif-mode/SKILL.md",
+      "target": "skills/shared/TOOLS.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "skills/aif-mode/SKILL.md",
+      "target": "docs/validation-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "skills/aif-mode/SKILL.md",
+      "target": "skills/shared/TOOLS.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "skills/aif-mode/SKILL.md",
+      "target": "skills/aif-mode/references/MODES.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "skills/aif-mode/SKILL.md",
+      "target": "skills/aif-mode/references/ARTIFACT-SYNC.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "skills/aif-mode/SKILL.md",
+      "target": "skills/aif-mode/references/SAFETY.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "skills/aif-mode/SKILL.md",
+      "target": "skills/aif-mode/templates/mode-switch-report.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "skills/aif-mode/references/MODES.md",
+      "target": "skills/shared/TOOLS.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "skills/shared/ISOLATED-EXECUTION.md",
+      "target": "docs/isolated-execution.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "skills/shared/TASK-COORDINATION.md",
+      "target": "skills/shared/TASK-DESIGN.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "skills/shared/TASK-COORDINATION.md",
+      "target": "skills/shared/ISOLATED-EXECUTION.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "skills/shared/TASK-COORDINATION.md",
+      "target": "docs/workflow-mechanics.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "skills/shared/TEST-QUALITY.md",
+      "target": "skills/shared/references/test-quality-examples.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/validation-providers.md",
+      "target": "schemas/tool-config.schema.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/validation-providers.md",
+      "target": "schemas/provider-config.schema.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/validation-providers.md",
+      "target": "schemas/provider-evidence.schema.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/validation-providers.md",
+      "target": "schemas/provider-capabilities.schema.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/validation-providers.md",
+      "target": "schemas/provider-semantic-evidence.schema.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/validation-providers.md",
+      "target": "test/fixtures/validation-providers/fake-lekalo-capabilities.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/validation-providers.md",
+      "target": "docs/context-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/validation-providers.md",
+      "target": "docs/skill-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/validation-providers.md",
+      "target": "docs/openspec-compatibility.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/isolated-execution.md",
+      "target": "docs/workflow-mechanics.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/isolated-execution.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/isolated-execution.md",
+      "target": "skills/shared/ISOLATED-EXECUTION.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/workflow-mechanics.md",
+      "target": "docs/runtime-research/prime-agent/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/workflow-mechanics.md",
+      "target": "README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/workflow-mechanics.md",
+      "target": "docs/runtime-research/prime-agent/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/workflow-mechanics.md",
+      "target": "docs/isolated-execution.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/workflow-mechanics.md",
+      "target": "docs/handoff-validation-profile.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/workflow-mechanics.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/workflow-mechanics.md",
+      "target": "skills/shared/TASK-COORDINATION.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/workflow-mechanics.md",
+      "target": "docs/runtime-research/prime-agent/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-providers.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-providers.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-providers.md",
+      "target": "docs/skill-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-providers.md",
+      "target": "docs/safety-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-providers.md",
+      "target": "docs/memory-tools-research/understand-anything.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-providers.md",
+      "target": "docs/memory-tools-research/understand-anything-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-providers.md",
+      "target": "docs/memory-tools-research/t-search.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-providers.md",
+      "target": "docs/memory-tools-research/t-search-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-providers.md",
+      "target": "docs/memory-tools-research/agentmemory-rohitg00.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-providers.md",
+      "target": "docs/memory-tools-research/agentmemory-rohitg00-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-providers.md",
+      "target": "docs/memory-tools-research/context7.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-providers.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-providers.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers.md",
+      "target": "docs/context-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers.md",
+      "target": "docs/safety-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers.md",
+      "target": "docs/skill-providers-research/ponytail-pi-ab/results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers.md",
+      "target": "docs/skill-providers-research/ponytail-lifecycle-ab/results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers.md",
+      "target": "docs/skill-providers-research/ponytail-pi-ab/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers.md",
+      "target": "docs/skill-providers-research/ponytail-pi-ab/results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers.md",
+      "target": "docs/context-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers.md",
+      "target": "docs/codex-agents.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers.md",
+      "target": "docs/claude-agents.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-compatibility.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-compatibility.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-compatibility.md",
+      "target": "docs/openspec-validation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-compatibility.md",
+      "target": "docs/openspec-1.13.0-audit.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-compatibility.md",
+      "target": "docs/openspec-1.12.0-audit.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-compatibility.md",
+      "target": "docs/openspec-1.11.0-audit.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-compatibility.md",
+      "target": "docs/openspec-validation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-compatibility.md",
+      "target": "docs/openspec-validation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-compatibility.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-compatibility.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-compatibility.md",
+      "target": "docs/openspec-validation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-compatibility.md",
+      "target": "docs/active-change-resolver.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-compatibility.md",
+      "target": "docs/adr/0001-openspec-native-artifact-protocol.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-compatibility.md",
+      "target": "docs/adr/0002-optional-project-context-glossary.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/artifact-storage-audit.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/adr/0005-ai-factory-plan-methodologies.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/sdd-profiles.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/adr/0004-sdd-profiles-and-session-brief.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/workflow-exchange.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/superpowers-adaptation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/context-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/skill-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/safety-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/memory-tool-recommendations.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/context-dedup.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/review-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/openspec-compatibility.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/openspec-validation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/spec-coverage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/legacy-plan-migration.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/active-change-resolver.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/handoff-validation-profile.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/adr/0001-openspec-native-artifact-protocol.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/adr/0002-optional-project-context-glossary.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/adr/0003-durable-project-review-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/aifhub-mcp.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/codex-agents.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/claude-agents.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/runtime-research/prime-agent/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/memory-tools-research/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/agent-plugins-research/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/codex-plan-mode.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/handoff.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/handoff-validation-profile.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/validation-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/runtime-research/prime-agent/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/agent-plugins-research/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/workflow-mechanics.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/superpowers-adaptation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/superpowers-skill-evaluation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/mattpocock-adaptation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/isolated-execution.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/isolated-host-smoke.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/skill-workflow-evaluation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/superpowers-follow-up-research.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/context-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/skill-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/skill-providers-research/ponytail-pi-ab/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/skill-providers-research/ponytail-pi-ab/results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/skill-providers-research/ponytail-lifecycle-ab/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/skill-providers-research/ponytail-lifecycle-ab/results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/safety-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/token-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/token-providers-research/rtk/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/memory-tool-recommendations.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/context-dedup.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/review-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/openspec-compatibility.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/openspec-validation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/spec-coverage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/legacy-plan-migration.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/active-change-resolver.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/handoff-validation-profile.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/workflow-exchange.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/adr/0001-openspec-native-artifact-protocol.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/adr/0002-optional-project-context-glossary.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/adr/0003-durable-project-review-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/aifhub-mcp.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/codex-agents.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/claude-agents.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/memory-tools-research/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/memory-tools-research/t-search.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/memory-tools-research/t-search-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/memory-tools-research/ai-tester-matrix.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/memory-tools-research/codegraph-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/memory-tools-research/ai-tester-token-matrices.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/codex-plan-mode.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/handoff.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/openspec-1.11.0-audit.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/superpowers-adaptation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/context-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/skill-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/skill-providers-research/ponytail-pi-ab/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/skill-providers-research/ponytail-lifecycle-ab/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/safety-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/token-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/memory-tool-recommendations.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/context-dedup.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/review-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/openspec-compatibility.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/openspec-validation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/spec-coverage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/legacy-plan-migration.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/active-change-resolver.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/handoff-validation-profile.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/workflow-exchange.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/adr/0001-openspec-native-artifact-protocol.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/adr/0002-optional-project-context-glossary.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/adr/0003-durable-project-review-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/aifhub-mcp.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/memory-tools-research/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/memory-tools-research/t-search.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/memory-tools-research/t-search-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/memory-tools-research/ai-tester-matrix.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/memory-tools-research/codegraph-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/memory-tools-research/ai-tester-token-matrices.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/openspec-1.13.0-audit.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "docs/openspec-1.12.0-audit.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/runtime-research/prime-agent/README.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/runtime-research/prime-agent/README.md",
+      "target": "docs/workflow-mechanics.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/runtime-research/prime-agent/README.md",
+      "target": "docs/runtime-research/prime-agent/results.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/runtime-research/prime-agent/README.md",
+      "target": "docs/handoff-validation-profile.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/runtime-research/prime-agent/README.md",
+      "target": "agent-files/codex/aifhub-review-sidecar.toml",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/runtime-research/prime-agent/README.md",
+      "target": "agent-files/claude/aifhub-review-sidecar.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/runtime-research/prime-agent/README.md",
+      "target": "docs/safety-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/runtime-research/prime-agent/README.md",
+      "target": "scripts/validate-extension.mjs",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/mattpocock-adaptation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/isolated-execution.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/sdd-profiles.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/adr/0004-sdd-profiles-and-session-brief.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/adr/0005-ai-factory-plan-methodologies.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/validation-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/validation-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/adr/0002-optional-project-context-glossary.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/review-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/adr/0003-durable-project-review-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/openspec-compatibility.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/superpowers-adaptation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/openspec-compatibility.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/aifhub-mcp.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/openspec-compatibility.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/openspec-compatibility.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/openspec-1.13.0-audit.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/openspec-1.12.0-audit.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/openspec-1.11.0-audit.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/openspec-compatibility.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/legacy-plan-migration.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/superpowers-adaptation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/superpowers-skill-evaluation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/superpowers-follow-up-research.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/context-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/skill-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/safety-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/token-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/memory-tool-recommendations.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/review-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/openspec-compatibility.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/openspec-validation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/spec-coverage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/legacy-plan-migration.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/active-change-resolver.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/adr/0001-openspec-native-artifact-protocol.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/adr/0002-optional-project-context-glossary.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/adr/0003-durable-project-review-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/aifhub-mcp.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/codex-agents.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/claude-agents.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/runtime-research/prime-agent/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/agent-plugins-research/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/workflow-mechanics.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/handoff-validation-profile.md",
+      "target": "docs/handoff.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/handoff-validation-profile.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/context-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/adr/0002-optional-project-context-glossary.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/review-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/adr/0003-durable-project-review-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/context-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/memory-tool-recommendations.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/skill-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/token-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/token-providers-research/rtk/ai-tester-ab.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/token-providers-research/rtk/multirepo-ab.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/openspec-validation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/spec-coverage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/codex-plan-mode.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/validation-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/mattpocock-adaptation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "skills/shared/TASK-DESIGN.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "skills/shared/RESEARCH-DESIGN.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/mattpocock-adaptation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "skills/shared/TASK-DESIGN.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "skills/shared/TASK-COORDINATION.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/superpowers-adaptation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/superpowers-skill-evaluation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "skills/shared/REVIEW-DELEGATION.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "skills/shared/BUG-REPRODUCTION.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/legacy-plan-migration.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/codex-plan-mode.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/workflow-mechanics.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/isolated-execution.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/context-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/skill-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/memory-tool-recommendations.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/openspec-compatibility.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/spec-coverage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/legacy-plan-migration.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/active-change-resolver.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/adr/0001-openspec-native-artifact-protocol.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/adr/0002-optional-project-context-glossary.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/review-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/adr/0003-durable-project-review-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/safety-providers.md",
+      "target": "docs/skill-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/safety-providers.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/safety-providers.md",
+      "target": "docs/memory-tool-recommendations.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/safety-providers.md",
+      "target": "docs/context-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/safety-providers.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/safety-providers.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/understand-anything.md",
+      "target": "docs/memory-tools-research/understand-anything-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/t-search.md",
+      "target": "docs/memory-tools-research/t-search-ab-scenarios.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/t-search.md",
+      "target": "docs/memory-tools-research/t-search-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/t-search.md",
+      "target": "docs/memory-tools-research/t-search-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/t-search.md",
+      "target": "docs/memory-tools-research/t-search-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/t-search-benchmark-results.md",
+      "target": "docs/memory-tools-research/t-search-ab-scenarios.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/agentmemory-rohitg00.md",
+      "target": "docs/memory-tools-research/agentmemory-rohitg00-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/agentmemory-rohitg00-benchmark-results.md",
+      "target": "docs/memory-tools-research/agentmemory-rohitg00.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/context7.md",
+      "target": "docs/memory-tools-research/context7-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/context-dedup.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/openspec-compatibility.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/review-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/adr/0003-durable-project-review-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/context-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/memory-tool-recommendations.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/token-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/context-dedup.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/memory-tools-research/t-search.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/memory-tools-research/t-search-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/legacy-plan-migration.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/context-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/skill-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/safety-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/memory-tool-recommendations.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/context-dedup.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/openspec-compatibility.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/legacy-plan-migration.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/adr/0001-openspec-native-artifact-protocol.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/adr/0002-optional-project-context-glossary.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/review-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/adr/0003-durable-project-review-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers-research/ponytail-pi-ab/results.md",
+      "target": "docs/skill-providers-research/ponytail-pi-ab/results.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers-research/ponytail-pi-ab/results.md",
+      "target": "docs/skill-providers-research/ponytail-pi-ab/aggregate-qwen.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers-research/ponytail-pi-ab/results.md",
+      "target": "docs/skill-providers-research/ponytail-pi-ab/aggregate-la.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers-research/ponytail-pi-ab/results.md",
+      "target": "docs/skill-providers-research/ponytail-pi-ab/aggregate-bai-mimo-v2-5.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers-research/ponytail-pi-ab/results.md",
+      "target": "docs/skill-providers-research/ponytail-pi-ab/aggregate-bai-glm-5-3-flash.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers-research/ponytail-pi-ab/results.md",
+      "target": "docs/skill-providers-research/ponytail-pi-ab/aggregate-bai-deepseek-v4-flash.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers-research/ponytail-pi-ab/results.md",
+      "target": "docs/skill-providers-research/ponytail-pi-ab/aggregate-bai-qwen3.8-flash.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers-research/ponytail-lifecycle-ab/results.md",
+      "target": "docs/skill-providers-research/ponytail-lifecycle-ab/aggregate-la.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers-research/ponytail-pi-ab/README.md",
+      "target": "docs/skill-providers-research/ponytail-pi-ab/results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers-research/ponytail-pi-ab/README.md",
+      "target": "docs/skill-providers-research/ponytail-pi-ab/results.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers-research/ponytail-pi-ab/README.md",
+      "target": "docs/skill-providers-research/ponytail-pi-ab/aggregate-qwen.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers-research/ponytail-pi-ab/README.md",
+      "target": "docs/skill-providers-research/ponytail-pi-ab/aggregate-la.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers-research/ponytail-pi-ab/README.md",
+      "target": "docs/skill-providers-research/ponytail-pi-ab/aggregate-bai-mimo-v2-5.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers-research/ponytail-pi-ab/README.md",
+      "target": "docs/skill-providers-research/ponytail-pi-ab/aggregate-bai-glm-5-3-flash.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers-research/ponytail-pi-ab/README.md",
+      "target": "docs/skill-providers-research/ponytail-pi-ab/aggregate-bai-deepseek-v4-flash.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers-research/ponytail-pi-ab/README.md",
+      "target": "docs/skill-providers-research/ponytail-pi-ab/aggregate-bai-qwen3.8-flash.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers-research/ponytail-pi-ab/README.md",
+      "target": "docs/skill-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/codex-agents.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/codex-agents.md",
+      "target": "README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/codex-agents.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/codex-agents.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/codex-agents.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/codex-agents.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/claude-agents.md",
+      "target": "docs/codex-agents.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/claude-agents.md",
+      "target": "README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/claude-agents.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/claude-agents.md",
+      "target": "docs/codex-agents.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/claude-agents.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/claude-agents.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/claude-agents.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-validation.md",
+      "target": "docs/openspec-compatibility.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-validation.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-validation.md",
+      "target": "docs/spec-coverage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-validation.md",
+      "target": "docs/openspec-1.12.0-audit.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-validation.md",
+      "target": "docs/openspec-1.11.0-audit.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-validation.md",
+      "target": "docs/spec-coverage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-validation.md",
+      "target": "docs/openspec-compatibility.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-validation.md",
+      "target": "docs/spec-coverage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-validation.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-validation.md",
+      "target": "docs/active-change-resolver.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-1.13.0-audit.md",
+      "target": "docs/openspec-1.12.0-audit.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-1.13.0-audit.md",
+      "target": "scripts/openspec-compatibility-live-smoke.mjs",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-1.13.0-audit.md",
+      "target": "scripts/openspec-1-13-live-cases.mjs",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-1.12.0-audit.md",
+      "target": "docs/openspec-1.11.0-audit.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-1.12.0-audit.md",
+      "target": "scripts/openspec-compatibility-live-smoke.mjs",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-1.12.0-audit.md",
+      "target": "scripts/openspec-1-12-live-cases.mjs",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-1.11.0-audit.md",
+      "target": "scripts/openspec-compatibility-live-smoke.mjs",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-1.11.0-audit.md",
+      "target": "docs/openspec-1.12.0-audit.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/openspec-1.11.0-audit.md",
+      "target": "docs/openspec-validation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/active-change-resolver.md",
+      "target": "docs/legacy-plan-migration.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/active-change-resolver.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/active-change-resolver.md",
+      "target": "docs/adr/0001-openspec-native-artifact-protocol.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/active-change-resolver.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/active-change-resolver.md",
+      "target": "docs/legacy-plan-migration.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/active-change-resolver.md",
+      "target": "docs/adr/0001-openspec-native-artifact-protocol.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/active-change-resolver.md",
+      "target": "docs/openspec-compatibility.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0001-openspec-native-artifact-protocol.md",
+      "target": "docs/active-change-resolver.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0001-openspec-native-artifact-protocol.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0001-openspec-native-artifact-protocol.md",
+      "target": "docs/adr/0002-optional-project-context-glossary.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0001-openspec-native-artifact-protocol.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0001-openspec-native-artifact-protocol.md",
+      "target": "docs/openspec-compatibility.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0001-openspec-native-artifact-protocol.md",
+      "target": "docs/adr/0002-optional-project-context-glossary.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0002-optional-project-context-glossary.md",
+      "target": "docs/adr/0001-openspec-native-artifact-protocol.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0002-optional-project-context-glossary.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0002-optional-project-context-glossary.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0002-optional-project-context-glossary.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0002-optional-project-context-glossary.md",
+      "target": "docs/adr/0001-openspec-native-artifact-protocol.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/artifact-storage-audit.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/artifact-storage-audit.md",
+      "target": "scripts/tool-config.mjs",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/artifact-storage-audit.md",
+      "target": "docs/adr/0005-ai-factory-plan-methodologies.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/artifact-storage-audit.md",
+      "target": "scripts/session-brief.mjs",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/artifact-storage-audit.md",
+      "target": "scripts/aifhub-providers.mjs",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/artifact-storage-audit.md",
+      "target": "scripts/provider-files.mjs",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/artifact-storage-audit.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/artifact-storage-audit.md",
+      "target": "skills/aif-done/SKILL.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/artifact-storage-audit.md",
+      "target": "docs/adr/0001-openspec-native-artifact-protocol.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/artifact-storage-audit.md",
+      "target": "scripts/runtime-gitignore.mjs",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/artifact-storage-audit.md",
+      "target": "commands/post-update-init.mjs",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/artifact-storage-audit.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/artifact-storage-audit.md",
+      "target": "docs/validation-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/artifact-storage-audit.md",
+      "target": "docs/openspec-compatibility.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0005-ai-factory-plan-methodologies.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0005-ai-factory-plan-methodologies.md",
+      "target": "docs/adr/0004-sdd-profiles-and-session-brief.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0005-ai-factory-plan-methodologies.md",
+      "target": "docs/adr/0001-openspec-native-artifact-protocol.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0005-ai-factory-plan-methodologies.md",
+      "target": "docs/adr/0004-sdd-profiles-and-session-brief.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0005-ai-factory-plan-methodologies.md",
+      "target": "docs/artifact-storage-audit.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/sdd-profiles.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/sdd-profiles.md",
+      "target": "docs/adr/0005-ai-factory-plan-methodologies.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/sdd-profiles.md",
+      "target": "docs/adr/0004-sdd-profiles-and-session-brief.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/sdd-profiles.md",
+      "target": "schemas/sdd-profile-inputs.schema.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/sdd-profiles.md",
+      "target": "schemas/sdd-policy.schema.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/sdd-profiles.md",
+      "target": "schemas/sdd-profile-decision.schema.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/sdd-profiles.md",
+      "target": "schemas/session-brief.schema.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/sdd-profiles.md",
+      "target": "schemas/plan-compliance.schema.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/sdd-profiles.md",
+      "target": "schemas/plan-context.schema.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/sdd-profiles.md",
+      "target": "schemas/ai-cross-context-review.schema.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/sdd-profiles.md",
+      "target": "schemas/tracer-brief.schema.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/sdd-profiles.md",
+      "target": "schemas/tracer-findings.schema.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/sdd-profiles.md",
+      "target": "schemas/tracer-decision.schema.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0004-sdd-profiles-and-session-brief.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0004-sdd-profiles-and-session-brief.md",
+      "target": "docs/adr/0005-ai-factory-plan-methodologies.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0004-sdd-profiles-and-session-brief.md",
+      "target": "docs/sdd-profiles.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0004-sdd-profiles-and-session-brief.md",
+      "target": "docs/adr/0001-openspec-native-artifact-protocol.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0004-sdd-profiles-and-session-brief.md",
+      "target": "docs/openspec-compatibility.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/workflow-exchange.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/workflow-exchange.md",
+      "target": "docs/adr/0005-ai-factory-plan-methodologies.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-adaptation.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-adaptation.md",
+      "target": "skills/shared/TEST-QUALITY.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-adaptation.md",
+      "target": "skills/shared/TASK-COORDINATION.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-adaptation.md",
+      "target": "skills/shared/SCOPED-REVIEW.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-adaptation.md",
+      "target": "skills/shared/references/test-quality-examples.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-adaptation.md",
+      "target": "docs/superpowers-skill-evaluation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-adaptation.md",
+      "target": "docs/superpowers-skill-evaluation-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-adaptation.md",
+      "target": "docs/superpowers-follow-up-research.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-adaptation.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-adaptation.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-adaptation.md",
+      "target": "docs/codex-agents.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-adaptation.md",
+      "target": "docs/claude-agents.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tool-recommendations.md",
+      "target": "docs/safety-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tool-recommendations.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tool-recommendations.md",
+      "target": "docs/context-dedup.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tool-recommendations.md",
+      "target": "docs/memory-tools-research/agentmemory-rohitg00.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tool-recommendations.md",
+      "target": "docs/memory-tools-research/agentmemory-rohitg00-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tool-recommendations.md",
+      "target": "docs/memory-tools-research/understand-anything.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tool-recommendations.md",
+      "target": "docs/memory-tools-research/codegraph-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tool-recommendations.md",
+      "target": "docs/memory-tools-research/ai-tester-token-matrices-screening-codegraph.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tool-recommendations.md",
+      "target": "docs/memory-tools-research/ai-tester-token-matrices-python-openspec-all-tools.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tool-recommendations.md",
+      "target": "docs/memory-tools-research/context7.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-dedup.md",
+      "target": "docs/memory-tool-recommendations.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-dedup.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-dedup.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-dedup.md",
+      "target": "docs/memory-tools-research/sqz-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-dedup.md",
+      "target": "docs/aifhub-mcp.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-dedup.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-dedup.md",
+      "target": "docs/memory-tools-research/sqz.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/context-dedup.md",
+      "target": "docs/memory-tools-research/sqz-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/review-policy.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/review-policy.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/review-policy.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/review-policy.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/review-policy.md",
+      "target": "docs/adr/0003-durable-project-review-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/spec-coverage.md",
+      "target": "docs/openspec-validation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/spec-coverage.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/spec-coverage.md",
+      "target": "docs/legacy-plan-migration.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/spec-coverage.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/spec-coverage.md",
+      "target": "docs/openspec-validation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/spec-coverage.md",
+      "target": "docs/openspec-compatibility.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/spec-coverage.md",
+      "target": "docs/active-change-resolver.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/legacy-plan-migration.md",
+      "target": "docs/spec-coverage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/legacy-plan-migration.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/legacy-plan-migration.md",
+      "target": "docs/active-change-resolver.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/legacy-plan-migration.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/legacy-plan-migration.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/legacy-plan-migration.md",
+      "target": "docs/active-change-resolver.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0003-durable-project-review-policy.md",
+      "target": "docs/adr/0002-optional-project-context-glossary.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0003-durable-project-review-policy.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0003-durable-project-review-policy.md",
+      "target": "docs/review-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0003-durable-project-review-policy.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/adr/0003-durable-project-review-policy.md",
+      "target": "docs/adr/0002-optional-project-context-glossary.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/aifhub-mcp.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/aifhub-mcp.md",
+      "target": "README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/aifhub-mcp.md",
+      "target": "docs/context-dedup.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/aifhub-mcp.md",
+      "target": "docs/validation-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/aifhub-mcp.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/aifhub-mcp.md",
+      "target": "docs/context-dedup.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/aifhub-mcp.md",
+      "target": "docs/openspec-compatibility.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/aifhub-mcp.md",
+      "target": "docs/codex-agents.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/aifhub-mcp.md",
+      "target": "docs/claude-agents.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/sqz.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/sqz-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/context-dedup.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/squeez.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/squeez-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/recommendation-metadata.yaml",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/understand-anything.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/understand-anything-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/t-search.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/t-search-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/ai-tester-matrix.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/ai-tester-scenarios.yaml",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/ai-tester-token-matrices-screening-codegraph.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/ai-tester-token-matrices-python-openspec-all-tools.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/ai-tester-token-matrices-python-openspec-all-tools.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/ai-tester-token-matrices-screening-codegraph.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/agentmemory-rohitg00-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/agentmemory-rohitg00-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/understand-anything-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/t-search-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/graphify-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/graphify-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/graphify-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/context7-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/context7-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/context7-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/context-mode-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/context-mode-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/context-mode-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/context-mode-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/context-mode-codex-ai-tester/live-authorized-evidence.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/graphify.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/graphify-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/context7.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/context7-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/codex-agent-mem.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/codex-agent-mem-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/agent-memory.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/agent-memory-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/agentmemory-rohitg00.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/agentmemory-rohitg00-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/context-mode.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/context-mode-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/codex-mem.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/codex-mem-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/eagle-mem.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/eagle-mem-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/t-search.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/t-search-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/codegraph.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/codegraph-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/repowise.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/repowise-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/agent-plugins-research/README.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/codex-plan-mode.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/codex-plan-mode.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/codex-plan-mode.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/handoff.md",
+      "target": "docs/usage.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/handoff.md",
+      "target": "README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/handoff.md",
+      "target": "docs/handoff-validation-profile.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/handoff.md",
+      "target": "docs/handoff-validation-profile.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation.md",
+      "target": "docs/superpowers-adaptation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation.md",
+      "target": "README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation.md",
+      "target": "docs/superpowers-follow-up-research.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation.md",
+      "target": "docs/skill-workflow-evaluation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation.md",
+      "target": "docs/superpowers-adaptation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation.md",
+      "target": "test/fixtures/superpowers-skill-eval/manifest.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation.md",
+      "target": "test/fixtures/superpowers-skill-eval/variants/test-pollution-2.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation.md",
+      "target": "docs/superpowers-skill-evaluation-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation.md",
+      "target": "scripts/superpowers-skill-observations.mjs",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation.md",
+      "target": "test/fixtures/superpowers-skill-eval/observations/incomplete.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation.md",
+      "target": "docs/superpowers-skill-evaluation-pilot.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation.md",
+      "target": "docs/superpowers-skill-evaluation-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation.md",
+      "target": "docs/superpowers-skill-evaluation-results.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation.md",
+      "target": "docs/superpowers-adaptation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation.md",
+      "target": "docs/skill-workflow-evaluation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation.md",
+      "target": "docs/workflow-mechanics.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/mattpocock-adaptation.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/mattpocock-adaptation.md",
+      "target": "skills/shared/RESEARCH-DESIGN.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/mattpocock-adaptation.md",
+      "target": "injections/core/aif-explore-plan-folder.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/mattpocock-adaptation.md",
+      "target": "injections/core/aif-plan-plan-folder.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/mattpocock-adaptation.md",
+      "target": "injections/core/aif-improve-plan-folder.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/mattpocock-adaptation.md",
+      "target": "agent-files/codex/aifhub-plan-polisher.toml",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/mattpocock-adaptation.md",
+      "target": "agent-files/claude/aifhub-plan-polisher.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/mattpocock-adaptation.md",
+      "target": "docs/sdd-profiles.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/mattpocock-adaptation.md",
+      "target": "skills/shared/TASK-DESIGN.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/mattpocock-adaptation.md",
+      "target": "skills/shared/BUG-REPRODUCTION.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/mattpocock-adaptation.md",
+      "target": "skills/shared/TEST-QUALITY.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/mattpocock-adaptation.md",
+      "target": "injections/core/aif-architecture-context-boundary.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/mattpocock-adaptation.md",
+      "target": "skills/shared/PROJECT-GLOSSARY.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/mattpocock-adaptation.md",
+      "target": "skills/shared/REVIEW-DELEGATION.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/mattpocock-adaptation.md",
+      "target": "docs/workflow-mechanics.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/mattpocock-adaptation.md",
+      "target": "docs/isolated-execution.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/mattpocock-adaptation.md",
+      "target": "docs/adr/0005-ai-factory-plan-methodologies.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/mattpocock-adaptation.md",
+      "target": "docs/isolated-host-smoke.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/mattpocock-adaptation.md",
+      "target": "docs/skill-workflow-evaluation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/isolated-host-smoke.md",
+      "target": "docs/isolated-host-smoke-results.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/isolated-host-smoke.md",
+      "target": "docs/skill-workflow-evaluation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-workflow-evaluation.md",
+      "target": "docs/skill-workflow-evaluation-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-workflow-evaluation.md",
+      "target": "docs/skill-workflow-explore-followup.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-follow-up-research.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-follow-up-research.md",
+      "target": "docs/superpowers-skill-evaluation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-follow-up-research.md",
+      "target": "docs/superpowers-adaptation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-follow-up-research.md",
+      "target": "skills/shared/TEST-QUALITY.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-follow-up-research.md",
+      "target": "skills/shared/TASK-COORDINATION.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-follow-up-research.md",
+      "target": "skills/shared/SCOPED-REVIEW.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-follow-up-research.md",
+      "target": "injections/core/aif-implement-plan-folder.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-follow-up-research.md",
+      "target": "agent-files/codex/aifhub-implement-worker.toml",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-follow-up-research.md",
+      "target": "agent-files/codex/aifhub-implement-worker.toml",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-follow-up-research.md",
+      "target": "injections/core/aif-review-context-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-follow-up-research.md",
+      "target": "agent-files/codex/aifhub-review-sidecar.toml",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-follow-up-research.md",
+      "target": "agent-files/codex/aifhub-implement-worker.toml",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-follow-up-research.md",
+      "target": "injections/core/aif-fix-plan-folder.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-follow-up-research.md",
+      "target": "skills/shared/QUESTION-TOOL.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-follow-up-research.md",
+      "target": "agent-files/codex/aifhub-implement-worker.toml",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-follow-up-research.md",
+      "target": "agent-files/codex/aifhub-review-sidecar.toml",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-follow-up-research.md",
+      "target": "agent-files/claude/aifhub-implement-worker.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers-research/ponytail-lifecycle-ab/README.md",
+      "target": "docs/skill-providers-research/ponytail-pi-ab/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-providers-research/ponytail-lifecycle-ab/README.md",
+      "target": "docs/skill-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers.md",
+      "target": "docs/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers.md",
+      "target": "docs/token-providers-research/rtk/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers.md",
+      "target": "docs/token-providers-research/rtk/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers.md",
+      "target": "docs/token-providers-research/rtk/ai-tester-ab.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers.md",
+      "target": "docs/token-providers-research/rtk/multirepo-ab.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers.md",
+      "target": "docs/token-providers-research/rtk/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers.md",
+      "target": "docs/safety-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers.md",
+      "target": "docs/skill-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers.md",
+      "target": "docs/token-providers-research/rtk/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers-research/rtk/README.md",
+      "target": "docs/token-providers-research/rtk/ai-tester-ab.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers-research/rtk/README.md",
+      "target": "docs/token-providers-research/rtk/multirepo-ab.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers-research/rtk/README.md",
+      "target": "docs/token-providers-research/rtk/results.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers-research/rtk/README.md",
+      "target": "docs/token-providers-research/rtk/probe.py",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers-research/rtk/README.md",
+      "target": "docs/token-providers-research/rtk/ai-tester-ab.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers-research/rtk/README.md",
+      "target": "docs/token-providers-research/rtk/results.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers-research/rtk/README.md",
+      "target": "docs/token-providers-research/rtk/ai-tester-ab.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers-research/rtk/README.md",
+      "target": "docs/token-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/ai-tester-matrix.md",
+      "target": "docs/memory-tools-research/recommendation-metadata.yaml",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/ai-tester-matrix.md",
+      "target": "docs/memory-tools-research/ai-tester-scenarios.yaml",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/ai-tester-matrix.md",
+      "target": "docs/memory-tools-research/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/ai-tester-matrix.md",
+      "target": "docs/memory-tools-research/codegraph-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/codegraph-benchmark-results.md",
+      "target": "docs/memory-tools-research/codegraph.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/codegraph-benchmark-results.md",
+      "target": "docs/memory-tools-research/ai-tester-token-matrices-screening-codegraph.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/codegraph-benchmark-results.md",
+      "target": "docs/memory-tools-research/ai-tester-token-matrices-python-openspec-all-tools.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/ai-tester-token-matrices.md",
+      "target": "docs/memory-tools-research/ai-tester-token-matrices-screening-codegraph.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers-research/rtk/ai-tester-ab.md",
+      "target": "scripts/rtk-ai-tester-ab/cleanup.ps1",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers-research/rtk/ai-tester-ab.md",
+      "target": "docs/token-providers-research/rtk/ai-tester-ab-results.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers-research/rtk/ai-tester-ab.md",
+      "target": "scripts/rtk-ai-tester-ab/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers-research/rtk/ai-tester-ab.md",
+      "target": "docs/token-providers-research/rtk/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers-research/rtk/multirepo-ab.md",
+      "target": "scripts/rtk-ai-tester-multi/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers-research/rtk/multirepo-ab.md",
+      "target": "docs/token-providers-research/rtk/multirepo-ab-results.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers-research/rtk/multirepo-ab.md",
+      "target": "docs/token-providers-research/rtk/ai-tester-ab.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers-research/rtk/multirepo-ab.md",
+      "target": "docs/token-providers.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/token-providers-research/rtk/multirepo-ab.md",
+      "target": "docs/token-providers-research/rtk/README.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/context7-benchmark-results.md",
+      "target": "docs/memory-tools-research/context7.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/context7-benchmark-results.md",
+      "target": "docs/memory-tools-research/ai-tester-token-matrices-python-openspec-all-tools.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation-results.md",
+      "target": "docs/superpowers-skill-evaluation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation-results.md",
+      "target": "docs/superpowers-skill-evaluation-pilot.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation-results.md",
+      "target": "docs/superpowers-skill-evaluation-results.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation-results.md",
+      "target": "docs/superpowers-skill-evaluation-results.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation-results.md",
+      "target": "docs/superpowers-skill-evaluation-results.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation-results.md",
+      "target": "docs/superpowers-skill-evaluation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation-results.md",
+      "target": "docs/superpowers-skill-evaluation-pilot.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation-results.md",
+      "target": "docs/superpowers-skill-evaluation-results.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/sqz-benchmark-results.md",
+      "target": "docs/memory-tools-research/sqz.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/sqz-benchmark-results.md",
+      "target": "docs/context-dedup.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/sqz-benchmark-results.md",
+      "target": "docs/memory-tools-research/context-dedup-ai-tester/sqz-adapter",
+      "kind": "directory-link-not-expanded"
+    },
+    {
+      "from": "docs/memory-tools-research/sqz.md",
+      "target": "docs/memory-tools-research/sqz-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/sqz.md",
+      "target": "docs/context-dedup.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/squeez.md",
+      "target": "docs/memory-tools-research/squeez-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/squeez.md",
+      "target": "docs/context-dedup.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/squeez.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/squeez-benchmark-results.md",
+      "target": "docs/memory-tools-research/squeez.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/squeez-benchmark-results.md",
+      "target": "docs/context-dedup.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/squeez-benchmark-results.md",
+      "target": "docs/memory-tools-research/ai-tester-matrix.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/squeez-benchmark-results.md",
+      "target": "docs/memory-tools-research/context-dedup-ai-tester",
+      "kind": "directory-link-not-expanded"
+    },
+    {
+      "from": "docs/memory-tools-research/squeez-benchmark-results.md",
+      "target": "docs/memory-tools-research/context-dedup-ai-tester/baseline-no-dedup.yaml",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/squeez-benchmark-results.md",
+      "target": "docs/memory-tools-research/context-dedup-ai-tester/variant-a-aifhub-context-dedup.yaml",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/squeez-benchmark-results.md",
+      "target": "docs/memory-tools-research/context-dedup-ai-tester/variant-b-squeez.yaml",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/squeez-benchmark-results.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/graphify-benchmark-results.md",
+      "target": "docs/memory-tools-research/graphify.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/graphify-benchmark-results.md",
+      "target": "docs/memory-tools-research/ai-tester-token-matrices-python-openspec-all-tools.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/context-mode-benchmark-results.md",
+      "target": "docs/memory-tools-research/context-mode.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/context-mode-benchmark-results.md",
+      "target": "docs/memory-tools-research/ai-tester-token-matrices-python-openspec-all-tools.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/context-mode-benchmark-results.md",
+      "target": "docs/memory-tools-research/context-mode-codex-ai-tester/live-authorized-evidence.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/graphify.md",
+      "target": "docs/memory-tools-research/graphify-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/codex-agent-mem.md",
+      "target": "docs/memory-tools-research/codex-agent-mem-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/codex-agent-mem-benchmark-results.md",
+      "target": "docs/memory-tools-research/codex-agent-mem.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/codex-agent-mem-benchmark-results.md",
+      "target": "docs/memory-tools-research/ai-tester-token-matrices-python-openspec-all-tools.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/agent-memory.md",
+      "target": "docs/memory-tools-research/agent-memory-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/agent-memory-benchmark-results.md",
+      "target": "docs/memory-tools-research/agent-memory.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/context-mode.md",
+      "target": "docs/memory-tools-research/context-mode-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/context-mode.md",
+      "target": "docs/memory-tools-research/context-mode-codex-ai-tester/live-authorized-evidence.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/codex-mem.md",
+      "target": "docs/memory-tools-research/codex-mem-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/codex-mem-benchmark-results.md",
+      "target": "docs/memory-tools-research/codex-mem.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/eagle-mem.md",
+      "target": "docs/memory-tools-research/eagle-mem-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/eagle-mem-benchmark-results.md",
+      "target": "docs/memory-tools-research/eagle-mem.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/codegraph.md",
+      "target": "docs/memory-tools-research/recommendation-metadata.yaml",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/codegraph.md",
+      "target": "docs/memory-tools-research/codegraph-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/repowise.md",
+      "target": "docs/memory-tools-research/recommendation-metadata.yaml",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/memory-tools-research/repowise.md",
+      "target": "docs/memory-tools-research/repowise-benchmark-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation-pilot.md",
+      "target": "docs/superpowers-skill-evaluation-pilot.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation-pilot.md",
+      "target": "docs/superpowers-skill-evaluation.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "injections/core/aif-explore-plan-folder.md",
+      "target": "skills/shared/TOOLS.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "injections/core/aif-explore-plan-folder.md",
+      "target": "skills/shared/RESEARCH-DESIGN.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "injections/core/aif-plan-plan-folder.md",
+      "target": "skills/shared/TOOLS.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "injections/core/aif-plan-plan-folder.md",
+      "target": "skills/shared/RESEARCH-DESIGN.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "injections/core/aif-plan-plan-folder.md",
+      "target": "skills/shared/TASK-DESIGN.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "injections/core/aif-plan-plan-folder.md",
+      "target": "docs/sdd-profiles.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "injections/core/aif-plan-plan-folder.md",
+      "target": "docs/adr/0004-sdd-profiles-and-session-brief.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "injections/core/aif-improve-plan-folder.md",
+      "target": "skills/shared/TOOLS.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "injections/core/aif-improve-plan-folder.md",
+      "target": "skills/shared/RESEARCH-DESIGN.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "injections/core/aif-improve-plan-folder.md",
+      "target": "skills/shared/TASK-DESIGN.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "injections/core/aif-architecture-context-boundary.md",
+      "target": "skills/shared/TOOLS.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-workflow-evaluation-results.md",
+      "target": "docs/skill-workflow-evaluation-results.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-workflow-evaluation-results.md",
+      "target": "docs/isolated-host-smoke.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-workflow-evaluation-results.md",
+      "target": "docs/skill-workflow-explore-followup.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-workflow-explore-followup.md",
+      "target": "docs/skill-workflow-explore-followup-results.json",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "docs/skill-workflow-explore-followup.md",
+      "target": "docs/skill-workflow-evaluation-results.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "injections/core/aif-implement-plan-folder.md",
+      "target": "skills/shared/TOOLS.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "injections/core/aif-implement-plan-folder.md",
+      "target": "skills/shared/TEST-QUALITY.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "injections/core/aif-implement-plan-folder.md",
+      "target": "skills/shared/TASK-COORDINATION.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "injections/core/aif-implement-plan-folder.md",
+      "target": "skills/shared/TASK-COORDINATION.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "injections/core/aif-implement-plan-folder.md",
+      "target": "skills/shared/ISOLATED-EXECUTION.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "injections/core/aif-review-context-providers.md",
+      "target": "skills/shared/TOOLS.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "injections/core/aif-review-context-providers.md",
+      "target": "skills/shared/REVIEW-DELEGATION.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "injections/core/aif-fix-plan-folder.md",
+      "target": "skills/shared/TOOLS.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "injections/core/aif-fix-plan-folder.md",
+      "target": "skills/shared/TEST-QUALITY.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "injections/core/aif-fix-plan-folder.md",
+      "target": "skills/shared/BUG-REPRODUCTION.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "injections/core/aif-fix-plan-folder.md",
+      "target": "skills/shared/TASK-COORDINATION.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "scripts/rtk-ai-tester-multi/README.md",
+      "target": "docs/token-providers-research/rtk/multirepo-ab.md",
+      "kind": "markdown-link"
+    },
+    {
+      "from": "scripts/rtk-ai-tester-multi/README.md",
+      "target": "docs/token-providers-research/rtk/multirepo-ab-results.json",
+      "kind": "markdown-link"
+    }
+  ],
+  "missing": [],
+  "path_tokens": [
+    {
+      "from": "skills/aif-analyze/SKILL.md",
+      "target": "docs/memory-tools-research/recommendation-metadata.yaml",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-analyze/SKILL.md",
+      "target": "scripts/openspec-runner.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-analyze/SKILL.md",
+      "target": "skills/aif-analyze/references/config-keys.json",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-analyze/SKILL.md",
+      "target": "skills/shared/LANGUAGE-POLICY.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-analyze/SKILL.md",
+      "target": "skills/shared/QUESTION-TOOL.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-done/SKILL.md",
+      "target": "docs/tooling-only",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "skills/aif-done/SKILL.md",
+      "target": "scripts/legacy-plan-migration.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-done/SKILL.md",
+      "target": "scripts/legacy-ultra-verification-receipt.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-done/SKILL.md",
+      "target": "scripts/openspec-done-finalizer.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-done/SKILL.md",
+      "target": "scripts/openspec-done-readiness.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-done/SKILL.md",
+      "target": "scripts/openspec-policy.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-done/SKILL.md",
+      "target": "scripts/openspec-runner.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-done/SKILL.md",
+      "target": "skills/shared/LANGUAGE-POLICY.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-done/references/finalization-contract.md",
+      "target": "docs/tooling-only",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "skills/aif-done/references/finalization-contract.md",
+      "target": "scripts/openspec-done-finalizer.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-done/references/finalization-contract.md",
+      "target": "scripts/openspec-policy.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-done/references/finalization-contract.md",
+      "target": "scripts/openspec-runner.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-mode/SKILL.md",
+      "target": "commands/post-update-init.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-mode/SKILL.md",
+      "target": "scripts/migrate-legacy-plans.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-mode/SKILL.md",
+      "target": "scripts/openspec-runner.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-mode/SKILL.md",
+      "target": "scripts/runtime-gitignore.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-mode/SKILL.md",
+      "target": "scripts/tool-initialization.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-mode/SKILL.md",
+      "target": "skills/shared/LANGUAGE-POLICY.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-mode/references/ARTIFACT-SYNC.md",
+      "target": "scripts/openspec-rules-compiler.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-mode/references/ARTIFACT-SYNC.md",
+      "target": "scripts/openspec-runner.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-mode/references/MODES.md",
+      "target": "scripts/openspec-runner.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-mode/references/SAFETY.md",
+      "target": "scripts/migrate-legacy-plans.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-mode/references/SAFETY.md",
+      "target": "scripts/openspec-rules-compiler.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/aif-mode/references/SAFETY.md",
+      "target": "scripts/openspec-runner.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/shared/LANGUAGE-POLICY.md",
+      "target": "skills/shared/PROJECT-GLOSSARY.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/shared/PROJECT-GLOSSARY.md",
+      "target": "skills/shared/LANGUAGE-POLICY.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/shared/QUESTION-TOOL.md",
+      "target": "skills/shared/QUESTION-TOOL.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/shared/RESEARCH-DESIGN.md",
+      "target": "skills/shared/PROJECT-GLOSSARY.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "skills/shared/REVIEW-POLICY.md",
+      "target": "skills/shared/LANGUAGE-POLICY.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/validation-providers.md",
+      "target": "scripts/aifhub-providers.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/validation-providers.md",
+      "target": "scripts/lekalo-provider.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/isolated-execution.md",
+      "target": "scripts/isolated-execution.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/workflow-mechanics.md",
+      "target": "skills/agent",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/context-providers.md",
+      "target": "docs/memory-tools-research/context-mode-codex-ai-tester/live-authorized-evidence.json",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-compatibility.md",
+      "target": "docs/context-providers.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-compatibility.md",
+      "target": "docs/memory-tools-research",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/openspec-compatibility.md",
+      "target": "docs/tooling-only",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/openspec-compatibility.md",
+      "target": "injections/core/aif-architecture-context-boundary.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-compatibility.md",
+      "target": "schemas/extension.schema.json",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-compatibility.md",
+      "target": "scripts/openspec-",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/openspec-compatibility.md",
+      "target": "scripts/openspec-done-finalizer.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-compatibility.md",
+      "target": "scripts/openspec-rules-compiler.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-compatibility.md",
+      "target": "scripts/openspec-runner.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-compatibility.md",
+      "target": "skills/commands",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/README.md",
+      "target": "scripts/openspec-runner.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/runtime-research/prime-agent/README.md",
+      "target": "docs/prime-agent-runtime.md",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/runtime-research/prime-agent/README.md",
+      "target": "docs/runtime-research/prime-agent/kernel-probe.py",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/runtime-research/prime-agent/README.md",
+      "target": "docs/runtime-research/prime-agent/refinement-probe.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/README.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/active-change-resolver.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/adr/0001-openspec-native-artifact-protocol.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/adr/0002-optional-project-context-glossary.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/adr/0003-durable-project-review-policy.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/adr/0004-sdd-profiles-and-session-brief.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/adr/0005-ai-factory-plan-methodologies.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/agent-plugins-research/README.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/aifhub-mcp.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/claude-agents.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/codex-agents.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/context-loading-policy.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/context-providers.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/isolated-execution.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/legacy-plan-migration.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/mattpocock-adaptation.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/memory-tool-recommendations.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/memory-tools-research",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/openspec-1.11.0-audit.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/openspec-1.12.0-audit.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/openspec-1.13.0-audit.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/openspec-compatibility.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/openspec-validation.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/review-policy.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/runtime-research/prime-agent/README.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/safety-providers.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/sdd-profiles.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/skill-providers.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/spec-coverage.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/superpowers-adaptation.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/superpowers-follow-up-research.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/superpowers-skill-evaluation.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/token-providers.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/tooling-only",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/usage.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/validation-providers.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/workflow-mechanics.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "schemas/aifhub-extension.schema.json",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "scripts/fixtures/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "README.md",
+      "target": "scripts/openspec-done-finalizer.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "scripts/openspec-runner.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "README.md",
+      "target": "skills/commands",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/handoff-validation-profile.md",
+      "target": "injections/handoff/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/context-providers.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/memory-tools-research",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/memory-tools-research/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "docs/tooling-only",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "schemas/aifhub-extension.schema.json",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "scripts/fixtures/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "scripts/openspec-done-finalizer.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "scripts/openspec-done-readiness.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "scripts/openspec-runner.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/usage.md",
+      "target": "skills/aif-analyze/references/config-keys.json",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/memory-tools-research/t-search.md",
+      "target": "docs/retrieval-providers.md",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/memory-tools-research/t-search.md",
+      "target": "scripts/t-search-ab-benchmark.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/memory-tools-research/t-search-benchmark-results.md",
+      "target": "scripts/t-search-ab-benchmark.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/context-providers.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "docs/memory-tools-research",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "scripts/fixtures/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "scripts/openspec-runner.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "skills/shared/LANGUAGE-POLICY.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "skills/shared/PROJECT-GLOSSARY.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/context-loading-policy.md",
+      "target": "skills/shared/REVIEW-POLICY.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/skill-providers-research/ponytail-pi-ab/README.md",
+      "target": "scripts/ponytail-pi-ab.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/skill-providers-research/ponytail-pi-ab/README.md",
+      "target": "skills/ponytail/SKILL.md",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/codex-agents.md",
+      "target": "agent-files/codex/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/codex-agents.md",
+      "target": "docs/tooling-only",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/codex-agents.md",
+      "target": "scripts/openspec-",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/claude-agents.md",
+      "target": "docs/tooling-only",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/claude-agents.md",
+      "target": "scripts/openspec-",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/openspec-validation.md",
+      "target": "docs/tooling-only",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/openspec-validation.md",
+      "target": "scripts/openspec-artifact-validator.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-validation.md",
+      "target": "scripts/openspec-done-finalizer.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-validation.md",
+      "target": "scripts/openspec-done-readiness.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-validation.md",
+      "target": "scripts/openspec-policy.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-validation.md",
+      "target": "scripts/openspec-runner.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-1.13.0-audit.md",
+      "target": "scripts/openspec-compatibility-live-smoke.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-1.12.0-audit.md",
+      "target": "scripts/aif-analyze-openspec-bootstrap.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-1.12.0-audit.md",
+      "target": "scripts/aif-artifact-sync.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-1.12.0-audit.md",
+      "target": "scripts/docs-workflow-contract.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-1.12.0-audit.md",
+      "target": "scripts/openspec-1-11-compatibility.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-1.12.0-audit.md",
+      "target": "scripts/openspec-1-12-compatibility.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-1.12.0-audit.md",
+      "target": "scripts/openspec-compatibility-live-smoke.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-1.12.0-audit.md",
+      "target": "scripts/openspec-policy.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-1.12.0-audit.md",
+      "target": "scripts/openspec-runner.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-1.12.0-audit.md",
+      "target": "scripts/openspec-verification-context.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-1.12.0-audit.md",
+      "target": "scripts/validate-extension.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-1.12.0-audit.md",
+      "target": "skills/commands",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/openspec-1.11.0-audit.md",
+      "target": "scripts/aif-analyze-openspec-bootstrap.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-1.11.0-audit.md",
+      "target": "scripts/aif-artifact-sync.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-1.11.0-audit.md",
+      "target": "scripts/docs-workflow-contract.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-1.11.0-audit.md",
+      "target": "scripts/fixtures/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/openspec-1.11.0-audit.md",
+      "target": "scripts/openspec-1-11-compatibility.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-1.11.0-audit.md",
+      "target": "scripts/openspec-compatibility-live-smoke.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-1.11.0-audit.md",
+      "target": "scripts/openspec-policy.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-1.11.0-audit.md",
+      "target": "scripts/openspec-runner.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/openspec-1.11.0-audit.md",
+      "target": "scripts/validate-extension.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/active-change-resolver.md",
+      "target": "scripts/active-change-resolver.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/active-change-resolver.md",
+      "target": "scripts/openspec-execution-context.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/active-change-resolver.md",
+      "target": "scripts/openspec-verification-context.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/adr/0001-openspec-native-artifact-protocol.md",
+      "target": "docs/tooling-only",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/artifact-storage-audit.md",
+      "target": "docs/adr/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/artifact-storage-audit.md",
+      "target": "docs/architecture/",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/artifact-storage-audit.md",
+      "target": "docs/qa/",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/adr/0005-ai-factory-plan-methodologies.md",
+      "target": "scripts/session-brief.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/sdd-profiles.md",
+      "target": "docs/integration-contract.md",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/sdd-profiles.md",
+      "target": "schemas/templates",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/superpowers-adaptation.md",
+      "target": "scripts/openspec-execution-context.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/superpowers-adaptation.md",
+      "target": "scripts/superpowers-discipline-contract.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/superpowers-adaptation.md",
+      "target": "scripts/superpowers-test-quality-examples.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/superpowers-adaptation.md",
+      "target": "skills/shared/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/memory-tool-recommendations.md",
+      "target": "docs/memory-tools-research/recommendation-metadata.yaml",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/memory-tool-recommendations.md",
+      "target": "docs/version",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/context-dedup.md",
+      "target": "docs/../",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/context-dedup.md",
+      "target": "docs/frozen/",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/context-dedup.md",
+      "target": "scripts/context-dedup-benchmark.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/context-dedup.md",
+      "target": "scripts/context-dedup.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/spec-coverage.md",
+      "target": "scripts/openspec-coverage-matrix.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/adr/0003-durable-project-review-policy.md",
+      "target": "skills/shared/REVIEW-POLICY.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/ai-tester-scenarios.yaml",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "docs/memory-tools-research/recommendation-metadata.yaml",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "scripts/memory-tool-ai-tester-evaluate-tool.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/memory-tools-research/README.md",
+      "target": "scripts/memory-tool-ai-tester-promote-metadata.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/agent-plugins-research/README.md",
+      "target": "docs/workflow-exchange.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/agent-plugins-research/README.md",
+      "target": "injections/core/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/agent-plugins-research/README.md",
+      "target": "injections/handoff/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/agent-plugins-research/README.md",
+      "target": "skills/aif-analyze/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/agent-plugins-research/README.md",
+      "target": "skills/aif-done/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/agent-plugins-research/README.md",
+      "target": "skills/aif-mode/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/agent-plugins-research/README.md",
+      "target": "skills/shared/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/codex-plan-mode.md",
+      "target": "injections/core/aif-",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/codex-plan-mode.md",
+      "target": "skills/shared/QUESTION-TOOL.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/handoff.md",
+      "target": "agent-files/codex/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/handoff.md",
+      "target": "commands/agents",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/handoff.md",
+      "target": "injections/core/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/handoff.md",
+      "target": "injections/handoff/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/handoff.md",
+      "target": "injections/handoff/aif-done-handoff-finalizer.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/handoff.md",
+      "target": "injections/handoff/aif-review-handoff-gate.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/handoff.md",
+      "target": "injections/handoff/aif-rules-check-handoff-gate.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/handoff.md",
+      "target": "injections/handoff/aif-security-checklist-handoff-gate.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/handoff.md",
+      "target": "injections/references/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation.md",
+      "target": "scripts/superpowers-reproduction-examples.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation.md",
+      "target": "scripts/superpowers-skill-eval.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation.md",
+      "target": "scripts/superpowers-skill-eval.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation.md",
+      "target": "scripts/superpowers-skill-observations.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation.md",
+      "target": "skills/aif-analyze/references/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation.md",
+      "target": "skills/aif-mode/references/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation.md",
+      "target": "skills/shared/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/isolated-host-smoke.md",
+      "target": "scripts/fixtures/isolated-host-project.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/skill-workflow-evaluation.md",
+      "target": "injections/core/aif-",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/skill-workflow-evaluation.md",
+      "target": "scripts/skill-workflow-eval.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/skill-workflow-evaluation.md",
+      "target": "scripts/skill-workflow-eval.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/skill-providers-research/ponytail-lifecycle-ab/README.md",
+      "target": "scripts/fixtures/ponytail-lifecycle-ab/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/skill-providers-research/ponytail-lifecycle-ab/README.md",
+      "target": "scripts/ponytail-lifecycle-ab.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/skill-providers-research/ponytail-lifecycle-ab/README.md",
+      "target": "scripts/ponytail-lifecycle-ab.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/token-providers-research/rtk/README.md",
+      "target": "docs/token-providers-research/rtk/probe.py",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/memory-tools-research/ai-tester-matrix.md",
+      "target": "docs/memory-tools-research/ai-tester-scenarios.yaml",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/memory-tools-research/ai-tester-matrix.md",
+      "target": "scripts/context-mode-codex-ai-tester-",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "docs/memory-tools-research/ai-tester-matrix.md",
+      "target": "scripts/memory-tool-ai-tester-evaluate-tool.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/memory-tools-research/ai-tester-matrix.md",
+      "target": "scripts/memory-tool-ai-tester-matrix.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/memory-tools-research/ai-tester-matrix.md",
+      "target": "scripts/memory-tool-ai-tester-promote-metadata.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/memory-tools-research/ai-tester-matrix.md",
+      "target": "scripts/memory-tool-ai-tester-results-report.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/memory-tools-research/ai-tester-matrix.md",
+      "target": "scripts/memory-tool-recommender.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/memory-tools-research/ai-tester-matrix.md",
+      "target": "skills/profiles",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "agent-files/claude/aifhub-review-sidecar.md",
+      "target": "skills/shared/LANGUAGE-POLICY.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "agent-files/claude/aifhub-review-sidecar.md",
+      "target": "skills/shared/REVIEW-DELEGATION.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "agent-files/claude/aifhub-review-sidecar.md",
+      "target": "skills/shared/REVIEW-POLICY.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "agent-files/claude/aifhub-review-sidecar.md",
+      "target": "skills/shared/SCOPED-REVIEW.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "agent-files/claude/aifhub-review-sidecar.md",
+      "target": "skills/shared/TOOLS.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/memory-tools-research/context7-benchmark-results.md",
+      "target": "scripts/memory-tool-field-run.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation-results.md",
+      "target": "skills/aif-analyze/references/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation-results.md",
+      "target": "skills/aif-mode/references/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/superpowers-skill-evaluation-results.md",
+      "target": "skills/shared/",
+      "kind": "repository-directory"
+    },
+    {
+      "from": "docs/memory-tools-research/sqz-benchmark-results.md",
+      "target": "docs/memory-tools-research/context-dedup-ai-tester/generate-matrix.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/memory-tools-research/sqz-benchmark-results.md",
+      "target": "docs/memory-tools-research/context-dedup-ai-tester/summarize-matrix.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/memory-tools-research/sqz-benchmark-results.md",
+      "target": "scripts/context-dedup-benchmark.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/memory-tools-research/squeez-benchmark-results.md",
+      "target": "docs/memory-tools-research/context-dedup-ai-tester/baseline-no-dedup.yaml",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/memory-tools-research/squeez-benchmark-results.md",
+      "target": "scripts/context-dedup-benchmark.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/memory-tools-research/squeez-benchmark-results.md",
+      "target": "scripts/context-dedup.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/memory-tools-research/graphify-benchmark-results.md",
+      "target": "scripts/memory-tool-field-run.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/memory-tools-research/context-mode-benchmark-results.md",
+      "target": "scripts/memory-tool-field-run.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "docs/memory-tools-research/agent-memory.md",
+      "target": "skills/global",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "test/fixtures/superpowers-skill-eval/variants/test-pollution-2.md",
+      "target": "scripts/superpowers-reproduction-examples.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-explore-plan-folder.md",
+      "target": "scripts/ai-factory-version-resolver.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-explore-plan-folder.md",
+      "target": "skills/shared/LANGUAGE-POLICY.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-explore-plan-folder.md",
+      "target": "skills/shared/QUESTION-TOOL.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-plan-plan-folder.md",
+      "target": "docs/tooling-only",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "injections/core/aif-plan-plan-folder.md",
+      "target": "scripts/active-change-resolver.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-plan-plan-folder.md",
+      "target": "scripts/ai-factory-version-resolver.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-plan-plan-folder.md",
+      "target": "scripts/openspec-runner.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-plan-plan-folder.md",
+      "target": "scripts/ultra-research-resolver.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-plan-plan-folder.md",
+      "target": "skills/shared/LANGUAGE-POLICY.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-plan-plan-folder.md",
+      "target": "skills/shared/QUESTION-TOOL.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-improve-plan-folder.md",
+      "target": "scripts/active-change-resolver.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-improve-plan-folder.md",
+      "target": "scripts/legacy-plan-migration.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-improve-plan-folder.md",
+      "target": "scripts/openspec-runner.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-improve-plan-folder.md",
+      "target": "scripts/ultra-research-resolver.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-improve-plan-folder.md",
+      "target": "skills/shared/LANGUAGE-POLICY.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-improve-plan-folder.md",
+      "target": "skills/shared/QUESTION-TOOL.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "agent-files/claude/aifhub-plan-polisher.md",
+      "target": "scripts/openspec-runner.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "agent-files/claude/aifhub-plan-polisher.md",
+      "target": "skills/shared/LANGUAGE-POLICY.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "agent-files/claude/aifhub-plan-polisher.md",
+      "target": "skills/shared/RESEARCH-DESIGN.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "agent-files/claude/aifhub-plan-polisher.md",
+      "target": "skills/shared/TASK-DESIGN.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "agent-files/claude/aifhub-plan-polisher.md",
+      "target": "skills/shared/TOOLS.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-architecture-context-boundary.md",
+      "target": "skills/aif-architecture/",
+      "kind": "unresolved-or-example"
+    },
+    {
+      "from": "injections/core/aif-architecture-context-boundary.md",
+      "target": "skills/shared/LANGUAGE-POLICY.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-implement-plan-folder.md",
+      "target": "docs/isolated-execution.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-implement-plan-folder.md",
+      "target": "docs/workflow-mechanics.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-implement-plan-folder.md",
+      "target": "scripts/active-change-resolver.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-implement-plan-folder.md",
+      "target": "scripts/legacy-plan-migration.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-implement-plan-folder.md",
+      "target": "scripts/openspec-execution-context.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-implement-plan-folder.md",
+      "target": "scripts/ultra-research-resolver.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-implement-plan-folder.md",
+      "target": "skills/shared/LANGUAGE-POLICY.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-implement-plan-folder.md",
+      "target": "skills/shared/TASK-COORDINATION.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-review-context-providers.md",
+      "target": "skills/shared/LANGUAGE-POLICY.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-review-context-providers.md",
+      "target": "skills/shared/REVIEW-POLICY.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-review-context-providers.md",
+      "target": "skills/shared/SCOPED-REVIEW.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-fix-plan-folder.md",
+      "target": "docs/workflow-mechanics.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-fix-plan-folder.md",
+      "target": "scripts/active-change-resolver.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-fix-plan-folder.md",
+      "target": "scripts/legacy-plan-migration.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-fix-plan-folder.md",
+      "target": "scripts/openspec-execution-context.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-fix-plan-folder.md",
+      "target": "scripts/ultra-research-resolver.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-fix-plan-folder.md",
+      "target": "skills/shared/LANGUAGE-POLICY.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "injections/core/aif-fix-plan-folder.md",
+      "target": "skills/shared/SCOPED-REVIEW.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "agent-files/claude/aifhub-implement-worker.md",
+      "target": "docs/workflow-mechanics.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "agent-files/claude/aifhub-implement-worker.md",
+      "target": "scripts/openspec-execution-context.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "agent-files/claude/aifhub-implement-worker.md",
+      "target": "skills/shared/ISOLATED-EXECUTION.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "agent-files/claude/aifhub-implement-worker.md",
+      "target": "skills/shared/LANGUAGE-POLICY.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "agent-files/claude/aifhub-implement-worker.md",
+      "target": "skills/shared/TASK-COORDINATION.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "agent-files/claude/aifhub-implement-worker.md",
+      "target": "skills/shared/TEST-QUALITY.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "agent-files/claude/aifhub-implement-worker.md",
+      "target": "skills/shared/TOOLS.md",
+      "kind": "repository-file"
+    },
+    {
+      "from": "scripts/rtk-ai-tester-ab/README.md",
+      "target": "scripts/rtk-ai-tester-ab/guard.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "scripts/rtk-ai-tester-ab/README.md",
+      "target": "scripts/rtk-ai-tester-ab/run.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "scripts/rtk-ai-tester-multi/README.md",
+      "target": "scripts/rtk-ai-tester-multi/audit.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "scripts/rtk-ai-tester-multi/README.md",
+      "target": "scripts/rtk-ai-tester-multi/grade.test.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "scripts/rtk-ai-tester-multi/README.md",
+      "target": "scripts/rtk-ai-tester-multi/probe.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "scripts/rtk-ai-tester-multi/README.md",
+      "target": "scripts/rtk-ai-tester-multi/publish.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "scripts/rtk-ai-tester-multi/README.md",
+      "target": "scripts/rtk-ai-tester-multi/run.mjs",
+      "kind": "repository-file"
+    },
+    {
+      "from": "scripts/rtk-ai-tester-multi/README.md",
+      "target": "scripts/rtk-ai-tester-multi/summarize.mjs",
+      "kind": "repository-file"
+    }
+  ],
+  "additional_repository_files_in_instructions": [
+    "docs/memory-tools-research/context-dedup-ai-tester/generate-matrix.mjs",
+    "docs/memory-tools-research/context-dedup-ai-tester/summarize-matrix.mjs",
+    "docs/runtime-research/prime-agent/kernel-probe.py",
+    "docs/runtime-research/prime-agent/refinement-probe.mjs",
+    "injections/handoff/aif-done-handoff-finalizer.md",
+    "injections/handoff/aif-review-handoff-gate.md",
+    "injections/handoff/aif-rules-check-handoff-gate.md",
+    "injections/handoff/aif-security-checklist-handoff-gate.md",
+    "schemas/aifhub-extension.schema.json",
+    "schemas/extension.schema.json",
+    "scripts/active-change-resolver.mjs",
+    "scripts/ai-factory-version-resolver.mjs",
+    "scripts/aif-analyze-openspec-bootstrap.test.mjs",
+    "scripts/aif-artifact-sync.test.mjs",
+    "scripts/context-dedup-benchmark.mjs",
+    "scripts/context-dedup.mjs",
+    "scripts/docs-workflow-contract.test.mjs",
+    "scripts/fixtures/isolated-host-project.mjs",
+    "scripts/isolated-execution.test.mjs",
+    "scripts/legacy-plan-migration.mjs",
+    "scripts/legacy-ultra-verification-receipt.mjs",
+    "scripts/lekalo-provider.mjs",
+    "scripts/memory-tool-ai-tester-evaluate-tool.mjs",
+    "scripts/memory-tool-ai-tester-matrix.mjs",
+    "scripts/memory-tool-ai-tester-promote-metadata.mjs",
+    "scripts/memory-tool-ai-tester-results-report.mjs",
+    "scripts/memory-tool-field-run.mjs",
+    "scripts/memory-tool-recommender.mjs",
+    "scripts/migrate-legacy-plans.mjs",
+    "scripts/openspec-1-11-compatibility.test.mjs",
+    "scripts/openspec-1-12-compatibility.test.mjs",
+    "scripts/openspec-artifact-validator.mjs",
+    "scripts/openspec-coverage-matrix.mjs",
+    "scripts/openspec-done-finalizer.mjs",
+    "scripts/openspec-done-readiness.mjs",
+    "scripts/openspec-execution-context.mjs",
+    "scripts/openspec-execution-context.test.mjs",
+    "scripts/openspec-policy.mjs",
+    "scripts/openspec-policy.test.mjs",
+    "scripts/openspec-rules-compiler.mjs",
+    "scripts/openspec-runner.mjs",
+    "scripts/openspec-runner.test.mjs",
+    "scripts/openspec-verification-context.mjs",
+    "scripts/openspec-verification-context.test.mjs",
+    "scripts/ponytail-lifecycle-ab.mjs",
+    "scripts/ponytail-lifecycle-ab.test.mjs",
+    "scripts/ponytail-pi-ab.mjs",
+    "scripts/rtk-ai-tester-ab/guard.test.mjs",
+    "scripts/rtk-ai-tester-ab/run.mjs",
+    "scripts/rtk-ai-tester-multi/audit.mjs",
+    "scripts/rtk-ai-tester-multi/grade.test.mjs",
+    "scripts/rtk-ai-tester-multi/probe.mjs",
+    "scripts/rtk-ai-tester-multi/publish.mjs",
+    "scripts/rtk-ai-tester-multi/run.mjs",
+    "scripts/rtk-ai-tester-multi/summarize.mjs",
+    "scripts/skill-workflow-eval.mjs",
+    "scripts/skill-workflow-eval.test.mjs",
+    "scripts/superpowers-discipline-contract.test.mjs",
+    "scripts/superpowers-reproduction-examples.test.mjs",
+    "scripts/superpowers-skill-eval.mjs",
+    "scripts/superpowers-skill-eval.test.mjs",
+    "scripts/superpowers-skill-observations.test.mjs",
+    "scripts/superpowers-test-quality-examples.test.mjs",
+    "scripts/t-search-ab-benchmark.mjs",
+    "scripts/tool-initialization.mjs",
+    "scripts/ultra-research-resolver.mjs",
+    "scripts/validate-extension.test.mjs"
+  ],
+  "limits": [
+    "anchors not validated",
+    "directory links not recursively copied",
+    "prose/code path tokens are candidates, not proven dependencies",
+    "dynamic runtime paths and code imports not resolved"
+  ]
+}
