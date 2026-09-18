@@ -1,0 +1,260 @@
+{
+  "source_revision": "02d3f68538abc9ac1712e3396eb69eca74f9e830",
+  "node": "v24.13.0",
+  "ai_factory": "2.19.0",
+  "normalizations": [
+    {
+      "skill": "aif-analyze",
+      "fields": [
+        "version",
+        "author"
+      ],
+      "source_sha256": "22257e2a3af320e393ed5185035e07836bc43b48736afc337bc6cf27fe7d8de2"
+    },
+    {
+      "skill": "aif-done",
+      "fields": [
+        "argument-hint",
+        "version",
+        "author"
+      ],
+      "source_sha256": "f1183d9a3b0dd5521eace7a68d3b6b8b7e6586b824aafdad6ca6f5cea355e492"
+    }
+  ],
+  "report": {
+    "source_revision": "02d3f68538abc9ac1712e3396eb69eca74f9e830",
+    "profile": "research-strict-subset",
+    "included_skills": [
+      "aif-analyze",
+      "aif-done"
+    ],
+    "excluded": [
+      {
+        "surface": "aif-mode",
+        "reason": "manual-only policy retained in canonical installed extension; never normalized into auto-loadable skill"
+      },
+      {
+        "surface": "mcp.json",
+        "reason": "MCP uses an explicit native host project binding; not exported as a portable server"
+      },
+      {
+        "surface": "commands,injections,agentFiles,config defaults,validation providers",
+        "reason": "owned by installed AI Factory extension; workflow prerequisites"
+      }
+    ],
+    "prerequisites": [
+      "AI Factory 2.19.0 and registered AIFHub 1.7.0 in the selected project",
+      "Resolve runtime helpers and prose paths from the installed extension",
+      "Pinned external guides or matching installed documentation must be available; otherwise stop"
+    ],
+    "rewrites": [
+      {
+        "file": "skills/shared/ISOLATED-EXECUTION.md",
+        "from": "../../docs/isolated-execution.md",
+        "to": "https://github.com/ichinya/aifhub-extension/blob/02d3f68538abc9ac1712e3396eb69eca74f9e830/docs/isolated-execution.md",
+        "installed_extension_fallback": ".ai-factory/extensions/aifhub-extension/docs/isolated-execution.md"
+      },
+      {
+        "file": "skills/shared/TASK-COORDINATION.md",
+        "from": "../../docs/workflow-mechanics.md",
+        "to": "https://github.com/ichinya/aifhub-extension/blob/02d3f68538abc9ac1712e3396eb69eca74f9e830/docs/workflow-mechanics.md",
+        "installed_extension_fallback": ".ai-factory/extensions/aifhub-extension/docs/workflow-mechanics.md"
+      }
+    ],
+    "full_workflow_semantics": "NOT_RUN",
+    "full_client_loads": "NOT_RUN"
+  },
+  "validations": [
+    {
+      "skill": "aif-analyze",
+      "exit": 0,
+      "stdout": "Valid skill: <skill>"
+    },
+    {
+      "skill": "aif-done",
+      "exit": 0,
+      "stdout": "Valid skill: <skill>"
+    }
+  ],
+  "mcp": [
+    {
+      "case": "plugin-root-without-binding",
+      "exit": 1,
+      "handshake": false,
+      "errors": [],
+      "content": null,
+      "stderr": "error: unknown command 'aifhub-mcp'"
+    },
+    {
+      "case": "env-only-does-not-register-command",
+      "exit": 1,
+      "handshake": false,
+      "errors": [],
+      "content": null,
+      "stderr": "error: unknown command 'aifhub-mcp'"
+    },
+    {
+      "case": "selected-project-cwd",
+      "exit": 0,
+      "handshake": true,
+      "errors": [],
+      "content": "selected-project",
+      "stderr": ""
+    },
+    {
+      "case": "stale-override-reads-other-project",
+      "exit": 0,
+      "handshake": true,
+      "errors": [],
+      "content": "other-project",
+      "stderr": ""
+    },
+    {
+      "case": "explicit-cwd-and-env-agree",
+      "exit": 0,
+      "handshake": true,
+      "errors": [],
+      "content": "selected-project",
+      "stderr": ""
+    }
+  ],
+  "bundle_files": 27,
+  "bundle_bytes": 185344,
+  "inventory": [
+    {
+      "file": "compatibility-report.json",
+      "bytes": 1761,
+      "sha256": "6f3d44adaa084726c1d8b1a73fe57cbd558a864c933a1b25a00b3c650f4afa25"
+    },
+    {
+      "file": "plugin.json",
+      "bytes": 223,
+      "sha256": "ec1df44e4087bde0d5629e773e3fdb6bd5fa4a3ab14a8e84fc9441383b36904b"
+    },
+    {
+      "file": "README.md",
+      "bytes": 622,
+      "sha256": "56b790325e2d5e674967f17c737931e64445a5929a4a118e3ebda7b26cffe0ed"
+    },
+    {
+      "file": "skills/aif-analyze/references/config-keys.json",
+      "bytes": 4266,
+      "sha256": "1e6bcad355ba8506c3dd9d88c1a7f43f591544ef15031a776433542be7e75bcf"
+    },
+    {
+      "file": "skills/aif-analyze/references/config-template.yaml",
+      "bytes": 6138,
+      "sha256": "adf934a395026b0b486070d2a3a9adcbf980b03db8bb0245c5e0d2e405668d46"
+    },
+    {
+      "file": "skills/aif-analyze/references/description-template.md",
+      "bytes": 569,
+      "sha256": "4aae4df333b8dd3fde0389b5785b39fdfde8cf2ebc55213053952603d5aed1f0"
+    },
+    {
+      "file": "skills/aif-analyze/references/project-glossary-template.md",
+      "bytes": 485,
+      "sha256": "9d044241dcc4f6d0441a1d4bcedbbbd3369fd714432b0ac171649baf67cddd9e"
+    },
+    {
+      "file": "skills/aif-analyze/references/project-scan-checklist.md",
+      "bytes": 3080,
+      "sha256": "df4744ba55da7c3d862807303b904d9d761fd5e6baafc977c850aac52bc22eb4"
+    },
+    {
+      "file": "skills/aif-analyze/references/review-policy-template.md",
+      "bytes": 1137,
+      "sha256": "cc8a6d9823c77fb8e7abccdcfa486ea0767596285e834163ae5c0a9137e20208"
+    },
+    {
+      "file": "skills/aif-analyze/references/rules-base-template.md",
+      "bytes": 2307,
+      "sha256": "ebb4d1287218a21dc7a692cb5d0999478ee278c6a8d5860bbe6c386339a33b3e"
+    },
+    {
+      "file": "skills/aif-analyze/SKILL.md",
+      "bytes": 48523,
+      "sha256": "f47f4a4cff208e3b2543eed6623bee8bd12b0ac7babe60d20eef4ba4ec34374a"
+    },
+    {
+      "file": "skills/aif-done/references/finalization-contract.md",
+      "bytes": 14603,
+      "sha256": "358720fff318d6d4966722e19f875afce2ad2db13dee41c28a86287bb113a7c1"
+    },
+    {
+      "file": "skills/aif-done/SKILL.md",
+      "bytes": 20586,
+      "sha256": "11209b28f8f3057b40954d18da87360185395a9f48c4e3f658f95d50428b433f"
+    },
+    {
+      "file": "skills/shared/BUG-REPRODUCTION.md",
+      "bytes": 4140,
+      "sha256": "c3a72a40c79dd494412ffea715a0ceb2b58d9c19ec15bb6ea4739671b4d69b6b"
+    },
+    {
+      "file": "skills/shared/ISOLATED-EXECUTION.md",
+      "bytes": 6332,
+      "sha256": "96b2003cbb6595a8d04d19ece68f6506fde1dab8a97aa5a5253392c3b7977b76"
+    },
+    {
+      "file": "skills/shared/LANGUAGE-POLICY.md",
+      "bytes": 4184,
+      "sha256": "7d78b05016ac26f6d7ce6cdce0cfd624d3d1e277874ea169fa8a78e650e2e958"
+    },
+    {
+      "file": "skills/shared/PROJECT-GLOSSARY.md",
+      "bytes": 4515,
+      "sha256": "fec6286318eec9f6183e372aabdddb02d7c631393d3812b5871488a4c8826315"
+    },
+    {
+      "file": "skills/shared/QUESTION-TOOL.md",
+      "bytes": 8284,
+      "sha256": "5090554a27ea2f273793bef1a22fb94d0dd34fa6e56ad90242a89e28f1ec642e"
+    },
+    {
+      "file": "skills/shared/references/test-quality-examples.md",
+      "bytes": 2821,
+      "sha256": "81d963411c8499d81ae879dd1ea0a606f1f0388c3fe1572528e98f86c8ff3525"
+    },
+    {
+      "file": "skills/shared/RESEARCH-DESIGN.md",
+      "bytes": 9609,
+      "sha256": "a6ecbacd94560ba3f83c5cd694ad25520558bc576da0b847f8f517ed0cc37e86"
+    },
+    {
+      "file": "skills/shared/REVIEW-DELEGATION.md",
+      "bytes": 4009,
+      "sha256": "079914c8f22489245ee2978488e39fada7c0aa1381ded4e74fc3bbe5357e936d"
+    },
+    {
+      "file": "skills/shared/REVIEW-POLICY.md",
+      "bytes": 6567,
+      "sha256": "9cd7ff45495069cd2339252e3769580cfe4ecab68b4183689b109af6ace45f31"
+    },
+    {
+      "file": "skills/shared/SCOPED-REVIEW.md",
+      "bytes": 5239,
+      "sha256": "3f18face90341306229a8aa1ba9d6aa58f34724266176688ff6724d349f24fce"
+    },
+    {
+      "file": "skills/shared/TASK-COORDINATION.md",
+      "bytes": 11217,
+      "sha256": "b24344f72e9ce305b688acb99c2b1b8ec2b2e7579f2e0d05f532865365ceb51c"
+    },
+    {
+      "file": "skills/shared/TASK-DESIGN.md",
+      "bytes": 4697,
+      "sha256": "99d83b9c659972a8ed4088965d4fafacfa068e1c5ff6cb368579377cecb9da19"
+    },
+    {
+      "file": "skills/shared/TEST-QUALITY.md",
+      "bytes": 5145,
+      "sha256": "1f648f2f66cc8dddc439691e223188aec3f12bf8ecda75dc1c95219bd26371d1"
+    },
+    {
+      "file": "skills/shared/TOOLS.md",
+      "bytes": 4285,
+      "sha256": "0ee5dd0dc71174b51ab7fe33e3982e852b6016e679a901b9ada59a5bd20e67b8"
+    }
+  ]
+}
