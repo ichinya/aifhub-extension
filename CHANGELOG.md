@@ -6,6 +6,21 @@
 
 ## [В разработке]
 
+## [1.7.1] - 2026-09-18
+
+### Добавлено
+- Research совместимости Agent Plugins 1.0 (#200): pinned revisions `plugin.schema`/`mcp.schema`, conformance frontmatter через `skills-ref 0.1.0` (Python 3.12.11), инвентаризация зависимостей на exact commit через `git archive`, client-kernel probe. Первая попытка экспорта трёх skills завершена решением reference-only — замыкание справочных ссылок затягивает значительную часть репозитория, а нормализация frontmatter теряет ограничение invocation. Исправленный профиль (2026-09-18) проверяет two-skill subset (`aif-analyze`, `aif-done`) с обязательным preflight и native host MCP binding с согласованным root override; production exporter, installer и настройки host не изменены.
+- Оценка TencentCloud/TencentDB-Agent-Memory (#201): paired screening 24 пар (6 проектов × tool/baseline × FTS/embeddings), качество 1.00/PASS во всех 48 запусках. Устойчивая экономия только для research-follow-up на средних/больших en-репо и impl-continuity на самом большом репо; recommendation `conditional_external_runtime_only` с exact screening gate и availability probe. AIFHub не устанавливает и не запускает: OpenClaw/Hermes-only surface, npm `postinstall` патчит host runtime, purge остаётся user-owned.
+- Подготовленная scenario-матрица Prime Agent (#148): восемь оставшихся runtime-экспериментов зафиксированы как sanitized `NOT_RUN` каталог с validation harness, отказывающим фабриковать execution claims; deferred-решение остаётся pinned, манифесты расширения защищены от тихого adoption prime-agent.
+- SQZ × pi live matrix (#186): 108 прогонов (3 независимых прогона × 6 анонимизированных репо × 2 типа задач × `off`/`aifhub`/`sqz`) через боевой `context-dedup` контракт с per-run изоляцией и восстановлением рабочего дерева. Главный результат — экономия байтов ≠ экономия токенов: SQZ сжимает 25–72% model-visible байтов, но в 4 из 6 профилей увеличивает полный расход токенов провайдера.
+- Кросс-проектная RTK матрица (#138): пять agent-фаз (explore, plan gates, diagnostics, fix archaeology, ops safety) × шесть помеченных проектов через ai-tester + ACP + Pi: baseline 23/30 пар против RTK 18/30, токены 342,653 → 345,823 (+0.9%). Два дефекта грейдера найдены после round 1, исправлены с unit-тестами, затронутые сценарии повторно исполнены; decision `reject_defer` не изменился.
+
+### Изменено
+- Evidence-based user-owned RTK рекомендации: включать для overview/search на больших репозиториях (-24..-58% с сохранением качества), ops/status проверок и proxy-просмотров истории/diffs; держать выключенным для маленьких репо, exact aggregate counting задач, verification/fix runners и чувствительных сессий. Machine-readable metadata `aifhub.token_providers.recommendation.v1` зеркалирует memory-tools паттерн (decision, evidence pointers, proven benefits, anti-scopes) — durable research metadata, которую runtime не потребляет и ничто не гейтит.
+
+### Исправлено
+- Gate tencentdb-agent-memory: закрыты Devin review findings через hardening recommender с regression-тестами; provenance guard prime-agent матрицы усилен, screening labels санитизированы.
+
 ## [1.7.0] - 2026-09-13
 
 ### Добавлено
