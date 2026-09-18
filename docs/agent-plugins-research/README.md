@@ -2,7 +2,7 @@
 
 # Исследование совместимости с Agent Plugins 1.0 — issue #200
 
-Решение: **reference-only для текущего AIFHub; выпуск export subset отложен**. [Проверка пяти вопросов](follow-up.md) установила: все 3 исходных skills отклоняются `skills-ref 0.1.0`; нормализация проходит, но теряет флаг ручного запуска `aif-mode` в parser kernel VS Code 1.137.0. Замыкание справочных ссылок расширяет 29 исходных файлов до 188, включая runtime-код и agents. MCP нельзя переносить 1:1 без отдельного project binding. Поэтому текущие файлы не выпускаются как подтверждённый portable package. Ветка содержит исследование, schema snapshots и воспроизводимые probes; публичного генератора/инспектора и full client smoke нет. Статусы критериев issue приведены в конце.
+Решение после коррекции 2026-09-18: **проверен ограниченный профиль из двух skills с отдельным host-bound MCP; выпуск продукта отложен**. [Исправление и положительные пробы](remediation.md): `aif-analyze` и `aif-done` проходят strict validator; `aif-mode` сохраняет ручной запуск в канонической установке и исключён из portable discovery; справочные ссылки ограничены явным allowlist; MCP с согласованными `cwd`/`AIFHUB_PROJECT_ROOT` читает выбранный fixture-проект. [Прежнее исследование](follow-up.md) сохраняет evidence непригодности прямого экспорта трёх skills + MCP. Публичного генератора/инспектора и full client smoke по-прежнему нет.
 
 Orkora [#312](https://github.com/ichinya/orkora/issues/312) владеет orchestration-side композицией пакетов, релизами и grants. Этот документ владеет только границей совместимости/дистрибуции AIFHub; стороны обмениваются версионированными манифестами и evidence и никогда не дублируют release engine.
 
@@ -58,6 +58,8 @@ Orkora [#312](https://github.com/ichinya/orkora/issues/312) владеет orche
 
 Mapping подтверждает предпосылку issue: копирование skills в каталог плагина не заменяет `ai-factory extension add/update` и не делает полный workflow AIFHub переносимым. Граница, уже проведённая в README для upstream-дистрибуции skills через APM, применяется здесь без изменений.
 
+Таблица описывает все исходные поверхности. Исправленный prototype profile намеренно включает **два**, а не три skill; `aif-mode`, MCP и остальные runtime-поверхности явно перечислены в exclusion report и продолжают принадлежать установленному расширению.
+
 ## Выводы по соответствию frontmatter навыков
 
 Статус frontmatter каждого навыка против спецификации Agent Skills:
@@ -79,6 +81,8 @@ Mapping подтверждает предпосылку issue: копирова�
 3. `workflow_semantics_verified` — полный workflow AIFHub (injections, extension-команды, managed files, validation gates). **Недостижим без AI Factory.** Любой экспорт или consumer, претендующий на этот уровень для переносимого подмножества, неверен по определению, и compatibility-отчёт обязан говорить это явно.
 
 ## План минимального экспорта
+
+Ниже сохранены требования к возможному полному экспорту. Они не являются составом уже проверенного прототипа. Актуальный ограниченный allowlist и результаты находятся в [remediation](remediation.md): 24 skill/data файла, 27 файлов bundle всего; вместо рекурсивного включения двух общих руководств используются pinned ссылки с fallback на matching installed documentation.
 
 Опциональный производный экспортер (новая extension-команда или генератор в `scripts/`, решается на этапе реализации) пишет только в выбранный пользователем output directory:
 
@@ -123,7 +127,7 @@ Read-only инспектор внешних bundle выдаёт нормализ
 Кандидат — **GitHub Copilot в VS Code**. Публикация в списке клиентов не доказывает поддержку требуемого формата конкретным билдом. До прогона фиксируются версия VS Code, версия Copilot, ОС, способ загрузки root `plugin.json`, версия `skills-ref`, digest пакета и schema snapshots. Если этот билд не поддерживает пакет напрямую, результат `NOT_RUN` с причиной; ручной перевод в native config не считается portable smoke.
 
 1. `format_valid` офлайн (схемы + записанный вывод `skills-ref validate`);
-2. `loads`: обнаружены **все три** ожидаемых навыка, shared не обнаружен как четвёртый skill; проверены чтения reference/template и ограничение invocation `aif-mode`. Для skills-only пакета MCP явно `excluded`;
+2. `loads` исправленного профиля: обнаружены **ровно два** ожидаемых навыка (`aif-analyze`, `aif-done`), shared и `aif-mode` не обнаружены как дополнительные skills; проверены reference reads и prerequisite preflight. `aif-mode` остаётся в канонической установке с прежним ограничением invocation. Для portable subset MCP явно `excluded`;
 3. `workflow_semantics_verified` явно зафиксирован как **не заявленный**.
 
 После отдельного решения о MCP binding дополнительный smoke покрывает: отсутствующий CLI; установленный CLI без зарегистрированного AIFHub; зарегистрированный AIFHub с неверным root; корректно связанный проект. Последний сценарий требует handshake и read-only запроса к известному файлу fixture-проекта. Одного handshake недостаточно: сервер может подключиться к неправильному корню. Smoke не вызывает `install_skill`, `run_skill_tests` и другие операции с пользовательскими данными. Любые записи служебного ledger допускаются только внутри изолированного fixture-проекта.
@@ -140,7 +144,7 @@ Read-only инспектор внешних bundle выдаёт нормализ
 
 ## Запись решения и триггеры пересмотра
 
-Текущее решение по пункту 7 issue — **reference-only**, выпуск отложен. Для skills-only нужны ограниченные portable references и решение конфликта нормализации с invocation control. Прямой MCP-export требует явной project binding; шесть вариантов и их trade-offs разобраны в [follow-up](follow-up.md). Существующий native host MCP config остаётся рабочим направлением, но не переименовывается в portable `mcp.json`. Исследование не обосновывает новый installer или runtime adapter без отдельного дизайна.
+Текущее решение по пункту 7 issue — **export subset как проверенное направление**, выпуск отложен до продуктовой реализации и client smoke. Конфликт invocation обходится явным исключением `aif-mode` при сохранении канонической установки; это не реализация переносимого запрета для всех клиентов. Для MCP выбран native host binding, положительно проверенный на fixture-проектах. Он не переименовывается в portable `mcp.json`. Прежний трёхskill-вариант остаётся reference-only; шесть MCP alternatives сохранены в [follow-up](follow-up.md).
 
 - Agent Plugins добавляет тип компонентов commands, injections, agents или rules со стабильным кросс-клиентским контрактом → пересмотреть mapping (сегодня они «явно вне формата v1»).
 - Сам AI Factory публикует конформный клиент Agent Plugins или принимает плагины как источник расширений → требуется ADR до любого изменения installer; upstream `extension add/update` остаётся каноническим путём установки до тех пор.
@@ -160,13 +164,15 @@ Read-only инспектор внешних bundle выдаёт нормализ
 
 [Дополнительное исследование](follow-up.md) закрывает пять согласованных направлений: validator, dependency inventory, schema snapshots, точный клиентский parser kernel и MCP alternatives. Диагностические скрипты работают с доверенными snapshot и scratch-копиями; они не являются готовым exporter/inspector.
 
+[Коррекция 2026-09-18](remediation.md) содержит отдельные новые результаты: 2/2 skills проходят validator; 24 файла локального dependency closure без потерь; schema и 27 inventory hashes проверены; реальные MCP handshake/read подтверждают выбранный root. Отрицательный stale-env контроль показал чтение чужого fixture-проекта и обосновал согласование env с cwd.
+
 | Критерий issue | Статус этой ветки | Что остаётся |
 |---|---|---|
 | Mapping distribution surfaces | Выполнен на baseline `02d3f68` | Повторять при изменении манифеста |
 | Exact spec/schema и tested client versions | Schema bytes/digests, validator SHA, установленный client build и source-kernel probe зафиксированы | Полный client smoke после получения безопасного кандидата |
-| Read-only inspection/export fixture | Не реализован | Отдельный локальный генератор/инспектор с output boundary и отрицательными сценариями |
-| Positive/negative fixtures | Выполнены локальная MCP-проба, 7 validator-вариантов и client parser probes; матрица внешнего инспектора спроектирована | Реализовать отдельный fixture suite для публичного инспектора, если направление возобновится |
-| Minimal subset smoke или обоснование нецелесообразности | Обоснование reference-only подкреплено нормализацией, inventory и kernel evidence | Runtime smoke текущего небезопасного кандидата не проводится; полный `loads` NOT_RUN |
+| Read-only inspection/export fixture | Диагностический subset собирается в OS temp; generic external inspector не реализован | Production output safety и внешний read-only inspector остаются отдельной реализацией |
+| Positive/negative fixtures | Добавлены два успешных validator cases и пять MCP startup/root cases к прежним семи frontmatter-вариантам и parser probes | Нужен отдельный fixture suite для публичного инспектора |
+| Minimal subset smoke или обоснование нецелесообразности | Ограниченный subset и native CLI binding проходят локальные проверки | Полный `loads` в клиентском UI и workflow semantics NOT_RUN |
 | Сохранение canonical artifacts и install/update flow | Сохранено: в ветке нет runtime/installer изменений | Сохранить этот инвариант в реализации |
 
 Issue #200 **не закрывается** этим исследованием. Полный набор тестов baseline прошёл (1507 tests / 180 suites, Node 24.13.0), но он не содержит ещё не реализованный plugin exporter и не доказывает его conformance.

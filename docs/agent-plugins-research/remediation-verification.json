@@ -1,0 +1,11 @@
+{
+  "plugin_schema": "PASS",
+  "schema_sha256": "0a4aad95ce337878ad38802ebf0daa3fde76abe3f65400c86bcbb1ec0b3ab883",
+  "jsonschema": "4.25.1",
+  "inventory_hashes": "PASS",
+  "checked_files": 27,
+  "manual_only_skill_excluded": true,
+  "portable_mcp_excluded": true,
+  "full_client_loads": "NOT_RUN",
+  "workflow_semantics_verified": "NOT_RUN"
+}
