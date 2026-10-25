@@ -233,6 +233,8 @@ export async function worktree(store, scopes = [], projections = {}) {
     requireValue(!portablePath(scope).split('/').some(p => p.toLowerCase() === '.git'), 'protected-scope');
     Object.assign(scopedFiles, await store.inventory(scope, { excludeGit: true }));
   }
+  // The per-inventory bound is not a combined budget: scoped entries share one aggregate limit.
+  requireValue(Object.keys(scopedFiles).length <= 10000, 'too-many-files');
   for (const name of Object.keys(scopedFiles)) names.add(name);
   requireValue(names.size <= 20000, 'too-many-files');
   const files = Object.create(null);

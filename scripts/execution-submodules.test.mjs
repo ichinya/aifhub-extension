@@ -211,6 +211,18 @@ test('recursive leaves retain the 16 MiB file bound', async t => {
   const p = await project(t); await p.put('api/openapi/large.bin', ''); await truncate(path.join(p.root, 'api/openapi/large.bin'), 16 * 1024 * 1024 + 1);
   await fails(p.call('start', p.start()), 'unsupported-file');
 });
+test('scoped file budget is aggregate across scopes, not per inventory call', async t => {
+  const p = await project(t);
+  const bulk = async (dir, from, to) => {
+    await mkdir(path.join(p.root, dir), { recursive: true });
+    for (let i = from; i < to; i++) await writeFile(path.join(p.root, dir, `f${String(i).padStart(5, '0')}.txt`), `${i}\n`);
+  };
+  await bulk('bulk-a', 0, 10000);
+  const store = await storeFor(p.root);
+  await worktree(store, ['bulk-a']);
+  await bulk('bulk-b', 10000, 10001);
+  await fails(worktree(store, ['bulk-a', 'bulk-b']), 'too-many-files');
+});
 test('snapshot validation accepts old records and rejects malformed module metadata and checkpoint erasure', async t => {
   const p = await project(t); await p.call('start', p.start()); const run = await p.run();
   const plain = { head: run.initial_worktree.head, branch: run.initial_worktree.branch, index: run.initial_worktree.index, files: {} };
