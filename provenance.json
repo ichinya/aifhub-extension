@@ -1,0 +1,26 @@
+{
+  "version": "1.8.0",
+  "released_at": "2026-10-25T17:08:43.405Z",
+  "files": [
+    {
+      "path": "scripts/workflow-state-store.mjs",
+      "sha256": "3cb11b1f0f2b21d6a66009cc6d7eb636a1b96f85779b4cea461e3f5d922d9495"
+    },
+    {
+      "path": "scripts/execution-state.mjs",
+      "sha256": "b6470f422e8d50442f8af2474a353d092b850c8a878bdc75c5cb8e322a79a456"
+    },
+    {
+      "path": "scripts/execution-records.mjs",
+      "sha256": "b2d13e9251a30a6ab24f0d937865e0c842e4356dcf447cd21e40632fe133bf9e"
+    },
+    {
+      "path": "scripts/execution-task-source.mjs",
+      "sha256": "e438a94e0314621879382b16afcd282743f32dc95c7f8a431ccb01bfde3c313f"
+    },
+    {
+      "path": "scripts/isolated-execution.mjs",
+      "sha256": "5a9cd172e47d9924c645852fc0c0bb7da54b298ec4ab3fc3a973560d01a555fe"
+    }
+  ]
+}

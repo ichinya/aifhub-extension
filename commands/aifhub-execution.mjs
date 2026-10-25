@@ -5,6 +5,9 @@ export function register(program) {
     .description('Manage source-bound execution, sealed batches, isolated integration, fix attempts, and recovery.')
     .allowUnknownOption(true).allowExcessArguments(true).argument('[args...]')
     .action(async (args, command) => {
-      await runInstalledScript('../scripts/execution-state.mjs', normalizeWrapperArgs(args, command), import.meta.url);
+      const normalized = normalizeWrapperArgs(args, command);
+      // The independent scanner also works when execution-state itself was locally replaced.
+      const script = normalized[0] === 'diagnostics' ? '../scripts/execution-provenance.mjs' : '../scripts/execution-state.mjs';
+      await runInstalledScript(script, normalized, import.meta.url);
     });
 }

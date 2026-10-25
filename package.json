@@ -3,6 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "release:prepare": "node scripts/generate-provenance.mjs",
+    "provenance:check": "node scripts/generate-provenance.mjs --check",
     "migrate:legacy-plans": "node scripts/migrate-legacy-plans.mjs",
     "benchmark:t-search": "node scripts/t-search-ab-benchmark.mjs",
     "smoke:ai-factory-2-18": "node scripts/ai-factory-2-18-live-smoke.mjs",
