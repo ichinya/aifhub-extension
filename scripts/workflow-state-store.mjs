@@ -120,7 +120,7 @@ export async function storeFor(rootDir = process.cwd()) {
     try { await handle.writeFile(JSON.stringify({ pid: process.pid, created_at: new Date().toISOString() })); return await action(); }
     finally { await handle.close(); await unlink(filename); }
   }
-  async function inventory(relative) {
+  async function inventory(relative, { excludeGit = false } = {}) {
     const filename = await target(relative);
     let info;
     try { info = await lstat(filename); } catch (e) { if (e.code === 'ENOENT') return {}; throw e; }
@@ -129,7 +129,8 @@ export async function storeFor(rootDir = process.cwd()) {
     requireValue(entries.length <= 10000, 'too-many-files');
     const result = Object.create(null);
     for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-      Object.assign(result, await inventory(`${relative}/${entry.name}`));
+      if (excludeGit && entry.name.toLowerCase() === '.git') continue;
+      Object.assign(result, await inventory(`${relative}/${entry.name}`, { excludeGit }));
       requireValue(Object.keys(result).length <= 10000, 'too-many-files');
     }
     return result;
@@ -149,29 +150,109 @@ export async function storeFor(rootDir = process.cwd()) {
 }
 
 export async function worktree(store, scopes = [], projections = {}) {
-  async function git(args) {
-    try { return (await exec('git', args, { cwd: store.root, encoding: 'buffer', maxBuffer: LIMIT, windowsHide: true })).stdout; }
+  async function git(cwd, args) {
+    try { return (await exec('git', args, { cwd, encoding: 'buffer', maxBuffer: LIMIT, windowsHide: true })).stdout; }
     catch { throw new WorkflowError('git-unavailable'); }
   }
-  const root = (await git(['rev-parse', '--show-toplevel'])).toString('utf8').trim();
-  requireValue(await realpath(root) === store.root, 'project-root-required');
-  const head = (await git(['rev-parse', '--verify', 'HEAD'])).toString('utf8').trim();
-  const branch = (await git(['rev-parse', '--abbrev-ref', 'HEAD'])).toString('utf8').trim();
-  const index = digest(await git(['ls-files', '--stage', '-z']));
+  const inside = (base, filename) => { const rel = path.relative(base, filename); return !path.isAbsolute(rel) && rel !== '..' && !rel.startsWith('..'+path.sep); };
+  async function safeDirectory(filename) {
+    let current = path.parse(filename).root;
+    for (const part of filename.slice(current.length).split(path.sep).filter(Boolean)) {
+      current = path.join(current, part);
+      const info = await lstat(current);
+      requireValue(info.isDirectory() && !info.isSymbolicLink(), 'unsafe-submodule');
+    }
+    const info = await lstat(filename);
+    return { path: await realpath(filename), device: info.dev, inode: info.ino };
+  }
+  async function safeAdminFile(filename, required = false) {
+    await safeDirectory(path.dirname(filename));
+    const info = await lstat(filename).catch(e => { if (e.code === 'ENOENT' && !required) return null; throw e; });
+    requireValue(!info || (info.isFile() && !info.isSymbolicLink() && info.nlink === 1 && info.size <= LIMIT), 'unsafe-submodule');
+  }
+  const rootCommon = await safeDirectory(path.resolve(store.root, (await git(store.root, ['rev-parse', '--git-common-dir'])).toString('utf8').trim()));
+  async function inspect(prefix, trustedAdmins, includeFiles = true) {
+    const cwd = prefix ? await store.target(prefix) : store.root;
+    let marker = null, ownAdmin = null;
+    if (prefix) {
+      const markerPath = await store.target(`${prefix}/.git`);
+      const info = await lstat(markerPath).catch(e => { if (e.code === 'ENOENT') return null; throw e; });
+      requireValue(info, 'uninitialized-submodule');
+      requireValue((await lstat(cwd)).isDirectory(), 'unsafe-submodule');
+      if (info.isDirectory()) ownAdmin = await safeDirectory(markerPath);
+      else {
+        const data = await store.bytes(`${prefix}/.git`);
+        const match = /^gitdir: ([^\r\n]+)\r?\n?$/.exec(data.toString('utf8'));
+        requireValue(match, 'unsafe-submodule');
+        const admin = path.resolve(cwd, match[1]);
+        requireValue(trustedAdmins.some(base => inside(base, admin)), 'unsafe-submodule');
+        await safeDirectory(admin);
+        marker = digest(data);
+      }
+    }
+    const identity = (await git(cwd, ['rev-parse', '--show-toplevel', '--absolute-git-dir', '--git-common-dir', 'HEAD', '--abbrev-ref', 'HEAD'])).toString('utf8').trim().split(/\r?\n/);
+    requireValue(identity.length === 5 && /^[a-f0-9]{40,64}$/.test(identity[3]), 'invalid-git-identity');
+    const [top, gitDirPath, commonDirPath, head, branch] = identity;
+    requireValue(await realpath(top) === cwd, prefix ? 'unsafe-submodule' : 'project-root-required');
+    const gitDir = path.resolve(cwd, gitDirPath), commonDir = path.resolve(cwd, commonDirPath);
+    for (const dir of [gitDir, commonDir]) requireValue(!prefix || trustedAdmins.some(base => inside(base, dir)) || (ownAdmin && inside(ownAdmin.path, dir)), 'unsafe-submodule');
+    const admin = await safeDirectory(gitDir), common = await safeDirectory(commonDir), checkout = await safeDirectory(cwd);
+    await safeAdminFile(path.join(gitDir, 'HEAD'), true);
+    for (const filename of [path.join(gitDir, 'index'), path.join(gitDir, 'commondir'), path.join(commonDir, 'config'), path.join(commonDir, 'packed-refs')]) await safeAdminFile(filename);
+    const [stages, namesBytes] = await Promise.all([
+      git(cwd, ['ls-files', '--stage', '-z']), includeFiles ? git(cwd, ['ls-files', '--cached', '--others', '--exclude-standard', '-z']) : Buffer.alloc(0),
+    ]);
+    const entries = stages.toString('utf8').split('\0').filter(Boolean).map(row => {
+      const match = /^(\d{6}) ([a-f0-9]{40,64}) ([0-3])\t(.+)$/.exec(row);
+      requireValue(match, 'invalid-git-index');
+      return { mode: match[1], oid: match[2], stage: match[3], name: portablePath(match[4]) };
+    });
+    requireValue(entries.length <= 20000, 'too-many-files');
+    const links = entries.filter(e => e.mode === '160000');
+    requireValue(links.every(e => e.stage === '0'), 'unmerged-submodule');
+    return { head, branch, index: digest(stages), repository: digest({ checkout, admin, common, marker }), adminPaths: [admin.path, common.path], links,
+      names: namesBytes.toString('utf8').split('\0').filter(Boolean) };
+  }
+  const modules = Object.create(null), repositories = [], names = new Set(), adminIdentities = new Set();
+  async function collect(prefix = '', gitlink = null, depth = 0, trustedAdmins = [rootCommon.path]) {
+    requireValue(depth <= 20 && repositories.length <= 100, 'too-many-submodules');
+    const info = await inspect(prefix, trustedAdmins); repositories.push({ prefix, info, trustedAdmins });
+    requireValue(!adminIdentities.has(info.repository), 'unsafe-submodule'); adminIdentities.add(info.repository);
+    if (prefix) modules[prefix] = { head: info.head, branch: info.branch, index: info.index, repository: info.repository, gitlink };
+    const links = new Set(info.links.map(e => e.name));
+    for (const name of info.names) {
+      if (links.has(name)) continue;
+      names.add(portablePath(prefix ? `${prefix}/${name}` : name));
+      requireValue(names.size <= 20000, 'too-many-files');
+    }
+    for (const link of info.links) await collect(prefix ? `${prefix}/${link.name}` : link.name, link.oid, depth + 1, [...new Set([...trustedAdmins, ...info.adminPaths])]);
+  }
+  await collect();
   const scopedFiles = Object.create(null);
-  for (const scope of scopes) Object.assign(scopedFiles, await store.inventory(scope));
-  const names = [...new Set([...(await git(['ls-files', '--cached', '--others', '--exclude-standard', '-z'])).toString('utf8').split('\0').filter(Boolean), ...Object.keys(scopedFiles)])].sort();
-  requireValue(names.length <= 20000, 'too-many-files');
+  for (const scope of scopes) {
+    requireValue(!portablePath(scope).split('/').some(p => p.toLowerCase() === '.git'), 'protected-scope');
+    Object.assign(scopedFiles, await store.inventory(scope, { excludeGit: true }));
+  }
+  for (const name of Object.keys(scopedFiles)) names.add(name);
+  requireValue(names.size <= 20000, 'too-many-files');
   const files = Object.create(null);
-  for (const name of names) {
+  for (const name of [...names].sort()) {
     // Runtime state and evidence have separate identities. Canonical OpenSpec stays in the snapshot.
     if (name.toLowerCase().startsWith('.ai-factory/')) continue;
     const data = await store.bytes(name);
     const mode = data === null ? null : (await lstat(await store.target(name))).mode & 0o111;
     files[name] = data === null ? null : digest({ content: Object.hasOwn(projections, name) ? projections[name] : digest(data), executable: mode });
   }
-  return { head, branch, index, files };
+  // Do not publish a mixture if Git metadata changes while leaf files are read.
+  for (const { prefix, info, trustedAdmins } of repositories) {
+    const after = await inspect(prefix, trustedAdmins, false);
+    requireValue(sameRevision(info, after) && info.repository === after.repository, 'stale-revision', true);
+  }
+  const { head, branch, index } = repositories[0].info;
+  return { head, branch, index, files, ...(Object.keys(modules).length ? { submodules: modules } : {}) };
 }
+export const sameRevision = (before, after) => before.head === after.head && before.branch === after.branch && before.index === after.index
+  && canonical(before.submodules ?? {}) === canonical(after.submodules ?? {});
 export const changedFiles = (before, after) => [...new Set([...Object.keys(before.files), ...Object.keys(after.files)])]
   .filter(p => (before.files[p] ?? null) !== (after.files[p] ?? null)).sort();
 

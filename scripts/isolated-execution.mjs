@@ -5,7 +5,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import { assertAuxiliaryPaths, resolveExecutionSource, selectExecutionTask, validateExecutionScope } from './execution-task-source.mjs';
 import { catalogue, history, names, pendingTransactions, reserves } from './execution-transactions.mjs';
-import { digest, requireValue, storeFor, worktree, WorkflowError } from './workflow-state-store.mjs';
+import { digest, requireValue, sameRevision, storeFor, worktree, WorkflowError } from './workflow-state-store.mjs';
 import { applyImages, eventKey, imageHash, ISOLATION_SCHEMA, isolationFolder, isolationInput, isolationState, same } from './isolated-execution-records.mjs';
 
 const exec = promisify(execFile);
@@ -175,7 +175,7 @@ async function finishTransfer(store, record, state, options) {
   const direction = state.phase === 'applying' ? 'after' : 'before';
   const target = applyImages(state.expected, images, direction);
   const current = await worktree(store, allFiles(record), source.projections);
-  requireValue(current.head === state.expected.head && current.index === state.expected.index && current.branch === state.expected.branch, 'stale-integration-revision', true);
+  requireValue(sameRevision(current, state.expected), 'stale-integration-revision', true);
   const transferPaths = new Set(images.map(i => i.path));
   const outside = tree => Object.fromEntries(Object.entries(tree.files).filter(([p]) => !transferPaths.has(p)));
   requireValue(same(outside(current), outside(state.expected)), 'integration-recovery-conflict', true);

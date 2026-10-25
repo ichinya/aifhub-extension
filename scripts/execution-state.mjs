@@ -1,13 +1,31 @@
 import { randomUUID } from 'node:crypto';
-import { maskMarkdownCode } from './markdown-structural-markers.mjs';
-import { parseWorkItemSourceBinding } from './active-change-resolver.mjs';
-import { assertAuxiliaryPaths, executionId, parseExecutionTasks, resolveExecutionSource, selectExecutionTask, validateExecutionScope } from './execution-task-source.mjs';
-import { RUN_SCHEMA, LEDGER_SCHEMA, SOURCE_SCHEMA, manifestRecord, overlap, progressRecord, resultPayload, validateRun, validateLedger } from './execution-records.mjs';
-import { catalogue, folderFor, history, pendingTransactions, publish, readTransaction, reserves, validateHistoricalRun } from './execution-transactions.mjs';
-import { boundedText, canonical, changedFiles, cliMain, digest, fields, identifier, requireValue, storeFor, stringList, worktree } from './workflow-state-store.mjs';
+import { helperCliMain, helperDiagnostics } from './execution-provenance.mjs';
+
+// Defer all replaceable runtime dependencies until after read-only diagnostics dispatch.
+let maskMarkdownCode, parseWorkItemSourceBinding, assertAuxiliaryPaths, executionId, parseExecutionTasks,
+  resolveExecutionSource, selectExecutionTask, validateExecutionScope, RUN_SCHEMA, LEDGER_SCHEMA, SOURCE_SCHEMA,
+  manifestRecord, overlap, progressRecord, resultPayload, validateRun, validateLedger, catalogue, folderFor,
+  history, pendingTransactions, publish, readTransaction, reserves, validateHistoricalRun, boundedText,
+  canonical, changedFiles, digest, fields, identifier, requireValue, sameRevision, storeFor, stringList, worktree;
+let runtimeReady;
+async function loadRuntime() {
+  runtimeReady ??= Promise.all([
+    import('./markdown-structural-markers.mjs'), import('./active-change-resolver.mjs'),
+    import('./execution-task-source.mjs'), import('./execution-records.mjs'),
+    import('./execution-transactions.mjs'), import('./workflow-state-store.mjs'),
+  ]).then(([markdown, resolver, task, records, transactions, store]) => {
+    ({ maskMarkdownCode } = markdown); ({ parseWorkItemSourceBinding } = resolver);
+    ({ assertAuxiliaryPaths, executionId, parseExecutionTasks, resolveExecutionSource, selectExecutionTask, validateExecutionScope } = task);
+    ({ RUN_SCHEMA, LEDGER_SCHEMA, SOURCE_SCHEMA, manifestRecord, overlap, progressRecord, resultPayload, validateRun, validateLedger } = records);
+    ({ catalogue, folderFor, history, pendingTransactions, publish, readTransaction, reserves, validateHistoricalRun } = transactions);
+    ({ boundedText, canonical, changedFiles, digest, fields, identifier, requireValue, sameRevision, storeFor, stringList, worktree } = store);
+  });
+  await runtimeReady;
+}
 
 const common=['change_id','run_id'], mutation=[...common,'actor','version'];
 const contracts={
+  diagnostics:[[],[]],
   start:[[...common,'task_id','owner','worker','role','scope'],['context_paths']],
   'batch-start':[[...common,'owner','worker','role','manifest','preflight_paths'],['context_paths']],
   resume:[common,[]], inspect:[['change_id'],['run_id']],
@@ -42,7 +60,7 @@ async function current(store,run) {
   requireValue(!source.delegated && source.namespace_digest===run.source.namespace_digest,'stale-source',true);
   requireValue(source.context.digest===run.context.digest,'stale-context',true);
   const snapshot=await worktree(store,run.scope,source.projections);
-  requireValue(snapshot.head===run.initial_worktree.head && snapshot.branch===run.initial_worktree.branch && snapshot.index===run.initial_worktree.index,'stale-revision',true);
+  requireValue(sameRevision(snapshot,run.initial_worktree),'stale-revision',true);
   scopeDiff(run,snapshot);
   if(run.kind==='batch')requireValue(same(await refs(store,Object.keys(run.preflight)),run.preflight),'stale-preflight',true);
   return snapshot;
@@ -86,6 +104,12 @@ function transactionId(action,input) { return digest(`${action}:${input.run_id??
 
 /** Local cooperative bookkeeping. Actor labels are correlation, not authentication. */
 export async function executionCommand(action,input,options={}) {
+  if (action === 'diagnostics') {
+    if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).length) throw { code: 'invalid-input' };
+    // options.rootDir is the consumer checkout, not the installed helper location.
+    return helperDiagnostics();
+  }
+  await loadRuntime();
   if (typeof action === 'string' && action.startsWith('isolation-')) {
     return (await import('./isolated-execution.mjs')).isolatedExecutionCommand(action, input, options, executionCommand);
   }
@@ -234,7 +258,7 @@ async function drift(store,run) {
     if(source.context?.digest!==run.context.digest)changed.push('context');
   } catch { changed.push('source-unavailable'); }
   try { const snapshot=await worktree(store,run.scope,source?.projections);
-    if(snapshot.head!==run.initial_worktree.head || snapshot.index!==run.initial_worktree.index || snapshot.branch!==run.initial_worktree.branch)changed.push('revision');
+    if(!sameRevision(snapshot,run.initial_worktree))changed.push('revision');
     if(!same(snapshot,run.checkpoint.worktree))changed.push('worktree');
     if(run.seal)await freshSeal(store,run,snapshot); else await freshResult(store,run,snapshot);
   } catch { changed.push('evidence'); }
@@ -358,4 +382,4 @@ async function upgrade(store,folder,h,input,options) {
   return publish(store,folder,txId,'upgrade',input,writes,response,options);
 }
 
-await cliMain(import.meta.url,executionCommand);
+await helperCliMain(import.meta.url,executionCommand);

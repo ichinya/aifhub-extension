@@ -193,6 +193,7 @@ export async function validateExecutionScope(store, paths, source, exact = false
   requireValue(stringList(paths).length > 0);
   for (const value of paths) {
     const p = portablePath(value).toLowerCase();
+    requireValue(!p.split('/').includes('.git'), 'protected-scope');
     requireValue(!source.protected_paths.some(root => {
       const r = root.toLowerCase(); return p === r || p.startsWith(r+'/') || r.startsWith(p+'/');
     }), 'protected-scope');

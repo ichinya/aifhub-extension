@@ -17,9 +17,18 @@ export function refs(value, nullable = false) {
 }
 function evidenceRefs(value) { refs(value); assertAuxiliaryPaths(Object.keys(value)); }
 export function snapshot(value) {
-  fields(value, ['head', 'branch', 'index', 'files']);
+  fields(value, ['head', 'branch', 'index', 'files'], ['submodules']);
   requireValue(typeof value.head === 'string' && /^[a-f0-9]{40,64}$/.test(value.head), 'invalid-state');
   boundedText(value.branch, 300); hash(value.index); refs(value.files, true);
+  if (value.submodules !== undefined) {
+    object(value.submodules); requireValue(Object.keys(value.submodules).length <= 100, 'invalid-state');
+    for (const [p, module] of Object.entries(value.submodules)) {
+      portablePath(p); requireValue(!Object.hasOwn(value.files, p), 'invalid-state');
+      fields(module, ['head', 'branch', 'index', 'repository', 'gitlink']);
+      for (const k of ['head', 'gitlink']) requireValue(typeof module[k] === 'string' && /^[a-f0-9]{40,64}$/.test(module[k]), 'invalid-state');
+      boundedText(module.branch, 300); hash(module.index); hash(module.repository);
+    }
+  }
 }
 export function contextRecord(value) {
   fields(value, ['digest', 'sources']); hash(value.digest); object(value.sources);
@@ -166,6 +175,7 @@ export function validateRun(run, {predecessors=[]}={}) {
   integer(run.version); enumeration(run.status,['started','completed','failed','blocked','cancelled','timed_out','accepted']);
   contextRecord(run.context); snapshot(run.initial_worktree);
   fields(run.checkpoint,['worktree','progress']); snapshot(run.checkpoint.worktree); progressRecord(run.checkpoint.progress);
+  requireValue(canonical(run.initial_worktree.submodules ?? {}) === canonical(run.checkpoint.worktree.submodules ?? {}), 'invalid-state');
   if(run.result) resultRecord(run.result,run,run.task_id);
   if(run.accepted_by!==undefined) requireValue(run.accepted_by===run.owner && run.status==='accepted','invalid-state');
   if(legacy || run.kind==='single') {
