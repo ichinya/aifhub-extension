@@ -26,6 +26,13 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "tag=v$VERSION" >> $GITHUB_OUTPUT
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.x'
+
+      - name: Verify committed release provenance before tagging
+        run: node scripts/generate-provenance.mjs --check
+
       - name: Check if tag exists
         id: check-tag
         run: |

@@ -11,11 +11,12 @@ permissions:
 
 jobs:
   validate:
-    name: Run validators (Node ${{ matrix.node-version }})
-    runs-on: ubuntu-latest
+    name: Run validators (${{ matrix.os }}, Node ${{ matrix.node-version }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest]
         node-version: ['18.x', '20.19.x']
     steps:
       - uses: actions/checkout@v4
@@ -29,6 +30,9 @@ jobs:
 
       - name: Run validators
         run: npm run validate
+
+      - name: Check release provenance
+        run: npm run provenance:check
 
       - name: Run tests
         run: npm test
