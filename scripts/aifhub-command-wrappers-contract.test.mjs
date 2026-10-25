@@ -189,6 +189,10 @@ async function copyInstalledCommandLayout(userProjectDir) {
     path.join(REPO_ROOT, 'commands', 'post-update-init.mjs'),
     path.join(extensionDir, 'commands', 'post-update-init.mjs')
   );
+  await copyFile(
+    path.join(REPO_ROOT, 'scripts', 'execution-provenance.mjs'),
+    path.join(extensionDir, 'scripts', 'execution-provenance.mjs')
+  );
 
   for (const command of WRAPPER_COMMANDS) {
     await copyFile(
