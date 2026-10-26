@@ -17,12 +17,17 @@ const projectLock = '.ai-factory/state/execution-write.lock';
 
 async function identity(store) {
   async function git(args) {
-    try { return (await exec('git', args, { cwd: store.root, windowsHide: true, maxBuffer: 2 * 1024 * 1024 })).stdout.trim(); }
+    try { return (await exec('git', args, { cwd: store.root, windowsHide: true, maxBuffer: 2 * 1024 * 1024 })).stdout; }
     catch { throw new WorkflowError('git-unavailable'); }
   }
-  requireValue(await realpath(await git(['rev-parse', '--show-toplevel'])) === store.root, 'project-root-required');
-  return { root: store.root, common: await realpath(path.resolve(store.root, await git(['rev-parse', '--git-common-dir']))),
-    git_dir: await realpath(await git(['rev-parse', '--absolute-git-dir'])) };
+  const lines = (await git(['rev-parse', '--show-toplevel', '--absolute-git-dir', '--git-common-dir']))
+    .replace(/\r?\n$/, '').split(/\r?\n/);
+  requireValue(lines.length === 3 && lines.every(line => line.length > 0 && !/[\r\0]/.test(line))
+    && path.isAbsolute(lines[0]) && path.isAbsolute(lines[1]), 'invalid-git-identity');
+  const [top, gitDir, commonDir] = lines;
+  requireValue(await realpath(top) === store.root, 'project-root-required');
+  return { root: store.root, common: await realpath(path.resolve(store.root, commonDir)),
+    git_dir: await realpath(gitDir) };
 }
 function separateRoots(a, b) {
   const rel = path.relative(a.toLowerCase(), b.toLowerCase());
