@@ -6,6 +6,19 @@
 
 ## [В разработке]
 
+## [1.8.0] - 2026-10-25
+
+### Добавлено
+- Recursive submodule snapshots для serial execution одного checkout (#229): root-relative leaf inventory, отдельные HEAD/branch/index, parent gitlink и repository administration identity; initialized gitfile и old-form modules поддерживаются рекурсивно. Исходное расхождение module HEAD и parent gitlink допускается с независимым pinning. Physical submodule worktrees как isolation workers остаются unsupported.
+- Read-only `aifhub-execution diagnostics` с input `{}`: declared version, фактические SHA256 пяти execution modules и diagnostics host, per-file mismatches, capability probe и Git availability. Release `provenance.json`, генератор и проверка в CI/release отличают exact release от local modifications и unknown baseline; baseline 1.7.1 встроена отдельно.
+- Preserve-handoff при update: modified/unknown helper files сохраняются до замены в `.ai-factory/state/extension-updates/<utc-ts>/preserve/`, `diff-manifest.json` фиксирует installed/incoming hashes, stderr возвращает review/migrate instructions. `AIFHUB_UPDATE_STRICT=1` устанавливает nonzero после update. Bootstrap-ограничение: guard защищает обновления ИЗ этого релиза; первый переход со старой версии требует ручного consumer audit.
+
+### Исправлено
+- Git entries mode 160000 больше не читаются как обычные files; missing/uninitialized modules, unresolved gitlink stages, unsafe administration и filesystem aliases блокируются. Metadata drift блокирует resume/checkpoint без изменения historical receipts и существующих isolation invariants.
+
+### Изменено
+- Документированы recursive snapshot semantics, provenance diagnostics и update migration; CI matrix расширена `windows-latest` с сохранением Node 18.x / 20.19.x.
+
 ## [1.7.1] - 2026-09-18
 
 ### Добавлено
