@@ -69,11 +69,13 @@ test('invalid manifest version, duplicate or malformed entries cannot supply a c
     assert.equal((await helperDiagnostics({ rootDir: root })).implementation, 'unknown');
   }
 });
-test('missing or syntax-broken probe exports degrade safely even against an exact manifest', async t => {
+test('capability follows the exact manifest without executing the audited runtime', async t => {
+  // The manifest is the only capability source: even files a probe could not import stay
+  // 'yes' when their bytes match the shipped release, and nothing is evaluated during a scan.
   for (const source of ['export const oldStore = true;\n', 'export const = syntax error\n']) {
     const root = await installation(t); await writeFile(path.join(root, HELPER_MODULES[0]), source);
     await generateProvenance({ rootDir: root });
-    assert.equal((await helperDiagnostics({ rootDir: root })).capabilities[0].support, 'unknown');
+    assert.equal((await helperDiagnostics({ rootDir: root })).capabilities[0].support, 'yes');
   }
 });
 test('independent CLI diagnoses partially replaced runtime with JSON and empty stderr', async t => {

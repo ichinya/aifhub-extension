@@ -203,7 +203,8 @@ export async function worktree(store, scopes = [], projections = {}) {
       git(cwd, ['ls-files', '--stage', '-z']), includeFiles ? git(cwd, ['ls-files', '--cached', '--others', '--exclude-standard', '-z']) : Buffer.alloc(0),
     ]);
     const entries = stages.toString('utf8').split('\0').filter(Boolean).map(row => {
-      const match = /^(\d{6}) ([a-f0-9]{40,64}) ([0-3])\t(.+)$/.exec(row);
+      // The `s` flag keeps Unicode line-separator names (accepted by portablePath) parseable.
+    const match = /^(\d{6}) ([a-f0-9]{40,64}) ([0-3])\t(.+)$/s.exec(row);
       requireValue(match, 'invalid-git-index');
       return { mode: match[1], oid: match[2], stage: match[3], name: portablePath(match[4]) };
     });

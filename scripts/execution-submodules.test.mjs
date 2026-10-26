@@ -223,6 +223,14 @@ test('scoped file budget is aggregate across scopes, not per inventory call', as
   await bulk('bulk-b', 10000, 10001);
   await fails(worktree(store, ['bulk-a', 'bulk-b']), 'too-many-files');
 });
+test('tracked names with Unicode line-separator characters survive index parsing', async t => {
+  const p = await project(t), name = 'api/a\u2028b.txt';
+  await p.put(name, 'separator name\n');
+  await p.moduleGit('api', 'add', 'a\u2028b.txt'); await commit(path.join(p.root, 'api'));
+  await p.call('start', p.start({ scope: [name] }));
+  const run = await p.run();
+  assert.ok(Object.hasOwn(run.initial_worktree.files, name));
+});
 test('snapshot validation accepts old records and rejects malformed module metadata and checkpoint erasure', async t => {
   const p = await project(t); await p.call('start', p.start()); const run = await p.run();
   const plain = { head: run.initial_worktree.head, branch: run.initial_worktree.branch, index: run.initial_worktree.index, files: {} };

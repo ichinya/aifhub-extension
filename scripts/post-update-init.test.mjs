@@ -55,6 +55,18 @@ it('clean helper installation creates no preserve state or modification handoff'
   assert.equal(f.stderr.length, 0); assert.equal(f.calls.length, 1);
 });
 
+it('update failure after preservation still hands off preserved copies on process exit', async () => {
+  const f = await fixture(), installed = await helperInstallation(f), relative = HELPER_MODULES[0];
+  const patch = '// installed helper repair\n';
+  await writeFile(path.join(installed, relative), patch);
+  const action = f.action('global'); await f.pre(action);
+  const before = await preservedManifest(f);
+  f.exit(); // Commander skips postAction when the update action itself throws.
+  assert.match(f.stderr.join(''), /update failed after helper preservation/);
+  assert.equal(await readFile(path.join(before.directory, 'preserve', relative), 'utf8'), patch);
+  assert.equal(f.calls.length, 0);
+});
+
 it('unknown baseline conservatively preserves every existing helper module', async () => {
   const f = await fixture(), installed = await helperInstallation(f);
   await writeFile(path.join(installed, 'extension.json'), JSON.stringify({ version: '9.9.9' }));
@@ -109,10 +121,11 @@ async function fixture(options = {}) {
   await writeFile(path.join(root, '.ai-factory.json'), JSON.stringify({ extensions: [{ name: 'aifhub-extension' }] }));
   const hooks = { preAction: [], postAction: [] };
   const program = { hook(name, callback) { hooks[name].push(callback); return this; } };
-  const stdout = [], stderr = [], calls = [];
+  const stdout = [], stderr = [], calls = [], exitHandlers = [];
   const processLike = {
     cwd: () => root, execPath: process.execPath, env: { ...process.env, AIFHUB_UPDATE_STRICT: '' }, exitCode: undefined,
-    stdout: { write: (text) => stdout.push(text) }, stderr: { write: (text) => stderr.push(text) }
+    stdout: { write: (text) => stdout.push(text) }, stderr: { write: (text) => stderr.push(text) },
+    once(type, handler) { if (type === 'exit') exitHandlers.push(handler); return this; }
   };
   const moduleUrl = pathToFileURL(path.join(installed, 'commands/aifhub-mode.mjs')).href;
   const run = options.realChild ? {} : { runInstalledScript: async (...args) => { calls.push(args); return options.exitCode ?? 0; } };
@@ -126,7 +139,8 @@ async function fixture(options = {}) {
     }),
     pre: async (action) => { for (const hook of hooks.preAction) await hook(program, action); },
     post: async (action) => { for (const hook of hooks.postAction) await hook(program, action); },
-    refresh: () => writeFile(script, '// Updated implementation with a different revision\n')
+    refresh: () => writeFile(script, '// Updated implementation with a different revision\n'),
+    exit: () => { for (const handler of exitHandlers.splice(0)) handler(); }
   };
 }
 

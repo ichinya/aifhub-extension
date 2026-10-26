@@ -25,6 +25,12 @@ export function registerPostUpdateInit(program, moduleUrl, options = {}) {
       try {
         const preservation = await preserveHelper(rootDir);
         pending.set(action, { rootDir, before, preservation });
+        // Commander skips postAction when the update action itself throws; the exit
+        // fallback is the last chance to hand off preserved copies for review.
+        processLike.once?.('exit', () => {
+          if (!pending.get(action)) return;
+          processLike.stderr.write('AIFHub: update failed after helper preservation; preserved copies and diff-manifest.json remain under .ai-factory/state/extension-updates. Review them before retrying.\n');
+        });
       } catch {
         processLike.exitCode = 1;
         throw new Error('AIFHub: helper preservation failed; update stopped before replacement. Review .ai-factory/state/extension-updates and retry.');

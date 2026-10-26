@@ -50,17 +50,14 @@ export async function helperDiagnostics({ rootDir = helperRoot } = {}) {
   const mismatches = baseline.expected ? modules.filter(m => Object.hasOwn(baseline.expected, m.path) && m.sha256 !== baseline.expected[m.path])
     .map(m => ({ path: m.path, expected_sha256: baseline.expected[m.path], actual_sha256: m.sha256 })) : [];
   let support = 'unknown';
-  try {
-    // The callable export and an exact manifest entry are evidence, never a source-text grep.
-    const store = modules[0];
-    if (baseline.source === 'manifest' && store.sha256 === baseline.expected[store.path] &&
-        typeof (await import(pathToFileURL(path.join(rootDir, store.path)).href)).sameRevision === 'function') support = 'yes';
-  } catch { /* Missing exports and syntax errors are unknown capability, not a scanner failure. */ }
+  // Capability is attested by the shipped release manifest alone: importing the audited
+  // runtime from a read-only scanner would execute whatever a regenerated manifest vouches for.
+  if (baseline.source === 'manifest' && mismatches.length === 0) support = 'yes';
   let git = { available: false, version: null };
   try {
     const { stdout } = await exec('git', ['--version'], { encoding: 'utf8', timeout: 3000, maxBuffer: 4096, windowsHide: true });
     const version = stdout.trim();
-    if (/^git version [\w.+()-]+$/.test(version)) git = { available: true, version };
+    if (/^git version [\w.+() -]+$/.test(version)) git = { available: true, version };
   } catch { /* Git is optional for read-only installed-byte diagnostics. */ }
   return {
     schema: 'aifhub.execution_helper_provenance.v1', declared_version: baseline.version, modules,
