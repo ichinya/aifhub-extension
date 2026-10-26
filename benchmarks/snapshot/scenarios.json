@@ -1,0 +1,866 @@
+{
+  "schema": "aifhub.snapshot.ab_scenario_catalog.v1",
+  "revision": 1,
+  "generator_revision": "snapshot-fixture-1",
+  "seed": 237,
+  "order_seed": 237,
+  "profiles": [
+    "process-cold",
+    "process-warm",
+    "diagnostic"
+  ],
+  "repeats": 10,
+  "warmups": 2,
+  "os_cache": "uncontrolled",
+  "limits": {
+    "concurrency": 1,
+    "file_bytes": 16777216,
+    "scoped_leaves": 10000,
+    "total_names": 20000
+  },
+  "privacy_canaries": [
+    "SNAPSHOT_PRIVATE_CANARY_237",
+    "/private/consumer-secret"
+  ],
+  "no_promote": true,
+  "scenarios": [
+    {
+      "id": "W-m0-l100-exact",
+      "family": "W",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "W-m0-l100-directory",
+      "family": "W",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "directory",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "W-m0-l981-exact",
+      "family": "W",
+      "modules": 0,
+      "leaves": 981,
+      "scope": "exact",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "W-m0-l981-directory",
+      "family": "W",
+      "modules": 0,
+      "leaves": 981,
+      "scope": "directory",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "W-m0-l4000-exact",
+      "family": "W",
+      "modules": 0,
+      "leaves": 4000,
+      "scope": "exact",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "W-m0-l4000-directory",
+      "family": "W",
+      "modules": 0,
+      "leaves": 4000,
+      "scope": "directory",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "W-m2-l100-exact",
+      "family": "W",
+      "modules": 2,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "W-m2-l100-directory",
+      "family": "W",
+      "modules": 2,
+      "leaves": 100,
+      "scope": "directory",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "W-m2-l981-exact",
+      "family": "W",
+      "modules": 2,
+      "leaves": 981,
+      "scope": "exact",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "W-m2-l981-directory",
+      "family": "W",
+      "modules": 2,
+      "leaves": 981,
+      "scope": "directory",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "W-m2-l4000-exact",
+      "family": "W",
+      "modules": 2,
+      "leaves": 4000,
+      "scope": "exact",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "W-m2-l4000-directory",
+      "family": "W",
+      "modules": 2,
+      "leaves": 4000,
+      "scope": "directory",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "W-m8-l100-exact",
+      "family": "W",
+      "modules": 8,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "W-m8-l100-directory",
+      "family": "W",
+      "modules": 8,
+      "leaves": 100,
+      "scope": "directory",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "W-m8-l981-exact",
+      "family": "W",
+      "modules": 8,
+      "leaves": 981,
+      "scope": "exact",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "W-m8-l981-directory",
+      "family": "W",
+      "modules": 8,
+      "leaves": 981,
+      "scope": "directory",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "W-m8-l4000-exact",
+      "family": "W",
+      "modules": 8,
+      "leaves": 4000,
+      "scope": "exact",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "W-m8-l4000-directory",
+      "family": "W",
+      "modules": 8,
+      "leaves": 4000,
+      "scope": "directory",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "W-m16-l100-exact",
+      "family": "W",
+      "modules": 16,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "W-m16-l100-directory",
+      "family": "W",
+      "modules": 16,
+      "leaves": 100,
+      "scope": "directory",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "W-m16-l981-exact",
+      "family": "W",
+      "modules": 16,
+      "leaves": 981,
+      "scope": "exact",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "W-m16-l981-directory",
+      "family": "W",
+      "modules": 16,
+      "leaves": 981,
+      "scope": "directory",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "W-m16-l4000-exact",
+      "family": "W",
+      "modules": 16,
+      "leaves": 4000,
+      "scope": "exact",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "W-m16-l4000-directory",
+      "family": "W",
+      "modules": 16,
+      "leaves": 4000,
+      "scope": "directory",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "S-m0-l100-lifecycle",
+      "family": "S",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "lifecycle",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "S-m0-l100-result-replay",
+      "family": "S",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "result-replay",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "S-m0-l100-accept-replay",
+      "family": "S",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "accept-replay",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "S-m8-l981-lifecycle",
+      "family": "S",
+      "modules": 8,
+      "leaves": 981,
+      "scope": "exact",
+      "content": "small",
+      "operation": "lifecycle",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "S-m8-l981-result-replay",
+      "family": "S",
+      "modules": 8,
+      "leaves": 981,
+      "scope": "exact",
+      "content": "small",
+      "operation": "result-replay",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "S-m8-l981-accept-replay",
+      "family": "S",
+      "modules": 8,
+      "leaves": 981,
+      "scope": "exact",
+      "content": "small",
+      "operation": "accept-replay",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "S-m16-l4000-lifecycle",
+      "family": "S",
+      "modules": 16,
+      "leaves": 4000,
+      "scope": "exact",
+      "content": "small",
+      "operation": "lifecycle",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "S-m16-l4000-result-replay",
+      "family": "S",
+      "modules": 16,
+      "leaves": 4000,
+      "scope": "exact",
+      "content": "small",
+      "operation": "result-replay",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "S-m16-l4000-accept-replay",
+      "family": "S",
+      "modules": 16,
+      "leaves": 4000,
+      "scope": "exact",
+      "content": "small",
+      "operation": "accept-replay",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "B-k3-123",
+      "family": "B",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "lifecycle",
+      "variant": "normal",
+      "order": [
+        1,
+        2,
+        3
+      ],
+      "expected_codes": []
+    },
+    {
+      "id": "B-k3-321",
+      "family": "B",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "lifecycle",
+      "variant": "normal",
+      "order": [
+        3,
+        2,
+        1
+      ],
+      "expected_codes": []
+    },
+    {
+      "id": "B-k3-replay",
+      "family": "B",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "replay",
+      "variant": "normal",
+      "order": [
+        1,
+        2,
+        3
+      ],
+      "expected_codes": []
+    },
+    {
+      "id": "I-w2-preflight",
+      "family": "I",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "preflight",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "H-c1-small",
+      "family": "H",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "start",
+      "variant": "normal",
+      "changes": 1,
+      "history": "small",
+      "expected_codes": []
+    },
+    {
+      "id": "H-c1-large",
+      "family": "H",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "start",
+      "variant": "normal",
+      "changes": 1,
+      "history": "large",
+      "expected_codes": []
+    },
+    {
+      "id": "H-c20-small",
+      "family": "H",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "start",
+      "variant": "normal",
+      "changes": 20,
+      "history": "small",
+      "expected_codes": []
+    },
+    {
+      "id": "H-c20-large",
+      "family": "H",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "start",
+      "variant": "normal",
+      "changes": 20,
+      "history": "large",
+      "expected_codes": []
+    },
+    {
+      "id": "F-normal",
+      "family": "F",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "directory",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "F-linked",
+      "family": "F",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "directory",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "linked",
+      "expected_codes": []
+    },
+    {
+      "id": "F-detached",
+      "family": "F",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "directory",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "detached",
+      "expected_codes": []
+    },
+    {
+      "id": "F-old-form",
+      "family": "F",
+      "modules": 4,
+      "leaves": 100,
+      "scope": "directory",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "old-form",
+      "expected_codes": []
+    },
+    {
+      "id": "F-gitfile",
+      "family": "F",
+      "modules": 4,
+      "leaves": 100,
+      "scope": "directory",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "gitfile",
+      "expected_codes": []
+    },
+    {
+      "id": "F-divergent",
+      "family": "F",
+      "modules": 4,
+      "leaves": 100,
+      "scope": "directory",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "divergent",
+      "expected_codes": []
+    },
+    {
+      "id": "N-bytes",
+      "family": "N",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "negative",
+      "variant": "bytes",
+      "expected_codes": [
+        "stale-checkpoint"
+      ]
+    },
+    {
+      "id": "N-ignored",
+      "family": "N",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "negative",
+      "variant": "ignored",
+      "expected_codes": [
+        "stale-checkpoint"
+      ]
+    },
+    {
+      "id": "N-mode",
+      "family": "N",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "negative",
+      "variant": "mode",
+      "expected_codes": [
+        "stale-checkpoint"
+      ]
+    },
+    {
+      "id": "N-scope",
+      "family": "N",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "negative",
+      "variant": "scope",
+      "expected_codes": [
+        "outside-scope"
+      ]
+    },
+    {
+      "id": "N-metadata",
+      "family": "N",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "negative",
+      "variant": "metadata",
+      "expected_codes": [
+        "stale-revision"
+      ]
+    },
+    {
+      "id": "N-metadata-during-read",
+      "family": "N",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "negative",
+      "variant": "metadata-during-read",
+      "expected_codes": [
+        "stale-revision"
+      ]
+    },
+    {
+      "id": "N-identity-replacement",
+      "family": "N",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "negative",
+      "variant": "identity-replacement",
+      "expected_codes": [
+        "file-changed"
+      ],
+      "baseline_gap": true
+    },
+    {
+      "id": "N-hardlink",
+      "family": "N",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "negative",
+      "variant": "hardlink",
+      "expected_codes": [
+        "unsafe-filesystem-entry"
+      ]
+    },
+    {
+      "id": "N-symlink",
+      "family": "N",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "negative",
+      "variant": "symlink",
+      "expected_codes": [
+        "unsafe-filesystem-entry"
+      ]
+    },
+    {
+      "id": "N-oversize",
+      "family": "N",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "negative",
+      "variant": "oversize",
+      "expected_codes": [
+        "unsupported-file"
+      ]
+    },
+    {
+      "id": "N-size-boundary",
+      "family": "N",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "negative",
+      "variant": "size-boundary",
+      "expected_codes": []
+    },
+    {
+      "id": "N-count",
+      "family": "N",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "negative",
+      "variant": "count",
+      "expected_codes": [
+        "too-many-files"
+      ]
+    },
+    {
+      "id": "N-interrupted",
+      "family": "N",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "negative",
+      "variant": "interrupted",
+      "expected_codes": []
+    },
+    {
+      "id": "W-io-heavy",
+      "family": "W",
+      "modules": 8,
+      "leaves": 981,
+      "scope": "directory",
+      "content": "io-heavy",
+      "operation": "snapshot",
+      "variant": "normal",
+      "expected_codes": []
+    },
+    {
+      "id": "F-eol",
+      "family": "F",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "directory",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "eol",
+      "expected_codes": []
+    },
+    {
+      "id": "F-filter",
+      "family": "F",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "directory",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "filter",
+      "expected_codes": []
+    },
+    {
+      "id": "W-tracked-dirty",
+      "family": "W",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "directory",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "tracked-dirty",
+      "expected_codes": []
+    },
+    {
+      "id": "W-untracked",
+      "family": "W",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "directory",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "untracked",
+      "expected_codes": []
+    },
+    {
+      "id": "W-ignored-in-scope",
+      "family": "W",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "directory",
+      "content": "small",
+      "operation": "snapshot",
+      "variant": "ignored-in-scope",
+      "expected_codes": []
+    },
+    {
+      "id": "S-creation",
+      "family": "S",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "lifecycle",
+      "variant": "creation",
+      "expected_codes": []
+    },
+    {
+      "id": "S-deletion",
+      "family": "S",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "lifecycle",
+      "variant": "deletion",
+      "expected_codes": []
+    },
+    {
+      "id": "N-junction",
+      "family": "N",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "negative",
+      "variant": "junction",
+      "expected_codes": [
+        "unsafe-filesystem-entry"
+      ]
+    },
+    {
+      "id": "H-c1-active",
+      "family": "H",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "start",
+      "variant": "normal",
+      "changes": 1,
+      "history": "small",
+      "active_runs": 1,
+      "expected_codes": []
+    },
+    {
+      "id": "H-c20-active",
+      "family": "H",
+      "modules": 0,
+      "leaves": 100,
+      "scope": "exact",
+      "content": "small",
+      "operation": "start",
+      "variant": "normal",
+      "changes": 20,
+      "history": "small",
+      "active_runs": 1,
+      "expected_codes": []
+    }
+  ],
+  "arms": [],
+  "generator_digest": "09a43d008422001a7ad8ed30efe1af21e423e9127b47ffaa6b3b53584af6deb0",
+  "catalog_digest": "ddc39af96d539ffdf35eae9be38bcd1dd59c2083846f7737f4958a50df8771c4"
+}
