@@ -81,7 +81,8 @@ export async function storeFor(rootDir = process.cwd()) {
       const matches = info => info.isFile() && !info.isSymbolicLink() && info.nlink === 1n
         && info.dev === before.dev && info.ino === before.ino;
       requireValue(typeof before.dev === 'bigint' && typeof before.ino === 'bigint' && before.ino > 0n, 'unsupported-file-identity');
-      requireValue(matches(await lstat(filename, { bigint: true })), 'file-changed', true);
+      const opened = await lstat(filename, { bigint: true }).catch(e => { if (e.code === 'ENOENT') return null; throw e; });
+      requireValue(opened && matches(opened), 'file-changed', true);
       const buffer = Buffer.alloc(Number(before.size) + 1);
       let length = 0;
       while (length < buffer.length) {
@@ -94,10 +95,10 @@ export async function storeFor(rootDir = process.cwd()) {
       requireValue(after.isFile() && after.nlink === 1n && before.dev === after.dev && before.ino === after.ino
         && BigInt(length) === before.size && before.size === after.size && before.mtimeNs === after.mtimeNs
         && before.ctimeNs === after.ctimeNs && before.mode === after.mode, 'file-changed', true);
-      const named = await lstat(await revalidate(), { bigint: true });
-      requireValue(matches(named) && named.size === after.size && named.mode === after.mode
+      const named = await lstat(await revalidate(), { bigint: true }).catch(e => { if (e.code === 'ENOENT') return null; throw e; });
+      requireValue(named && matches(named) && named.size === after.size && named.mode === after.mode
         && named.mtimeNs === after.mtimeNs && named.ctimeNs === after.ctimeNs, 'file-changed', true);
-      return { data, mode: Number(before.mode & 0o111n) };
+      return { data, mode: Number(before.mode & 0o111n), permissions: Number(before.mode & 0o777n) };
     } finally { await file.close(); }
   }
   async function bytes(relative) { return (await readLeaf(relative))?.data ?? null; }
@@ -207,7 +208,9 @@ export async function worktree(store, scopes = [], projections = {}) {
     }
     const identity = (await git(cwd, ['rev-parse', '--show-toplevel', '--absolute-git-dir', '--git-common-dir', 'HEAD', '--abbrev-ref', 'HEAD'])).toString('utf8').replace(/\r?\n$/, '').split(/\r?\n/);
     requireValue(identity.length === 5 && identity.every(line => line.length > 0 && !/[\r\0]/.test(line))
-      && path.isAbsolute(identity[0]) && path.isAbsolute(identity[1]) && /^[a-f0-9]{40,64}$/.test(identity[3]) && !/\s/.test(identity[4]), 'invalid-git-identity');
+      && path.isAbsolute(identity[0]) && path.isAbsolute(identity[1]) && /^[a-f0-9]{40,64}$/.test(identity[3])
+      // Git ref names permit Unicode letters such as U+00A0; forbid only what git itself rejects.
+      && !/[\x00-\x20\x7f~^:?*[\\]/.test(identity[4]), 'invalid-git-identity');
     const [top, gitDirPath, commonDirPath, head, branch] = identity;
     requireValue(await realpath(top) === cwd, prefix ? 'unsafe-submodule' : 'project-root-required');
     const gitDir = path.resolve(cwd, gitDirPath), commonDir = path.resolve(cwd, commonDirPath);

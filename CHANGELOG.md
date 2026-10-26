@@ -12,8 +12,10 @@
 - Offline snapshot cost matrix (#237): `benchmark:snapshot`, deterministic W/S/B/I/H/F/N fixtures с точным leaf count, закрытые catalog/results schemas, pinned commit/module hashes, отдельные cold/warm и diagnostic profiles, Trace2/fs counters, raw latency samples и median/IQR. Safety/equivalence/privacy gates сохраняют PASS/FAIL/NOTRUN и `no_promote=true`; измеренное ускорение публикуется только после запуска сопоставимых arms.
 
 ### Изменено
-- Snapshot перечисляет bounded scope names без раннего content read и читает каждый уникальный leaf один раз. Bytes и executable mode получаются из одного fd с before/after checks, bigint pathname/fd identity и повторной проверкой компонентов пути; projections и persistent snapshot digest-контракт сохраняются.
+- Snapshot перечисляет bounded scope names без раннего content read и читает каждый уникальный leaf один раз. Bytes и executable mode получаются из одного fd с before/after checks, bigint pathname/fd identity и повторной проверкой компонентов пути; projections и persistent snapshot digest-контракт сохраняются. Isolation transfer images читаются тем же fd-bound примитивом.
 - Root common dir берётся из первого combined inspect, isolation identity объединяет три rev-parse в один, normal start повторно использует admission source до final fresh resolution. Полный Git re-inspect, replay freshness, catalogue lineage и prepared recovery сохраняются.
+- Combined identity принимает все git-допустимые символы branch names (включая Unicode whitespace) и отвергает только git-запрещённые. Leaf, удалённый между open и проверками, классифицируется как blocked `file-changed`, а не сырая fs-ошибка.
+- Snapshot требует файловую систему с inode numbers (dev/ino identity binding): ФС без inode (FAT32/exFAT, часть SMB) дают fail-closed `unsupported-file-identity`.
 - Release provenance обновлён для helper bytes версии 1.8.1.
 
 ## [1.8.0] - 2026-10-25

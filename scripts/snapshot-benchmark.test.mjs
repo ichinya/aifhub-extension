@@ -99,7 +99,7 @@ test('matrix retains NOTRUN-sandbox rows when fixture Git is unavailable', async
   const arms = ['A0', 'A-first'].map(name => ({ name, root: path.resolve('.'), identity }));
   // A fixture probe is allowed only in owned temporary space. A working host exercises the full fixture below instead.
   try { const fixture = await createFixture(catalog.scenarios[0]); await fixture.cleanup(); return t.skip('Git available; sandbox-only branch not applicable'); }
-  catch (e) { if (e.code !== 'EPERM') throw e; }
+  catch (e) { if (e.code !== 'EPERM' && e.code !== 'ENOENT') throw e; }
   const result = await runMatrix({ arms, catalog, selected: [catalog.scenarios[0].id] });
   assert.equal(result.status, 'NOTRUN'); assert.equal(result.rows.length, 42);
   assert.ok(result.rows.every(r => r.wall_ms === null && r.code === 'NOTRUN-sandbox'));

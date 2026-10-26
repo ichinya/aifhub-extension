@@ -22,6 +22,22 @@ for (const shape of ['missing', 'extra', 'blank', 'trailing-blank', 'invalid-hea
   const api = await helperWithGit('workflow-state-store.mjs', async () => ({ stdout: Buffer.from(lines.join('\n') + (shape === 'trailing-blank' ? '\n\n' : '\n')) }));
   await assert.rejects(api.worktree(await api.storeFor(p.root)), { code: 'invalid-git-identity' });
 });
+test('branch names with git-permitted Unicode whitespace are accepted', async t => {
+  const p = await fakeRepository(t);
+  const api = await helperWithGit('workflow-state-store.mjs', async (cmd, args) => {
+    if (args[0] !== 'rev-parse') return p.git(cmd, args);
+    return { stdout: Buffer.from(`${p.root}\n${path.join(p.root, '.git')}\n.git\n${p.head}\nfeature/a\u00A0b\n`) };
+  });
+  const tree = await api.worktree(await api.storeFor(p.root));
+  assert.equal(tree.branch, 'feature/a\u00A0b');
+});
+test('branch names with git-forbidden characters are rejected', async t => {
+  for (const branch of ['feature/a b', 'feature/a~b', 'feature/a:b']) {
+    const p = await fakeRepository(t);
+    const api = await helperWithGit('workflow-state-store.mjs', async () => ({ stdout: Buffer.from(`${p.root}\n${path.join(p.root, '.git')}\n.git\n${p.head}\n${branch}\n`) }));
+    await assert.rejects(api.worktree(await api.storeFor(p.root)), { code: 'invalid-git-identity' });
+  }
+});
 test('root identity mismatch remains blocked', async t => {
   const p = await fakeRepository(t), api = await helperWithGit('workflow-state-store.mjs', async () => ({ stdout: Buffer.from(`${path.dirname(p.root)}\n${path.join(p.root, '.git')}\n.git\n${p.head}\nmain\n`) }));
   await assert.rejects(api.worktree(await api.storeFor(p.root)), { code: 'project-root-required' });

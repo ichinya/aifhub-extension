@@ -163,11 +163,11 @@ async function workerRecord(record, assignment, execute, initial = false) {
   return { store, run };
 }
 async function readImage(store, filename) {
-  const data = await store.bytes(filename);
-  if (data === null) return null;
-  requireValue(data.length <= 4.5 * 1024 * 1024, 'transfer-too-large');
-  const info = await lstat(await store.target(filename));
-  return { data: data.toString('base64'), mode: info.mode & 0o777 };
+  // One fd-bound acquisition: data and permission bits come from the same verified inode.
+  const leaf = await store.readLeaf(filename);
+  if (leaf === null) return null;
+  requireValue(leaf.data.length <= 4.5 * 1024 * 1024, 'transfer-too-large');
+  return { data: leaf.data.toString('base64'), mode: leaf.permissions };
 }
 async function save(store, record) {
   const state = isolationState(record);
