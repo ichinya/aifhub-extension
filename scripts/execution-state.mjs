@@ -162,13 +162,15 @@ export async function executionCommand(action,input,options={}) {
       if(h.source)requireValue(same(h.source.source,sourceRecord(preflight.source)),'state-source-collision',true);
       const all=await catalogue(store); requireValue(all.length<1000,'execution-catalogue-full',true);
       requireValue(!all.some(r=>reserves(r) && r.scope.some(a=>preflight.scope.some(b=>overlap(a,b)))),'scope-reserved',true);
-      const selected=await resolveExecutionSource(store,change,input.role,preflight.extra);
-      requireValue(!selected.delegated && same(sourceRecord(selected),sourceRecord(preflight.source)) && selected.context.digest===preflight.source.context.digest,'stale-admission',true);
+      const selected=preflight.source;
       await validateExecutionScope(store,preflight.scope,selected,action==='batch-start');
       if(preflight.refs)requireValue(same(await refs(store,input.preflight_paths),preflight.refs),'stale-preflight',true);
       const snapshot=await worktree(store,preflight.scope,selected.projections), timestamp=now();
       const finalSource=await resolveExecutionSource(store,change,input.role,preflight.extra);
       requireValue(!finalSource.delegated && finalSource.context.digest===selected.context.digest && finalSource.namespace_digest===selected.namespace_digest,'stale-admission',true);
+      if(action==='batch-start')for(const item of input.manifest)selectExecutionTask(finalSource,item.task_id,input.role,preflight.extra);
+      else selectExecutionTask(finalSource,input.task_id,input.role,preflight.extra);
+      await validateExecutionScope(store,preflight.scope,finalSource,action==='batch-start');
       run={schema:RUN_SCHEMA,kind:action==='start'?'single':'batch',change_id:change,run_id:id,task_id:input.task_id??null,
         owner:input.owner,worker:input.worker,role:input.role,scope:preflight.scope,context_paths:preflight.extra,
         version:1,status:'started',lifecycle:'active',execution_state:'running',source:sourceRecord(selected),context:selected.context,
