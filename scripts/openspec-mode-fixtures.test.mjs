@@ -188,7 +188,7 @@ describe('OpenSpec Node compatibility and CI matrix', () => {
   it('keeps new OpenSpec integration tests under the npm test glob', async () => {
     const packageJson = JSON.parse(await readFile(path.join(REPO_ROOT, 'package.json'), 'utf8'));
 
-    assert.match(packageJson.scripts.test, /node --test scripts\/\*\.test\.mjs/);
+    assert.match(packageJson.scripts.test, /node scripts\/run-tests\.mjs/);
     assert.equal(await pathExists(path.join(REPO_ROOT, 'scripts', 'openspec-mode-fixtures.test.mjs')), true);
     assert.equal(await pathExists(path.join(REPO_ROOT, 'scripts', 'openspec-v1-integration.test.mjs')), true);
   });

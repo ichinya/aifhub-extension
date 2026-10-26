@@ -883,7 +883,7 @@ describe('AI Factory 2.18/2.19 consumer compatibility smoke', () => {
 
   it('keeps the live driver outside the default glob and exposes it only via the opt-in package script', async () => {
     const packageJson = await readJson(path.join(REPO_ROOT, 'package.json'));
-    assert.equal(packageJson.scripts.test, 'node --test scripts/*.test.mjs');
+    assert.equal(packageJson.scripts.test, 'node scripts/run-tests.mjs');
     assert.equal(
       packageJson.scripts['smoke:ai-factory-2-18'],
       'node scripts/ai-factory-2-18-live-smoke.mjs'
