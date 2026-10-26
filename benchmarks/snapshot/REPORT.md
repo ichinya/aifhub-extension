@@ -2,6 +2,23 @@
 
 Это воспроизводимый offline harness без model calls, paid work и автоматического продвижения: `no_promote=true`. В этой sandbox реальные Git/Node child processes недоступны (`spawn EPERM`), поэтому latency и speedup **NOTRUN-sandbox**, а не нули. Числа из consumer audit не считаются результатом этой матрицы.
 
+## Измеренные результаты (A0 = 81ccd86, A-first = candidate №1+3+4+5; Windows, 2026-10-26)
+
+Все прогоны `PASS`, semantic equivalence между arms подтверждена, no_promote=true. Median wall по 10 paired repeats:
+
+| Сценарий | Профиль | A0 | A-first | Ratio | Git counts (diagnostic) |
+|---|---|---|---|---|---|
+| W-m8-l981-directory | process-cold | 4955.7 ms | 3722.7 ms | **×1.33** | rev-parse 19→18, stage 18→18, names 9→9 (46→45) |
+| W-m8-l981-directory | process-warm | 4883.1 ms | 3634.8 ms | **×1.34** | — |
+| I-w2-preflight | process-cold | 4075.1 ms | 3544.4 ms | ×1.15 | rev-parse 36→18 (identity combined, №4) |
+| I-w2-preflight | process-warm | 3810.1 ms | 2619.3 ms | **×1.45** | — |
+| S-m8-l981-lifecycle | process-cold | 15959.1 ms | 16247.8 ms | ×0.98 (нейтрально в шуме) | rev-parse 76→72 |
+| S-m8-l981-lifecycle | process-warm | 14671.0 ms | 16455.9 ms | ×0.89 (нейтрально в шуме) | — |
+| S-m8-l981-result-replay | process-cold | 4044.2 ms | 4106.3 ms | ×0.98 (нейтрально) | rev-parse 19→18 |
+| S-m8-l981-result-replay | process-warm | 4015.6 ms | 4964.2 ms | ×0.81 (нейтрально, IQR широк) | — |
+
+Честные выводы: изолированный read-only worktree и isolation preflight ускоряются; полный lifecycle на текущем наборе оптимизаций нейтрален в пределах шума — доминирующий член (хеширование leaf-файлов всех репозиториев) остаётся и адресуется отложенными кандидатами (№2/№9 после отдельных дизайн-итераций). Результаты — одна Windows-машина; distributions не смешиваются с Linux.
+
 ## Запуск в Windows Git Bash
 
 Нужны уже подготовленные checkout A0 (`81ccd8686f15cae729fbd652ef50b6ee57b9f689`) и candidate. Harness запускается из текущего репозитория, а helpers импортируются из каждого указанного arm. Ничего не устанавливается; remote/tags не меняются. Пути в примере заменить своими.

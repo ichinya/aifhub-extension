@@ -6,6 +6,16 @@
 
 ## [В разработке]
 
+## [1.8.1] - 2026-10-26
+
+### Добавлено
+- Offline snapshot cost matrix (#237): `benchmark:snapshot`, deterministic W/S/B/I/H/F/N fixtures с точным leaf count, закрытые catalog/results schemas, pinned commit/module hashes, отдельные cold/warm и diagnostic profiles, Trace2/fs counters, raw latency samples и median/IQR. Safety/equivalence/privacy gates сохраняют PASS/FAIL/NOTRUN и `no_promote=true`; измеренное ускорение публикуется только после запуска сопоставимых arms.
+
+### Изменено
+- Snapshot перечисляет bounded scope names без раннего content read и читает каждый уникальный leaf один раз. Bytes и executable mode получаются из одного fd с before/after checks, bigint pathname/fd identity и повторной проверкой компонентов пути; projections и persistent snapshot digest-контракт сохраняются.
+- Root common dir берётся из первого combined inspect, isolation identity объединяет три rev-parse в один, normal start повторно использует admission source до final fresh resolution. Полный Git re-inspect, replay freshness, catalogue lineage и prepared recovery сохраняются.
+- Release provenance обновлён для helper bytes версии 1.8.1.
+
 ## [1.8.0] - 2026-10-25
 
 ### Добавлено

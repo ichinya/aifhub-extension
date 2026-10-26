@@ -1,6 +1,6 @@
 {
-  "version": "1.8.0",
-  "released_at": "2026-10-26T12:54:24.576Z",
+  "version": "1.8.1",
+  "released_at": "2026-10-26T14:59:17.685Z",
   "files": [
     {
       "path": "scripts/workflow-state-store.mjs",
