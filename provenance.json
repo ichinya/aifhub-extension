@@ -1,10 +1,10 @@
 {
   "version": "1.8.0",
-  "released_at": "2026-10-25T17:08:43.405Z",
+  "released_at": "2026-10-26T04:21:53.704Z",
   "files": [
     {
       "path": "scripts/workflow-state-store.mjs",
-      "sha256": "3cb11b1f0f2b21d6a66009cc6d7eb636a1b96f85779b4cea461e3f5d922d9495"
+      "sha256": "a5ea4aa8f0440767f5a649073ad4fbc8924865d46167eda8f767af71a0b0bbbf"
     },
     {
       "path": "scripts/execution-state.mjs",
