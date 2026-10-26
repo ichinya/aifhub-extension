@@ -186,7 +186,6 @@ export async function worktree(store, scopes = [], projections = {}) {
     const info = await lstat(filename).catch(e => { if (e.code === 'ENOENT' && !required) return null; throw e; });
     requireValue(!info || (info.isFile() && !info.isSymbolicLink() && info.nlink === 1 && info.size <= LIMIT), 'unsafe-submodule');
   }
-  const rootCommon = await safeDirectory(path.resolve(store.root, (await git(store.root, ['rev-parse', '--git-common-dir'])).toString('utf8').trim()));
   async function inspect(prefix, trustedAdmins, includeFiles = true) {
     const cwd = prefix ? await store.target(prefix) : store.root;
     let marker = null, ownAdmin = null;
@@ -206,8 +205,9 @@ export async function worktree(store, scopes = [], projections = {}) {
         marker = digest(data);
       }
     }
-    const identity = (await git(cwd, ['rev-parse', '--show-toplevel', '--absolute-git-dir', '--git-common-dir', 'HEAD', '--abbrev-ref', 'HEAD'])).toString('utf8').trim().split(/\r?\n/);
-    requireValue(identity.length === 5 && /^[a-f0-9]{40,64}$/.test(identity[3]), 'invalid-git-identity');
+    const identity = (await git(cwd, ['rev-parse', '--show-toplevel', '--absolute-git-dir', '--git-common-dir', 'HEAD', '--abbrev-ref', 'HEAD'])).toString('utf8').replace(/\r?\n$/, '').split(/\r?\n/);
+    requireValue(identity.length === 5 && identity.every(line => line.length > 0 && !/[\r\0]/.test(line))
+      && path.isAbsolute(identity[0]) && path.isAbsolute(identity[1]) && /^[a-f0-9]{40,64}$/.test(identity[3]) && !/\s/.test(identity[4]), 'invalid-git-identity');
     const [top, gitDirPath, commonDirPath, head, branch] = identity;
     requireValue(await realpath(top) === cwd, prefix ? 'unsafe-submodule' : 'project-root-required');
     const gitDir = path.resolve(cwd, gitDirPath), commonDir = path.resolve(cwd, commonDirPath);
@@ -231,7 +231,7 @@ export async function worktree(store, scopes = [], projections = {}) {
       names: namesBytes.toString('utf8').split('\0').filter(Boolean) };
   }
   const modules = Object.create(null), repositories = [], names = new Set(), adminIdentities = new Set();
-  async function collect(prefix = '', gitlink = null, depth = 0, trustedAdmins = [rootCommon.path]) {
+  async function collect(prefix = '', gitlink = null, depth = 0, trustedAdmins = []) {
     requireValue(depth <= 20 && repositories.length <= 100, 'too-many-submodules');
     const info = await inspect(prefix, trustedAdmins); repositories.push({ prefix, info, trustedAdmins });
     requireValue(!adminIdentities.has(info.repository), 'unsafe-submodule'); adminIdentities.add(info.repository);
