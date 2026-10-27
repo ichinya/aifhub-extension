@@ -34,7 +34,8 @@ async function image(root) {
 
 test('final PASS inventory is read-only and has no authority or target freshness claim', async t => {
   const f = await fixture(t), before = await image(f.root), r = await f.build();
-  assert.equal(r.coverage, 'complete'); assert.deepEqual(r.required, ['verify']);
+  assert.equal(r.coverage, 'incomplete'); assert.deepEqual(r.required, ['verify']);
+      assert.ok(gate(r).codes.includes('target-binding-unrecorded'));
   assert.equal(gate(r).result_state, 'valid'); assert.equal(gate(r).target_binding, 'unknown');
   assert.equal(gate(r).evidence_sha256, digest(render())); assert.deepEqual(r.authorizes, []);
   assert.deepEqual(await image(f.root), before);
@@ -64,7 +65,7 @@ test('last failing result wins over old PASS; duplicate same-type results are or
   const f = await fixture(t); await f.put(`${qa}/verify.md`, render() + '\n' + render('verify', 'fail'));
   assert.equal((await f.build()).coverage, 'blocked');
   await f.put(`${qa}/verify.md`, render() + '\n' + render());
-  assert.equal((await f.build()).coverage, 'complete');
+  assert.equal((await f.build()).coverage, 'incomplete');
 });
 test('canonical evidence is exact and does not fall back to a passing alias', async t => {
   const f = await fixture(t); await f.put(`${qa}/verify.md`, 'no final result');
@@ -76,7 +77,9 @@ test('effective policy unions verify/done flags and validates current coverage s
   await f.put('source.md', 'current');
   const coverage = { schema_version: 1, change_id: 'work', status: 'pass', requirements: [], sources: [{ path: 'source.md', sha256: digest('current') }] };
   await f.put(`${qa}/coverage.json`, JSON.stringify(coverage));
-  let r = await f.build(); assert.deepEqual(r.required, ['verify', 'rules', 'coverage']); assert.equal(r.coverage, 'complete');
+  let r = await f.build(); assert.deepEqual(r.required, ['verify', 'rules', 'coverage']); assert.equal(r.coverage, 'incomplete');
+  assert.equal(r.supporting.find(s => s.gate === 'coverage').target_binding, 'matched');
+  assert.ok(gate(r).codes.includes('target-binding-unrecorded'));
   await f.put('source.md', 'changed'); r = await f.build(); assert.equal(r.coverage, 'incomplete');
   assert.equal(r.supporting[0].target_binding, 'mismatched');
   coverage.sources[0].path = '../outside'; await f.put(`${qa}/coverage.json`, JSON.stringify(coverage));
@@ -87,20 +90,20 @@ test('default policy requires rules and spec coverage; optional failing gates do
   assert.deepEqual((await f.build()).required, ['verify', 'rules', 'coverage']);
   await f.put('.ai-factory/config.yaml', 'aifhub:\n  openspec:\n    requireRulesPassForDone: false\n    requireSpecCoverageForDone: false\n');
   await f.put(`${qa}/review.md`, render('review', 'fail'));
-  assert.equal((await f.build()).coverage, 'complete');
+  assert.equal((await f.build()).coverage, 'incomplete');
   assert.equal((await f.build({ require: ['review'] })).coverage, 'blocked');
 });
 test('required WARN follows owner policy: Done allowWarn does not weaken Verify', async t => {
   const f = await fixture(t);
   const config = 'aifhub:\n  openspec:\n    requireRulesPassForDone: true\n    requireSpecCoverageForDone: false\n    allowWarnOnDone:\n      rules: true\n';
   await f.put('.ai-factory/config.yaml', config); await f.put(`${qa}/rules.md`, render('rules', 'warn'));
-  assert.equal((await f.build()).coverage, 'complete');
+  assert.equal((await f.build()).coverage, 'incomplete');
   await f.put('.ai-factory/config.yaml', config.replace('    allowWarnOnDone:', '    requireRulesPassForVerify: true\n    allowWarnOnDone:'));
   assert.equal((await f.build()).coverage, 'incomplete');
 });
 test('labels, self-review prose and no receipt never establish independence', async t => {
   const f = await fixture(t); await f.put(`${qa}/review.md`, 'Role: independent specialist; self-review\n' + render('review'));
-  const r = await f.build({ require: ['review'] }); assert.equal(r.coverage, 'unknown');
+  const r = await f.build({ require: ['review'] }); assert.equal(r.coverage, 'incomplete');
   assert.equal(gate(r, 'review').provenance, 'unrecorded'); assert.equal(gate(r, 'review').independence, 'unknown');
 });
 for (const kind of ['fresh-context', 'same-session', 'mismatched', 'reviewed']) test(`${kind} receipt cannot substitute for final result/role/current-target binding`, async t => {
@@ -110,7 +113,7 @@ for (const kind of ['fresh-context', 'same-session', 'mismatched', 'reviewed']) 
   await f.put(`${dir}/ai-cross-context-review.json`, JSON.stringify({ schema: 'aifhub.ai_cross_context_review.v1', change_id: 'work',
     execution_profile: 'ai-fresh-context', same_session_fallback: kind === 'same-session',
     outcome: kind === 'reviewed' ? 'reviewed' : 'prepared', target: { path: 'review-target.diff', fingerprint: digest(kind === 'mismatched' ? 'other' : 'diff') } }));
-  const r = await f.build({ require: ['review', 'security'] }); assert.equal(r.coverage, 'unknown');
+  const r = await f.build({ require: ['review', 'security'] }); assert.equal(r.coverage, 'incomplete');
   for (const name of ['review', 'security']) assert.equal(gate(r, name).independence, 'unknown');
   assert.equal(r.provenance_observations[0].provenance, kind === 'same-session' ? 'same-session' : kind === 'mismatched' ? 'unknown' : 'fresh-context');
   assert.equal(r.provenance_observations[0].target_binding, 'unknown');
@@ -135,10 +138,11 @@ test('unsafe query fields and unknown arguments give exit 2 without echoing inpu
     assert.deepEqual(out.codes, ['invalid-query']);
   }
 });
-test('command exits 0/1 for inventory and gaps without spawning a process', async t => {
+test('command exits 1 while gate-to-target binding is unrecorded, 2 for bad queries', async t => {
   const f = await fixture(t); let out;
   const options = { rootDir: f.root, output: value => { out = value; } };
-  assert.equal(await runGateCoverageCommand(['--change', 'work', '--json'], options), 0); assert.deepEqual(out.authorizes, []);
+  assert.equal(await runGateCoverageCommand(['--change', 'work', '--json'], options), 1);
+  assert.equal(out.coverage, 'incomplete'); assert.deepEqual(out.authorizes, []);
   assert.equal(await runGateCoverageCommand(['--change', 'work', '--require', 'review', '--json'], options), 1);
 });
 for (const kind of ['hardlink', 'junction']) test(`rejects ${kind} evidence`, async t => {
@@ -155,7 +159,7 @@ for (const kind of ['hardlink', 'junction']) test(`rejects ${kind} evidence`, as
 test('bounded files and receipt inventory cannot produce unbounded diagnostics', async t => {
   const f = await fixture(t); await f.put(`${qa}/verify.md`, 'x'.repeat(1024 * 1024 + 1));
   for (let i = 0; i < 65; i++) await f.put(`.ai-factory/state/work/reviews/r${i}/ai-cross-context-review.json`, '{}');
-  const r = await f.build(); assert.equal(r.coverage, 'incomplete'); assert.ok(JSON.stringify(r).length < 10000);
+  const r = await f.build(); assert.equal(r.coverage, 'unknown'); assert.ok(JSON.stringify(r).length < 10000);
   assert.ok(r.codes.includes('receipt-inventory-invalid-or-unsafe'));
 });
 test('evidence bytes changed after the first read prevent complete inventory', async t => {

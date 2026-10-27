@@ -66,7 +66,9 @@ export async function buildGateCoverage(options = {}) {
     portablePath(relative);
     const data = await store.bytes(relative);
     requireValue(data === null || data.length <= LIMIT, 'evidence-too-large');
-    const hash = data === null ? null : digest(data);
+    // Hash the decoded text like the coverage matrix writer does, so UTF-8 BOM
+    // differences between writers never report an unchanged source as stale.
+    const hash = data === null ? null : digest(new TextDecoder('utf-8', { fatal: true }).decode(data));
     if (inputs.has(relative)) requireValue(inputs.get(relative) === hash, 'evidence-changed');
     inputs.set(relative, hash);
     return data === null ? null : new TextDecoder('utf-8', { fatal: true }).decode(data);
@@ -174,8 +176,10 @@ export async function buildGateCoverage(options = {}) {
         if (receipt.same_session_fallback === true) observation.provenance = 'same-session';
         else if (receipt.execution_profile === 'ai-fresh-context' && receipt.same_session_fallback === false) {
           requireValue(receipt.target?.path === 'review-target.diff' && SHA.test(receipt.target.fingerprint), 'unsupported-target');
-          await read(`${reviewDir}/${name}/review-target.diff`);
-          if (inputs.get(`${reviewDir}/${name}/review-target.diff`) === receipt.target.fingerprint) observation.provenance = 'fresh-context';
+          // The preparer allows up to the store limit for this diff; read it through
+          // the store's own custody path instead of the diagnostic's smaller bound.
+          const diff = await store.bytes(`${reviewDir}/${name}/review-target.diff`);
+          if (diff !== null && digest(diff) === receipt.target.fingerprint) observation.provenance = 'fresh-context';
           else observation.codes.push('receipt-target-mismatched');
         }
         if (receipt.outcome === 'prepared') observation.codes.push('preparation-only');
@@ -207,11 +211,15 @@ export async function buildGateCoverage(options = {}) {
     if (!allowsWarning) check.codes.push('required-warning-not-accepted');
   }
   const failing = requested.some(c => c.result_state === 'valid' && c.result_status === 'fail');
-  const gap = requested.some(c => c.result_state !== 'valid' || c.target_binding === 'mismatched'
-    || c.codes.includes('required-warning-not-accepted'));
-  const unknown = diagnostics.length > 0 || requested.some(c => c.independence === 'unknown');
+  // Untrusted input identity (mid-read changes) makes the whole inventory
+  // 'unknown'. A final gate result that cannot be bound to the current target,
+  // or whose independence is unproven, is a known gap: 'complete' stays
+  // reserved for recorded matching bindings and proven independence.
+  const unknown = diagnostics.length > 0;
+  const gap = requested.some(c => c.result_state !== 'valid' || c.target_binding !== 'matched'
+    || c.independence === 'unknown' || c.codes.includes('required-warning-not-accepted'));
   // Preserve the final status; coverage never becomes a semantic QA verdict.
-  const coverage = failing ? 'blocked' : gap ? 'incomplete' : unknown ? 'unknown' : 'complete';
+  const coverage = failing ? 'blocked' : unknown ? 'unknown' : gap ? 'incomplete' : 'complete';
   return { schema_version: 1, change_id: query.changeId, diagnostic_only: true,
     requirements_complete: true, requirements_scope: 'explicit-query-and-openspec-policy',
     coverage, required, checks, supporting, provenance_observations: observations,
