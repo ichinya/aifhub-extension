@@ -4,6 +4,14 @@ Apply after artifact classification permits local implementation and the active 
 
 For unclear readiness, dependency or migration boundaries, consult [executable task design](TASK-DESIGN.md) read-only during preflight. Missing facts and external access remain prerequisites; route affected plan changes to their existing owner. This does not make shared-worktree assignments safe for concurrent edits.
 
+## Service mechanics vs productive dispatch
+
+Use existing deterministic helpers or the coordinator's direct tool path for JSON field extraction, digest/version propagation, receipt collection and formatting, ACK formatting, status collection, and supported event waits. Do not dispatch an AI worker solely to perform these mechanical operations.
+
+Use only capabilities already exposed by the installed helper and host. Formatting an ACK does not authorize release, confirm delivery or prove that a worker stopped. A missing capability keeps the existing manual path and its stated limitations; a present helper's rejection must not be bypassed.
+
+Semantic independence checks, review findings, QA verdicts, parent acceptance, canonical progress and final verification remain with their existing owners. Mechanical assistance must not create a parent decision, relabel self-review as independent, or replace /aif-verify or /aif-done.
+
 ## Before implementation or first worker dispatch
 
 Scan the active plan's unfinished tasks and relevant completed producers before implementation edits or first worker dispatch. In the existing execution notes or normal response, identify the canonical task snapshot and record:
@@ -17,7 +25,9 @@ Before dispatching a later task, confirm its inputs still match the scanned snap
 
 ## Select one task, a coupled group, or a small same-shape batch
 
-Choose the execution shape from the actual work before dispatch. Record one short reason in existing preflight notes; no new approval or task artifact is needed.
+Choose the execution form from the actual work before dispatch. In the existing dispatch manifest or assignment/preflight notes, record the selected form — direct, serial coupled group, supported same-shape batch, or independent isolated tasks — and one short reason tied to the task's scope, dependencies, risk and available capabilities.
+
+This is assignment metadata in existing prose, not an additional field in execution helper JSON. Do not add fields to batch-start, isolation-start or per-item runtime manifests.
 
 | Shape | Choose when | Cost to account for |
 | --- | --- | --- |
@@ -27,9 +37,17 @@ Choose the execution shape from the actual work before dispatch. Record one shor
 
 Use the smallest useful number of workers, within host capacity and the existing five-task group limit. An idle slot alone is not a reason to delegate a tiny edit or duplicate investigation. Preserve selected user constraints and project policy; do not impose guessed token budgets, model switches or timeouts. Reassess the remaining work at group boundaries when observed setup/integration costs or new dependencies change the choice. Record measured time/cost only when available, and never label an estimate as observed savings.
 
-Keep the existing one-task or tightly coupled group default. The coordinator may explicitly select a small same-shape batch only when all items belong to the same active plan/change, are independently executable, have the same mechanical change and validation approach, and have comparable low risk. Dependencies within the proposed batch, different behavior/risk, or unresolved conflicts require splitting it. Do not combine unrelated work merely to reduce worker launches; a batch grants no additional write scope.
+When two to five ready items from the same active plan/change are independently executable, have the same mechanical change and validation approach, and have comparable low risk, select the existing same-worker batch contract unless a concrete capability, scope or inspection constraint requires direct or serial execution. Record that constraint in the existing assignment/preflight notes.
 
-Give the worker a complete manifest before editing: each canonical task ID, exact project-relative files, expected change, and applicable check or existing no-test fallback. Expand file globs into the explicit intended list. Include relevant preflight resolutions. Keep the batch small enough to inspect every item and its diff in one bounded run; otherwise split it. Use existing task IDs without renumbering or rewriting canonical task intent. If the dispatch lacks these inputs, narrow to a fully specified authorized task or return the missing information to the coordinator before edits.
+A shared interface, overlapping file, unresolved dependency, different behavior or different risk prevents treating the proposed items as an independent same-shape batch. Keep the affected work coupled/serial, split at a supported boundary, or report the exact blocker to the coordinator. Do not combine unrelated work merely to reduce launches, and do not interpret the existing batch size bound as a general worker-count limit.
+
+Give the worker a complete manifest before editing: each canonical task ID, exact project-relative files, expected change, and applicable check or existing no-test fallback. Expand file globs into the explicit intended list. Include relevant preflight resolutions. Keep the batch small enough to inspect every item and its diff in one bounded run; otherwise split it. Use existing task IDs without renumbering or rewriting canonical task intent. Preserve one canonical task ID, exact scope, expected change, check or existing fallback, and actual result/evidence per item. An omitted, blocked or unaccepted item remains unfinished regardless of aggregate success. If the dispatch lacks these inputs, narrow to a fully specified authorized task or return the missing information to the coordinator before edits.
+
+At each group boundary, use available observations from the completed group when selecting the next execution form. In the existing execution notes or response, distinguish observed setup/orientation/integration work and helper/tool calls from estimates; identify the scenario or group and the source of each reported measurement.
+
+If counts or timings were not observed, report them as unknown or estimated and state the basis of the estimate. Do not infer measured savings from fewer workers, sum overlapping worker intervals as run duration, or claim a speedup without a paired baseline/candidate measurement.
+
+Keep admitted preflight references and sealed evidence immutable. Record feedback outside those pinned inputs, or after their owning lifecycle has completed, without changing canonical artifacts, QA verdicts or execution schemas.
 
 ## Worker execution and coordinator reconciliation
 

@@ -113,6 +113,11 @@
       "name": "aifhub-evolution",
       "description": "Propose, apply, and roll back versioned skill-context changes.",
       "module": "./commands/aifhub-evolution.mjs"
+    },
+    {
+      "name": "aifhub-gate-coverage",
+      "description": "Inspect required gate coverage without changing evidence or authorizing progression.",
+      "module": "./commands/aifhub-gate-coverage.mjs"
     }
   ],
   "skills": [

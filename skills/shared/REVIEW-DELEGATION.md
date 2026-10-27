@@ -2,6 +2,10 @@
 
 Use when an authorized review has separable concerns that benefit from independent attention and the host offers permitted read-only subagents. The coordinating parent owns dispatch, complete coverage and the combined verdict. Small reviews stay direct; a delegated sidecar never launches nested reviewers. Missing subagents retain the ordinary review path and must not be reported as independent review.
 
+Dispatch an additional review sidecar only for a concrete, independently useful question with an explicit target and expected coverage. A free concurrency slot alone is not a reason to launch a sidecar, duplicate a review or split a small mechanical operation.
+
+Preserve every independent audit required by the user or project policy, including its distinct role and actual independence. Direct review, same-session fallback and self-review must be reported as such; they must not be relabeled as an independent audit.
+
 ## Bind the scope before dispatch
 
 Keep the user's selected comparison semantics and resolve its exact base/target. Include relevant uncommitted and added files through identified snapshots and the full selected patch; HEAD alone is insufficient. Bind canonical requirements, applicable standards and accepted policy snapshots to the same target. Do not replace a requested working-tree review with a merge-base comparison or silently choose a different spec.

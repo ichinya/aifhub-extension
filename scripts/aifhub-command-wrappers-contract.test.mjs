@@ -15,6 +15,13 @@ const execFileAsync = promisify(execFile);
 
 const WRAPPER_COMMANDS = [
   {
+    name: 'aifhub-gate-coverage',
+    description: 'Inspect required gate coverage without changing evidence or authorizing progression.',
+    module: './commands/aifhub-gate-coverage.mjs',
+    script: 'aif-gate-coverage.mjs',
+    args: ['--change', 'add-oauth', '--require', 'review,security', '--json']
+  },
+  {
     name: 'aifhub-providers',
     description: 'Inspect and run configured AIFHub validation and semantic model providers.',
     module: './commands/aifhub-providers.mjs',

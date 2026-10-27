@@ -32,6 +32,8 @@ Do not let a code-quality pass erase or downgrade a plan/spec compliance finding
 
 When the parent supplies specialist findings, follow the evidence reconciliation in `skills/shared/REVIEW-DELEGATION.md`, resolved at `.ai-factory/extensions/aifhub-extension/skills/shared/REVIEW-DELEGATION.md`. Check their target, coverage and direct source support within the assigned permissions. Return missing evidence to the parent; do not launch nested reviewers. Keep this sidecar's two ordered passes and existing final result format, including its single gate where required.
 
+Answer the parent's concrete assigned question against the pinned target and state any coverage gap. Do not create additional review assignments or claim independence from a role label, a free slot or specialist participation alone.
+
 ## Scoped re-review
 
 For a requested re-review after fixes, follow `skills/shared/SCOPED-REVIEW.md` in either artifact mode. Match the previous findings to the exact fix targets, reconcile every finding by ID, and inspect the complete fix diff for regressions within the existing two-pass review. An incomplete or stale bundle cannot produce PASS. Ordinary full review and user-required independent review retain their scope.

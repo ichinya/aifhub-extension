@@ -6,7 +6,11 @@
 
 ## [В разработке]
 
+### Добавлено
+- Read-only `aifhub-gate-coverage` (#235): bounded диагностика final gate inventory, policy-required rules/coverage и явно required review/security, без writes/locks или workflow authority. Недоказанная independence остаётся UNKNOWN; offline K=5/5×serial counters не заявляют model-call savings.
+
 ### Изменено
+- Coordination prompt-assets (#235): helper/direct path для служебной механики без AI worker; четыре формы и причина в existing notes; bounded same-shape batches с явными блокерами; sidecars только для самостоятельного вопроса; observed cost feedback отдельно от estimates/UNKNOWN, с сохранением pinned inputs и независимых ролей.
 - Precise-request fast path для `/aif-explore` (#236): явный read-only запрос с пятью settled измерениями служит confirmed brief; derived brief предъявляется один раз без второго confirmation. Новая authority для implementation, credentials, environment inspection, outside-project reads, optional providers и publication не возникает.
 - Действительное exact confirmation переносится между steps в пределах своего scope; material scope/risk/tradeoff change пересчитывает только affected frontier и запрашивает новые необходимые решения.
 - При уже разрешённой research persistence секция `## Confirmed brief` сохраняется вне Active Summary в regular research file либо ultra `RESEARCH.md`, никогда `INDEX.md`, с normalized SHA256, source/profile binding, confirmation provenance и запретом sensitive content. Запись остаётся частью обычного research output перед upstream coherence gates.

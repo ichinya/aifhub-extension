@@ -453,3 +453,7 @@ npm test
 ## License
 
 MIT
+
+## Coordination and review notes
+
+Coordination mechanics (JSON/digest/version propagation, receipts/ACK, status collection, and supported waits) run on the helper/direct path. The execution form and its reason stay in the existing assignment notes; a review sidecar requires its own concrete question, and required independent roles are preserved. See [workflow mechanics](docs/workflow-mechanics.md).

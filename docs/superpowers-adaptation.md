@@ -109,3 +109,9 @@ rootCauseEvidence
 - [Context Loading Policy](context-loading-policy.md)
 - [Codex Agents](codex-agents.md)
 - [Claude Agents](claude-agents.md)
+
+## Coordination dispatch и стоимость
+
+Service mechanics выполняются helper/direct path. Для ready independent low-risk same-shape 2–5 items применяется существующий bounded batch с per-item scope/check/evidence; shared interface, overlapping file, unresolved dependency, разный behavior/risk требуют coupled/serial или exact blocker. Batch size не ограничивает общее число workers. На group boundaries используются доступные observations с источником и сценарием; estimates/UNKNOWN не становятся measured savings, pinned preflight/sealed evidence остаются immutable.
+
+Дополнительный review sidecar требует concrete independently useful question, pinned target и expected coverage; free concurrency slot не повод для запуска. Required independent audits сохраняют отдельные роли. Direct review, same-session fallback и self-review не обозначаются independent audit. Instruction contract fixtures проверяют наличие policy и mirror parity; actual dispatch/service-call поведение требует host evaluation.
