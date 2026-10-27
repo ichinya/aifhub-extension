@@ -1379,3 +1379,14 @@ npm test
 
 Перед admission координатор указывает direct / serial coupled group / supported same-shape batch / independent isolated tasks и короткую причину в existing assignment/preflight notes. Runtime JSON не расширяется. JSON extraction, digest/version propagation, receipt/ACK formatting, status collection и supported event waits выполняются helper/direct path без отдельного AI worker. Review sidecar получает самостоятельный вопрос, pinned target и expected coverage; free slot сам по себе не причина. Required independent roles сохраняются; self-review и same-session fallback не independent.
 
+### Read-only gate coverage diagnostics
+
+```text
+ai-factory aifhub-gate-coverage --change <id> [--require review,security] --json
+```
+
+Helper читает exact `.ai-factory/qa/<id>/{verify,rules,review,security}.md` через существующий gate parser, `coverage.json`, `done-readiness.json` и fresh-context receipts. Verify обязателен, rules/coverage включаются объединением verify/done policy flags. Дополнительные review/security передаются явным `--require`; natural-language policy и несколько независимых audit slots одного gate не выводятся автоматически. `requirements_complete` относится только к указанной query и OpenSpec flags.
+
+Exit 0 означает наличие запрошенного final result inventory и current supporting coverage, exit 1 — missing/invalid/stale/failing evidence или недоказанную required independence, exit 2 — bad query. WARN сохраняется как final status; required rules/coverage учитывают allowWarnOnDone без ослабления Verify policy. Verify WARN даёт gap, а не completion. Диагностика не становится semantic acceptance. Bounded JSON разделяет result_state/result_status, target_binding, role_coverage, independence; `authorizes: []` всегда. Role coverage означает тип gate, не аутентификацию исполнителя. Unknown target binding выводится явно и не доказывает свежесть review.
+
+Provenance observations показывают tier fresh-context (execution_profile ai-fresh-context и совпадающий hash сохранённого diff), same-session (same_session_fallback), unrecorded либо unknown. Existing prepared receipt не связывает final gate result с ролью и актуальным target; без поддерживаемого binding independence остаётся unknown, даже при outcome reviewed. Labels, self-review и same-session не повышаются до independent. Поэтому явно required review/security сейчас дают UNKNOWN independence, пока такой binding не появится. Gate coverage не заменяет /aif-verify, /aif-done или required audits. Это диагностика без writes/locks/creates, providers и stage routing.
