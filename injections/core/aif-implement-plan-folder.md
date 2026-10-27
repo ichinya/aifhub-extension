@@ -117,7 +117,9 @@ For both configured OpenSpec and complete classic plans after marker-first class
 
 Apply the service-mechanics boundary in TASK-COORDINATION.md: extract and propagate helper JSON fields through the existing helper/direct tool path, without a separate AI worker. Preserve the recorded actor, current version, exact digests, freshness checks and parent decision for every transition.
 
-Include the selected execution form and its short reason in the existing dispatch manifest or assignment/preflight notes before admission. Keep helper payloads unchanged.
+Include the selected execution form and its short reason in the existing dispatch manifest or assignment/preflight notes before admission. Keep helper payloads unchanged. Select eligible low-risk same-shape items through the bounded batch policy; keep shared-interface, overlapping-file, unresolved-dependency or different-risk work coupled/serial or report its exact blocker.
+
+Before selecting the next group, reconcile available observed setup/orientation/integration costs with the previous execution-form reason. Keep estimates and unavailable measurements explicit, and preserve all required checks and independent roles.
 
 For authorized parallel implementation in host-provided worktrees, follow [isolated execution](../../skills/shared/ISOLATED-EXECUTION.md) and the installed extension's `docs/isolated-execution.md`. Register fresh single-task worker runs as one independent group before edits. Workers use ordinary execution actions in their own roots; the parent uses `isolation-*` in the integration root, observes actual worker stops, and verifies each transfer against the combined tree. In this mode, local worker `accept` grants no checkbox authority: defer progress synchronization until `isolation-close` and fresh read-only `isolation-resume`, then apply only `closure.accepted`. Recover the existing group/worker records on re-entry. Worktree preparation, cancellation and cleanup belong to the host; absent capability keeps execution serial.
 

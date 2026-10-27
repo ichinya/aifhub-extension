@@ -90,4 +90,4 @@ The implementation supports bounded waves with completed prerequisites. It does 
 
 ## Причина формы и стоимость группы
 
-Independent isolated tasks и причина выбора isolation фиксируются до admission в тех же assignment/preflight notes, без дополнительных helper JSON fields.
+Independent isolated tasks и причина выбора isolation фиксируются до admission в тех же assignment/preflight notes, без дополнительных helper JSON fields. На границе завершённой группы учитываются доступные observed setup/orientation/integration и helper/tool counts с источником; estimates и UNKNOWN отмечаются явно. Feedback хранится вне pinned preflight/sealed evidence, по TASK-COORDINATION.md; parent acceptance, stop observation и final verification сохраняют владельцев.

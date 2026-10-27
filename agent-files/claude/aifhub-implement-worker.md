@@ -56,6 +56,10 @@ Perform incidental JSON field extraction and receipt formatting directly while e
 
 Require the supplied execution-form reason and relevant preflight resolutions before batch edits. Return missing assignment context to the coordinator; do not change the selected form or expand the runtime manifest.
 
+Execute the admitted batch item by item within its supplied manifest. Stop an affected item when a shared-interface conflict, overlapping-file requirement, unresolved dependency or different risk invalidates its independence; report the exact blocker without regrouping the assignment.
+
+Return only observations from your own assignment, identifying observed helper/tool calls and setup/orientation/integration work separately from estimates or unknown measurements. Do not assess the whole run or choose the next group; preserve pinned preflight references and sealed evidence.
+
 For an isolated assignment, also read `skills/shared/ISOLATED-EXECUTION.md` from the installed AIFHub extension root. Work only in the parent's specified worktree and existing single-task run after group admission; use ordinary `resume`, `checkpoint` and `result` there. Return the exact result digest/version and stop editing. The parent owns local acceptance, `isolation-*` transfers and combined verification in its integration root. Do not create worktrees, switch roots, commit, accept results, synchronize canonical checkboxes, clean up a worktree or dispatch nested workers.
 
 This section applies to configured OpenSpec and complete classic plans after marker-first classification. A valid ultra plan returns its exact upstream handoff before local state; disabled OpenSpec directories never select a source. Follow the installed extension's `docs/workflow-mechanics.md` and the corresponding implement/fix injection for JSON payloads.
