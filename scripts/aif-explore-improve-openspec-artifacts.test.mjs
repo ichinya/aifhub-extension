@@ -351,12 +351,12 @@ describe('aif-explore and aif-improve OpenSpec-native contracts', () => {
     assertOrder(
       interview,
       [
-        'This confirmation gate is intentional for every research run',
+        'If the precise-request conditions are not met and no valid confirmation already covers the exact brief',
         'assumptions never satisfy unresolved brief decisions or confirmation: do not start the full research run',
         'If any user-owned brief decision remains unresolved',
         'return assumptions, blockers, and open questions to the interactive parent',
         'do not label the brief confirmation-ready',
-        'After every user-owned brief decision is settled',
+        'If confirmation is required and every user-owned brief decision is settled',
         'return the normalized brief, recorded assumptions, and remaining research questions',
         '`research-brief-confirmation-required` blocker',
         'The only autonomous or subagent re-entry condition',
@@ -369,6 +369,45 @@ describe('aif-explore and aif-improve OpenSpec-native contracts', () => {
       ],
       label
     );
+  });
+
+  it('accepts only precise authorized briefs and reuses exact scope-bound confirmation', async () => {
+    for (const relativePath of ['injections/core/aif-explore-plan-folder.md', 'docs/usage.md']) {
+      const asset = await readRepoFile(relativePath);
+      const label = `runtime=shared asset=${relativePath} case=precise-and-exact-reuse`;
+      for (const expected of [
+        'settles every user-owned brief dimension',
+        'target question, boundaries and non-goals, constraints, evidence standard, and desired deliverable',
+        'no pending prerequisite fact-finding and no blocked or cyclic unresolved decision',
+        'An empty frontier alone is insufficient',
+        'once as a non-blocking notice',
+        'without a second confirmation',
+        'Do not add decisions, permissions, or material assumptions',
+        'no new authority: implementation, credentials, environment inspection, outside-project reads, optional-provider enablement, and publication',
+        'It does not itself authorize persistence',
+        'Every other request still waits for explicit user confirmation',
+        'Before reopening the interview, reuse valid confirmation for the exact normalized brief',
+        '(b) the parent forwards a user-supplied brief that itself settles every user-owned brief dimension',
+        'A digest or artifact reference alone is insufficient',
+        'a material scope, risk, or tradeoff change invalidates confirmation for the affected content',
+        'recompute the affected frontier and ask only the newly unresolved decisions',
+        'Bind any resulting confirmation to the updated exact brief',
+        'New findings alone do not reopen settled brief decisions'
+      ]) {
+        assertIncludes(asset, expected, label);
+      }
+      assertNotIncludes(asset, 'the normalized brief still requires confirmation', label);
+      assertNotIncludes(asset, 'this confirmation is required even for an already precise request', label);
+      assertOrder(asset, [
+        'Once the interview is complete, present one normalized research brief',
+        'without a second confirmation',
+        'Every other request still waits for explicit user confirmation',
+        'In autonomous or subagent mode',
+        'The only autonomous or subagent re-entry condition',
+        '(b) the parent forwards a user-supplied brief',
+        'do not request confirmation again'
+      ], label);
+    }
   });
 
   it('bounds interview reads by mode and keeps public handoff and no-artifact docs aligned', async () => {
