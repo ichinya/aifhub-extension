@@ -1,0 +1,593 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "no_promote",
+    "catalog_digest",
+    "harness_digest",
+    "environment",
+    "arms",
+    "fixtures",
+    "rows",
+    "summaries",
+    "status"
+  ],
+  "properties": {
+    "schema": {
+      "const": "aifhub.snapshot.ab_results.v1"
+    },
+    "no_promote": {
+      "const": true
+    },
+    "catalog_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "harness_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "os",
+        "release",
+        "arch",
+        "cpu",
+        "memory_bytes",
+        "node",
+        "git",
+        "filesystem",
+        "storage",
+        "antivirus",
+        "indexer",
+        "os_cache",
+        "peak_rss_scope",
+        "concurrency",
+        "git_config"
+      ],
+      "properties": {
+        "os": {
+          "type": "string"
+        },
+        "release": {
+          "type": "string"
+        },
+        "arch": {
+          "type": "string"
+        },
+        "cpu": {
+          "type": "string"
+        },
+        "memory_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "node": {
+          "type": "string"
+        },
+        "git": {
+          "type": "string"
+        },
+        "filesystem": {
+          "type": "string"
+        },
+        "storage": {
+          "type": "string"
+        },
+        "antivirus": {
+          "type": "string"
+        },
+        "indexer": {
+          "type": "string"
+        },
+        "os_cache": {
+          "const": "uncontrolled"
+        },
+        "peak_rss_scope": {
+          "type": "string"
+        },
+        "concurrency": {
+          "const": 1
+        },
+        "git_config": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "autocrlf",
+            "filemode",
+            "system_config",
+            "global_config",
+            "filters",
+            "fixed_dates"
+          ],
+          "properties": {
+            "autocrlf": {
+              "const": false
+            },
+            "filemode": {
+              "type": "boolean"
+            },
+            "system_config": {
+              "const": false
+            },
+            "global_config": {
+              "const": "isolated-empty"
+            },
+            "filters": {
+              "const": "scenario-local"
+            },
+            "fixed_dates": {
+              "const": true
+            }
+          }
+        }
+      }
+    },
+    "arms": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "identity"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "identity": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "commit",
+              "source",
+              "modules"
+            ],
+            "properties": {
+              "commit": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "source": {
+                "enum": [
+                  "committed",
+                  "working-tree"
+                ]
+              },
+              "modules": {
+                "type": "object",
+                "minProperties": 3,
+                "propertyNames": {
+                  "pattern": "^scripts/[a-zA-Z0-9_./-]+\\.mjs$"
+                },
+                "additionalProperties": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            }
+          }
+        }
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "fixtures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scenario",
+          "generator",
+          "semantic_digest",
+          "leaf_count",
+          "repositories",
+          "physical_identity"
+        ],
+        "properties": {
+          "scenario": {
+            "type": "string"
+          },
+          "generator": {
+            "type": "string"
+          },
+          "semantic_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "leaf_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "repositories": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "physical_identity": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scenario",
+          "profile",
+          "repeat",
+          "arm",
+          "status",
+          "code",
+          "wall_ms",
+          "fs",
+          "git",
+          "peak_rss_kib",
+          "semantic_digest",
+          "fixture_digest",
+          "expected",
+          "unchanged"
+        ],
+        "properties": {
+          "scenario": {
+            "type": "string"
+          },
+          "profile": {
+            "enum": [
+              "process-cold",
+              "process-warm",
+              "diagnostic"
+            ]
+          },
+          "repeat": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "arm": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PASS",
+              "FAIL",
+              "NOTRUN"
+            ]
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "wall_ms": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fs": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "opens",
+                  "reads",
+                  "bytes",
+                  "lstat",
+                  "fstat",
+                  "realpath",
+                  "readdir",
+                  "peak_fds"
+                ],
+                "properties": {
+                  "opens": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "reads": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "bytes": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "lstat": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "fstat": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "realpath": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "readdir": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "peak_fds": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "git": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "rev-parse",
+                  "stage-list",
+                  "names-list",
+                  "other"
+                ],
+                "properties": {
+                  "rev-parse": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "stage-list": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "names-list": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "other": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "peak_rss_kib": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "semantic_digest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fixture_digest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expected": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "unchanged": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "summaries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "key",
+          "status",
+          "equivalence",
+          "safety",
+          "arms",
+          "paired_speedup",
+          "uncertainty",
+          "no_promote"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PASS",
+              "FAIL",
+              "NOTRUN"
+            ]
+          },
+          "equivalence": {
+            "type": "boolean"
+          },
+          "safety": {
+            "enum": [
+              "PASS",
+              "FAIL",
+              "UNKNOWN"
+            ]
+          },
+          "arms": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "pass",
+                "fail",
+                "notrun",
+                "latency_ms"
+              ],
+              "properties": {
+                "status": {
+                  "enum": [
+                    "PASS",
+                    "FAIL",
+                    "NOTRUN"
+                  ]
+                },
+                "pass": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "fail": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "notrun": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "latency_ms": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "median",
+                    "iqr",
+                    "samples"
+                  ],
+                  "properties": {
+                    "median": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "iqr": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "samples": {
+                      "type": "array",
+                      "items": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "paired_speedup": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "median",
+              "iqr",
+              "samples"
+            ],
+            "properties": {
+              "median": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "iqr": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "samples": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "uncertainty": {
+            "type": "string"
+          },
+          "no_promote": {
+            "const": true
+          }
+        }
+      }
+    },
+    "status": {
+      "enum": [
+        "PASS",
+        "FAIL",
+        "NOTRUN"
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "aifhub.snapshot.ab_results.v1"
+}

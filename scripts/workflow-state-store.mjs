@@ -46,13 +46,13 @@ export function stringList(value, max = 100) {
 
 export async function storeFor(rootDir = process.cwd()) {
   const root = await realpath(path.resolve(rootDir));
-  async function target(relative, makeParents = false) {
+  async function target(relative, makeParents = false, identities = null) {
     const parts = portablePath(relative).split('/');
     let current = root;
     for (let i = 0; i < parts.length; i++) {
       current = path.join(current, parts[i]);
       let info;
-      try { info = await lstat(current); } catch (error) {
+      try { info = await lstat(current, identities ? { bigint: true } : undefined); } catch (error) {
         if (error.code !== 'ENOENT') throw error;
         if (makeParents && i < parts.length - 1) {
           try { await mkdir(current); } catch (e) { if (e.code !== 'EEXIST') throw e; }
@@ -60,18 +60,30 @@ export async function storeFor(rootDir = process.cwd()) {
         } else continue;
       }
       requireValue(!info.isSymbolicLink(), 'unsafe-filesystem-entry');
-      requireValue(i === parts.length - 1 ? (info.isDirectory() || (info.isFile() && info.nlink === 1)) : info.isDirectory(), 'unsafe-filesystem-entry');
+      requireValue(i === parts.length - 1 ? (info.isDirectory() || (info.isFile() && info.nlink === (identities ? 1n : 1))) : info.isDirectory(), 'unsafe-filesystem-entry');
+      if (identities && i < parts.length - 1) identities.push([info.dev, info.ino]);
     }
     return current;
   }
-  async function bytes(relative) {
-    const filename = await target(relative);
+  // Bind content and mode to one open file, then revalidate its pathname.
+  async function readLeaf(relative) {
+    const ancestors = [], filename = await target(relative, false, ancestors);
+    async function revalidate() {
+      const current = [], checked = await target(relative, false, current);
+      requireValue(current.length === ancestors.length && current.every((entry, i) => entry[0] === ancestors[i][0] && entry[1] === ancestors[i][1]), 'file-changed', true);
+      return checked;
+    }
     let file;
     try { file = await open(filename, 'r'); } catch (e) { if (e.code === 'ENOENT') return null; throw e; }
     try {
-      const before = await file.stat();
-      requireValue(before.isFile() && before.nlink === 1 && before.size <= LIMIT, 'unsupported-file');
-      const buffer = Buffer.alloc(before.size + 1);
+      const before = await file.stat({ bigint: true });
+      requireValue(before.isFile() && before.nlink === 1n && before.size <= BigInt(LIMIT), 'unsupported-file');
+      const matches = info => info.isFile() && !info.isSymbolicLink() && info.nlink === 1n
+        && info.dev === before.dev && info.ino === before.ino;
+      requireValue(typeof before.dev === 'bigint' && typeof before.ino === 'bigint' && before.ino > 0n, 'unsupported-file-identity');
+      const opened = await lstat(filename, { bigint: true }).catch(e => { if (e.code === 'ENOENT') return null; throw e; });
+      requireValue(opened && matches(opened), 'file-changed', true);
+      const buffer = Buffer.alloc(Number(before.size) + 1);
       let length = 0;
       while (length < buffer.length) {
         const { bytesRead } = await file.read(buffer, length, buffer.length - length, null);
@@ -79,12 +91,17 @@ export async function storeFor(rootDir = process.cwd()) {
         length += bytesRead;
       }
       const data = buffer.subarray(0, length);
-      const after = await file.stat();
-      requireValue(length === before.size && before.size === after.size && before.mtimeMs === after.mtimeMs && before.ctimeMs === after.ctimeMs, 'file-changed', true);
-      await target(relative);
-      return data;
+      const after = await file.stat({ bigint: true });
+      requireValue(after.isFile() && after.nlink === 1n && before.dev === after.dev && before.ino === after.ino
+        && BigInt(length) === before.size && before.size === after.size && before.mtimeNs === after.mtimeNs
+        && before.ctimeNs === after.ctimeNs && before.mode === after.mode, 'file-changed', true);
+      const named = await lstat(await revalidate(), { bigint: true }).catch(e => { if (e.code === 'ENOENT') return null; throw e; });
+      requireValue(named && matches(named) && named.size === after.size && named.mode === after.mode
+        && named.mtimeNs === after.mtimeNs && named.ctimeNs === after.ctimeNs, 'file-changed', true);
+      return { data, mode: Number(before.mode & 0o111n), permissions: Number(before.mode & 0o777n) };
     } finally { await file.close(); }
   }
+  async function bytes(relative) { return (await readLeaf(relative))?.data ?? null; }
   async function textFile(relative) {
     const data = await bytes(relative);
     if (data === null) return null;
@@ -120,22 +137,22 @@ export async function storeFor(rootDir = process.cwd()) {
     try { await handle.writeFile(JSON.stringify({ pid: process.pid, created_at: new Date().toISOString() })); return await action(); }
     finally { await handle.close(); await unlink(filename); }
   }
-  async function inventory(relative, { excludeGit = false } = {}) {
+  async function inventory(relative, { excludeGit = false, namesOnly = false } = {}) {
     const filename = await target(relative);
     let info;
     try { info = await lstat(filename); } catch (e) { if (e.code === 'ENOENT') return {}; throw e; }
-    if (info.isFile()) return { [relative]: digest(await bytes(relative)) };
+    if (info.isFile()) return { [relative]: namesOnly ? null : digest(await bytes(relative)) };
     const entries = await readdir(filename, { withFileTypes: true });
     requireValue(entries.length <= 10000, 'too-many-files');
     const result = Object.create(null);
     for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
       if (excludeGit && entry.name.toLowerCase() === '.git') continue;
-      Object.assign(result, await inventory(`${relative}/${entry.name}`, { excludeGit }));
+      Object.assign(result, await inventory(`${relative}/${entry.name}`, { excludeGit, namesOnly }));
       requireValue(Object.keys(result).length <= 10000, 'too-many-files');
     }
     return result;
   }
-  return { root, target, bytes, textFile, write, save, load, lock, inventory,
+  return { root, target, bytes, readLeaf, textFile, write, save, load, lock, inventory,
     async remove(relative) { await unlink(await target(relative)); },
     async references(paths) {
       const refs = Object.create(null);
@@ -170,7 +187,6 @@ export async function worktree(store, scopes = [], projections = {}) {
     const info = await lstat(filename).catch(e => { if (e.code === 'ENOENT' && !required) return null; throw e; });
     requireValue(!info || (info.isFile() && !info.isSymbolicLink() && info.nlink === 1 && info.size <= LIMIT), 'unsafe-submodule');
   }
-  const rootCommon = await safeDirectory(path.resolve(store.root, (await git(store.root, ['rev-parse', '--git-common-dir'])).toString('utf8').trim()));
   async function inspect(prefix, trustedAdmins, includeFiles = true) {
     const cwd = prefix ? await store.target(prefix) : store.root;
     let marker = null, ownAdmin = null;
@@ -190,8 +206,11 @@ export async function worktree(store, scopes = [], projections = {}) {
         marker = digest(data);
       }
     }
-    const identity = (await git(cwd, ['rev-parse', '--show-toplevel', '--absolute-git-dir', '--git-common-dir', 'HEAD', '--abbrev-ref', 'HEAD'])).toString('utf8').trim().split(/\r?\n/);
-    requireValue(identity.length === 5 && /^[a-f0-9]{40,64}$/.test(identity[3]), 'invalid-git-identity');
+    const identity = (await git(cwd, ['rev-parse', '--show-toplevel', '--absolute-git-dir', '--git-common-dir', 'HEAD', '--abbrev-ref', 'HEAD'])).toString('utf8').replace(/\r?\n$/, '').split(/\r?\n/);
+    requireValue(identity.length === 5 && identity.every(line => line.length > 0 && !/[\r\0]/.test(line))
+      && path.isAbsolute(identity[0]) && path.isAbsolute(identity[1]) && /^[a-f0-9]{40,64}$/.test(identity[3])
+      // Git ref names permit Unicode letters such as U+00A0; forbid only what git itself rejects.
+      && !/[\x00-\x20\x7f~^:?*[\\]/.test(identity[4]), 'invalid-git-identity');
     const [top, gitDirPath, commonDirPath, head, branch] = identity;
     requireValue(await realpath(top) === cwd, prefix ? 'unsafe-submodule' : 'project-root-required');
     const gitDir = path.resolve(cwd, gitDirPath), commonDir = path.resolve(cwd, commonDirPath);
@@ -215,7 +234,7 @@ export async function worktree(store, scopes = [], projections = {}) {
       names: namesBytes.toString('utf8').split('\0').filter(Boolean) };
   }
   const modules = Object.create(null), repositories = [], names = new Set(), adminIdentities = new Set();
-  async function collect(prefix = '', gitlink = null, depth = 0, trustedAdmins = [rootCommon.path]) {
+  async function collect(prefix = '', gitlink = null, depth = 0, trustedAdmins = []) {
     requireValue(depth <= 20 && repositories.length <= 100, 'too-many-submodules');
     const info = await inspect(prefix, trustedAdmins); repositories.push({ prefix, info, trustedAdmins });
     requireValue(!adminIdentities.has(info.repository), 'unsafe-submodule'); adminIdentities.add(info.repository);
@@ -232,7 +251,7 @@ export async function worktree(store, scopes = [], projections = {}) {
   const scopedFiles = Object.create(null);
   for (const scope of scopes) {
     requireValue(!portablePath(scope).split('/').some(p => p.toLowerCase() === '.git'), 'protected-scope');
-    Object.assign(scopedFiles, await store.inventory(scope, { excludeGit: true }));
+    Object.assign(scopedFiles, await store.inventory(scope, { excludeGit: true, namesOnly: true }));
   }
   // The per-inventory bound is not a combined budget: scoped entries share one aggregate limit.
   requireValue(Object.keys(scopedFiles).length <= 10000, 'too-many-files');
@@ -242,9 +261,8 @@ export async function worktree(store, scopes = [], projections = {}) {
   for (const name of [...names].sort()) {
     // Runtime state and evidence have separate identities. Canonical OpenSpec stays in the snapshot.
     if (name.toLowerCase().startsWith('.ai-factory/')) continue;
-    const data = await store.bytes(name);
-    const mode = data === null ? null : (await lstat(await store.target(name))).mode & 0o111;
-    files[name] = data === null ? null : digest({ content: Object.hasOwn(projections, name) ? projections[name] : digest(data), executable: mode });
+    const leaf = await store.readLeaf(name);
+    files[name] = leaf === null ? null : digest({ content: Object.hasOwn(projections, name) ? projections[name] : digest(leaf.data), executable: leaf.mode });
   }
   // Do not publish a mixture if Git metadata changes while leaf files are read.
   for (const { prefix, info, trustedAdmins } of repositories) {
