@@ -43,7 +43,7 @@ finalization:
   /aif-done <change-id>                             # required after passing verify
   /aif-mode sync                                    # recommended after archive
   /aif-commit                                       # recommended AI Factory commit gate
-  /aif-evolve                                       # optional learning step
+  /aif-evolve                                       # optional, separately authorized learning step
 ```
 
 OpenSpec-native mode uses OpenSpec artifacts as canonical planning/spec artifacts and AI Factory paths for runtime state, QA evidence, and generated rules in user projects.
@@ -1046,7 +1046,7 @@ Next steps after `/aif-done`:
 
 1. Run `/aif-mode sync` to refresh derived artifacts after OpenSpec archive.
 2. Run `/aif-commit` to commit implementation, OpenSpec archive/spec changes, QA evidence, and final summaries.
-3. Optionally run `/aif-evolve` when the change produced durable workflow or skill learnings.
+3. Present compact evolution proposals backed by existing durable learning evidence without starting optional learning; optional evolution never blocks verified finalization. `/aif-done` never runs evolution as part of finalization and does not dispatch an evolution intake worker or write skill-context/rules/patch cursors for optional proposals. Explicit user-requested evolution or an applicable mandatory project policy uses a separately authorized owner workflow, or an exact `/aif-evolve @.ai-factory/qa/<change-id>` handoff when execution is unavailable.
 
 `/aif-done` finalizes the OpenSpec lifecycle. It does not replace `/aif-commit`.
 
@@ -1107,7 +1107,7 @@ Useful AIFHub inputs include `docs/memory-tools-research/`, `docs/context-provid
 
 ### `/aif-evolve`
 
-`/aif-evolve` is optional after commit/finalization. Use it when the implementation, fix, or finalization evidence contains durable lessons that should improve future skills or skill-context. It should not mutate OpenSpec canonical artifacts.
+`/aif-evolve` is an optional, separately authorized learning step after commit/finalization. `/aif-done` presents compact evolution proposals as output only and never runs evolution as part of finalization. A done invocation, integrated-finalization request, or proposal alone does not authorize evolution. Explicit user-requested evolution or an applicable mandatory project policy retains owner execution semantics: the parent runs the separate workflow when supported or returns an exact owner handoff with the selected evidence scope (`/aif-evolve @.ai-factory/qa/<change-id>` after OpenSpec archive, `/aif-evolve <plan-id>` for classic legacy evidence). Preserve upstream approval semantics, exact `proposal_digest` binding, and existing `aifhub-evolution` transactions for writes; invocation alone does not approve an unreviewed diff. Evolution must not mutate OpenSpec canonical artifacts. Required verification, coverage, rules evidence, readiness, and governance owner updates/handoffs remain unchanged; marked legacy ultra returns only its existing exact receipt-derived handoff.
 
 ## OAuth Example
 
@@ -1129,7 +1129,7 @@ openspec/changes/add-oauth-login/
       spec.md
 ```
 
-Refine, sync, implement, gate, verify, finalize, sync, commit, and optionally evolve:
+Refine, sync, implement, gate, verify, finalize, sync, commit, and optionally evolve as a separately authorized owner step:
 
 ```text
 /aif-improve add-oauth-login

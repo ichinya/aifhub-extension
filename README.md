@@ -77,7 +77,7 @@ Create and refine a change:
 /aif-mode sync --change add-oauth-login
 ```
 
-Implement, check optional gates, verify, fix if needed, finalize, sync, commit, and optionally evolve:
+Implement, check optional gates, verify, fix if needed, finalize, sync, commit, and optionally evolve as a separately authorized owner workflow:
 
 ```text
 /aif-implement add-oauth-login
@@ -94,6 +94,8 @@ Implement, check optional gates, verify, fix if needed, finalize, sync, commit, 
 /aif-commit
 /aif-evolve
 ```
+
+Finalization presents compact evolution proposals backed by existing evidence without starting optional learning. Explicitly requested or policy-required evolution uses its own owner workflow and approval rules, or an exact scoped handoff; it never runs inside `/aif-done` finalization.
 
 Core AI Factory workflow:
 

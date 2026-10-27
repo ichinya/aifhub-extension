@@ -130,7 +130,7 @@ Verifier writes QA evidence under `.ai-factory/qa/<change-id>/`.
 
 ### Optional learning
 
-- `/aif-evolve` after commit/finalization when durable learnings exist.
+- Finalizer возвращает compact evolution proposals по существующему evidence без optional learning execution или intake worker; они не блокируют verified finalization. `/aif-evolve` никогда не запускается внутри finalization. Explicit или policy-required evolution возвращается parent для отдельного owner workflow либо exact scoped `/aif-evolve` handoff; upstream approval и transaction rules сохраняются. Marked legacy ultra остаётся exact-output branch.
 
 ## Примеры явного вызова
 

@@ -33,7 +33,7 @@ gate-summary:
 - Bounded archival scope: `status.yaml`, `.ai-factory/specs/<plan-id>/`, `.ai-factory/specs/index.yaml`.
 - Commit/PR summaries выводятся как drafts для пользовательского review.
 - Для roadmap/rules/architecture follow-ups использует только plan-backed evidence и owner-safe update path; если update нельзя безопасно завершить в текущем runtime, возвращает exact handoff.
-- `/aif-evolve` запускает по явному запросу и при наличии runtime support, иначе предлагает как следующий шаг.
+- После успешной classic finalization возвращает compact evolution proposals по существующему evidence как output без intake worker, execution, skill-context/rules writes или patch cursor updates. Optional learning не блокирует verified finalization. `/aif-evolve` никогда не запускается в составе finalization; integrated-finalization request сам по себе не даёт authority. Явно запрошенный или обязательный по project policy evolution возвращается parent как exact owner handoff `/aif-evolve <plan-id>` с точным выбранным scope; parent выполняет отдельный owner workflow с existing approvals и proposal_digest binding. Marked legacy ultra сохраняет только exact receipt-derived handoff без proposals.
 - Если workspace dirty не только из текущего плана — останавливается и просит подтверждения.
 - Если `gh` недоступен — выводит manual PR instructions вместо падения.
 

@@ -33,8 +33,8 @@ Follow skills/shared/TOOLS.md: only when the entire tools mapping is absent, rea
 - Normal output reports the local roadmap lifecycle outcome `updated`, `skipped`, or `handoff` separately from external GitHub issue, pull request, and milestone state. Local finalization must not claim that a GitHub issue is closed or a pull request is merged.
 - If a post-archive roadmap update cannot be completed safely, preserve the successful archive and final evidence, return `handoff` with the exact `/aif-roadmap check` guidance, and must not roll back the successful archive or fabricate a `finalized` row.
 - Allowed writes are `.ai-factory/qa/<change-id>/` final evidence and `.ai-factory/state/<change-id>/` final summaries; do not write runtime-only files into `openspec/changes/<change-id>/`.
-- Return only bounded finalizer human/JSON fields: selected active OpenSpec change, readiness and verification status, coverage and rules gate status, dirty working tree summary, archive result, safe OpenSpec command/source, runtime and QA paths, commit/PR summary draft, governance follow-up result, next-step recommendation for `/aif-mode sync`, next-step recommendation for `/aif-commit`, and any `/aif-evolve` recommendation. Never return full context, environment, raw stdout/stderr, or artifact contents.
-- After successful finalization, recommend `/aif-mode sync` to refresh derived artifacts after archive, recommend `/aif-commit` as the next AI Factory command, and optionally recommend `/aif-evolve` when durable learning evidence exists.
+- Return only bounded finalizer human/JSON fields: selected active OpenSpec change, readiness and verification status, coverage and rules gate status, dirty working tree summary, archive result, safe OpenSpec command/source, runtime and QA paths, commit/PR summary draft, governance follow-up result, next-step recommendation for `/aif-mode sync`, and next-step recommendation for `/aif-commit`. Present any compact evolution proposals or exact owner handoff in the human response without execution or new JSON fields. Never return full context, environment, raw stdout/stderr, or artifact contents.
+- After successful finalization, recommend `/aif-mode sync` to refresh derived artifacts after archive, recommend `/aif-commit` as the next AI Factory command, and present compact evolution proposals when durable learning evidence exists under the optional evolution boundary below.
 
 ## Legacy AI Factory-only mode
 
@@ -49,6 +49,20 @@ Use this mode when OpenSpec-native mode is not enabled.
 - Allowed write scope after validation: the resolved active plan's `status.yaml`, its archive directory under `.ai-factory/specs/<plan-id>/`, and `.ai-factory/specs/index.yaml`.
 - Copy or refresh plan-folder contents in the archive, minus execution metadata.
 - Archive the companion plan file as `plan.md` alongside folder artifacts.
+
+## Optional evolution boundary
+
+After successful OpenSpec-native or classic legacy finalization, present compact evolution proposals backed by existing durable learning evidence in the normal response. Optional evolution never blocks verified finalization. Never run `/aif-evolve` as part of finalization. No learning evidence means no artificial learning backlog or required evolution step.
+
+Do not dispatch an evolution intake worker for optional learning. Compact evolution proposals are output only: do not call aifhub-evolution propose or apply, write skill-context or rules, or update patch cursors. This restriction concerns optional learning; required evidence-backed governance updates retain their existing owner-safe paths, exact handoffs, and gate evidence.
+
+An integrated-finalization request alone does not authorize evolution. Explicit user-requested evolution or an applicable mandatory project policy requires a separately authorized evolution owner workflow when supported, or an exact owner handoff when execution is unavailable. The parent may continue that separate workflow after finalization. Preserve upstream approval semantics and exact proposal_digest binding for evolution writes.
+
+Each compact proposal includes the proposed improvement, evidence reference, owner/target, and exact next command when needed. Use `/aif-evolve @.ai-factory/qa/<change-id>` for existing post-archive OpenSpec evidence or `/aif-evolve <plan-id>` for classic legacy evidence, replacing placeholders with the exact selected scope; never guess a scope.
+
+Do not append proposals to the exact marked legacy ultra handoff. That read-only receipt branch keeps its existing exact-output contract.
+
+Return explicitly requested or policy-required evolution to the parent with an exact owner handoff; do not execute evolution from this bounded finalizer. Keep proposals in the human response; do not extend the runtime finalizer JSON.
 
 Rules:
 - Reject `--force`, `--no-validate`, `--skip-archive`, `--dry-run`, `--summary-only`, and unknown finalizer options; never bypass readiness or archive policy.
