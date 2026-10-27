@@ -11,7 +11,7 @@ AI Factory UX + OpenSpec artifact protocol
 ## What This Extension Does
 
 - Keeps `/aif-analyze`, `/aif-plan`, `/aif-explore`, `/aif-improve`, `/aif-implement`, `/aif-rules-check`, `/aif-review`, `/aif-security-checklist`, `/aif-verify`, `/aif-fix`, `/aif-done`, `/aif-commit`, `/aif-evolve`, and `/aif-mode` as the public command vocabulary.
-- Sharpens `/aif-explore` requests through dependency-aware decision rounds: project facts stay assistant-owned and read-only, user-owned decisions are asked by prerequisite frontier with recommendations, and an empty blocked or cyclic frontier never counts as completion. Research waits until every brief decision is settled and the normalized brief is confirmed; non-interactive runs return unresolved decisions or the confirmation-ready brief to the interactive parent instead of treating assumptions as approval.
+- Sharpens `/aif-explore` requests through dependency-aware decision rounds: project facts stay assistant-owned and read-only, user-owned decisions are asked by prerequisite frontier with recommendations, and an empty blocked or cyclic frontier never counts as completion. An explicit authorized read-only request that settles all five brief dimensions is the confirmed brief: present the derived brief once as a non-blocking notice and continue without a second confirmation. Reuse valid confirmation only for the exact scope; material scope/risk/tradeoff changes reopen only affected decisions. Every other request still waits for explicit user confirmation unless already covered by valid exact confirmation. Non-interactive runs require exact parent-forwarded confirmation or a parent-forwarded user-supplied settled read-only brief; assignments and assumptions never create approval. This grants no new implementation, credential, environment-inspection, outside-project, optional-provider, publication, or persistence authority.
 - Adds optional read-only research delegation and comparison of materially different interfaces to explore/plan/improve. The coordinating parent reconciles source-bound findings; small tasks stay direct and existing confirmation/artifact rules remain in force. See [mattpocock adaptation](docs/mattpocock-adaptation.md) for the implemented scope.
 - Supports bounded parallel implementation in host-managed Git worktrees through the existing execution helper: exact worker baselines, serial file integration, combined checks, durable recovery and closure before task progress. See [isolated execution](docs/isolated-execution.md) for host prerequisites and limits.
 - Strengthens task design, difficult-bug reproduction, observable-interface tests, architecture assessment and focused review support through conditional shared guidance. Existing commands retain task identity, write scope, retry limits and one combined review verdict.
@@ -77,7 +77,7 @@ Create and refine a change:
 /aif-mode sync --change add-oauth-login
 ```
 
-Implement, check optional gates, verify, fix if needed, finalize, sync, commit, and optionally evolve:
+Implement, check optional gates, verify, fix if needed, finalize, sync, commit, and optionally evolve as a separately authorized owner workflow:
 
 ```text
 /aif-implement add-oauth-login
@@ -94,6 +94,8 @@ Implement, check optional gates, verify, fix if needed, finalize, sync, commit, 
 /aif-commit
 /aif-evolve
 ```
+
+Finalization presents compact evolution proposals backed by existing evidence without starting optional learning. Explicitly requested or policy-required evolution uses its own owner workflow and approval rules, or an exact scoped handoff; it never runs inside `/aif-done` finalization.
 
 Core AI Factory workflow:
 

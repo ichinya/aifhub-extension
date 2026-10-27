@@ -1638,6 +1638,30 @@ describe('OpenSpec-native prompt asset contract', () => {
         assertIncludes(asset, expected, relativePath);
       }
 
+      assert.match(asset, /compact evolution proposals/i, `${relativePath} optional learning output`);
+      assert.ok(asset.split('\n').some(line => /never/i.test(line) && /finalization/i.test(line) && /evolve|evolution/i.test(line)),
+        `${relativePath} evolve not in finalization`);
+      for (const expected of [
+        'Optional evolution never blocks verified finalization',
+        'Do not dispatch an evolution intake worker for optional learning',
+        'do not call aifhub-evolution propose or apply, write skill-context or rules, or update patch cursors',
+        'An integrated-finalization request alone does not authorize evolution',
+        'Explicit user-requested evolution or an applicable mandatory project policy',
+        'exact owner handoff',
+        'Preserve upstream approval semantics and exact proposal_digest binding',
+        '/aif-evolve @.ai-factory/qa/<change-id>',
+        '/aif-evolve <plan-id>',
+        'Do not append proposals to the exact marked legacy ultra handoff'
+      ]) {
+        assertIncludes(asset, expected, relativePath);
+      }
+      for (const obsolete of [
+        'Run `/aif-evolve` when the user explicitly asked for integrated finalization',
+        'can run or recommend evolution follow-ups'
+      ]) {
+        assertNotIncludes(asset, obsolete, `${relativePath} obsolete evolution execution`);
+      }
+
       assert.match(
         asset,
         /do not (?:create|make) commits|does not create commits|never create commits/i,
@@ -1653,6 +1677,36 @@ describe('OpenSpec-native prompt asset contract', () => {
         /does not replace `?\/aif-commit`?|do not present `?\/aif-done`?.*replac(?:e|ing) `?\/aif-commit`?/i,
         `${relativePath} should state that /aif-done does not replace /aif-commit`
       );
+    }
+  });
+
+  it('keeps bounded evolution output parent-owned and preserves classic status compatibility', async () => {
+    for (const relativePath of [
+      'agent-files/claude/aifhub-done-finalizer.md',
+      'agent-files/codex/aifhub-done-finalizer.toml'
+    ]) {
+      const asset = await readRepoFile(relativePath);
+      assertIncludes(asset, 'Return explicitly requested or policy-required evolution to the parent', relativePath);
+      assertIncludes(asset, 'do not execute evolution from this bounded finalizer', relativePath);
+      assertIncludes(asset, 'do not extend the runtime finalizer JSON', relativePath);
+    }
+    const contract = await readRepoFile('skills/aif-done/references/finalization-contract.md');
+    assertIncludes(contract, 'evolve_action: <proposed|handoff|skip>', 'full legacy status template');
+    assertNotIncludes(contract, 'evolve_action: <ran|suggested|skip>', 'obsolete legacy status template');
+    assertIncludes(contract, 'Historical `ran` and `suggested` values remain readable', 'legacy status compatibility');
+    assertIncludes(contract, 'This field does not authorize evolution', 'legacy status authority');
+    assertOrder(contract, ['### Required governance follow-ups', '### Optional learning'], 'governance before optional learning');
+  });
+
+  it('requires separate evolution invocation authority while preserving the existing write contract', async () => {
+    const asset = await readRepoFile('injections/core/aif-evolve-plan-evidence.md');
+    for (const expected of [
+      'A /aif-done invocation, integrated-finalization request, or compact evolution proposal does not by itself authorize this command',
+      'Explicit user-requested evolution or an applicable mandatory project policy',
+      'command invocation alone does not authorize an unreviewed skill-context diff',
+      'existing versioned skill-context application contract'
+    ]) {
+      assertIncludes(asset, expected, 'evolve invocation boundary');
     }
   });
 

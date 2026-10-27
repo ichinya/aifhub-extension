@@ -28,7 +28,7 @@
 ## Границы
 
 - Решения и разрешения пользователя сохраняются. Каждый worker не начинает собственное интервью или подтверждение.
-- До explore brief confirmation допустим только ограниченный поиск фактов. Полное исследование сохраняет существующий confirmation/re-entry contract.
+- До explore brief confirmation допустим только ограниченный поиск фактов. Явный precise read-only запрос с пятью settled измерениями сам служит confirmed brief: derived brief предъявляется один раз non-blocking, без второго confirmation и без новой authority. Exact confirmation переносится только в свой scope; material scope/risk/tradeoff change открывает только affected frontier. Autonomous/subagent re-entry остаётся parent-bound (exact brief + explicit confirmation либо forwarded user-supplied settled read-only brief), assignment не создаёт approval. При уже разрешённой persistence секция `## Confirmed brief` с digest и известной provenance хранится вне Active Summary в regular research file либо ultra `RESEARCH.md`, никогда `INDEX.md`; upstream coherence ordering сохраняется.
 - Исследовательские задания возвращают текст родителю; они не пишут документы, временные заметки за пределами проекта, runtime state или канонические артефакты. Запись выполняет уже разрешённый writer текущей команды; назначенный plan-polisher сохраняет свой scope уточнения плана после сверки доказательств.
 - Committed Research Context и его rebase contract сохраняются. Glossary остаётся в ведении `/aif-analyze`.
 - Классификация legacy ultra предшествует уточнению; валидный bundle возвращается upstream, malformed/collision прекращают обработку.

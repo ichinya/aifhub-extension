@@ -351,12 +351,12 @@ describe('aif-explore and aif-improve OpenSpec-native contracts', () => {
     assertOrder(
       interview,
       [
-        'This confirmation gate is intentional for every research run',
+        'If the precise-request conditions are not met and no valid confirmation already covers the exact brief',
         'assumptions never satisfy unresolved brief decisions or confirmation: do not start the full research run',
         'If any user-owned brief decision remains unresolved',
         'return assumptions, blockers, and open questions to the interactive parent',
         'do not label the brief confirmation-ready',
-        'After every user-owned brief decision is settled',
+        'If confirmation is required and every user-owned brief decision is settled',
         'return the normalized brief, recorded assumptions, and remaining research questions',
         '`research-brief-confirmation-required` blocker',
         'The only autonomous or subagent re-entry condition',
@@ -371,13 +371,52 @@ describe('aif-explore and aif-improve OpenSpec-native contracts', () => {
     );
   });
 
+  it('accepts only precise authorized briefs and reuses exact scope-bound confirmation', async () => {
+    for (const relativePath of ['injections/core/aif-explore-plan-folder.md', 'docs/usage.md']) {
+      const asset = await readRepoFile(relativePath);
+      const label = `runtime=shared asset=${relativePath} case=precise-and-exact-reuse`;
+      for (const expected of [
+        'settles every user-owned brief dimension',
+        'target question, boundaries and non-goals, constraints, evidence standard, and desired deliverable',
+        'no pending prerequisite fact-finding and no blocked or cyclic unresolved decision',
+        'An empty frontier alone is insufficient',
+        'once as a non-blocking notice',
+        'without a second confirmation',
+        'Do not add decisions, permissions, or material assumptions',
+        'no new authority: implementation, credentials, environment inspection, outside-project reads, optional-provider enablement, and publication',
+        'It does not itself authorize persistence',
+        'Every other request still waits for explicit user confirmation',
+        'Before reopening the interview, reuse valid confirmation for the exact normalized brief',
+        '(b) the parent forwards a user-supplied brief that itself settles every user-owned brief dimension',
+        'A digest or artifact reference alone is insufficient',
+        'a material scope, risk, or tradeoff change invalidates confirmation for the affected content',
+        'recompute the affected frontier and ask only the newly unresolved decisions',
+        'Bind any resulting confirmation to the updated exact brief',
+        'New findings alone do not reopen settled brief decisions'
+      ]) {
+        assertIncludes(asset, expected, label);
+      }
+      assertNotIncludes(asset, 'the normalized brief still requires confirmation', label);
+      assertNotIncludes(asset, 'this confirmation is required even for an already precise request', label);
+      assertOrder(asset, [
+        'Once the interview is complete, present one normalized research brief',
+        'without a second confirmation',
+        'Every other request still waits for explicit user confirmation',
+        'In autonomous or subagent mode',
+        'The only autonomous or subagent re-entry condition',
+        '(b) the parent forwards a user-supplied brief',
+        'do not request confirmation again'
+      ], label);
+    }
+  });
+
   it('bounds interview reads by mode and keeps public handoff and no-artifact docs aligned', async () => {
     const injection = await readRepoFile('injections/core/aif-explore-plan-folder.md');
     const interview = extractSection(injection, 'Dependency-aware research brief interview');
     const openspec = extractSection(injection, 'OpenSpec-native mode');
     const usage = await readRepoFile('docs/usage.md');
     const label = 'runtime=shared asset=aif-explore case=interview-read-and-doc-boundaries';
-    const noArtifactContract = 'Do not create a separate interview, design-tree, decision-log, or research-brief file; the confirmed brief remains conversation context for the existing regular or ultra research output.';
+    const noArtifactContract = 'Do not create a separate interview, design-tree, decision-log, or research-brief file; the confirmed brief stays conversation context until an already authorized research write records it under `## Confirmed brief`.';
 
     for (const expected of [
       '`Bounded read-only inspection` does not grant a new read scope',
@@ -407,6 +446,43 @@ describe('aif-explore and aif-improve OpenSpec-native contracts', () => {
 
     assertIncludes(interview, noArtifactContract, `${label} prompt no-artifact contract`);
     assertIncludes(usage, noArtifactContract, `${label} docs no-artifact contract`);
+  });
+
+  it('persists exact confirmed briefs only within authorized research output and never grants authority from a digest', async () => {
+    for (const relativePath of ['injections/core/aif-explore-plan-folder.md', 'docs/usage.md']) {
+      const asset = await readRepoFile(relativePath);
+      const label = `runtime=shared asset=${relativePath} case=confirmed-brief-persistence`;
+      for (const expected of [
+        'Only when research persistence is already authorized',
+        'one minimal scrubbed `## Confirmed brief` section',
+        "the resolved `paths.research` file in regular mode, or the selected valid marked bundle's `RESEARCH.md` in ultra mode, never in INDEX.md",
+        'outside the Active Summary',
+        'part of the ordinary research write or update, not a separate confirmation write, file, or worker',
+        'preserve the upstream coherence and bundle gate ordering',
+        'exact normalized five-dimension brief',
+        'confirmation origin (explicit user confirmation or precise user request)',
+        'safe project-relative research source/profile binding',
+        'Digest: sha256=<lowercase hex>',
+        'UTF-8 normalized brief body including its authority boundary',
+        'excluding markdown comments, excluding the section heading, the `Digest:` line, and any timestamp metadata',
+        'must also not contain metadata-shaped lines that downstream research parsing reserves',
+        'any line starting with `Status:`, `Updated:`, or `Digest:`, any `aif:` marker comment, or any additional `## Confirmed brief` heading',
+        'normalizing line endings to LF',
+        'removing trailing spaces from each line',
+        'ending the digest input with exactly one newline',
+        'must not contain credentials, tokens, raw provider output, private data, or private absolute paths',
+        'do not persist a redacted body under the old confirmation',
+        'digest matches the newly derived normalized brief',
+        'known confirmation provenance also match',
+        'A heading or valid digest alone creates no authority',
+        'Missing or uncertain provenance, changed content, or a digest mismatch returns',
+        'Any other content inherits no confirmation authority',
+        'Parent-forwarded exact binding remains required for autonomous/subagent re-entry'
+      ]) {
+        assertIncludes(asset, expected, label);
+      }
+      assertNotIncludes(asset, 'the confirmed brief remains conversation context for the existing regular or ultra research output', label);
+    }
   });
 
   it('preserves the upstream 2.18.1 Research Coherence Gate as a non-bypass pass-through', async () => {

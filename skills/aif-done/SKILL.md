@@ -3,7 +3,7 @@ name: aif-done
 description: Finalize a verified OpenSpec-native change or legacy AI Factory-only plan, prepare commit/PR summaries, and drive evidence-backed follow-ups.
 argument-hint: "[change-id|plan-id] [--skip-specs] [--record-dirty-state]"
 allowed-tools: Read Write Edit Glob Grep Bash(ai-factory aifhub-done-finalizer *) Bash(ai-factory aifhub-providers *) Bash(git status *) Bash(git branch --show-current) Bash(git diff *) Bash(git log *) Bash(git ls-files *) Bash(git rev-parse *) Bash(gh --version)
-version: 1.4.0
+version: 1.5.0
 author: ichi
 ---
 
@@ -11,7 +11,7 @@ author: ichi
 
 Read [tool selection and artifact ownership](../shared/TOOLS.md) before choosing artifact paths or lifecycle instructions.
 
-AIFHub/Handoff finalization skill. Finalizes a verified OpenSpec-native change or a legacy AI Factory-only plan, drafts commit and PR summaries, drives evidence-backed governance follow-ups, and can run or recommend evolution follow-ups.
+AIFHub/Handoff finalization skill. Finalizes a verified OpenSpec-native change or a legacy AI Factory-only plan, drafts commit and PR summaries, drives evidence-backed governance follow-ups, and presents optional compact evolution proposals without starting evolution.
 
 This skill does not duplicate `/aif-verify` — it runs **after** a passing verification (PASS or PASS-with-notes).
 
@@ -99,7 +99,7 @@ Normal output must report:
 - final evidence under `.ai-factory/qa/<change-id>/`;
 - final summaries under `.ai-factory/state/<change-id>/`;
 - commit/PR summary draft;
-- next steps: `/aif-mode sync`, `/aif-commit`, and optional `/aif-evolve`.
+- compact evolution proposals and next steps: `/aif-mode sync`, `/aif-commit`, and an exact `/aif-evolve` owner handoff for separately requested or policy-required evolution.
 
 ### Roadmap Lifecycle Co-Ownership
 
@@ -116,10 +116,22 @@ After successful finalization:
 
 1. Recommend `/aif-mode sync` to refresh derived artifacts after archive.
 2. Recommend `/aif-commit` as the next AI Factory command.
-3. Optionally recommend `/aif-evolve` when durable learning evidence exists.
+3. Present compact evolution proposals when durable learning evidence exists; optional learning does not start inside finalization. Separately requested or policy-required evolution follows the owner boundary below.
 4. Do not create commits automatically.
 5. Do not create PRs automatically.
 6. `/aif-done` does not replace `/aif-commit`.
+
+## Optional evolution boundary
+
+After successful OpenSpec-native or classic legacy finalization, present compact evolution proposals backed by existing durable learning evidence in the normal response. Optional evolution never blocks verified finalization. Never run `/aif-evolve` as part of finalization. No learning evidence means no artificial learning backlog or required evolution step.
+
+Do not dispatch an evolution intake worker for optional learning. Compact evolution proposals are output only: do not call aifhub-evolution propose or apply, write skill-context or rules, or update patch cursors. This restriction concerns optional learning; required evidence-backed governance updates retain their existing owner-safe paths, exact handoffs, and gate evidence.
+
+An integrated-finalization request alone does not authorize evolution. Explicit user-requested evolution or an applicable mandatory project policy requires a separately authorized evolution owner workflow when supported, or an exact owner handoff when execution is unavailable. The parent may continue that separate workflow after finalization. Preserve upstream approval semantics and exact proposal_digest binding for evolution writes.
+
+Each compact proposal includes the proposed improvement, evidence reference, owner/target, and exact next command when needed. Use `/aif-evolve @.ai-factory/qa/<change-id>` for existing post-archive OpenSpec evidence or `/aif-evolve <plan-id>` for classic legacy evidence, replacing placeholders with the exact selected scope; never guess a scope.
+
+Do not append proposals to the exact marked legacy ultra handoff. That read-only receipt branch keeps its existing exact-output contract.
 
 ## Legacy AI Factory-only mode
 
@@ -192,13 +204,13 @@ The marked ultra branch is read-only. It must not modify the bundle, create or s
    - roadmap milestone completion or maturity movement;
    - new architecture decisions, boundaries, or modules;
    - new or modified durable project rules;
-   - evolution candidates worth feeding into `/aif-evolve`.
+   - evolution candidates worth reporting as compact proposals, separate from required governance.
 2. Apply follow-ups only when the evidence exists:
    - Roadmap -> update through the roadmap owner or return an exact `/aif-roadmap` handoff.
    - Architecture -> update through the architecture owner or return an exact `/aif-architecture` handoff.
    - Rules -> update the project rules owner path or return an exact handoff if direct update is not safe in the current runtime.
 3. If the current runtime cannot safely perform the owner update, do not silently skip it — return the exact next command/instruction instead.
-4. Run `/aif-evolve` when the user explicitly asked for integrated finalization and the runtime can chain the action; otherwise propose it as the next step.
+4. Present compact evolution proposals under the optional evolution boundary above. Return separately authorized evolution to its owner workflow or an exact handoff; do not execute it inside finalization.
 5. Never invent governance changes that are not supported by plan evidence.
 
 #### Step 6: Mark Plan Done
@@ -211,7 +223,7 @@ The marked ultra branch is read-only. It must not modify the bundle, create or s
    - Commit message draft.
    - PR summary draft (or manual instructions).
    - Governance updates performed or exact handoffs prepared.
-   - `/aif-evolve` action taken or recommended.
+   - Compact evolution proposals presented or the exact `/aif-evolve` owner handoff returned. Report evolution as completed only when separately authorized execution actually succeeded.
 
 ## Ownership Boundary
 
@@ -244,6 +256,7 @@ The marked ultra branch is read-only. It must not modify the bundle, create or s
 - In legacy mode, classify marker-first. Never treat a marked ultra bundle as a classic companion plan or migrate it automatically.
 - For a marked legacy ultra bundle, recompute receipt bindings on every `/aif-done` run and return only `/aif-verify <entrypoint>` or `/aif-archive <entrypoint>`; do not execute either command or write any artifact.
 - Never invent governance changes without evidence from the verified plan.
+- Never run `/aif-evolve` as part of finalization; evolution executes separately under its own authority, upstream approval semantics, and exact proposal_digest binding.
 - When governance updates belong to another owner, use the owning path or return an exact handoff instead of silently skipping the change.
 - Keep `/aif-done` roadmap writes confined to the marker-delimited `OpenSpec Change Lifecycle` block after successful OpenSpec archive; never infer external GitHub closure from local finalization.
 - Never auto-create a PR — always present drafts for user approval.

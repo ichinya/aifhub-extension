@@ -6,6 +6,12 @@
 
 ## [В разработке]
 
+### Изменено
+- Precise-request fast path для `/aif-explore` (#236): явный read-only запрос с пятью settled измерениями служит confirmed brief; derived brief предъявляется один раз без второго confirmation. Новая authority для implementation, credentials, environment inspection, outside-project reads, optional providers и publication не возникает.
+- Действительное exact confirmation переносится между steps в пределах своего scope; material scope/risk/tradeoff change пересчитывает только affected frontier и запрашивает новые необходимые решения.
+- При уже разрешённой research persistence секция `## Confirmed brief` сохраняется вне Active Summary в regular research file либо ultra `RESEARCH.md`, никогда `INDEX.md`, с normalized SHA256, source/profile binding, confirmation provenance и запретом sensitive content. Запись остаётся частью обычного research output перед upstream coherence gates.
+- Optional evolution отделён от finalization: `/aif-done` выводит compact evolution proposals как output без intake worker и evolution writes; learning не блокирует verified finalization. Explicit/policy-required evolution получает отдельный owner workflow либо exact handoff с existing approvals и proposal_digest binding. Required governance и readiness gates сохраняются.
+
 ## [1.8.1] - 2026-10-26
 
 ### Добавлено

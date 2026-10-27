@@ -12,6 +12,10 @@ Resolve user-facing prose language in this order: use a usable non-empty `langua
 
 `/aif-evolve` remains the built-in upstream skill, but in this extension it must support **plan-aware evolution** in addition to patch analysis.
 
+### Invocation boundary
+
+A /aif-done invocation, integrated-finalization request, or compact evolution proposal does not by itself authorize this command. Explicit user-requested evolution or an applicable mandatory project policy may invoke the upstream evolution workflow as a separate owner action. Preserve its existing approval semantics; command invocation alone does not authorize an unreviewed skill-context diff. Apply approved edits only through the existing versioned skill-context application contract below.
+
 ### Mode Detection
 
 Before resolving evidence selectors, read `.ai-factory/config.yaml` when it exists.

@@ -85,7 +85,7 @@ fail -> /aif-fix -> /aif-verify -> /aif-done
 - В legacy AI Factory-only mode может финализировать только classic plan folder/companion по существующему AIFHub contract. Для marked ultra `/aif-done` ничего не архивирует: он read-only re-evaluates revision-bound receipt и возвращает exact `/aif-archive <entrypoint>` только для current exact `pass`, иначе exact `/aif-verify <entrypoint>`.
 - Готовит commit message и PR summary drafts.
 - Применяет roadmap/architecture/rules follow-ups только при plan-backed evidence; если owning update нельзя выполнить в текущем runtime, возвращает exact handoff вместо silent skip.
-- Запускает или предлагает `/aif-evolve` в зависимости от runtime capability и явного user intent.
+- После успешной OpenSpec/classic finalization выводит compact evolution proposals по существующему evidence как output без intake worker, execution и optional skill-context/rules/patch-cursor writes; optional learning не блокирует verified finalization. `/aif-evolve` никогда не выполняется в составе finalization. Явно запрошенный или обязательный по project policy evolution возвращается parent для отдельного owner workflow либо exact scoped handoff; existing approvals и proposal_digest binding сохраняются. Integrated-finalization request сам по себе не даёт evolution authority. Marked legacy ultra сохраняет только exact receipt-derived handoff.
 
 Что **не** делает:
 - Не дублирует `/aif-verify` verification logic.
@@ -124,7 +124,7 @@ fail -> /aif-fix -> /aif-verify -> /aif-done
                                                          fail -> /aif-fix -> /aif-verify --check-only
                                       /aif-review + /aif-security-checklist + /aif-rules-check (optional manual gates)
 any failed Review gate -> aggregated comment -> return to Implementing -> /aif-fix -> /aif-verify --check-only
-passing full /aif-verify -> /aif-done (archive, commit/PR drafts, governance/evolution follow-ups)
+passing full /aif-verify -> /aif-done (archive, commit/PR drafts, required governance follow-ups, optional evolution proposals)
 ```
 
 Все перечисленные команды работают в текущем CLI workflow через `injections/core/` overlays. `injections/handoff/` в этом scope покрывает только review/security/rules/done stubs и не вмешивается в implementing loop.
