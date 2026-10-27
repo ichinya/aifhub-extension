@@ -10,6 +10,7 @@
 - Read-only `aifhub-gate-coverage` (#235): bounded диагностика final gate inventory, policy-required rules/coverage и явно required review/security, без writes/locks или workflow authority. Недоказанная independence остаётся UNKNOWN; offline K=5/5×serial counters не заявляют model-call savings.
 
 ### Изменено
+- SessionBrief компилятор читает tool-config через канонический precedence (TOOLS.md): new-style конфиги с `aifhub.tools.openspec: true` без legacy `artifactProtocol` больше не дают `openspec_protocol_required`; fail-closed сохранён для конфигураций без openspec и для malformed tool mappings (#243).
 - Coordination prompt-assets (#235): helper/direct path для служебной механики без AI worker; четыре формы и причина в existing notes; bounded same-shape batches с явными блокерами; sidecars только для самостоятельного вопроса; observed cost feedback отдельно от estimates/UNKNOWN, с сохранением pinned inputs и независимых ролей.
 - Precise-request fast path для `/aif-explore` (#236): явный read-only запрос с пятью settled измерениями служит confirmed brief; derived brief предъявляется один раз без второго confirmation. Новая authority для implementation, credentials, environment inspection, outside-project reads, optional providers и publication не возникает.
 - Действительное exact confirmation переносится между steps в пределах своего scope; material scope/risk/tradeoff change пересчитывает только affected frontier и запрашивает новые необходимые решения.

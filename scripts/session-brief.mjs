@@ -7,6 +7,7 @@ import { TextDecoder } from 'node:util';
 import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
 import { normalizeChangeId, resolveActiveChange } from './active-change-resolver.mjs';
 import { parseSimpleYaml } from './aif-artifact-sync.mjs';
+import { parseToolConfig } from './tool-config.mjs';
 import { resolveAiFactoryVersion } from './ai-factory-version-resolver.mjs';
 import { resolvePlanContext } from './common-plan-resolver.mjs';
 import { parseStrictJson } from './json-strict.mjs';
@@ -110,7 +111,12 @@ async function buildSnapshot(options, explicitCompile) {
   const planContext = await resolvePlanContext({ rootDir: root, changeId, methodology: 'openspec' });
   if (planContext.errors.length > 0) throw sddError(planContext.errors[0].code ?? 'plan_context_unresolved');
   if (!explicitCompile && !planContext.sdd_inputs && !policyFile && !existing && !existingDecision && !existingMarkdown) return { disabled: true, root, changeId, paths };
-  if (config.aifhub?.artifactProtocol !== 'openspec') throw sddError('openspec_protocol_required');
+  // Canonical tool-config precedence (TOOLS.md): an explicit tools mapping wins;
+  // legacy artifactProtocol is honored only when the tools mapping is absent.
+  let toolMode;
+  try { toolMode = parseToolConfig(configFile?.content ?? '').mode; }
+  catch (error) { throw sddError(error.message); }
+  if (toolMode !== 'openspec') throw sddError('openspec_protocol_required');
   const rawPolicy = policyFile ? parseStrictJson(policyFile.content) : {};
   if (policyFile && rawPolicy.schema !== 'aifhub.sdd_policy.v1') throw sddError('invalid-sdd-policy');
   const policy = validateSddPolicy(rawPolicy);

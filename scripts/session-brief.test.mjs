@@ -45,9 +45,9 @@ async function temp() {
   roots.push(root);
   return root;
 }
-async function fixture(input = signals) {
+async function fixture(input = signals, config) {
   const root = await temp();
-  await put(root, '.ai-factory/config.yaml', 'aifhub:\n  artifactProtocol: openspec\n  openspec:\n    useInstructionsApply: false\n');
+  await put(root, '.ai-factory/config.yaml', config ?? 'aifhub:\n  artifactProtocol: openspec\n  openspec:\n    useInstructionsApply: false\n');
   await put(root, `${base}/proposal.md`, proposal(input));
   await put(root, `${base}/tasks.md`, '# Tasks\n\n- [ ] 1.1 Implement behavior; verify focused regression.\n');
   await put(root, `${base}/specs/behavior/spec.md`, spec);
@@ -113,6 +113,30 @@ describe('SDD planning depth and gate separation', () => {
 });
 
 describe('SessionBrief compiler and exact revision custody', () => {
+  it('accepts new-style tool configs where tools.openspec replaces legacy artifactProtocol', async () => {
+    for (const config of [
+      'aifhub:\n  tools:\n    openspec: true\n',
+      'aifhub:\n  tools:\n    openspec: true\n  openspec:\n    useInstructionsApply: false\n',
+    ]) {
+      const root = await fixture(signals, config);
+      const result = await compileSessionBrief(options(root));
+      assert.equal(result.ok, true, JSON.stringify(result));
+    }
+  });
+  it('fails closed on new-style configs without openspec and on malformed tool mappings', async () => {
+    // The active-change resolver rejects these before the compiler protocol check,
+    // surfacing them as a blocked result rather than a thrown error.
+    for (const config of [
+      'aifhub:\n  tools:\n    openspec: false\n',
+      'aifhub:\n  tools: {}\n',
+      'aifhub:\n  tools:\n    nope: true\n',
+    ]) {
+      const root = await fixture(signals, config);
+      const result = await compileSessionBrief(options(root));
+      assert.equal(result.ok, false, JSON.stringify(result));
+      assert.deepEqual((result.errors ?? []).map(e => e.code), ['active_change_unresolved']);
+    }
+  });
   it('creates only runtime context, reproduces exact sources, and is byte/mtime idempotent', async () => {
     const root = await fixture();
     const before = await snapshot(root);
