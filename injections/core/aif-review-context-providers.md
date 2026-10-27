@@ -51,6 +51,8 @@ Do not let a code-quality pass erase or downgrade a plan/spec compliance finding
 
 When an authorized review benefits from independent focused questions, follow [specialized review support](../../skills/shared/REVIEW-DELEGATION.md). Resolve it from the installed extension at `.ai-factory/extensions/aifhub-extension/skills/shared/REVIEW-DELEGATION.md`. Only the coordinating parent dispatches permitted support workers. Keep the two-pass order, exact target and complete coverage; reconcile evidence before the single existing verdict. Without subagents, perform the permitted review directly and describe its actual independence.
 
+Do not add review sidecars solely because concurrency is available. Assign each permitted sidecar a distinct question and expected coverage, while preserving all user- or project-required independent roles.
+
 ### Scoped re-review
 
 For a requested re-review after fixes, follow `skills/shared/SCOPED-REVIEW.md` in either artifact mode. Match the previous findings to the exact fix targets, reconcile every finding by ID, and inspect the complete fix diff for regressions within the existing two-pass review. An incomplete or stale bundle cannot produce PASS. Ordinary full review and user-required independent review retain their scope.

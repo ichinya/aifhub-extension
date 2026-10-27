@@ -453,3 +453,5 @@ npm test
 ## License
 
 MIT
+
+Механика координации (JSON/digest/version, receipts/ACK, status и поддерживаемые waits) выполняется helper/direct path. Форма исполнения и причина остаются в existing notes; sidecar требует самостоятельного вопроса и сохраняет обязательные независимые роли. См. [workflow mechanics](docs/workflow-mechanics.md).

@@ -109,3 +109,7 @@ rootCauseEvidence
 - [Context Loading Policy](context-loading-policy.md)
 - [Codex Agents](codex-agents.md)
 - [Claude Agents](claude-agents.md)
+
+## Coordination dispatch и стоимость
+
+Дополнительный review sidecar требует concrete independently useful question, pinned target и expected coverage; free concurrency slot не повод для запуска. Required independent audits сохраняют отдельные роли. Direct review, same-session fallback и self-review не обозначаются independent audit. Instruction contract fixtures проверяют наличие policy и mirror parity; actual dispatch/service-call поведение требует host evaluation.

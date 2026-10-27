@@ -4,6 +4,14 @@ Apply after artifact classification permits local implementation and the active 
 
 For unclear readiness, dependency or migration boundaries, consult [executable task design](TASK-DESIGN.md) read-only during preflight. Missing facts and external access remain prerequisites; route affected plan changes to their existing owner. This does not make shared-worktree assignments safe for concurrent edits.
 
+## Service mechanics vs productive dispatch
+
+Use existing deterministic helpers or the coordinator's direct tool path for JSON field extraction, digest/version propagation, receipt collection and formatting, ACK formatting, status collection, and supported event waits. Do not dispatch an AI worker solely to perform these mechanical operations.
+
+Use only capabilities already exposed by the installed helper and host. Formatting an ACK does not authorize release, confirm delivery or prove that a worker stopped. A missing capability keeps the existing manual path and its stated limitations; a present helper's rejection must not be bypassed.
+
+Semantic independence checks, review findings, QA verdicts, parent acceptance, canonical progress and final verification remain with their existing owners. Mechanical assistance must not create a parent decision, relabel self-review as independent, or replace /aif-verify or /aif-done.
+
 ## Before implementation or first worker dispatch
 
 Scan the active plan's unfinished tasks and relevant completed producers before implementation edits or first worker dispatch. In the existing execution notes or normal response, identify the canonical task snapshot and record:
@@ -17,7 +25,9 @@ Before dispatching a later task, confirm its inputs still match the scanned snap
 
 ## Select one task, a coupled group, or a small same-shape batch
 
-Choose the execution shape from the actual work before dispatch. Record one short reason in existing preflight notes; no new approval or task artifact is needed.
+Choose the execution form from the actual work before dispatch. In the existing dispatch manifest or assignment/preflight notes, record the selected form — direct, serial coupled group, supported same-shape batch, or independent isolated tasks — and one short reason tied to the task's scope, dependencies, risk and available capabilities.
+
+This is assignment metadata in existing prose, not an additional field in execution helper JSON. Do not add fields to batch-start, isolation-start or per-item runtime manifests.
 
 | Shape | Choose when | Cost to account for |
 | --- | --- | --- |

@@ -28,6 +28,13 @@ const REVIEW_PROMPTS = [
 
 const AGENT_SEMANTIC_PAIRS = [
   {
+    label: 'concrete review question and independence boundary',
+    codexPath: 'agent-files/codex/aifhub-review-sidecar.toml',
+    claudePath: 'agent-files/claude/aifhub-review-sidecar.md',
+    start: "Answer the parent's concrete assigned question",
+    end: 'specialist participation alone.'
+  },
+  {
     label: 'source-aware execution, batch and recovery worker contract',
     codexPath: 'agent-files/codex/aifhub-implement-worker.toml',
     claudePath: 'agent-files/claude/aifhub-implement-worker.md',
@@ -128,10 +135,36 @@ function extractMarkdownSection(source, heading) {
 }
 
 describe('Superpowers-inspired workflow discipline', () => {
+  it('keeps service mechanics direct, dispatch reasons in prose and review questions independent of free slots', async () => {
+    // Instruction semantics, not a measurement of actual model dispatch.
+    const coordination = await readRepoFile('skills/shared/TASK-COORDINATION.md');
+    const review = await readRepoFile('skills/shared/REVIEW-DELEGATION.md');
+    for (const witness of [
+      "coordinator's direct tool path for JSON field extraction",
+      'Do not dispatch an AI worker solely',
+      'Formatting an ACK does not authorize release',
+      'must not create a parent decision',
+      'direct, serial coupled group, supported same-shape batch, or independent isolated tasks',
+      'not an additional field in execution helper JSON'
+    ]) assertIncludes(coordination, witness, 'service mechanics and reason policy');
+    for (const witness of [
+      'concrete, independently useful question',
+      'A free concurrency slot alone is not a reason',
+      'Preserve every independent audit required',
+      'must not be relabeled as an independent audit'
+    ]) assertIncludes(review, witness, 'review delegation policy');
+    for (const relativePath of IMPLEMENT_PROMPTS) {
+      const source = await readRepoFile(relativePath);
+      assert.match(source, /(?:without a separate AI worker|Perform incidental JSON field extraction)/);
+      assert.match(source, /(?:selected execution form and its short reason|supplied execution-form reason)/);
+    }
+  });
+
   it('resolves extension-owned coordination and re-review policies from every consumer', async () => {
     // Asset wiring only: this does not evaluate an agent's decisions on a real task.
     const policies = new Map([
       ['TASK-COORDINATION.md', IMPLEMENT_PROMPTS],
+      ['REVIEW-DELEGATION.md', REVIEW_PROMPTS],
       ['SCOPED-REVIEW.md', [...FIX_PROMPTS, ...REVIEW_PROMPTS]]
     ]);
     for (const [filename, consumers] of policies) {

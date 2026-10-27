@@ -87,3 +87,7 @@ Records live at `.ai-factory/state/<change-id>/execution/isolation/<group-id>.js
 The parent project lock serializes all isolation mutations with ordinary execution admission. An active group blocks ordinary parent runs; existing active runs or pending ordinary transactions block group admission. Orphan locks remain blocked and are never removed based on age/PID/silence. All helpers must be the same compatible version and cooperative; this is not an OS security boundary against other writers. Worker/result labels and stop notes are assertions from the host. The host alone owns process cancellation and any worktree cleanup after termination and data reconciliation.
 
 The implementation supports bounded waves with completed prerequisites. It does not schedule an arbitrary DAG, create worktrees, supervise processes, auto-resolve semantic conflicts or publish code. Behavioral coverage in `scripts/isolated-execution.test.mjs` uses real temporary Git worktrees and actual Node fixture checks; it does not measure model quality or validate a full installed multi-agent host session.
+
+## Причина формы и стоимость группы
+
+Independent isolated tasks и причина выбора isolation фиксируются до admission в тех же assignment/preflight notes, без дополнительных helper JSON fields.

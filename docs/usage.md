@@ -1374,3 +1374,8 @@ npm test
 - [ADR 0002: Optional Project Glossary](adr/0002-optional-project-context-glossary.md)
 - [Project Review Policy](review-policy.md)
 - [ADR 0003: Durable Project Review Policy](adr/0003-durable-project-review-policy.md)
+
+### Выбор формы исполнения и служебная механика
+
+Перед admission координатор указывает direct / serial coupled group / supported same-shape batch / independent isolated tasks и короткую причину в existing assignment/preflight notes. Runtime JSON не расширяется. JSON extraction, digest/version propagation, receipt/ACK formatting, status collection и supported event waits выполняются helper/direct path без отдельного AI worker. Review sidecar получает самостоятельный вопрос, pinned target и expected coverage; free slot сам по себе не причина. Required independent roles сохраняются; self-review и same-session fallback не independent.
+

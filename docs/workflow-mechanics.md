@@ -279,3 +279,9 @@ These records are local supporting artifacts, excluded from canonical OpenSpec a
 - [Usage](usage.md) — workflow and authoritative verification ownership.
 - [Task coordination](../skills/shared/TASK-COORDINATION.md) — independence checks and parent reconciliation.
 - [Prime Agent evaluation](runtime-research/prime-agent/README.md) — provenance and deferred runtime adoption.
+
+## Coordination cost and dispatch selection
+
+Use the existing helper/direct path for JSON extraction, digest/version propagation, receipts/ACK formatting, status collection and supported waits; do not dispatch an AI worker solely for service mechanics. An ACK does not prove delivery, release or stop. Keep semantic review, QA verdicts, parent acceptance, canonical progress and final verification with their existing owners.
+
+Record direct / serial coupled group / supported same-shape batch / independent isolated tasks and a scope/dependency/risk/capability reason in existing prose assignment/preflight notes before admission. Helper payloads stay closed.
