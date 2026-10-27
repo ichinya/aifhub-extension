@@ -1356,6 +1356,22 @@ npm test
 
 `npm run validate` checks the split manifest contract: upstream `extension.json`, private `aifhub-extension.json`, bundled agent files, and docs links.
 
+### Choosing the execution form and service mechanics
+
+Before admission the coordinator names direct / serial coupled group / supported same-shape batch / independent isolated tasks plus a short reason in the existing assignment/preflight notes. Runtime JSON is not extended. JSON extraction, digest/version propagation, receipt/ACK formatting, status collection, and supported event waits run on the helper/direct path without a separate AI worker. A review sidecar receives a concrete question, a pinned target, and expected coverage; a free slot alone is not a reason. Required independent roles are preserved; self-review and same-session fallback are not independent.
+
+### Read-only gate coverage diagnostics
+
+```text
+ai-factory aifhub-gate-coverage --change <id> [--require review,security] --json
+```
+
+The helper reads the exact `.ai-factory/qa/<id>/{verify,rules,review,security}.md` through the existing gate parser, plus `coverage.json`, `done-readiness.json`, and fresh-context receipts. Verify is always required; rules/coverage are included by unioning the verify/done policy flags. Additional review/security requirements are passed explicitly via `--require`; natural-language policy and multiple independent audit slots of one gate are not inferred automatically. `requirements_complete` refers only to the given query and OpenSpec flags.
+
+Exit 0 means the requested final-result inventory and current supporting coverage are present, exit 1 means missing/invalid/stale/failing evidence or unproven required independence, exit 2 means a bad query. WARN stays a final status; required rules/coverage honor allowWarnOnDone without weakening verify policy. A verify WARN yields a gap, not completion. The diagnostics are not semantic acceptance. The bounded JSON separates result_state/result_status, target_binding, role_coverage, and independence; `authorizes: []` always. Role coverage means the gate type, not performer authentication. An unknown target binding is reported explicitly and does not prove review freshness.
+
+Provenance observations show the fresh-context tier (execution_profile ai-fresh-context with a matching saved diff hash), same-session (same_session_fallback), unrecorded, or unknown. An existing prepared receipt does not bind a final gate result to a role and a current target; without a supported binding independence stays unknown even when the outcome says reviewed. Labels, self-review, and same-session never promote to independent. Explicitly required review/security therefore currently report UNKNOWN independence until such a binding exists. Gate coverage does not replace /aif-verify, /aif-done, or required audits. This is a diagnostic with no writes, locks, creates, providers, or stage routing.
+
 ## See Also
 
 - [Persistent Workflow Mechanics](workflow-mechanics.md) — classic/OpenSpec execution, `batch-start` → checkpoint/seal → per-item acceptance → close, exact inspection and owner interruption/stop confirmation. Use `ai-factory aifhub-execution <action> --json` with JSON on stdin; authoritative verification remains `/aif-verify`.
@@ -1374,8 +1390,6 @@ npm test
 - [ADR 0002: Optional Project Glossary](adr/0002-optional-project-context-glossary.md)
 - [Project Review Policy](review-policy.md)
 - [ADR 0003: Durable Project Review Policy](adr/0003-durable-project-review-policy.md)
-
-### Выбор формы исполнения и служебная механика
 
 Перед admission координатор указывает direct / serial coupled group / supported same-shape batch / independent isolated tasks и короткую причину в existing assignment/preflight notes. Runtime JSON не расширяется. JSON extraction, digest/version propagation, receipt/ACK formatting, status collection и supported event waits выполняются helper/direct path без отдельного AI worker. Review sidecar получает самостоятельный вопрос, pinned target и expected coverage; free slot сам по себе не причина. Required independent roles сохраняются; self-review и same-session fallback не independent.
 

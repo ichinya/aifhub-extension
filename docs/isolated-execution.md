@@ -88,6 +88,6 @@ The parent project lock serializes all isolation mutations with ordinary executi
 
 The implementation supports bounded waves with completed prerequisites. It does not schedule an arbitrary DAG, create worktrees, supervise processes, auto-resolve semantic conflicts or publish code. Behavioral coverage in `scripts/isolated-execution.test.mjs` uses real temporary Git worktrees and actual Node fixture checks; it does not measure model quality or validate a full installed multi-agent host session.
 
-## Причина формы и стоимость группы
+## Execution form reason and group cost feedback
 
-Independent isolated tasks и причина выбора isolation фиксируются до admission в тех же assignment/preflight notes, без дополнительных helper JSON fields. На границе завершённой группы учитываются доступные observed setup/orientation/integration и helper/tool counts с источником; estimates и UNKNOWN отмечаются явно. Feedback хранится вне pinned preflight/sealed evidence, по TASK-COORDINATION.md; parent acceptance, stop observation и final verification сохраняют владельцев.
+Independent isolated tasks and the reason for choosing isolation are recorded before admission in the same assignment/preflight notes, without additional helper JSON fields. At a completed group boundary, available observed setup/orientation/integration and helper/tool counts are accounted for with their source; estimates and UNKNOWN are labeled explicitly. Feedback is kept outside pinned preflight/sealed evidence, per TASK-COORDINATION.md; parent acceptance, stop observation, and final verification keep their owners.

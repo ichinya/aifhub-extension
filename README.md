@@ -454,4 +454,6 @@ npm test
 
 MIT
 
-Механика координации (JSON/digest/version, receipts/ACK, status и поддерживаемые waits) выполняется helper/direct path. Форма исполнения и причина остаются в existing notes; sidecar требует самостоятельного вопроса и сохраняет обязательные независимые роли. См. [workflow mechanics](docs/workflow-mechanics.md).
+## Coordination and review notes
+
+Coordination mechanics (JSON/digest/version propagation, receipts/ACK, status collection, and supported waits) run on the helper/direct path. The execution form and its reason stay in the existing assignment notes; a review sidecar requires its own concrete question, and required independent roles are preserved. See [workflow mechanics](docs/workflow-mechanics.md).
