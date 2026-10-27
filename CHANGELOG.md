@@ -6,8 +6,6 @@
 
 ## [В разработке]
 
-## [Незапланированное]
-
 ### Изменено
 - Precise-request fast path для `/aif-explore` (#236): явный read-only запрос с пятью settled измерениями служит confirmed brief; derived brief предъявляется один раз без второго confirmation. Новая authority для implementation, credentials, environment inspection, outside-project reads, optional providers и publication не возникает.
 - Действительное exact confirmation переносится между steps в пределах своего scope; material scope/risk/tradeoff change пересчитывает только affected frontier и запрашивает новые необходимые решения.

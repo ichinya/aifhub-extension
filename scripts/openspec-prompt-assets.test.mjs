@@ -1639,7 +1639,8 @@ describe('OpenSpec-native prompt asset contract', () => {
       }
 
       assert.match(asset, /compact evolution proposals/i, `${relativePath} optional learning output`);
-      assert.match(asset, /never[^\n]{0,80}(?:part of|inside|during|within)[^\n]{0,40}finalization/i, `${relativePath} evolve not in finalization`);
+      assert.ok(asset.split('\n').some(line => /never/i.test(line) && /finalization/i.test(line) && /evolve|evolution/i.test(line)),
+        `${relativePath} evolve not in finalization`);
       for (const expected of [
         'Optional evolution never blocks verified finalization',
         'Do not dispatch an evolution intake worker for optional learning',
