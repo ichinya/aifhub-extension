@@ -191,12 +191,13 @@ export async function buildGateCoverage(options = {}) {
     check.provenance = observations.length ? 'unknown' : 'unrecorded';
     check.codes.push('independence-unproven');
   }
-  // Recheck every consumed identity, including absence and the receipt inventory.
+  // Recheck every consumed identity, including absence and the receipt inventory,
+  // with the same decoded-text basis as the first read.
   try {
     requireValue(JSON.stringify(receiptNames) === JSON.stringify(await listReceipts()), 'receipt-inventory-changed');
     for (const [relative, hash] of inputs) {
       const data = await store.bytes(relative);
-      requireValue((data === null ? null : digest(data)) === hash, 'evidence-changed');
+      requireValue((data === null ? null : digest(new TextDecoder('utf-8', { fatal: true }).decode(data))) === hash, 'evidence-changed');
     }
   } catch { diagnostics.push('input-identity-changed-or-unsafe'); }
   const requested = [...checks, ...supporting].filter(c => c.required);
