@@ -92,6 +92,35 @@ async function writeTrace(root, digest, files, extra = '') {
 after(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
 
 describe('Plan compliance selection', () => {
+  it('matches annotated code-span surfaces without authorizing paths mentioned in the explanation', async () => {
+    const root = await fixture();
+    await put(root, `${base}/proposal.md`, proposal().replace(
+      '- src/handler.mjs\n- test/handler.test.mjs',
+      '- `src/handler.mjs` — implementation file; evidence belongs in `docs/**`.\n- `test/` — regression checks.'
+    ));
+    await compileValidBrief(root, '# Tasks\n\n- [x] 1.1 Implement behavior; verify focused regression.\n');
+    const allowed = await checkPlanCompliance({ ...options(root), changedFiles: ['src/handler.mjs', 'test/nested/regression.test.mjs'] });
+    assert.equal(allowed.outcome, 'compliant', JSON.stringify(allowed));
+    const explanation = await checkPlanCompliance({ ...options(root), changedFiles: ['docs/evidence.md'] });
+    assert.equal(explanation.outcome, 'replan_required');
+    assert.deepEqual(explanation.receipt.scope_expansions, ['docs/evidence.md']);
+  });
+
+  it('applies every grouped code-span prohibition before a broad allowed surface', async () => {
+    const root = await fixture();
+    await put(root, `${base}/proposal.md`, proposal()
+      .replace('- src/handler.mjs\n- test/handler.test.mjs', '- `**` — repository files.')
+      .replace('- storage/**', '- `storage/**`, `vendor/**`, `config/**` — protected trees.'));
+    await compileValidBrief(root, '# Tasks\n\n- [x] 1.1 Implement behavior; verify focused regression.\n');
+    for (const file of ['storage/cache/item', 'vendor/package/file.php', 'config/app.php']) {
+      const result = await checkPlanCompliance({ ...options(root), changedFiles: [file] });
+      assert.equal(result.outcome, 'replan_required', file);
+      assert.deepEqual(result.receipt.scope_expansions, [file]);
+    }
+    const unrelated = await checkPlanCompliance({ ...options(root), changedFiles: ['src/handler.mjs'] });
+    assert.equal(unrelated.outcome, 'compliant');
+  });
+
   it('returns compliant when changed files match allowed and all tasks are done', async () => {
     const root = await fixture();
     const compiled = await compileValidBrief(root, '# Tasks\n\n- [x] 1.1 Implement behavior; verify focused regression.\n');
