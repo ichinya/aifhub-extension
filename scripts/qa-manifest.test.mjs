@@ -491,6 +491,33 @@ describe('QA review hardening: case aliases, module identity, policy roots, verd
     assert.equal(honest.gateResult.status, rulesTip.gate_block.status);
   });
 
+  it('pins installed extension metadata, including aifhub-extension.json, in the module catalog (F5)', async () => {
+    const f = await fixture();
+    await f.prepare();
+    const store = await qaStore(f.options);
+    const manifest = await store.manifest();
+    for (const name of ['extension.json', 'provenance.json', 'aifhub-extension.json']) {
+      assert.ok(Object.hasOwn(manifest.payload.snapshot.modules, name), name);
+      assert.notEqual(manifest.payload.snapshot.modules[name], digest('missing'));
+    }
+  });
+
+  it('pins installed extension metadata, including aifhub-extension.json, in the real-FS module catalog (F5)', async () => {
+    const f = await fixture();
+    await mkdir(path.join(f.rootDir, 'src'), { recursive: true });
+    await writeFile(path.join(f.rootDir, 'src/a.mjs'), 'before');
+    const execFile = async (_bin, argv) => ({ stdout: argv.includes('--cached') ? 'src/a.mjs ' : '' });
+    const options = { ...f.options, SnapshotProvider: undefined, execFile,
+      checks: [{ ...f.checks[0], inputs: ['src'], command: { argv: ['fake'], cwd: '.' } }] };
+    assert.equal((await prepareQaManifest(options)).ok, true);
+    const store = await qaStore(options);
+    const manifest = await store.manifest();
+    for (const name of ['extension.json', 'provenance.json', 'aifhub-extension.json']) {
+      assert.ok(Object.hasOwn(manifest.payload.snapshot.modules, name), name);
+      assert.notEqual(manifest.payload.snapshot.modules[name], digest('missing'));
+    }
+  });
+
   it('chains corrective results automatically while preserving both records', async () => {
     const f = await fixture();
     await f.prepare();
