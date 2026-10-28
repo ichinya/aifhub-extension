@@ -233,7 +233,23 @@ function collectSurfacePatterns(sections) {
   for (const section of sections) {
     for (const line of String(section ?? '').split(/\r\n|\n|\r/)) {
       const item = toPosix(line.trim().replace(/^[-*+]\s+/, '').trim());
-      if (item) patterns.push(item);
+      if (!item) continue;
+      if (!item.startsWith('`')) {
+        patterns.push(item);
+        continue;
+      }
+      // Only leading code spans separated by commas declare paths. Code spans
+      // later in an explanation must not expand the allowed surface.
+      let remaining = item;
+      while (true) {
+        const span = remaining.match(/^`([^`]+)`/);
+        if (!span) break;
+        const pattern = span[1].trim();
+        if (pattern) patterns.push(pattern);
+        remaining = remaining.slice(span[0].length).trimStart();
+        if (!remaining.startsWith(',')) break;
+        remaining = remaining.slice(1).trimStart();
+      }
     }
   }
   return patterns;
