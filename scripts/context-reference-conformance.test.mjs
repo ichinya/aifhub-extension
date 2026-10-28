@@ -100,7 +100,9 @@ async function snapshot(root, prefix = '') {
   return result;
 }
 afterEach(async () => {
-  for (const root of roots.splice(0)) await fs.rm(root, { recursive: true, force: true });
+  for (const root of roots.splice(0)) {
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  }
 });
 
 const TEXT = {
@@ -307,13 +309,14 @@ function observeReads(rootDir, { install = Object.defineProperty } = {}) {
     else partial('unattributed-read-error', { code: error.code ?? error.name });
   }
   function wrap(handle, file) {
-    const state = { file, depth: 0, closed: false, restore: [] };
+    const state = { file, depth: 0, maxDepth: 0, closed: false, restore: [] };
     handles.set(handle, state);
     for (const method of ['read', 'readv', 'readFile']) {
       if (typeof handle[method] !== 'function') continue;
       const original = handle[method];
       state.restore.push(patch(handle, method, async function (...args) {
         const outer = state.depth++ === 0;
+        state.maxDepth = Math.max(state.maxDepth, state.depth);
         try {
           const value = await original.apply(this, args);
           if (outer) record(file, method === 'readFile' ? bytes(value, args[0]) : value.bytesRead);
@@ -377,6 +380,9 @@ function observeReads(rootDir, { install = Object.defineProperty } = {}) {
       const openHandlesAtStop = [...handles.values()].filter(state => !state.closed).length;
       if (openHandlesAtStop) reasons.push('open-handles-at-stop');
       if ([...handles.values()].some(state => state.depth > 0)) reasons.push('pending-reads-at-stop');
+      // Overlapping reads of one handle are under-counted by the depth guard:
+      // report the window as partial instead of claiming complete observation.
+      if ([...handles.values()].some(state => state.maxDepth > 1)) reasons.push('concurrent-reads-unsupported');
       for (const restore of [...undo].reverse()) restore();
       syncBuiltinESMExports();
       activeObserver = false;
