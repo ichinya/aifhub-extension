@@ -2,6 +2,7 @@
 import { access, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { readBoundGateEvidence } from './qa-bound-evidence.mjs';
 import { fileURLToPath } from 'node:url';
 import { providerDiagnostics, runProviders } from './aifhub-providers.mjs';
 import { normalizeProviderPolicies, parseProviderConfig } from './provider-policy.mjs';
@@ -632,7 +633,7 @@ export async function doctorAifMode(options = {}) {
   }
 
   if (status.mode === MODES.openspec && status.activeChange.state === 'resolved') {
-    diagnostics.push(await inspectVerifyGateDiagnostic(rootDir, status));
+    diagnostics.push(await inspectVerifyGateDiagnostic(rootDir, status, options));
     const validateOpenSpecArtifactContract = options.validateOpenSpecArtifactContract ?? defaultValidateOpenSpecArtifactContract;
     artifactContract = await validateOpenSpecArtifactContract({
       ...options,
@@ -1819,7 +1820,7 @@ async function inspectConfiguredPaths(options = {}) {
   return diagnostics;
 }
 
-async function inspectVerifyGateDiagnostic(rootDir, status) {
+async function inspectVerifyGateDiagnostic(rootDir, status, options = {}) {
   const qaRoot = status.config.paths.qa ?? DEFAULT_OPEN_SPEC_PATHS.qa;
   const changeId = status.activeChange.changeId;
   const verifyPath = path.join(rootDir, qaRoot, changeId, 'verify.md');
@@ -1830,6 +1831,11 @@ async function inspectVerifyGateDiagnostic(rootDir, status) {
   }
 
   const gate = getLatestGateResult(content, { gate: 'verify' });
+  const binding = await readBoundGateEvidence({ ...options, rootDir, changeId,
+    qaDir: toPosix(path.join(qaRoot, changeId)), gate: 'verify', content });
+  if (binding.enrolled && binding.state !== 'valid') {
+    return fail('verify-gate-binding-invalid', `Verify QA binding ${binding.state}: ${binding.code}.`);
+  }
 
   if (gate === null) {
     return warn('verify-gate-missing', `Verify gate result is missing for active change ${changeId}.`);

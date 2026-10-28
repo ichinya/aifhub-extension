@@ -6,6 +6,8 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { getLatestGateResult } from './aif-gate-result.mjs';
+import { canonical } from './workflow-state-store.mjs';
+import { readBoundGateEvidence } from './qa-bound-evidence.mjs';
 
 export const OPENSPEC_POLICY_SCHEMA_VERSION = 1;
 
@@ -295,6 +297,33 @@ export function evaluatePolicyFinding(finding, policy, options = {}) {
 }
 
 export async function readOpenSpecRulesGateEvidence(changeId, options = {}) {
+  if (options.rulesGateEvidence !== undefined || options.rulesGateResult !== undefined) {
+    const binding = await readBoundGateEvidence({ ...options, changeId, gate: 'rules',
+      content: options.rulesGateEvidence?.content ?? '' });
+    if (binding.enrolled) {
+      if (binding.state !== 'valid') return { exists: true, ok: false,
+        status: 'invalid', gateResult: null, path: null, binding, warnings: [],
+        errors: [{ code: binding.code, message: `Rules QA binding: ${binding.state}.` }] };
+      // In bound mode the verdict must come from the exact bytes the binding
+      // validated; a separately passed parsed result could claim a different
+      // status than the published body.
+      const content = options.rulesGateEvidence?.content;
+      if (typeof content !== 'string' || binding.semantic_status === undefined) {
+        return { exists: true, ok: false, status: 'invalid', gateResult: null, path: null,
+          binding, warnings: [], errors: [{ code: 'gate-block-mismatch',
+            message: 'Bound rules evidence requires the validated content bytes.' }] };
+      }
+      const derived = getLatestGateResult(content, { gate: 'rules' });
+      const gateResult = derived?.ok === true ? derived.result : null;
+      if (options.rulesGateResult !== undefined
+        && canonical(options.rulesGateResult) !== canonical(gateResult)) {
+        return { exists: true, ok: false, status: 'invalid', gateResult: null, path: null,
+          binding, warnings: [], errors: [{ code: 'gate-block-mismatch',
+            message: 'Passed rules gate result does not match the bound evidence bytes.' }] };
+      }
+      return normalizeRulesGateEvidence({ exists: true, path: null, gateResult, content }, null);
+    }
+  }
   if (options.rulesGateEvidence !== undefined) {
     return normalizeRulesGateEvidence(options.rulesGateEvidence, null);
   }
@@ -332,6 +361,13 @@ export async function readOpenSpecRulesGateEvidence(changeId, options = {}) {
     try {
       const content = await readFile(candidatePath, 'utf8');
       const gate = getLatestGateResult(content, { gate: 'rules' });
+      const binding = await readBoundGateEvidence({ ...options, rootDir, changeId: normalized.changeId,
+        qaDir: toPosix(path.relative(rootDir, qaPath)), gate: 'rules', content });
+      if (binding.enrolled && binding.state !== 'valid') {
+        return { exists: true, ok: false, status: 'invalid', binding,
+          path: toPosix(path.relative(rootDir, candidatePath)), gateResult: null, warnings: [],
+          errors: [{ code: binding.code, message: `Rules QA binding: ${binding.state}.` }] };
+      }
       return normalizeRulesGateEvidence({
         exists: true,
         path: toPosix(path.relative(rootDir, candidatePath)),

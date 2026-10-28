@@ -4,6 +4,7 @@ import { execFile } from 'node:child_process';
 import { access, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
+import { evaluateQaBinding } from './qa-bound-evidence.mjs';
 import { providerDiagnostics, runProviders } from './aifhub-providers.mjs';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -192,6 +193,15 @@ export async function buildOpenSpecDoneReadiness(options = {}) {
   });
   context.verification = verification.value;
   recordCheck(checks, diagnostics, verification);
+
+  const binding = await (options.evaluateQaManifest ?? evaluateQaBinding)({ ...options, rootDir,
+    requirePublication: true, changeId: resolved.changeId, qaDir: toPosix(path.relative(rootDir, layout.qaPath)) });
+  if (binding.enrolled) {
+    recordCheck(checks, diagnostics, checkResult({ check: 'qa_manifest',
+      level: binding.state === 'valid' ? 'pass' : 'fail', code: binding.code,
+      message: `QA manifest binding: ${binding.state}.`, value: binding,
+      suggestedNext: { command: `/aif-verify ${resolved.changeId}`, reason: 'refresh QA binding before finalization' } }));
+  }
 
   const providers = await runProviders({ ...options, rootDir, changeId: resolved.changeId,
     phase: 'done', write: false, readOnly: true });

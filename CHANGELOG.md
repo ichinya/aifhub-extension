@@ -7,6 +7,7 @@
 ## [В разработке]
 
 ### Добавлено
+- `aifhub-qa-manifest` (#234): explicit enrollment для classic/OpenSpec, raw-byte dependency fingerprints, immutable results с corrective history, trusted observation bindings и publisher с custody/CAS; existing readers учитывают stale/blocked evidence без изменения gate v1 и unbound behavior.
 - Read-only `aifhub-gate-coverage` (#235): bounded диагностика final gate inventory, policy-required rules/coverage и явно required review/security, без writes/locks или workflow authority. Недоказанная independence остаётся UNKNOWN; offline K=5/5×serial counters не заявляют model-call savings.
 
 ### Изменено

@@ -236,6 +236,20 @@ afterEach(async () => {
 });
 
 describe('OpenSpec done readiness gate', () => {
+  it('adds qa_manifest only when enrolled and keeps persisted schema compatible', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+    const baseline = await buildOpenSpecDoneReadiness({ rootDir, changeId: 'add-oauth', ...passingOptions() });
+    assert.equal(baseline.checks.qa_manifest, undefined);
+    const readiness = await buildOpenSpecDoneReadiness({ rootDir, changeId: 'add-oauth', ...passingOptions(),
+      evaluateQaManifest: async () => ({ enrolled: true, state: 'stale', code: 'gate-source-stale', affected_checks: ['tests'] }) });
+    assert.equal(readiness.checks.qa_manifest, 'fail');
+    assert.equal(readiness.blocking, true);
+    assert.equal(readiness.schema_version, baseline.schema_version);
+    assert.equal(readiness.checks.verify_gate, baseline.checks.verify_gate);
+    assert.ok(readiness.diagnostics.some(d => d.check === 'qa_manifest' && d.code === 'gate-source-stale'));
+  });
+
   it('binds an OpenSpec requirement to HLV evidence before allowing done readiness', async () => {
     const rootDir = await createTempRoot();
     await createOpenSpecChange(rootDir);

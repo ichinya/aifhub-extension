@@ -4,6 +4,25 @@
 
 This guide documents the v1 OpenSpec-native workflow for AIFHub Extension.
 
+## QA manifest и dependency-aware reuse
+
+`aifhub-qa-manifest` (#234) явно включает bound mode для work item. Без enrollment существующие writers и `--force` работают как прежде. Для OpenSpec используется `.ai-factory/qa/<id>`, для classic — plan folder (rules gate хранится в `gates/rules.md`, чтобы сохранить canonical `rules.md`). Произвольный layout задаётся `--namespace` и `--qa-dir`.
+
+```text
+ai-factory aifhub-qa-manifest prepare --change <id> --config qa-inputs.json --json
+ai-factory aifhub-qa-manifest record --change <id> --gate verify --check tests --result run-1 --from verify.md --json
+ai-factory aifhub-qa-manifest publish --change <id> --expected-publication none --json
+ai-factory aifhub-qa-manifest inspect --change <id> --json
+```
+
+Classic использует `--plan <id>` вместо `--change`. JSON config содержит `scope`, `checks`, опциональные `policyInputs`, `moduleInputs`, `requiredGates`, `independentRoles` (`check_id`, `role`) и `evidenceRefs`. Каждый check задаёт `id`, `gate`, `profile: "declared.v1"`, `dependencies_complete: true`, `inputs`, `command: {argv, cwd, definition}`, `toolchain: [{name, path, sha256}]`, `env_inputs`, опциональные `ignored_inputs`, `required_evidence` и `requires_observed` (default false). `path` — project-relative файл фактического toolchain; его bytes перечитываются. Closure объявляет adapter/owner: неизвестные runtime dependencies или одна строка версии toolchain не доказывают reuse. Executable/dependency bytes следует включать в inputs; library `providers.toolchain` позволяет заново наблюдать external identities. Явные required gates/roles сохраняются при последующих prepare; новый config не может сократить их.
+
+`record` сохраняет FAIL/nonzero/timeout/cancelled; запись не означает acceptance. Corrective run получает новый `--result` и `--supersedes <id>`. Bound `--force` запрещён. Publication использует CAS id прежней публикации; после seal для новых results нужен новый prepare. Binding `valid/stale/blocked` отдельно от semantic `pass/warn/fail`. Publishers/readers не исполняют checks, не архивируют и не меняют checkboxes; verify/done и независимые роли сохраняют authority.
+
+Metadata registry v1 разрешает только JSON schemas `aifhub.delivery.v1` в `.ai-factory/state/<id>/delivery/*.json` (retry_count/ack/query_state/updated_at) и `aifhub.operational-status.v1` в `.ai-factory/state/<id>/status.json` (status/display/updated_at). Другие поля, declared inputs, policy и scope существенны. Generated rules и tasks checkboxes — inputs. Raw hashes различают CRLF/BOM; absent environment отличается от empty. Declared ignored inputs хэшируются, остальные ignored names отслеживаются. Лимиты: 20000 файлов, 16 MiB/blob, 256 MiB/snapshot, 64 checks, 256 results/refs; превышение блокирует без truncation.
+
+Host observation принимает consumer-side receipt `aifhub.observed-check.v1` только через injectable trusted `HostObservationRegistry.lookup(run_id)`; JSON statement сам по себе не trusted. Реальный host producer принадлежит #227/#231. Library также принимает `SnapshotProvider`, `execFile`, environment и providers для dependency/toolchain/owner requirements; offline fixtures не запускают Git или сеть. Default filesystem adapter отклоняет submodules с `submodule-identity-unproven` до подключения trusted snapshot adapter. Symlink/junction/hardlink и case collisions запрещены. Cooperative lock и повторные чтения предполагают спокойный checkout и не обеспечивают OS snapshot isolation; незавершённый journal не считается accepted publication.
+
 ```text
 setup and mode:
   /aif-mode status                                  # recommended

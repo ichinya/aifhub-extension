@@ -3,6 +3,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
 import process from 'node:process';
+import { isQaEnrolled, recordBoundEvidence } from './qa-manifest-record.mjs';
+import { readBoundGateEvidence } from './qa-bound-evidence.mjs';
 
 import {
   ensureRuntimeLayout as defaultEnsureRuntimeLayout,
@@ -223,8 +225,23 @@ export async function writeVerificationEvidence(changeId, evidence, options = {}
   assertSafeQaPath(rootDir, qaPath);
 
   const rawDir = path.join(qaPath, 'raw');
-  await ensureRuntimeGitignore(rootDir, options.qaPath !== undefined ? qaPath : path.dirname(qaPath));
-  await mkdir(rawDir, { recursive: true });
+  const bindingOptions = { ...options, rootDir, changeId: normalized.changeId,
+    qaDir: toPosix(path.relative(rootDir, qaPath)) };
+  const bound = await isQaEnrolled(bindingOptions);
+  const artifacts = {};
+  const persistJson = async (filename, value) => {
+    if (bound) artifacts[toPosix(path.relative(rootDir, filename))] = `${JSON.stringify(value, null, 2)}\n`;
+    else await writeJson(filename, value);
+  };
+  const persistStreams = async command => {
+    if (!bound) return writeRawCommandStreams(command, rawDir);
+    if (command.rawStdoutPath !== null) artifacts[command.rawStdoutPath] = command.stdout;
+    if (command.rawStderrPath !== null) artifacts[command.rawStderrPath] = command.stderr;
+  };
+  if (!bound) {
+    await ensureRuntimeGitignore(rootDir, options.qaPath !== undefined ? qaPath : path.dirname(qaPath));
+    await mkdir(rawDir, { recursive: true });
+  }
 
   const files = [];
   const validation = normalizeEvidenceCommand({
@@ -240,8 +257,8 @@ export async function writeVerificationEvidence(changeId, evidence, options = {}
     stdoutFileName: 'openspec-validate.stdout',
     stderrFileName: 'openspec-validate.stderr'
   });
-  await writeRawCommandStreams(validation, rawDir);
-  await writeJson(path.join(qaPath, VALIDATION_FILE), validation);
+  await persistStreams(validation);
+  await persistJson(path.join(qaPath, VALIDATION_FILE), validation);
   files.push(toPosix(path.relative(rootDir, path.join(qaPath, VALIDATION_FILE))));
 
   let status = null;
@@ -255,8 +272,8 @@ export async function writeVerificationEvidence(changeId, evidence, options = {}
       stdoutFileName: 'openspec-status.stdout',
       stderrFileName: 'openspec-status.stderr'
     });
-    await writeRawCommandStreams(status, rawDir);
-    await writeJson(path.join(qaPath, STATUS_FILE), status);
+    await persistStreams(status);
+    await persistJson(path.join(qaPath, STATUS_FILE), status);
     files.push(toPosix(path.relative(rootDir, path.join(qaPath, STATUS_FILE))));
   }
 
@@ -269,11 +286,14 @@ export async function writeVerificationEvidence(changeId, evidence, options = {}
     skipVerifyEvidence: true,
     policy: evidence.policy ?? options.policy
   });
-  const coverageEvidence = await writeOpenSpecCoverageMatrix(normalized.changeId, coverage, {
+  const coverageEvidence = bound
+    ? { relativePath: toPosix(path.relative(rootDir, path.join(qaPath, 'coverage.json'))) }
+    : await writeOpenSpecCoverageMatrix(normalized.changeId, coverage, {
     ...options,
     rootDir,
     qaPath
   });
+  if (bound) await persistJson(path.join(qaPath, 'coverage.json'), { ...coverage, change_id: normalized.changeId });
   files.push(coverageEvidence.relativePath);
 
   const summary = summarizeOpenSpecValidation({
@@ -293,7 +313,11 @@ export async function writeVerificationEvidence(changeId, evidence, options = {}
     ...evidence,
     coverage
   });
-  await writeFile(path.join(qaPath, VERIFY_FILE), `${summary}\n\n${renderGateResultBlock(gateResult)}\n`, 'utf8');
+  const markdown = `${summary}\n\n${renderGateResultBlock(gateResult)}\n`;
+  if (bound) {
+    const recorded = await recordBoundEvidence({ ...bindingOptions, gate: 'verify', markdown, artifacts });
+    if (!recorded.ok) return { ...recorded, changeId: normalized.changeId, qaEvidence: { path: toPosix(path.relative(rootDir, qaPath)), files: [] } };
+  } else await writeFile(path.join(qaPath, VERIFY_FILE), markdown, 'utf8');
   files.push(toPosix(path.relative(rootDir, path.join(qaPath, VERIFY_FILE))));
 
   return {
@@ -347,8 +371,12 @@ export async function readLatestVerificationEvidence(changeId, options = {}) {
     qaPath
   });
 
+  const binding = await readBoundGateEvidence({ ...options, rootDir, changeId: normalized.changeId,
+    qaDir: toPosix(path.relative(rootDir, qaPath)), gate: 'verify', content: verifyContent.value ?? '' });
+  const bindingBlocked = binding.enrolled && binding.state !== 'valid';
+
   return {
-    ok: validation.exists,
+    ok: validation.exists && !bindingBlocked,
     changeId: normalized.changeId,
     validation: validation.exists ? validation.value : null,
     status: status.exists ? status.value : null,
@@ -357,7 +385,9 @@ export async function readLatestVerificationEvidence(changeId, options = {}) {
       path: toPosix(path.relative(rootDir, verifyPath)),
       content: verifyContent.value
     },
-    gateResult,
+    gateResult: bindingBlocked && gateResult ? { ...gateResult, ok: false,
+      errors: [{ code: binding.code, message: `QA binding ${binding.state}.` }] } : gateResult,
+    ...(binding.enrolled ? { binding } : {}),
     coverage,
     warnings: validation.exists ? [] : [
       {
@@ -365,7 +395,7 @@ export async function readLatestVerificationEvidence(changeId, options = {}) {
         message: `Verification evidence is missing: ${toPosix(path.relative(rootDir, path.join(qaPath, VALIDATION_FILE)))}`
       }
     ],
-    errors: []
+    errors: bindingBlocked ? [{ code: binding.code, message: `QA binding ${binding.state}.` }] : []
   };
 }
 

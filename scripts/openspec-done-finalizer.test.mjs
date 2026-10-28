@@ -409,6 +409,25 @@ afterEach(async () => {
 });
 
 describe('OpenSpec done finalizer command', () => {
+  it('rechecks fresh QA custody after readiness and before calling archive', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+    await createRuntimeEvidence(rootDir);
+    let observations = 0;
+    let archived = 0;
+    const result = await finalizeOpenSpecChange(passingFinalizerOptions(rootDir, {
+      evaluateQaManifest: async () => (++observations === 1
+        ? { enrolled: true, state: 'valid', code: 'qa-binding-valid', affected_checks: [] }
+        : { enrolled: true, state: 'blocked', code: 'custody-race', affected_checks: [] }),
+      archiveOpenSpecChange: async () => { archived += 1; return archiveResult(); }
+    }));
+    assert.equal(result.readiness.blocking, false, JSON.stringify(result.errors));
+    assert.equal(observations, 2);
+    assert.equal(archived, 0);
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.some(e => e.code === 'custody-race'));
+  });
+
   it('parses only the public finalizer flags', () => {
     assert.deepEqual(
       parseDoneFinalizerArgs([
