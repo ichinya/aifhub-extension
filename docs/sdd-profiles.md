@@ -2,12 +2,13 @@
 
 # SDD profiles and SessionBrief (P0)
 
-Implementation status: this is an OpenSpec-only prototype. The revised target in
+Implementation status: classic AI Factory and OpenSpec SessionBrief are supported. The revised target in
 [ADR 0005](adr/0005-ai-factory-plan-methodologies.md) makes AI Factory the plan owner
 across methodologies and optional tools. A v1 common plan resolver and
-methodology adapters are implemented; SessionBrief now compiles from
-`aifhub.plan_context.v1` produced by the OpenSpec adapter while preserving exact
-source revision and adapter binding.
+methodology adapters are implemented; SessionBrief compiles from
+`aifhub.plan_context.v1` while preserving exact source revision and adapter binding.
+See [Classic SessionBrief](classic-session-brief.md) for the native pair format,
+config precedence, status projection, ultra handoff, and one-time digest migration.
 
 SDD profiles choose planning depth independently of quality gates. Public planning
 tokens remain `fast | full | ultra`; `quick` and `standard` use `full` canonical
@@ -65,14 +66,16 @@ For a new SDD-managed canonical change, `/aif-plan` records reviewed facts once 
 ````
 
 `Allowed Change Surface` is required for an executable brief. Behavioral changes
-also need delta specs, non-goals, and acceptance examples. `Acceptance Criteria`,
+in OpenSpec also need delta specs, non-goals, and acceptance examples. Classic
+uses declared `Requirements` and behavioral acceptance criteria instead of delta
+spec files. `Acceptance Criteria`,
 `Constraints`, `Assumptions`, `Forbidden Change Surface`, and `Verification Plan`
 are extracted from proposal/design only when useful. These sections supplement
 the exact OpenSpec headings and formal requirements/scenarios. Do not add empty
 boilerplate. An active nonempty `Open Questions` section blocks implementation;
 omit it once the questions are resolved instead of writing a placeholder.
 
-Quick requires proposal and tasks plus delta specs for behavior changes. Design
+In OpenSpec, quick requires proposal and tasks plus delta specs for behavior changes. Design
 is conditional: satisfy the selected OpenSpec schema and project policy before
 handoff. Standard, expanded, and ultra require design. Docs/tooling-only work may
 omit delta specs through the existing explicit no-spec explanation/metadata
@@ -105,7 +108,8 @@ output locations are not accepted. No automatic provider execution is involved.
 
 ## Installed commands
 
-After canonical planning and `/aif-mode sync --change <change-id>`:
+After canonical planning (and `/aif-mode sync --change <change-id>` for OpenSpec;
+classic uses the native pair directly):
 
 ```bash
 ai-factory aifhub-session-brief compile --change 168-bounded-change --json

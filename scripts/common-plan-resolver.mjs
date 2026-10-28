@@ -7,15 +7,19 @@ import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { resolveActiveChange, normalizeChangeId } from './active-change-resolver.mjs';
-import { readProviderFile, safeProviderPath, writeProviderFile } from './provider-files.mjs';
+import { readProviderFile, writeProviderFile } from './provider-files.mjs';
 import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
 import { selectSddProfile, validateSddInputs, validateSddPolicy } from './sdd-profiles.mjs';
+import { parseSimpleYaml } from './aif-artifact-sync.mjs';
+import { parseToolConfig } from './tool-config.mjs';
+import { discoverLegacyPlans } from './legacy-plan-migration.mjs';
 
 const ADAPTER_DIR = new URL('../adapters/', import.meta.url);
 
-export function planResolverError(code) {
+export function planResolverError(code, errors = [{ code }]) {
   const error = new Error(code);
   error.planResolverCode = code;
+  error.planResolverErrors = errors.map(({ code: value }) => ({ code: value }));
   return error;
 }
 
@@ -50,20 +54,14 @@ async function loadAdapter(methodology) {
 export async function resolvePlanContext(options = {}) {
   try {
     const root = path.resolve(options.rootDir ?? process.cwd());
-    let changeId;
-    if (options.changeId !== undefined) {
-      const normalized = normalizeChangeId(options.changeId);
-      if (!normalized.ok) throw planResolverError('invalid-change-id');
-      changeId = normalized.changeId;
-    } else {
-      const resolution = await resolveActiveChange({ rootDir: root, cwd: options.cwd ?? root });
-      if (!resolution.ok) throw planResolverError('active_change_unresolved');
-      changeId = resolution.changeId;
-    }
-    const methodology = options.methodology ?? 'openspec';
+    const target = await resolvePlanTarget({ ...options, rootDir: root });
+    const { changeId, methodology } = target;
     const adapter = await loadAdapter(methodology);
-    const identity = await adapter.resolveIdentity(root, changeId, options);
-    const rawContext = await adapter.readContext(root, identity, options);
+    const adapterOptions = { ...options, nativeTarget: options.changeId };
+    const identity = await adapter.resolveIdentity(root, changeId, adapterOptions);
+    const validation = await adapter.validate(root, identity, adapterOptions);
+    if (validation.length) throw planResolverError(validation[0].code, validation);
+    const rawContext = await adapter.readContext(root, identity, adapterOptions);
     const context = await normalizePlanContext(rawContext, identity, changeId, methodology);
     context.documents = await resolveDocuments(root, identity, context, options);
     context.source_revision = computeSourceRevision(context.documents);
@@ -73,6 +71,39 @@ export async function resolvePlanContext(options = {}) {
     const code = typeof error.message === 'string' && /^[a-z0-9_-]+$/.test(error.message) ? error.message : 'plan_resolver_failed';
     throw planResolverError(code);
   }
+}
+
+export async function resolvePlanTarget(options = {}) {
+  const root = path.resolve(options.rootDir ?? process.cwd());
+  const read = options.readSource ?? ((root, file) => readProviderFile(root, file, 2 * 1024 * 1024));
+  const bytes = await read(root, '.ai-factory/config.yaml');
+  const raw = bytes?.toString('utf8') ?? '';
+  const effective = parseToolConfig(raw);
+  const methodology = options.methodology ?? (effective.mode === 'openspec' ? 'openspec' : 'aifactory');
+  if (methodology === 'openspec') {
+    if (options.changeId !== undefined && !normalizeChangeId(options.changeId).ok) throw planResolverError('invalid-change-id');
+    const resolution = await resolveActiveChange({ ...options, rootDir: root, cwd: options.cwd ?? root });
+    if (!resolution.ok) throw planResolverError('active_change_unresolved');
+    return { ...resolution, methodology };
+  }
+  if (options.changeId !== undefined) {
+    if (typeof options.changeId !== 'string' || !options.changeId) throw planResolverError('invalid-change-id');
+    let value = options.changeId.replace(/^@/, '').replaceAll('\\', '/');
+    const config = parseSimpleYaml(raw);
+    const plans = (config.paths?.plans ?? '.ai-factory/plans').replaceAll('\\', '/').replace(/\/$/, '');
+    const fast = (config.paths?.plan ?? '.ai-factory/PLAN.md').replaceAll('\\', '/');
+    if (value === fast) value = path.posix.basename(fast, '.md');
+    else if (value.startsWith(`${plans}/`)) value = value.slice(plans.length + 1).replace(/\/(?:index|task|context|rules|verify|explore)\.md$|\/status\.yaml$|\.md$|\/$/g, '');
+    const normalized = normalizeChangeId(value);
+    if (!normalized.ok) throw planResolverError('invalid-change-id');
+    return { ok: true, changeId: normalized.changeId, methodology, source: 'explicit', warnings: [], errors: [] };
+  }
+  const config = parseSimpleYaml(raw);
+  const discovery = await discoverLegacyPlans({ rootDir: root, plansDir: config.paths?.plans ?? '.ai-factory/plans', useRecordedLegacyPlanSource: false });
+  if (!discovery.ok) throw planResolverError(discovery.errors[0]?.code ?? 'active_change_unresolved', discovery.errors);
+  const pairs = discovery.plans.filter(plan => plan.shape === 'classic-pair');
+  if (pairs.length !== 1) throw planResolverError(pairs.length ? 'ambiguous_active_plan' : 'active_change_unresolved');
+  return { ok: true, changeId: pairs[0].id, methodology, source: 'single-classic-pair', warnings: [], errors: [] };
 }
 
 async function normalizePlanContext(raw, identity, changeId, methodology) {
@@ -85,6 +116,15 @@ async function normalizePlanContext(raw, identity, changeId, methodology) {
     public_mode: raw.public_mode ?? null,
     sdd_profile: raw.sdd_profile ?? null,
     original_request: raw.original_request ?? '',
+    requirements_reconciliation: raw.requirements_reconciliation ?? '',
+    entrypoint: raw.entrypoint ?? identity.entrypoint ?? null,
+    checklist: raw.checklist ?? identity.checklist ?? (identity.base ? `${identity.base}/tasks.md` : null),
+    shape: raw.shape ?? null,
+    upstream_handoff: raw.upstream_handoff ?? null,
+    source_binding: raw.source_binding ?? null,
+    sections: raw.sections ?? [],
+    document_refs: raw.document_refs ?? [],
+    document_projections: raw.document_projections ?? {},
     requirements: {
       intent: '',
       target_outcome: '',
@@ -110,9 +150,9 @@ async function normalizePlanContext(raw, identity, changeId, methodology) {
     try {
       const inputs = validateSddInputs(raw.sdd_inputs);
       const policy = validateSddPolicy(raw.sdd_policy ?? {});
-      const selection = selectSddProfile(inputs, policy, { supportsUltra: raw.public_mode === 'ultra' });
+      const selection = selectSddProfile(inputs, policy, { supportsUltra: raw.public_mode === 'ultra', methodology });
       defaults.sdd_profile = selection.profile;
-      defaults.public_mode = selection.recommended_planning_mode;
+      defaults.recommended_planning_mode = selection.recommended_planning_mode;
     } catch (error) {
       defaults.errors.push({ code: error.sddCode ?? error.planResolverCode ?? 'invalid-sdd-profile-selection' });
     }
@@ -130,10 +170,12 @@ async function resolveDocuments(root, identity, context, options) {
   const docs = [];
   for (const key of paths) {
     const { path: file, kind } = JSON.parse(key);
-    try {
-      const bytes = await readProviderFile(root, file, 4 * 1024 * 1024);
-      if (bytes !== null) docs.push({ path: file, sha256: sha256(bytes), kind, bytes: bytes.length });
-    } catch { docs.push({ path: file, sha256: '', kind, bytes: 0 }); }
+    const bytes = await (options.readSource ?? ((root, file) => readProviderFile(root, file, 2 * 1024 * 1024)))(root, file);
+    if (bytes === null && kind === 'canonical') throw planResolverError('missing_plan_file');
+    const projection = context.document_projections[file];
+    if (bytes !== null) docs.push({ path: file, sha256: sha256(projection ?? bytes), kind,
+      bytes: projection === undefined ? bytes.length : Buffer.byteLength(projection),
+      ...(projection === undefined ? {} : { fidelity: 'projection' }) });
   }
   return docs.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
 }
@@ -148,7 +190,7 @@ function sha256(value) { return createHash('sha256').update(value).digest('hex')
 export async function resolvePlanContextCommand(argv = process.argv.slice(2), options = {}) {
   let jsonOutput = false;
   let changeId;
-  let methodology = 'openspec';
+  let methodology;
   let list = false;
   let outputFile;
   const seen = new Set();

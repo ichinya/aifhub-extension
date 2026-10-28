@@ -7,11 +7,14 @@
 ## [В разработке]
 
 ### Добавлено
+- Classic AI Factory SDD в SessionBrief (#233, этапы 1+2): native parent и companions, synchronized source binding, methodology-neutral resolver/compiler и consumers; ultra marker-first handoff остаётся у upstream. Поля requirements не выводятся из tasks, неполные пары и факты блокируют execution.
 - `aifhub-qa-manifest` (#234): explicit enrollment для classic/OpenSpec, raw-byte dependency fingerprints, immutable results с corrective history, trusted observation bindings и publisher с custody/CAS; existing readers учитывают stale/blocked evidence без изменения gate v1 и unbound behavior.
 - Read-only `aifhub-gate-coverage` (#235): bounded диагностика final gate inventory, policy-required rules/coverage и явно required review/security, без writes/locks или workflow authority. Недоказанная independence остаётся UNKNOWN; offline K=5/5×serial counters не заявляют model-call savings.
 
 ### Изменено
-- SessionBrief компилятор читает tool-config через канонический precedence (TOOLS.md): new-style конфиги с `aifhub.tools.openspec: true` без legacy `artifactProtocol` больше не дают `openspec_protocol_required`; fail-closed сохранён для конфигураций без openspec и для malformed tool mappings (#243).
+- SessionBrief выбирает methodology по effective tool-config: `openspec:false`, `tools:{}` и отсутствие конфига выбирают classic, наличие каталога OpenSpec не включает его. `status.yaml` привязан через проекцию `{plan_id, source_binding}`; обычный progress/history не делает brief stale. Native parsing/validation закрывает deferred pins #239.
+- Однократная digest-волна для **всех** сохранённых SessionBrief, включая OpenSpec: payload обязательно содержит `instruction_composition_digest:null` рядом с `plan_context`. Требуется перекомпиляция. Null означает отсутствие зафиксированной composition; producer manifest и обнаружение instruction drift остаются follow-up, caller hash не принимается. Сокращение entrypoints и upstream skill bodies в это изменение не входит.
+- SessionBrief компилятор читает tool-config через канонический precedence (TOOLS.md): new-style конфиги с `aifhub.tools.openspec: true` без legacy `artifactProtocol` больше не дают `openspec_protocol_required`; malformed tool mappings остаются fail-closed (#243).
 - Coordination prompt-assets (#235): helper/direct path для служебной механики без AI worker; четыре формы и причина в existing notes; bounded same-shape batches с явными блокерами; sidecars только для самостоятельного вопроса; observed cost feedback отдельно от estimates/UNKNOWN, с сохранением pinned inputs и независимых ролей.
 - Precise-request fast path для `/aif-explore` (#236): явный read-only запрос с пятью settled измерениями служит confirmed brief; derived brief предъявляется один раз без второго confirmation. Новая authority для implementation, credentials, environment inspection, outside-project reads, optional providers и publication не возникает.
 - Действительное exact confirmation переносится между steps в пределах своего scope; material scope/risk/tradeoff change пересчитывает только affected frontier и запрашивает новые необходимые решения.

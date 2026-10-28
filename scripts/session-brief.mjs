@@ -5,11 +5,11 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { TextDecoder } from 'node:util';
 import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
-import { normalizeChangeId, resolveActiveChange } from './active-change-resolver.mjs';
+import { normalizeChangeId } from './active-change-resolver.mjs';
 import { parseSimpleYaml } from './aif-artifact-sync.mjs';
 import { parseToolConfig } from './tool-config.mjs';
 import { resolveAiFactoryVersion } from './ai-factory-version-resolver.mjs';
-import { resolvePlanContext } from './common-plan-resolver.mjs';
+import { resolvePlanContext, resolvePlanTarget } from './common-plan-resolver.mjs';
 import { parseStrictJson } from './json-strict.mjs';
 import {
   SDD_POLICY_PATH, selectSddProfile, sddError, validateSddPolicy
@@ -37,6 +37,7 @@ export async function compileSessionBrief(options = {}) {
   try {
     const snapshot = await buildSnapshot(options, true);
     const result = summarize(snapshot);
+    if (snapshot.delegated) return result;
     const outputs = [[snapshot.paths.decision, json(snapshot.decision)]];
     if (snapshot.brief) outputs.push([snapshot.paths.markdown, renderSessionBrief(snapshot.brief)], [snapshot.paths.json, json(snapshot.brief)]);
     if (outputs.some(([, content]) => Buffer.byteLength(content) > MAX_BYTES)) throw sddError('brief_budget_exceeded');
@@ -54,6 +55,7 @@ export async function compileSessionBrief(options = {}) {
 export async function inspectSessionBrief(options = {}) {
   try {
     const snapshot = await buildSnapshot(options, false);
+    if (snapshot.delegated) return summarize(snapshot);
     if (snapshot.disabled) return { ok: true, status: 'disabled', change_id: snapshot.changeId, paths: snapshot.paths, stale_reasons: [] };
     const result = summarize(snapshot);
     const stored = await readSafeFile(snapshot.root, snapshot.paths.json);
@@ -91,46 +93,70 @@ export async function assertSessionBriefBinding(changeId, digest, options = {}) 
 
 async function buildSnapshot(options, explicitCompile) {
   const root = await realpath(path.resolve(options.rootDir ?? process.cwd()));
-  if (options.changeId !== undefined && (typeof options.changeId !== 'string' || !options.changeId || !normalizeChangeId(options.changeId).ok)) throw sddError('invalid-change-id');
+  if (options.changeId !== undefined && (typeof options.changeId !== 'string' || !options.changeId)) throw sddError('invalid-change-id');
   // Protect resolver reads as well as the later compiler reads.
-  for (const file of [CONFIG, 'openspec/changes', '.ai-factory/state/current.yaml']) await inspectPath(root, file);
-  const resolution = await resolveActiveChange({ rootDir: root, cwd: options.cwd ?? root, changeId: options.changeId, getCurrentBranch: options.getCurrentBranch });
-  if (!resolution.ok) throw sddError('active_change_unresolved');
+  const configFile = await readSafeFile(root, CONFIG);
+  let toolMode;
+  try { toolMode = parseToolConfig(configFile?.content ?? '').mode; }
+  catch (error) { throw sddError(error.message); }
+  const methodology = toolMode === 'openspec' ? 'openspec' : 'aifactory';
+  const config = parseSimpleYaml(configFile?.content ?? '');
+  const resolverReads = new Map();
+  const readSource = async (_root, file) => {
+    const item = await readSafeFile(root, file);
+    if (item) resolverReads.set(file, item.bytes);
+    if (resolverReads.size > MAX_FILES || [...resolverReads.values()].reduce((a, b) => a + b, 0) > MAX_TOTAL_BYTES) throw sddError('source_budget_exceeded');
+    return item?.data ?? null;
+  };
+  const plansRoot = methodology === 'openspec' ? 'openspec/changes' : config.paths?.plans ?? '.ai-factory/plans';
+  await inspectPath(root, plansRoot);
+  if (methodology === 'aifactory' && options.changeId === undefined) {
+    // Discovery invokes the same marker-first classifier. Bound its possible
+    // bundle inputs before it reads them, even when no target was explicit.
+    for (const file of await walkFiles(root, plansRoot, file => /\/(?:index\.md|phase-[^/]+\.md)$/i.test(file))) await readSource(root, file);
+  }
+  const resolution = await resolvePlanTarget({ ...options, rootDir: root, methodology, readSource });
   const changeId = resolution.changeId;
-  const base = `openspec/changes/${changeId}`;
+  const base = methodology === 'openspec' ? `openspec/changes/${changeId}` : `${(config.paths?.plans ?? '.ai-factory/plans').replace(/\/$/, '')}/${changeId}`;
   const paths = sessionBriefPaths(changeId);
   await inspectPath(root, base);
+  // Resolve methodology-neutral plan context (ADR 0005). Canonical ownership stays
+  // with the plan; this is a derived execution context bound to source revisions.
+  const planContext = await resolvePlanContext({ ...options, rootDir: root, changeId: options.changeId ?? changeId, methodology, readSource,
+    preflightDirectory: async directory => {
+      for (const file of await walkFiles(root, directory, file => /\/(?:index\.md|phase-[^/]+\.md)$/i.test(file))) await readSource(root, file);
+    } });
+  if (planContext.errors.length > 0) {
+    const error = sddError(planContext.errors[0].code ?? 'plan_context_unresolved');
+    error.planResolverErrors = planContext.errors;
+    throw error;
+  }
+  if (planContext.upstream_handoff) return { root, changeId, paths, delegated: true, sources: [], blocked: ['ultra_upstream_handoff'],
+    decision: { profile: 'ultra', implementation_allowed: false, blocked_reason: 'ultra_upstream_handoff' },
+    ownerHandoff: `/aif-${['fix', 'verify'].includes(options.role) ? options.role : 'implement'} ${planContext.upstream_handoff.entrypoint}` };
   const policyFile = await readSafeFile(root, SDD_POLICY_PATH);
   const existing = await readSafeFile(root, paths.json);
   const existingDecision = await readSafeFile(root, paths.decision);
   const existingMarkdown = await readSafeFile(root, paths.markdown);
-  const configFile = await readSafeFile(root, CONFIG);
-  const config = parseSimpleYaml(configFile?.content ?? '');
-  // Resolve methodology-neutral plan context (ADR 0005). Canonical ownership stays
-  // with the plan; this is a derived execution context bound to source revisions.
-  const planContext = await resolvePlanContext({ rootDir: root, changeId, methodology: 'openspec' });
-  if (planContext.errors.length > 0) throw sddError(planContext.errors[0].code ?? 'plan_context_unresolved');
   if (!explicitCompile && !planContext.sdd_inputs && !policyFile && !existing && !existingDecision && !existingMarkdown) return { disabled: true, root, changeId, paths };
   // Canonical tool-config precedence (TOOLS.md): an explicit tools mapping wins;
   // legacy artifactProtocol is honored only when the tools mapping is absent.
-  let toolMode;
-  try { toolMode = parseToolConfig(configFile?.content ?? '').mode; }
-  catch (error) { throw sddError(error.message); }
-  if (toolMode !== 'openspec') throw sddError('openspec_protocol_required');
   const rawPolicy = policyFile ? parseStrictJson(policyFile.content) : {};
   if (policyFile && rawPolicy.schema !== 'aifhub.sdd_policy.v1') throw sddError('invalid-sdd-policy');
   const policy = validateSddPolicy(rawPolicy);
   // Config/schema ownership remains authoritative; the overlay can only add depth.
-  if (config.aifhub?.openspec?.requireDesign === true) policy.require_design = true;
+  if (methodology === 'openspec' && config.aifhub?.openspec?.requireDesign === true) policy.require_design = true;
   const inputs = planContext.sdd_inputs;
   const files = new Map();
   let totalBytes = 0;
+  let rawSourceBytes = 0;
   const add = async (file, kind = 'supporting') => {
     if (files.has(file)) return files.get(file);
     const item = await readSafeFile(root, file);
     if (item) {
       totalBytes += item.bytes;
-      if (files.size >= MAX_FILES || totalBytes > MAX_TOTAL_BYTES) throw sddError('source_budget_exceeded');
+      rawSourceBytes += item.bytes;
+      if (files.size >= MAX_FILES || rawSourceBytes > MAX_TOTAL_BYTES) throw sddError('source_budget_exceeded');
       files.set(file, { ...item, kind });
     }
     return item;
@@ -138,12 +164,27 @@ async function buildSnapshot(options, explicitCompile) {
   await add(CONFIG, 'policy');
   await add(SDD_POLICY_PATH, 'policy');
   await add('.ai-factory.json', 'policy');
-  await add('openspec/config.yaml', 'policy');
-  // Local schema/template edits can change the canonical artifact contract.
-  for (const file of await walkFiles(root, 'openspec/schemas', (file) => /\.(?:md|yaml|yml|json)$/.test(file))) await add(file, 'policy');
-  for (const file of ['proposal.md', 'design.md', 'design.context.json', 'tasks.md', '.openspec.yaml']) await add(`${base}/${file}`, 'canonical');
-  for (const dir of [`${base}/specs`, 'openspec/specs']) {
-    for (const file of await walkFiles(root, dir, (file) => file.endsWith('.md'))) await add(file, 'protected');
+  if (methodology === 'openspec') {
+    await add('openspec/config.yaml', 'policy');
+    // Local schema/template edits can change the canonical artifact contract.
+    for (const file of await walkFiles(root, 'openspec/schemas', (file) => /\.(?:md|yaml|yml|json)$/.test(file))) await add(file, 'policy');
+    for (const file of ['proposal.md', 'design.md', 'design.context.json', 'tasks.md', '.openspec.yaml']) await add(`${base}/${file}`, 'canonical');
+    for (const dir of [`${base}/specs`, 'openspec/specs']) {
+      for (const file of await walkFiles(root, dir, (file) => file.endsWith('.md'))) await add(file, 'protected');
+    }
+  } else {
+    for (const document of planContext.documents) {
+      await add(document.path, 'canonical');
+      const projection = planContext.document_projections[document.path];
+      if (projection !== undefined) {
+        const item = files.get(document.path);
+        files.set(document.path, { ...item, sha256: hash(projection), bytes: Buffer.byteLength(projection), fidelity: 'projection' });
+        totalBytes += Buffer.byteLength(projection) - item.bytes;
+      }
+    }
+    for (const file of planContext.document_refs) {
+      if (!await add(safeReference(file), 'protected')) throw sddError('missing_context_reference');
+    }
   }
   const rulesRoot = safeReference(config.paths?.rules ?? '.ai-factory/rules');
   const generatedFiles = [
@@ -152,18 +193,19 @@ async function buildSnapshot(options, explicitCompile) {
   ];
   for (const file of await walkFiles(root, rulesRoot, (file) => /\.(?:md|json)$/.test(file))) {
     // Other changes' generated outputs are unrelated and may contain private context.
-    if (file.startsWith(`${rulesRoot}/generated/`) && !generatedFiles.includes(path.posix.basename(file))) continue;
+    if (file.startsWith(`${rulesRoot}/generated/`) && (methodology !== 'openspec' || !generatedFiles.includes(path.posix.basename(file)))) continue;
     await add(file, 'protected');
   }
   // Generated OpenSpec outputs retain their fixed owner path even when the
   // configured project rules directory is elsewhere.
-  for (const file of generatedFiles) await add(`.ai-factory/rules/generated/${file}`, 'protected');
+  if (methodology === 'openspec') for (const file of generatedFiles) await add(`.ai-factory/rules/generated/${file}`, 'protected');
   const contextRefs = new Set([
     safeReference(config.paths?.architecture ?? '.ai-factory/ARCHITECTURE.md'),
     safeReference(config.paths?.context ?? 'CONTEXT.md'),
     safeReference(config.reviews?.policy_file ?? 'REVIEW.md'),
     'AGENTS.md', 'CLAUDE.md', ...policy.context_refs.map(safeReference)
   ]);
+  if (methodology === 'aifactory' || config.paths?.rules_file) await add(safeReference(config.paths?.rules_file ?? '.ai-factory/RULES.md'), 'protected');
   for (const file of [...contextRefs].sort()) {
     if (!file.endsWith('.md')) throw sddError('invalid_context_reference');
     const item = await add(file, 'protected');
@@ -176,9 +218,13 @@ async function buildSnapshot(options, explicitCompile) {
   if (policyFile?.sha256 !== files.get(SDD_POLICY_PATH)?.sha256 || configFile?.sha256 !== files.get(CONFIG)?.sha256) throw sddError('sources_changed_during_compile');
   const version = inputs?.planning_mode === 'ultra' || policy.minimum_profile === 'ultra'
     ? await resolveAiFactoryVersion({ rootDir: root }) : { supportsUltra: false };
-  const design = files.get(`${base}/design.md`);
+  const design = files.get(`${base}/${methodology === 'openspec' ? 'design' : 'context'}.md`);
   const openQuestions = planContext.requirements.open_questions;
-  const selection = selectSddProfile(inputs && openQuestions.length ? { ...inputs, requirements_clear: false } : inputs, policy, version);
+  const selection = selectSddProfile(inputs && openQuestions.length ? { ...inputs, requirements_clear: false } : inputs, policy, { ...version, methodology });
+  if (methodology === 'aifactory' && planContext.public_mode === 'fast') {
+    selection.implementation_allowed = false;
+    selection.blocked_reason = inputs?.planning_mode && inputs.planning_mode !== 'fast' ? 'planning_mode_mismatch' : 'upstream_fast_handoff';
+  }
   const sources = [...files].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([file, item]) => ({ path: file, sha256: item.sha256, bytes: item.bytes, kind: item.kind }));
   const sourceRevision = hash(json(sources));
   const policyRevision = hash(json({ compiler: COMPILER, policy, sources: sources.filter((item) => item.kind === 'policy' || item.kind === 'protected') }));
@@ -186,10 +232,12 @@ async function buildSnapshot(options, explicitCompile) {
   let brief = null;
   const blocked = [];
   if (selection.implementation_allowed) {
-    const proposalFile = files.get(`${base}/proposal.md`);
+    const proposalFile = files.get(methodology === 'openspec' ? `${base}/proposal.md` : planContext.entrypoint);
     if (!proposalFile) blocked.push('missing_proposal');
-    if (!files.get(`${base}/tasks.md`)) blocked.push('missing_tasks');
-    if (selection.required_artifacts.includes('design') && !design) blocked.push('missing_design');
+    if (!files.get(planContext.checklist)) blocked.push('missing_tasks');
+    if (selection.required_artifacts.includes('design') && (!design || !(methodology === 'openspec' ? design.content.trim() : design.content.replace(/^#{1,6}[^\r\n]*$/gm, '').trim()))) blocked.push(methodology === 'openspec' ? 'missing_design' : 'missing_design_context');
+    if (methodology === 'aifactory' && !planContext.requirements.acceptance_criteria.length) blocked.push('missing_acceptance_criteria');
+    if (methodology === 'aifactory' && !planContext.requirements.verification_plan.length) blocked.push('missing_verification_plan');
     if (selection.required_artifacts.includes('delta_specs') && !sources.some((item) => item.path.startsWith(`${base}/specs/`))) blocked.push('missing_delta_specs');
     const intent = planContext.requirements.intent;
     const targetOutcome = planContext.requirements.target_outcome;
@@ -199,7 +247,9 @@ async function buildSnapshot(options, explicitCompile) {
     const forbidden = planContext.change_surface.forbidden;
     if (!intent || !targetOutcome) blocked.push('missing_intent_or_outcome');
     if (!allowed.length) blocked.push('missing_allowed_change_surface');
-    if (inputs?.behavior_change && (!nonGoals.length || !acceptanceExamples.length)) blocked.push('missing_behavior_acceptance_context');
+    if (inputs?.behavior_change && (methodology === 'aifactory'
+      ? !planContext.requirements.acceptance_criteria.length
+      : !nonGoals.length || !acceptanceExamples.length)) blocked.push('missing_behavior_acceptance_context');
     if (!blocked.length) {
       const fields = {
         intent, target_outcome: targetOutcome, acceptance_criteria: planContext.requirements.acceptance_criteria,
@@ -216,9 +266,10 @@ async function buildSnapshot(options, explicitCompile) {
         scope_fingerprint: hash(json({ sources, change_surface: fields.change_surface })),
         ...fields, expected_artifacts: selection.required_artifacts,
         verification: { required_checks: selection.required_gates, policy_refs: sources.filter((item) => item.kind === 'policy').map((item) => item.path) },
-        context_manifest: sources.map(({ path: file, sha256, kind }) => ({ path: file, sha256, fidelity: kind === 'canonical' && /(?:proposal|design)\.md$/.test(file) ? 'selected_sections' : 'full' })),
+        context_manifest: sources.map(({ path: file, sha256, kind }) => ({ path: file, sha256, fidelity: files.get(file).fidelity ?? (methodology === 'openspec' && kind === 'canonical' && /(?:proposal|design)\.md$/.test(file) ? 'selected_sections' : 'full') })),
         required_capabilities: ['canonical_source_read', 'project_policy_checks'],
         plan_context: { methodology: planContext.methodology, adapter_version: planContext.adapter_version, source_revision: planContext.source_revision },
+        instruction_composition_digest: null,
         budget: { strategy: 'measured', source_bytes: totalBytes, brief_bytes: null, token_estimate: null }
       };
       brief = { ...payload, digest: hash(json(payload)) };
@@ -240,7 +291,7 @@ function summarize(snapshot) {
     paths: snapshot.paths, decision: snapshot.decision, digest: snapshot.brief?.digest ?? null,
     sources: snapshot.sources, stale_reasons: [],
     blocked_reasons: snapshot.blocked.length ? snapshot.blocked : snapshot.decision.blocked_reason ? [snapshot.decision.blocked_reason] : [],
-    owner_handoff: snapshot.decision.profile === 'research' ? 'aif-explore' : snapshot.brief ? null : 'aif-plan'
+    owner_handoff: snapshot.ownerHandoff ?? (snapshot.decision.profile === 'research' ? 'aif-explore' : snapshot.brief ? null : 'aif-plan')
   };
 }
 
@@ -293,7 +344,7 @@ async function readSafeFile(root, file) {
     if (size > MAX_BYTES || before.size !== size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs
       || current?.ino !== before.ino || current?.dev !== before.dev) throw sddError('source_identity_changed');
     const bytes = buffer.subarray(0, size);
-    return { content: decoder.decode(bytes), sha256: hash(bytes), bytes: size };
+    return { content: decoder.decode(bytes), sha256: hash(bytes), bytes: size, data: bytes };
   } finally { await handle.close(); }
 }
 
@@ -362,7 +413,11 @@ function hash(value) { return createHash('sha256').update(value).digest('hex'); 
 function json(value) { return `${JSON.stringify(value, null, 2)}\n`; }
 function failure(error) {
   const code = error.sddCode ?? error.planResolverCode ?? 'session_brief_io_error';
-  return { ok: false, status: 'blocked', errors: [{ code }], stale_reasons: [], owner_handoff: 'aif-plan' };
+  const errors = (error.planResolverErrors ?? [{ code }]).map(({ code: value }) => ({ code: typeof value === 'string' && /^[a-z0-9_-]+$/.test(value) ? value : 'plan_context_unresolved' }));
+  return { ok: false, status: 'blocked', errors, blocked_reasons: [...new Set([
+    ...errors.map(({ code }) => code.replaceAll('-', '_')),
+    ...(errors.some(({ code }) => /^(?:ultra-|classic-ultra-)/.test(code)) ? ['unsupported_plan_shape'] : [])
+  ])], stale_reasons: [], owner_handoff: 'aif-plan' };
 }
 
 export async function runSessionBriefCommand(argv = process.argv.slice(2), options = {}) {

@@ -154,7 +154,10 @@
       "additionalProperties": false,
       "properties": {
         "methodology": {
-          "type": "string"
+          "enum": [
+            "aifactory",
+            "openspec"
+          ]
         },
         "adapter_version": {
           "type": "string"
@@ -225,7 +228,8 @@
           "fidelity": {
             "enum": [
               "selected_sections",
-              "full"
+              "full",
+              "projection"
             ]
           }
         },
@@ -278,6 +282,14 @@
     "digest": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
+    },
+    "instruction_composition_digest": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "null means the instruction composition has not been recorded."
     }
   },
   "required": [
@@ -305,6 +317,8 @@
     "context_manifest",
     "required_capabilities",
     "budget",
-    "digest"
+    "digest",
+    "plan_context",
+    "instruction_composition_digest"
   ]
 }

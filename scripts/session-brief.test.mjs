@@ -124,8 +124,8 @@ describe('SessionBrief compiler and exact revision custody', () => {
     }
   });
   it('fails closed on new-style configs without openspec and on malformed tool mappings', async () => {
-    // The active-change resolver rejects these before the compiler protocol check,
-    // surfacing them as a blocked result rather than a thrown error.
+    // reason: methodology-config-precedence; false/empty selects classic, while
+    // malformed mappings retain their exact config error before any target read.
     for (const config of [
       'aifhub:\n  tools:\n    openspec: false\n',
       'aifhub:\n  tools: {}\n',
@@ -134,7 +134,8 @@ describe('SessionBrief compiler and exact revision custody', () => {
       const root = await fixture(signals, config);
       const result = await compileSessionBrief(options(root));
       assert.equal(result.ok, false, JSON.stringify(result));
-      assert.deepEqual((result.errors ?? []).map(e => e.code), ['active_change_unresolved']);
+      assert.deepEqual((result.errors ?? []).map(e => e.code), config.includes('nope') ? ['invalid_tool_switch']
+        : ['missing_plan_file', ...Array(5).fill('missing_classic_companion')]);
     }
   });
   it('creates only runtime context, reproduces exact sources, and is byte/mtime idempotent', async () => {

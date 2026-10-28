@@ -7,10 +7,11 @@
 Target architecture from the user's clarification on 2026-09-05. Adapter contracts
 and the common plan resolver are now implemented, and the SessionBrief compiler
 (`scripts/session-brief.mjs`) consumes `aifhub.plan_context.v1` produced by the
-OpenSpec adapter. The brief binds its digest to both the compiled source revision
+OpenSpec or native classic adapter. The brief binds its digest to both the compiled source revision
 and the resolver's methodology/adapter/source binding. The AI Factory native
-adapter exists but is not yet used by SessionBrief; provider integration and
-legacy plan migration still target OpenSpec directly.
+adapter now parses complete classic pairs and is consumed end-to-end by SessionBrief
+and its runtime helpers (#233 stages 1+2). Provider integration and legacy plan
+migration still target OpenSpec directly. See the [classic contract](../classic-session-brief.md).
 
 [ADR 0004](0004-sdd-profiles-and-session-brief.md). The existing OpenSpec-native
 runtime described in ADR 0001 remains the current implementation, not the target
@@ -130,9 +131,9 @@ provider contracts, not from listing their names in a plan.
    and AI Factory plan forms. Preserve task completion, original requests, source
    bindings, links, and accepted specification history across the transition.
 
-This requires runtime changes in both the SessionBrief and provider integrations.
-The current OpenSpec-only P0 tests establish prototype behavior; they do not
-establish acceptance of the revised architecture.
+SessionBrief and its consumers now have classic and OpenSpec fixtures. Provider
+integrations and the remaining architecture work retain their independent
+acceptance gates; classic support does not establish acceptance of all items below.
 
 ## Acceptance evidence for implementation
 

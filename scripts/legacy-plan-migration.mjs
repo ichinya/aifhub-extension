@@ -1313,6 +1313,16 @@ export async function migrateLegacyPlan(planId, options = {}) {
   }
 
   const validation = await validateMigratedChange(collision.changeId, { ...options, rootDir });
+  // Adopting OpenSpec is a config-level decision: without `aifhub.tools.openspec: true`
+  // the effective precedence keeps the migrated project classic and the new change
+  // stays unreachable through implementation context.
+  let configAdoption = null;
+  if (!dryRun && validation.status !== 'FAIL') {
+    // Lazy import: aif-artifact-sync imports this module, so the adoption write
+    // must not create a static cycle.
+    const { MODES, writeModeConfig } = await import('./aif-artifact-sync.mjs');
+    configAdoption = await writeModeConfig(MODES.openspec, { ...options, rootDir });
+  }
   const result = {
     ...baseResult,
     ok: validation.status !== 'FAIL',
@@ -1327,6 +1337,12 @@ export async function migrateLegacyPlan(planId, options = {}) {
         ]
       : []
   };
+  if (configAdoption && !configAdoption.ok) {
+    result.warnings = [...result.warnings ?? [], {
+      code: 'openspec-mode-config-not-adopted',
+      message: 'Migration artifacts are written, but the OpenSpec mode config update failed; run `aifhub-mode switch` manually.'
+    }];
+  }
 
   const report = await writeMigrationReport(normalized.planId, {
     ...result,

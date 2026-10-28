@@ -181,7 +181,8 @@
               "review_receipt",
               "verification_receipt",
               "tracer_result",
-              "design_context"
+              "design_context",
+              "plan_companion"
             ]
           },
           "sha256": {

@@ -73,15 +73,18 @@ describe('Common plan resolver', () => {
     const change = 'add-oauth';
     await mkdir(path.join(root, '.ai-factory/plans'), { recursive: true });
     await writeFile(path.join(root, `.ai-factory/plans/${change}.md`), '# Plan\n\n- [ ] 1.1 Implement auth.\n- [x] 1.2 Verify.\n');
+    await completeNativePair(root, change);
     const context = await resolvePlanContext({ rootDir: root, changeId: change, methodology: 'aifactory' });
     assert.equal(context.schema, 'aifhub.plan_context.v1');
     assert.equal(context.methodology, 'aifactory');
     assert.equal(context.public_mode, 'full');
     assert.equal(context.tasks.length, 2);
-    assert.equal(context.errors[0].code, 'aifactory-native-plan-parsing-incomplete');
+    // reason: classic-native-parsing-complete replaces deferred parser pin.
+    assert.ok(context.requirements.intent && context.requirements.target_outcome);
+    assert.equal(context.documents.length, 6);
     assert.equal(context.sdd_inputs, null);
     assert.equal(context.sdd_profile, null);
-    assert.deepEqual(context.errors.map((error) => error.code), ['aifactory-native-plan-parsing-incomplete']);
+    assert.deepEqual(context.errors, []);
   });
 
   it('fails on unknown methodology', async () => {
@@ -98,6 +101,7 @@ describe('Common plan resolver', () => {
     roots.push(nativeRoot);
     await mkdir(path.join(nativeRoot, '.ai-factory/plans'), { recursive: true });
     await writeFile(path.join(nativeRoot, `.ai-factory/plans/${change}.md`), '# Plan\r\n\r\n- [ ] 1.1 Implement auth.\r\n- [x] 1.2 Verify.\r\n');
+    await completeNativePair(nativeRoot, change);
     const native = await resolvePlanContext({ rootDir: nativeRoot, changeId: change, methodology: 'aifactory' });
     assert.equal(native.tasks.length, 2);
     assert.equal(native.tasks[1].done, true);
@@ -122,3 +126,13 @@ describe('Common plan resolver', () => {
     assert.equal(unsafe, 2);
   });
 });
+
+async function completeNativePair(root, change) {
+  const base = path.join(root, '.ai-factory/plans', change);
+  const source = await readFile(base + '.md', 'utf8');
+  await mkdir(base, { recursive: true });
+  for (const name of ['task.md', 'context.md', 'rules.md', 'verify.md', 'status.yaml']) {
+    await writeFile(path.join(base, name), name === 'task.md' ? source : name === 'status.yaml' ? 'plan_id: ' + change + '\n' : '# Context\n');
+  }
+  await writeFile(base + '.md', '## Summary\nDeclared native intent.\n\n## Scope\n- src/auth/**\n\n## Requirements\n- Reject invalid input.\n\n' + source);
+}
