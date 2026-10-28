@@ -60,10 +60,11 @@ function sections(text, sourcePath, inventory, errors) {
   inventory.push(...spans.map(span => ({ ...span, source_path: sourcePath,
     sha256: createHash('sha256').update(bytes.subarray(span.start, span.end)).digest('hex') })));
   const get = names => {
-    const matches = names.flatMap(name => findExactMarkdownH2Sections(text, name));
+    // Selection and duplicate detection must use the same span criterion:
+    // tab-prefixed variants resolve to the same heading either way.
+    const matches = spans.filter(span => names.includes(span.heading));
     if (matches.length > 1) errors.push({ code: 'duplicate_source_section' });
-    const span = spans.find(span => names.includes(span.heading));
-    return span ? bytes.subarray(span.body_start, span.end).toString('utf8') : '';
+    return matches[0] ? bytes.subarray(matches[0].body_start, matches[0].end).toString('utf8') : '';
   };
   const result = Object.fromEntries(Object.entries(ALIASES).map(([key, names]) => [key, get(names).trim()]));
   return { ...result, original: get(['Original Request']), reconciliation: get(['Requirements Reconciliation']), sdd: get(['SDD Profile Inputs']).trim() };

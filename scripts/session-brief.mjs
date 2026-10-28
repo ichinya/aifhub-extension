@@ -191,7 +191,10 @@ async function buildSnapshot(options, explicitCompile) {
     'openspec-base.md', `openspec-merged-${changeId}.md`, `openspec-change-${changeId}.md`,
     `openspec-rules-trace-${changeId}.json`
   ];
-  for (const file of await walkFiles(root, rulesRoot, (file) => /\.(?:md|json)$/.test(file))) {
+  // Classic must not even descend into the generated subtree: excluded outputs
+  // still consume the walk budget and may carry foreign context.
+  const pruneGenerated = methodology === 'openspec' ? null : file => file === `${rulesRoot}/generated`;
+  for (const file of await walkFiles(root, rulesRoot, (file) => /\.(?:md|json)$/.test(file), [], 0, pruneGenerated)) {
     // Other changes' generated outputs are unrelated and may contain private context.
     if (file.startsWith(`${rulesRoot}/generated/`) && (methodology !== 'openspec' || !generatedFiles.includes(path.posix.basename(file)))) continue;
     await add(file, 'protected');
@@ -348,7 +351,7 @@ async function readSafeFile(root, file) {
   } finally { await handle.close(); }
 }
 
-async function walkFiles(root, directory, accept, result = [], depth = 0) {
+async function walkFiles(root, directory, accept, result = [], depth = 0, prune = null) {
   const info = await inspectPath(root, directory);
   if (!info) return result;
   if (!info.isDirectory() || depth > 32) throw sddError('invalid_source_directory');
@@ -357,7 +360,7 @@ async function walkFiles(root, directory, accept, result = [], depth = 0) {
   for (const entry of entries.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)) {
     const file = `${directory}/${entry.name}`;
     await inspectPath(root, file);
-    if (entry.isDirectory()) await walkFiles(root, file, accept, result, depth + 1);
+    if (entry.isDirectory() && !(prune && prune(file))) await walkFiles(root, file, accept, result, depth + 1, prune);
     else if (accept(file)) result.push(file);
   }
   return result;

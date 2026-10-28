@@ -57,13 +57,22 @@ export async function resolvePlanContext(options = {}) {
     const target = await resolvePlanTarget({ ...options, rootDir: root });
     const { changeId, methodology } = target;
     const adapter = await loadAdapter(methodology);
-    const adapterOptions = { ...options, nativeTarget: options.changeId };
+    // Parsing and hashing must observe the same bytes: reading sources twice
+    // allowed parsed facts and digests to disagree under concurrent edits.
+    const sourceBytes = new Map();
+    const cachedReadSource = async (readRoot, file) => {
+      if (!sourceBytes.has(file)) {
+        sourceBytes.set(file, await (options.readSource ?? ((r, f) => readProviderFile(r, f, 4 * 1024 * 1024)))(readRoot, file));
+      }
+      return sourceBytes.get(file);
+    };
+    const adapterOptions = { ...options, nativeTarget: options.changeId, readSource: cachedReadSource };
     const identity = await adapter.resolveIdentity(root, changeId, adapterOptions);
     const validation = await adapter.validate(root, identity, adapterOptions);
     if (validation.length) throw planResolverError(validation[0].code, validation);
     const rawContext = await adapter.readContext(root, identity, adapterOptions);
     const context = await normalizePlanContext(rawContext, identity, changeId, methodology);
-    context.documents = await resolveDocuments(root, identity, context, options);
+    context.documents = await resolveDocuments(root, identity, context, { ...options, readSource: cachedReadSource });
     context.source_revision = computeSourceRevision(context.documents);
     return context;
   } catch (error) {

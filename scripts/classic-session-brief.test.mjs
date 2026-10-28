@@ -418,3 +418,53 @@ it('emitted context, brief, receipts, tracer and exchange conform to their publi
   const schema = JSON.parse(await readFile(new URL('../schemas/session-brief.schema.json', import.meta.url), 'utf8'));
   assert.throws(() => assertSchema(missingHook, schema), /instruction_composition_digest/);
 });
+
+it('migration adoption enables openspec without touching existing settings', async () => {
+  const root = await fixture();
+  await put(root, '.ai-factory/config.yaml', 'aifhub:\n  openspec:\n    requireDesign: true\npaths:\n  rules: project/rules\nreviews:\n  policy:\n    requireRulesPassForVerify: true\n');
+  const { migrateLegacyPlan } = await import('./legacy-plan-migration.mjs');
+  const migrated = await migrateLegacyPlan(id, { rootDir: root, detectOpenSpec: async () => ({ available: false }) });
+  assert.equal(migrated.ok, true, JSON.stringify(migrated.errors ?? migrated.warnings));
+  const config = await text(root, '.ai-factory/config.yaml');
+  assert.match(config, /openspec: true/);
+  assert.match(config, /requireDesign: true/);
+  assert.match(config, /rules: project\/rules/);
+  assert.match(config, /requireRulesPassForVerify: true/);
+  assert.equal((await import('./tool-config.mjs')).parseToolConfig(config).mode, 'openspec');
+});
+
+it('classic rules walk prunes the generated subtree before recursion', async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, '.ai-factory/rules/generated'), { recursive: true });
+  for (let index = 0; index < 1200; index++) {
+    await put(root, `.ai-factory/rules/generated/openspec-change-filler-${index}.md`, 'unrelated');
+  }
+  const compiled = await compileSessionBrief(opts(root));
+  assert.equal(compiled.ok, true, JSON.stringify(compiled.errors ?? compiled));
+  assert.equal((await inspectSessionBrief({ ...opts(root), includeBrief: true })).brief.sources.some(s => s.path.includes('rules/generated')), false);
+});
+
+it('resolver parses and hashes from a single read per source', async () => {
+  const root = await fixture();
+  const seen = new Map();
+  const context = await resolvePlanContext({ ...opts(root), readSource: async (r, file) => {
+    let current;
+    try { current = await readFile(path.join(r, file)); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; return null; }
+    seen.set(file, (seen.get(file) ?? 0) + 1);
+    return current;
+  } });
+  assert.deepEqual(context.errors, []);
+  assert.equal(seen.get(parent), 1);
+  const stored = context.documents.find(d => d.path === parent);
+  const actual = await readFile(path.join(root, parent));
+  assert.equal(stored.sha256, (await import('node:crypto')).createHash('sha256').update(actual).digest('hex'));
+});
+
+it('duplicate active headings with tab-prefixed variants are blocked', async () => {
+  const root = await fixture();
+  const source = await text(root, parent);
+  await put(root, parent, `${source}\n##\tSummary\n\nTab variant summary text.\n`);
+  const context = await resolvePlanContext(opts(root));
+  assert.ok(context.errors.some(error => error.code === 'duplicate_source_section'), JSON.stringify(context.errors));
+});

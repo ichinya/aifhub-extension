@@ -1,6 +1,7 @@
 // legacy-plan-migration.mjs - explicit migration from legacy AI Factory plans to OpenSpec changes
 import { access, mkdir, readdir, readFile, realpath, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { parseToolConfig } from './tool-config.mjs';
 import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
 import process from 'node:process';
 
@@ -1075,6 +1076,28 @@ export function mapLegacyPlanToOpenSpecArtifacts(legacyPlan, options = {}) {
   };
 }
 
+// Adopting OpenSpec is a config-level decision, but it must not touch anything
+// beyond methodology: the mode renderer restores policy flags and path defaults,
+// which would rewrite project authority as a side effect.
+async function adoptOpenSpecConfig(rootDir, dryRun) {
+  const configPath = path.join(rootDir, '.ai-factory', 'config.yaml');
+  let raw = null;
+  try { raw = await readFile(configPath, 'utf8'); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
+  if (raw !== null && parseToolConfig(raw).mode === 'openspec') return { ok: true, action: 'skip' };
+  const block = 'aifhub:\n  tools:\n    openspec: true';
+  let updated;
+  if (raw === null) updated = `${block}\n`;
+  else if (/^aifhub:[ \t]*$/m.test(raw)) updated = raw.replace(/^aifhub:[ \t]*$/m, block);
+  else updated = `${raw.endsWith('\n') || raw.length === 0 ? raw : `${raw}\n`}${block}\n`;
+  if (parseToolConfig(updated).mode !== 'openspec') return { ok: false, action: 'unsupported-config' };
+  if (!dryRun) {
+    await mkdir(path.dirname(configPath), { recursive: true });
+    await writeFile(configPath, updated, 'utf8');
+  }
+  return { ok: true, action: raw === null ? 'create' : 'update' };
+}
+
 export async function migrateLegacyPlan(planId, options = {}) {
   const rootDir = resolveRootDir(options);
   const normalized = normalizeLegacyPlanId(planId);
@@ -1318,10 +1341,7 @@ export async function migrateLegacyPlan(planId, options = {}) {
   // stays unreachable through implementation context.
   let configAdoption = null;
   if (!dryRun && validation.status !== 'FAIL') {
-    // Lazy import: aif-artifact-sync imports this module, so the adoption write
-    // must not create a static cycle.
-    const { MODES, writeModeConfig } = await import('./aif-artifact-sync.mjs');
-    configAdoption = await writeModeConfig(MODES.openspec, { ...options, rootDir });
+    configAdoption = await adoptOpenSpecConfig(rootDir, dryRun);
   }
   const result = {
     ...baseResult,
