@@ -37,6 +37,7 @@
 - Preserve-handoff при update: modified/unknown helper files сохраняются до замены в `.ai-factory/state/extension-updates/<utc-ts>/preserve/`, `diff-manifest.json` фиксирует installed/incoming hashes, stderr возвращает review/migrate instructions. `AIFHUB_UPDATE_STRICT=1` устанавливает nonzero после update. Bootstrap-ограничение: guard защищает обновления ИЗ этого релиза; первый переход со старой версии требует ручного consumer audit.
 
 ### Исправлено
+- Plan compliance: code spans внутри пояснения surface-буллета больше не расширяют разрешённую поверхность изменений; групповые code-span запреты применяются до широкой разрешённой поверхности.
 - Git entries mode 160000 больше не читаются как обычные files; missing/uninitialized modules, unresolved gitlink stages, unsafe administration и filesystem aliases блокируются. Metadata drift блокирует resume/checkpoint без изменения historical receipts и существующих isolation invariants.
 
 ### Изменено
