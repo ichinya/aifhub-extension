@@ -491,17 +491,6 @@ describe('QA review hardening: case aliases, module identity, policy roots, verd
     assert.equal(honest.gateResult.status, rulesTip.gate_block.status);
   });
 
-  it('pins installed extension metadata, including aifhub-extension.json, in the module catalog (F5)', async () => {
-    const f = await fixture();
-    await f.prepare();
-    const store = await qaStore(f.options);
-    const manifest = await store.manifest();
-    for (const name of ['extension.json', 'provenance.json', 'aifhub-extension.json']) {
-      assert.ok(Object.hasOwn(manifest.payload.snapshot.modules, name), name);
-      assert.notEqual(manifest.payload.snapshot.modules[name], digest('missing'));
-    }
-  });
-
   it('pins installed extension metadata, including aifhub-extension.json, in the real-FS module catalog (F5)', async () => {
     const f = await fixture();
     await mkdir(path.join(f.rootDir, 'src'), { recursive: true });
