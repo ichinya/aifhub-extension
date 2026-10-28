@@ -16,7 +16,7 @@ import { doctorAifMode } from './aif-artifact-sync.mjs';
 
 const roots = [];
 afterEach(async () => {
-  for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true });
+  for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 const bytes = value => Buffer.from(value);
 const gateBody = (gate = 'verify', status = 'pass') => `${renderGateResultBlock(createGateResult({ gate, status,
@@ -421,5 +421,97 @@ describe('QA consumers and existing producers (AC6, AC7)', () => {
     const f = await fixture(); const chunks = [];
     assert.equal(await runQaManifestCommand(['inspect', '--change', 'sample', '--json'], { ...f.options, stdout: { write: s => chunks.push(s) } }), 0);
     assert.equal(JSON.parse(chunks.join('')).code, 'manifest-absent');
+  });
+});
+
+describe('QA review hardening: case aliases, module identity, policy roots, verdict binding', () => {
+  it('rejects Windows case-alias artifact paths into protected result history (F1)', async () => {
+    const f = await fixture();
+    await f.ready();
+    const before = await f.inspect();
+    assert.equal(before.state, 'valid');
+    const attacked = await f.record('verify', { resultId: 'verify-2',
+      artifacts: { [`${f.qa}/Results/failed.json`]: bytes('overwritten history') } });
+    assert.equal(attacked.ok, false, JSON.stringify(attacked));
+    assert.equal(attacked.code, 'artifact-control-path');
+    const store = await qaStore(f.options);
+    const history = await store.bytes(`${f.qa}/results/verify-1.json`);
+    assert.notEqual(history.toString('utf8'), 'overwritten history');
+    assert.equal((await f.inspect()).state, 'valid');
+  });
+
+  it('blocks results whose recorded module identity was restored before publication (F2)', async () => {
+    const f = await fixture();
+    await f.prepare();
+    f.model.modules = { helper: digest('tampered-helper') };
+    assert.equal((await f.record('verify')).ok, true);
+    f.model.modules = { helper: digest('helper') };
+    const verdict = await f.inspect({ requirePublication: false });
+    assert.equal(verdict.state, 'blocked', JSON.stringify(verdict));
+    assert.equal(verdict.code, 'module-identity-drift');
+  });
+
+  it('reuses a published wave only while the recorded module identity is current (F2 reuse)', async () => {
+    const f = await fixture();
+    await f.ready();
+    f.model.modules = { helper: digest('drifted-helper') };
+    const after = await f.inspect();
+    assert.equal(after.state, 'blocked');
+    assert.equal(after.code, 'module-identity-drift');
+  });
+
+  it('adds configured rules.base/skills to policy inputs from the project config (F3)', async () => {
+    const f = await fixture();
+    await mkdir(path.join(f.rootDir, '.ai-factory'), { recursive: true });
+    await writeFile(path.join(f.rootDir, '.ai-factory', 'config.yaml'),
+      '# comment\nother: 1\nrules:\n  base: .ai-factory/rules/base.md\n  skills: .ai-factory/rules/skills.md\n', 'utf8');
+    await f.prepare();
+    const store = await qaStore(f.options);
+    const manifest = await store.manifest();
+    assert.ok(manifest.payload.policy_inputs.includes('.ai-factory/rules/base.md'));
+    assert.ok(manifest.payload.policy_inputs.includes('.ai-factory/rules/skills.md'));
+  });
+
+  it('rules reader derives the verdict from bound bytes and rejects a mismatched parse (F4)', async () => {
+    const f = await fixture('openspec', ['verify', 'rules']);
+    const published = await f.ready();
+    const store = await qaStore(f.options);
+    const records = await store.results();
+    const rulesTip = records.filter(r => r.check_id === 'check-rules').at(-1);
+    const content = (await store.bytes(rulesTip.evidence.path)).toString('utf8');
+    const forged = JSON.parse(content.match(/```aif-gate-result\n([\s\S]*?)\n```/)[1]);
+    forged.status = rulesTip.gate_block.status === 'pass' ? 'warn' : 'pass';
+    const mismatch = await readOpenSpecRulesGateEvidence('sample', { ...f.options,
+      rulesGateEvidence: { content }, rulesGateResult: forged });
+    assert.equal(mismatch.ok, false);
+    assert.equal(mismatch.errors.at(-1).code, 'gate-block-mismatch');
+    const honest = await readOpenSpecRulesGateEvidence('sample', { ...f.options,
+      rulesGateEvidence: { content }, rulesGateResult: rulesTip.gate_block });
+    assert.equal(honest.ok, true, JSON.stringify({ honest, published: published?.code ?? null }));
+    assert.equal(honest.gateResult.status, rulesTip.gate_block.status);
+  });
+
+  it('chains corrective results automatically while preserving both records', async () => {
+    const f = await fixture();
+    await f.prepare();
+    assert.equal((await f.record('verify', { resultId: 'verify-1', markdown: gateBody('verify', 'fail') })).ok, true);
+    assert.equal((await f.record('verify', { resultId: 'verify-2' })).ok, true);
+    const store = await qaStore(f.options);
+    const records = await store.results();
+    assert.equal(records.length, 2);
+    assert.equal(records.find(r => r.id === 'verify-2').supersedes, 'verify-1');
+    assert.equal(records.find(r => r.id === 'verify-1').gate_block.status, 'fail');
+  });
+
+  it('refuses publication when freshly read owner requirements exceed the prepared wave', async () => {
+    const f = await fixture();
+    await f.ready();
+    const store = await qaStore(f.options);
+    const pointer = await store.json(`${f.qa}/publication.json`);
+    const drifted = await f.publish({ expectedPublication: pointer.id,
+      providers: { requirements: async () => ({ gates: ['verify', 'rules'],
+      independent_roles: [], evidence: [] }) } });
+    assert.equal(drifted.ok, false, JSON.stringify(drifted));
+    assert.equal(drifted.code, 'owner-requirements-drift');
   });
 });

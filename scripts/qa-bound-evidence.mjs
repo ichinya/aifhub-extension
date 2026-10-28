@@ -69,6 +69,9 @@ export async function evaluateQaBinding(options = {}) {
       requireValue(result.gate === check.gate, 'gate-identity-drift', true);
       requireValue(result.binding_code === null, result.binding_code ?? 'result-binding-invalid', true);
       requireValue(result.worktree_identity === current.worktree_identity, 'stale-worktree', true);
+      // The identity observed at record time must still be the current one;
+      // a change-then-restore between record and publish stays blocked (review F2).
+      requireValue(result.modules_digest === digest(current.modules), 'module-identity-drift', true);
       if (result.input_fingerprints[check.id] !== fingerprints[check.id]
         || payload.fingerprints[check.id] !== fingerprints[check.id]) affected.push(check.id);
       if (check.depends_on_diff && current.actual_diff !== payload.snapshot.actual_diff) affected.push(check.id);

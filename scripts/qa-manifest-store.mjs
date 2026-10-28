@@ -8,6 +8,12 @@ export const QA_LIMITS = Object.freeze({ files: 20000, blob: 16 * 1024 * 1024,
 export const QA_SCHEMA = 'aifhub.qa-manifest.v1';
 export const sorted = values => [...new Set(values)].sort();
 export const within = (file, root) => file === root || file.startsWith(`${root}/`);
+// Control namespaces must reject Windows case aliases (Results, Waves, Manifest.json):
+// on a case-insensitive filesystem those paths denote the protected files themselves.
+export const withinCi = (file, root) => {
+  const lower = file.toLowerCase();
+  return lower === root.toLowerCase() || lower.startsWith(`${root.toLowerCase()}/`);
+};
 export const gateView = (target, gate) => `${target.qa}/${target.flow === 'classic' && gate === 'rules' ? 'gates/rules' : gate}.md`;
 
 export function jsonValue(value) {
@@ -26,7 +32,7 @@ export function qaTarget(options = {}) {
   const qa = portablePath(options.qaDir ?? (flow === 'classic'
     ? options.planDir ?? `.ai-factory/plans/${id}` : `.ai-factory/qa/${id}`));
   requireValue(!qa.split('/').some(p => p.toLowerCase() === '.git')
-    && !within(qa, 'openspec/changes'), 'unsafe-qa-directory', true);
+    && !withinCi(qa, 'openspec/changes'), 'unsafe-qa-directory', true);
   return { flow, id, namespace, qa };
 }
 

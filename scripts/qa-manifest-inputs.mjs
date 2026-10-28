@@ -5,7 +5,7 @@ import { readdir, lstat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { digest, canonical, portablePath, identifier, requireValue, storeFor } from './workflow-state-store.mjs';
-import { QA_LIMITS, sorted, within, jsonValue } from './qa-manifest-store.mjs';
+import { QA_LIMITS, sorted, within, withinCi, jsonValue } from './qa-manifest-store.mjs';
 
 const exec = promisify(execFile);
 const SHA = /^[a-f0-9]{64}$/;
@@ -195,7 +195,7 @@ async function filesystemSnapshot(store, payload, options) {
     || within(p, `${store.qa}/publications`) || within(p, `${store.qa}/journals`)
     || ['manifest.json', 'enrollment.json', 'publication.json', 'qa.lock', 'verify.md',
       ...(payload.target.flow === 'classic' ? ['gates'] : ['rules.md']), 'review.md', 'security.md', 'coverage.json', 'done-readiness.json', '.gitignore', 'raw', 'openspec-validation.json', 'openspec-status.json']
-      .some(name => within(p, `${store.qa}/${name}`));
+      .some(name => withinCi(p, `${store.qa}/${name}`));
   const excluded = p => within(p, '.git') || qaInternal(p);
   requireValue(!roots.some(excluded), 'self-referential-input', true);
   const names = new Set(visible.filter(p => !excluded(p)));
@@ -247,7 +247,7 @@ async function filesystemSnapshot(store, payload, options) {
     for (const match of imports) await moduleIdentity(path.posix.normalize(path.posix.join(path.posix.dirname(relative), match[1])));
   }
   for (const name of MODULES) await moduleIdentity(`scripts/${name}`);
-  for (const name of ['extension.json', 'provenance.json']) await moduleIdentity(name);
+  for (const name of ['extension.json', 'provenance.json', 'aifhub-extension.json']) await moduleIdentity(name);
   for (const name of payload.module_inputs ?? []) modules[name] = digest(files[name] ?? 'missing');
   const rootInfo = await lstat(store.root, { bigint: true });
   requireValue(rootInfo.isDirectory() && rootInfo.ino > 0n, 'unsupported-file-identity', true);

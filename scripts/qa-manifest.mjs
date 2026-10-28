@@ -16,6 +16,27 @@ import { REQUIRED_GATES_BY_STAGE } from './handoff-gate-summary.mjs';
 export { evaluateQaBinding, readBoundGateEvidence } from './qa-bound-evidence.mjs';
 export { qaTarget, QA_LIMITS } from './qa-manifest-store.mjs';
 
+// Configured rules hierarchy (rules.base / rules.skills under the top-level
+// `rules:` key) is material policy even when the files are gitignored: without
+// this a byte change to base.md would leave the ignored name-set untouched.
+async function configuredRulesInputs(store) {
+  const data = await store.bytes('.ai-factory/config.yaml');
+  if (data === null) return [];
+  const inputs = [];
+  let inRules = false;
+  for (const rawLine of data.toString('utf8').split(/\r?\n/)) {
+    if (/^\s*#/.test(rawLine)) continue;
+    const match = rawLine.match(/^(\s*)([A-Za-z0-9_-]+):\s*(.*?)\s*$/);
+    if (!match) continue;
+    const [, indent, key, rawValue] = match;
+    if (indent.length === 0) { inRules = key === 'rules'; continue; }
+    if (inRules && indent.length > 0 && (key === 'base' || key === 'skills') && rawValue) {
+      inputs.push(rawValue.replace(/^['"]|['"]$/g, ''));
+    }
+  }
+  return inputs;
+}
+
 async function ownerRequirements(options, target) {
   const provider = options.providers?.requirements;
   if (provider) return provider({ target, stage: options.stage ?? 'done' });
@@ -55,7 +76,7 @@ export async function prepareQaManifest(options = {}) {
       const scope = sorted(options.scope ?? []);
       requireValue(scope.length > 0 && scope.length <= QA_LIMITS.files, 'scope-required', true);
       const policyInputs = sorted([...(options.policyInputs ?? []), '.ai-factory/config.yaml', '.ai-factory/RULES.md',
-        '.ai-factory/rules/generated', ...(store.target.flow === 'openspec'
+        '.ai-factory/rules/generated', ...(await configuredRulesInputs(store)), ...(store.target.flow === 'openspec'
           ? ['openspec/specs', `openspec/changes/${store.target.id}`] : [`${store.qa}/task.md`, `${store.qa}/context.md`, `${store.qa}/rules.md`])]);
       const payload = { wave_id: options.waveId ?? randomUUID(), target: store.target, scope,
         policy_inputs: policyInputs, module_inputs: sorted(options.moduleInputs ?? []),
@@ -95,7 +116,12 @@ export async function publishQaManifest(options = {}) {
       const owner = await ownerRequirements({ ...options, rootDir: store.root, stage: manifest.payload.stage }, store.target);
       const requiredGates = sorted([...(owner.gates ?? []), ...(options.requiredGates ?? [])]);
       const roles = [...(owner.independent_roles ?? []), ...(options.independentRoles ?? [])];
+      // Freshly read owner requirements must already belong to the prepared wave:
+      // evidence or gates demanded only now would not be covered by any recorded
+      // result, so publication is refused instead of silently accepted (review F6).
       requireValue(roles.every(role => manifest.payload.requirements.independent_roles.some(r => canonical(r) === canonical(role))), 'owner-requirements-drift', true);
+      requireValue(requiredGates.every(gate => manifest.payload.requirements.gates.includes(gate)), 'owner-requirements-drift', true);
+      requireValue((owner.evidence ?? []).every(relative => manifest.payload.requirements.evidence.includes(relative)), 'owner-requirements-drift', true);
       const first = await evaluateQaBinding({ ...options, requirePublication: false, requiredGates });
       const id = options.publicationId ?? randomUUID();
       identifier(id);
