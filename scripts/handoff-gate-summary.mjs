@@ -10,6 +10,7 @@ import {
   resolveActiveChange as defaultResolveActiveChange
 } from './active-change-resolver.mjs';
 import { getLatestGateResult } from './aif-gate-result.mjs';
+import { evaluateQaBinding } from './qa-bound-evidence.mjs';
 import { readOpenSpecCoverageMatrix as defaultReadOpenSpecCoverageMatrix } from './openspec-coverage-matrix.mjs';
 import { collectGeneratedRules as defaultCollectGeneratedRules } from './openspec-execution-context.mjs';
 
@@ -31,7 +32,7 @@ const GATE_CANDIDATES = Object.freeze({
   verify: ['verify.md']
 });
 
-const REQUIRED_GATES_BY_STAGE = Object.freeze({
+export const REQUIRED_GATES_BY_STAGE = Object.freeze({
   planning: [],
   implementing: ['verify'],
   review: ['review', 'security', 'rules', 'coverage'],
@@ -151,6 +152,22 @@ export async function buildHandoffGateSummary(options = {}) {
   gateSignals.coverage = coverage;
   evidence.coverage = coverage.evidencePath;
   diagnostics.push(...coverage.diagnostics);
+
+  const binding = await (options.evaluateQaManifest ?? evaluateQaBinding)({ ...options, rootDir, changeId,
+    requirePublication: true, qaDir: relativePath(rootDir, qaPath), gateContents: Object.fromEntries(Object.entries(gateSignals)
+      .filter(([, signal]) => typeof signal.content === 'string').map(([gate, signal]) => [gate, signal.content])) });
+  if (binding.enrolled) {
+    for (const gate of ['rules', 'review', 'security', 'verify']) {
+      const affected = binding.state === 'blocked' || (binding.state === 'stale'
+        && binding.affected_checks.some(id => binding.check_gates?.[id] === gate));
+      if (affected) gateSignals[gate].issue = binding.state === 'stale' ? 'stale' : 'invalid';
+    }
+    diagnostics.push({ code: binding.code, severity: binding.state === 'valid' ? 'info' : 'warning',
+      message: `QA binding: ${binding.state}.`, state: binding.state, affected_checks: binding.affected_checks });
+  } else {
+    diagnostics.push({ code: 'manifest-absent', severity: 'info', message: 'QA binding: legacy unbound.',
+      state: 'valid', affected_checks: [] });
+  }
 
   const generatedRules = await readGeneratedRulesStatus(changeId, {
     ...options,
@@ -303,6 +320,7 @@ async function readGateStatus(gate, options) {
 
     return {
       status: latest.result.status,
+      content,
       issue: null,
       evidencePath,
       diagnostics: fallbackDiagnostics

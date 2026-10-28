@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // openspec-done-finalizer.mjs - shared OpenSpec done/finalization runtime helpers
 import { execFile } from 'node:child_process';
+import { evaluateQaBinding } from './qa-bound-evidence.mjs';
 import { access, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
@@ -287,6 +288,14 @@ export async function finalizeOpenSpecChange(options = {}) {
       archive: createSkippedArchiveSummary(context.changeId, options, 'dirty-working-tree'),
       errors: workingTree.errors
     });
+  }
+
+  const binding = await (options.evaluateQaManifest ?? evaluateQaBinding)({ ...options, rootDir,
+    requirePublication: true, changeId: context.changeId, qaDir: toPosix(path.relative(rootDir, context.paths.qa)) });
+  if (binding.enrolled && binding.state !== 'valid') {
+    return createFinalizeFailure({ context, readiness, workingTree,
+      archive: createSkippedArchiveSummary(context.changeId, options, 'qa-manifest-blocked'),
+      errors: [{ code: binding.code, message: `Fresh QA binding before archive: ${binding.state}.` }] });
   }
 
   const archive = await archiveChangeWithOpenSpec(context.changeId, {

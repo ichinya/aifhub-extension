@@ -6,6 +6,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { getLatestGateResult } from './aif-gate-result.mjs';
+import { readBoundGateEvidence } from './qa-bound-evidence.mjs';
 
 export const OPENSPEC_POLICY_SCHEMA_VERSION = 1;
 
@@ -295,6 +296,13 @@ export function evaluatePolicyFinding(finding, policy, options = {}) {
 }
 
 export async function readOpenSpecRulesGateEvidence(changeId, options = {}) {
+  if (options.rulesGateEvidence !== undefined || options.rulesGateResult !== undefined) {
+    const binding = await readBoundGateEvidence({ ...options, changeId, gate: 'rules',
+      content: options.rulesGateEvidence?.content ?? '' });
+    if (binding.enrolled && binding.state !== 'valid') return { exists: true, ok: false,
+      status: 'invalid', gateResult: null, path: null, binding, warnings: [],
+      errors: [{ code: binding.code, message: `Rules QA binding: ${binding.state}.` }] };
+  }
   if (options.rulesGateEvidence !== undefined) {
     return normalizeRulesGateEvidence(options.rulesGateEvidence, null);
   }
@@ -332,6 +340,13 @@ export async function readOpenSpecRulesGateEvidence(changeId, options = {}) {
     try {
       const content = await readFile(candidatePath, 'utf8');
       const gate = getLatestGateResult(content, { gate: 'rules' });
+      const binding = await readBoundGateEvidence({ ...options, rootDir, changeId: normalized.changeId,
+        qaDir: toPosix(path.relative(rootDir, qaPath)), gate: 'rules', content });
+      if (binding.enrolled && binding.state !== 'valid') {
+        return { exists: true, ok: false, status: 'invalid', binding,
+          path: toPosix(path.relative(rootDir, candidatePath)), gateResult: null, warnings: [],
+          errors: [{ code: binding.code, message: `Rules QA binding: ${binding.state}.` }] };
+      }
       return normalizeRulesGateEvidence({
         exists: true,
         path: toPosix(path.relative(rootDir, candidatePath)),
