@@ -1088,9 +1088,18 @@ async function adoptOpenSpecConfig(rootDir, dryRun) {
   const block = 'aifhub:\n  tools:\n    openspec: true';
   let updated;
   if (raw === null) updated = `${block}\n`;
-  else if (/^aifhub:[ \t]*$/m.test(raw)) updated = raw.replace(/^aifhub:[ \t]*$/m, block);
+  else if (/^aifhub:[ \t]*$/m.test(raw)) {
+    if (/^    openspec\s*:/m.test(raw)) {
+      // The explicit tools mapping already owns the openspec switch: flip its
+      // value in place instead of inserting a second key (duplicates are malformed).
+      updated = raw.replace(/^([ \t]*openspec\s*:[ \t]*)(?:false|["']?false["']?)([ \t]*(?:#.*)?)$/m, '$1true$2');
+    } else if (/^  tools\s*:/m.test(raw)) {
+      updated = raw.replace(/^([ \t]*tools[ \t]*:[ \t]*(?:#.*)?[\r\n]+)/m, '$1    openspec: true\n');
+    } else updated = raw.replace(/^aifhub:[ \t]*$/m, block);
+  }
   else updated = `${raw.endsWith('\n') || raw.length === 0 ? raw : `${raw}\n`}${block}\n`;
-  if (parseToolConfig(updated).mode !== 'openspec') return { ok: false, action: 'unsupported-config' };
+  try { if (parseToolConfig(updated).mode !== 'openspec') return { ok: false, action: 'unsupported-config' }; }
+  catch (error) { return { ok: false, action: 'unsupported-config', reason: error.message }; }
   if (!dryRun) {
     await mkdir(path.dirname(configPath), { recursive: true });
     await writeFile(configPath, updated, 'utf8');
