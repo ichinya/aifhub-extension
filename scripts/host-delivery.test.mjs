@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { readFile } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
 import { deliveryProject } from './fixtures/delivery-project.mjs';
 import { createFakeHost } from './fixtures/host-delivery.mjs';
 import { createGateResult, renderGateResultBlock } from './aif-gate-result.mjs';
@@ -250,4 +250,17 @@ test('caller cannot rebind prepare/run/task or manufacture host acknowledgement 
   assert.equal((await g.prepare({ body: 'conflicting-body' })).state, 'blocked');
   await assert.rejects(g.send({ ack: true }), { code: 'invalid-input' });
   assert.equal(g.host.state.counters.create_calls, 0);
+});
+
+test('reserve replay materializes the registry when the journal survived without it', async t => {
+  const f = await fixture(t, { mode: 'after-commit' }); await f.prepare();
+  const requestPath = `.ai-factory/state/${f.id}/execution/requests/${uuid}.json`;
+  await rm(f.root + '/' + requestPath);
+  const replay = await f.call('delivery-reserve', { change_id: f.id, run_id: 'run-1', task_id: '1.1', request_uuid: uuid, target: { kind: 'completion', locator: 'worker-1' } });
+  assert.equal(replay.ok, true, JSON.stringify(replay));
+
+  const saved = JSON.parse(await f.get(requestPath));
+  assert.equal(saved.record.phase, 'prepared');
+  const replayed = await f.call('delivery-reserve', { change_id: f.id, run_id: 'run-1', task_id: '1.1', request_uuid: uuid, target: { kind: 'completion', locator: 'worker-1' } });
+  assert.equal(replayed.ok, true);
 });

@@ -257,8 +257,14 @@ export async function executionCommand(action,input,options={}) {
 }
 
 // Delivery borrows freshness from the execution owner; it never creates a result/receipt.
-export async function deliveryAdmission(store, input, { historical = false, resultRequired = true } = {}) {
+export async function deliveryAdmission(store, input, { historical = false, resultRequired = true, mutating = true } = {}) {
   await loadRuntime();
+  if (mutating) {
+    // An unreplayed execution journal owns the run: delivery must not create a
+    // host completion past it (review F1).
+    const pending = await pendingTransactions(store);
+    requireValue(pending.length === 0, 'pending-transaction', true);
+  }
   const h = await history(store, executionId(input.change_id));
   const run = h.runs.find(r => r.run_id === identifier(input.run_id));
   requireValue(run && run.schema === RUN_SCHEMA && !run.legacy, 'missing-or-invalid-run', true);

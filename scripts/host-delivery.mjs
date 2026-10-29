@@ -7,6 +7,8 @@ import { DELIVERY_REQUEST_SCHEMA, DELIVERY_RECORD_SCHEMA, RECOVERY_ACTION_TYPES,
   frozenRequest, strictBody, readBody, validateFrozenBody, projection } from './host-delivery-store.mjs';
 export { DELIVERY_REQUEST_SCHEMA, DELIVERY_RECORD_SCHEMA, RECOVERY_ACTION_TYPES, validateDeliveryRequest,
   validateDeliveryRecord, validateRecoveryAction };
+// Records this operation may still append after the host create (review F2).
+const HISTORY_HEADROOM = 4;
 const same = (a, b) => canonical(a) === canonical(b);
 const common = ['change_id', 'run_id', 'request_uuid'];
 const optional = ['task_id', 'target', 'body', 'body_file', 'binding'];
@@ -20,11 +22,20 @@ export async function reserveDeliverySlot(input, options = {}) {
   const uuid = requestUuid(input.request_uuid ?? randomUUID()), s = await deliveryStore(options), p = deliveryPaths(input.change_id, uuid);
   return lock(s, input.change_id, async () => {
     const a = await deliveryAdmission(s, input, { resultRequired: false });
-    const existing = await s.load(p.request) ?? (await s.load(p.journal))?.record;
+    let existing = null;
+    try { existing = await s.loadRequest(input.change_id, uuid); }
+    catch (error) { if (error.code !== 'delivery-request-missing') throw error; }
     if (existing) {
-      const r = await s.loadRequest(input.change_id, uuid);
-      requireValue(same(r.slot, { change_id: input.change_id, run_id: input.run_id, task_id: a.task_id }) && same(r.target, input.target), 'delivery-identity-conflict', true);
-      await s.project(r); return localView(r, a);
+      requireValue(same(existing.slot, { change_id: input.change_id, run_id: input.run_id, task_id: a.task_id }) && same(existing.target, input.target), 'delivery-identity-conflict', true);
+      const persisted = await s.bytes(p.request);
+      if (persisted === null) {
+        // Interrupted between journal and registry: rebuild the registry entry
+        // and verify every stable name before admitting the replay (review F3).
+        const bytes = await s.bytes(p.body);
+        requireValue(bytes !== null && digest(bytes) === existing.body?.sha256, 'delivery-integrity', true);
+        await s.saveRequest(existing);
+      }
+      await s.project(existing); return localView(existing, a);
     }
     requireValue(Object.keys(await s.inventory(`${p.folder}/requests`)).length < DELIVERY_LIMITS.requests, 'delivery-registry-full', true);
     const timestamp = s.now();
@@ -54,6 +65,7 @@ function localView(r, admission, extra = {}) {
     query_state: projection(r).query_state, body_sha256: r.identity?.body_sha256 ?? null,
     delivery_verified: false, reservation_retained: admission.reservation_retained, retry_create_allowed: false,
     recovery_action: r.recovery, host_state: r.host.request_state, authorizes: [], historical: admission.historical,
+    persisted: admission.mutating !== false,
     runner_metrics: { schema: 'aifhub.runner_metrics.v1', run_id: r.slot.run_id, transport: structuredClone(r.transport) }, ...extra };
 }
 async function assertIdentity(s, r, input, a) {
@@ -151,7 +163,7 @@ async function resolveRequest(input, options, mode) {
   const s = await deliveryStore(options), inspect = mode === 'inspect';
   return lock(s, input.change_id, async () => {
     const r = await s.loadRequest(input.change_id, input.request_uuid);
-    const a = await deliveryAdmission(s, r.slot, { historical: true, resultRequired: r.phase !== 'reserved' });
+    const a = await deliveryAdmission(s, r.slot, { historical: true, resultRequired: r.phase !== 'reserved', mutating: !inspect });
     if (a.historical && !inspect) return localView(r, a, { ok: false, code: 'delivery-historical-only', query_state: 'unknown', state: 'blocked' });
     const writable = !inspect && !a.historical;
     const start = Date.parse(s.now());
@@ -223,6 +235,9 @@ async function resolveRequest(input, options, mode) {
       await s.hit('before-send-intent'); r.phase = 'in_flight'; await s.saveRequest(r); await s.hit('after-send-intent');
       await s.hit('before-host-create');
       try {
+        // The operation still has to record its own outcome: without headroom a
+        // committed completion could never be persisted (review F2).
+        requireValue(r.history.length + HISTORY_HEADROOM <= DELIVERY_LIMITS.history, 'delivery-history-full', true);
         await operate('create', s, r, () => client.createRequest({ ...request, transport: transfer.transport, serialized_input: transfer.stdin }), options, true);
       } catch { /* Local failure is not a remote outcome: observe below. */ }
       await s.hit('after-host-response');

@@ -9,7 +9,9 @@ export class ProcessTransportError extends Error {
 const fail = code => { throw new ProcessTransportError(code); };
 const token = value => { if (typeof value !== 'string' || !value || /[\x00\r\n]/.test(value)) fail('invalid-toolchain-token'); };
 const ENVIRONMENT_KEYS = ['PATH', 'PATHEXT', 'SYSTEMROOT', 'WINDIR', 'COMSPEC', 'TEMP', 'TMP', 'TMPDIR', 'HOME',
-  'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'CI', 'NO_COLOR'];
+  'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'CI', 'NO_COLOR',
+  'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy',
+  'npm_config_registry', 'npm_config_strict_ssl'];
 export const processEnvironment = environment => Object.fromEntries(Object.entries(environment)
   .filter(([key, value]) => ENVIRONMENT_KEYS.includes(key.toUpperCase()) && typeof value === 'string'));
 function quoteWindowsCmdToken(value) {
