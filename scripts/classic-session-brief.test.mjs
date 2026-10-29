@@ -468,3 +468,16 @@ it('duplicate active headings with tab-prefixed variants are blocked', async () 
   const context = await resolvePlanContext(opts(root));
   assert.ok(context.errors.some(error => error.code === 'duplicate_source_section'), JSON.stringify(context.errors));
 });
+
+it('migration adoption flips an existing explicit tools mapping without duplicates', async () => {
+  const root = await fixture();
+  await put(root, '.ai-factory/config.yaml', 'aifhub:\n  tools:\n    openspec: false\n    hlv: false\n');
+  const { migrateLegacyPlan } = await import('./legacy-plan-migration.mjs');
+  const migrated = await migrateLegacyPlan(id, { rootDir: root, detectOpenSpec: async () => ({ available: false }) });
+  assert.equal(migrated.ok, true, JSON.stringify(migrated.errors ?? migrated.warnings));
+  const config = await text(root, '.ai-factory/config.yaml');
+  assert.equal(config.match(/openspec:/g).length, 1);
+  assert.match(config, /openspec: true/);
+  assert.match(config, /hlv: false/);
+  assert.equal((await import('./tool-config.mjs')).parseToolConfig(config).mode, 'openspec');
+});
