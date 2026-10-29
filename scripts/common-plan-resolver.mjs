@@ -66,7 +66,7 @@ export async function resolvePlanContext(options = {}) {
       }
       return sourceBytes.get(file);
     };
-    const adapterOptions = { ...options, nativeTarget: options.changeId, readSource: cachedReadSource };
+    const adapterOptions = { ...options, nativeTarget: target.nativeTarget ?? options.changeId, readSource: cachedReadSource };
     const identity = await adapter.resolveIdentity(root, changeId, adapterOptions);
     const validation = await adapter.validate(root, identity, adapterOptions);
     if (validation.length) throw planResolverError(validation[0].code, validation);
@@ -101,11 +101,12 @@ export async function resolvePlanTarget(options = {}) {
     const config = parseSimpleYaml(raw);
     const plans = (config.paths?.plans ?? '.ai-factory/plans').replaceAll('\\', '/').replace(/\/$/, '');
     const fast = (config.paths?.plan ?? '.ai-factory/PLAN.md').replaceAll('\\', '/');
-    if (value === fast) value = path.posix.basename(fast, '.md');
+    const nativeTarget = value === fast ? fast : undefined;
+    if (value === fast) value = path.posix.basename(fast, '.md').toLowerCase();
     else if (value.startsWith(`${plans}/`)) value = value.slice(plans.length + 1).replace(/\/(?:index|task|context|rules|verify|explore)\.md$|\/status\.yaml$|\.md$|\/$/g, '');
     const normalized = normalizeChangeId(value);
     if (!normalized.ok) throw planResolverError('invalid-change-id');
-    return { ok: true, changeId: normalized.changeId, methodology, source: 'explicit', warnings: [], errors: [] };
+    return { ok: true, changeId: normalized.changeId, methodology, ...(nativeTarget ? { nativeTarget } : {}), source: 'explicit', warnings: [], errors: [] };
   }
   const config = parseSimpleYaml(raw);
   const discovery = await discoverLegacyPlans({ rootDir: root, plansDir: config.paths?.plans ?? '.ai-factory/plans', useRecordedLegacyPlanSource: false });

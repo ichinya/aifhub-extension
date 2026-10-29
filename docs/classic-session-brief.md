@@ -46,6 +46,8 @@ Canonical inventory содержит parent и пять companions. Policy: conf
 
 ## Ultra и consumers
 
+Fast target, явно выбранный через настроенный `paths.plan`, передаётся upstream напрямую: `status: delegated`, `blocked_reasons: ['upstream_fast_handoff']`, точная команда `/aif-implement <fast-path>` (для ролей fix/verify — их команда). Полные companions и содержимое fast-плана не читаются, runtime outputs не создаются. Fast и full identity не подменяют друг друга; full SDD inputs внутри fast-файла не повышают его до full.
+
 Сначала выполняется существующий marker-first classifier. Valid ultra возвращает `public_mode:ultra`, `upstream_handoff:{owner:'upstream',entrypoint}` и пустые errors. Local compiler возвращает `blocked_reasons:['ultra_upstream_handoff']` с точной `/aif-implement <entrypoint>` командой; fix/verify используют свои команды. Native companions не открываются и не создаются. Invalid marker или collision сохраняет все sanitized classifier codes.
 
 Execution context возвращает `aifactory-classic`, не собирает generated OpenSpec rules и не вызывает detect/instructions CLI. Implement **и Fix** проверяют exact consumed digest перед trace write. Compliance использует resolved checklist, отсутствие digest не подтверждает binding, explicit отсутствующий runId не заменяется другим trace. Fresh review сохраняет `outcome:prepared`. Tracer хранит methodology, canonical revision и nullable consumed digest; promotion проверяет source binding и для classic не предлагает OpenSpec sync.
@@ -54,4 +56,4 @@ Execution context возвращает `aifactory-classic`, не собирае�
 
 Обязательное `instruction_composition_digest:null` находится внутри digest payload рядом с plan_context. Все ранее сохранённые brief, включая OpenSpec, однократно становятся stale и требуют recompile. Caller-provided hash игнорируется. Null означает «composition не зафиксирована»; обнаружение instruction drift требует отдельного producer manifest, которого этот change не реализует.
 
-Follow-up: versioned instruction-composition manifest с ordered skill/injection/reference hashes и prepared/consumed per-attempt bindings. Отбор context #216, #203 P2, classic QA manifest #234 и reviewed outcome остаются отдельными задачами. Сокращение entrypoints/references — отдельный PR; сокращение upstream skill bodies требует отдельного upstream issue. Измеренного сокращения entrypoints этот change не заявляет.
+Follow-up: versioned instruction-composition manifest с ordered skill/injection/reference hashes и prepared/consumed per-attempt bindings. Отбор context #216, #203 P2 и reviewed outcome остаются отдельными задачами. PR3 сокращает extension-owned entrypoints; сокращение upstream skill bodies остаётся в #253. Поставка, update и методика замера описаны в [entrypoint delivery](entrypoint-delivery.md).

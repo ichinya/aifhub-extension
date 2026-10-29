@@ -1,3 +1,4 @@
+import { readPromptContract } from './prompt-reference-graph.mjs';
 // superpowers-discipline-contract.test.mjs - bounded workflow ideas adapted from obra/superpowers
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -93,7 +94,7 @@ const AGENT_SEMANTIC_PAIRS = [
 ];
 
 async function readRepoFile(relativePath) {
-  return readFile(join(REPO_ROOT, relativePath), 'utf8');
+  return readPromptContract(REPO_ROOT, relativePath);
 }
 
 function assertIncludes(source, expected, label) {

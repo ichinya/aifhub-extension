@@ -7,6 +7,7 @@ import { afterEach, it } from 'node:test';
 import { registerPostUpdateInit } from '../commands/post-update-init.mjs';
 import { HELPER_MODULES, sha256 } from './execution-provenance.mjs';
 import { generateProvenance } from './generate-provenance.mjs';
+import { recordPromptBaseline } from './prompt-assets.mjs';
 
 const roots = [];
 async function helperInstallation(f) {
@@ -29,6 +30,37 @@ afterEach(async () => {
     assert.ok(path.basename(root).startsWith('aifhub-post-update-'));
     await rm(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   }
+});
+
+it('hook preserves modified prompt bytes separately from helper provenance before replacement', async () => {
+  const f = await fixture(), installed = await helperInstallation(f);
+  const relative = 'injections/references/aif-implement/local.md';
+  await mkdir(path.dirname(path.join(installed, relative)), { recursive: true });
+  await writeFile(path.join(installed, relative), 'release\n');
+  await recordPromptBaseline(f.root);
+  await writeFile(path.join(installed, relative), 'user patch\r\n');
+  const action = f.action('global'); await f.pre(action);
+  const parent = path.join(f.root, '.ai-factory/state/extension-prompt-updates');
+  const directory = path.join(parent, (await readdir(parent))[0]);
+  const original = path.join(directory, 'preserve/.ai-factory/extensions/aifhub-extension', relative);
+  assert.equal(await readFile(original, 'utf8'), 'user patch\r\n');
+  await writeFile(path.join(installed, relative), 'incoming\n'); await f.refresh(); await f.post(action);
+  const manifest = JSON.parse(await readFile(path.join(directory, 'prompt-diff-manifest.json'), 'utf8'));
+  assert.equal(manifest.files[0].incoming_sha256, sha256('incoming\n'));
+  assert.equal(await readFile(original, 'utf8'), 'user patch\r\n');
+  assert.match(f.stderr.join(''), /prompt-diff-manifest/);
+  await assert.rejects(readdir(path.join(f.root, '.ai-factory/state/extension-updates')), { code: 'ENOENT' });
+});
+
+it('prompt preservation failure aborts update before initialization or replacement', async () => {
+  const f = await fixture(), installed = await helperInstallation(f);
+  await mkdir(path.join(installed, 'skills'), { recursive: true });
+  await writeFile(path.join(installed, 'skills/local.md'), 'user prompt');
+  await mkdir(path.join(f.root, '.ai-factory/state'), { recursive: true });
+  await writeFile(path.join(f.root, '.ai-factory/state/extension-prompt-updates'), 'blocked');
+  await assert.rejects(f.pre(f.action('global')), /prompt-asset preservation failed/);
+  assert.equal(f.processLike.exitCode, 1); assert.equal(f.calls.length, 0);
+  assert.equal(await readFile(path.join(installed, 'skills/local.md'), 'utf8'), 'user prompt');
 });
 
 it('preserves a modified installed helper before replacement and emits a reviewable migration handoff', async () => {

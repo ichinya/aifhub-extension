@@ -1,3 +1,4 @@
+import { readPromptContract } from './prompt-reference-graph.mjs';
 // openspec-prompt-assets.test.mjs - instruction-level tests for OpenSpec-native prompt assets
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -285,7 +286,7 @@ const LEGACY_PLAN_ARTIFACTS = [
 ];
 
 async function readRepoFile(relativePath) {
-  return readFile(join(REPO_ROOT, relativePath), 'utf8');
+  return readPromptContract(REPO_ROOT, relativePath);
 }
 
 function normalizeManifestPath(pathValue) {

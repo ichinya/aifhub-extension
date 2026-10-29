@@ -22,6 +22,7 @@ import {
   parseStableAiFactoryVersion
 } from './ai-factory-version-resolver.mjs';
 import { classifyLegacyPlanShape } from './legacy-plan-migration.mjs';
+import { validatePromptReferences } from './prompt-reference-graph.mjs';
 
 export const SMOKE_SCHEMA_VERSION = 1;
 export const EXPECTED_AI_FACTORY_VERSIONS = Object.freeze({
@@ -735,6 +736,11 @@ function classifyLanguageUiState(config) {
 
 async function inspectInjectionContracts(projectDir, manifest, flow) {
   const entries = [];
+  try {
+    await validatePromptReferences(path.join(projectDir, '.ai-factory/extensions', EXTENSION_NAME));
+  } catch {
+    assertContract(false, flow, 'installed-prompt-reference-unresolved');
+  }
   for (const injection of manifest.injections ?? []) {
     const skillPath = path.join(projectDir, '.codex', 'skills', injection.target, 'SKILL.md');
     assertContract(await exists(skillPath), flow, 'missing-injection-target', { target: injection.target });

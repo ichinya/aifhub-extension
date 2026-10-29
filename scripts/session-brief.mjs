@@ -109,7 +109,9 @@ async function buildSnapshot(options, explicitCompile) {
     return item?.data ?? null;
   };
   const plansRoot = methodology === 'openspec' ? 'openspec/changes' : config.paths?.plans ?? '.ai-factory/plans';
-  await inspectPath(root, plansRoot);
+  const explicitFast = methodology === 'aifactory' && typeof options.changeId === 'string'
+    && options.changeId.replace(/^@/, '').replaceAll('\\', '/') === (config.paths?.plan ?? '.ai-factory/PLAN.md').replaceAll('\\', '/');
+  if (!explicitFast) await inspectPath(root, plansRoot);
   if (methodology === 'aifactory' && options.changeId === undefined) {
     // Discovery invokes the same marker-first classifier. Bound its possible
     // bundle inputs before it reads them, even when no target was explicit.
@@ -119,7 +121,7 @@ async function buildSnapshot(options, explicitCompile) {
   const changeId = resolution.changeId;
   const base = methodology === 'openspec' ? `openspec/changes/${changeId}` : `${(config.paths?.plans ?? '.ai-factory/plans').replace(/\/$/, '')}/${changeId}`;
   const paths = sessionBriefPaths(changeId);
-  await inspectPath(root, base);
+  if (!resolution.nativeTarget) await inspectPath(root, base);
   // Resolve methodology-neutral plan context (ADR 0005). Canonical ownership stays
   // with the plan; this is a derived execution context bound to source revisions.
   const planContext = await resolvePlanContext({ ...options, rootDir: root, changeId: options.changeId ?? changeId, methodology, readSource,
@@ -131,8 +133,8 @@ async function buildSnapshot(options, explicitCompile) {
     error.planResolverErrors = planContext.errors;
     throw error;
   }
-  if (planContext.upstream_handoff) return { root, changeId, paths, delegated: true, sources: [], blocked: ['ultra_upstream_handoff'],
-    decision: { profile: 'ultra', implementation_allowed: false, blocked_reason: 'ultra_upstream_handoff' },
+  if (planContext.upstream_handoff) return { root, changeId, paths, delegated: true, sources: [], blocked: [planContext.public_mode === 'fast' ? 'upstream_fast_handoff' : 'ultra_upstream_handoff'],
+    decision: { profile: planContext.public_mode, implementation_allowed: false, blocked_reason: planContext.public_mode === 'fast' ? 'upstream_fast_handoff' : 'ultra_upstream_handoff' },
     ownerHandoff: `/aif-${['fix', 'verify'].includes(options.role) ? options.role : 'implement'} ${planContext.upstream_handoff.entrypoint}` };
   const policyFile = await readSafeFile(root, SDD_POLICY_PATH);
   const existing = await readSafeFile(root, paths.json);
@@ -290,7 +292,7 @@ async function buildSnapshot(options, explicitCompile) {
 
 function summarize(snapshot) {
   return {
-    ok: Boolean(snapshot.brief), status: snapshot.brief ? 'valid' : 'blocked', change_id: snapshot.changeId,
+    ok: Boolean(snapshot.brief), status: snapshot.delegated && snapshot.decision.profile === 'fast' ? 'delegated' : snapshot.brief ? 'valid' : 'blocked', change_id: snapshot.changeId,
     paths: snapshot.paths, decision: snapshot.decision, digest: snapshot.brief?.digest ?? null,
     sources: snapshot.sources, stale_reasons: [],
     blocked_reasons: snapshot.blocked.length ? snapshot.blocked : snapshot.decision.blocked_reason ? [snapshot.decision.blocked_reason] : [],

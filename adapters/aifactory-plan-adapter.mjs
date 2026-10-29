@@ -1,7 +1,7 @@
 // Native classic sources remain authoritative; this adapter never repairs them.
 import { createHash } from 'node:crypto';
 import { parseSimpleYaml } from '../scripts/aif-artifact-sync.mjs';
-import { readProviderFile } from '../scripts/provider-files.mjs';
+import { readProviderFile, safeProviderPath } from '../scripts/provider-files.mjs';
 import { classifyLegacyPlanShape } from '../scripts/legacy-plan-migration.mjs';
 import { parseExecutionTasks } from '../scripts/execution-task-source.mjs';
 import { parseClassicStatusProjection } from '../scripts/classic-status-projection.mjs';
@@ -36,7 +36,10 @@ async function resolveIdentity(root, changeId, options = {}) {
   const isFast = requested === fast;
   const entrypoint = isFast ? fast : `${plans}/${changeId}.md`;
   const base = `${plans}/${changeId}`;
-  if (isFast) return { planId: changeId, entrypoint, checklist: entrypoint, base, mode: 'fast', shape: 'fast', documents: [entrypoint] };
+  if (isFast) {
+    await safeProviderPath(root, entrypoint);
+    return { planId: changeId, entrypoint, checklist: entrypoint, base, mode: 'fast', shape: 'fast', documents: [] };
+  }
   if (options.preflightDirectory) await options.preflightDirectory(base);
   await read(root, entrypoint);
   const shape = await classifyLegacyPlanShape(changeId, { rootDir: root, plansDir: plans, useRecordedLegacyPlanSource: false });
@@ -48,7 +51,7 @@ async function resolveIdentity(root, changeId, options = {}) {
 }
 async function validate(root, identity, options = {}) {
   if (identity.errors?.length) return identity.errors.map(({ code }) => ({ code }));
-  if (identity.mode === 'ultra') return [];
+  if (['ultra', 'fast'].includes(identity.mode)) return [];
   const errors = [];
   for (const file of identity.documents) if (await reader(options)(root, file) === null) {
     errors.push({ code: file === identity.entrypoint ? 'missing_plan_file' : 'missing_classic_companion', path: file });
@@ -108,7 +111,7 @@ function declaredRefs(value) {
 async function readContext(root, identity, options = {}) {
   const common = { adapter_version: ADAPTER_VERSION, public_mode: identity.mode, entrypoint: identity.entrypoint,
     checklist: identity.checklist ?? null, shape: identity.shape };
-  if (identity.mode === 'ultra') return { ...common, upstream_handoff: { owner: 'upstream', entrypoint: identity.entrypoint }, errors: [] };
+  if (['ultra', 'fast'].includes(identity.mode)) return { ...common, upstream_handoff: { owner: 'upstream', entrypoint: identity.entrypoint }, errors: [] };
   const read = reader(options), errors = [], inventory = [];
   const texts = Object.fromEntries(await Promise.all(identity.documents.map(async file => [file, (await read(root, file)).toString('utf8')])));
   const parent = texts[identity.entrypoint];

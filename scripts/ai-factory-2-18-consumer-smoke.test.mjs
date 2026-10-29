@@ -1,5 +1,6 @@
 // ai-factory-2-18-consumer-smoke.test.mjs - offline install/update contract coverage
 import assert from 'node:assert/strict';
+import { validateInstalledPromptAssets, recordPromptBaseline, preservePromptAssets, inventoryPromptAssets } from './prompt-assets.mjs';
 import { createHash } from 'node:crypto';
 import {
   cp,
@@ -220,7 +221,7 @@ async function installFakeExtension(projectDir, sourceRoot) {
     ...(manifest.skills ?? []),
     ...(manifest.injections ?? []).map((entry) => entry.file),
     ...(manifest.agentFiles ?? []).map((entry) => entry.source),
-    ...(manifest.name === 'aifhub-extension' ? ['skills/shared/LANGUAGE-POLICY.md'] : [])
+    ...(manifest.name === 'aifhub-extension' ? ['skills/shared', 'injections/references', 'docs/workflow-mechanics.md', 'docs/isolated-execution.md'] : [])
   ]);
   for (const assetPath of assetPaths) {
     await copyReferencedAsset(sourceRoot, installedRoot, assetPath);
@@ -454,6 +455,43 @@ afterEach(async () => {
 });
 
 describe('AI Factory 2.18/2.19 consumer compatibility smoke', () => {
+  it('reapplies the short kernel twice with stable references and exact outside-marker bytes', async () => {
+    const harness = await createHarness();
+    const projectDir = path.join(harness.root, 'repeat-update');
+    const manifest = await readJson(path.join(REPO_ROOT, 'extension.json'));
+    await mkdir(projectDir, { recursive: true });
+    await fakeInit(projectDir, EXPECTED_AI_FACTORY_VERSIONS.v218, ['init'], manifest);
+    await installFakeExtension(projectDir, REPO_ROOT);
+    const injection = manifest.injections.find(i => i.target === 'aif-implement');
+    const file = path.join(projectDir, '.codex/skills/aif-implement/SKILL.md');
+    const end = '<!-- aif-ext:aifhub-extension:aif-implement:prepend:end -->';
+    let initial = await readFile(file, 'utf8');
+    initial = initial.slice(0, initial.indexOf(end) + end.length) + '\n\nuser outside marker\r\n' + initial.slice(initial.indexOf(end) + end.length + 2);
+    await writeFile(file, initial);
+    const outside = value => value.slice(value.indexOf(end) + end.length);
+    await recordPromptBaseline(projectDir);
+    const before = await inventoryPromptAssets(projectDir);
+    for (let i = 0; i < 2; i++) {
+      assert.equal(await preservePromptAssets(projectDir), null);
+      await applyFakeInjection(projectDir, 'aifhub-extension', injection, REPO_ROOT);
+      const current = await readFile(file, 'utf8');
+      assert.equal(current, initial);
+      assert.equal(outside(current), outside(initial));
+      await validateInstalledPromptAssets(projectDir);
+      assert.deepEqual(await inventoryPromptAssets(projectDir), before);
+    }
+  });
+
+  it('rejects an update whose installed mode reference was omitted', async () => {
+    const harness = await createHarness({ mutateInstalledInjection: async ({ projectDir, stage }) => {
+      if (stage === 'global-update') await rm(path.join(projectDir, '.ai-factory/extensions/aifhub-extension/injections/references/aif-implement/classic-sdd.md'));
+    } });
+    const result = await runAiFactory218ConsumerSmoke({ toolchains: harness.toolchains, extensionRoot: REPO_ROOT,
+      runner: harness.runner, workspaceFactory: harness.workspaceFactory, timeoutMs: 5_000, networkEnabled: false, evidence: 'deterministic' });
+    assert.equal(result.status, SMOKE_STATUS.FAIL);
+    assert.equal(result.failure.code, 'installed-prompt-reference-unresolved');
+  });
+
   it('uses injected 2.17.0/2.18.1 executors for clean, global, and exact targeted update contracts', async () => {
     const harness = await createHarness();
     const result = await runAiFactory218ConsumerSmoke({

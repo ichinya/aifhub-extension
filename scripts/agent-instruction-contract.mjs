@@ -39,6 +39,14 @@ export function validateAgentInstructionContract({ runtime, name, source }) {
     if (!ok) issues.push({ runtime, name, case: caseName, message });
   };
 
+  if (name === 'aifhub-implement-worker') record(
+    'mandatory-worker-reference',
+    source.includes(`\`injections/references/aif-implement/worker-${runtime}.md\``)
+      && source.includes('before task reconciliation, admission/resume, edits, checks, traces, checkpoints or results')
+      && source.includes('.ai-factory/extensions/aifhub-extension/'),
+    'Worker details must load from the installed extension before every governed local action.'
+  );
+
   record(
     'marker-first-delegation',
     legacy !== null
