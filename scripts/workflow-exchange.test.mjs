@@ -105,7 +105,9 @@ describe('Workflow profile export', () => {
   it('fails profile --change when the change cannot be resolved', async () => {
     const result = await exportWorkflowProfile({ rootDir: os.tmpdir(), changeId: 'missing-change' });
     assert.equal(result.outcome, 'failed');
-    assert.equal(result.errors[0].code, 'active_change_unresolved');
+    // reason: config-default-classic resolves explicit identity, then validates
+    // its selected sources instead of searching an OpenSpec directory.
+    assert.equal(result.errors[0].code, 'missing_plan_file');
   });
 
   it('degrades instead of silently dropping a malformed stored decision', async () => {
@@ -253,20 +255,27 @@ describe('Exchange bundle export', () => {
     assert.equal(details.invalid_tracer_decision, 'change_binding_mismatch');
   });
 
-  it('exports a degraded bundle for a native-only AI Factory plan', async () => {
+  it('exports unopted native context without fabricating requirements or a SessionBrief', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'aifhub-exchange-aif-'));
     roots.push(root);
     await put(root, '.ai-factory/config.yaml', 'paths:\n  plan: .ai-factory/PLAN.md\n');
-    await put(root, '.ai-factory/PLAN.md', '# Plan\n\n- [ ] 1.1 Do the native task.\n');
+    // reason: validation-before-parsing; a native pair with incomplete facts
+    // exports as degraded, while missing companions are resolver failures.
+    const native = '.ai-factory/plans/native-task';
+    await put(root, `${native}.md`, '# Plan\n\n- [ ] 1.1 Do the native task.\n');
+    for (const name of ['task.md', 'context.md', 'rules.md', 'verify.md', 'status.yaml']) {
+      await put(root, `${native}/${name}`, name === 'task.md' ? '# Tasks\n\n- [ ] 1.1 Do the native task.\n' : name === 'status.yaml' ? 'plan_id: native-task\n' : '# Context\n');
+    }
     const result = await exportExchangeBundle({ rootDir: root, changeId: 'native-task', methodology: 'aifactory' });
-    assert.equal(result.outcome, 'degraded');
+    assert.equal(result.outcome, 'exported');
     const bundle = result.bundle;
     assert.equal(bundle.plan.methodology, 'aifactory');
-    assert.equal(bundle.plan.public_mode, 'fast');
+    assert.equal(bundle.plan.public_mode, 'full');
     assert.equal(bundle.plan.tasks.length, 1);
-    assert.ok(result.notes.some((note) => note.code === 'aifactory-native-plan-parsing-incomplete'));
-    // SessionBrief is OpenSpec-protocol-bound; aifactory exports stay degraded.
-    assert.ok(result.notes.some((note) => note.code === 'session_brief_blocked'));
+    assert.equal(result.notes.some((note) => note.code === 'aifactory-native-plan-parsing-incomplete'), false);
+    // Missing declared facts remain visible; no synthetic requirements.
+    assert.equal(result.notes.some((note) => note.code === 'session_brief_blocked'), false);
+    assert.equal(bundle.plan.requirements.intent, '');
   });
 });
 

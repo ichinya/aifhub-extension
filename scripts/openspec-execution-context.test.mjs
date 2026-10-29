@@ -37,6 +37,8 @@ async function writeFixture(rootDir, relativePath, content) {
 }
 
 async function createOpenSpecChange(rootDir, changeId = 'add-oauth') {
+  // reason: methodology-config-precedence; a directory alone never opts in.
+  await writeFixture(rootDir, '.ai-factory/config.yaml', 'aifhub:\n  tools:\n    openspec: true\n');
   await writeFixture(rootDir, `openspec/changes/${changeId}/proposal.md`, '# Proposal\n');
   await writeFixture(rootDir, `openspec/changes/${changeId}/design.md`, '# Design\n');
   await writeFixture(rootDir, `openspec/changes/${changeId}/tasks.md`, '# Tasks\n\n- [ ] Implement\n');
@@ -496,6 +498,8 @@ describe('OpenSpec execution context API', () => {
     await createOpenSpecChange(rootDir, 'add-oauth');
     await writeFixture(rootDir, '.ai-factory/config.yaml', [
       'aifhub:',
+      '  tools:',
+      '    openspec: true',
       '  openspec:',
       '    useInstructionsApply: false'
     ].join('\n'));

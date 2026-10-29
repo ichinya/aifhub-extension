@@ -106,7 +106,7 @@ export function selectSddProfile(input, policyInput = {}, options = {}) {
     } else blockedReason = 'planning_mode_mismatch';
   }
   const requiredArtifacts = profile === 'direct' || profile === 'research' ? [] : ['proposal', 'tasks', 'session_brief'];
-  if (requiredArtifacts.length && signals?.behavior_change) requiredArtifacts.push('delta_specs');
+  if (requiredArtifacts.length && signals?.behavior_change && options.methodology !== 'aifactory') requiredArtifacts.push('delta_specs');
   const requireDesign = policy.require_design || ['standard', 'expanded', 'ultra'].includes(profile);
   if (requiredArtifacts.length && requireDesign) requiredArtifacts.push('design');
   return {

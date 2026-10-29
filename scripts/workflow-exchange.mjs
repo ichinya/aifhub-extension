@@ -7,8 +7,8 @@ import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { resolveActiveChange, normalizeChangeId } from './active-change-resolver.mjs';
-import { resolvePlanContext, listAdapters } from './common-plan-resolver.mjs';
+import { normalizeChangeId } from './active-change-resolver.mjs';
+import { resolvePlanContext, resolvePlanTarget, listAdapters } from './common-plan-resolver.mjs';
 import { inspectSessionBrief } from './session-brief.mjs';
 import { parseStrictJson } from './json-strict.mjs';
 import { readProviderFile, writeProviderFile } from './provider-files.mjs';
@@ -325,7 +325,12 @@ async function readTracerState(root, changeId, notes) {
   return { brief, findings, decision };
 }
 
-function lineageKind(ref, changeId) {
+function lineageKind(ref, changeId, context) {
+  if (context?.methodology === 'aifactory') {
+    if (ref === context.entrypoint) return 'change_spec';
+    if (ref === context.checklist) return 'work_item_spec';
+    if (context.documents.some(document => document.path === ref)) return 'plan_companion';
+  }
   const base = `openspec/changes/${changeId}`;
   if (ref === `${base}/design.context.json`) return 'design_context';
   if (ref === `${base}/proposal.md` || ref === `${base}/design.md` || ref.startsWith(`${base}/specs/`)) return 'change_spec';
@@ -334,22 +339,11 @@ function lineageKind(ref, changeId) {
   return null;
 }
 
-async function resolveExchangeChangeId(root, methodology, options) {
-  // Non-OpenSpec methodologies do not require an OpenSpec change directory; an
-  // explicit --change names the native plan identity the adapter resolves.
-  if (methodology !== 'openspec' && options.changeId !== undefined) {
-    return normalizeChangeId(options.changeId).changeId;
-  }
-  const resolution = await resolveActiveChange({ rootDir: root, cwd: options.cwd ?? root, changeId: options.changeId, getCurrentBranch: options.getCurrentBranch });
-  if (!resolution.ok) throw exchangeError('active_change_unresolved');
-  return resolution.changeId;
-}
-
 async function buildExchangeSnapshot(options) {
   const root = path.resolve(options.rootDir ?? process.cwd());
-  const methodology = options.methodology ?? 'openspec';
-  if (options.changeId !== undefined && (typeof options.changeId !== 'string' || !options.changeId || !normalizeChangeId(options.changeId).ok)) throw exchangeError('invalid-change-id');
-  const changeId = await resolveExchangeChangeId(root, methodology, options);
+  const target = await resolvePlanTarget({ ...options, rootDir: root });
+  const methodology = target.methodology;
+  const changeId = target.changeId;
   const notes = [];
   // The plan context and the brief must describe the same source snapshot; a
   // concurrent recompile between the two reads yields a bounded retry, then a
@@ -374,7 +368,7 @@ async function buildExchangeSnapshot(options) {
   const complianceReceipt = await readReceipt(root, `.ai-factory/state/${changeId}/implementation/plan-compliance.json`, 'aifhub.plan_compliance.v1', changeId, notes, 'invalid_plan_compliance_receipt');
   const reviews = await listReviewReceipts(root, changeId, notes);
   const tracer = await readTracerState(root, changeId, notes);
-  const designContext = await readDesignContext(root, changeId, notes);
+  const designContext = methodology === 'openspec' ? await readDesignContext(root, changeId, notes) : null;
   const degraded = notes.length > 0 || (briefStatus.status !== 'valid' && briefStatus.status !== 'disabled');
   return { root, changeId, notes, planContext, briefStatus, complianceReceipt, reviews, tracer, designContext, degraded };
 }
@@ -390,7 +384,7 @@ function buildArtifactInventory(snapshot) {
   const artifacts = [];
   const references = [];
   for (const entry of seen.values()) {
-    const kind = lineageKind(entry.ref, snapshot.changeId);
+    const kind = lineageKind(entry.ref, snapshot.changeId, snapshot.planContext);
     if (kind) artifacts.push({ ref: entry.ref, kind, sha256: entry.sha256, bytes: entry.bytes ?? null });
     else references.push({ path: entry.ref, sha256: entry.sha256, kind: entry.role ?? 'supporting' });
   }
@@ -473,6 +467,7 @@ function buildBundle(snapshot, version, now) {
       context_manifest: brief.context_manifest,
       required_capabilities: brief.required_capabilities,
       plan_context: brief.plan_context,
+      instruction_composition_digest: brief.instruction_composition_digest ?? null,
       budget: brief.budget,
       sources: brief.sources
     } : null,
@@ -485,7 +480,7 @@ function buildBundle(snapshot, version, now) {
       tracer: snapshot.tracer
     },
     design_context: snapshot.designContext,
-    vocabulary_extensions: ['design_context'],
+    vocabulary_extensions: snapshot.planContext.methodology === 'aifactory' ? ['design_context', 'plan_companion'] : ['design_context'],
     exchange_notes: snapshot.notes
   };
   assertNoCredentials(JSON.stringify(bundle));
@@ -609,11 +604,11 @@ async function buildProfileExport(options, version, now, notes) {
   if (options.changeId !== undefined) {
     // --change binds the export to a concrete project decision.
     const root = path.resolve(options.rootDir ?? process.cwd());
-    const methodology = options.methodology ?? 'openspec';
-    const changeId = await resolveExchangeChangeId(root, methodology, options);
+    const { methodology, changeId } = await resolvePlanTarget({ ...options, rootDir: root });
+    artifact.framework.id = methodology;
     const decision = await readReceipt(root, `.ai-factory/state/${changeId}/sdd/profile-decision.json`, 'aifhub.sdd_profile_decision.v1', changeId, notes, 'invalid_profile_decision');
     if (decision) artifact.resolved_decision = { change_id: changeId, decision };
-    const planContext = await resolvePlanContext({ rootDir: root, changeId, methodology }).catch(() => null);
+    const planContext = await resolvePlanContext({ rootDir: root, changeId, methodology });
     if (planContext) artifact.framework.adapter_version = planContext.adapter_version;
   }
   return artifact;

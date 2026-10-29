@@ -29,12 +29,13 @@ function planError(code) {
 
 function sha256(value) { return createHash('sha256').update(value).digest('hex'); }
 
-async function resolveIdentity(root, changeId) {
+async function resolveIdentity(root, changeId, options = {}) {
+  const read = options.readSource ?? readProviderFile;
   const base = `openspec/changes/${changeId}`;
   const documents = [`${base}/proposal.md`, `${base}/tasks.md`];
   const optional = [`${base}/design.md`, `${base}/.openspec.yaml`, `${base}/design.context.json`];
   for (const file of optional) {
-    const bytes = await readProviderFile(root, file, 4 * 1024 * 1024);
+    const bytes = await read(root, file, 4 * 1024 * 1024);
     if (bytes !== null) documents.push(file);
   }
   const specsDir = `${base}/specs`;
@@ -100,12 +101,13 @@ function parseSddInputs(proposal) {
   try { return parseStrictJson(match[1]); } catch (error) { throw planError(error.sddCode ?? 'invalid-sdd-inputs'); }
 }
 
-async function readContext(root, identity) {
-  const proposalBytes = await readProviderFile(root, `${identity.base}/proposal.md`, 4 * 1024 * 1024);
+async function readContext(root, identity, options = {}) {
+  const read = options.readSource ?? readProviderFile;
+  const proposalBytes = await read(root, `${identity.base}/proposal.md`, 4 * 1024 * 1024);
   const proposal = proposalBytes ? proposalBytes.toString('utf8') : '';
-  const designBytes = await readProviderFile(root, `${identity.base}/design.md`, 4 * 1024 * 1024);
+  const designBytes = await read(root, `${identity.base}/design.md`, 4 * 1024 * 1024);
   const design = designBytes ? designBytes.toString('utf8') : '';
-  const tasksBytes = await readProviderFile(root, `${identity.base}/tasks.md`, 4 * 1024 * 1024);
+  const tasksBytes = await read(root, `${identity.base}/tasks.md`, 4 * 1024 * 1024);
   const tasksContent = tasksBytes ? tasksBytes.toString('utf8') : '';
   const sddInputs = parseSddInputs(proposal);
   const tasks = parseTasks(tasksContent, `${identity.base}/tasks.md`);
@@ -143,11 +145,12 @@ async function readContext(root, identity) {
   };
 }
 
-async function validate(root, identity) {
+async function validate(root, identity, options = {}) {
+  const read = options.readSource ?? readProviderFile;
   const errors = [];
-  const proposal = await readProviderFile(root, `${identity.base}/proposal.md`, 4 * 1024 * 1024);
+  const proposal = await read(root, `${identity.base}/proposal.md`, 4 * 1024 * 1024);
   if (proposal === null) errors.push({ code: 'missing_proposal', path: `${identity.base}/proposal.md` });
-  const tasks = await readProviderFile(root, `${identity.base}/tasks.md`, 4 * 1024 * 1024);
+  const tasks = await read(root, `${identity.base}/tasks.md`, 4 * 1024 * 1024);
   if (tasks === null) errors.push({ code: 'missing_tasks', path: `${identity.base}/tasks.md` });
   return errors;
 }

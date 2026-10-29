@@ -69,6 +69,18 @@
           "items": {
             "type": "string"
           }
+        },
+        "acceptance_criteria": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "verification_plan": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -157,6 +169,11 @@
           "bytes": {
             "type": "integer",
             "minimum": 0
+          },
+          "fidelity": {
+            "enum": [
+              "projection"
+            ]
           }
         },
         "required": [
@@ -272,6 +289,111 @@
           "code"
         ]
       }
+    },
+    "requirements_reconciliation": {
+      "type": "string"
+    },
+    "entrypoint": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "checklist": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "shape": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "upstream_handoff": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "owner": {
+          "const": "upstream"
+        },
+        "entrypoint": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "entrypoint"
+      ]
+    },
+    "source_binding": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "heading": {
+            "type": "string"
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "body_start": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "end": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "source_path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "heading",
+          "start",
+          "body_start",
+          "end",
+          "source_path",
+          "sha256"
+        ]
+      }
+    },
+    "document_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "document_projections": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "recommended_planning_mode": {
+      "enum": [
+        "fast",
+        "full",
+        "ultra",
+        null
+      ]
     }
   },
   "required": [

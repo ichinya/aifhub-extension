@@ -55,6 +55,9 @@ async function compileValidBrief(root, tasksContent) {
   if (tasksContent) await put(root, `${base}/tasks.md`, tasksContent);
   const compiled = await compileSessionBrief(options(root));
   assert.equal(compiled.ok, true, JSON.stringify(compiled));
+  // reason: exact-consumed-digest-required; scope fixtures now include explicit
+  // synthetic consumed evidence, rather than treating no trace as bound.
+  await writeTrace(root, compiled.digest, []);
   return compiled;
 }
 
@@ -137,7 +140,7 @@ describe('Plan compliance selection', () => {
 
   it('returns acceptable_drift for skipped tasks', async () => {
     const root = await fixture();
-    const compiled = await compileSessionBrief(options(root));
+    const compiled = await compileValidBrief(root);
     const result = await checkPlanCompliance({ ...options(root), changedFiles: ['src/handler.mjs', 'test/handler.test.mjs'] });
     assert.equal(result.ok, true);
     assert.equal(result.outcome, 'acceptable_drift');
@@ -147,7 +150,7 @@ describe('Plan compliance selection', () => {
 
   it('returns replan_required for forbidden surface', async () => {
     const root = await fixture();
-    await compileSessionBrief(options(root));
+    await compileValidBrief(root);
     const result = await checkPlanCompliance({ ...options(root), changedFiles: ['storage/secret.mjs'] });
     assert.equal(result.ok, false);
     assert.equal(result.outcome, 'replan_required');
@@ -157,7 +160,7 @@ describe('Plan compliance selection', () => {
 
   it('returns replan_required for new top-level scope', async () => {
     const root = await fixture();
-    await compileSessionBrief(options(root));
+    await compileValidBrief(root);
     const result = await checkPlanCompliance({ ...options(root), changedFiles: ['docs/readme.md'] });
     assert.equal(result.ok, false);
     assert.equal(result.outcome, 'replan_required');
@@ -166,7 +169,7 @@ describe('Plan compliance selection', () => {
 
   it('returns acceptable_drift for unplanned changes inside allowed top-level', async () => {
     const root = await fixture();
-    await compileSessionBrief(options(root));
+    await compileValidBrief(root);
     const result = await checkPlanCompliance({ ...options(root), changedFiles: ['src/handler.mjs', 'src/extra.mjs'] });
     assert.equal(result.ok, true);
     assert.equal(result.outcome, 'acceptable_drift');
@@ -183,7 +186,7 @@ describe('Plan compliance selection', () => {
 
   it('blocks when trace SessionBrief digest is stale', async () => {
     const root = await fixture();
-    const compiled = await compileSessionBrief(options(root));
+    const compiled = await compileValidBrief(root);
     await writeTrace(root, '0'.repeat(64), ['src/handler.mjs']);
     const result = await checkPlanCompliance(options(root));
     assert.equal(result.ok, false);
@@ -193,7 +196,7 @@ describe('Plan compliance selection', () => {
 
   it('uses trace and writes receipt to runtime state', async () => {
     const root = await fixture();
-    const compiled = await compileSessionBrief(options(root));
+    const compiled = await compileValidBrief(root);
     await writeTrace(root, compiled.digest, ['src/handler.mjs', 'test/handler.test.mjs']);
     const result = await checkPlanCompliance(options(root));
     assert.equal(result.ok, true);
@@ -206,7 +209,7 @@ describe('Plan compliance selection', () => {
 
   it('accepts a specific run id and returns clean CLI output', async () => {
     const root = await fixture();
-    const compiled = await compileSessionBrief(options(root));
+    const compiled = await compileValidBrief(root);
     await writeTrace(root, compiled.digest, ['src/handler.mjs']);
     const stdout = { written: '', write(value) { this.written += value; } };
     const exit = await runPlanComplianceCommand(['check', '--change', change, '--run-id', 'run-test', '--json'], { rootDir: root, stdout });
@@ -229,7 +232,7 @@ describe('Plan compliance selection', () => {
   it('keeps a single-star allowed surface from crossing directory boundaries', async () => {
     const root = await fixture();
     await put(root, `${base}/proposal.md`, proposal().replace('- src/handler.mjs\n- test/handler.test.mjs', '- src/*'));
-    await compileSessionBrief(options(root));
+    await compileValidBrief(root);
     const result = await checkPlanCompliance({ ...options(root), changedFiles: ['src/a/b.ts'] });
     assert.equal(result.ok, true);
     assert.equal(result.outcome, 'acceptable_drift');
@@ -238,7 +241,7 @@ describe('Plan compliance selection', () => {
   it('classifies a specific-pattern miss inside an allowed top-level as unplanned drift, not scope expansion', async () => {
     const root = await fixture();
     await put(root, `${base}/proposal.md`, proposal().replace('- src/handler.mjs\n- test/handler.test.mjs', '- src/*.mjs'));
-    await compileSessionBrief(options(root));
+    await compileValidBrief(root);
     const result = await checkPlanCompliance({ ...options(root), changedFiles: ['src/a/b/c.mjs'] });
     assert.equal(result.ok, true);
     assert.equal(result.outcome, 'acceptable_drift');

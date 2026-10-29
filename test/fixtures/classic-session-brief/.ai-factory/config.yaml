@@ -1,0 +1,6 @@
+aifhub:
+  tools:
+    openspec: false
+paths:
+  plans: .ai-factory/plans
+  plan: .ai-factory/PLAN.md

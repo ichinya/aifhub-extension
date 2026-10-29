@@ -102,6 +102,12 @@
     },
     "replan_required": {
       "type": "boolean"
+    },
+    "blocked_reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     }
   },
   "required": [

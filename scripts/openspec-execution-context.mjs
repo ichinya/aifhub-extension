@@ -4,11 +4,11 @@ import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { assertSessionBriefBinding, inspectSessionBrief } from './session-brief.mjs';
+import { resolvePlanTarget, resolvePlanContext } from './common-plan-resolver.mjs';
 
 import {
   ensureRuntimeLayout,
-  normalizeChangeId,
-  resolveActiveChange
+  normalizeChangeId
 } from './active-change-resolver.mjs';
 import {
   detectOpenSpec as defaultDetectOpenSpec,
@@ -23,12 +23,18 @@ const REQUIRED_CHANGE_ARTIFACTS = ['proposal.md', 'design.md', 'tasks.md'];
 
 export async function buildImplementationContext(options = {}) {
   const rootDir = resolveRootDir(options);
-  const resolverResult = await resolveActiveChange({
+  let resolverResult;
+  try { resolverResult = await resolvePlanTarget({
     rootDir,
     cwd: options.cwd ?? process.cwd(),
     changeId: options.changeId,
     getCurrentBranch: options.getCurrentBranch
-  });
+  }); } catch (error) {
+    const code = error.planResolverCode ?? error.message;
+    return createContextFailure({ resolverResult: { ok: false, warnings: [], errors: [] },
+      errors: error.planResolverErrors ?? [{ code: typeof code === 'string' && /^[a-z0-9_-]+$/.test(code) ? code : 'plan_context_unresolved' }] });
+  }
+  const mode = resolveMode(resolverResult.methodology);
 
   if (!resolverResult.ok) {
     return createContextFailure({
@@ -45,7 +51,8 @@ export async function buildImplementationContext(options = {}) {
         code: 'session-brief-not-current',
         message: 'Return to the planning owner to compile a current SessionBrief before implementation.'
       }] }),
-      sessionBrief
+      sessionBrief,
+      owner_handoff: sessionBrief.owner_handoff ?? null
     };
   }
 
@@ -55,10 +62,14 @@ export async function buildImplementationContext(options = {}) {
     stateDir: options.stateDir,
     qaDir: options.qaDir
   });
-  const canonical = await collectCanonicalChangeArtifacts(resolverResult.changeId, { ...options, rootDir });
-  const generatedRules = await collectGeneratedRules(resolverResult.changeId, { ...options, rootDir });
+  const canonical = mode === MODE
+    ? await collectCanonicalChangeArtifacts(resolverResult.changeId, { ...options, rootDir })
+    : await collectClassicArtifacts(resolverResult.changeId, { ...options, rootDir }, sessionBrief);
+  const generatedRules = mode === MODE
+    ? await collectGeneratedRules(resolverResult.changeId, { ...options, rootDir })
+    : { generatedRules: [], warnings: [{ code: 'classic-generated-rules-not-applicable', message: 'Classic uses native plan and project rules.' }], errors: [] };
   const config = await readExecutionConfig(rootDir);
-  const instructions = config.useInstructionsApply
+  const instructions = mode === MODE && config.useInstructionsApply
     ? await collectOpenSpecInstructions(resolverResult.changeId, { ...options, rootDir })
     : createDisabledInstructionsResult();
   const warnings = dedupeDiagnostics([
@@ -75,11 +86,11 @@ export async function buildImplementationContext(options = {}) {
 
   return {
     ok: errors.length === 0,
-    mode: MODE,
+    mode,
     changeId: resolverResult.changeId,
     resolver: createResolverSummary(resolverResult),
     paths: {
-      change: resolverResult.changePath,
+      change: resolverResult.changePath ?? path.dirname(path.join(rootDir, canonical.entrypoint)),
       state: layout.statePath,
       qa: layout.qaPath,
       generatedRules: path.join(rootDir, GENERATED_DIR)
@@ -102,13 +113,18 @@ function briefSourceReferences(value, sources) {
   if (!value || typeof value !== 'object') return value;
   if (typeof value.content === 'string' && typeof value.path === 'string') {
     const { content: _content, ...reference } = value;
-    return { ...reference, sha256: sources.find((source) => source.path === value.path)?.sha256 ?? null, fidelity: 'full' };
+    if (value.exists === false) return reference;
+    const source = sources.find((source) => source.path === value.path);
+    if (!source) throw new Error('missing_session_brief_source');
+    return { ...reference, sha256: source.sha256, fidelity: source.fidelity ?? 'full' };
   }
   return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, briefSourceReferences(item, sources)]));
 }
 
+function resolveMode(methodology) { return methodology === 'openspec' ? 'openspec-native' : 'aifactory-classic'; }
+
 export async function buildFixContext(options = {}) {
-  const context = await buildImplementationContext(options);
+  const context = await buildImplementationContext({ ...options, role: 'fix' });
 
   if (!context.ok) {
     return {
@@ -141,6 +157,19 @@ export async function buildFixContext(options = {}) {
     warnings,
     errors
   };
+}
+
+async function collectClassicArtifacts(changeId, options, sessionBrief) {
+  const context = await resolvePlanContext({ ...options, changeId, methodology: 'aifactory' });
+  const errors = [...context.errors];
+  if (sessionBrief.status === 'valid' && context.source_revision !== sessionBrief.brief.plan_context.source_revision) errors.push({ code: 'sources_changed_during_context_build' });
+  const artifacts = {};
+  for (const document of context.documents) {
+    artifacts[document.path === context.entrypoint ? 'proposal' : path.posix.basename(document.path).replace(/\.[^.]+$/, '')] = {
+      path: document.path, exists: true, sha256: document.sha256, fidelity: document.fidelity ?? 'full'
+    };
+  }
+  return { canonicalArtifacts: artifacts, entrypoint: context.entrypoint, warnings: [], errors };
 }
 
 export async function collectCanonicalChangeArtifacts(changeId, options = {}) {
@@ -495,9 +524,7 @@ async function writeTrace({ changeId, trace, options, type, directoryName }) {
 
   const runId = normalizeRunId(options.runId ?? createDefaultRunId(options));
   const rootDir = resolveRootDir(options);
-  if (type === 'Implementation') {
-    await assertSessionBriefBinding(normalized.changeId, trace?.sessionBriefDigest, { ...options, rootDir });
-  }
+  await assertSessionBriefBinding(normalized.changeId, trace?.sessionBriefDigest, { ...options, rootDir });
   const layout = await ensureRuntimeLayout(normalized.changeId, {
     rootDir,
     cwd: options.cwd,
@@ -562,7 +589,7 @@ function renderTraceMarkdown({ changeId, trace, type }) {
     '',
     ...renderList(trace?.canonicalArtifactsRead),
     '',
-    ...(type === 'Implementation' && trace?.sessionBriefDigest ? [
+    ...(trace?.sessionBriefDigest ? [
       '## SessionBrief binding', '', `Digest: ${trace.sessionBriefDigest}`, ''
     ] : []),
     '## Generated rules read',
@@ -1068,7 +1095,7 @@ async function readOptionalTextFile(rootDir, filePath) {
 function createContextFailure({ resolverResult, warnings = [], errors = [] }) {
   return {
     ok: false,
-    mode: MODE,
+    mode: resolverResult?.methodology === 'aifactory' ? 'aifactory-classic' : MODE,
     changeId: null,
     resolver: createResolverSummary(resolverResult),
     paths: {},

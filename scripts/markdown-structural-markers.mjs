@@ -66,6 +66,23 @@ export function hasActiveStandaloneMarker(content, marker = ULTRA_PLAN_MARKER) {
   return countActiveStandaloneMarker(content, marker) > 0;
 }
 
+export function markdownH2Spans(content) {
+  const text = String(content);
+  const lines = text.match(/[^\r\n]*(?:\r\n|\n|\r|$)/g).filter(Boolean);
+  const bare = lines.map(line => line.replace(/(?:\r\n|\n|\r)$/, ''));
+  const mask = createMarkdownCodeMask(bare);
+  const spans = [];
+  let offset = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (!mask[i] && /^##(?!#)[ \t]+/.test(bare[i])) {
+      if (spans.length) spans[spans.length - 1].end = offset;
+      spans.push({ heading: bare[i].slice(3), start: offset, body_start: offset + Buffer.byteLength(lines[i]), end: Buffer.byteLength(text) });
+    }
+    offset += Buffer.byteLength(lines[i]);
+  }
+  return spans;
+}
+
 function splitMarkdownLines(content) {
   return String(content ?? '').split(/\r\n|\n|\r/);
 }

@@ -7,7 +7,8 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
-import { resolveActiveChange, normalizeChangeId } from './active-change-resolver.mjs';
+import { normalizeChangeId } from './active-change-resolver.mjs';
+import { resolvePlanTarget } from './common-plan-resolver.mjs';
 import { inspectSessionBrief } from './session-brief.mjs';
 import { loadReviewPolicy } from './review-policy-resolver.mjs';
 import { readProviderFile, safeProviderPath, writeProviderFile } from './provider-files.mjs';
@@ -62,8 +63,7 @@ export async function prepareFreshContextReview(options = {}) {
 
 async function buildReviewSnapshot(options) {
   const root = path.resolve(options.rootDir ?? process.cwd());
-  if (options.changeId !== undefined && (typeof options.changeId !== 'string' || !options.changeId || !normalizeChangeId(options.changeId).ok)) throw reviewError('invalid-change-id');
-  const resolution = await resolveActiveChange({ rootDir: root, cwd: options.cwd ?? root, changeId: options.changeId, getCurrentBranch: options.getCurrentBranch });
+  const resolution = await resolvePlanTarget({ ...options, rootDir: root });
   if (!resolution.ok) throw reviewError('active_change_unresolved');
   const changeId = resolution.changeId;
   const status = await inspectSessionBrief({ rootDir: root, cwd: options.cwd ?? root, changeId, includeBrief: true });
@@ -309,13 +309,14 @@ async function writeReviewTextFile(root, relative, text) {
 }
 
 function failure(error) {
+  const code = error.reviewCode ?? error.planResolverCode ?? 'fresh_context_review_io_error';
   const receipt = emptyReceipt(null, {
     outcome: 'blocked',
-    blockedReasons: [error.reviewCode ?? 'fresh_context_review_io_error']
+    blockedReasons: [code]
   });
   if (error?.changeId) receipt.change_id = error.changeId;
   if (error?.reviewId) receipt.review_id = error.reviewId;
-  return { ok: false, outcome: 'blocked', errors: [{ code: error.reviewCode ?? 'fresh_context_review_io_error' }], receipt };
+  return { ok: false, outcome: 'blocked', errors: error.planResolverErrors ?? [{ code }], receipt };
 }
 
 function toPosix(value) { return String(value ?? '').replaceAll('\\', '/'); }

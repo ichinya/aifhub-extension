@@ -7,7 +7,9 @@ import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
-import { resolveActiveChange, normalizeChangeId } from './active-change-resolver.mjs';
+import { normalizeChangeId } from './active-change-resolver.mjs';
+import { resolvePlanTarget, resolvePlanContext } from './common-plan-resolver.mjs';
+import { inspectSessionBrief } from './session-brief.mjs';
 import { parseStrictJson } from './json-strict.mjs';
 import { readProviderFile, safeProviderPath, writeProviderFile } from './provider-files.mjs';
 
@@ -59,7 +61,7 @@ export async function decideTracer(options = {}) {
 export async function statusTracer(options = {}) {
   try {
     const root = path.resolve(options.rootDir ?? process.cwd());
-    const resolution = await resolveActiveChange({ rootDir: root, cwd: options.cwd ?? root, changeId: options.changeId });
+    const resolution = await resolvePlanTarget({ ...options, rootDir: root });
     if (!resolution.ok) return { ok: false, outcome: 'blocked', errors: [{ code: 'active_change_unresolved' }] };
     const paths = tracerPaths(resolution.changeId);
     const brief = await readJsonIfExists(root, paths.brief);
@@ -74,18 +76,23 @@ export async function statusTracer(options = {}) {
 
 async function buildTracerSnapshot(options, phase) {
   const root = path.resolve(options.rootDir ?? process.cwd());
-  if (options.changeId !== undefined && (typeof options.changeId !== 'string' || !options.changeId || !normalizeChangeId(options.changeId).ok)) throw tracerError('invalid-change-id');
-  const resolution = await resolveActiveChange({ rootDir: root, cwd: options.cwd ?? root, changeId: options.changeId });
+  const resolution = await resolvePlanTarget({ ...options, rootDir: root });
   if (!resolution.ok) throw tracerError('active_change_unresolved');
   const changeId = resolution.changeId;
   const paths = tracerPaths(changeId);
   const errors = [];
 
-  const sources = [];
-  for (const file of ['proposal.md', 'tasks.md', 'design.md']) {
-    const relative = `openspec/changes/${changeId}/${file}`;
-    const bytes = await readProviderFile(root, relative, 2 * 1024 * 1024);
-    if (bytes !== null) sources.push({ path: relative, sha256: sha256(bytes) });
+  const context = await resolvePlanContext({ ...options, rootDir: root, changeId, methodology: resolution.methodology });
+  errors.push(...context.errors);
+  const sources = context.documents.map(({ path, sha256 }) => ({ path, sha256 }));
+  const status = await inspectSessionBrief({ ...options, rootDir: root, changeId });
+  if (status.status === 'stale') errors.push({ code: 'session_brief_not_current' });
+  const previous = await readJsonIfExists(root, paths.brief);
+  const bindingChanged = previous && (previous.methodology !== context.methodology
+    || JSON.stringify(previous.canonical_sources) !== JSON.stringify(sources)
+    || previous.session_brief_digest !== (status.digest ?? null));
+  if (phase === 'decide') {
+    if (!previous || bindingChanged) errors.push({ code: 'tracer_source_binding_stale' });
   }
   if (sources.length === 0) errors.push({ code: 'missing_canonical_sources' });
 
@@ -113,6 +120,9 @@ async function buildTracerSnapshot(options, phase) {
     budget,
     expected_artifacts: expectedArtifacts,
     canonical_sources: sources,
+    methodology: context.methodology,
+    source_revision: context.source_revision,
+    session_brief_digest: status.digest ?? null,
     created_at: now,
     updated_at: now
   } : null;
@@ -127,7 +137,8 @@ async function buildTracerSnapshot(options, phase) {
     updated_at: now
   } : null;
 
-  const decisionFile = await readJsonIfExists(root, paths.decision);
+  const storedDecision = await readJsonIfExists(root, paths.decision);
+  const decisionFile = phase === 'run' && bindingChanged ? null : storedDecision;
   const decision = {
     schema: DECISION_SCHEMA,
     change_id: changeId,
@@ -138,12 +149,15 @@ async function buildTracerSnapshot(options, phase) {
     updated_at: now
   };
 
-  return { root, changeId, paths, brief, findings, decision, errors, options, now };
+  const history = bindingChanged && phase === 'run' ? { brief: previous, findings: await readJsonIfExists(root, paths.findings), decision: storedDecision } : null;
+  return { root, changeId, paths, brief, findings, decision, errors, options, now, methodology: context.methodology, history };
 }
 
 async function writeTracerState(snapshot) {
   await ensureRuntimeGitignore(snapshot.root, '.ai-factory/state');
   await mkdir(path.join(snapshot.root, path.dirname(snapshot.paths.brief)), { recursive: true });
+  if (snapshot.history) await writeProviderFile(snapshot.root,
+    `${snapshot.paths.dir}/history/${sha256(JSON.stringify(snapshot.history))}.json`, snapshot.history);
   await writeProviderFile(snapshot.root, snapshot.paths.brief, snapshot.brief);
   await writeProviderFile(snapshot.root, snapshot.paths.findings, snapshot.findings);
   await writeProviderFile(snapshot.root, snapshot.paths.decision, snapshot.decision);
@@ -156,7 +170,10 @@ async function writeDecision(snapshot) {
   if (!valid.includes(decision)) throw tracerError('invalid_decision');
   const now = new Date().toISOString();
   const reason = snapshot.options.reason ?? '';
-  const promotionSteps = decision === 'promote' ? [
+  const promotionSteps = decision === 'promote' ? snapshot.methodology === 'aifactory' ? [
+    'Update the native parent and synchronized task/context/rules/verify companions as needed.',
+    'Compile a new production SessionBrief.', 'Run full implementation against the new brief.'
+  ] : [
     'Update canonical proposal/design/tasks/delta-specs as needed.',
     'Run `ai-factory aifhub-mode sync --change <id>`.',
     'Compile a new production SessionBrief.',
@@ -267,8 +284,8 @@ function failure(error, changeId) {
   return {
     ok: false,
     outcome: 'blocked',
-    errors: [{ code: error.tracerCode ?? 'tracer_io_error' }],
-    paths: changeId ? tracerPaths(changeId) : null
+    errors: error.planResolverErrors ?? [{ code: error.tracerCode ?? error.planResolverCode ?? 'tracer_io_error' }],
+    paths: normalizeChangeId(changeId).ok ? tracerPaths(changeId) : null
   };
 }
 
