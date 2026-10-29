@@ -4,7 +4,7 @@ import { parseWorkItemSourceBinding, parseLegacyWorkItemSourceBinding, parseSync
 
 export function parseClassicStatusProjection(text, id, parent) {
   const parsed = parseSimpleYaml(text);
-  if ((Object.hasOwn(parsed, 'plan_id') && parsed.plan_id !== id) || (text.match(/^plan_id\s*:/gm) ?? []).length > 1) throw new Error('plan-id-mismatch');
+  if ((Object.hasOwn(parsed, 'plan_id') && String(parsed.plan_id) !== String(id)) || (text.match(/^plan_id\s*:/gm) ?? []).length > 1) throw new Error('plan-id-mismatch');
   const md = parseWorkItemSourceBinding(parent), yaml = parseLegacyWorkItemSourceBinding(text);
   if (!md.ok || !yaml.ok) throw new Error('invalid-source-binding');
   let binding = null;
