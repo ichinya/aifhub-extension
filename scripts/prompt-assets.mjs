@@ -26,6 +26,23 @@ async function ensure(root, relative) {
     await safe(root, part, true);
   }
 }
+function ledgerRuntimeDirs(installation) {
+  const runtimeDir = (runtime, kind, fallback) => {
+    const agent = installation?.agents?.find(entry => entry?.id === runtime.slice(1));
+    const dir = String(agent?.[kind] ?? fallback).replaceAll('\\', '/');
+    if (path.isAbsolute(dir) || dir.includes(':') || dir.split('/').some(part => !part || part === '..' || part === '.')) throw new Error('invalid-installed-layout');
+    return dir;
+  };
+  return Object.fromEntries(['.agents', '.codex', '.claude'].map(runtime => [runtime, {
+    skillsDir: runtimeDir(runtime, 'skillsDir', `${runtime}/skills`),
+    agentsDir: runtimeDir(runtime, 'agentsDir', `${runtime}/agents`)
+  }]));
+}
+async function readInstallation(root) {
+  try { return JSON.parse(await readFile(path.join(root, '.ai-factory.json'), 'utf8')); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; return null; }
+}
+
 export async function inventoryPromptAssets(root) {
   const files = [];
   async function walk(relative) {
@@ -47,20 +64,12 @@ export async function inventoryPromptAssets(root) {
   }
   const manifestPath = await missing(() => safe(root, `${EXT}/extension.json`));
   const manifest = manifestPath ? JSON.parse(await readFile(manifestPath, 'utf8')) : {};
-  let installation = null;
-  try { installation = JSON.parse(await readFile(path.join(root, '.ai-factory.json'), 'utf8')); }
-  catch (error) { if (error.code !== 'ENOENT') throw error; }
   // Custom runtime layouts from the installed ledger own the prompt locations:
   // ignoring them would let an update replace preserved user edits silently.
-  const runtimeDir = (runtime, kind, fallback) => {
-    const agent = installation?.agents?.find(entry => entry?.id === runtime.slice(1));
-    const dir = String(agent?.[kind] ?? fallback).replaceAll('\\', '/');
-    if (path.isAbsolute(dir) || dir.includes(':') || dir.split('/').some(part => !part || part === '..' || part === '.')) throw new Error('invalid-installed-layout');
-    return dir;
-  };
+  const dirs = ledgerRuntimeDirs(await readInstallation(root));
   for (const runtime of ['.agents', '.codex', '.claude']) {
-    const skillsDir = runtimeDir(runtime, 'skillsDir', `${runtime}/skills`);
-    const agentsDir = runtimeDir(runtime, 'agentsDir', `${runtime}/agents`);
+    const skillsDir = dirs[runtime].skillsDir;
+    const agentsDir = dirs[runtime].agentsDir;
     const skills = new Set([...(manifest.skills ?? []).map(s => path.posix.basename(s)), ...(manifest.injections ?? []).map(i => i.target)]);
     for (const skill of skills) {
       if (!/^[\w-]+$/.test(skill)) throw new Error('unsafe-prompt-manifest');
@@ -121,10 +130,13 @@ export async function validateInstalledPromptAssets(root) {
   const refs = await validatePromptReferences(extension);
   for (const ref of refs) await safe(root, `${EXT}/${ref.target}`);
   let targets = 0;
+  const dirs = ledgerRuntimeDirs(await readInstallation(root));
   for (const runtime of ['.agents', '.codex', '.claude']) {
+    const skillsDir = dirs[runtime].skillsDir;
+    const agentsDir = dirs[runtime].agentsDir;
     for (const injection of manifest.injections ?? []) {
       if (!/^[\w-]+$/.test(injection.target) || !['prepend', 'append'].includes(injection.position)) throw new Error('unsafe-injection-manifest');
-      const filename = await missing(() => safe(root, `${runtime}/skills/${injection.target}/SKILL.md`));
+      const filename = await missing(() => safe(root, `${skillsDir}/${injection.target}/SKILL.md`));
       if (!filename) continue;
       const text = await readFile(filename, 'utf8'), prefix = `<!-- aif-ext:aifhub-extension:${injection.target}:${injection.position}:`;
       const start = prefix + 'start -->', end = prefix + 'end -->';
@@ -134,8 +146,8 @@ export async function validateInstalledPromptAssets(root) {
       targets++;
     }
     const published = [
-      ...(manifest.skills ?? []).map(source => [`${source}/SKILL.md`, `${runtime}/skills/${path.posix.basename(source)}/SKILL.md`]),
-      ...(manifest.agentFiles ?? []).filter(a => runtime === `.${a.runtime}`).map(a => [a.source.replace(/^\.\//, ''), `${runtime}/agents/${a.target}`]),
+      ...(manifest.skills ?? []).map(source => [`${source}/SKILL.md`, `${skillsDir}/${path.posix.basename(source)}/SKILL.md`]),
+      ...(manifest.agentFiles ?? []).filter(a => runtime === `.${a.runtime}`).map(a => [a.source.replace(/^\.\//, ''), `${agentsDir}/${a.target}`]),
     ];
     for (const [source, relative] of published) {
       const filename = await missing(() => safe(root, relative));
