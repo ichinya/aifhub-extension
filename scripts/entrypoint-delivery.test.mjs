@@ -114,6 +114,14 @@ it('preservation honors custom runtime directories from the installed ledger', a
   await assert.rejects(inventoryPromptAssets(root), /invalid-installed-layout/);
 });
 
+it('installed prompt validation honors custom runtime directories', async () => {
+  const root = await fixture();
+  await put(root, '.ai-factory.json', JSON.stringify({ agents: [{ id: 'codex', skillsDir: 'custom-codex/skills' }] }));
+  const source = await readFile(path.join(root, '.ai-factory/extensions/aifhub-extension/injections/core/aif-implement-plan-folder.md'), 'utf8');
+  await put(root, 'custom-codex/skills/aif-implement/SKILL.md', `# aif-implement\n\n<!-- aif-ext:aifhub-extension:aif-implement:prepend:start -->\n${source.trim()}\n<!-- aif-ext:aifhub-extension:aif-implement:prepend:end -->\n`);
+  await validateInstalledPromptAssets(root);
+});
+
 it('preservation fails before replacement when its destination is unsafe', async () => {
   const root = await fixture();
   await put(root, '.ai-factory/state/extension-prompt-updates', 'blocked');
