@@ -205,11 +205,18 @@ export function validateDesignContext(input) {
 function validateRunnerMetrics(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw exchangeError('invalid_runner_metrics');
   if (input.schema !== RUNNER_METRICS_SCHEMA) throw exchangeError('invalid_runner_metrics');
-  const allowed = ['schema', 'run_id', 'tokens', 'cost', 'latency_ms', 'model', 'harness', 'retries', 'changed_loc', 'unrelated_changes', 'human_review_ms', 'verified_success'];
+  const allowed = ['schema', 'run_id', 'tokens', 'cost', 'latency_ms', 'model', 'harness', 'retries', 'changed_loc', 'unrelated_changes', 'human_review_ms', 'verified_success', 'transport'];
   if (Object.keys(input).some((key) => !allowed.includes(key))) throw exchangeError('invalid_runner_metrics');
   const label = (value) => value === null || value === undefined || (typeof value === 'string' && value.length <= MAX_LABEL && !/[\x00-\x1f]/.test(value));
   if (!label(input.run_id)) throw exchangeError('invalid_runner_metrics');
   const intOrNull = (value) => value === null || value === undefined || (Number.isSafeInteger(value) && value >= 0);
+  if (input.transport !== undefined && input.transport !== null) {
+    const keys = ['create_calls', 'read_calls', 'fetch_calls', 'retry_creates', 'recovery_attempts', 'verified_recoveries',
+      'uncertain_returns', 'identity_conflicts', 'transport_ms', 'recovery_ms', 'wait_ms', 'incomplete_intervals'];
+    if (typeof input.transport !== 'object' || Array.isArray(input.transport)
+      || Object.keys(input.transport).some(k => !keys.includes(k))
+      || Object.values(input.transport).some(v => v !== null && (!Number.isSafeInteger(v) || v < 0))) throw exchangeError('invalid_runner_metrics');
+  }
   if (input.tokens !== undefined && input.tokens !== null) {
     const tokens = input.tokens;
     if (typeof tokens !== 'object' || Array.isArray(tokens)
@@ -521,7 +528,8 @@ function buildEvaluationRecord(snapshot, version, now, options) {
     retries: runner?.retries ?? null,
     changed_loc: runner?.changed_loc ?? null,
     unrelated_changes: runner?.unrelated_changes ?? null,
-    human_review_ms: runner?.human_review_ms ?? null
+    human_review_ms: runner?.human_review_ms ?? null,
+    transport: runner?.transport ? { ...runner.transport } : null
   };
   const record = {
     schema: EVALUATION_SCHEMA,

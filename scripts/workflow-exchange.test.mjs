@@ -296,6 +296,8 @@ describe('Evaluation export', () => {
       tokens: { input: 1200, output: 300, total: 1500 },
       cost: { amount: 0.02, currency: 'USD' }, latency_ms: 4200,
       retries: 1, changed_loc: 87, unrelated_changes: 0, human_review_ms: 60000,
+      transport: { create_calls: 2, read_calls: 5, fetch_calls: 1, retry_creates: 1, recovery_attempts: 2,
+        verified_recoveries: 1, uncertain_returns: 1, identity_conflicts: 0, transport_ms: 180, recovery_ms: 120, wait_ms: 0, incomplete_intervals: 1 },
       verified_success: true,
       model: { provider: 'anthropic', id: 'claude-sonnet', version: 'exact' },
       harness: { id: 'ai-factory', version: '2.18.1' }
@@ -317,6 +319,9 @@ describe('Evaluation export', () => {
     assert.equal(record.metrics.tasks_total, 2);
     assert.equal(record.metrics.tasks_completed, 1);
     assert.equal(record.metrics.retries, 1);
+    assert.equal(record.metrics.transport.create_calls, 2);
+    assert.equal(record.metrics.transport.read_calls, 5);
+    assert.equal(record.metrics.transport.incomplete_intervals, 1);
     assert.equal(record.metrics.changed_loc, 87);
     assert.equal(record.metrics.unrelated_changes, 0);
     assert.equal(record.metrics.human_review_ms, 60000);
@@ -376,6 +381,21 @@ describe('Evaluation export', () => {
     const result = await exportEvaluation({ rootDir: root, changeId: change, evidenceClass: 'synthetic_fixture', runnerMetricsPath: 'metrics/bad.json' });
     assert.equal(result.outcome, 'failed');
     assert.equal(result.errors[0].code, 'invalid_runner_metrics');
+  });
+});
+
+describe('Transport runner metrics', () => {
+  it('rejects unknown/negative/coerced data and never implies verified_success', async () => {
+    const { root, change } = await compiledFixture();
+    for (const transport of [{ body: 'private' }, { create_calls: -1 }, { read_calls: '2' }, { fetch_calls: true }]) {
+      await put(root, 'metrics/transport.json', JSON.stringify({ schema: 'aifhub.runner_metrics.v1', transport }));
+      const result = await exportEvaluation({ rootDir: root, changeId: change, evidenceClass: 'synthetic_fixture', runnerMetricsPath: 'metrics/transport.json' });
+      assert.equal(result.errors[0].code, 'invalid_runner_metrics');
+    }
+    await put(root, 'metrics/transport.json', JSON.stringify({ schema: 'aifhub.runner_metrics.v1', transport: { verified_recoveries: 1, transport_ms: null } }));
+    const result = await exportEvaluation({ rootDir: root, changeId: change, evidenceClass: 'synthetic_fixture', runnerMetricsPath: 'metrics/transport.json' });
+    assert.equal(result.evaluation.outcomes.verified_success, null);
+    assert.equal(result.evaluation.metrics.transport.transport_ms, null);
   });
 });
 

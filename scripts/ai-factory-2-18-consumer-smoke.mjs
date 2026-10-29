@@ -1,5 +1,6 @@
 // ai-factory-2-18-consumer-smoke.mjs - deterministic/live consumer compatibility orchestration
-import { execFile } from 'node:child_process';
+import { buildNoShellInvocation, createNoShellProcessRunner as sharedProcessRunner } from './no-shell-process.mjs';
+export { buildNoShellInvocation } from './no-shell-process.mjs';
 import { createHash } from 'node:crypto';
 import {
   access,
@@ -252,103 +253,9 @@ function isWithin(parentDir, childPath) {
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
-function quoteWindowsCmdToken(value) {
-  assertSafeToken(value, 'Windows command token');
-  if (/["%!]/.test(value)) {
-    throw new SmokeFailure(SMOKE_STATUS.NOT_RUN, 'preflight', 'unsafe-windows-command-token');
-  }
-
-  let result = '"';
-  let backslashes = 0;
-  for (const character of value) {
-    if (character === '\\') {
-      backslashes += 1;
-      continue;
-    }
-    result += '\\'.repeat(backslashes);
-    backslashes = 0;
-    result += character;
-  }
-  result += `${'\\'.repeat(backslashes * 2)}"`;
-  return result;
-}
-
-export function buildNoShellInvocation({ command, args = [], platform = process.platform, comSpec = process.env.ComSpec }) {
-  assertSafeToken(command, 'command');
-  for (const [index, argument] of args.entries()) assertSafeToken(argument, `argv[${index}]`);
-
-  const extension = path.extname(command).toLowerCase();
-  if (platform === 'win32' && (extension === '.cmd' || extension === '.bat')) {
-    if (!comSpec || !path.win32.isAbsolute(comSpec)) {
-      throw new SmokeFailure(SMOKE_STATUS.NOT_RUN, 'preflight', 'missing-comspec');
-    }
-    const commandLine = [command, ...args].map(quoteWindowsCmdToken).join(' ');
-    return {
-      command: comSpec,
-      args: ['/d', '/s', '/c', `"${commandLine}"`],
-      adapter: 'windows-comspec',
-      options: { shell: false }
-    };
-  }
-
-  return {
-    command,
-    args,
-    adapter: 'direct-exec-file',
-    options: { shell: false }
-  };
-}
-
-export function createNoShellProcessRunner({
-  execFileImpl = execFile,
-  platform = process.platform,
-  comSpec = process.env.ComSpec,
-  environment = process.env
-} = {}) {
-  const runProcess = async function runProcess({ command, args = [], cwd, timeoutMs = DEFAULT_TIMEOUT_MS }) {
-    const boundedTimeout = resolveTimeoutMs(timeoutMs);
-    const invocation = buildNoShellInvocation({ command, args, platform, comSpec });
-    const options = {
-      cwd,
-      env: {
-        ...environment,
-        CI: '1',
-        NO_COLOR: '1'
-      },
-      encoding: 'utf8',
-      maxBuffer: MAX_BUFFER_BYTES,
-      timeout: boundedTimeout,
-      windowsHide: true,
-      shell: false
-    };
-
-    return new Promise((resolve) => {
-      execFileImpl(invocation.command, invocation.args, options, (error, stdout = '', stderr = '') => {
-        const numericExitCode = typeof error?.code === 'number' ? error.code : (error ? null : 0);
-        resolve({
-          exitCode: numericExitCode,
-          processCode: typeof error?.code === 'string' ? error.code : null,
-          signal: error?.signal ?? null,
-          timedOut: Boolean(error?.killed && error?.signal) || error?.code === 'ETIMEDOUT',
-          stdout: String(stdout ?? ''),
-          stderr: String(stderr ?? ''),
-          adapter: invocation.adapter,
-          shell: false,
-          timeoutMs: boundedTimeout
-        });
-      });
-    });
-  };
-  runProcess.preflight = async ({ command, args = [] }) => {
-    const invocation = buildNoShellInvocation({ command, args, platform, comSpec });
-    if (invocation.adapter === 'windows-comspec') {
-      if (!await exists(invocation.command) || !(await stat(invocation.command)).isFile()) {
-        throw new SmokeFailure(SMOKE_STATUS.NOT_RUN, 'preflight', 'missing-comspec');
-      }
-    }
-    return { adapter: invocation.adapter, shell: false };
-  };
-  return runProcess;
+// Smoke owns its environment defaults; the shared runner has no smoke dependencies.
+export function createNoShellProcessRunner(options = {}) {
+  return sharedProcessRunner({ ...options, environment: { ...(options.environment ?? process.env), CI: '1', NO_COLOR: '1' } });
 }
 
 function classifyProcessFailure(processResult, networkEnabled) {

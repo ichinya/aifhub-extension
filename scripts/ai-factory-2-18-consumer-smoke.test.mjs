@@ -892,8 +892,8 @@ describe('AI Factory 2.18/2.19 consumer compatibility smoke', () => {
     });
     assert.equal(invocation.command, comSpec);
     assert.equal(invocation.adapter, 'windows-comspec');
-    assert.deepEqual(invocation.args.slice(0, 3), ['/d', '/s', '/c']);
-    assert.match(invocation.args[3], /"C:\\Local Toolchains\\ai-factory\.cmd"/);
+    assert.deepEqual(invocation.args.slice(0, 4), ['/d', '/v:off', '/s', '/c']);
+    assert.match(invocation.args[4], /"C:\\Local Toolchains\\ai-factory\.cmd"/);
     assert.equal(invocation.options.shell, false);
     assert.throws(
       () => buildNoShellInvocation({ command, args: ['%PATH%'], platform: 'win32', comSpec }),
