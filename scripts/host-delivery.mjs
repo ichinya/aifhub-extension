@@ -7,8 +7,10 @@ import { DELIVERY_REQUEST_SCHEMA, DELIVERY_RECORD_SCHEMA, RECOVERY_ACTION_TYPES,
   frozenRequest, strictBody, readBody, validateFrozenBody, projection } from './host-delivery-store.mjs';
 export { DELIVERY_REQUEST_SCHEMA, DELIVERY_RECORD_SCHEMA, RECOVERY_ACTION_TYPES, validateDeliveryRequest,
   validateDeliveryRecord, validateRecoveryAction };
-// Records this operation may still append after the host create (review F2).
-const HISTORY_HEADROOM = 4;
+// Records one bounded send/recover action may still append after the host
+// create: up to six operate calls with a pre/post save each, plus the final
+// verification write (review F2 / rules gate R1).
+const HISTORY_HEADROOM = 16;
 const same = (a, b) => canonical(a) === canonical(b);
 const common = ['change_id', 'run_id', 'request_uuid'];
 const optional = ['task_id', 'target', 'body', 'body_file', 'binding'];

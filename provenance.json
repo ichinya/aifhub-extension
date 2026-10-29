@@ -1,6 +1,6 @@
 {
   "version": "1.8.1",
-  "released_at": "2026-10-29T14:02:20.957Z",
+  "released_at": "2026-10-29T14:52:28.015Z",
   "files": [
     {
       "path": "scripts/workflow-state-store.mjs",
@@ -24,7 +24,7 @@
     },
     {
       "path": "scripts/host-delivery.mjs",
-      "sha256": "005b7ab35931f1b866da76824d74a36f61ac842f959a4bf92c8c9d693613efea"
+      "sha256": "0ba4b594c135a1367630cd57ce87179d96387fa9000a2a8d55b7d0d25a4df2da"
     },
     {
       "path": "scripts/host-delivery-store.mjs",
