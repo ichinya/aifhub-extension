@@ -120,7 +120,8 @@ const EXCHANGE_CAPABILITIES = Object.freeze([
 // design_context is an extension kind pending registry vocabulary support.
 const ARTIFACT_VOCABULARY = Object.freeze([
   { kind: 'change_spec', native: ['openspec/changes/<id>/proposal.md', 'openspec/changes/<id>/design.md', 'openspec/changes/<id>/specs/**'] },
-  { kind: 'work_item_spec', native: ['openspec/changes/<id>/tasks.md'] },
+  { kind: 'work_item_spec', native: ['openspec/changes/<id>/tasks.md', '.ai-factory/plans/<id>/task.md'] },
+  { kind: 'plan_companion', native: ['.ai-factory/plans/<id>/{context.md,rules.md,verify.md,status.yaml}'] },
   { kind: 'capability_spec', native: ['openspec/specs/**'] },
   { kind: 'session_brief', native: ['.ai-factory/state/<id>/context/session-brief.json'] },
   { kind: 'plan_compliance_receipt', native: ['.ai-factory/state/<id>/implementation/plan-compliance.json'] },
