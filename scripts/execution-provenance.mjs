@@ -6,10 +6,12 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
-export const HELPER_MODULES = Object.freeze([
+const LEGACY_HELPER_MODULES = Object.freeze([
   'scripts/workflow-state-store.mjs', 'scripts/execution-state.mjs', 'scripts/execution-records.mjs',
   'scripts/execution-task-source.mjs', 'scripts/isolated-execution.mjs',
 ]);
+export const HELPER_MODULES = Object.freeze([...LEGACY_HELPER_MODULES,
+  'scripts/host-delivery.mjs', 'scripts/host-delivery-store.mjs', 'scripts/no-shell-process.mjs']);
 const OLD_HASHES = [
   'fa61bfab15fe948ce29918117a0510c57b735c83a5b04f472286220275c90759',
   'de007ec332ac5ea6c520063ad20577f1be3650b70a798b413b218b646d588cc6',
@@ -17,7 +19,7 @@ const OLD_HASHES = [
   '21315368c7727d40ff736f8e70fd0b31730a8413470e4fb27787a67b9c1332e4',
   '7dbdbe464fbe6cfcf8a3dcb83759813ed316fa71d6f093820b518bfc0ff6b9a7',
 ];
-export const BASELINE_171 = Object.freeze(Object.fromEntries(HELPER_MODULES.map((p, i) => [p, OLD_HASHES[i]])));
+export const BASELINE_171 = Object.freeze(Object.fromEntries(LEGACY_HELPER_MODULES.map((p, i) => [p, OLD_HASHES[i]])));
 export const helperRoot = fileURLToPath(new URL('../', import.meta.url));
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 const exec = promisify(execFile);

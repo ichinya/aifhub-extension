@@ -104,7 +104,7 @@ it('unknown baseline conservatively preserves every existing helper module', asy
   await writeFile(path.join(installed, 'extension.json'), JSON.stringify({ version: '9.9.9' }));
   const action = f.action('global'); await f.pre(action); await f.post(action);
   const { manifest } = await preservedManifest(f);
-  assert.equal(manifest.baseline, 'unknown'); assert.equal(manifest.files.length, 5);
+  assert.equal(manifest.baseline, 'unknown'); assert.equal(manifest.files.length, HELPER_MODULES.length);
   assert.equal(f.calls.length, 0); assert.match(f.stderr.join(''), /preserved modified\/unknown/);
 });
 

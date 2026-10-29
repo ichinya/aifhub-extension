@@ -32,9 +32,9 @@ test('exact release diagnostics reports actual hashes, declared version and prob
   assert.equal(result.schema, 'aifhub.execution_helper_provenance.v1');
   assert.equal(result.declared_version, '1.8.0'); assert.equal(result.implementation, 'release-exact');
   assert.equal(result.local_modifications, false); assert.deepEqual(result.mismatches, []);
-  assert.equal(result.modules.length, 6); assert.equal(result.capabilities[0].support, 'yes');
+  assert.equal(result.modules.length, HELPER_MODULES.length + 1); assert.equal(result.capabilities[0].support, 'yes');
   for (const file of manifest.files) assert.equal(result.modules.find(m => m.path === file.path).sha256, file.sha256);
-  assert.equal(result.modules[5].sha256, sha256(await readFile(path.join(root, result.modules[5].path))));
+  assert.equal(result.modules[HELPER_MODULES.length].sha256, sha256(await readFile(path.join(root, result.modules[HELPER_MODULES.length].path))));
   assert.deepEqual(await readdir(root, { recursive: true }), before);
 });
 test('local modification is distinguished from the declared version and a missing module is diagnosed', async t => {
@@ -104,4 +104,10 @@ test('generator check detects changed execution bytes and version without rewrit
   await writeFile(path.join(root, HELPER_MODULES[4]), '// changed\n');
   await assert.rejects(generateProvenance({ rootDir: root, check: true }), /stale-provenance/);
   assert.equal(await readFile(path.join(root, 'provenance.json'), 'utf8'), before);
+});
+
+test('legacy provenance paths stay bound to the five original hashes', () => {
+  assert.equal(Object.keys(BASELINE_171).length, 5);
+  for (const p of HELPER_MODULES.slice(5)) assert.equal(BASELINE_171[p], undefined);
+  assert.equal(BASELINE_171['scripts/isolated-execution.mjs'], '7dbdbe464fbe6cfcf8a3dcb83759813ed316fa71d6f093820b518bfc0ff6b9a7');
 });

@@ -7,6 +7,7 @@
 ## [В разработке]
 
 ### Добавлено
+- Delivery recovery по request UUID (#232): reserve/prepare, checksummed registry и journal, typed uncertain, strict gate/byte verification без нового AI-аудита; injectable HostClient, общий no-shell transport, fake-host/failpoints и optional transport metrics. Production adapter и live-host измерения остаются вне первой итерации.
 - Измеритель entrypoints (#233, PR3): read-only JSON manifests source/installed, bytes/lines/sha256 и раздельные references; отдельный prompt-asset inventory/preservation guard перед update с проверкой marker pairs и installed references.
 - Classic AI Factory SDD в SessionBrief (#233, этапы 1+2): native parent и companions, synchronized source binding, methodology-neutral resolver/compiler и consumers; ultra marker-first handoff остаётся у upstream. Поля requirements не выводятся из tasks, неполные пары и факты блокируют execution.
 - `aifhub-qa-manifest` (#234): explicit enrollment для classic/OpenSpec, raw-byte dependency fingerprints, immutable results с corrective history, trusted observation bindings и publisher с custody/CAS; existing readers учитывают stale/blocked evidence без изменения gate v1 и unbound behavior.

@@ -110,6 +110,9 @@ export async function executionCommand(action,input,options={}) {
     return helperDiagnostics();
   }
   await loadRuntime();
+  if (typeof action === 'string' && action.startsWith('delivery-')) {
+    return (await import('./host-delivery.mjs')).deliveryCommand(action, input, options);
+  }
   if (typeof action === 'string' && action.startsWith('isolation-')) {
     return (await import('./isolated-execution.mjs')).isolatedExecutionCommand(action, input, options, executionCommand);
   }
@@ -251,6 +254,26 @@ export async function executionCommand(action,input,options={}) {
   await options.beforeLock?.();
   // Fixed lock order. An orphan is never reclaimed using age or a PID guess.
   return store.lock('.ai-factory/state/execution-write.lock',()=>store.lock(`${folder}/write.lock`,execute));
+}
+
+// Delivery borrows freshness from the execution owner; it never creates a result/receipt.
+export async function deliveryAdmission(store, input, { historical = false, resultRequired = true } = {}) {
+  await loadRuntime();
+  const h = await history(store, executionId(input.change_id));
+  const run = h.runs.find(r => r.run_id === identifier(input.run_id));
+  requireValue(run && run.schema === RUN_SCHEMA && !run.legacy, 'missing-or-invalid-run', true);
+  const terminal = ['interrupted', 'closed'].includes(run.lifecycle);
+  requireValue(historical || !terminal, 'delivery-historical-only', true);
+  const task = input.task_id ?? run.task_id;
+  requireValue(run.kind === 'batch' ? Object.hasOwn(run.items, task) : task === run.task_id, 'unknown-or-ambiguous-task', true);
+  const result = run.kind === 'batch' ? run.items[task].result : run.result;
+  if (resultRequired) requireValue(result, 'delivery-result-required', true);
+  if (!terminal) {
+    const snapshot = await current(store, run);
+    if (run.kind === 'batch') await freshSeal(store, run, snapshot);
+    else if (resultRequired) await freshResult(store, run, snapshot);
+  }
+  return { run, result, task_id: task, historical: terminal, reservation_retained: reserves(run) };
 }
 
 async function drift(store,run) {

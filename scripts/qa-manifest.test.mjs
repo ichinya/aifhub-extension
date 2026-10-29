@@ -6,7 +6,7 @@ import path from 'node:path';
 import { createGateResult, renderGateResultBlock } from './aif-gate-result.mjs';
 import { digest, canonical } from './workflow-state-store.mjs';
 import { prepareQaManifest, recordQaResult, publishQaManifest, evaluateQaBinding, parseQaManifestArgs, runQaManifestCommand } from './qa-manifest.mjs';
-import { observeQaSnapshot, allDeclaredRoots } from './qa-manifest-inputs.mjs';
+import { observeQaSnapshot, allDeclaredRoots, metadataProjection } from './qa-manifest-inputs.mjs';
 import { qaStore, QA_LIMITS } from './qa-manifest-store.mjs';
 import { writeGateEvidence } from './write-gate-evidence.mjs';
 import { writeVerificationEvidence, readLatestVerificationEvidence } from './openspec-verification-context.mjs';
@@ -54,6 +54,28 @@ async function fixture(flow = 'openspec', gates = ['verify']) {
 }
 
 describe('QA canonicalization and bounds (AC2, AC7)', () => {
+  it('delivery #232 preserves only four metadata deltas; new records and declared inputs remain material', async () => {
+    const f = await fixture();
+    const p = '.ai-factory/state/sample/delivery/request.json';
+    const record = { schema: 'aifhub.delivery.v1', request_uuid: 'fixed', request_ref: 'fixed-registry', retry_count: 0, ack: false, query_state: 'unknown', updated_at: 'before' };
+    f.model.files[p] = bytes(JSON.stringify(record)); await f.ready();
+    const projected = metadataProjection(p, f.model.files[p]);
+    for (const delta of [{ retry_count: 1 }, { ack: true }, { query_state: 'received' }, { updated_at: 'after' }]) {
+      f.model.files[p] = bytes(JSON.stringify({ ...record, ...delta }));
+      assert.equal(metadataProjection(p, f.model.files[p]), projected);
+      assert.equal((await f.inspect()).state, 'valid');
+    }
+    f.model.files[p] = bytes(JSON.stringify({ ...record, request_uuid: 'changed' }));
+    assert.equal((await f.inspect()).code, 'out-of-scope-edit');
+    f.model.files[p] = bytes(JSON.stringify(record));
+    f.model.files['.ai-factory/state/sample/delivery/new.json'] = bytes(JSON.stringify(record));
+    assert.notEqual((await f.inspect()).state, 'valid');
+    delete f.model.files['.ai-factory/state/sample/delivery/new.json'];
+    const declared = await fixture(); declared.checks[0].inputs.push(p);
+    declared.model.files[p] = bytes(JSON.stringify(record)); await declared.ready();
+    declared.model.files[p] = bytes(JSON.stringify({ ...record, ack: true }));
+    assert.deepEqual((await declared.inspect()).affected_checks, ['check-verify']);
+  });
   it('canonicalizes sorted object keys without changing array order or raw bytes', async () => {
     assert.equal(canonical({ b: 1, a: 2 }), canonical({ a: 2, b: 1 }));
     assert.notEqual(digest(['a', 'b']), digest(['b', 'a']));

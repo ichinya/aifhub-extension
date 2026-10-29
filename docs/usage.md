@@ -1409,3 +1409,7 @@ Provenance observations show the fresh-context tier (execution_profile ai-fresh-
 - [ADR 0002: Optional Project Glossary](adr/0002-optional-project-context-glossary.md)
 - [Project Review Policy](review-policy.md)
 - [ADR 0003: Durable Project Review Policy](adr/0003-durable-project-review-policy.md)
+
+## Delivery recovery по UUID
+
+Слой доставки готового результата: reserve до QA snapshot, prepare из frozen evidence, read/fetch recovery без повторного AI-аудита. Контракт HostClient, uncertain и ограничения описаны в [host-delivery.md](host-delivery.md).

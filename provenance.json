@@ -1,6 +1,6 @@
 {
   "version": "1.8.1",
-  "released_at": "2026-10-26T15:48:53.816Z",
+  "released_at": "2026-10-29T12:04:29.830Z",
   "files": [
     {
       "path": "scripts/workflow-state-store.mjs",
@@ -8,7 +8,7 @@
     },
     {
       "path": "scripts/execution-state.mjs",
-      "sha256": "df64a20d80d5f0127cdf93bb2ba68edb8e954f5837990874d9a68631d696f7a2"
+      "sha256": "44099abc8bb37b4db9547aa217c35e70ec7fe41700cd36e7a7421bfa418d8fc3"
     },
     {
       "path": "scripts/execution-records.mjs",
@@ -21,6 +21,18 @@
     {
       "path": "scripts/isolated-execution.mjs",
       "sha256": "964c54a83bf6d9f507ad800a125af36c870b054fb0f13949080bf5a1d3b6c6da"
+    },
+    {
+      "path": "scripts/host-delivery.mjs",
+      "sha256": "d1ac5724b3351586b10a39a10faf9b07b7602396e8ca3bf91cbb1dbaffc02850"
+    },
+    {
+      "path": "scripts/host-delivery-store.mjs",
+      "sha256": "b4c3b4064aaad6d8dcf79a7da92a1f6ccff5d51ffdb841d0420c3ede1758df8f"
+    },
+    {
+      "path": "scripts/no-shell-process.mjs",
+      "sha256": "ddd5c095d0a5e54c55abc263dda82ab6e83116c7a0727ecc33f9f9991fd61328"
     }
   ]
 }
