@@ -6,12 +6,18 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const METHOD_VERSION = 'aifhub.entrypoints.v1';
+// Tracked sources only: the four upstream skill bodies exist as dogfood copies
+// that are absent from a clean checkout; they belong to the upstream PR (#253)
+// and are measured there, not in this repository's manifest.
 export const SOURCE_SURFACES = Object.freeze([
-  '.agents/skills/aif/SKILL.md', '.agents/skills/aif-implement/SKILL.md',
-  '.agents/skills/aif-verify/SKILL.md', '.agents/skills/aif-fix/SKILL.md',
   'skills/aif-done/SKILL.md', 'injections/core/aif-implement-plan-folder.md',
   'agent-files/claude/aifhub-implement-worker.md', 'skills/shared/QUESTION-TOOL.md',
   'skills/shared/TASK-COORDINATION.md',
+]);
+// Dogfood-only upstream bodies, measurable only in an installed project.
+export const UPSTREAM_DOGFOOD_SURFACES = Object.freeze([
+  '.agents/skills/aif/SKILL.md', '.agents/skills/aif-implement/SKILL.md',
+  '.agents/skills/aif-verify/SKILL.md', '.agents/skills/aif-fix/SKILL.md',
 ]);
 export function measure(bytes) {
   const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
@@ -29,7 +35,7 @@ export async function measureEntrypoints({ rootDir = fileURLToPath(new URL('../'
   for (const dir of layout) if (typeof dir !== 'string' || path.isAbsolute(dir) || dir.includes(':') || dir.split(/[\\/]/).some(p => !p || p === '..' || p === '.')) throw new Error('invalid-installed-layout');
   const [skillsDir, agentsDir] = layout.map(dir => dir.replaceAll('\\', '/'));
   const worker = `agent-files/${runtime}/aifhub-implement-worker.${runtime === 'codex' ? 'toml' : 'md'}`;
-  const files = surface === 'source-surfaces' ? SOURCE_SURFACES.map(p => p === SOURCE_SURFACES[6] ? worker : p) : [
+  const files = surface === 'source-surfaces' ? SOURCE_SURFACES.map(p => p.endsWith('aifhub-implement-worker.md') ? worker : p) : [
     ...['aif', 'aif-implement', 'aif-verify', 'aif-fix', 'aif-done'].map(n => `${skillsDir}/${n}/SKILL.md`),
     `${agentsDir}/aifhub-implement-worker.${runtime === 'codex' ? 'toml' : 'md'}`,
     ...['QUESTION-TOOL.md', 'TASK-COORDINATION.md'].map(n => `${extension}skills/shared/${n}`),

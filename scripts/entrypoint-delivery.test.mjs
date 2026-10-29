@@ -41,7 +41,7 @@ it('measures strict UTF-8 physical bytes and CR/LF line endings', () => {
 });
 it('source and installed manifests are deterministic, read-only, and reject missing files', async () => {
   const first = await measureEntrypoints({ rootDir: repo });
-  assert.equal(first.files.length, 9); assert.equal(SOURCE_SURFACES.length, 9);
+  assert.equal(first.files.length, SOURCE_SURFACES.length);
   assert.equal(JSON.stringify(await measureEntrypoints({ rootDir: repo })), JSON.stringify(first));
   assert.equal(first.tokens, null); assert.equal(first.agent_consumption, 'not_observed_offline');
   const reference = 'injections/references/aif-implement/classic-sdd.md';
