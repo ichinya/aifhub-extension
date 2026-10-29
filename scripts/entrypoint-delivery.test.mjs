@@ -95,6 +95,25 @@ it('separate prompt guard preserves unknown and modified extension/published/ref
   await finishPromptPreservation(root, preserved);
   assert.ok(preserved.manifest.files.every(f => f.installed_sha256 !== f.incoming_sha256));
 });
+it('preservation honors custom runtime directories from the installed ledger', async () => {
+  const root = await fixture();
+  const ledger = { agents: [{ id: 'codex', skillsDir: 'custom-codex/skills', agentsDir: 'custom-codex/agents' }] };
+  await put(root, '.ai-factory.json', JSON.stringify(ledger));
+  await put(root, 'custom-codex/skills/aif-implement/SKILL.md', 'custom skill bytes\n');
+  await put(root, 'custom-codex/agents/aifhub-fixer.toml', 'custom agent bytes\n');
+  const inventory = await inventoryPromptAssets(root);
+  assert.ok(inventory.some(f => f.path === 'custom-codex/skills/aif-implement/SKILL.md'));
+  assert.ok(inventory.some(f => f.path === 'custom-codex/agents/aifhub-fixer.toml'));
+  await recordPromptBaseline(root);
+  await put(root, 'custom-codex/skills/aif-implement/SKILL.md', 'user edit\n');
+  const preserved = await preservePromptAssets(root);
+  assert.ok(preserved.manifest.files.some(f => f.path === 'custom-codex/skills/aif-implement/SKILL.md'));
+  const ledgerBounded = JSON.parse(await readFile(path.join(root, '.ai-factory.json'), 'utf8'));
+  ledgerBounded.agents.push({ id: 'claude', skillsDir: '../escape' });
+  await put(root, '.ai-factory.json', JSON.stringify(ledgerBounded));
+  await assert.rejects(inventoryPromptAssets(root), /invalid-installed-layout/);
+});
+
 it('preservation fails before replacement when its destination is unsafe', async () => {
   const root = await fixture();
   await put(root, '.ai-factory/state/extension-prompt-updates', 'blocked');

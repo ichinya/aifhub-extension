@@ -47,17 +47,30 @@ export async function inventoryPromptAssets(root) {
   }
   const manifestPath = await missing(() => safe(root, `${EXT}/extension.json`));
   const manifest = manifestPath ? JSON.parse(await readFile(manifestPath, 'utf8')) : {};
+  let installation = null;
+  try { installation = JSON.parse(await readFile(path.join(root, '.ai-factory.json'), 'utf8')); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
+  // Custom runtime layouts from the installed ledger own the prompt locations:
+  // ignoring them would let an update replace preserved user edits silently.
+  const runtimeDir = (runtime, kind, fallback) => {
+    const agent = installation?.agents?.find(entry => entry?.id === runtime.slice(1));
+    const dir = String(agent?.[kind] ?? fallback).replaceAll('\\', '/');
+    if (path.isAbsolute(dir) || dir.includes(':') || dir.split('/').some(part => !part || part === '..' || part === '.')) throw new Error('invalid-installed-layout');
+    return dir;
+  };
   for (const runtime of ['.agents', '.codex', '.claude']) {
+    const skillsDir = runtimeDir(runtime, 'skillsDir', `${runtime}/skills`);
+    const agentsDir = runtimeDir(runtime, 'agentsDir', `${runtime}/agents`);
     const skills = new Set([...(manifest.skills ?? []).map(s => path.posix.basename(s)), ...(manifest.injections ?? []).map(i => i.target)]);
     for (const skill of skills) {
       if (!/^[\w-]+$/.test(skill)) throw new Error('unsafe-prompt-manifest');
-      await walk(`${runtime}/skills/${skill}`);
+      await walk(`${skillsDir}/${skill}`);
     }
     // Only extension-owned published agent files; unrelated user agents stay outside inventory.
     for (const agent of manifest.agentFiles ?? []) {
       if (runtime !== `.${agent.runtime}`) continue;
       if (!/^[\w.-]+$/.test(agent.target)) throw new Error('unsafe-prompt-manifest');
-      const file = `${runtime}/agents/${agent.target}`;
+      const file = `${agentsDir}/${agent.target}`;
       const filename = await missing(() => safe(root, file));
       if (filename) { const bytes = await readFile(filename); files.push({ path: file, sha256: hash(bytes), bytes: bytes.length }); }
     }
