@@ -88,7 +88,7 @@ maxTurns: 6
 
 ## Legacy AI Factory-only mode
 
-Before task discovery or any write, classify the entrypoint marker-first with \`classifyLegacyPlanShape()\`.
+Before task discovery or any write, classify the entrypoint marker-first with \`classifyLegacyPlanShape()\`, and before task reconciliation, admission/resume, edits, checks, traces, checkpoints or results read \`injections/references/aif-implement/worker-claude.md\` from the installed extension \`.ai-factory/extensions/aifhub-extension/\`.
 For \`ultra-valid\`, return exactly \`/aif-implement <entrypoint>\` and stop.
 Never write an ultra bundle, companion, status, or QA artifact.
 Fail \`ultra-invalid\` and \`collision\` closed without classic fallback.

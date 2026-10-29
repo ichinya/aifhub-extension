@@ -200,6 +200,14 @@ async function copyInstalledCommandLayout(userProjectDir) {
     path.join(REPO_ROOT, 'scripts', 'execution-provenance.mjs'),
     path.join(extensionDir, 'scripts', 'execution-provenance.mjs')
   );
+  await copyFile(
+    path.join(REPO_ROOT, 'scripts', 'prompt-assets.mjs'),
+    path.join(extensionDir, 'scripts', 'prompt-assets.mjs')
+  );
+  await copyFile(
+    path.join(REPO_ROOT, 'scripts', 'prompt-reference-graph.mjs'),
+    path.join(extensionDir, 'scripts', 'prompt-reference-graph.mjs')
+  );
 
   for (const command of WRAPPER_COMMANDS) {
     await copyFile(

@@ -7,11 +7,13 @@
 ## [В разработке]
 
 ### Добавлено
+- Измеритель entrypoints (#233, PR3): read-only JSON manifests source/installed, bytes/lines/sha256 и раздельные references; отдельный prompt-asset inventory/preservation guard перед update с проверкой marker pairs и installed references.
 - Classic AI Factory SDD в SessionBrief (#233, этапы 1+2): native parent и companions, synchronized source binding, methodology-neutral resolver/compiler и consumers; ultra marker-first handoff остаётся у upstream. Поля requirements не выводятся из tasks, неполные пары и факты блокируют execution.
 - `aifhub-qa-manifest` (#234): explicit enrollment для classic/OpenSpec, raw-byte dependency fingerprints, immutable results с corrective history, trusted observation bindings и publisher с custody/CAS; existing readers учитывают stale/blocked evidence без изменения gate v1 и unbound behavior.
 - Read-only `aifhub-gate-coverage` (#235): bounded диагностика final gate inventory, policy-required rules/coverage и явно required review/security, без writes/locks или workflow authority. Недоказанная independence остаётся UNKNOWN; offline K=5/5×serial counters не заявляют model-call savings.
 
 ### Изменено
+- Extension-owned implement/done/worker/question entrypoints сокращены до обязательного kernel и selective references от установленного extension root; upstream skill bodies и TASK-COORDINATION сохранены. Fast-plan compiler возвращает `delegated` с точным upstream handoff без чтения companions.
 - SessionBrief выбирает methodology по effective tool-config: `openspec:false`, `tools:{}` и отсутствие конфига выбирают classic, наличие каталога OpenSpec не включает его. `status.yaml` привязан через проекцию `{plan_id, source_binding}`; обычный progress/history не делает brief stale. Native parsing/validation закрывает deferred pins #239.
 - Однократная digest-волна для **всех** сохранённых SessionBrief, включая OpenSpec: payload обязательно содержит `instruction_composition_digest:null` рядом с `plan_context`. Требуется перекомпиляция. Null означает отсутствие зафиксированной composition; producer manifest и обнаружение instruction drift остаются follow-up, caller hash не принимается. Сокращение entrypoints и upstream skill bodies в это изменение не входит.
 - SessionBrief компилятор читает tool-config через канонический precedence (TOOLS.md): new-style конфиги с `aifhub.tools.openspec: true` без legacy `artifactProtocol` больше не дают `openspec_protocol_required`; malformed tool mappings остаются fail-closed (#243).

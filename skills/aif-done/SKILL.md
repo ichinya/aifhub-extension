@@ -9,7 +9,7 @@ author: ichi
 
 # AIF Done
 
-Read [tool selection and artifact ownership](../shared/TOOLS.md) before choosing artifact paths or lifecycle instructions.
+Read `skills/shared/TOOLS.md` from the AIFHub extension root before choosing artifact paths or lifecycle instructions.
 
 AIFHub/Handoff finalization skill. Finalizes a verified OpenSpec-native change or a legacy AI Factory-only plan, drafts commit and PR summaries, drives evidence-backed governance follow-ups, and presents optional compact evolution proposals without starting evolution.
 
@@ -21,121 +21,20 @@ Resolve mode from `.ai-factory/config.yaml`:
 - Use OpenSpec-native mode when `aifhub.tools.openspec: true`.
 - Use Legacy AI Factory-only mode otherwise.
 
-For either artifact protocol, after selecting one safe change/plan ID and before finalization, run `ai-factory aifhub-providers done --change <id> --write --json`. Providers run only when their `aifhub.tools` switch is true; false or an omitted tool means a no-op. Enabled providers default to `policy: required`. A required provider blocker prevents finalization; optional provider failures require degraded notes. Provider failures are distinct from code/test failures. HLV validation may execute its project-configured gates; never run initialization, update, sync, or doctor `--fix`. Preserve HLV/OpenSpec/Lekalo canonical artifacts and keep provider summaries under `.ai-factory/qa/<id>/providers/`. OpenSpec readiness independently verifies current provider evidence before archive.
+For either artifact protocol, only after classification permits non-ultra finalization, required references are read, and one safe change/plan ID is selected, run `ai-factory aifhub-providers done --change <id> --write --json`. Providers run only when their `aifhub.tools` switch is true; false or an omitted tool means a no-op. Enabled providers default to `policy: required`. A required provider blocker prevents finalization; optional provider failures require degraded notes. Provider failures are distinct from code/test failures. HLV validation may execute its project-configured gates; never run initialization, update, sync, or doctor `--fix`. Preserve HLV/OpenSpec/Lekalo canonical artifacts and keep provider summaries under `.ai-factory/qa/<id>/providers/`. OpenSpec readiness independently verifies current provider evidence before archive.
+
+## Reference resolution and required reads
+
+Resolve every reference from the AIFHub extension root (installed: `.ai-factory/extensions/aifhub-extension/`), never from a merged upstream skill. Missing required reference stops the governed action. All referenced rules remain mandatory.
+Before any non-ultra provider run, evidence check, finalization, governance follow-up or normal output, read `skills/aif-done/references/finalization-contract.md`. Do not read it or append optional proposals to exact ultra handoffs.
 
 ## OpenSpec-native mode
 
-OpenSpec-native mode runs verified installed-project finalization through `ai-factory aifhub-done-finalizer --change <change-id> --json`. The wrapper resolves the extension-local `scripts/openspec-done-finalizer.mjs` implementation module; never execute that module from the consumer project root or an internal installed path. This remains the only OpenSpec-native archive/finalization step after `/aif-verify` passes.
-
-### Preconditions
-
-- Resolve exactly one active change or explicit `<change-id>`.
-- Resolve effective policy through `scripts/openspec-policy.mjs`; `/aif-verify`, `/aif-mode doctor`, and `/aif-done` must use the same policy semantics.
-- Read QA evidence from `.ai-factory/qa/<change-id>/`.
-- Treat verification as passing only when QA evidence clearly records a final PASS or PASS-with-notes for this change.
-- Require the latest final fenced `aif-gate-result` block in `verify.md` to be valid JSON with `"gate": "verify"` and `status` of `pass` or `warn`.
-- Require `.ai-factory/qa/<change-id>/coverage.json` to exist, be current, and have coverage status `pass` or policy-accepted `warn`.
-- Require generated rules and durable rules gate evidence according to `requireGeneratedRulesForDone` and `requireRulesPassForDone`; generated rules readiness does not satisfy rules gate pass.
-- Apply `allowWarnOnDone.rules`, `allowWarnOnDone.coverage`, and `allowWarnOnDone.openspecStatus` before accepting warning-only finalization evidence.
-- The installed finalizer must always run its extension-local `scripts/openspec-done-readiness.mjs` implementation module before archive and persist `.ai-factory/qa/<change-id>/done-readiness.json`; do not invoke that module as an installed-project command.
-- If verification has not run or verdict is `fail`, stop and suggest `/aif-verify` or `/aif-fix`.
-- If the verify gate result is missing, invalid, or `fail`, stop and suggest rerunning `/aif-verify <change-id>` or `/aif-fix <change-id>`.
-- If coverage, generated rules, or rules gate evidence is missing, invalid, stale, failed, or warning-only when policy does not allow the warning, stop on the readiness result and show its `suggested_next.command` and `suggested_next.reason` exactly. For rules gate blockers, the command may be the installed durable evidence writer, not `/aif-rules-check` alone.
-- If readiness reports a blocking failure, refuse archive and show `suggested_next.command` and `suggested_next.reason` exactly.
-- Refuse unverified changes; do not accept `Code verification: PENDING` as final verification.
-- Dirty workspace state is blocking by default before archive. Inspect with `git status --short`; commit or stash unrelated changes, or rerun `ai-factory aifhub-done-finalizer --change <change-id> --record-dirty-state --json` to record dirty state in final QA evidence before archive.
-- For docs/tooling-only changes that also need explicit dirty-state recording, preserve both flags with `ai-factory aifhub-done-finalizer --change <change-id> --skip-specs --record-dirty-state --json`.
-
-### Canonical Context
-
-Read canonical OpenSpec artifacts:
-
-- `openspec/specs/**`
-- `openspec/changes/<change-id>/proposal.md`
-- `openspec/changes/<change-id>/design.md`
-- `openspec/changes/<change-id>/tasks.md`
-- `openspec/changes/<change-id>/specs/**/spec.md`
-
-Read generated rules as derived guidance when present:
-
-- `.ai-factory/rules/generated/openspec-merged-<change-id>.md`
-- `.ai-factory/rules/generated/openspec-change-<change-id>.md`
-- `.ai-factory/rules/generated/openspec-base.md`
-
-Runtime state and QA evidence live outside canonical changes:
-
-- `.ai-factory/state/<change-id>/`
-- `.ai-factory/qa/<change-id>/`, including `verify.md`, `coverage.json`, and `done-readiness.json`
-- `.ai-factory/qa/<change-id>/rules.md` when a durable rules gate is required or available
-
-### Archive Policy
-
-- Use `ai-factory aifhub-done-finalizer --change <change-id> --json` as the installed executable route. Add `--skip-specs` only for docs/tooling-only finalization and never add `--force`, `--no-validate`, `--skip-archive`, `--dry-run`, or `--summary-only`.
-- Inside the extension implementation only, archive through `archiveOpenSpecChange(changeId, options)` from `scripts/openspec-runner.mjs`; this corresponds to `openspec archive <change-id> --yes`.
-- The extension-local implementation uses `archiveOpenSpecChange(changeId)` for normal finalization and `archiveOpenSpecChange(changeId, { skipSpecs: true })` for docs/tooling-only finalization; the latter corresponds to `openspec archive <change-id> --yes --skip-specs --no-color`.
-- Support the user-facing `--skip-specs` path while still writing final QA evidence and final summaries.
-- If OpenSpec CLI is missing or unsupported and archive is required, fail with an explicit OpenSpec CLI requirement.
-- Do not archive in `/aif-verify`; `/aif-verify` does not archive and only records verification evidence.
-- Do not use legacy `.ai-factory/specs` archive in OpenSpec-native mode.
-- OpenSpec-native mode does not use legacy `.ai-factory/specs` archive.
-- Do not silently archive OpenSpec changes through legacy `.ai-factory/specs`.
-- Do not write runtime-only output into `openspec/changes/<change-id>/`.
-- Do not directly mutate `openspec/specs/**` or manually move OpenSpec change folders.
-
-### OpenSpec-Native Output
-
-Normal output must report:
-
-- selected `change-id`;
-- readiness status, blocking checks, and exact suggested next command when blocked;
-- verification status and refusal reason when unverified;
-- dirty working tree state;
-- archive result;
-- bounded selected OpenSpec command/source from archive or pre-archive context;
-- canonical artifacts inspected;
-- generated rules state when relevant;
-- effective policy summary and policy-derived finalization blockers;
-- runtime state and QA evidence paths;
-- final evidence under `.ai-factory/qa/<change-id>/`;
-- final summaries under `.ai-factory/state/<change-id>/`;
-- commit/PR summary draft;
-- compact evolution proposals and next steps: `/aif-mode sync`, `/aif-commit`, and an exact `/aif-evolve` owner handoff for separately requested or policy-required evolution.
-
-### Roadmap Lifecycle Co-Ownership
-
-- After successful OpenSpec archive, `/aif-done` co-owns only the marker-delimited `OpenSpec Change Lifecycle` block in the configured project-relative roadmap; `/aif-roadmap` remains the owner of the full roadmap audit and reconciliation.
-- The finalizer uses the canonical pre-archive `## Roadmap Linkage` fields and a project-relative final evidence path to insert or update one local `finalized` row. Explicit `none` linkage produces the local outcome `skipped` without changing the roadmap.
-- A readiness, verification, artifact-contract, dirty-tree, or archive failure must not update the roadmap or create a `finalized` row.
-- Normal output reports the local roadmap lifecycle outcome `updated`, `skipped`, or `handoff` separately from external GitHub issue, pull request, and milestone state.
-- Local finalization must not claim that a GitHub issue is closed or a pull request is merged.
-- If a post-archive roadmap update cannot be completed safely, preserve the successful archive and final evidence, return `handoff` with the exact `/aif-roadmap check` guidance, and must not roll back the successful archive or fabricate a `finalized` row.
-
-### Post-Finalization Handoff
-
-After successful finalization:
-
-1. Recommend `/aif-mode sync` to refresh derived artifacts after archive.
-2. Recommend `/aif-commit` as the next AI Factory command.
-3. Present compact evolution proposals when durable learning evidence exists; optional learning does not start inside finalization. Separately requested or policy-required evolution follows the owner boundary below.
-4. Do not create commits automatically.
-5. Do not create PRs automatically.
-6. `/aif-done` does not replace `/aif-commit`.
-
-## Optional evolution boundary
-
-After successful OpenSpec-native or classic legacy finalization, present compact evolution proposals backed by existing durable learning evidence in the normal response. Optional evolution never blocks verified finalization. Never run `/aif-evolve` as part of finalization. No learning evidence means no artificial learning backlog or required evolution step.
-
-Do not dispatch an evolution intake worker for optional learning. Compact evolution proposals are output only: do not call aifhub-evolution propose or apply, write skill-context or rules, or update patch cursors. This restriction concerns optional learning; required evidence-backed governance updates retain their existing owner-safe paths, exact handoffs, and gate evidence.
-
-An integrated-finalization request alone does not authorize evolution. Explicit user-requested evolution or an applicable mandatory project policy requires a separately authorized evolution owner workflow when supported, or an exact owner handoff when execution is unavailable. The parent may continue that separate workflow after finalization. Preserve upstream approval semantics and exact proposal_digest binding for evolution writes.
-
-Each compact proposal includes the proposed improvement, evidence reference, owner/target, and exact next command when needed. Use `/aif-evolve @.ai-factory/qa/<change-id>` for existing post-archive OpenSpec evidence or `/aif-evolve <plan-id>` for classic legacy evidence, replacing placeholders with the exact selected scope; never guess a scope.
-
-Do not append proposals to the exact marked legacy ultra handoff. That read-only receipt branch keeps its existing exact-output contract.
+Before resolving an active change, reading policy/QA/canonical artifacts, checking readiness, archiving, writing evidence, updating the managed roadmap block or drafting output, read `skills/aif-done/references/openspec-finalization.md` and the shared finalization contract.
+Use only `ai-factory aifhub-done-finalizer --change <change-id> --json` after PASS/PASS-with-notes and current policy-accepted evidence. The finalizer always runs readiness before archive; refuse unverified changes and show exact `suggested_next.command` and `suggested_next.reason` on blockers.
+Support `--skip-specs` for docs/tooling only and `--record-dirty-state` for explicit dirty-state recording. Never bypass readiness, manually move changes, or mutate base specs. `/aif-verify` does not archive.
 
 ## Legacy AI Factory-only mode
-
-Legacy AI Factory-only mode first separates marked upstream ultra bundles from classic AIFHub companion plans. The classic finalization contract remains based on `.ai-factory/plans/<plan-id>/` and `.ai-factory/specs/<plan-id>/`; it must never consume a marked ultra bundle.
 
 ### Marker-first legacy ultra boundary
 
@@ -151,123 +50,45 @@ Before active-plan fallback, companion discovery, `status.yaml` reads, archive d
 
 The marked ultra branch is read-only. It must not modify the bundle, create or synchronize companion files, create OpenSpec artifacts, update `status.yaml`, write QA/final evidence, update `.ai-factory/specs`, or write a new receipt. Receipt creation belongs only to `/aif-verify` and is confined to `.ai-factory/state/legacy-ultra-verification/<entrypoint-digest>.json`.
 
-### Classic precondition
+Before evaluating a marked ultra receipt or selecting its exact handoff, read `skills/aif-done/references/classic-finalization.md`; this read authorizes no writes. Keep the marker-first branch above read-only.
+For `classic-pair` or `classic-folder-only`, before active-plan fallback, companion/status/archive reads, evidence checks, finalization or output, read that same classic reference and the shared finalization contract. Resolve configured paths and require passing verification; never consume marked ultra as classic.
 
-- Active plan must have a passing verification state (`pass` or `pass-with-notes`).
-- If verification has not run or verdict is `fail`, this skill stops and suggests running `/aif-verify` first.
+## Finalization safety kernel
 
-### Classic workflow
+- Never finalize without passing verification; current readiness and provider gates remain mandatory.
+- Preserve immutable request/research/reconciliation sources and existing user changes.
+- Do not create commits or PRs automatically. `/aif-done` does not replace `/aif-commit`.
+- Do not run `/aif-evolve` inside finalization. Optional proposals need durable evidence; separately authorized evolution keeps owner handoff and exact proposal_digest binding.
+- Keep runtime under `.ai-factory/state/<change-id>/` and QA/final evidence under `.ai-factory/qa/<change-id>/`; never write runtime-only output in canonical changes.
+- Local finalization cannot claim GitHub issue closure or PR merge. After archive, update only the managed `OpenSpec Change Lifecycle` block; failure returns `/aif-roadmap check` without rolling archive back.
+- Report verification/readiness, dirty state, archive result, canonical artifacts, effective policy, evidence paths, commit/PR drafts and exact next owner handoffs. After success recommend `/aif-mode sync` and `/aif-commit`.
 
-#### Step 1: Validate Precondition
+## Readiness and archive ownership
 
-1. Resolve the active plan (same resolution logic as `/aif-implement`).
-2. Read `status.yaml` and check `verification.verdict`.
-3. If verdict is missing or not `pass`/`pass-with-notes`:
-   - Stop with message: "Plan has not passed verification. Run `/aif-verify` first."
-4. Check workspace state:
-   - If `git status` shows uncommitted changes **outside** the current plan scope:
-     - Stop and ask the user to confirm or clean up.
-     - Only plan-related changes (files touched by the plan's implementation) are acceptable without confirmation.
+These checks apply after mode classification and required reference loading.
 
-#### Step 2: Archive Plan
+- Resolve exactly one safe change/plan ID; ambiguity never selects an arbitrary candidate.
+- OpenSpec policy comes from `scripts/openspec-policy.mjs`, shared with verify and doctor.
+- The latest final `aif-gate-result` must contain valid JSON, `gate: verify`, and pass or policy-accepted warn.
+- Current `coverage.json`, generated rules and durable rules gate evidence remain distinct requirements.
+- Apply each `allowWarnOnDone` flag to its own evidence category.
+- `Code verification: PENDING` never establishes passing verification.
+- Required provider blockers prevent finalization; optional failures require explicit degraded notes.
+- Provider validation never authorizes initialization, update, sync or doctor `--fix`.
+- The installed finalizer writes `done-readiness.json` before archive and refuses readiness blockers.
+- Dirty state is blocking unless explicit recording is authorized through `--record-dirty-state`.
+- Keep `--skip-specs` limited to docs/tooling; it still writes final evidence and summaries.
+- Never add `--force`, `--no-validate`, `--skip-archive`, `--dry-run` or `--summary-only`.
 
-1. Resolve archive path: `.ai-factory/specs/<plan-id>/`.
-2. **Idempotency check:** If `.ai-factory/specs/<plan-id>/` already exists:
-   - Treat the run as a refresh/finalize-again pass.
-   - Rebuild `spec.md`, refresh the index entry, and regenerate commit/PR/follow-up outputs from current plan evidence.
-   - If the archive came from legacy `/aif-verify` auto-archive behavior, adopt it instead of failing or blindly re-copying.
-   - Inform the user that finalization is refreshing an existing archive.
-3. If archive does not exist:
-   - Copy plan folder contents (minus `status.yaml` execution metadata) into the archive.
-   - Archive the companion plan file as `plan.md` alongside the folder artifacts.
-4. Create or update `spec.md` summarizing what was implemented, if part of the current contract.
-5. Update `.ai-factory/specs/index.yaml` with the new entry.
+## Final outputs and follow-ups
 
-#### Step 3: Prepare Commit Message
-
-1. Analyze all changes made under this plan.
-2. Draft a conventional commit message summarizing the implementation.
-3. Present the draft to the user for review.
-
-#### Step 4: Prepare PR Summary (if applicable)
-
-1. Check if a feature branch exists (branch != main/master).
-2. If `gh` CLI is available:
-   - Draft PR title and body based on plan scope and implementation evidence.
-   - Present the draft; do not create the PR automatically.
-3. If `gh` is not available:
-   - Output manual PR instructions with the drafted title and body.
-
-#### Step 5: Apply Evidence-Driven Follow-ups
-
-1. Check plan for evidence of:
-   - roadmap milestone completion or maturity movement;
-   - new architecture decisions, boundaries, or modules;
-   - new or modified durable project rules;
-   - evolution candidates worth reporting as compact proposals, separate from required governance.
-2. Apply follow-ups only when the evidence exists:
-   - Roadmap -> update through the roadmap owner or return an exact `/aif-roadmap` handoff.
-   - Architecture -> update through the architecture owner or return an exact `/aif-architecture` handoff.
-   - Rules -> update the project rules owner path or return an exact handoff if direct update is not safe in the current runtime.
-3. If the current runtime cannot safely perform the owner update, do not silently skip it — return the exact next command/instruction instead.
-4. Present compact evolution proposals under the optional evolution boundary above. Return separately authorized evolution to its owner workflow or an exact handoff; do not execute it inside finalization.
-5. Never invent governance changes that are not supported by plan evidence.
-
-#### Step 6: Mark Plan Done
-
-1. Update `status.yaml`:
-   - Set `status: done`.
-   - Record finalization timestamp.
-2. Output completion summary:
-   - Archive path.
-   - Commit message draft.
-   - PR summary draft (or manual instructions).
-   - Governance updates performed or exact handoffs prepared.
-   - Compact evolution proposals presented or the exact `/aif-evolve` owner handoff returned. Report evolution as completed only when separately authorized execution actually succeeded.
-
-## Ownership Boundary
-
-| Artifact | Owner | This Skill |
-|----------|-------|------------|
-| `openspec/changes/<change-id>/` | OpenSpec-native workflow | Reads before archive; OpenSpec CLI owns lifecycle mutation |
-| `.ai-factory/qa/<change-id>/` | `/aif-verify` and **aif-done** | Reads verification and coverage evidence; writes `done-readiness.json`, `done.md`, `openspec-archive.json`, and raw archive output |
-| `.ai-factory/state/<change-id>/` | OpenSpec-native runtime and **aif-done** | Reads traces; writes `final-summary.md` |
-| `.ai-factory/state/legacy-ultra-verification/<entrypoint-digest>.json` | `/aif-verify` | **aif-done** reads and revalidates only; never writes |
-| `.ai-factory/plans/<ultra-id>/index.md` and direct `phase-*.md` | upstream AI Factory ultra workflow | **aif-done** reads only for binding; returns `/aif-archive <entrypoint>` only for a current exact PASS receipt |
-| `.ai-factory/specs/<plan-id>/` | **aif-done** legacy mode only | Creates or refreshes on legacy finalization |
-| `.ai-factory/specs/index.yaml` | **aif-done** | Updates |
-| `.ai-factory/plans/<plan-id>/status.yaml` | **aif-done** | Updates `status: done` |
-| Commit/PR drafts | **aif-done** | Outputs to user |
-| `.ai-factory/ROADMAP.md` | roadmap owner; **aif-done** for the managed lifecycle block | Co-owns only the marker-delimited `OpenSpec Change Lifecycle` block after successful OpenSpec archive; otherwise hand off |
-| `.ai-factory/RULES.md` | project rules owner | Update only for durable plan-backed rules; otherwise hand off |
-| `.ai-factory/ARCHITECTURE.md` | architecture owner | Update only with plan-backed evidence; otherwise hand off |
-
-## Rules
-
-- Never finalize a plan that has not passed verification.
-- In OpenSpec-native mode, never finalize an unverified change.
-- In OpenSpec-native mode, never finalize a change with missing, stale, invalid, or failed `coverage.json`.
-- In OpenSpec-native mode, never treat generated rules as a substitute for durable `rules` gate evidence.
-- In OpenSpec-native mode, obey `allowWarnOnDone` before accepting warning-only rules, coverage, or OpenSpec status evidence.
-- In OpenSpec-native mode, archive only through `archiveOpenSpecChange`; never use custom OpenSpec archive logic.
-- In installed OpenSpec-native projects, execute finalization only through `ai-factory aifhub-done-finalizer`; treat `scripts/openspec-done-finalizer.mjs`, `scripts/openspec-done-readiness.mjs`, and `scripts/openspec-runner.mjs` as extension-local implementation modules, not project-root commands.
-- Reject `--force`, `--no-validate`, `--skip-archive`, `--dry-run`, `--summary-only`, and unknown finalizer options.
-- In OpenSpec-native mode, never silently archive through legacy `.ai-factory/specs`.
-- In legacy mode, classify marker-first. Never treat a marked ultra bundle as a classic companion plan or migrate it automatically.
-- For a marked legacy ultra bundle, recompute receipt bindings on every `/aif-done` run and return only `/aif-verify <entrypoint>` or `/aif-archive <entrypoint>`; do not execute either command or write any artifact.
-- Never invent governance changes without evidence from the verified plan.
-- Never run `/aif-evolve` as part of finalization; evolution executes separately under its own authority, upstream approval semantics, and exact proposal_digest binding.
-- When governance updates belong to another owner, use the owning path or return an exact handoff instead of silently skipping the change.
-- Keep `/aif-done` roadmap writes confined to the marker-delimited `OpenSpec Change Lifecycle` block after successful OpenSpec archive; never infer external GitHub closure from local finalization.
-- Never auto-create a PR — always present drafts for user approval.
-- Never create commits from `/aif-done`; hand commit creation to `/aif-commit` or the user's normal git workflow.
-- If `gh` is unavailable, provide manual instructions instead of failing.
-- Keep direct archival writes bounded to the plan status, specs directory, and specs index.
-- Do not reintroduce `/aif-done` as the canonical upstream workflow step, and do not present `/aif-done` as replacing `/aif-commit`.
-
-## Example Requests
-
-- "Finalize this plan."
-- "Archive the verified plan."
-- "Prepare commit and PR summary."
-- "/aif-done"
+- Prepare commit/PR drafts from the selected scope and actual evidence.
+- Classic finalization may refresh an existing archive without blindly duplicating it.
+- Classic status becomes done only after passing verification and completed finalization.
+- Preserve historical finalization/evolution records; do not rewrite them as new executions.
+- Governance follow-ups require durable evidence and their owning workflow.
+- Unavailable owner execution returns its exact handoff instead of a fabricated success.
+- Optional evolution never creates an artificial learning backlog or blocks verified finalization.
+- Do not dispatch an optional evolution intake worker or apply proposals during finalization.
+- The marked ultra receipt branch keeps only its exact handoff output.
+- Local archive success remains separate from external GitHub issue, PR and milestone state.

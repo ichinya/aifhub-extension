@@ -1,6 +1,6 @@
 # Finalization Contract
 
-Read [tool selection and artifact ownership](../../shared/TOOLS.md) before choosing artifact paths or lifecycle instructions.
+Read `skills/shared/TOOLS.md` from the AIFHub extension root before choosing artifact paths or lifecycle instructions.
 
 Reference for the `aif-done` skill and `aifhub-done-finalizer` agents.
 
@@ -275,3 +275,49 @@ For classic legacy status only: `proposed` means compact proposals were presente
 | Archive already exists | Refresh archive/spec/index outputs; do not fail |
 | `gh` not available | Output manual PR instructions instead of failing |
 | Specs directory missing | Create `.ai-factory/specs/` and `index.yaml` |
+## Ownership Boundary
+
+| Artifact | Owner | This Skill |
+|----------|-------|------------|
+| `openspec/changes/<change-id>/` | OpenSpec-native workflow | Reads before archive; OpenSpec CLI owns lifecycle mutation |
+| `.ai-factory/qa/<change-id>/` | `/aif-verify` and **aif-done** | Reads verification and coverage evidence; writes `done-readiness.json`, `done.md`, `openspec-archive.json`, and raw archive output |
+| `.ai-factory/state/<change-id>/` | OpenSpec-native runtime and **aif-done** | Reads traces; writes `final-summary.md` |
+| `.ai-factory/state/legacy-ultra-verification/<entrypoint-digest>.json` | `/aif-verify` | **aif-done** reads and revalidates only; never writes |
+| `.ai-factory/plans/<ultra-id>/index.md` and direct `phase-*.md` | upstream AI Factory ultra workflow | **aif-done** reads only for binding; returns `/aif-archive <entrypoint>` only for a current exact PASS receipt |
+| `.ai-factory/specs/<plan-id>/` | **aif-done** legacy mode only | Creates or refreshes on legacy finalization |
+| `.ai-factory/specs/index.yaml` | **aif-done** | Updates |
+| `.ai-factory/plans/<plan-id>/status.yaml` | **aif-done** | Updates `status: done` |
+| Commit/PR drafts | **aif-done** | Outputs to user |
+| `.ai-factory/ROADMAP.md` | roadmap owner; **aif-done** for the managed lifecycle block | Co-owns only the marker-delimited `OpenSpec Change Lifecycle` block after successful OpenSpec archive; otherwise hand off |
+| `.ai-factory/RULES.md` | project rules owner | Update only for durable plan-backed rules; otherwise hand off |
+| `.ai-factory/ARCHITECTURE.md` | architecture owner | Update only with plan-backed evidence; otherwise hand off |
+
+## Rules
+
+- Never finalize a plan that has not passed verification.
+- In OpenSpec-native mode, never finalize an unverified change.
+- In OpenSpec-native mode, never finalize a change with missing, stale, invalid, or failed `coverage.json`.
+- In OpenSpec-native mode, never treat generated rules as a substitute for durable `rules` gate evidence.
+- In OpenSpec-native mode, obey `allowWarnOnDone` before accepting warning-only rules, coverage, or OpenSpec status evidence.
+- In OpenSpec-native mode, archive only through `archiveOpenSpecChange`; never use custom OpenSpec archive logic.
+- In installed OpenSpec-native projects, execute finalization only through `ai-factory aifhub-done-finalizer`; treat `scripts/openspec-done-finalizer.mjs`, `scripts/openspec-done-readiness.mjs`, and `scripts/openspec-runner.mjs` as extension-local implementation modules, not project-root commands.
+- Reject `--force`, `--no-validate`, `--skip-archive`, `--dry-run`, `--summary-only`, and unknown finalizer options.
+- In OpenSpec-native mode, never silently archive through legacy `.ai-factory/specs`.
+- In legacy mode, classify marker-first. Never treat a marked ultra bundle as a classic companion plan or migrate it automatically.
+- For a marked legacy ultra bundle, recompute receipt bindings on every `/aif-done` run and return only `/aif-verify <entrypoint>` or `/aif-archive <entrypoint>`; do not execute either command or write any artifact.
+- Never invent governance changes without evidence from the verified plan.
+- Never run `/aif-evolve` as part of finalization; evolution executes separately under its own authority, upstream approval semantics, and exact proposal_digest binding.
+- When governance updates belong to another owner, use the owning path or return an exact handoff instead of silently skipping the change.
+- Keep `/aif-done` roadmap writes confined to the marker-delimited `OpenSpec Change Lifecycle` block after successful OpenSpec archive; never infer external GitHub closure from local finalization.
+- Never auto-create a PR — always present drafts for user approval.
+- Never create commits from `/aif-done`; hand commit creation to `/aif-commit` or the user's normal git workflow.
+- If `gh` is unavailable, provide manual instructions instead of failing.
+- Keep direct archival writes bounded to the plan status, specs directory, and specs index.
+- Do not reintroduce `/aif-done` as the canonical upstream workflow step, and do not present `/aif-done` as replacing `/aif-commit`.
+
+## Example Requests
+
+- "Finalize this plan."
+- "Archive the verified plan."
+- "Prepare commit and PR summary."
+- "/aif-done"

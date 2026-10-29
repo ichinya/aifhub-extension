@@ -159,14 +159,16 @@ it('explicit full and fast identity obey custom paths without intercepting each 
   assert.equal(full.public_mode, 'full');
   const fast = await resolvePlanContext({ ...opts(root), changeId: 'planning/fast.md' });
   assert.equal(fast.public_mode, 'fast');
-  assert.deepEqual(fast.documents.map(d => d.path), ['planning/fast.md']);
+  assert.deepEqual(fast.documents, []);
+  assert.deepEqual(fast.upstream_handoff, { owner: 'upstream', entrypoint: 'planning/fast.md' });
   const result = await compileSessionBrief({ ...opts(root), changeId: `planning/changes/${id}.md` });
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.equal(result.sources.some(d => d.path.startsWith('.ai-factory/plans/')), false);
   await put(root, 'planning/fast.md', (await text(root, parent)) + '\n## Verification Plan\n\n- Run focused checks.\n');
   const mismatchedFast = await compileSessionBrief({ ...opts(root), changeId: 'planning/fast.md' });
-  assert.equal(mismatchedFast.ok, false, 'full SDD inputs cannot promote an actual fast layout');
-  assert.ok(mismatchedFast.blocked_reasons.includes('planning_mode_mismatch'));
+  assert.equal(mismatchedFast.status, 'delegated');
+  assert.equal(mismatchedFast.owner_handoff, '/aif-implement planning/fast.md');
+  assert.deepEqual(mismatchedFast.blocked_reasons, ['upstream_fast_handoff']);
 });
 
 it('synchronized Markdown/YAML binding drift revises the brief; conflicts fail closed', async () => {

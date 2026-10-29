@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInstalledScript } from './run-installed-script.mjs';
 import { HELPER_MODULES, helperBaseline, helperBytes, sha256 } from '../scripts/execution-provenance.mjs';
+import { preservePromptAssets, finishPromptPreservation, validateInstalledPromptAssets, recordPromptBaseline } from '../scripts/prompt-assets.mjs';
 
 const registered = new WeakSet();
 const EXTENSION_NAME = 'aifhub-extension';
@@ -23,17 +24,19 @@ export function registerPostUpdateInit(program, moduleUrl, options = {}) {
     const before = await refreshStamp(rootDir, moduleUrl);
     if (before !== null || await installedProject(rootDir, moduleUrl)) {
       try {
+        const promptPreservation = await preservePromptAssets(rootDir);
         const preservation = await preserveHelper(rootDir);
-        pending.set(action, { rootDir, before, preservation });
+        pending.set(action, { rootDir, before, preservation, promptPreservation });
         // Commander skips postAction when the update action itself throws; the exit
         // fallback is the last chance to hand off preserved copies for review.
         processLike.once?.('exit', () => {
           if (!pending.get(action)) return;
           processLike.stderr.write('AIFHub: update failed after helper preservation; preserved copies and diff-manifest.json remain under .ai-factory/state/extension-updates. Review them before retrying.\n');
+          if (promptPreservation) processLike.stderr.write(`AIFHub: prompt assets preserved at ${promptPreservation.manifestPath}; review before retrying.\n`);
         });
       } catch {
         processLike.exitCode = 1;
-        throw new Error('AIFHub: helper preservation failed; update stopped before replacement. Review .ai-factory/state/extension-updates and retry.');
+        throw new Error('AIFHub: helper or prompt-asset preservation failed; update stopped before replacement. Review .ai-factory/state/extension-updates and extension-prompt-updates and retry.');
       }
     }
   });
@@ -44,12 +47,22 @@ export function registerPostUpdateInit(program, moduleUrl, options = {}) {
     // Finalize the handoff even if the updater/initializer failed or skipped its refresh.
     try {
       await finishPreservation(state, processLike);
+      await finishPromptPreservation(state.rootDir, state.promptPreservation);
+      if (state.promptPreservation) processLike.stderr.write(`AIFHub: preserved modified/unknown prompt assets: ${state.promptPreservation.manifestPath}. Compare preserve/ with incoming files and migrate local edits explicitly.\n`);
     } catch {
       if (Number(processLike.exitCode ?? 0) === 0) processLike.exitCode = 1;
-      processLike.stderr.write('AIFHub: helper diff finalization failed; preserved copies remain under .ai-factory/state/extension-updates. Review them before retrying.\n');
+      processLike.stderr.write('AIFHub: helper or prompt diff finalization failed; preserved copies remain under .ai-factory/state/extension-updates and extension-prompt-updates. Review them before retrying.\n');
     }
-    const strictHandoff = state.preservation && processLike.env?.AIFHUB_UPDATE_STRICT === '1';
+    const strictHandoff = (state.preservation || state.promptPreservation) && processLike.env?.AIFHUB_UPDATE_STRICT === '1';
     if (Number(processLike.exitCode ?? 0) !== 0) return;
+    try {
+      const installedManifest = await readFile(path.join(state.rootDir, '.ai-factory/extensions', EXTENSION_NAME, 'extension.json'), 'utf8').catch(error => { if (error.code === 'ENOENT') return null; throw error; });
+      if (installedManifest !== null) await validateInstalledPromptAssets(state.rootDir);
+    } catch {
+      processLike.exitCode = 1;
+      processLike.stderr.write('AIFHub: installed prompt marker/reference validation failed; update is incomplete. Preserved local edits remain under .ai-factory/state/extension-prompt-updates. Repair extension delivery and retry.\n');
+      return;
+    }
     const after = await refreshStamp(state.rootDir, moduleUrl);
     if (after === state.before) {
       if (strictHandoff) processLike.exitCode = 1;
@@ -57,6 +70,8 @@ export function registerPostUpdateInit(program, moduleUrl, options = {}) {
     }
     try {
       if (after === null || processLike.cwd() !== state.rootDir) throw new Error('initialization_unavailable');
+      // Upstream update already refreshed base and re-applied injections;
+      // record the independent baseline only after successful initialization.
       processLike.stdout.write('\nAIFHub: initializing the project after extension update.\n');
       // Resolve at execution time: the updater has replaced the installed scripts.
       const code = await run('../scripts/aif-mode.mjs', ['init', '--json'], moduleUrl, { processLike });
@@ -64,6 +79,7 @@ export function registerPostUpdateInit(program, moduleUrl, options = {}) {
         processLike.exitCode = code;
         throw new Error('initialization_failed');
       }
+      await recordPromptBaseline(state.rootDir);
     } catch {
       if (Number(processLike.exitCode ?? 0) === 0) processLike.exitCode = 1;
       processLike.stderr.write('AIFHub: post-update initialization failed. Resolve the setup error and retry ai-factory aifhub-mode init --json.\n');

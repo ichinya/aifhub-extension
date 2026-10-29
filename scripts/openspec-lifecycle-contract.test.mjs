@@ -1,3 +1,4 @@
+import { readPromptContract } from './prompt-reference-graph.mjs';
 // openspec-lifecycle-contract.test.mjs - lifecycle-level OpenSpec CLI prompt contracts
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -42,7 +43,7 @@ const OPENSPEC_SLASH_COMMAND_PATTERNS = [
 ];
 
 async function readRepoFile(relativePath) {
-  return readFile(join(REPO_ROOT, relativePath), 'utf8');
+  return readPromptContract(REPO_ROOT, relativePath);
 }
 
 async function readJoined(paths) {
