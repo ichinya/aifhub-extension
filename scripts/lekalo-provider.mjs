@@ -170,6 +170,10 @@ async function traceArgs(rootDir, options) {
     ? `.ai-factory/traces/${options.changeId}/lekalo-trace-manifest.json` : null);
   if (relative === null || relative === '') return null;
   if (typeof relative !== 'string' || !relative.startsWith('.ai-factory/traces/')) throw new Error('trace_custody');
+  // An explicit path must stay inside this change's own custody directory:
+  // another change's trace is foreign evidence for the current change.
+  if (options.tracePath !== undefined && safeId(options.changeId)
+    && !relative.startsWith(`.ai-factory/traces/${options.changeId}/`)) throw new Error('trace_custody');
   const target = await safeProviderPath(rootDir, relative);
   if (!target.exists) return null;
   const stat = await lstat(target.path);
@@ -217,7 +221,13 @@ async function runSemantic(operation, rootDir, config, options) {
     // Impact alone has no context capsule. Never relabel its digest as context.
     let context = null;
     if (operation === 'context') {
-      if (!impact.ids.length) return { status: 'unavailable', reason: 'changed_symbols_missing', diagnostics: [] };
+      // A clean worktree is a complete empty result, not an error: a required
+      // provider must not block implementation on unchanged trees.
+      if (!impact.ids.length) return { status: 'pass', reason: 'semantic_result',
+        diagnostics: [], semantic: normalizeSemanticEvidence(SEMANTIC_MANIFEST, {
+          status: 'pass', diagnostics: [], impact: impact.refs, context: null,
+          complete: impact.complete, trace: { schemaVersion: '1.0.0', links: [] } }),
+        streams: impactResult.streams };
       result = await execute(['context', '--changed', impact.ids.join(','), '--budget', '5000', '--project', rootDir], rootDir, config, options);
       if (result.failure) return result.failure;
       if (result.exitCode !== 0) return normalizedProcessResult(operation, result);
@@ -260,7 +270,12 @@ export async function runLekaloOperation(operation, rootDir, config = {}, option
         : operation === 'readiness' ? ['readiness', '--phase', 'done', '--project', rootDir] : [operation, '--project', rootDir];
     if (args === null) return { status: 'unavailable', reason: 'trace_missing', diagnostics: [] };
     if (args === 'overflow') return { status: 'infrastructure_error', reason: 'export_overflow', diagnostics: [] };
-    const result = await execute(args, rootDir, config, options);
+    // Trace exports are bounded by the contract maxExportBytes (32 MiB), not the
+    // default 1 MiB process-output cap: a valid manifest above 4 MiB is real
+    // evidence, not an overflow.
+    const limits = operation === 'trace'
+      ? { ...config, maxOutputBytes: LEKALO_WORKFLOW_CONTRACT.maxExportBytes } : config;
+    const result = await execute(args, rootDir, limits, options);
     if (result.failure) return result.failure;
     return normalizedProcessResult(operation, result);
   } catch (error) {

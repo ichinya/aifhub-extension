@@ -173,3 +173,30 @@ test('Lekalo revision binds ignored lock and trace inputs as well as the canonic
   await writeFile(trace, '{"changed":true}');
   assert.notEqual((await providerRevision(root, options)).worktree, exported.worktree);
 });
+
+test('clean worktree context is a complete empty pass; foreign traces and big valid traces behave', async t => {
+  const root = await project();
+  // Empty impact roots (clean worktree): context is a complete pass, not unavailable.
+  const emptyRunner = { AIF_TEST_LEKALO_IMPACT: 'empty' };
+  const context = await runLekaloOperation('context', root, {}, { runProcess: runner(emptyRunner) });
+  assert.equal(context.status, 'pass', JSON.stringify(context));
+  assert.equal(context.reason, 'semantic_result');
+  assert.equal(context.semantic.complete, true);
+  // A valid trace larger than the default 1 MiB output cap is not an overflow.
+  const big = await project();
+  const trace = path.join(big, '.ai-factory/traces', 'fixture', 'lekalo-trace-manifest.json');
+  await mkdir(path.dirname(trace), { recursive: true });
+  await writeFile(trace, JSON.stringify({ padding: 'x'.repeat(2 * 1024 * 1024) }));
+  const exported = await runLekaloOperation('trace', big, {}, {
+    tracePath: '.ai-factory/traces/fixture/lekalo-trace-manifest.json',
+    runProcess: runner({ AIF_TEST_LEKALO_TRACE_BIG: '1' }) });
+  assert.notEqual(exported.reason, 'output_overflow');
+  assert.notEqual(exported.status, 'infrastructure_error');
+  // An explicit tracePath outside this change's custody is refused (outer
+  // catch maps trace_custody to unsupported/unsafe_path_or_result_schema).
+  const foreign = await runLekaloOperation('trace', root, {}, {
+    tracePath: '.ai-factory/traces/other-change/lekalo-trace-manifest.json', changeId: 'fixture',
+    runProcess: () => assert.fail('spawn') });
+  assert.equal(foreign.status, 'unsupported');
+  assert.equal(foreign.reason, 'unsafe_path_or_result_schema');
+});

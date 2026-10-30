@@ -56,8 +56,10 @@ export async function fakeLekalo(args, env = {}, cwd = process.cwd()) {
     if (severity) Object.assign(payload, { diagnostics, reasonCodes: diagnostics.map(item => item.id) });
   } else if (args[0] === 'impact') {
     payload = { status: 'valid', impact: { schemaVersion: 'lekalo/impact/v0.2.16', identity: 'dev.lekalo.impact@0.2.16',
-      digest: hash('impact'), roots: ['operation:fixture.changed'],
-      direct: { items: [{ subject: 'entity:fixture.account' }] }, transitive: { items: [] }, mandatoryPublic: { items: [] },
+      digest: hash('impact'),
+      roots: env.AIF_TEST_LEKALO_IMPACT === 'empty' ? [] : ['operation:fixture.changed'],
+      direct: { items: env.AIF_TEST_LEKALO_IMPACT === 'empty' ? [] : [{ subject: 'entity:fixture.account' }] },
+      transitive: { items: [] }, mandatoryPublic: { items: [] },
       completeness: { complete: !env.AIF_TEST_LEKALO_PARTIAL } } };
   } else if (args[0] === 'context') {
     payload = { status: 'valid', context: { schemaVersion: 'lekalo/context/v0.8.0', identity: 'dev.lekalo.context@0.8.0',
@@ -67,7 +69,8 @@ export async function fakeLekalo(args, env = {}, cwd = process.cwd()) {
       sections: { privateText } } };
   } else if (args[0] === 'trace' && args[1] === 'export') {
     const trace = { schemaVersion: 'lekalo/trace-manifest/v0.2.16', identity: 'dev.lekalo.trace-manifest@0.2.16',
-      completeness: 'partial', nodes: [], relations: [], gaps: [{ reason: privateText }] };
+      completeness: 'partial', nodes: [], relations: [], gaps: [{ reason: privateText }],
+      ...(env.AIF_TEST_LEKALO_TRACE_BIG ? { padding: 'x'.repeat(2 * 1024 * 1024) } : {}) };
     payload = { status: 'valid', trace, manifestDigest: hash(JSON.stringify(trace)) };
   } else return reply({}, 2);
   if (env.AIF_TEST_LEKALO_ADDITIVE) payload.future = { privateText };
