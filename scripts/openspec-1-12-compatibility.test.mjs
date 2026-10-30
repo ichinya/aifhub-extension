@@ -55,13 +55,13 @@ describe('OpenSpec 1.12 report and advisory preflight boundary', () => {
       ['1.12.0-beta.1', '20.19.0', false, null]
     ]) {
       const result = await detectOpenSpec({ nodeVersion, executor: async () => ({ exitCode: 0, stdout: version, stderr: '' }) });
-      assert.equal(result.latestReviewedVersion, '1.13.0');
+      assert.equal(result.latestReviewedVersion, '1.15.0');
       assert.equal(result.canValidate, supported);
       assert.equal(result.canArchive, supported);
       assert.equal(result.versionOutdated, outdated);
     }
     const skill = await readFile(new URL('../skills/aif-analyze/SKILL.md', import.meta.url), 'utf8');
-    assert.match(skill, /^version: 0\.16\.0$/m);
+    assert.match(skill, /^version: 0\.17\.0$/m);
   });
 
   it('documents report scope, advisory preflight and proportional source grounding', async () => {
