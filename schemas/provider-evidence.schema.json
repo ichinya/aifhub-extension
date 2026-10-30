@@ -20,8 +20,8 @@
     "toolVersion": { "type": ["string", "null"], "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
     "commandContract": { "oneOf": [{ "type": "null" }, { "type": "object", "additionalProperties": false,
       "required": ["id", "version", "source"], "properties": {
-        "id": { "const": "aifhub.hlv-cli" }, "version": { "const": "1.0.0" },
-        "source": { "const": "https://github.com/lee-to/hlv/tree/v1.0.0" }
+        "id": { "const": "aifhub.hlv-cli" }, "version": { "const": "1.1.0" },
+        "source": { "const": "https://github.com/lee-to/hlv/tree/v1.1.0" }
       } }] },
     "provenance": { "type": "object", "additionalProperties": false,
       "required": ["boundary", "source", "policyDigest"], "properties": {

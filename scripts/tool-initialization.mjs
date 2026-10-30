@@ -47,7 +47,7 @@ function result(options, state, layout = null, error = null) {
     operations: ['created', 'would-create', 'preserved'].includes(state)
       ? [{ action: state === 'preserved' ? 'preserve' : state === 'created' ? 'create' : state, target }] : [],
     warnings: [], errors: error === null ? [] : [{ code: `hlv-init-${error}`,
-      message: `HLV project initialization could not complete (${error}). Fresh setup requires installed HLV 1.0.0; existing projects are reused and incomplete layouts need repair before retrying.` }] };
+      message: `HLV project initialization could not complete (${error}). Fresh setup requires installed HLV 1.1.0; existing projects are reused and incomplete layouts need repair before retrying.` }] };
 }
 
 export async function initializeHlvProject(options = {}) {

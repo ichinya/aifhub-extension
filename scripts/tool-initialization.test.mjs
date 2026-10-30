@@ -6,6 +6,7 @@ import os from 'node:os';
 import { initializeEnabledTools, syncArtifacts, switchToAiFactoryMode, switchToOpenSpecMode } from './aif-artifact-sync.mjs';
 import { runModeCommand } from './aif-mode.mjs';
 import { initializeHlvProject, inspectHlvLayout } from './tool-initialization.mjs';
+import { HLV_COMMAND_CONTRACT } from './hlv-provider.mjs';
 
 const roots = [];
 afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true, maxRetries: 5 }); });
@@ -20,7 +21,7 @@ async function put(root, relative, text) {
   await mkdir(path.dirname(target), { recursive: true });
   await writeFile(target, text);
 }
-function nativeFixture(calls, version = '1.0.0') {
+function nativeFixture(calls, version = HLV_COMMAND_CONTRACT.toolVersion) {
   return async (executable, args, options) => {
     calls.push(args);
     assert.equal(executable, 'hlv');
@@ -89,7 +90,7 @@ test('unsupported CLI, failed process, ambiguous or partial layouts never report
   assert.equal((await initializeHlvProject({ rootDir, runProcess: nativeFixture([], '0.3.0') })).ok, false);
   await assert.rejects(stat(path.join(rootDir, '.hlv')));
   const failure = await initializeHlvProject({ rootDir, runProcess: async (_, args) => args[0] === '--version'
-    ? { outcome: 'completed', exitCode: 0, stdout: 'hlv 1.0.0', stderr: '' }
+    ? { outcome: 'completed', exitCode: 0, stdout: `hlv ${HLV_COMMAND_CONTRACT.toolVersion}`, stderr: '' }
     : { outcome: 'timeout', exitCode: null, stdout: 'private path', stderr: 'secret' } });
   assert.equal(failure.ok, false);
   assert.doesNotMatch(JSON.stringify(failure), /private|secret/);
