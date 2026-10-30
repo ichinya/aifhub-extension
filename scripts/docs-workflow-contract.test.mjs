@@ -1552,7 +1552,8 @@ describe('complete OpenSpec workflow documentation contract', () => {
     assertIncludes(contextPolicy, 'raw paths found in `index.json`', 'docs/context-loading-policy.md index boundary');
     assertNotIncludes(contextPolicy, 'Files in that directory are safe to delete', 'docs/context-loading-policy.md broad cleanup wording');
 
-    assertIncludes(canonicalSkill, 'version: "1.3.0"', 'skills/aif-mode/SKILL.md version');
+    // reason: aif-mode 1.3.0 -> 1.3.1 — HLV 1.1.0 instruction fix (patch increment per rules/skills.md)
+    assertIncludes(canonicalSkill, 'version: "1.3.1"', 'skills/aif-mode/SKILL.md version');
     assertIncludes(canonicalSkill, 'openspec-change-<safe-id>.md', 'skills/aif-mode/SKILL.md cleanup boundary');
     assertIncludes(canonicalSkill, 'normal bounded failure report', 'skills/aif-mode/SKILL.md failure-report exception');
     assertIncludes(canonicalSkill, 'selected `codex-app` runtime uses `$aif-mode`', 'skills/aif-mode/SKILL.md Codex invocation guidance');

@@ -6,7 +6,7 @@ disable-model-invocation: true
 allowed-tools: Read Write Grep Glob Bash(ai-factory aifhub-mode *) Bash(ai-factory aifhub-migrate-legacy-plans *) Bash(npm run validate) Bash(npm test)
 metadata:
   author: aifhub-extension
-  version: "1.3.0"
+  version: "1.3.1"
   category: workflow
 ---
 
