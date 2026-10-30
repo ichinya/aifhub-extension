@@ -699,15 +699,17 @@ async function inspectInjectionContracts(projectDir, manifest, flow) {
 
 
 // Real applyInjection() inserts the prepend after the upstream frontmatter, so
-// the injected file is not a contiguous upstream tail: compare everything
-// outside the single marker block with the exact upstream bytes.
-const escapeRegExp = value => value.replace(/[.*+?^${}()|[]\]/g, '\function assertInjectedUpstreamBytes');
+// the injected file is not a contiguous upstream tail: strip the single marker
+// block and require exact byte equality with the upstream bytes (rules gate R1:
+// a substring check would tolerate arbitrary extra content).
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 function assertInjectedUpstreamBytes(flow, code, upstreamBytes, installedBytes, markerStart, markerEnd, details) {
   const installed = installedBytes.toString('utf8');
-  const stripped = installed.replace(new RegExp(`${escapeRegExp(markerStart)}[\s\S]*?${escapeRegExp(markerEnd)}\s*`, 'g'), '');
-  // Upstream bytes must survive intact as one contiguous run; the installed
-  // file may legitimately carry a prefix (frontmatter, rendered wrapper).
-  assertContract(stripped.includes(upstreamBytes.toString('utf8')), flow, code, details);
+  const stripped = installed.replace(
+    new RegExp(`${escapeRegExp(markerStart)}[\\s\\S]*?${escapeRegExp(markerEnd)}\\s*`, 'g'),
+    ''
+  );
+  assertContract(stripped === upstreamBytes.toString('utf8'), flow, code, details);
 }
 
 async function inspectPromptLanguageContract(projectDir, extension, toolchain, flow) {
