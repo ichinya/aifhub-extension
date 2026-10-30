@@ -23,17 +23,18 @@ Use the built-in `/aif-plan` skill as the canonical planning entrypoint for this
 Resolve the artifact profile and parse the leading planning mode before creating a plan directory or writing any planning artifact.
 
 - Recognize only a command-position mode token: `fast`, `full`, or `ultra`. Remove that one leading token from the request body; preserve every later occurrence of those words byte-for-byte, including casing, punctuation, internal whitespace, and line breaks.
-- Absence of an explicit `ultra` token keeps the existing default, `fast`, or `full` behavior. Do not enable ultra from extension baseline metadata.
-- For explicit `ultra`, use the dependency-free shared resolver in `scripts/ai-factory-version-resolver.mjs` before any write. Resolution precedence is: injected test toolchain/version, then project-managed `.ai-factory.json.version`, then bounded CLI evidence only when the executable provenance is proven to match the same project installation.
+- Resolve `resolved_mode` with `resolveAiFactoryWorkflowMode()` from `scripts/ai-factory-version-resolver.mjs`: leading `fast`/`full`/`ultra` token > `workflow.plan_mode` (`ask|fast|full|ultra`) > `ask`. Invalid config emits bounded `WARN [ai-factory-workflow-mode-invalid]` and falls back to `ask`; never echo the invalid value. Interactive `ask` asks full/fast before dispatch. Handoff non-interactive mode resolves config first, then falls back from `ask` to `fast`. Do not enable ultra from extension baseline metadata.
+- For every resolved `ultra` (explicit token OR `workflow.plan_mode: ultra` without a token), call `resolveAiFactoryUltraSupport()` using the dependency-free shared resolver in `scripts/ai-factory-version-resolver.mjs` before any write. Resolution precedence is: injected test toolchain/version, then project-managed `.ai-factory.json.version`, then bounded CLI evidence only when the executable provenance is proven to match the same project installation.
+- `resolveAiFactoryWorkflowSupport(input, { command: 'plan', workflow, ...versionOptions })` combines mode resolution and this same read-only gate. A false `ok` is a no-write stop; it never authorizes persistence itself.
 - A global or PATH-only `ai-factory --version` is not authoritative. When stable project metadata exists, unverified global/PATH-only CLI evidence is ignored with a bounded `ai-factory-cli-provenance-unverified` warning and does not override the project version.
 - Missing, malformed, prerelease, unsupported `<2.18.0`, or provenance-matched CLI/project mismatch results fail closed and create no plan, change, bundle, companion, runtime-state, or research artifact.
 - On that failure emit only a bounded diagnostic with `mode`, `profile`, `version`, `source`, and stable `code`, followed by the actionable handoff `/aif-plan full <request>`. Never include the request body, research body, provider output, credentials, raw stdout, or raw stderr in the diagnostic.
 
-For stable AI Factory `>=2.18.0`, route explicit `ultra` by the resolved artifact profile:
+For stable AI Factory `>=2.18.0`, route resolved `ultra` by the resolved artifact profile:
 
 - In OpenSpec-native mode, `ultra` is a depth profile over the canonical OpenSpec change. Apply the upstream Ultra Detail Gate to exact files and symbols, ordered edits, contracts and data flow, failure handling, bounded logging, tests, acceptance criteria, rollback, and verification detail in `design.md` and `tasks.md`.
 - OpenSpec-native `ultra` still writes only `proposal.md`, `design.md`, `tasks.md`, and applicable delta specs. It MUST NOT create `index.md`, `phase-NN-*.md`, companion files, or an active standalone `<!-- aif:plan-mode:ultra -->` anywhere under the canonical change.
-- In legacy AI Factory-only mode, explicit `ultra` remains upstream-owned. Hand control to the upstream `aif-plan` ultra workflow before AIFHub classic companion normalization; do not create or synchronize a sibling classic plan or companion files.
+- In legacy AI Factory-only mode, resolved `ultra` remains upstream-owned (including explicit `/aif-plan ultra`). Hand control to the upstream `aif-plan` ultra workflow before AIFHub classic companion normalization; do not create or synchronize a sibling classic plan or companion files.
 
 ### Research and interface choices
 

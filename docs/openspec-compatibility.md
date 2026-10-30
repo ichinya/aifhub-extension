@@ -366,6 +366,73 @@ AI Factory 2.19 adds upstream-owned browser replay evidence under the same branc
 
 Branch-scoped `qa-check.md` and `browser-replay/` artifacts are not change-scoped AIFHub evidence. They cannot by themselves satisfy `/aif-verify`, `/aif-done`, `coverage.json`, rules evidence, `done-readiness.json`, `done.md`, or `openspec-archive.json`; no implicit bridge is registered.
 
+## AI Factory 2.20 Reviewed Release
+
+Reviewed baseline: опубликованный тег `2.20.0`, commit `c38ff6ffe183ccf39b01774be892fcf64d9169c1`, matching the npm `ai-factory@2.20.0` `gitHead`. Полный range `2.19.0...2.20.0`: **64 commits and 124 changed files**. Дата review: 2026-10-30. Предыдущий cumulative ledger 2.19/2.18 сохранён ниже и в prose `sources.ai-factory.notes`; диапазон `>=2.11.0 <3.0.0` и ultra boundary `>=2.18.0` не изменены.
+
+### AI Factory 2.20 surface audit
+
+| Material surface | Факты | Вердикт |
+|---|---|---|
+| `src/core/skill-targets.ts` (нов., 191) | `resolveSkillTargets` группирует по physical skillsDir; codex→`.agents/skills` при наличии `.agents/`; nested/linked/outside-project reject; `usesSharedCodexProfile` (codex/codex-app/universal) | **adapter** (smoke пути из ledger; docs про миграцию) |
+| `src/core/skills-migration.ts` (нов., 787) | `withSkillProjectLock`, `prepareSkillTargets`, `preflightSkillMigration`, journal+recovery; доказательство ownership каждого файла «including injections or unknown files»; linked entries reject до каноникализации | **adapter** (пере-доказать сохранность маркеров; неизвестные файлы блокируют миграцию fail-closed) |
+| `src/core/installer.ts` (+511/−47) | shared skills в lifecycle ops, rollback preserve, `aif-loop` selection fix, `renderContext`, `installSkills` once-per-physical-target | **adapter** (поведенческая ре-проверка через temp-tree+smoke; манифест не менять) |
+| `src/core/extension-ops.ts` (+108/−38) | `withSkillProjectLock` на commit; `collectSkillOwners` (no duplicate basename; bundled name только через `replaces`); `assertNoConfiguredRuntimeOrphans`, `assertNoAgentFileConflicts`; rollback захватывает replaces+skills+**injection targets**; rollback-failure сохраняет backup; возвращает `customSkillInstalls` | **adapter** (ownership-аудит: наши aif-analyze/aif-done/aif-mode — не bundled имена, конфликтов нет; `replaces` отсутствует) |
+| `src/core/injections.ts` (+2/−2) | `stripInjectionsByExtensionName` сканирует `agent.skillsDir`+`configDir/workflows`+`configDir/rules` (был весь configDir); `applySingleExtensionInjections` — один проход на **группу** shared target | **retain** для контента инъекций; **adapter** через тесты кардинальности marker=1 на новом флоу |
+| `src/core/transformer.ts` (+26/−20) | удалён `simplifyFrontmatter`; universal→CodexTransformer на shared dir; antigravity identity→'default'; `getTransformer(agentId, targets)` | **no-op** (upstream-рендер; наши agentFiles — сырые .toml/.md) |
+| `src/core/template.ts` (+5/−4) | `home_skills_dir` для `.codex`/`.agents`; `~/{{skills_dir}}` pre-replace | **no-op** |
+| `src/core/config.ts` (+41/−23) | `ManagedSkillState` +`renderContextHash`/`rawInstalledHash`; `AGENT_IDS` import | **no-op** для smoke (managedSkills не ассертим), зафиксировать форму ledger |
+| `src/core/agents.ts` (+11/−7) | antigravity: `configDir: '.agents'`, `skillsDir: '.agents/skills'`, `agentsDir`, MCP, `.md` | **no-op** (наш runtime-скоуп codex+claude) |
+| `src/utils/fs.ts` (+27) | `removeEmptyDirBottomUp` | **no-op** |
+| `src/cli/commands/init.ts` (+116/−22) | `recoverSkillMigration`; `removeOwnedSkills` с surviving-consumers; Zero-Data-Loss для modified/untracked native files; `composeInstalledExtensionSkills` вместо per-agent `applyExtensionInjections` | **adapter** (init re-apply теперь compose → инвариант marker-once пере-доказывается) |
+| `src/cli/commands/update.ts` (+40/−12) | lock+`prepareSkillTargets`; grouped `updateSkills`; refreshed-replacement retention; `composeInstalledExtensionSkills`; `skill-not-selected` reason | **adapter** (тот же инвариант; reason codes расширены) |
+| `src/cli/commands/upgrade.ts` (+508/−16) | 1.0 flat migration, cross-agent skill-loss защита, YAML metadata protection | **retain no-op** (upgrade сознательно вне нашего harness — задокументировано `usage.md`) |
+| `src/cli/commands/extension.ts` (+15) | add/remove/update под `withSkillProjectLock`; `prepareSkillTargets` на remove/update | **adapter** (путь `extension update aifhub-extension --force` сохранён; наш post-update Commander-hook незатронут) |
+| `skills/aif-plan/SKILL.md` (+26/−27) | `workflow.plan_mode`, `resolved_mode`, leading fast/full/ultra > config > `ask`; Handoff non-interactive резолвит config до fast-fallback; hypothesis-cards consumption в research | **adapter** (гейт на resolved ultra, не только token) |
+| `skills/aif-explore/SKILL.md` (+34/−12) | `workflow.explore_mode`, новый leading `regular` token, hypothesis cards (opt-in), Coherence Gate теперь включает saved-card checks при enabled | **adapter** (гейт на resolved ultra + `regular` token; cards upstream-owned) |
+| `skills/aif-explore/references/PROJECT-HYPOTHESES.md`, `RETRY-HYPOTHESIS.md` (нов.), `ULTRA-RESEARCH-FORMAT.md` (+6/−1) | hypothesis card template, retry-пример | **retain** (upstream-owned; наш `## Confirmed brief` — отдельная секция, коексистит; сохранить ordering-клаузу) |
+| `skills/aif-improve/SKILL.md` (+7/−5) + CHECK-MODE/LIST-MODE | `workflow.improve_check`, `--no-check`, `check_enabled` | **retain** (наша инъекция `aif-improve-plan-folder.md` не имеет +check-логики — проверено `:1-202`) |
+| `skills/aif-review/SKILL.md` (+111/−14) | coverage-first findings, `(confidence: low|medium)` маркеры, **auto-`+check` dispatch по маркерам**, `review-validator` agent (tool-allowlist boundary — только Claude; на Codex auto-dispatch НЕ запускается → `review-validation-failed` gate), PR-SOURCE pinned evidence (SHA-pinned tree, `Bash(node *)`), `Review Sources` секция, taxonomy таблица | **retain** для инъекции (наши read-only/provider boundaries не конфликтуют; PR-mode pinned-tree — upstream-owned); **adapter** для smoke sentinel + docs о `review-validation-failed` |
+| `skills/aif-review/references/*` (PR-SOURCE.md нов. +61, pr-source.mjs +194, CHECK-MODE +62/−18, VALIDATOR +48/−8, SEVERITY +6) | upstream-owned | **retain no-op** |
+| `skills/aif/SKILL.md` (+1) + `references/config-template.yaml` (+15) + `update-config.mjs` (+1/−1) | managed keys `workflow.{explore_mode,plan_mode,improve_check}`; backfill defaults `regular/ask/false` при rerun | **adapter** (наш `skills/aif-analyze/references/config-template.yaml:107-124` не упоминает новые ключи — добавить документирующий комментарий per spec «omitted upstream optional … resolve through defaults») |
+| `skills/aif-distillation` (+10), `aif-reference` (+8) | hypothesis handoffs в `/aif-explore` | **retain no-op** |
+| `skills/aif-skill-generator/scripts/{cleanup-blocked-skill.py,security-scan.py}` | upstream helper scripts генератора скиллов | **retain no-op** (upstream-owned; AIFHub не потребляет) |
+| `skills/{aif-implement,aif-verify,aif-fix,aif-archive,aif-commit,aif-evolve,aif-roadmap,aif-rules-check,aif-architecture,aif-warmup,aif-qa-check}` | blob SHA идентичны 2.19.0 (проверено per-file) | **no-op** |
+| `skills/*/tests/*.yaml` (мн., −1 строка) | ai-tester 1.2 compat | **no-op** (в репо нет `.ai-tester.yaml`; `.ai-tester-tools` пуст) |
+| `subagents/antigravity/agents/*` (10 нов.), `subagents/{claude,codex}/agents/review-validator.{md,toml}` | antigravity 2.0 native agents; upstream review-validator | **no-op** (наши `aifhub-*` цели не коллидируют; upstream review-validator ≠ наш fresh-context-review — разные механизмы) |
+| `transformers/antigravity.ts` (+510/−66), e2e | Antigravity 2.0 | **no-op** для extension; зафиксировать как reviewed surface |
+| `schemas/extension.schema.json` | blob SHA `a82b8a0b` одинаков на 2.19.0 и 2.20.0 | **no-op** по контенту; **adapter** = пин URL |
+| `package.json` | version bump, test-scripts, knip ignore; Node `>=18`, bin, deps неизменны | **no-op** |
+| `plugin.json` (нов.) | agent-plugins.org manifest | **no-op** (upstream distribution) |
+| `docs/*` (extensions +13, configuration +134, config-reference +33, research +53, subagents +38, workflow +26, plan-files +12, skills +28, getting-started +10) | Shared Skill Targets секция, codex dirs + workflow defaults, hypothesis docs | **adapter** (наши docs: migration boundary, workflow defaults, review-validation-failed, hypothesis cards upstream-owned) |
+| `.github/ai-review/*`, `.ai-tester.yaml`, `AGENTS.md`, `.gitignore`, `scripts/test-*`, `scripts/simulate-*`, `docs/superpowers/*` | upstream repo infra | **no-op** |
+
+### Workflow defaults и ownership
+
+Leading plan `fast|full|ultra` или explore `regular|ultra` побеждает config. Без токена `workflow.plan_mode` = `ask|fast|full|ultra` (default `ask`), `workflow.explore_mode` = `regular|ultra` (default `regular`). Invalid config даёт bounded WARN и default. Interactive ask задаёт full/fast; Handoff non-interactive config разрешается до fast fallback. Любой resolved ultra, включая config-only, проходит provenance-aware version gate до записи; missing/malformed/prerelease/<2.18.0/matched CLI mismatch — fail-closed no-write. Leading `regular` отменяет configured ultra и возвращает regular save prompt. Поздние mode words остаются частью request/topic.
+
+`workflow.improve_check` (default false), `--no-check`, hypothesis cards (`PROJECT-HYPOTHESES.md`, opt-in), upstream review auto-`+check`, SHA-pinned PR tree и `review-validator` остаются upstream-owned. Наш отдельный `## Confirmed brief` вне Active Summary перед `## Sessions` коексистит с cards и не меняет coherence-before-bundle-integrity ordering. На Codex auto-validator не имеет Claude tool-allowlist boundary: review с confidence markers может завершиться `review-validation-failed`, blocking gate и `suggested_next: null`. Это не успех проверки и не повод обходить gate. `aifhub-fresh-context-review` использует отдельный export-package механизм; upstream validator его не заменяет.
+
+### Shared Codex migration boundary
+
+AI Factory 2.20.0 при наличии каталога `.agents/` переносит Codex skills из `.codex/skills` в `.agents/skills`; codex/codex-app/universal могут разделять physical target. Истина для consumer — ledger `.ai-factory.json`, `agents[].skillsDir`, а не имя runtime. AIFHub не реализует миграцию и не меняет bootstrap target: это docs-only boundary; smoke читает ledger. Upstream preflight требует ownership каждого файла, включая injections; unknown/modified файлы и linked entries блокируют migration fail-closed. Post-update prompt preservation остаётся отдельным слоем и не разрешает обход migration blocker. Rollback сохраняет injection targets; при rollback-failure upstream сохраняет backup.
+
+Ownership audit: `aif-analyze`, `aif-done`, `aif-mode` не bundled имена; `replaces` отсутствует; targets `aifhub-*` не коллидируют с upstream agents. `assertNoAgentFileConflicts`, `collectSkillOwners`, `assertNoConfiguredRuntimeOrphans` не требуют изменения manifest. Configured codex/claude runtime entries сохраняются.
+
+### Schema и release scope
+
+`extension.json.$schema` pinned к `https://raw.githubusercontent.com/lee-to/ai-factory/2.20.0/schemas/extension.schema.json`. Blob `a82b8a0b834df2047e71857476f72ed66c6472d7` byte-identical 2.19.0: локальная схема и её `$id` остаются неизменными. Floating `2.x` уже имеет другую схему; pin обновляется отдельным осознанным sync, не moving target. Extension version, MCP, commands, Node >=18 и зависимости не меняются.
+
+Lekalo v1.0.0/v1.1.0 публикует workflow + `lekalo install prompt` и LPAC-sandbox. Stub сознательно сохраняет `unsupported / protocol_unpublished` до отдельного issue адаптера: обновлено только обоснование, исполнения CLI нет.
+
+### Deferred post-#199 — следующий отдельный change после релиз-тега
+
+Ветка 2.x на момент research опережает тег на 72 commits и не является acceptance target. Deferred карта: PR #199 selective references (перенос sentinel gate в IMPLEMENT-TASK.md с сохранением count/tail/marker strength); #190 instruction manifests (digest follow-up); #195 runtime question contract (coherence review); #198 scoped tool permissions (canonical upstream + overlay review); #188 aif-skills-audit (не копировать); #187 requirement modality; #186/#192/#193/#194/#196/#197 technical writing/improve validator/security/evolve regression/API compatibility/evolve ownership. Lekalo adapter, OpenSpec 1.14–1.15 и hlv v1.1.0 — отдельные follow-up issues, номера не назначаются этим change. В текущем scope нет новых AIFHub copies upstream skills/references и нет адаптации Antigravity, ai-tester 1.2 или plugin.json.
+
+Smoke v220 использует тот же строгий SKILL.md sentinel set, что v219; installed upstream tail byte-equal и marker pair exactly 1. Live smoke — opt-in, без запуска NOTRUN; deterministic fixtures не доказывают live install, CI или production. См. [Usage](usage.md#ai-factory-220-workflow-defaults-and-consumer-smoke).
+
+Отдельная offline core matrix запускается без CLI/network: тест `scripts/ai-factory-2-20-core-contract.test.mjs` с переменной `AIFHUB_TEST_AI_FACTORY_220_ROOT=<built-exact-tag-tree>` (runtime — `node --test`). Она проверяет реальный `composeInstalledExtensionSkills`, shared targets, rollback, strip roots и migration blockers. Upstream prepend вставляется после frontmatter: matrix удаляет только известный marker block и требует точного byte equality с rendered baseline, без нормализации. Существующие raw-tail assertions consumer harness сохранены; их live-прохождение не заявляется.
+
 ## AI Factory 2.19 Reviewed Release
 
 AIFHub reviewed the published AI Factory `2.19.0` release: Git tag `v2.19.0` at commit [`e144f95c89de0d0cb6c9b38dbe8c2907b00dc5ce`](https://github.com/lee-to/ai-factory/commit/e144f95c89de0d0cb6c9b38dbe8c2907b00dc5ce), matching the npm `ai-factory@2.19.0` `gitHead` published 2026-09-10. The `2.18.1...2.19.0` range spans 15 commits and 32 changed files; the earlier 2026-09-01 review covered the pre-release snapshot `3c1ddd4740d7b1c30d8ecb3dc80fa5e7b8d7ef5a` declaring `2.19.0`, and the release adds 8 further commits across 22 files.

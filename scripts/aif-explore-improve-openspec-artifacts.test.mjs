@@ -149,7 +149,9 @@ describe('aif-explore and aif-improve OpenSpec-native contracts', () => {
     );
     for (const expected of [
       'before creating a file or directory',
-      'Remove only an explicit leading `ultra` token',
+      'Remove only an explicit leading `ultra` token or leading `regular` token',
+      'workflow.explore_mode: ultra',
+      'Leading `regular` overrides configured ultra and restores the upstream regular save prompt',
       'preserve every later occurrence of `ultra` in the topic byte-for-byte',
       'resolveAiFactoryUltraSupport()',
       'scripts/ai-factory-version-resolver.mjs',
@@ -158,7 +160,8 @@ describe('aif-explore and aif-improve OpenSpec-native contracts', () => {
       'CLI evidence only with proven matching project provenance',
       'unverified global/PATH-only CLI evidence is ignored with a bounded `ai-factory-cli-provenance-unverified` warning',
       'Missing, malformed, prerelease, unsupported `<2.18.0`, or provenance-matched CLI/project mismatch is a no-write stop',
-      'Recommend regular `/aif-explore <topic>`',
+      // reason: 2.20.0 workflow.explore_mode makes the plain command resolve ultra; the recovery command carries the regular token
+      'Recommend `/aif-explore regular <topic>`',
       'do not redirect this failure to `/aif-plan full`',
       'do not silently perform a regular research write'
     ]) {
@@ -180,7 +183,8 @@ describe('aif-explore and aif-improve OpenSpec-native contracts', () => {
         profile: 'regular',
         source: gate,
         clauses: [
-          'Regular `/aif-explore <topic>` writes only the resolved `paths.research` file',
+          // reason: under configured ultra the regular write needs the explicit token
+          'Regular `/aif-explore regular <topic>` writes only the resolved `paths.research` file',
           'It does not create a research bundle or change-scoped runtime note'
         ]
       },

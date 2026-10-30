@@ -22,15 +22,16 @@ Before resolving exploration inputs, read `.ai-factory/config.yaml` when it exis
 
 ### Research profile and AI Factory version gate
 
-Resolve `paths.research` and parse the command-position mode before creating a file or directory. Remove only an explicit leading `ultra` token; preserve every later occurrence of `ultra` in the topic byte-for-byte.
+Resolve `paths.research` and parse the command-position mode before creating a file or directory. Remove only an explicit leading `ultra` token or leading `regular` token; preserve every later occurrence of `ultra` in the topic byte-for-byte, and likewise every non-leading `regular`. Use `resolveAiFactoryWorkflowMode()` from `scripts/ai-factory-version-resolver.mjs` with command `explore`: leading `regular`/`ultra` > `workflow.explore_mode` (`regular|ultra`) > `regular`. Invalid config emits bounded `WARN [ai-factory-workflow-mode-invalid]` and regular fallback without echoing its value. Leading `regular` overrides configured ultra and restores the upstream regular save prompt; persistence still requires authorization.
 
-- Regular `/aif-explore <topic>` writes only the resolved `paths.research` file (default `.ai-factory/RESEARCH.md`). It does not create a research bundle or change-scoped runtime note.
-- Explicit `/aif-explore ultra <topic>` must call the shared dependency-free `resolveAiFactoryUltraSupport()` contract from `scripts/ai-factory-version-resolver.mjs` before any write. Use injected test toolchain/version first, then project `.ai-factory.json.version`, then CLI evidence only with proven matching project provenance.
+- Regular `/aif-explore regular <topic>` writes only the resolved `paths.research` file (default `.ai-factory/RESEARCH.md`). It does not create a research bundle or change-scoped runtime note.
+- Resolved `ultra` (explicit `/aif-explore ultra <topic>` OR `workflow.explore_mode: ultra` without a token) must call the shared dependency-free `resolveAiFactoryUltraSupport()` contract from `scripts/ai-factory-version-resolver.mjs` before any write. Use injected test toolchain/version first, then project `.ai-factory.json.version`, then CLI evidence only with proven matching project provenance.
+- `resolveAiFactoryWorkflowSupport(input, { command: 'explore', workflow, ...versionOptions })` combines mode resolution and this same read-only gate. A false `ok` is a no-write stop; regular mode still needs the upstream save prompt and persistence authorization.
 - When stable project metadata exists, unverified global/PATH-only CLI evidence is ignored with a bounded `ai-factory-cli-provenance-unverified` warning and does not override the project version.
-- Missing, malformed, prerelease, unsupported `<2.18.0`, or provenance-matched CLI/project mismatch is a no-write stop. Recommend regular `/aif-explore <topic>`; do not redirect this failure to `/aif-plan full` and do not silently perform a regular research write.
+- Missing, malformed, prerelease, unsupported `<2.18.0`, or provenance-matched CLI/project mismatch is a no-write stop. Recommend `/aif-explore regular <topic>`; do not redirect this failure to `/aif-plan full` and do not silently perform a regular research write.
 - The extension baseline version never enables ultra by itself.
 
-For explicit ultra on stable AI Factory `>=2.18.0`, derive exactly one bundle root without adding a config key:
+For resolved ultra on stable AI Factory `>=2.18.0`, derive exactly one bundle root without adding a config key:
 
 ```text
 research_bundles_dir = <parent directory of resolved paths.research>/research/
@@ -79,6 +80,8 @@ The section carries the exact normalized five-dimension brief, its read-only aut
 The recorded brief must not contain credentials, tokens, raw provider output, private data, or private absolute paths. It must also not contain metadata-shaped lines that downstream research parsing reserves: any line starting with `Status:`, `Updated:`, or `Digest:`, any `aif:` marker comment, or any additional `## Confirmed brief` heading. Rewrite such content as plain prose inside the brief; a brief that cannot be expressed without reserved metadata lines is not persisted. A hash of sensitive content is not scrubbing. If removing sensitive or reserved content materially changes the brief, do not persist a redacted body under the old confirmation: keep it in conversation context or obtain confirmation for the new exact safe brief.
 
 A later `/aif-explore` run treats this record as forwarded confirmation for the same scope only when its digest matches the newly derived normalized brief and the exact body, read-only authority, source/profile binding, and known confirmation provenance also match. A heading or valid digest alone creates no authority. Missing or uncertain provenance, changed content, or a digest mismatch returns to the appropriate unresolved-decision or confirmation-required flow. Any other content inherits no confirmation authority. Parent-forwarded exact binding remains required for autonomous/subagent re-entry.
+
+Hypothesis cards are upstream-owned opt-in via `PROJECT-HYPOTHESES.md`; do not copy, enable, or gate them here. The optional `## Confirmed brief` stays a separate section outside Active Summary before `## Sessions`, coexisting with optional upstream cards in their upstream-defined position. Both preserve the coherence-before-bundle-integrity ordering below.
 
 ### Upstream Research Coherence Gate pass-through
 

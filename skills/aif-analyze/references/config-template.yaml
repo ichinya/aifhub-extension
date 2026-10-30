@@ -105,6 +105,9 @@ utilities:
 # WORKFLOW SETTINGS
 # ============================================================================
 workflow:
+  # Upstream 2.20+ optional workflow.explore_mode / plan_mode / improve_check
+  # resolve through defaults regular / ask / false when omitted. Leading mode
+  # tokens override config; AIFHub gates every resolved ultra before any write.
   # Auto-create missing directories when needed
   auto_create_dirs: true
   

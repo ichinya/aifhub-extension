@@ -374,7 +374,7 @@ Research is supporting context in both artifact modes. Regular `/aif-explore <to
 `extension.json` follows the upstream AI Factory extension manifest schema and should not contain AIFHub-private fields. Its `$schema` value points at:
 
 ```text
-https://raw.githubusercontent.com/lee-to/ai-factory/2.x/schemas/extension.schema.json
+https://raw.githubusercontent.com/lee-to/ai-factory/2.20.0/schemas/extension.schema.json
 ```
 
 The private AIFHub metadata contract lives in `aifhub-extension.json` and is described by `schemas/aifhub-extension.schema.json`. `compat.ai-factory` and `sources.*` belong there, not in `extension.json`.
@@ -1229,6 +1229,24 @@ After migration, run:
 ```
 
 See [Legacy Plan Migration](legacy-plan-migration.md).
+
+## AI Factory 2.20 Workflow Defaults and Consumer Smoke
+
+Reviewed baseline — AI Factory `2.20.0`; cumulative [surface audit](openspec-compatibility.md#ai-factory-220-reviewed-release) сохраняет 2.19/2.18 decisions. Leading plan `fast|full|ultra` и explore `regular|ultra` побеждают `workflow.plan_mode` / `workflow.explore_mode`; omitted defaults — `ask` / `regular`, `workflow.improve_check: false`. Invalid defaults дают WARN + fallback; interactive ask предлагает full/fast, Handoff разрешает config до fast fallback. Config-only ultra проходит тот же stable `>=2.18.0` gate до записи. Leading `regular` отменяет configured ultra и восстанавливает save prompt. `--no-check` и improve_check остаются upstream-owned.
+
+При существующей `.agents/` upstream 2.20 мигрирует Codex `.codex/skills` → `.agents/skills`; фактические пути берутся из `.ai-factory.json` → `agents[].skillsDir`. Unknown/modified files и linked entries блокируют preflight fail-closed; сначала разрешите ownership конфликт, не обходите guard. AIFHub не управляет миграцией. Hypothesis cards остаются opt-in upstream; отдельный Confirmed brief не заменяет их.
+
+Upstream `review-validator`, auto-`+check` по confidence markers и pinned PR tree не заменяют `aifhub-fresh-context-review` export-package. На Codex результат `review-validation-failed` означает blocking gate с `suggested_next: null`, а не успешную validation; runtime tool-allowlist boundary upstream разрешает auto-dispatch только Claude.
+
+Offline harness поддерживает v218=2.18.1, v219=2.19.0 и v220=2.20.0; source v217=2.17.0. Ровно один target за запуск. v219/v220 сохраняют идентичные strict SKILL.md sentinels, настоящий ``Language: `en` (English)``, byte-equal upstream tail и marker pair exactly 1. Все installed skill paths, включая dummy extension и transfer, разрешаются через ledger.
+
+Opt-in live-driver (без скачивания, при явном разрешении live-run):
+
+```bash
+npm run smoke:ai-factory-2-18 -- --v217-command <absolute-node> --v217-arg <local-2.17.0-bin> --v217-root <local-2.17.0-root> --v220-command <absolute-node> --v220-arg <local-2.20.0-bin> --v220-root <local-2.20.0-root> --extension-root <local-extension-root>
+```
+
+`--v220-arg` повторяется для каждого argv token, как v218/v219. Ноль или несколько target groups дают NOT_RUN до записи. Live smoke в этом change: NOTRUN (opt-in); deterministic pass не доказывает published install, release, deployment или пользовательскую migration. Команда `upgrade` сознательно вне harness; `update --force` и targeted `extension update aifhub-extension --force` сохраняют свои роли.
 
 ## Mode Switching and Sync
 
