@@ -2150,7 +2150,8 @@ describe('OpenSpec-native prompt asset contract', () => {
       const asset = await readRepoFile(relativePath);
 
       for (const expected of [
-        'version: "1.3.0"',
+        // reason: aif-mode 1.3.0 -> 1.3.1 — HLV 1.1.0 instruction fix (patch increment)
+        'version: "1.3.1"',
         'Generated cleanup is confined',
         'openspec-change-<safe-id>.md',
         'openspec-merged-<safe-id>.md',
