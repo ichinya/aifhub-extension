@@ -88,7 +88,7 @@ describe('durable project review policy', () => {
     const configKeys = JSON.parse(await readRepoFile('skills/aif-analyze/references/config-keys.json'));
 
     for (const expected of [
-      // reason: 2.20.0 adaptation bumped aif-analyze 0.16.0 -> 0.17.0 (reviewed-version docs + config-template workflow keys note)
+      // reason: OpenSpec 1.15.0 adaptation bumped aif-analyze 0.16.0 -> 0.17.0 (reviewed-version documentation update to 1.15.0)
       'version: 0.17.0',
       '### Step 3.3: Project Review Policy',
       '`reviews.policy_file`',
