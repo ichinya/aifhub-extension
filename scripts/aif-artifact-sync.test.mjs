@@ -1347,8 +1347,10 @@ describe('artifact sync and export', () => {
     assert.equal(result.ok, true);
     assert.equal(detectionCalls.length, 1);
     assert.equal(detectionCalls[0].command, command);
-    assert.equal(showCalls.length, 1);
-    assert.equal(showCalls[0].options.command, command);
+    // reason: change sources derive from their delta files (#263); the explicit
+    // command propagates through detection and the canonical-side reads.
+    assert.equal(showCalls.length, 0);
+    assert.equal(result.generatedRules.openspecCli.command, command);
     assert.deepEqual(result.generatedRules.openspecCli, {
       available: true,
       canValidate: true,
