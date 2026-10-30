@@ -24,11 +24,11 @@ Before resolving exploration inputs, read `.ai-factory/config.yaml` when it exis
 
 Resolve `paths.research` and parse the command-position mode before creating a file or directory. Remove only an explicit leading `ultra` token or leading `regular` token; preserve every later occurrence of `ultra` in the topic byte-for-byte, and likewise every non-leading `regular`. Use `resolveAiFactoryWorkflowMode()` from `scripts/ai-factory-version-resolver.mjs` with command `explore`: leading `regular`/`ultra` > `workflow.explore_mode` (`regular|ultra`) > `regular`. Invalid config emits bounded `WARN [ai-factory-workflow-mode-invalid]` and regular fallback without echoing its value. Leading `regular` overrides configured ultra and restores the upstream regular save prompt; persistence still requires authorization.
 
-- Regular `/aif-explore <topic>` writes only the resolved `paths.research` file (default `.ai-factory/RESEARCH.md`). It does not create a research bundle or change-scoped runtime note.
+- Regular `/aif-explore regular <topic>` writes only the resolved `paths.research` file (default `.ai-factory/RESEARCH.md`). It does not create a research bundle or change-scoped runtime note.
 - Resolved `ultra` (explicit `/aif-explore ultra <topic>` OR `workflow.explore_mode: ultra` without a token) must call the shared dependency-free `resolveAiFactoryUltraSupport()` contract from `scripts/ai-factory-version-resolver.mjs` before any write. Use injected test toolchain/version first, then project `.ai-factory.json.version`, then CLI evidence only with proven matching project provenance.
 - `resolveAiFactoryWorkflowSupport(input, { command: 'explore', workflow, ...versionOptions })` combines mode resolution and this same read-only gate. A false `ok` is a no-write stop; regular mode still needs the upstream save prompt and persistence authorization.
 - When stable project metadata exists, unverified global/PATH-only CLI evidence is ignored with a bounded `ai-factory-cli-provenance-unverified` warning and does not override the project version.
-- Missing, malformed, prerelease, unsupported `<2.18.0`, or provenance-matched CLI/project mismatch is a no-write stop. Recommend regular `/aif-explore <topic>`; do not redirect this failure to `/aif-plan full` and do not silently perform a regular research write.
+- Missing, malformed, prerelease, unsupported `<2.18.0`, or provenance-matched CLI/project mismatch is a no-write stop. Recommend `/aif-explore regular <topic>`; do not redirect this failure to `/aif-plan full` and do not silently perform a regular research write.
 - The extension baseline version never enables ultra by itself.
 
 For resolved ultra on stable AI Factory `>=2.18.0`, derive exactly one bundle root without adding a config key:

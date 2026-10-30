@@ -697,6 +697,19 @@ async function inspectInjectionContracts(projectDir, manifest, flow) {
   return { count: entries.length, digest: stableJsonDigest(entries), entries };
 }
 
+
+// Real applyInjection() inserts the prepend after the upstream frontmatter, so
+// the injected file is not a contiguous upstream tail: compare everything
+// outside the single marker block with the exact upstream bytes.
+const escapeRegExp = value => value.replace(/[.*+?^${}()|[]\]/g, '\function assertInjectedUpstreamBytes');
+function assertInjectedUpstreamBytes(flow, code, upstreamBytes, installedBytes, markerStart, markerEnd, details) {
+  const installed = installedBytes.toString('utf8');
+  const stripped = installed.replace(new RegExp(`${escapeRegExp(markerStart)}[\s\S]*?${escapeRegExp(markerEnd)}\s*`, 'g'), '');
+  // Upstream bytes must survive intact as one contiguous run; the installed
+  // file may legitimately carry a prefix (frontmatter, rendered wrapper).
+  assertContract(stripped.includes(upstreamBytes.toString('utf8')), flow, code, details);
+}
+
 async function inspectPromptLanguageContract(projectDir, extension, toolchain, flow) {
   const reviewInjections = (extension.manifest.injections ?? []).filter((entry) => entry.target === PROMPT_LANGUAGE_TARGET);
   assertContract(
@@ -734,13 +747,10 @@ async function inspectPromptLanguageContract(projectDir, extension, toolchain, f
     readFile(sourcePolicyPath),
     readFile(configPath, 'utf8')
   ]);
-  const retainedBytes = installedBytes.subarray(Math.max(0, installedBytes.byteLength - upstreamBytes.byteLength));
-  assertContract(
-    installedBytes.byteLength >= upstreamBytes.byteLength && retainedBytes.equals(upstreamBytes),
-    flow,
-    'upstream-review-bytes-changed',
-    { target: PROMPT_LANGUAGE_TARGET }
-  );
+  assertInjectedUpstreamBytes(flow, 'upstream-review-bytes-changed', upstreamBytes, installedBytes,
+    `<!-- aif-ext:${EXTENSION_NAME}:${PROMPT_LANGUAGE_TARGET}:prepend:start -->`,
+    `<!-- aif-ext:${EXTENSION_NAME}:${PROMPT_LANGUAGE_TARGET}:prepend:end -->`,
+    { target: PROMPT_LANGUAGE_TARGET });
   assertContract(installedPolicyBytes.equals(sourcePolicyBytes), flow, 'packaged-language-policy-bytes-changed');
 
   const installed = installedBytes.toString('utf8');
@@ -802,13 +812,10 @@ async function inspectExploreUpstreamContract(projectDir, extension, toolchain, 
     readFile(upstreamPath),
     readFile(installedPath)
   ]);
-  const retainedBytes = installedBytes.subarray(Math.max(0, installedBytes.byteLength - upstreamBytes.byteLength));
-  assertContract(
-    installedBytes.byteLength >= upstreamBytes.byteLength && retainedBytes.equals(upstreamBytes),
-    flow,
-    'upstream-explore-bytes-changed',
-    { upstreamVersion: toolchain.expectedVersion }
-  );
+  assertInjectedUpstreamBytes(flow, 'upstream-explore-bytes-changed', upstreamBytes, installedBytes,
+    `<!-- aif-ext:${EXTENSION_NAME}:aif-explore:prepend:start -->`,
+    `<!-- aif-ext:${EXTENSION_NAME}:aif-explore:prepend:end -->`,
+    { upstreamVersion: toolchain.expectedVersion });
 
   const upstream = upstreamBytes.toString('utf8');
   const installed = installedBytes.toString('utf8');
@@ -869,13 +876,10 @@ async function inspectImplementUpstreamContract(projectDir, extension, toolchain
     readFile(upstreamPath),
     readFile(installedPath)
   ]);
-  const retainedBytes = installedBytes.subarray(Math.max(0, installedBytes.byteLength - upstreamBytes.byteLength));
-  assertContract(
-    installedBytes.byteLength >= upstreamBytes.byteLength && retainedBytes.equals(upstreamBytes),
-    flow,
-    'upstream-implement-bytes-changed',
-    { upstreamVersion: toolchain.expectedVersion }
-  );
+  assertInjectedUpstreamBytes(flow, 'upstream-implement-bytes-changed', upstreamBytes, installedBytes,
+    `<!-- aif-ext:${EXTENSION_NAME}:aif-implement:prepend:start -->`,
+    `<!-- aif-ext:${EXTENSION_NAME}:aif-implement:prepend:end -->`,
+    { upstreamVersion: toolchain.expectedVersion });
 
   const upstream = upstreamBytes.toString('utf8');
   const installed = installedBytes.toString('utf8');
@@ -1474,6 +1478,7 @@ async function runUpdateFlows(context) {
 }
 
 function applyFailure(result, error) {
+  if (process.env.QA_DEBUG && !(error instanceof SmokeFailure)) console.error('QA-DEBUG smoke error:', error && (error.stack || error));
   const failure = error instanceof SmokeFailure
     ? error
     : new SmokeFailure(SMOKE_STATUS.FAIL, 'internal', 'unexpected-smoke-error');
