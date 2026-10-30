@@ -2,6 +2,16 @@
 
 # OpenSpec Artifact Validation
 
+## Strict warnings in OpenSpec 1.14.x
+
+OpenSpec 1.15.0 preserves WARNING-level diagnostics as advisory without `--strict` (exit 0, valid true) and blocking with `--strict` (exit 1, valid false). Do not retry failed strict validation as non-strict to accept a change. Three new classes require author attention:
+
+- Since 1.14.0, unknown top-level `.openspec.yaml` keys warn. Known keys are `schema`, `created`, `goal`, `affected_areas`, `initiative`, `skip_specs`, `retire_capabilities`. Native AIFHub metadata remains recognized. Since 1.14.2, `/^x-\S+$/` keys are exempt, including structured or empty values; `X-Tracker`, `x-`, `x- tracker` are not exempt. `skip_design` is unsupported; preserve user metadata and explain the correction instead of stripping keys. Nested `initiative` keys have their own strict schema.
+- Since 1.14.1, ADDED requirement body text over 500 characters warns; the heading is excluded. Keep normative requirements concise, put examples and edge cases in scenarios. MODIFIED delta requirements are exempt; main-spec long requirements still warn. This is requirement-body length, not Purpose length.
+- Since 1.14.2, archive-unportable text warns: prose before the first `## ` section, prose before the first requirement in ADDED/MODIFIED, and content in unknown sections such as `## Notes`. Move explanatory prose into `proposal.md` or `design.md`, or into a real requirement. `## Purpose` is exempt; fenced headings do not create real sections. Orphan requirements outside delta sections have warned since 1.13.1.
+
+The [1.15.0 audit](openspec-1.15.0-audit.md) distinguishes source checkpoints from exact npm fixtures and confirms native skip/retirement metadata, x- extensions, boundary lengths and strict/non-strict outcomes.
+
 ## Validation findings and archive preflight in OpenSpec 1.12.0
 
 The default full JSON report keeps `items`, `summary`, `version`, and `root`. The optional bulk `--report findings` format instead returns `report`, `itemFindings`, `summary`, and `root`. It includes every item with an issue, including valid INFO-only or WARNING-only items; totals and exit status still cover the entire selected scope. An empty `itemFindings` array does not mean that no items were validated. An explicit bulk scope is required; item names and mixed archived/active scopes are rejected. AIFHub's per-change validator continues to request the full report and does not add this optional flag.

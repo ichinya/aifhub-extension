@@ -13,6 +13,7 @@ import {
 } from './openspec-runner.mjs';
 import { smokeOpenSpec112 } from './openspec-1-12-live-cases.mjs';
 import { smokeOpenSpec113 } from './openspec-1-13-live-cases.mjs';
+import { smokeOpenSpec115 } from './openspec-1-15-live-cases.mjs';
 
 const args = process.argv.slice(2);
 assert.equal(args.length, 2, 'Usage: node scripts/openspec-compatibility-live-smoke.mjs <installed-package-root> <verified-tarball>');
@@ -33,9 +34,39 @@ const pins = {
   '1.13.0': {
     integrity: 'sha512-1b1VbjELIUHPz8BLnkVxqPu4pAYS6BhfrLcmUIM7Bd0iJXQDvE+e/LBofE1kydegfxmG7R1xCMRXsl5VtZD+0w==',
     sha1: '5b124e7aafb6b539701a671e1fd015dac6b8bbf0', files: 389
+  },
+  '1.13.1': {
+    integrity: 'sha512-UHJSV2n6ohjfRaJLvi526avOohFS/orCjM+7JPgvDzuEJbCCkykKfP2fp3gcsvthDLeWolMRT5JAE08MSPnr8Q==',
+    sha1: '50fcb3d2fa8830a9fcdf036155fca4520d03dff1', files: 401
+  },
+  '1.13.2': {
+    integrity: 'sha512-HzBaN9C1/ET+tgm/pxbWQYY4Kf+X9/1MSVEGQ8ZT3g4ZpdHn6v82CHkN+zmt9qv98Ghw0MDpmURasjJD2f90bg==',
+    sha1: 'ae88d3667eff76495e517399b3e0385d9d6af009', files: 403
+  },
+  '1.14.0': {
+    integrity: 'sha512-V+zitRK918I6B3EIcYL3gVYoPoPgzknSxE1zL0zUQdbd4NsO5kbrxU5jVceuNNEznD94pbRPCvpCDIa6BeEaPA==',
+    sha1: 'ac2758566048099c1b5626ede3ab568772f8f5f9', files: 413
+  },
+  '1.14.1': {
+    integrity: 'sha512-IU9ggB7UYMDU47S0R59NH2ngJp+CK2X/r1B8+QU2Fm8LLBPFatQRO1Ia7B8nO3FHbTE7xRXAIs9NcuUF8Beeag==',
+    sha1: 'cf4c18ecda23818ae176ae41ba5a3741b18b641d', files: 429
+  },
+  '1.14.2': {
+    integrity: 'sha512-GgCphpZD5FHfk6IGjQPkUtz+pfeztWAz2yqODlSGqOzYHRPqfYQkSds1uY783AP0S5Kx0+HiyrISlJ5LqDcsrw==',
+    sha1: 'a3eae80c3e75d048d9d5cede4f395fe5c23ca157', files: 429
+  },
+  '1.14.3': {
+    integrity: 'sha512-ALFW1d5bSm6t27Kmcle93SDFuqUc8fLwy5ZdBfIiNffo0Yk9AEOJxw6xDqBv38eMM7l7TeOZBB/7C08luxYGfg==',
+    sha1: 'bf083ea41e0d2c0dbbef00ca0e4f8ca1fdd84881', files: 431
+  },
+  '1.15.0': {
+    integrity: 'sha512-lG/EPEiL22bB70yKJhWWSPk1UQGLnwO7Dp+hNc/jUmBwb0qxPLzHCUkXEfkny4iYDOsgnsNQmc39/g9QcvnBnA==',
+    sha1: '5f516375c1a340425677cb997dc8fc74954d2076', files: 441
   }
 }[pkg.version];
-assert.ok(pins, 'Only the exact reviewed 1.11.0, 1.12.0 and 1.13.0 packages are accepted');
+assert.ok(pins, 'Only exact checksum-pinned reviewed packages are accepted');
+assert.ok(['1.11.0', '1.12.0', '1.13.0', '1.15.0'].includes(pkg.version),
+  'Intermediate releases are source custody checkpoints; executable matrices are bound to 1.11/1.12/1.13/1.15 only');
 assert.equal(integrity, pins.integrity);
 assert.equal(createHash('sha1').update(tarball).digest('hex'), pins.sha1);
 assert.equal(pkg.name, '@fission-ai/openspec');
@@ -75,7 +106,11 @@ function invoke(root, argv, expectedExit = 0, json = true, prefix = []) {
     data = JSON.parse(result.stdout);
   }
   if (json) assert.equal(result.stderr, argv[0] === 'schema' ? 'Note: Schema commands are experimental and may change.\n' : '', `${argv.join(' ')} unexpected stderr`);
-  rows.push({ command: argv.join(' '), exitCode: result.status, jsonKeys: data ? Object.keys(data).sort() : null });
+  else {
+    assert.doesNotMatch(result.stderr, /\u001b\[|SyntaxError|ReferenceError|Unhandled|uncaught/i, `${argv.join(' ')} unexpected text stderr`);
+    if (argv[0] === '--version') assert.equal(result.stderr, '');
+  }
+  rows.push({ command: argv.join(' '), exitCode: result.status, jsonKeys: data ? Object.keys(data).sort() : null, stderr: result.stderr, fixture: path.basename(root) });
   return { ...result, data };
 }
 function requirement(name, action = `handle ${name.toLowerCase()} requests`) {
@@ -109,7 +144,7 @@ function inventory(root) {
 async function adapter(label, operation, root, extra = {}, expected = true) {
   const result = await operation({ command, cwd: root, env, ...extra });
   assert.equal(result.ok, expected, `${label}: ${result.stdout}\n${result.stderr}`);
-  rows.push({ adapter: label, exitCode: result.exitCode, ok: result.ok });
+  rows.push({ adapter: label, exitCode: result.exitCode, ok: result.ok, stderr: result.stderr });
   return result;
 }
 
@@ -117,7 +152,12 @@ try {
   // Bind the executable bytes to the verified archive, not only its version string.
   const extracted = path.join(scratch, 'package-snapshot');
   mkdirSync(extracted);
-  const unpack = spawnSync('tar', ['-xzf', tarballPath, '-C', extracted], { encoding: 'utf8', timeout: 60000 });
+  const unpack = spawnSync('tar', [
+    '-xzf', tarballPath,
+    // bsdtar on Windows treats a colon-prefixed archive path as a remote host.
+    ...(process.platform === 'win32' ? ['--force-local'] : []),
+    '-C', extracted
+  ], { encoding: 'utf8', timeout: 60000 });
   assert.ifError(unpack.error);
   assert.equal(unpack.status, 0, unpack.stderr);
   const packedFiles = inventory(path.join(extracted, 'package'));
@@ -156,7 +196,7 @@ try {
   // 1.12 reports the missing base as INFO; strict validation still passes.
   const missingValidation = invoke(root, ['validate', 'missing-base', '--type', 'change', '--strict', '--json']).data;
   assert.equal(missingValidation.items[0].valid, true);
-  if (['1.12.0', '1.13.0'].includes(pkg.version)) {
+  if (['1.12.0', '1.13.0', '1.15.0'].includes(pkg.version)) {
     assert.ok(missingValidation.items[0].issues.some((issue) => issue.level === 'INFO'
       && issue.path === 'nested/missing/spec.md' && /Archive would refuse/.test(issue.message)));
   } else assert.deepEqual(missingValidation.items[0].issues, []);
@@ -289,8 +329,11 @@ try {
   invoke(agentsRoot, ['update', '--force'], 0, false);
   assert.deepEqual(readFileSync(path.join(agentsRoot, '.agents/skills/openspec-explore/SKILL.md')), sharedSkill);
   assert.equal(readFileSync(path.join(agentsRoot, '.agents/skills/aifhub-sentinel/SKILL.md'), 'utf8'), '# User-owned AIFHub sentinel\n');
-  if (['1.12.0', '1.13.0'].includes(pkg.version)) {
+  if (['1.12.0', '1.13.0', '1.15.0'].includes(pkg.version)) {
     await smokeOpenSpec112({ project, put, change, spec, requirement, invoke, inventory, adapter, scratch });
+  }
+  if (pkg.version === '1.15.0') {
+    await smokeOpenSpec115({ project, put, change, spec, requirement, invoke, inventory, adapter, scratch, packageRoot });
   }
   if (pkg.version === '1.13.0') {
     await smokeOpenSpec113({ project, put, change, spec, requirement, invoke, inventory, adapter });

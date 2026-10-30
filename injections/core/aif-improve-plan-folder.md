@@ -92,6 +92,8 @@ When refining an OpenSpec-native change, audit normalized task quality across th
 - `tasks.md` for an executable checklist whose task descriptions state how completion is verified
 - `specs/**/spec.md` for behavior deltas
 
+For OpenSpec 1.14.x/1.15.0 strict validation, keep ADDED requirement body text at most 500 characters (heading excluded); put examples and edge cases in scenarios, explanatory prose in proposal.md or design.md, and use durable requirement/scenario names. MODIFIED delta bodies and `## Purpose` have separate upstream rules. Do not add unsupported `.openspec.yaml` keys such as `skip_design`; preserve user metadata and explain unknown-key findings instead of stripping it. Keep delta prose inside recognized sections; valid lowercase `x-` metadata extensions are exempt since 1.14.2.
+
 For a new capability, refine its delta's `## Purpose` into a meaningful description before first sync/archive. An existing main spec's Purpose is not replaced by a delta's Purpose: if strict validation reports a placeholder, record the affected accepted-spec path and bounded direct remediation instead of manufacturing a requirement delta. Do not rewrite archived changes to clear historical placeholders.
 
 Classify open questions as `blocker`, `warn`, or `info` when useful, without requiring classification in trivial changes or forcing a specific table format.

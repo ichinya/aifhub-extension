@@ -26,12 +26,12 @@ AI Factory = execution runtime
 
 AI Factory-only workflows follow AI Factory's runtime support. OpenSpec validation/archive follows the OpenSpec CLI runtime requirement.
 
-## OpenSpec 1.13.0 Reviewed Baseline
+## OpenSpec 1.15.0 Reviewed Baseline
 
-AIFHub metadata records OpenSpec `1.13.0` as the latest reviewed upstream baseline while keeping the supported stable CLI range `>=1.3.1 <2.0.0`.
+AIFHub metadata records OpenSpec `1.15.0` as the latest reviewed upstream baseline while keeping the supported stable CLI range `>=1.3.1 <2.0.0`.
 
 - Baseline `1.3.1` is the first supported and reviewed release.
-- Reviewed stable releases: `1.3.1`, `1.4.0`, `1.4.1`, `1.5.0`, `1.6.0`, `1.7.0`, `1.8.0`, `1.9.0`, `1.10.0`, `1.11.0`, `1.12.0`, `1.13.0`.
+- Reviewed stable releases: `1.3.1`, `1.4.0`, `1.4.1`, `1.5.0`, `1.6.0`, `1.7.0`, `1.8.0`, `1.9.0`, `1.10.0`, `1.11.0`, `1.12.0`, `1.13.0`, `1.13.1`, `1.13.2`, `1.14.0`, `1.14.1`, `1.14.2`, `1.14.3`, `1.15.0`.
 - Reviewed prereleases: `1.6.0-beta.1`. A prerelease review does not imply production support; prerelease detection remains unavailable for production capabilities.
 
 | Release | Channel | Adapter result | Checked AIFHub surfaces | Required adaptation |
@@ -48,11 +48,24 @@ AIFHub metadata records OpenSpec `1.13.0` as the latest reviewed upstream baseli
 | `1.10.0` | stable | supported | checksum-verified exact CLI version/validate/status/show/instructions matrix, Store-root specs instructions, no-spec schema scaffolding, stderr output hygiene, blocked-retirement diagnostics, and archive no-mutation | advance reviewed metadata, mirror inline task verification in AIFHub plan/refinement prompts, and preserve open envelopes, fail-closed diagnostics, native `skip_specs`, and upstream ownership |
 | `1.11.0` | stable | supported | exact CLI adapter matrix, show diff, sorted batch diagnostics, strict Purpose remediation, archive rename order, schema default rollback and Antigravity shared-root fixtures | advance reviewed metadata, author meaningful new-capability Purpose, document direct accepted-spec remediation; optional commands and generated tools stay upstream-owned |
 | `1.12.0` | stable | supported | checksum-bound adapter matrix, full/findings reports, strict INFO and archive refusal, I/O failure, .gitkeep and SourceCraft fixtures | advance reviewed metadata and ground planning in repository evidence; full per-change reports and archive failure semantics remain intact |
-| `1.13.0` | stable | supported with documented show limitation | checksum-bound matrix, apply warnings/prerequisites, repeated sections, CommonMark removal/rename, fenced archive content and wrapped retirement | surface advisory warnings, ignore fenced coverage headings, advance reviewed metadata; show JSON is not an exhaustive repeated-section inventory |
+| `1.13.0` | stable | supported (historical exact-version residual) | checksum-bound matrix, apply warnings/prerequisites, repeated sections, CommonMark removal/rename, fenced archive content and wrapped retirement | surface advisory warnings, ignore fenced coverage headings, advance reviewed metadata; exact-1.13.0 show residual resolved upstream in 1.13.1 |
+| `1.13.1` | stable | supported | cumulative source checkpoint; source-reviewed, executable regressions replayed on 1.15.0 | show residual resolved upstream in 1.13.1 |
+| `1.13.2` | stable | supported | cumulative source checkpoint; source-reviewed, executable regressions replayed on 1.15.0 | see cumulative 1.15.0 audit |
+| `1.14.0` | stable | supported | cumulative source checkpoint; source-reviewed, executable regressions replayed on 1.15.0 | see cumulative 1.15.0 audit |
+| `1.14.1` | stable | supported | cumulative source checkpoint; source-reviewed, executable regressions replayed on 1.15.0 | see cumulative 1.15.0 audit |
+| `1.14.2` | stable | supported | cumulative source checkpoint; source-reviewed, executable regressions replayed on 1.15.0 | see cumulative 1.15.0 audit |
+| `1.14.3` | stable | supported | cumulative source checkpoint; source-reviewed, executable regressions replayed on 1.15.0 | see cumulative 1.15.0 audit |
+| `1.15.0` | stable | supported reviewed baseline | cumulative source checkpoint; checksum-bound exact npm CLI matrix | see cumulative 1.15.0 audit |
+
+### Exact 1.15.0 Custody and Evidence Boundary
+
+The [1.15.0 audit](openspec-1.15.0-audit.md) records seven independent Git/npm checkpoints for 1.13.1–1.15.0 and the checksum-bound exact npm 1.15.0 CLI matrix. The repeated-section show residual is resolved upstream in 1.13.1 and verified on exact 1.15.0, including additive requirement/scenario `name`. New WARNING-level diagnostics fail strict validation: unknown top-level metadata (valid `x-` extensions exempt since 1.14.2), ADDED requirement bodies over 500 characters (1.14.1; MODIFIED exempt), and text that archive would not carry into main specs (1.14.2; Purpose exempt). See [authoring guidance](openspec-validation.md#strict-warnings-in-openspec-114x). Older supported CLI retain validate/archive capabilities with advisory `versionOutdated: true`; the supported range and Node floor are unchanged.
+
+OpenSpec 1.15.0 standalone install provides binaries and SHA256SUMS as a separate upstream distribution channel. AIFHub resolves an explicit executable, project-local `node_modules/.bin/openspec[.cmd]`, then PATH, and runs it as a process. It does not install binaries or detect install-type; `openspec version`, `openspec install` and `update --dry-run` remain upstream-owned. AIFHub runner still requires Node `>=20.19.0` because it is an `.mjs` process. Standalone binaries are outside the npm executable custody matrix.
 
 ### Exact 1.13.0 Custody and Evidence Boundary
 
-The [1.13.0 audit](openspec-1.13.0-audit.md) records issue #198, exact Git/npm custody and executable regressions. Apply `warnings` and `missingPrerequisites` are additive: `state: ready` or `all_done` can coexist with a missing-spec warning. AIFHub preserves the full envelope and surfaces string warnings as `openspec-apply-warning` diagnostics without changing upstream state or replacing artifact validation. Coverage ignores fenced example headings while retaining repeated real sections. Exact 1.13.0 `show --deltas-only --json` omits later repeated sections even though archive applies them; canonical filesystem artifacts remain the coverage source. Generated workflows, init/update and Stores remain upstream-owned.
+The [1.13.0 audit](openspec-1.13.0-audit.md) records issue #198, exact Git/npm custody and executable regressions. Apply `warnings` and `missingPrerequisites` are additive: `state: ready` or `all_done` can coexist with a missing-spec warning. AIFHub preserves the full envelope and surfaces string warnings as `openspec-apply-warning` diagnostics without changing upstream state or replacing artifact validation. Coverage ignores fenced example headings while retaining repeated real sections. Exact 1.13.0 `show --deltas-only --json` omitted repeated-section deltas even though archive applied them; this residual was resolved upstream in 1.13.1 and exact 1.15.0 verifies both deltas. Canonical filesystem artifacts remain the coverage source. Generated workflows, init/update and Stores remain upstream-owned.
 
 ### Exact 1.12.0 Custody and Evidence Boundary
 
@@ -647,7 +660,7 @@ openspec:
   canArchive: boolean
   version: string | null
   supportedRange: ">=1.3.1 <2.0.0"
-  latestReviewedVersion: "1.13.0"
+  latestReviewedVersion: "1.15.0"
   versionOutdated: boolean | null
   requiresNode: ">=20.19.0"
 ```

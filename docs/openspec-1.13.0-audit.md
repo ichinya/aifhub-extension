@@ -55,6 +55,8 @@ Follow-up validation: both new regressions failed before the fix. Afterward, 162
 
 There is no tracked root accepted-spec corpus in this extension. Disposable synthetic fixtures are not accepted project requirements; no archived project evidence was rewritten.
 
+Follow-up: the repeated-section show residual was resolved upstream in 1.13.1; the [1.15.0 audit](openspec-1.15.0-audit.md) verifies completeness on the new exact package. The observations above remain historical exact-1.13.0 evidence.
+
 ## Reproduction and evidence limits
 
 Provision the exact npm package and tarball outside the checkout, with install lifecycle scripts disabled. Use an explicit physical Node executable and a matching child PATH when a version-manager link can change. Run:

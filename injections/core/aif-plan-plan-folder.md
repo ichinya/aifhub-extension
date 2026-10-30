@@ -123,6 +123,8 @@ If the task is docs/tooling-only and does not change product or workflow behavio
 
 When a behavior change removes the final requirement of a capability and the selected OpenSpec CLI is `>=1.8.0`, add native `retire_capabilities: true` to `openspec/changes/<change-id>/.openspec.yaml`, preserving the selected `schema` and other existing metadata. Do this only when the user's request explicitly authorizes capability retirement. Planning must not infer retirement merely because a `REMOVED` delta would leave the base capability empty. For an older supported CLI, record the required OpenSpec upgrade as a blocking archive prerequisite instead of writing unsupported retirement metadata.
 
+For OpenSpec 1.14.x/1.15.0 strict validation, keep ADDED requirement body text at most 500 characters (heading excluded); put examples and edge cases in scenarios, explanatory prose in proposal.md or design.md, and use durable requirement/scenario names. MODIFIED delta bodies and `## Purpose` have separate upstream rules. Do not add unsupported `.openspec.yaml` keys such as `skip_design`; preserve user metadata and explain unknown-key findings instead of stripping it. Keep delta prose inside recognized sections; valid lowercase `x-` metadata extensions are exempt since 1.14.2.
+
 #### Task Intake Normalization
 
 Before normalizing task content, preserve the explicit planning request as canonical raw source when one was supplied:
