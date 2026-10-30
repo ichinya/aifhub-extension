@@ -1224,22 +1224,24 @@ The fallback parser SHOULD NOT be used when CLI JSON is complete.
     }));
 
     assert.equal(result.ok, true);
-    assert.equal(result.mode, 'cli-json');
+    // reason: change sources derive from their delta files (#263) — the CLI
+    // canonical read by capability name would misattribute old requirement
+    // texts to the change delta. Base sources still prefer CLI JSON.
+    assert.equal(result.mode, 'mixed');
     assert.equal(detectionCalls.length, 1);
     assert.equal(detectionCalls[0].command, explicitCommand);
     assert.equal(result.openspecCli.command, explicitCommand);
     assert.equal(result.openspecCli.commandSource, 'explicit');
     assert.deepEqual(calls.map((call) => [call.itemName, call.options.deltasOnly]), [
-      ['billing', false],
-      ['auth', true]
+      ['billing', false]
     ]);
     assert.equal(calls.every((call) => call.options.command === explicitCommand), true);
 
     const mergedRules = await readGenerated(rootDir, 'openspec-merged-cli-rules.md');
     assert.match(mergedRules, /Requirement: CLI billing/);
-    assert.match(mergedRules, /Requirement: CLI auth/);
+    assert.match(mergedRules, /Requirement: Fallback Delta/);
     assert.doesNotMatch(mergedRules, /Fallback Base/);
-    assert.doesNotMatch(mergedRules, /Fallback Delta/);
+    assert.doesNotMatch(mergedRules, /CLI auth/);
   });
 });
 

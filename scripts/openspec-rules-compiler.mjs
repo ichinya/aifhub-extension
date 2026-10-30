@@ -1602,7 +1602,10 @@ async function readRuleSource(filePath, context) {
   let parseResult = null;
   let extractionMode = 'filesystem-fallback';
 
-  if (context.cli.available) {
+  // For change sources the delta file is the derivation source: the CLI reads
+  // the canonical spec by capability name and would attribute canonical
+  // requirements (old texts) to the change delta file (#263).
+  if (context.cli.available && context.kind !== 'change') {
     const cliResult = await tryReadRequirementsFromCli(capability, context);
     warnings.push(...cliResult.warnings);
 
