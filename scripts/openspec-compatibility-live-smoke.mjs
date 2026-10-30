@@ -152,7 +152,12 @@ try {
   // Bind the executable bytes to the verified archive, not only its version string.
   const extracted = path.join(scratch, 'package-snapshot');
   mkdirSync(extracted);
-  const unpack = spawnSync('tar', ['-xzf', tarballPath, '-C', extracted], { encoding: 'utf8', timeout: 60000 });
+  const unpack = spawnSync('tar', [
+    '-xzf', tarballPath,
+    // bsdtar on Windows treats a colon-prefixed archive path as a remote host.
+    ...(process.platform === 'win32' ? ['--force-local'] : []),
+    '-C', extracted
+  ], { encoding: 'utf8', timeout: 60000 });
   assert.ifError(unpack.error);
   assert.equal(unpack.status, 0, unpack.stderr);
   const packedFiles = inventory(path.join(extracted, 'package'));

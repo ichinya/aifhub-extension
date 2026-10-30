@@ -74,9 +74,9 @@ export async function smokeOpenSpec115(context) {
 
   const portability = project('115-portability');
   for (const [name, delta, pattern] of [
-    ['notes', '## Notes\nThis text would be lost.\n\n## ADDED Requirements\n' + requirement('Extra'), /section "## Notes"/],
-    ['pre-requirement', '## ADDED Requirements\nThis text would be lost.\n\n' + requirement('Extra'), /text before the first requirement/],
-    ['pre-section', 'This text would be lost.\n\n## ADDED Requirements\n' + requirement('Extra'), /text above the first/]
+    ['notes', '## Notes\nThis text would be lost.\n\n## ADDED Requirements\n' + requirement('Extra'), /Section "## Notes" is not carried into the main spec/],
+    ['pre-requirement', '## ADDED Requirements\nThis text would be lost.\n\n' + requirement('Extra'), /Text before the first requirement in "## ADDED Requirements" is not carried into the main spec/],
+    ['pre-section', 'This text would be lost.\n\n## ADDED Requirements\n' + requirement('Extra'), /Text above the first "## " section is not carried into the main spec/]
   ]) {
     const base = change(portability, name, delta);
     if (name === 'pre-section') put(portability, `${base}/specs/widgets/spec.md`, delta);
