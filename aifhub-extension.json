@@ -4,6 +4,13 @@
     "ai-factory": ">=2.11.0 <3.0.0"
   },
   "sources": {
+    "hlv": {
+      "url": "https://github.com/lee-to/hlv/tree/v1.1.0",
+      "version": "1.1.0",
+      "baselineVersion": "1.1.0",
+      "lastSync": "2026-10-30",
+      "notes": "Reviewed CLI contract aifhub.hlv-cli@1.1.0. Annotated tag v1.1.0 (941f0c671a28a7e23eafae45267e27123bbcdb81) resolves to commit f23d9622bc46124e6ea8462eceea01ee04edc4fd. Additive structural/execution-evidence fields remain upstream-owned; existing saved HLV evidence requires re-validation. See docs/hlv-1.1.0-audit.md for custody and execution limits."
+    },
     "ai-factory": {
       "url": "https://github.com/lee-to/ai-factory",
       "version": "2.20.0",

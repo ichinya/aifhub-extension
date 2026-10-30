@@ -23,7 +23,7 @@ The command may:
 - update `.ai-factory/config.yaml`
 - create skeleton directories
 - create `openspec/config.yaml` when missing
-- initialize a missing enabled HLV project through the bounded HLV 1.0.0 adopt adapter; preserve root/adopt project maps and existing source, contracts, milestones and instructions without native reinit
+- initialize a missing enabled HLV project through the bounded HLV 1.1.0 adopt adapter; preserve root/adopt project maps and existing source, contracts, milestones and instructions without native reinit
 - run legacy migration through `scripts/migrate-legacy-plans.mjs`
 - export compatibility legacy artifacts when explicitly requested
 - compile generated rules through `scripts/openspec-rules-compiler.mjs`

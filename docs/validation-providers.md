@@ -87,7 +87,7 @@ After enabled tool choices are saved, `/aif-analyze`, mode switches and artifact
 
 HLV initialization first inspects both `project.yaml` and `.hlv/project.yaml`. Existing root HLV projects (with `human/`, `validation/`, `llm/` or custom configured paths) are reused without creating `.hlv/`. Existing adopted projects are also reused. Neither path invokes native reinit, modifies the project map, nor rewrites contracts or milestones. Both markers together, malformed maps, unsafe paths and nonempty partial `.hlv/` layouts require repair instead of automatic overwrites.
 
-With neither marker present, [HLV 1.0.0 native adopt](https://github.com/lee-to/hlv/blob/v1.0.0/src/cmd/init.rs) runs `hlv init --adopt --path <root> --project <safe-project-name> --owner <safe-project-name> --agent agents --profile standard`. It keeps existing source in place, creates `.hlv/` with native project/contract/milestone scaffolding, creates missing shared agent skills and instructions, and appends `.hlv/index/` to `.gitignore`. Closed stdin selects native initial milestone and feature defaults. Existing root instructions and skill files are preserved. A missing/unsupported HLV executable or failed initializer is reported explicitly, with raw process output excluded. No project gates run during initialization, and initialization success is not validation PASS.
+With neither marker present, [HLV 1.1.0 native adopt](https://github.com/lee-to/hlv/blob/v1.1.0/src/cmd/init.rs) runs `hlv init --adopt --path <root> --project <safe-project-name> --owner <safe-project-name> --agent agents --profile standard`. It keeps existing source in place, creates `.hlv/` with native project/contract/milestone scaffolding, creates missing shared agent skills and instructions, and appends `.hlv/index/` to `.gitignore`. Closed stdin selects native initial milestone and feature defaults. Existing root instructions and skill files are preserved. A missing/unsupported HLV executable or failed initializer is reported explicitly, with raw process output excluded. No project gates run during initialization, and initialization success is not validation PASS.
 
 `init --dry-run` describes missing scaffolding without writes or provider commands; it does not claim CLI readiness. `status`, `doctor` and read-only done readiness never initialize anything. Before validation of a newly enabled tool, initialize its missing project once, then obtain the revision and run validation against that initialized state.
 
@@ -97,9 +97,9 @@ With neither marker present, [HLV 1.0.0 native adopt](https://github.com/lee-to/
 
 ## HLV compatibility
 
-The initial command adapter targets exact **HLV 1.0.0**, based on [the tagged CLI](https://github.com/lee-to/hlv/blob/v1.0.0/src/main.rs) and [check output](https://github.com/lee-to/hlv/blob/v1.0.0/src/cmd/check.rs). Other versions return `unsupported`, including 0.3.0 which lacks `doctor`. Detection accepts root `project.yaml` or adopt `.hlv/project.yaml`; both markers together are a configuration error. Symlink/junction and hard-link marker paths are rejected.
+The command adapter targets exact **HLV 1.1.0**, based on [the tagged CLI](https://github.com/lee-to/hlv/blob/v1.1.0/src/main.rs) and [check output](https://github.com/lee-to/hlv/blob/v1.1.0/src/cmd/check.rs). Other versions return `unsupported / tool_version`, including the previous 1.0.0 and 0.3.0 which lacks `doctor`. Detection accepts root `project.yaml` or adopt `.hlv/project.yaml`; both markers together are a configuration error. Symlink/junction and hard-link marker paths are rejected.
 
-| Adapter operation | HLV 1.0.0 command | Interpretation |
+| Adapter operation | HLV 1.1.0 command | Interpretation |
 | --- | --- | --- |
 | detect | `hlv --version` | Exact version, existing marker; no setup |
 | status | `hlv --root <root> status --json` | Bounded project-state summary |
@@ -111,7 +111,11 @@ The initial command adapter targets exact **HLV 1.0.0**, based on [the tagged CL
 
 There is no invented `hlv readiness` or `hlv trace export` command. Workflow next-action text is never executed. Native HLV trace exports are not a neutral OpenSpec-to-semantic graph; only their content identity is retained in public evidence, and their supplemental availability does not replace validation/readiness.
 
-HLV 1.0.0 does not publish a separately versioned CLI envelope. `commandContract: aifhub.hlv-cli@1.0.0` is the **AIFHub adapter's reviewed command contract**, not an invented upstream protocol version. Tool version and adapter contract identity are independent.
+HLV 1.1.0 does not publish a separately versioned CLI envelope. `commandContract: aifhub.hlv-cli@1.1.0` is the **AIFHub adapter's reviewed command contract**, not an invented upstream protocol version. Tool version and adapter contract identity are independent. Updating the contract's version/source invalidates saved HLV evidence from the previous contract: rerun validation before done/archive readiness can accept it, even when project source has not changed. AIFHub does not install or update the HLV executable; users with 1.0.0 must update it separately.
+
+HLV 1.1.0 adds `structural_only`, `structural_status` and `execution_evidence` to `check --json`, and `execution_evidence` to `status --json`. AIFHub ignores these extra fields and retains diagnostics/counts/strictness/exit-code agreement as the validation contract. EVD-001/010/020/030/040 use the existing diagnostic-code format: errors yield `fail`, warnings yield `warn`; `structural_status: passed` cannot override an EVD error. DOC-080 remains `unsupported`.
+
+Optional execution evidence configuration in `project.yaml`, evidence production through `hlv evidence snapshot`, `--structural-only`, and the upstream MCP surface remain HLV-owned. AIFHub does not write that section or invoke those commands/flags. If users configure execution evidence, missing/stale evidence errors block validation and consequently done/archive readiness until the upstream evidence is corrected. Warnings retain the existing non-blocking warning policy. See the [1.1.0 audit](hlv-1.1.0-audit.md) for tag/asset custody, fixture coverage and reproduction limits; the 1.0.0 native results below are historical evidence.
 
 ## Evidence and execution boundary
 

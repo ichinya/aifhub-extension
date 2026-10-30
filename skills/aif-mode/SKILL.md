@@ -153,7 +153,7 @@ Use this only as supplemental diagnostic context when available. It is optional,
 
 ### `init`
 
-Run `ai-factory aifhub-mode init --json` after enabling tools, or `init --dry-run --json` to preview. It creates only missing scaffolding for true tool switches, without changing the switches. OpenSpec gets its config and canonical directories. HLV reuses root `project.yaml` or `.hlv/project.yaml` unchanged, including custom paths and active milestones. When neither exists, invoke installed HLV 1.0.0 `init --adopt` with the standard profile and shared `--agent agents` skills. Existing source, instructions and skill files are preserved; native adopt appends its generated-index ignore rule. Missing binaries and ambiguous, incomplete or unsafe layouts are setup errors. Initialization does not install or update binaries, run project validation gates or supply validation evidence. See [optional tools](../shared/TOOLS.md).
+Run `ai-factory aifhub-mode init --json` after enabling tools, or `init --dry-run --json` to preview. It creates only missing scaffolding for true tool switches, without changing the switches. OpenSpec gets its config and canonical directories. HLV reuses root `project.yaml` or `.hlv/project.yaml` unchanged, including custom paths and active milestones. When neither exists, invoke installed HLV 1.1.0 `init --adopt` with the standard profile and shared `--agent agents` skills. Existing source, instructions and skill files are preserved; native adopt appends its generated-index ignore rule. Missing binaries and ambiguous, incomplete or unsafe layouts are setup errors. Initialization does not install or update binaries, run project validation gates or supply validation evidence. See [optional tools](../shared/TOOLS.md).
 
 ## References
 

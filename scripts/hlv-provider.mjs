@@ -2,8 +2,8 @@ import { digest, readProviderFile } from './provider-files.mjs';
 import { runProviderProcess } from './provider-process.mjs';
 
 export const HLV_COMMAND_CONTRACT = Object.freeze({
-  id: 'aifhub.hlv-cli', version: '1.0.0', toolVersion: '1.0.0',
-  source: 'https://github.com/lee-to/hlv/tree/v1.0.0',
+  id: 'aifhub.hlv-cli', version: '1.1.0', toolVersion: '1.1.0',
+  source: 'https://github.com/lee-to/hlv/tree/v1.1.0',
   operations: ['detect', 'status', 'doctor', 'validate', 'readiness', 'trace']
 });
 const STAGES = ['pending', 'verified', 'implementing', 'implemented', 'validating', 'validated'];
