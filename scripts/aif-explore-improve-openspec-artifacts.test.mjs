@@ -149,7 +149,9 @@ describe('aif-explore and aif-improve OpenSpec-native contracts', () => {
     );
     for (const expected of [
       'before creating a file or directory',
-      'Remove only an explicit leading `ultra` token',
+      'Remove only an explicit leading `ultra` token or leading `regular` token',
+      'workflow.explore_mode: ultra',
+      'Leading `regular` overrides configured ultra and restores the upstream regular save prompt',
       'preserve every later occurrence of `ultra` in the topic byte-for-byte',
       'resolveAiFactoryUltraSupport()',
       'scripts/ai-factory-version-resolver.mjs',

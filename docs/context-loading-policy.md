@@ -66,6 +66,10 @@ Consumer commands load these project context files when present:
 
 Consumer commands must not use bridge files such as `AGENTS.md`, `CLAUDE.md`, `QWEN.md`, or `AIFACTORY.md` as substitutes for configured context paths.
 
+## AI Factory 2.20 Context Boundaries
+
+Current reviewed baseline: `2.20.0`, with exact v220 consumer smoke alongside v218/v219. Workflow defaults resolve before ultra gating, including config-only ultra and leading explore regular override. Hypothesis cards remain upstream-owned opt-in and coexist with separate Confirmed brief outside Active Summary before Sessions. `workflow.improve_check` / `--no-check`, review auto-+check, upstream review-validator and pinned PR tree remain upstream-owned; Codex may return blocking `review-validation-failed`. This differs from AIFHub fresh-context export-package review. Codex installed paths come from ledger `agents[].skillsDir`, including shared `.agents/skills`; migration preflight owns unknown/modified/linked-file rejection. See [2.20 audit](openspec-compatibility.md#ai-factory-220-reviewed-release).
+
 ## AI Factory 2.19 Session Warmup
 
 The published AI Factory `2.19.0` release adds upstream `/aif-warmup` as a read-only session-start handoff. AIFHub does not copy, replace, or inject that skill.

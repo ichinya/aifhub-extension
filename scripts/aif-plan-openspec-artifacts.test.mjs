@@ -114,6 +114,9 @@ describe('aif-plan OpenSpec-native planning contract', () => {
 
     for (const expected of [
       'scripts/ai-factory-version-resolver.mjs',
+      'workflow.plan_mode: ultra',
+      'For every resolved `ultra`',
+      'leading `fast`/`full`/`ultra` token > `workflow.plan_mode`',
       'injected test toolchain/version',
       'project-managed `.ai-factory.json.version`',
       'only when the executable provenance is proven to match the same project installation',

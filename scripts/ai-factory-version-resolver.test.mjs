@@ -6,6 +6,9 @@ import {
   AI_FACTORY_ULTRA_MIN_VERSION,
   compareStableAiFactoryVersions,
   parseAiFactoryPlanRequest,
+  parseAiFactoryExploreRequest,
+  resolveAiFactoryWorkflowMode,
+  resolveAiFactoryWorkflowSupport,
   parseStableAiFactoryVersion,
   resolveAiFactoryUltraSupport,
   resolveAiFactoryVersion
@@ -251,5 +254,71 @@ describe('aif-plan request parsing', () => {
 
     assert.equal(parsed.modeToken, null);
     assert.equal(parsed.originalRequest, request);
+  });
+});
+
+describe('resolved workflow defaults before the ultra gate', () => {
+  it('honors leading tokens over config and preserves later words byte-for-byte', () => {
+    const request = 'Build  regular ultra.\r\nKeep full';
+    for (const command of ['plan', 'explore']) {
+      const tokens = command === 'plan' ? ['fast', 'full', 'ultra'] : ['regular', 'ultra'];
+      for (const token of tokens) {
+        const r = resolveAiFactoryWorkflowMode('/aif-' + command + ' ' + token + ' ' + request,
+          { command, workflow: { plan_mode: 'ultra', explore_mode: 'ultra' } });
+        assert.equal(r.resolvedMode, token);
+        assert.equal(r.source, 'explicit');
+        assert.equal(r.originalRequest, request);
+      }
+    }
+    assert.equal(parseAiFactoryExploreRequest('Study regular ultra').modeToken, null);
+    assert.equal(parseAiFactoryExploreRequest('$aif-explore regular regular ultra').originalRequest, 'regular ultra');
+  });
+
+  it('resolves config before Handoff fallback and warns only for an invalid used config', () => {
+    assert.equal(resolveAiFactoryWorkflowMode('Build').requiresModeQuestion, true);
+    assert.equal(resolveAiFactoryWorkflowMode('Build', { nonInteractive: true }).resolvedMode, 'fast');
+    for (const mode of ['fast', 'full', 'ultra']) {
+      const r = resolveAiFactoryWorkflowMode('Build', { nonInteractive: true, workflow: { plan_mode: mode } });
+      assert.equal(r.resolvedMode, mode);
+    }
+    for (const invalid of ['unknown-private-value', null, true, {}, 0]) {
+      for (const command of ['plan', 'explore']) {
+        const r = resolveAiFactoryWorkflowMode('Topic', { command, workflow: { plan_mode: invalid, explore_mode: invalid } });
+        assert.equal(r.resolvedMode, command === 'plan' ? 'ask' : 'regular');
+        assert.equal(r.warnings[0].code, 'ai-factory-workflow-mode-invalid');
+        assert.equal(JSON.stringify(r.warnings).includes('unknown-private-value'), false);
+      }
+    }
+  });
+
+  it('gates config-only ultra for plan and explore through the same provenance matrix', async () => {
+    for (const command of ['plan', 'explore']) {
+      for (const version of ['2.18.0', '2.19.0', '2.20.0', '2.17.0', '2.20', '2.20.0-rc.1', undefined]) {
+        const r = await resolveAiFactoryWorkflowSupport('Topic', { command,
+          workflow: { plan_mode: 'ultra', explore_mode: 'ultra' },
+          rootDir: ROOT_DIR, readFile: version === undefined ? missingMetadataReader : metadataReader(version) });
+        assert.equal(r.resolvedMode, 'ultra');
+        assert.equal(r.ok, ['2.18.0', '2.19.0', '2.20.0'].includes(version));
+        assert.ok(r.gate);
+      }
+      const mismatch = await resolveAiFactoryWorkflowSupport('Topic', { command,
+        workflow: { plan_mode: 'ultra', explore_mode: 'ultra' }, rootDir: ROOT_DIR, readFile: metadataReader('2.20.0'),
+        cliEvidence: { version: '2.19.0', provenanceMatchesProject: true } });
+      assert.equal(mismatch.ok, false);
+      const unverified = await resolveAiFactoryWorkflowSupport('Topic', { command,
+        workflow: { plan_mode: 'ultra', explore_mode: 'ultra' }, rootDir: ROOT_DIR, readFile: metadataReader('2.20.0'),
+        cliEvidence: { version: '2.19.0', commandSource: 'PATH' } });
+      assert.equal(unverified.ok, true);
+      assert.equal(unverified.gate.warnings[0].code, 'ai-factory-cli-provenance-unverified');
+    }
+  });
+
+  it('leading regular cancels configured ultra without reading runtime or enabling a write', async () => {
+    const r = await resolveAiFactoryWorkflowSupport('/aif-explore regular Topic ultra', { command: 'explore',
+      workflow: { explore_mode: 'ultra' }, readFile: () => { throw new Error('must not probe version'); } });
+    assert.equal(r.resolvedMode, 'regular');
+    assert.equal(r.ok, true);
+    assert.equal(r.gate, null);
+    assert.equal(r.originalRequest, 'Topic ultra');
   });
 });

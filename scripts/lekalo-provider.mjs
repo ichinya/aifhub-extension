@@ -1,8 +1,7 @@
-// Lekalo adapter. The upstream provider protocol is unpublished at v0.1.10, so
-// this adapter never spawns the lekalo CLI: detection and every operation fail
-// closed with unsupported / protocol_unpublished. The reserved command contract
-// and dispatch shape mirror hlv-provider.mjs so a published protocol only needs
-// changes in this file.
+// Lekalo v1.0.0/v1.1.0 publishes the workflow + `lekalo install prompt`
+// protocol and LPAC-sandbox. A real AIFHub adapter is deferred to a separate issue.
+// This intentional fail-closed stub never spawns the CLI and retains the stable
+// unsupported / protocol_unpublished result until that adapter is implemented.
 export const LEKALO_COMMAND_CONTRACT = Object.freeze({
   id: 'aifhub.lekalo-cli',
   version: '0.0.0',
@@ -12,9 +11,8 @@ export const LEKALO_COMMAND_CONTRACT = Object.freeze({
 });
 
 export async function detectLekalo(rootDir, config, options = {}) {
-  // No process spawn and no guessed capability commands: v0.1.10 recognizes
-  // inspect/impact/context only as unsupported stubs and publishes no versioned
-  // provider manifest to negotiate against.
+  // No process spawn or guessed negotiation; the published protocol requires
+  // a separately reviewed adapter, rather than enabling this stub implicitly.
   return { status: 'unsupported', reason: 'protocol_unpublished', version: null, layout: null };
 }
 

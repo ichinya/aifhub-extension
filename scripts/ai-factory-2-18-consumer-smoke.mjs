@@ -30,14 +30,21 @@ export const EXPECTED_AI_FACTORY_VERSIONS = Object.freeze({
   v217: '2.17.0',
   v218Boundary: AI_FACTORY_ULTRA_MIN_VERSION,
   v218: '2.18.1',
-  v219: '2.19.0'
+  v219: '2.19.0',
+  v220: '2.20.0'
 });
-export const CONSUMER_TARGET_KEYS = Object.freeze(['v218', 'v219']);
-export const AI_FACTORY_2190_RELEASE_SENTINELS = Object.freeze({
+export const CONSUMER_TARGET_KEYS = Object.freeze(['v218', 'v219', 'v220']);
+export const AI_FACTORY_RELEASE_SENTINELS = Object.freeze({
   implementReconciliationGate: 'Run the requirement consistency gate',
   implementConflictToken: 'ERROR [requirement-conflict]',
   qaCheckBrowserReplay: 'browser-replay',
   warmupSkillPath: 'skills/aif-warmup/SKILL.md'
+});
+// Retained export for callers of the historical v219 fixture contract.
+export const AI_FACTORY_2190_RELEASE_SENTINELS = AI_FACTORY_RELEASE_SENTINELS;
+export const RELEASE_SENTINELS_BY_TARGET = Object.freeze({
+  v219: AI_FACTORY_RELEASE_SENTINELS,
+  v220: AI_FACTORY_RELEASE_SENTINELS
 });
 export const AI_FACTORY_2181_EXPLORE_SENTINELS = Object.freeze({
   coherenceHeading: '#### Research Coherence Gate (all persisted modes)',
@@ -70,7 +77,7 @@ const CLASSIC_PLAN_ID = 'classic-smoke';
 const ULTRA_PLAN_ID = 'ultra-smoke';
 const SHARED_LANGUAGE_POLICY_PATH = 'skills/shared/LANGUAGE-POLICY.md';
 const PROMPT_LANGUAGE_TARGET = 'aif-review';
-const UPSTREAM_REVIEW_LANGUAGE_DEFAULT = 'Language: en';
+const UPSTREAM_REVIEW_LANGUAGE_DEFAULT = 'Language: `en` (English)';
 const UI_LANGUAGE_RESOLUTION_CLAUSE = 'Resolve user-facing prose language in this order: use a usable non-empty `language.ui`; otherwise preserve the current conversation language for this response only; use English only when that language is indeterminate. This rule overrides downstream generic English defaults; do not infer from OS locale or persist the inferred choice. On that hard-English fallback, add exactly one concise setup hint only when the output contract permits human-readable prose, before any required final machine-readable block; never add it inside or after `aif-gate-result`, and never alter exact handoffs, fixed commands, paths, keys/enums, or machine-only output.';
 
 const ARTIFACT_FIXTURES = Object.freeze({
@@ -538,6 +545,18 @@ function findCodexAgent(ledger, flow) {
   return agent;
 }
 
+async function consumerSkillsRoot(projectDir, flow) {
+  const agent = findCodexAgent(await readConsumerLedger(projectDir), flow);
+  const relative = agent.skillsDir;
+  assertContract(typeof relative === 'string' && relative.length > 0 && !path.isAbsolute(relative)
+    && !/^[A-Za-z]:/.test(relative) && !relative.replaceAll('\\', '/').split('/').includes('..'),
+    flow, 'unsafe-ledger-skills-dir');
+  const root = path.resolve(projectDir, relative);
+  assertContract(isWithin(projectDir, root) && root !== path.resolve(projectDir), flow, 'unsafe-ledger-skills-dir');
+  assertContract(isWithin(await realpath(projectDir), await realpath(root)), flow, 'unsafe-ledger-skills-dir');
+  return root;
+}
+
 async function assertCanonicalOpenSpecConfig(projectDir, flow) {
   const configPath = path.join(projectDir, '.ai-factory', 'config.yaml');
   assertContract(await exists(configPath), flow, 'missing-aif-config');
@@ -649,7 +668,7 @@ async function inspectInjectionContracts(projectDir, manifest, flow) {
     assertContract(false, flow, 'installed-prompt-reference-unresolved');
   }
   for (const injection of manifest.injections ?? []) {
-    const skillPath = path.join(projectDir, '.codex', 'skills', injection.target, 'SKILL.md');
+    const skillPath = path.join(await consumerSkillsRoot(projectDir, flow), injection.target, 'SKILL.md');
     assertContract(await exists(skillPath), flow, 'missing-injection-target', { target: injection.target });
     const content = await readFile(skillPath, 'utf8');
     const markerPair = inspectManagedMarkerPair(content, injection, flow);
@@ -688,7 +707,7 @@ async function inspectPromptLanguageContract(projectDir, extension, toolchain, f
   );
 
   const injection = reviewInjections[0];
-  const installedPath = path.join(projectDir, '.codex', 'skills', PROMPT_LANGUAGE_TARGET, 'SKILL.md');
+  const installedPath = path.join(await consumerSkillsRoot(projectDir, flow), PROMPT_LANGUAGE_TARGET, 'SKILL.md');
   const upstreamPath = path.resolve(toolchain.provenanceRoot, 'skills', PROMPT_LANGUAGE_TARGET, 'SKILL.md');
   const installedPolicyPath = path.join(
     projectDir,
@@ -776,7 +795,7 @@ async function inspectExploreUpstreamContract(projectDir, extension, toolchain, 
   const upstreamPath = path.resolve(toolchain.provenanceRoot, 'skills', 'aif-explore', 'SKILL.md');
   assertContract(isWithin(toolchain.provenanceRoot, upstreamPath), flow, 'unsafe-upstream-explore-source');
   assertContract(await exists(upstreamPath), flow, 'missing-upstream-explore-source');
-  const installedPath = path.join(projectDir, '.codex', 'skills', 'aif-explore', 'SKILL.md');
+  const installedPath = path.join(await consumerSkillsRoot(projectDir, flow), 'aif-explore', 'SKILL.md');
   assertContract(await exists(installedPath), flow, 'missing-installed-explore-skill');
 
   const [upstreamBytes, installedBytes] = await Promise.all([
@@ -843,7 +862,7 @@ async function inspectImplementUpstreamContract(projectDir, extension, toolchain
   const upstreamPath = path.resolve(toolchain.provenanceRoot, 'skills', 'aif-implement', 'SKILL.md');
   assertContract(isWithin(toolchain.provenanceRoot, upstreamPath), flow, 'unsafe-upstream-implement-source');
   assertContract(await exists(upstreamPath), flow, 'missing-upstream-implement-source');
-  const installedPath = path.join(projectDir, '.codex', 'skills', 'aif-implement', 'SKILL.md');
+  const installedPath = path.join(await consumerSkillsRoot(projectDir, flow), 'aif-implement', 'SKILL.md');
   assertContract(await exists(installedPath), flow, 'missing-installed-implement-skill');
 
   const [upstreamBytes, installedBytes] = await Promise.all([
@@ -868,9 +887,10 @@ async function inspectImplementUpstreamContract(projectDir, extension, toolchain
 
   let reconciliationGateCount = null;
   let conflictTokenCount = null;
-  if (toolchain.key === 'v219') {
-    reconciliationGateCount = countOccurrences(upstream, AI_FACTORY_2190_RELEASE_SENTINELS.implementReconciliationGate);
-    conflictTokenCount = countOccurrences(upstream, AI_FACTORY_2190_RELEASE_SENTINELS.implementConflictToken);
+  const sentinels = RELEASE_SENTINELS_BY_TARGET[toolchain.key];
+  if (sentinels) {
+    reconciliationGateCount = countOccurrences(upstream, sentinels.implementReconciliationGate);
+    conflictTokenCount = countOccurrences(upstream, sentinels.implementConflictToken);
     assertContract(reconciliationGateCount === 1, flow, 'upstream-implement-reconciliation-gate-mismatch', {
       count: reconciliationGateCount
     });
@@ -888,9 +908,10 @@ async function inspectImplementUpstreamContract(projectDir, extension, toolchain
   };
 }
 
-async function inspect219ReleaseSurface(toolchain, flow) {
+async function inspectReleaseSurface(toolchain, flow) {
+  const sentinels = RELEASE_SENTINELS_BY_TARGET[toolchain.key];
   const qaCheckPath = path.resolve(toolchain.provenanceRoot, 'skills', 'aif-qa-check', 'SKILL.md');
-  const warmupPath = path.resolve(toolchain.provenanceRoot, AI_FACTORY_2190_RELEASE_SENTINELS.warmupSkillPath);
+  const warmupPath = path.resolve(toolchain.provenanceRoot, sentinels.warmupSkillPath);
   assertContract(
     isWithin(toolchain.provenanceRoot, qaCheckPath) && isWithin(toolchain.provenanceRoot, warmupPath),
     flow,
@@ -899,7 +920,7 @@ async function inspect219ReleaseSurface(toolchain, flow) {
   assertContract(await exists(qaCheckPath), flow, 'missing-upstream-qa-check-skill');
   assertContract(await exists(warmupPath), flow, 'missing-upstream-warmup-skill');
   const qaCheck = (await readFile(qaCheckPath)).toString('utf8');
-  const browserReplayCount = countOccurrences(qaCheck, AI_FACTORY_2190_RELEASE_SENTINELS.qaCheckBrowserReplay);
+  const browserReplayCount = countOccurrences(qaCheck, sentinels.qaCheckBrowserReplay);
   assertContract(browserReplayCount >= 1, flow, 'upstream-qa-check-browser-replay-missing', {
     count: browserReplayCount
   });
@@ -910,7 +931,7 @@ async function inspectTransferInventory(projectDir, expectedCount, flow) {
   const ledger = await readConsumerLedger(projectDir);
   const codexAgent = findCodexAgent(ledger, flow);
   const recordedCount = (codexAgent.installedSkills ?? []).filter((entry) => entry === 'aif-transfer').length;
-  const fileCount = await exists(path.join(projectDir, '.codex', 'skills', 'aif-transfer', 'SKILL.md')) ? 1 : 0;
+  const fileCount = await exists(path.join(await consumerSkillsRoot(projectDir, flow), 'aif-transfer', 'SKILL.md')) ? 1 : 0;
   assertContract(recordedCount === expectedCount, flow, 'transfer-ledger-count-mismatch', { expectedCount, recordedCount });
   assertContract(fileCount === expectedCount, flow, 'transfer-file-count-mismatch', { expectedCount, fileCount });
   return { expectedCount, recordedCount, fileCount, owner: expectedCount === 1 ? 'upstream' : 'not-selected' };
@@ -920,7 +941,7 @@ async function assertAdapterInventory(projectDir, manifest, flow) {
   const adapters = [];
   for (const skillPath of manifest.skills ?? []) {
     const skillName = path.basename(normalizeManifestPath(skillPath));
-    const target = path.join(projectDir, '.codex', 'skills', skillName, 'SKILL.md');
+    const target = path.join(await consumerSkillsRoot(projectDir, flow), skillName, 'SKILL.md');
     assertContract(await exists(target), flow, 'missing-aifhub-adapter', { skillName });
     adapters.push(skillName);
   }
@@ -1090,7 +1111,7 @@ async function snapshotDummyState(projectDir) {
   assertContract(extensionRecord, 'targeted-update', 'missing-dummy-ledger');
   const trees = await snapshotTrees(projectDir, [
     `.ai-factory/extensions/${DUMMY_EXTENSION_NAME}`,
-    '.codex/skills/aifhub-smoke-dummy'
+    normalizeRelativePath(path.relative(projectDir, path.join(await consumerSkillsRoot(projectDir, 'targeted-update'), 'aifhub-smoke-dummy')))
   ]);
   assertContract(trees.entries.length > 0, 'targeted-update', 'missing-dummy-files');
   return {
@@ -1164,8 +1185,8 @@ async function runCleanInstallFlow(context) {
       toolchains.target,
       'clean-install'
     );
-    const releaseSurface = toolchains.target.key === 'v219'
-      ? await inspect219ReleaseSurface(toolchains.target, 'clean-install')
+    const releaseSurface = RELEASE_SENTINELS_BY_TARGET[toolchains.target.key]
+      ? await inspectReleaseSurface(toolchains.target, 'clean-install')
       : null;
     const transfer = await inspectTransferInventory(workspace.projectDir, 1, 'clean-install');
     const adapters = await assertAdapterInventory(workspace.projectDir, extension.manifest, 'clean-install');
@@ -1286,8 +1307,8 @@ async function runUpdateFlows(context) {
       toolchains.target,
       'global-update'
     );
-    const globalReleaseSurface = toolchains.target.key === 'v219'
-      ? await inspect219ReleaseSurface(toolchains.target, 'global-update')
+    const globalReleaseSurface = RELEASE_SENTINELS_BY_TARGET[toolchains.target.key]
+      ? await inspectReleaseSurface(toolchains.target, 'global-update')
       : null;
     const globalTransfer = await inspectTransferInventory(workspace.projectDir, 0, 'global-update');
     const globalAgents = await assertManagedAgentsMatchSource(workspace.projectDir, extension, 'global-update');
@@ -1398,8 +1419,8 @@ async function runUpdateFlows(context) {
       toolchains.target,
       'targeted-update'
     );
-    const targetedReleaseSurface = toolchains.target.key === 'v219'
-      ? await inspect219ReleaseSurface(toolchains.target, 'targeted-update')
+    const targetedReleaseSurface = RELEASE_SENTINELS_BY_TARGET[toolchains.target.key]
+      ? await inspectReleaseSurface(toolchains.target, 'targeted-update')
       : null;
     assertContract(
       targetedInjections.digest === targetedInjectionBaseline.digest,

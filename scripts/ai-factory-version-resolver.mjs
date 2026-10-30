@@ -83,6 +83,42 @@ export function parseAiFactoryPlanRequest(input) {
   };
 }
 
+export function parseAiFactoryExploreRequest(input) {
+  const rawInput = String(input ?? '');
+  let remaining = rawInput.replace(/^\s*/, '');
+  const invocation = /^(\/aif-explore|\$aif-explore|aif-explore)(?=$|\s)/.exec(remaining);
+  if (invocation) remaining = remaining.slice(invocation[0].length).replace(/^\s+/, '');
+  const mode = /^(regular|ultra)(?=$|\s)/.exec(remaining);
+  if (mode) remaining = remaining.slice(mode[0].length).replace(/^\s+/, '');
+  return { rawInput, invocationToken: invocation?.[1] ?? null, modeToken: mode?.[1] ?? null,
+    mode: mode?.[1] ?? 'default', originalRequest: remaining };
+}
+
+// Resolve upstream 2.20 defaults before deciding whether the ultra gate applies.
+// Receives parsed config; never reads config, writes artifacts, or logs request text.
+export function resolveAiFactoryWorkflowMode(input, options = {}) {
+  const command = options.command ?? 'plan';
+  if (!['plan', 'explore'].includes(command)) throw new TypeError('Unsupported workflow command.');
+  const request = command === 'plan' ? parseAiFactoryPlanRequest(input) : parseAiFactoryExploreRequest(input);
+  const key = command === 'plan' ? 'plan_mode' : 'explore_mode';
+  const fallback = command === 'plan' ? 'ask' : 'regular';
+  const allowed = command === 'plan' ? ['ask', 'fast', 'full', 'ultra'] : ['regular', 'ultra'];
+  const configured = options.workflow?.[key];
+  const valid = allowed.includes(configured);
+  const warnings = request.modeToken === null && configured !== undefined && !valid
+    ? [{ code: 'ai-factory-workflow-mode-invalid', key }] : [];
+  let resolvedMode = request.modeToken ?? (valid ? configured : fallback);
+  const source = request.modeToken ? 'explicit' : valid ? 'config' : 'default';
+  if (resolvedMode === 'ask' && options.nonInteractive === true) resolvedMode = 'fast';
+  return { ...request, resolvedMode, source, requiresModeQuestion: resolvedMode === 'ask', warnings };
+}
+
+export async function resolveAiFactoryWorkflowSupport(input, options = {}) {
+  const mode = resolveAiFactoryWorkflowMode(input, options);
+  const gate = mode.resolvedMode === 'ultra' ? await resolveAiFactoryUltraSupport(options) : null;
+  return { ...mode, ok: gate?.ok ?? true, gate };
+}
+
 export async function resolveAiFactoryVersion(options = {}) {
   const rootDir = path.resolve(options.rootDir ?? process.cwd());
   const injected = resolveInjectedVersion(options);
