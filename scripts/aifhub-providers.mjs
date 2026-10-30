@@ -66,7 +66,7 @@ export async function runProviders(options = {}) {
       provenance: { boundary: 'process-json', source: config.executable ? 'explicit-executable' : 'path',
         policyDigest: digest(JSON.stringify({ enable: config.enable, policy: config.policy, phases: config.phases, timeoutMs: config.timeoutMs,
           maxOutputBytes: config.maxOutputBytes, executableDigest: config.executable ? digest(config.executable) : null })) },
-      status: 'unsupported', reason: 'protocol_unpublished', operations: [], gate: null
+      status: 'unsupported', reason: 'not_detected', operations: [], gate: null
     };
     try {
       if (id === 'hlv') {
@@ -139,11 +139,12 @@ export async function runProviders(options = {}) {
       } else if (id === 'lekalo') {
         const detection = await detectLekalo(rootDir, config, options);
         evidence = { ...evidence, status: detection.status, reason: detection.reason,
-          toolVersion: detection.version, layout: detection.layout };
+          toolVersion: detection.version, layout: detection.layout,
+          commandContract: detection.status === 'pass'
+            ? { id: LEKALO_COMMAND_CONTRACT.id, version: LEKALO_COMMAND_CONTRACT.version, source: LEKALO_COMMAND_CONTRACT.source } : null };
         if (detection.status === 'pass') {
-          // The adapter contract is reserved; real Lekalo execution stays
-          // fail-closed until the upstream provider protocol is published.
-          for (const operation of PHASE_OPERATIONS[phase]) {
+          const operations = phase === 'implement' ? ['impact', 'context'] : PHASE_OPERATIONS[phase];
+          for (const operation of operations) {
             evidence.operations.push({ operation,
               ...await runLekaloOperation(operation, rootDir, config, options) });
           }

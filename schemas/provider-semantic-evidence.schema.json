@@ -12,8 +12,12 @@
         "severity": { "enum": ["error", "warning", "info"] }, "symbol": { "$ref": "#/$defs/ref" }
       } } },
     "impact": { "type": "array", "uniqueItems": true, "maxItems": 2000, "items": { "$ref": "#/$defs/ref" } },
-    "context": { "type": "object", "additionalProperties": false, "required": ["digest", "tokens"],
-      "properties": { "digest": { "$ref": "#/$defs/ref" }, "tokens": { "type": "integer", "minimum": 0, "maximum": 1000000 } } },
+    "complete": { "type": "boolean" },
+    "context": { "type": ["object", "null"], "additionalProperties": false, "required": ["digest", "tokens"],
+      "properties": { "digest": { "$ref": "#/$defs/ref" }, "tokens": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+        "complete": { "type": "boolean" }, "fits": { "type": "boolean" },
+        "minimumRequired": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+        "excluded": { "type": "integer", "minimum": 0, "maximum": 1000000 } } },
     "trace": { "type": "object", "additionalProperties": false, "required": ["schemaVersion", "links"], "properties": {
       "schemaVersion": { "const": "1.0.0" },
       "links": { "type": "array", "maxItems": 2000, "items": { "type": "object", "additionalProperties": false,

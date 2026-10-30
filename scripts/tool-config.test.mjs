@@ -107,14 +107,14 @@ test('false prevents stale OpenSpec files from selecting done or writing runtime
   await assert.rejects(stat(path.join(rootDir, '.ai-factory/qa')));
 });
 
-test('reserved Lekalo switch reports unsupported without executing guessed commands or creating model files', async () => {
+test('enabled Lekalo without a project reports layout missing without creating model files', async () => {
   const rootDir = await rootWithConfig('aifhub:\n  tools:\n    openspec: false\n    hlv: false\n    lekalo: true\n');
   await commit(rootDir);
   const result = await runProviders({ rootDir, phase: 'verify', changeId: 'composition', write: true });
   assert.equal(result.blocking, true);
   assert.equal(result.providers.length, 1);
   assert.equal(result.providers[0].kind, 'semantic_model');
-  assert.equal(result.providers[0].reason, 'protocol_unpublished');
+  assert.equal(result.providers[0].reason, 'layout_missing');
   await assert.rejects(stat(path.join(rootDir, 'lekalo')));
 });
 
