@@ -265,7 +265,9 @@ async function finalize(input, s, options, counters) {
   // case-insensitive even on case-sensitive filesystems: deterministic ubuntu CI
   // behavior, conservative where 'Plans' and 'plans' name the same directory.
   const roots = new Set(['.ai-factory/qa', '.ai-factory/rules', '.ai-factory/rules/generated', '.ai-factory/evidence']);
-  for (const key of ['qa', 'rules', 'generated_rules']) if (config.paths[key]) roots.add(config.paths[key]);
+  // description/architecture/rules_file are authoritative inputs for every execution
+  // source: an archive destination around them would let the finalizer overwrite them.
+  for (const key of ['qa', 'rules', 'generated_rules', 'description', 'architecture', 'rules_file']) if (config.paths[key]) roots.add(config.paths[key]);
   const aliased = p => [...roots].some(root => { const r = root.toLowerCase(); return p === r || p.startsWith(r + '/') || r.startsWith(p + '/'); });
   requireValue(!aliased(specs.toLowerCase()) && !/^\.git(?:\/|$)/i.test(specs) && !/^\.ai-factory\/state(?:\/|$)/i.test(specs), 'unsafe-path', true);
   const source = await resolveExecutionSource(s, input.change_id, 'implement');
@@ -284,6 +286,9 @@ async function finalize(input, s, options, counters) {
   requireValue(target !== plan && !plan.startsWith(target + '/') && !target.startsWith(plan + '/'), 'unsafe-path', true);
   const archive = `${specs}/${input.change_id}`, writes = [], inventory = await s.inventory(base), guards = [];
   for (const path of Object.keys(inventory)) if (path !== statusPath) writes.push([`${archive}/${path.slice(base.length + 1)}`, await s.bytes(path)]);
+  // Companion copies own these two archive names; same-named plan-folder files would be
+  // silently replaced and lose their content, so refuse before any write.
+  requireValue(!Object.hasOwn(inventory, `${base}/plan.md`) && !Object.hasOwn(inventory, `${base}/spec.md`), 'conflicting-archive-entry', true);
   for (const path of [...Object.keys(inventory).filter(p => p !== statusPath), source.namespace.entrypoint, '.ai-factory/config.yaml']) {
     const bytes = await s.bytes(path); if (bytes !== null) guards.push({ path, sha256: digest(bytes) });
   }
@@ -295,16 +300,43 @@ async function finalize(input, s, options, counters) {
   let indexAfter = index ?? 'specs:\n';
   requireValue(/^specs:\s*(?:\[\])?\s*$/m.test(indexAfter), 'unsupported-spec-index', true);
   indexAfter = indexAfter.replace(/^specs:\s*\[\]\s*$/m, 'specs:');
-  const lines = indexAfter.split('\n'), matches = lines.map((line, i) => /^  - id:/.test(line) && parseSimpleYaml(line.trim().slice(2)).id === input.change_id ? i : -1).filter(i => i >= 0);
+  const lines = indexAfter.split('\n'), sectionStart = lines.findIndex(line => /^specs:/.test(line));
+  requireValue(sectionStart >= 0, 'unsupported-spec-index', true);
+  let sectionEnd = sectionStart + 1;
+  while (sectionEnd < lines.length && !/^[A-Za-z_][\w-]*:/.test(lines[sectionEnd])) sectionEnd++;
+  // Search and removal stay inside the specs list: same-id entries in foreign lists or
+  // comments never match. Entry shapes the flat replacement cannot represent — blank or
+  // deeper-indented continuation lines, flow/nested verification values — refuse here,
+  // before any write, instead of corrupting valid YAML.
+  const flat = v => v === undefined || (typeof v === 'string' && !/^[{[]/.test(v.trim()));
+  const matches = [];
+  for (let i = sectionStart + 1; i < sectionEnd; i++) {
+    if (!/^  - id:/.test(lines[i])) continue;
+    const row = parseSimpleYaml(lines[i].trim().slice(2));
+    if (row.id !== input.change_id) continue;
+    requireValue(flat(row.verification), 'unsupported-spec-index', true);
+    matches.push(i);
+  }
   requireValue(matches.length <= 1, 'unsupported-spec-index', true); const start = matches[0] ?? -1;
-  if (start >= 0) { let end = start + 1; while (end < lines.length && /^    \S/.test(lines[end])) end++; lines.splice(start, end - start); indexAfter = lines.join('\n'); }
+  if (start >= 0) {
+    let end = start + 1;
+    while (end < sectionEnd && /^    \S/.test(lines[end])) end++;
+    let probe = end;
+    while (probe < sectionEnd && !lines[probe].trim()) probe++;
+    requireValue(probe === sectionEnd || /^  - id:/.test(lines[probe]), 'unsupported-spec-index', true);
+    lines.splice(start, end - start); indexAfter = lines.join('\n');
+  }
   // Insert inside specs, before any following top-level block such as stats.
   const indexLines = indexAfter.split('\n'), specsLine = indexLines.findIndex(line => /^specs:/.test(line));
   let boundary = specsLine + 1;
   while (boundary < indexLines.length && !/^[A-Za-z_][\w-]*:/.test(indexLines[boundary])) boundary++;
   indexLines.splice(boundary, 0, entry.trimEnd());
-  const combined = indexLines.join('\n'), rows = combined.slice(combined.indexOf('\n', combined.indexOf('specs:'))).split(/(?=^  - id:)/m)
+  const combined = indexLines.join('\n'), listStart = indexLines.findIndex(line => /^specs:/.test(line));
+  let listEnd = listStart + 1;
+  while (listEnd < indexLines.length && !/^[A-Za-z_][\w-]*:/.test(indexLines[listEnd])) listEnd++;
+  const rows = indexLines.slice(listStart + 1, listEnd).join('\n').split(/(?=^  - id:)/m)
     .filter(row => /^  - id:/.test(row)).map(row => parseSimpleYaml(row.replace(/^  - /, '')));
+  requireValue(rows.every(row => flat(row.verification)), 'unsupported-spec-index', true);
   let inStats = false, inVerdicts = false;
   const withStats = combined.split('\n').map(line => {
     if (/^\S/.test(line) && !line.startsWith('#')) { inStats = /^stats:/.test(line); inVerdicts = false; }
@@ -315,11 +347,13 @@ async function finalize(input, s, options, counters) {
     return verdict ? `    ${verdict[1]}: ${rows.filter(row => (row.verification ?? row.verdict) === verdict[1]).length}` : line;
   }).join('\n');
   add(indexPath, withStats.replace(/\n?$/, '\n'));
+  // Keyed rewrites keep CRLF bytes and tolerate spacing before the colon; a duplicated
+  // status/finalized_at key is refused before any write.
   const bom = status.startsWith('\uFEFF') ? '\uFEFF' : '', statusBody = status.slice(bom.length);
-  requireValue((statusBody.match(/^status:/gm) ?? []).length <= 1 && (statusBody.match(/^finalized_at:/gm) ?? []).length <= 1, 'invalid-classic-status', true);
-  let after = /^status:.*$/m.test(statusBody) ? statusBody.replace(/^status:.*$/m, 'status: done') : statusBody.replace(/\n?$/, '\n') + 'status: done\n';
+  requireValue((statusBody.match(/^status\s*:/gm) ?? []).length <= 1 && (statusBody.match(/^finalized_at\s*:/gm) ?? []).length <= 1, 'invalid-classic-status', true);
+  let after = /^status\s*:[^\r\n]*/m.test(statusBody) ? statusBody.replace(/^status\s*:[^\r\n]*/m, 'status: done') : statusBody.replace(/\n?$/, '\n') + 'status: done\n';
   const timestamp = `finalized_at: ${JSON.stringify(s.now())}`;
-  after = /^finalized_at:.*$/m.test(after) ? after.replace(/^finalized_at:.*$/m, timestamp) : after.replace(/\n?$/, '\n') + timestamp + '\n';
+  after = /^finalized_at\s*:[^\r\n]*/m.test(after) ? after.replace(/^finalized_at\s*:[^\r\n]*/m, timestamp) : after.replace(/\n?$/, '\n') + timestamp + '\n';
   after = bom + after;
   // The execution source projection must survive status-only changes.
   const checkStatus = parseSimpleYaml(after);

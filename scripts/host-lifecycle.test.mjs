@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile, readdir, rm } from 'node:fs/promises';
+import path from 'node:path';
 import { deliveryProject } from './fixtures/delivery-project.mjs';
 import { createFakeHost } from './fixtures/host-delivery.mjs';
 import { createGateResult, renderGateResultBlock } from './aif-gate-result.mjs';
@@ -289,6 +290,8 @@ test('AC6: finalizer destination guards reject case aliases and canonical/eviden
     ['  specs: .ai-factory/rules/generated\n', '.ai-factory/rules/generated/work/spec.md'],
     ['  specs: .ai-factory/evidence\n', '.ai-factory/evidence/work/spec.md'],
     ['  qa: governance/qa\n  specs: governance/qa\n', 'governance/qa/work/spec.md'],
+    ['  specs: published\n  description: published/work/plan.md\n', 'published/work/spec.md'],
+    ['  specs: published\n  rules_file: published/index.yaml\n', 'published/index.yaml'],
   ]) {
     await f.put('.ai-factory/config.yaml', config + suffix);
     assert.equal((await f.call('lifecycle-finalize', input)).code, 'unsafe-path', suffix);
@@ -298,6 +301,49 @@ test('AC6: finalizer destination guards reject case aliases and canonical/eviden
   const result = await f.call('lifecycle-finalize', input); assertSafe(result);
   assert.equal(result.ok, true); assert.equal(result.archive, 'archive-out/work');
   assert.equal(await f.get('archive-out/work/spec.md'), input.spec); // safe custom output keeps working
+});
+
+test('AC6: finalizer refuses unsupported index shapes and plan-folder name collisions before writes', async t => {
+  const f = await single(t, { mode: 'classic', plans: 'plans' }); await f.close(); await f.call('lifecycle-progress', runInput);
+  await f.put('plans/work.md', (await f.get('plans/work.md')).replace('- [ ] 1.2', '- [x] 1.2'));
+  await f.put('plans/work/task.md', (await f.get('plans/work/task.md')).replace('- [ ] 1.2', '- [x] 1.2'));
+  await f.put('plans/work/status.yaml', 'status: verified\nplan_id: work\nverification:\n  verdict: pass\n');
+  const input = { change_id: 'work', actor: 'parent', spec: '# Spec\n' };
+  for (const index of [
+    // A deeper-indented continuation under the replaced entry would orphan after removal.
+    'specs:\n  - id: work\n    title: work\n    verification:\n      verdict: pass\nstats:\n  total: 1\n',
+    // A flow/nested verification value on any listed entry defeats the flat by_verdict recount.
+    'specs:\n  - id: old\n    title: Old\n    verification: {verdict: pass}\n',
+    'specs:\n  - id: work\n    title: work\n\n    verdict: pass\n', // blank line inside the entry span
+  ]) {
+    await f.put('.ai-factory/specs/index.yaml', index);
+    assert.equal((await f.call('lifecycle-finalize', input)).code, 'unsupported-spec-index');
+    await assert.rejects(f.get('.ai-factory/specs/work/spec.md'), { code: 'ENOENT' });
+    assert.equal(await f.get('.ai-factory/specs/index.yaml'), index); // byte-identical refusal
+  }
+  await f.put('plans/work/plan.md', '# Caller document that must not be replaced\n');
+  assert.equal((await f.call('lifecycle-finalize', input)).code, 'conflicting-archive-entry');
+  await assert.rejects(f.get('.ai-factory/specs/work/spec.md'), { code: 'ENOENT' });
+  await rm(path.join(f.root, 'plans/work/plan.md'));
+  await f.put('.ai-factory/specs/index.yaml', '# Keep\nother:\n  - id: work\n    title: Foreign\nspecs:\n  - id: old\n    title: Old\nstats:\n  total: 1\n');
+  const finalized = await f.call('lifecycle-finalize', input); assertSafe(finalized);
+  assert.equal(finalized.ok, true); // same-id entries outside the specs list never match
+  const index = await f.get('.ai-factory/specs/index.yaml');
+  assert.match(index, /other:/); assert.match(index, /Foreign/); assert.match(index, /id: "work"/);
+  assert.match(index, /total: 2/); assert.ok(index.indexOf('id: "work"') < index.indexOf('stats:'));
+});
+
+test('AC6: finalizer keeps CRLF status bytes and never duplicates keyed lines', async t => {
+  const f = await single(t, { mode: 'classic', plans: 'plans' }); await f.close(); await f.call('lifecycle-progress', runInput);
+  await f.put('plans/work.md', (await f.get('plans/work.md')).replace('- [ ] 1.2', '- [x] 1.2'));
+  await f.put('plans/work/task.md', (await f.get('plans/work/task.md')).replace('- [ ] 1.2', '- [x] 1.2'));
+  await f.put('plans/work/status.yaml', 'status : verified\r\nplan_id: work\r\nverification:\r\n  verdict: pass\r\n');
+  const result = await f.call('lifecycle-finalize', { change_id: 'work', actor: 'parent', spec: '# Spec\n' });
+  assert.equal(result.ok, true);
+  const text = await f.get('plans/work/status.yaml');
+  assert.equal((text.match(/^status\s*:/gm) ?? []).length, 1); // no duplicated status key
+  assert.equal((text.match(/^finalized_at\s*:/gm) ?? []).length, 1);
+  assert.match(text, /^status: done\r$/m); // CRLF byte preserved by the keyed rewrite
 });
 
 test('AC6: failing verification verdict blocks finalization before any archive write', async t => {
