@@ -182,6 +182,9 @@ test('clean worktree context is a complete empty pass; foreign traces and big va
   assert.equal(context.status, 'pass', JSON.stringify(context));
   assert.equal(context.reason, 'semantic_result');
   assert.equal(context.semantic.complete, true);
+  const partial = await runLekaloOperation('context', root, {}, { runProcess: runner({ ...emptyRunner, AIF_TEST_LEKALO_PARTIAL: '1' }) });
+  assert.equal(partial.status, 'warn', JSON.stringify(partial));
+  assert.equal(partial.diagnostics[0].code, 'LEK-SEM-002');
   // A valid trace larger than the default 1 MiB output cap is not an overflow.
   const big = await project();
   const trace = path.join(big, '.ai-factory/traces', 'fixture', 'lekalo-trace-manifest.json');

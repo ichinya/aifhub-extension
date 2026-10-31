@@ -221,13 +221,19 @@ async function runSemantic(operation, rootDir, config, options) {
     // Impact alone has no context capsule. Never relabel its digest as context.
     let context = null;
     if (operation === 'context') {
-      // A clean worktree is a complete empty result, not an error: a required
-      // provider must not block implementation on unchanged trees.
-      if (!impact.ids.length) return { status: 'pass', reason: 'semantic_result',
-        diagnostics: [], semantic: normalizeSemanticEvidence(SEMANTIC_MANIFEST, {
-          status: 'pass', diagnostics: [], impact: impact.refs, context: null,
-          complete: impact.complete, trace: { schemaVersion: '1.0.0', links: [] } }),
-        streams: impactResult.streams };
+      // A clean worktree with complete impact is a complete empty result, not
+      // an error: a required provider must not block implementation on
+      // unchanged trees. Incomplete empties stay honest (warn).
+      if (!impact.ids.length) {
+        const emptyComplete = impact.complete === true;
+        return { status: emptyComplete ? 'pass' : 'warn', reason: 'semantic_result',
+          diagnostics: emptyComplete ? [] : [{ code: 'LEK-SEM-002', severity: 'warning', id: 'semantic.incomplete', category: 'semantic' }],
+          semantic: normalizeSemanticEvidence(SEMANTIC_MANIFEST, {
+            status: emptyComplete ? 'pass' : 'warn', diagnostics: [],
+            impact: impact.refs, context: null,
+            complete: impact.complete, trace: { schemaVersion: '1.0.0', links: [] } }),
+          streams: impactResult.streams };
+      }
       result = await execute(['context', '--changed', impact.ids.join(','), '--budget', '5000', '--project', rootDir], rootDir, config, options);
       if (result.failure) return result.failure;
       if (result.exitCode !== 0) return normalizedProcessResult(operation, result);
