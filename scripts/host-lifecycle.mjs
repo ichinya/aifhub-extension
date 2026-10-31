@@ -254,6 +254,18 @@ async function finalize(input, s, options, counters) {
     requireValue(h.runs.every(r => r.owner === input.actor), 'actor-mismatch', true);
     return s.applyJournal(old, 'finalization', true);
   }
+  const config = parseProjectConfig(await s.textFile('.ai-factory/config.yaml') ?? ''), specs = config.paths.specs ?? '.ai-factory/specs';
+  // Destinations may not alias canonical/evidence roots — configured overrides plus the
+  // shipped defaults. Checked before source resolution so the refusal is one typed code
+  // (duplicate path values are rejected separately by the shared admission source).
+  // The openspec root is deliberately absent: the classic finalizer never reads it as a
+  // source, so an archive there cannot overwrite execution inputs. Comparisons are
+  // case-insensitive even on case-sensitive filesystems: deterministic ubuntu CI
+  // behavior, conservative where 'Plans' and 'plans' name the same directory.
+  const roots = new Set(['.ai-factory/qa', '.ai-factory/rules', '.ai-factory/rules/generated', '.ai-factory/evidence']);
+  for (const key of ['qa', 'rules', 'generated_rules']) if (config.paths[key]) roots.add(config.paths[key]);
+  const aliased = p => [...roots].some(root => { const r = root.toLowerCase(); return p === r || p.startsWith(r + '/') || r.startsWith(p + '/'); });
+  requireValue(!aliased(specs.toLowerCase()) && !/^\.git(?:\/|$)/i.test(specs) && !/^\.ai-factory\/state(?:\/|$)/i.test(specs), 'unsafe-path', true);
   const source = await resolveExecutionSource(s, input.change_id, 'implement');
   if (source.delegated) return { ok: true, state: 'delegated', ...source };
   if (source.namespace.kind !== 'ai-factory-classic') return { ok: true, state: 'delegated', delegated: true,
@@ -265,10 +277,9 @@ async function finalize(input, s, options, counters) {
   const base = source.namespace.checklist.slice(0, -'/task.md'.length), statusPath = `${base}/status.yaml`, status = await s.textFile(statusPath);
   const parsed = parseSimpleYaml(status);
   requireValue(['pass', 'pass-with-notes'].includes(parsed.verification?.verdict), 'lifecycle-verification-required', true);
-  const config = parseProjectConfig(await s.textFile('.ai-factory/config.yaml') ?? ''), specs = config.paths.specs ?? '.ai-factory/specs';
-  // Prevent config aliasing from turning finalization into a source/state overwrite.
-  requireValue(specs !== base && !base.startsWith(specs + '/') && !specs.startsWith(base + '/')
-    && !/^\.git(?:\/|$)/i.test(specs) && !/^\.ai-factory\/state(?:\/|$)/i.test(specs), 'unsafe-path', true);
+  // The checklist folder and the archive destination must stay disjoint directories.
+  const plan = base.toLowerCase(), target = specs.toLowerCase();
+  requireValue(target !== plan && !plan.startsWith(target + '/') && !target.startsWith(plan + '/'), 'unsafe-path', true);
   const archive = `${specs}/${input.change_id}`, writes = [], inventory = await s.inventory(base), guards = [];
   for (const path of Object.keys(inventory)) if (path !== statusPath) writes.push([`${archive}/${path.slice(base.length + 1)}`, await s.bytes(path)]);
   for (const path of [...Object.keys(inventory).filter(p => p !== statusPath), source.namespace.entrypoint, '.ai-factory/config.yaml']) {

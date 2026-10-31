@@ -251,6 +251,30 @@ test('AC5/6: classic finalization recovery and configured paths preserve verific
   assert.equal(await f.get('published/work/spec.md'), input.spec); assert.match(await f.get('plans/work/status.yaml'), /verdict: pass/);
 });
 
+test('AC6: finalizer destination guards reject case aliases and canonical/evidence roots', async t => {
+  const f = await single(t, { mode: 'classic', plans: 'plans' }); await f.close(); await f.call('lifecycle-progress', runInput);
+  await f.put('plans/work.md', (await f.get('plans/work.md')).replace('- [ ] 1.2', '- [x] 1.2'));
+  await f.put('plans/work/task.md', (await f.get('plans/work/task.md')).replace('- [ ] 1.2', '- [x] 1.2'));
+  await f.put('plans/work/status.yaml', 'status: verified\nplan_id: work\nverification:\n  verdict: pass\n');
+  const config = await f.get('.ai-factory/config.yaml'), input = { change_id: 'work', actor: 'parent', spec: '# Spec\n' };
+  for (const [suffix, forbidden] of [
+    ['  specs: PLANS/Work\n', 'PLANS/work/spec.md'],
+    ['  specs: .ai-factory/qa\n', '.ai-factory/qa/work/spec.md'],
+    ['  specs: .ai-factory/rules\n', '.ai-factory/rules/work/spec.md'],
+    ['  specs: .ai-factory/rules/generated\n', '.ai-factory/rules/generated/work/spec.md'],
+    ['  specs: .ai-factory/evidence\n', '.ai-factory/evidence/work/spec.md'],
+    ['  qa: governance/qa\n  specs: governance/qa\n', 'governance/qa/work/spec.md'],
+  ]) {
+    await f.put('.ai-factory/config.yaml', config + suffix);
+    assert.equal((await f.call('lifecycle-finalize', input)).code, 'unsafe-path', suffix);
+    await assert.rejects(f.get(forbidden), { code: 'ENOENT' }); // nothing written through the alias
+  }
+  await f.put('.ai-factory/config.yaml', config + '  specs: archive-out\n');
+  const result = await f.call('lifecycle-finalize', input); assertSafe(result);
+  assert.equal(result.ok, true); assert.equal(result.archive, 'archive-out/work');
+  assert.equal(await f.get('archive-out/work/spec.md'), input.spec); // safe custom output keeps working
+});
+
 test('AC6: finalizer cannot run while an unknown worker reserves scope', async t => {
   const f = await single(t, { mode: 'classic', pending: true });
   await f.call('interrupt', { ...runInput, version: 2, recovery_id: 'unknown', reason: 'abandoned', execution_state: 'unknown' });
