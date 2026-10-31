@@ -333,6 +333,14 @@ test('AC5: corrupt progress journals fail closed; missing journal is the determi
   assert.equal(await f.get(checklist), before); // fail-closed without recovery instructions
 });
 
+test('AC1: collect after applied progress returns the documented stale blocker; settle precedes progress', async t => {
+  const f = await single(t); await f.close();
+  assert.equal((await f.call('lifecycle-progress', runInput)).ok, true);
+  const after = await f.call('lifecycle-collect', { change_id: 'work', members: [{ run_id: 'run-1' }] });
+  assert.equal(after.ok, false); assert.equal(after.code, 'stale-context'); // intentional run drift, not a defect
+  assertSafe(after);
+});
+
 test('AC6: finalizer cannot run while an unknown worker reserves scope', async t => {
   const f = await single(t, { mode: 'classic', pending: true });
   await f.call('interrupt', { ...runInput, version: 2, recovery_id: 'unknown', reason: 'abandoned', execution_state: 'unknown' });
