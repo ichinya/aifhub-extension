@@ -10,7 +10,7 @@ import { normalizeProviderPolicies, parseProviderConfig, providerGate } from './
 import { HLV_COMMAND_CONTRACT, normalizeHlvResult, runHlvOperation } from './hlv-provider.mjs';
 import { negotiateProviderCapabilities, runProviderCommand, runProviders, validateNeutralTrace } from './aifhub-providers.mjs';
 import { normalizeSemanticEvidence } from './semantic-provider-contract.mjs';
-import { renderConfigForMode } from './aif-artifact-sync.mjs';
+import { initializeEnabledTools, renderConfigForMode } from './aif-artifact-sync.mjs';
 
 const fixtures = fileURLToPath(new URL('../test/fixtures/validation-providers/', import.meta.url));
 const { sources: { hlv: hlvSource } } = JSON.parse(await readFile(new URL('../aifhub-extension.json', import.meta.url), 'utf8'));
@@ -29,8 +29,8 @@ async function project(kind = 'openspec-native') {
 function fixtureRunner(env = {}, calls = []) {
   return async (executable, args, options) => {
     calls.push([...args]);
-    if (executable !== 'hlv') return runProviderProcess(executable, args, options);
-    return runProviderProcess(process.execPath, [path.join(fixtures, 'fake-hlv.mjs'), ...args],
+    if (!['hlv', 'lekalo'].includes(executable)) return runProviderProcess(executable, args, options);
+    return runProviderProcess(process.execPath, [path.join(fixtures, `fake-${executable}.mjs`), ...args],
       { ...options, env: { ...process.env, ...env } });
   };
 }
@@ -154,7 +154,7 @@ test('required unavailable/unsupported providers block; optional results degrade
     assert.equal(result.blocking, policy === 'required');
     assert.equal(result.providers[0].status, 'unsupported');
     assert.equal(result.providers[0].toolVersion, '0.3.0');
-    assert.equal(result.providers[1].reason, 'protocol_unpublished');
+    assert.equal(result.providers[1].reason, 'layout_missing');
     assert.ok(await readProviderFile(rootDir, '.ai-factory/qa/provider-composition/providers/lekalo-verify.json'));
   }
   assert.equal(providerGate('unavailable', 'optional').status, 'warn');
@@ -377,4 +377,41 @@ test('CLI rejects unsafe identifiers without echoing them and sync stays unsuppo
   assert.deepEqual(await runProviderCommand(['verify', '--change', '../fixture-secret', '--write', '--json']),
     { exitCode: 2, stdout: '', stderr: 'Invalid provider command arguments.\n' });
   assert.equal((await runHlvOperation('sync', '.', {}, {})).status, 'unsupported');
+});
+
+for (const verdict of ['ready', 'degraded', 'blocked']) test('Lekalo child process '+verdict+' normalizes before gates and never caches validation', async () => {
+  const rootDir = await project();
+  await writeFile(path.join(rootDir, '.ai-factory/config.yaml'), 'aifhub:\n  tools:\n    openspec: true\n    hlv: false\n    lekalo: true\n');
+  const { projectYaml } = await import('../test/fixtures/validation-providers/fake-lekalo.mjs');
+  await mkdir(path.join(rootDir, 'lekalo'));
+  await writeFile(path.join(rootDir, 'lekalo/project.yaml'), projectYaml);
+  const calls = [], options = { rootDir, phase: 'verify', changeId: 'lekalo-fixture', write: true,
+    runProcess: fixtureRunner({ AIF_TEST_LEKALO_VERDICT: verdict, AIF_TEST_LEKALO_RECEIPT: 'error', AIF_TEST_LEKALO_ADDITIVE: '1' }, calls) };
+  const before = await providerRevision(rootDir);
+  const result = await runProviders(options);
+  assert.equal(result.blocking, verdict === 'blocked', JSON.stringify(result));
+  const evidence = result.providers[0];
+  assert.equal(evidence.status, verdict === 'blocked' ? 'fail' : 'warn');
+  assert.equal(evidence.operations[0].diagnostics[0].code, 'LEK-SEM-001');
+  assert.equal(evidence.operations[0].diagnostics[0].severity, 'error');
+  assert.deepEqual(calls.find(args => args[0] === 'validate'), ['validate', '--no-cache', '--project', rootDir]);
+  assert.deepEqual(await providerRevision(rootDir), before);
+  const saved = await readFile(path.join(rootDir, '.ai-factory/qa/lekalo-fixture/providers/lekalo-verify.json'), 'utf8');
+  assert.doesNotMatch(saved, /fixture-secret|private|token=/);
+});
+test('Lekalo native adopt fixture is idempotent, dry-run safe and refuses a conflict', async () => {
+  const rootDir = await project();
+  await writeFile(path.join(rootDir, '.ai-factory/config.yaml'), 'aifhub:\n  tools:\n    openspec: false\n    hlv: false\n    lekalo: true\n');
+  const calls = [], options = { rootDir, runProcess: fixtureRunner({}, calls) };
+  assert.equal((await initializeEnabledTools({ ...options, dryRun: true })).lekalo.state, 'would-create');
+  assert.deepEqual(calls, []);
+  assert.equal((await initializeEnabledTools(options)).lekalo.state, 'created');
+  assert.equal((await initializeEnabledTools(options)).lekalo.state, 'preserved');
+  assert.equal(calls.filter(args => args[0] === 'init').length, 1);
+  const conflict = await project();
+  await writeFile(path.join(conflict, '.ai-factory/config.yaml'), 'aifhub:\n  tools:\n    openspec: false\n    hlv: false\n    lekalo: true\n');
+  await mkdir(path.join(conflict, 'lekalo'));
+  await writeFile(path.join(conflict, 'lekalo/project.yaml'), 'conflicting user file');
+  assert.equal((await initializeEnabledTools({ rootDir: conflict, runProcess: () => assert.fail('spawn') })).ok, false);
+  assert.equal(await readFile(path.join(conflict, 'lekalo/project.yaml'), 'utf8'), 'conflicting user file');
 });

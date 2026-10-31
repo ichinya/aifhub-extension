@@ -436,7 +436,7 @@ Ownership audit: `aif-analyze`, `aif-done`, `aif-mode` не bundled имена; 
 
 `extension.json.$schema` pinned к `https://raw.githubusercontent.com/lee-to/ai-factory/2.20.0/schemas/extension.schema.json`. Blob `a82b8a0b834df2047e71857476f72ed66c6472d7` byte-identical 2.19.0: локальная схема и её `$id` остаются неизменными. Floating `2.x` уже имеет другую схему; pin обновляется отдельным осознанным sync, не moving target. Extension version, MCP, commands, Node >=18 и зависимости не меняются.
 
-Lekalo v1.0.0/v1.1.0 публикует workflow + `lekalo install prompt` и LPAC-sandbox. Stub сознательно сохраняет `unsupported / protocol_unpublished` до отдельного issue адаптера: обновлено только обоснование, исполнения CLI нет.
+На этапе адаптации HLV Lekalo v1.0.0/v1.1.0 уже публиковал workflow + `lekalo install prompt` и LPAC-sandbox, а extension сохранял stub до отдельного адаптера. Теперь [Lekalo 1.1.0 adapter](validation-providers.md) реализует exact workflow-provider@0.8.0 для read-only операций; prompt installation и native/LPAC execution остаются upstream-owned. См. [custody audit](lekalo-1.1.0-audit.md).
 
 ### Deferred post-#199 — следующий отдельный change после релиз-тега
 

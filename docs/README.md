@@ -59,7 +59,7 @@ OpenSpec CLI features вызываются через AIFHub wrappers и `script
 
 | Guide | Назначение |
 |---|---|
-| [Validation Providers](validation-providers.md) | Composable HLV validation, independent tool switches and artifact selection, required/optional policy, revision-bound evidence, read-only doctor and the separate Lekalo-ready semantic contract |
+| [Validation Providers](validation-providers.md) | Composable HLV/Lekalo validation, independent tool switches and artifact selection, required/optional policy, revision-bound evidence, read-only doctor and Lekalo semantic impact/context |
 | [Prime Agent Runtime Evaluation](runtime-research/prime-agent/README.md) | Runtime adoption deferred: mutable harness roles, permission boundary, admission-only delegation, distribution constraints and reproducible source/kernel probes |
 | [Исследование совместимости с Agent Plugins 1.0](agent-plugins-research/README.md) | Исправленный двухskill subset: 27 файлов, явные exclusions, schema/validator checks и положительные/отрицательные MCP project-binding probes |
 | [Persistent Workflow Mechanics](workflow-mechanics.md) | Canonical task sources, sealed batches, interruption recovery, persistent fix budgets and reversible skill-context evolution |

@@ -1,6 +1,7 @@
 import { lstat, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { detectHlvVersion } from './hlv-provider.mjs';
+import { detectLekaloVersion } from './lekalo-provider.mjs';
 import { readProviderFile, safeProviderPath } from './provider-files.mjs';
 import { readProviderPolicies } from './provider-policy.mjs';
 import { runProviderProcess } from './provider-process.mjs';
@@ -76,4 +77,50 @@ export async function initializeHlvProject(options = {}) {
   } catch {
     return result(options, 'failed', null, 'unsafe_or_incomplete_layout');
   }
+}
+
+export async function inspectLekaloLayout(rootDir) {
+  const bytes = await readProviderFile(rootDir, 'lekalo/project.yaml', 256 * 1024);
+  if (bytes === null) return null;
+  const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  if (!/^schema_version:\s*["']?0\.(?:2\.16|8\.0)["']?\s*(?:#.*)?$/m.test(text)
+    || !/^definitions:\s*$/m.test(text) || !/^\s+kind:\s*project\s*$/m.test(text)) throw new Error('invalid_existing_layout');
+  return 'adopt';
+}
+
+function lekaloInitResult(options, state, error = null) {
+  return { ok: error === null, dryRun: Boolean(options.dryRun), tool: 'lekalo', state,
+    layout: ['created', 'would-create', 'preserved'].includes(state) ? 'adopt' : null,
+    operations: ['created', 'would-create', 'preserved'].includes(state)
+      ? [{ action: state === 'preserved' ? 'preserve' : state === 'created' ? 'create' : state, target: 'lekalo/project.yaml' }] : [],
+    warnings: [], errors: error === null ? [] : [{ code: `lekalo-init-${error}`,
+      message: `Lekalo initialization refused (${error}). Use reviewed CLI 1.1.0 and repair conflicting or incomplete layouts before retrying.` }] };
+}
+
+async function preflightLekaloInit(rootDir) {
+  // Refuse partial custody rather than letting adopt replace pre-existing files.
+  for (const relative of ['lekalo', '.lekalo']) {
+    const target = await safeProviderPath(rootDir, relative);
+    if (target.exists && (!(await lstat(target.path)).isDirectory() || (await readdir(target.path)).length)) throw new Error('partial_layout');
+  }
+  if (await readProviderFile(rootDir, 'lekalo.lock') !== null) throw new Error('conflicting_lock');
+}
+
+export async function initializeLekaloProject(options = {}) {
+  const rootDir = path.resolve(options.rootDir ?? process.cwd());
+  try {
+    const config = (await readProviderPolicies(rootDir)).lekalo;
+    if (!config.enable) return lekaloInitResult(options, 'disabled');
+    if (await inspectLekaloLayout(rootDir)) return lekaloInitResult(options, 'preserved');
+    await preflightLekaloInit(rootDir);
+    if (options.dryRun) return lekaloInitResult(options, 'would-create');
+    const detection = await detectLekaloVersion(rootDir, config, options);
+    if (detection.status !== 'pass') return lekaloInitResult(options, detection.status, detection.reason);
+    const result = await (options.runProcess ?? runProviderProcess)(config.executable ?? 'lekalo',
+      ['init', '--adopt', '--project', rootDir], { cwd: rootDir, timeoutMs: config.timeoutMs,
+        maxOutputBytes: config.maxOutputBytes, signal: options.signal, env: options.env });
+    if (result.outcome !== 'completed' || result.exitCode !== 0) return lekaloInitResult(options, 'failed', 'process_failed');
+    if (!await inspectLekaloLayout(rootDir)) return lekaloInitResult(options, 'failed', 'layout_missing_after_init');
+    return lekaloInitResult(options, 'created');
+  } catch { return lekaloInitResult(options, 'failed', 'unsafe_or_incomplete_layout'); }
 }

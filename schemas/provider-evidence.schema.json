@@ -20,8 +20,8 @@
     "toolVersion": { "type": ["string", "null"], "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
     "commandContract": { "oneOf": [{ "type": "null" }, { "type": "object", "additionalProperties": false,
       "required": ["id", "version", "source"], "properties": {
-        "id": { "const": "aifhub.hlv-cli" }, "version": { "const": "1.1.0" },
-        "source": { "const": "https://github.com/lee-to/hlv/tree/v1.1.0" }
+        "id": { "enum": ["aifhub.hlv-cli", "aifhub.lekalo-cli"] }, "version": { "const": "1.1.0" },
+        "source": { "enum": ["https://github.com/lee-to/hlv/tree/v1.1.0", "https://github.com/ichinya/lekalo/tree/v1.1.0"] }
       } }] },
     "provenance": { "type": "object", "additionalProperties": false,
       "required": ["boundary", "source", "policyDigest"], "properties": {
@@ -37,23 +37,140 @@
         "status": { "$ref": "#/$defs/status" }, "reason": { "type": "string", "pattern": "^[a-z_]+$" },
         "diagnostics": { "type": "array", "maxItems": 2000, "items": { "type": "object", "additionalProperties": false,
           "required": ["code", "severity"], "properties": {
-            "code": { "type": "string", "pattern": "^[A-Z]{2,5}-[0-9]{3}$" },
-            "severity": { "enum": ["error", "warning", "info"] }
+            "code": { "type": "string", "pattern": "^(?:[A-Z]{2,5}|LEK-[A-Z]{2,12})-[0-9]{3}$" },
+            "severity": { "enum": ["error", "warning", "info"] },
+            "id": { "type": "string", "maxLength": 128, "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+$" },
+            "category": { "enum": ["model", "semantic", "compatibility", "adapter", "infrastructure", "security"] }
           } } },
         "streams": { "type": "object", "additionalProperties": false, "required": ["stdout", "stderr", "exitCode"],
           "properties": { "stdout": { "enum": ["present", "empty"] }, "stderr": { "enum": ["present", "empty"] },
             "exitCode": { "type": ["integer", "null"] } } },
+        "semantic": { "$ref": "provider-semantic-evidence.schema.json" },
         "summary": { "type": "object", "additionalProperties": false, "properties": {
           "errors": { "type": "integer", "minimum": 0 }, "warnings": { "type": "integer", "minimum": 0 },
           "infos": { "type": "integer", "minimum": 0 }, "stages": { "type": "integer", "minimum": 0 },
           "validated": { "type": "integer", "minimum": 0 }, "milestone": { "type": "boolean" },
           "applicable": { "type": "boolean" },
           "history": { "type": "integer", "minimum": 0 }, "contentDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-          "format": { "const": "hlv-trace-1.0.0" }
+          "format": { "enum": ["hlv-trace-1.0.0", "lekalo-trace-manifest-v0.2.16"] }
         } }
       } } },
     "gate": { "type": "object", "additionalProperties": false, "required": ["status", "blocking"],
       "properties": { "status": { "enum": ["pass", "warn", "fail"] }, "blocking": { "type": "boolean" } } }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "provider": {
+            "const": "hlv"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "kind": {
+            "const": "validation"
+          },
+          "commandContract": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "const": "aifhub.hlv-cli"
+                  },
+                  "source": {
+                    "const": "https://github.com/lee-to/hlv/tree/v1.1.0"
+                  }
+                }
+              }
+            ]
+          },
+          "operations": {
+            "items": {
+              "properties": {
+                "diagnostics": {
+                  "items": {
+                    "properties": {
+                      "code": {
+                        "pattern": "^[A-Z]{2,5}-[0-9]{3}$"
+                      }
+                    }
+                  }
+                },
+                "summary": {
+                  "properties": {
+                    "format": {
+                      "const": "hlv-trace-1.0.0"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "provider": {
+            "const": "lekalo"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "kind": {
+            "const": "semantic_model"
+          },
+          "commandContract": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "const": "aifhub.lekalo-cli"
+                  },
+                  "source": {
+                    "const": "https://github.com/ichinya/lekalo/tree/v1.1.0"
+                  }
+                }
+              }
+            ]
+          },
+          "operations": {
+            "items": {
+              "properties": {
+                "diagnostics": {
+                  "items": {
+                    "properties": {
+                      "code": {
+                        "pattern": "^LEK-[A-Z]{2,12}-[0-9]{3}$"
+                      }
+                    }
+                  }
+                },
+                "summary": {
+                  "properties": {
+                    "format": {
+                      "const": "lekalo-trace-manifest-v0.2.16"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
   "$defs": { "status": { "enum": ["pass", "warn", "fail", "unavailable", "unsupported", "infrastructure_error", "configuration_error"] } }
 }

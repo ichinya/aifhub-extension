@@ -133,13 +133,30 @@ Statuses distinguish `pass`, `warn`, `fail`, `unavailable`, `unsupported`, `infr
 
 Processes use argument arrays with `shell: false`, hidden Windows windows, closed stdin, combined stdout/stderr byte limits, a bounded timeout and cancellation. Cancellation and timeout terminate the process group on POSIX or process tree on Windows. Output/schema failures never count as validation PASS. Evidence paths are contained in the project and reject links, hard links and traversal.
 
-## Lekalo-ready contract and deferred integration
+## Lekalo 1.1.0: реализованный read-only адаптер
 
-`semantic_model`, [capability negotiation](../schemas/provider-capabilities.schema.json), [neutral trace links and semantic evidence](../schemas/provider-semantic-evidence.schema.json) are reserved independently of HLV. The [fake capability fixture](../test/fixtures/validation-providers/fake-lekalo-capabilities.json) tests `aifhub.provider@1.0.0`; it is not a claim of real Lekalo execution. Missing capabilities or a mismatched contract version return `unsupported`. Neutral links carry requirement → semantic symbol → binding → scenario/test → gate references; absent semantic intermediates may be `null`.
+Адаптер принимает только **CLI 1.1.0** (из `lekalo --version`) и exact manifest **dev.lekalo.workflow-provider@0.8.0**, discriminator `lekalo/workflow-provider/v0.8.0`. Manifest productVersion **0.8.0** обозначает поколение контракта. Discovery вне проекта проверяет полный reviewed manifest digest: неизвестные поля, операции, effects и pins дают unsupported. Additive поля operation reports игнорируются. См. [upstream contract](https://github.com/ichinya/lekalo/blob/v1.1.0/docs/provider-contract.md) и [custody audit](lekalo-1.1.0-audit.md).
 
-The `scripts/lekalo-provider.mjs` adapter mirrors the HLV dispatch shape but is fail-closed: it never spawns the `lekalo` CLI, never writes Lekalo-owned artifacts, and always returns `unsupported / protocol_unpublished`. The reserved `aifhub.lekalo-cli` command contract and the provider-kind dispatch in `scripts/aifhub-providers.mjs` mean a published Lekalo provider protocol can be wired in by changing only the Lekalo adapter and the semantic manifest format, without touching HLV.
+| Операция | Prescribed argv после lekalo | Нормализация |
+| --- | --- | --- |
+| detect | `--version`; `provider describe --json` | Exact pins + маркер lekalo/project.yaml; отсутствие layout → unavailable |
+| status | `status --project DIR` | ready → pass, degraded → warn, blocked → fail |
+| doctor | `doctor --project DIR` | Та же семантика; missing trace evidence деградирует |
+| validate | `validate --no-cache --project DIR` | exit 0: clean → pass, findings → warn; exit 1/3 → fail |
+| readiness | `readiness --phase done --project DIR` | Report verdict; required blocked/unknown не проходит gate |
+| trace | `trace export PATH` | Supplemental digest, format lekalo-trace-manifest-v0.2.16 |
+| impact | `impact --changed --worktree --project DIR` | Bounded sha256 refs через semantic-provider-contract |
+| context | `context --changed IDS --budget 5000 --project DIR` | IDS из impact roots; fits:false/truncation — неполные данные, warn |
 
-The issue's description of Lekalo as a future repository is stale. At [v0.1.10](https://github.com/ichinya/lekalo/tree/v0.1.10), Lekalo has a CLI and semantic validation, but its [provider protocol is explicitly unpublished](https://github.com/ichinya/lekalo/blob/v0.1.10/docs/versioning.md), and [inspect/impact/context are recognized stubs](https://github.com/ichinya/lekalo/blob/v0.1.10/docs/cli.md). AIFHub therefore reports `unsupported / protocol_unpublished` without guessing or invoking a Lekalo command. Aggregated read-only provider status is already available through `aifhub.providers_status` in MCP. Real P2 Lekalo execution — `impact`/`context` in `/aif-implement`, `validate`/`verify`/`trace` in `/aif-verify` and `/aif-done`, target verification and an OpenSpec + Lekalo + HLV runtime fixture — remains dependent on a published compatible protocol. Product, Model, IR and protocol versions must not be conflated.
+Exit 0 у status/doctor/readiness означает получение отчёта. Validation сохраняет error severity classification findings на success-envelope default-профиля как warn. Exit 1 читается из stderr (invalid), exit 3 — stdout (denied), exit 4 — stdout (unsupported/unavailable), exit 5 — stderr (unsupported-version). LEK-коды, исходные diagnostic id/category/severity сохраняются; raw сообщения, пути и capsule не попадают в публичное evidence. Неожиданные exit и невалидный JSON — infrastructure_error. Timeout, cancellation и output_overflow явные; export_overflow не обрезает данные.
+
+Trace convention: `.ai-factory/traces/<change-id>/lekalo-trace-manifest.json`. API принимает явный project-relative tracePath только внутри `.ai-factory/traces/`; traversal, links и выход за custody отклоняются. Нет пути/файла → unavailable/trace_missing без запуска trace collect. Manifest export — входной нейтральный документ пользователя; адаптер не создаёт его автоматически. Partial trace остаётся partial и не заменяет native execution evidence. Входы `.ai-factory/traces/**` и `lekalo.lock` явно входят в revision binding даже при Git ignore; QA и execution-state outputs исключены.
+
+Фаза implement запускает impact/context, verify — validate/status/trace, done — validate/readiness/trace. Policy/phases/timeoutMs/maxOutputBytes/executable настраиваются в `aifhub.providers.lekalo`; default phases implement/verify/done, policy required, timeout 30000 ms, output 1 MiB (не более 4 MiB), executable — абсолютный нативный файл либо установленный lekalo из PATH. Export ceiling upstream — 32 MiB; меньший process limit также действует. Required non-success блокирует gate, optional меняет только gate на warn.
+
+Инициализация через `ai-factory aifhub-mode init --json` отдельно вызывает `lekalo init --adopt --project DIR` после exact detection. Existing valid layout сохраняется без запуска CLI; partial/conflicting layout и lock без модели дают refusal. Dry-run не пишет и не запускает процессы. Install prompt не вызывается: AGENTS.md остаётся injection-слоем AI Factory. Drift/generate/sync/trace collect/native gates не реализованы и fail-closed; LPAC и component receipts принадлежат upstream.
+
+Hermetic [fake-lekalo](../test/fixtures/validation-providers/fake-lekalo.mjs) и [describe golden](../test/fixtures/validation-providers/lekalo-describe-v0.8.0.json) проверяют adapter boundary; [semantic fixture](../test/fixtures/validation-providers/fake-lekalo-capabilities.json) проверяет отдельный AIFHub transport-neutral контракт. Реальный Lekalo binary — NOTRUN.
 
 See also [Context Providers](context-providers.md), [Skill Providers](skill-providers.md), and [OpenSpec Compatibility](openspec-compatibility.md).
 

@@ -8,7 +8,7 @@ import { providerDiagnostics, runProviders } from './aifhub-providers.mjs';
 import { normalizeProviderPolicies, parseProviderConfig } from './provider-policy.mjs';
 import { parseToolConfig, toolArtifactPaths } from './tool-config.mjs';
 import { readProviderFile, safeProviderPath } from './provider-files.mjs';
-import { initializeHlvProject } from './tool-initialization.mjs';
+import { initializeHlvProject, initializeLekaloProject } from './tool-initialization.mjs';
 import { ensureRuntimeGitignore, ensureRuntimeGitignores } from './runtime-gitignore.mjs';
 
 import {
@@ -373,9 +373,11 @@ export async function initializeEnabledTools(options = {}) {
   }
   const hlv = await initializeHlvProject({ ...options, rootDir });
   if (!hlv.ok) return { ...base, ok: false, hlv, errors: hlv.errors };
+  const lekalo = await initializeLekaloProject({ ...options, rootDir });
+  if (!lekalo.ok) return { ...base, ok: false, hlv, lekalo, errors: lekalo.errors };
   const skeleton = config.tools.openspec ? await ensureOpenSpecSkeleton({ ...options, rootDir })
     : { ok: true, operations: await ensureRuntimeGitignores(rootDir, runtimeDirs, options), warnings: [], errors: [] };
-  return { ...base, ok: skeleton.ok, hlv, skeleton, operations: [...hlv.operations, ...skeleton.operations],
+  return { ...base, ok: skeleton.ok, hlv, lekalo, skeleton, operations: [...hlv.operations, ...lekalo.operations, ...skeleton.operations],
     warnings: skeleton.warnings, errors: skeleton.errors };
 }
 

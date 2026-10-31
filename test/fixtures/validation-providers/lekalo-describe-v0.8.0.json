@@ -1,0 +1,146 @@
+{
+  "status": "valid",
+  "manifest": {
+  "schemaVersion": "lekalo/workflow-provider/v0.8.0",
+  "identity": "dev.lekalo.workflow-provider@0.8.0",
+  "productVersion": "0.8.0",
+  "discoveryCommand": "lekalo provider describe",
+  "targetProtocolIdentity": "dev.lekalo.target-protocol@0.3.2",
+  "schemaPins": [
+    {
+      "schemaVersion": "lekalo/context-result/v0.8.0",
+      "identity": "dev.lekalo.context-result@0.8.0"
+    },
+    {
+      "schemaVersion": "lekalo/context/v0.2.16",
+      "identity": "dev.lekalo.context@0.2.16"
+    },
+    {
+      "schemaVersion": "lekalo/context/v0.8.0",
+      "identity": "dev.lekalo.context@0.8.0"
+    },
+    {
+      "schemaVersion": "lekalo/diagnostic/v0.2.16"
+    },
+    {
+      "schemaVersion": "lekalo/doctor/v0.3.2",
+      "identity": "dev.lekalo.doctor@0.3.2"
+    },
+    {
+      "schemaVersion": "lekalo/generate-check/v0.6.3"
+    },
+    {
+      "schemaVersion": "lekalo/impact/v0.2.16",
+      "identity": "dev.lekalo.impact@0.2.16"
+    },
+    {
+      "schemaVersion": "lekalo/orchestration/v0.2.16",
+      "identity": "dev.lekalo.orchestration-report@0.2.16"
+    },
+    {
+      "schemaVersion": "lekalo/trace-assessment/v0.6.4",
+      "identity": "dev.lekalo.trace-assessment@0.6.4"
+    },
+    {
+      "schemaVersion": "lekalo/trace-manifest/v0.2.16",
+      "identity": "dev.lekalo.trace-manifest@0.2.16"
+    },
+    {
+      "schemaVersion": "lekalo/trace-validation-evidence/v0.6.4",
+      "identity": "dev.lekalo.trace-validation-evidence@0.6.4"
+    },
+    {
+      "schemaVersion": "lekalo/validation-profile/v0.6.4",
+      "identity": "dev.lekalo.validation-profile@0.6.4"
+    },
+    {
+      "schemaVersion": "lekalo/validation-report/v0.6.4"
+    }
+  ],
+  "operations": [
+    {
+      "id": "context",
+      "effect": "read-only",
+      "outputSchema": "lekalo/context-result/v0.8.0",
+      "requiresProject": true,
+      "requiresAdapter": false
+    },
+    {
+      "id": "doctor",
+      "effect": "read-only",
+      "outputSchema": "lekalo/doctor/v0.3.2",
+      "requiresProject": true,
+      "requiresAdapter": false
+    },
+    {
+      "id": "drift",
+      "effect": "read-only",
+      "outputSchema": "lekalo/generate-check/v0.6.3",
+      "requiresProject": true,
+      "requiresAdapter": false
+    },
+    {
+      "id": "generate",
+      "effect": "generated-artifacts",
+      "outputSchema": "lekalo/orchestration/v0.2.16",
+      "requiresProject": true,
+      "requiresAdapter": true
+    },
+    {
+      "id": "impact",
+      "effect": "read-only",
+      "outputSchema": "lekalo/impact/v0.2.16",
+      "requiresProject": true,
+      "requiresAdapter": false
+    },
+    {
+      "id": "readiness",
+      "effect": "read-only",
+      "outputSchema": "lekalo/doctor/v0.3.2",
+      "requiresProject": true,
+      "requiresAdapter": false
+    },
+    {
+      "id": "status",
+      "effect": "read-only",
+      "outputSchema": "lekalo/doctor/v0.3.2",
+      "requiresProject": true,
+      "requiresAdapter": false
+    },
+    {
+      "id": "trace.assess",
+      "effect": "read-only",
+      "outputSchema": "lekalo/trace-assessment/v0.6.4",
+      "requiresProject": false,
+      "requiresAdapter": false
+    },
+    {
+      "id": "trace.export",
+      "effect": "read-only",
+      "outputSchema": "lekalo/trace-manifest/v0.2.16",
+      "requiresProject": false,
+      "requiresAdapter": false
+    },
+    {
+      "id": "validate",
+      "effect": "read-only",
+      "outputSchema": "lekalo/validation-report/v0.6.4",
+      "requiresProject": true,
+      "requiresAdapter": false
+    },
+    {
+      "id": "verify",
+      "effect": "read-only",
+      "outputSchema": "lekalo/orchestration/v0.2.16",
+      "requiresProject": true,
+      "requiresAdapter": false
+    }
+  ],
+  "bounds": {
+    "recommendedContextBudgetTokens": 5000,
+    "maxContextBudgetTokens": 1000000,
+    "maxExportBytes": 33554432
+  },
+  "manifestDigest": "sha256:a674f1dd6f5608a28b8f1727bcddae4ad67adceace33e871ebb4334f091315d0"
+}
+}

@@ -99,11 +99,12 @@ export async function providerRevision(rootDir, options = {}) {
     if (stat.isFile()) { files.add(relative); return; }
     for (const entry of await readdir(target.path)) await visit(`${relative}/${entry}`);
   };
-  for (const relative of ['openspec', '.hlv', 'lekalo', 'project.yaml', '.ai-factory/config.yaml']) await visit(relative);
+  for (const relative of ['openspec', '.hlv', 'lekalo', 'lekalo.lock', 'project.yaml', '.ai-factory/config.yaml', '.ai-factory/traces']) await visit(relative);
   const hash = createHash('sha256');
   let total = 0;
   for (const relative of [...files].filter((value) => !excluded(value)).sort()) {
-    const bytes = await readProviderFile(rootDir, relative, 16 * 1024 * 1024);
+    const bytes = await readProviderFile(rootDir, relative,
+      relative.startsWith('.ai-factory/traces/') ? 32 * 1024 * 1024 : 16 * 1024 * 1024);
     total += bytes?.length ?? 0;
     if (total > 256 * 1024 * 1024) throw new Error('inventory_limit');
     const mode = bytes === null ? null : (await lstat((await safeProviderPath(rootDir, relative)).path)).mode & 0o777;
