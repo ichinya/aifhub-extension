@@ -47,8 +47,9 @@ function observation(r, caps, found) {
   const scope = caps.idempotency.scope_digest, continuity = caps.idempotency.continuity_token;
   // An absent or shape-invalid observation is a transport failure, not an identity
   // conflict: recovery retries the read instead of asking the owner to resolve identities.
+  const shaped = v => !!v && typeof v === 'object' && !Array.isArray(v);
   requireValue(found && typeof found === 'object' && !Array.isArray(found) && typeof found.state === 'string'
-    && found.identity !== undefined && found.binding !== undefined && found.target !== undefined
+    && shaped(found.identity) && shaped(found.binding) && shaped(found.target)
     && typeof found.namespace_digest === 'string' && typeof found.continuity_token === 'string', 'delivery-observation-unavailable', true);
   requireValue(r.host.namespace_digest === scope && r.host.continuity_token === continuity, 'delivery-identity-conflict', true);
   requireValue(same(found.identity, r.identity) && same(found.binding, r.binding) && same(found.target, r.target)
@@ -153,7 +154,10 @@ async function collect(input, s, options, counters) {
   if (delivery) suggestion = next(delivery.recovery_action?.type === 'wait-request' || !input.read_host ? 'lifecycle-collect' : 'delivery-recover',
     'Delivery requires a separate bounded recovery step.', { request_uuid: delivery.id, ...(delivery.recovery_action ? { recovery_type: delivery.recovery_action.type } : {}) });
   if (blocked || uncertain) suggestion = next('manual', 'Resolve capability, custody or transaction blocker.');
-  return { ok: !blocked && !uncertain, change_id: input.change_id, members, state: blocked ? 'blocked' : uncertain ? 'uncertain' : partial ? 'partial' : waiting ? 'waiting' : 'ready',
+  // Refusal aggregates carry the CLI blocked flag exactly like the catch path, so the
+  // published 0/1/2 exit contract holds for every collect refusal, not only throws.
+  return { ok: !blocked && !uncertain, blocked: blocked || uncertain, change_id: input.change_id, members,
+    state: blocked ? 'blocked' : uncertain ? 'uncertain' : partial ? 'partial' : waiting ? 'waiting' : 'ready',
     ...(limits.length ? { code: 'lifecycle-capabilities-required' } : {}), pending_transactions: pending.map(p => p.tx.id), next_action: suggestion,
     capability_limitations: [...new Set(limits)], reservation_retained: members.some(m => m.reservation_retained) };
 }
@@ -250,7 +254,10 @@ async function release(input, s, options, counters) {
       && ['schema', 'input_digest', 'request_uuid', 'binding_digest', 'state', 'release'].every(k => Object.hasOwn(journal, k))
       && Object.keys(journal).length === 6;
     requireValue(shape && journal.schema === RELEASE_SCHEMA && journal.input_digest === digest(input) && journal.request_uuid === r.request_uuid
-      && journal.binding_digest === digest(r.binding) && ['intent', 'released'].includes(journal.state), 'conflicting-lifecycle-replay', true);
+      && journal.binding_digest === digest(r.binding) && ['intent', 'released'].includes(journal.state)
+      && (journal.state === 'intent' ? journal.release === null
+        : !!journal.release && typeof journal.release === 'object' && !Array.isArray(journal.release)
+          && typeof journal.release.released_at === 'string' && journal.release.host_release_state === 'released'), 'conflicting-lifecycle-replay', true);
   }
   if (journal?.state !== 'released') {
     const query = { request_uuid: r.request_uuid, namespace_digest: caps.idempotency.scope_digest };
@@ -309,7 +316,11 @@ async function finalize(input, s, options, counters) {
   const plan = base.toLowerCase(), target = specs.toLowerCase();
   requireValue(target !== plan && !plan.startsWith(target + '/') && !target.startsWith(plan + '/'), 'unsafe-path', true);
   const archive = `${specs}/${input.change_id}`, writes = [], inventory = await s.inventory(base), guards = [];
-  for (const path of Object.keys(inventory)) if (path !== statusPath) writes.push([`${archive}/${path.slice(base.length + 1)}`, await s.bytes(path)]);
+  // Bound the buffer-accumulation peak before publish builds the base64 images.
+  requireValue(Object.keys(inventory).length + 3 <= LIFECYCLE_LIMITS.files, 'invalid-lifecycle-journal', true);
+  let planned = 0;
+  const budget = bytes => { planned += bytes.length; requireValue(planned <= LIFECYCLE_LIMITS.bytes, 'invalid-lifecycle-journal', true); return bytes; };
+  for (const path of Object.keys(inventory)) if (path !== statusPath) writes.push([`${archive}/${path.slice(base.length + 1)}`, budget(await s.bytes(path))]);
   // Companion copies own these two archive names; same-named plan-folder files would be
   // silently replaced and lose their content, so refuse before any write.
   requireValue(!Object.hasOwn(inventory, `${base}/plan.md`) && !Object.hasOwn(inventory, `${base}/spec.md`), 'conflicting-archive-entry', true);
@@ -317,13 +328,28 @@ async function finalize(input, s, options, counters) {
     const bytes = await s.bytes(path); if (bytes !== null) guards.push({ path, sha256: digest(bytes) });
   }
   const add = (path, data) => { const i = writes.findIndex(w => w[0] === path); if (i >= 0) writes[i] = [path, data]; else writes.push([path, data]); };
-  add(`${archive}/plan.md`, await s.bytes(source.namespace.entrypoint)); add(`${archive}/spec.md`, input.spec);
+  add(`${archive}/plan.md`, budget(await s.bytes(source.namespace.entrypoint))); add(`${archive}/spec.md`, budget(Buffer.from(input.spec)));
   const indexPath = `${specs}/index.yaml`, index = await s.textFile(indexPath);
   const entry = `  - id: ${JSON.stringify(input.change_id)}\n    title: ${JSON.stringify(input.change_id)}\n    archived_at: ${JSON.stringify(s.now())}\n    verification: ${parsed.verification.verdict}\n    source_branch: null\n`;
   // Preserve arbitrary index bytes; replace only our exact keyed entry on replay/refresh.
   let indexAfter = index ?? 'specs:\n';
   requireValue(/^specs:\s*(?:\[\])?\s*$/m.test(indexAfter), 'unsupported-spec-index', true);
   indexAfter = indexAfter.replace(/^specs:\s*\[\]\s*$/m, 'specs:');
+  // Structural validation before any manipulation: quoted or otherwise unrecognized
+  // top-level keys would hide foreign lists from the section boundaries, and entries
+  // not starting with `- id:` would be silently duplicated. Sections other than specs
+  // own their indentation; inside specs only flat `- id:` entries are representable.
+  const doc = indexAfter.split('\n'), specsAt = doc.findIndex(line => /^specs:/.test(line));
+  requireValue(specsAt >= 0, 'unsupported-spec-index', true);
+  let specsEnd = specsAt + 1;
+  while (specsEnd < doc.length && !/^[A-Za-z_][\w-]*:/.test(doc[specsEnd])) specsEnd++;
+  for (let i = 0; i < doc.length; i++) {
+    const line = doc[i];
+    if (!line.trim() || /^\s*#/.test(line)) continue;
+    if (/^\S/.test(line)) { requireValue(/^[A-Za-z_][\w-]*:(?:\s.*)?$/.test(line), 'unsupported-spec-index', true); continue; }
+    if (i <= specsAt || i >= specsEnd) continue;
+    requireValue(/^  - id:/.test(line) || /^    \S/.test(line), 'unsupported-spec-index', true);
+  }
   const lines = indexAfter.split('\n'), sectionStart = lines.findIndex(line => /^specs:/.test(line));
   requireValue(sectionStart >= 0, 'unsupported-spec-index', true);
   let sectionEnd = sectionStart + 1;
@@ -370,7 +396,7 @@ async function finalize(input, s, options, counters) {
     const verdict = inVerdicts && line.match(/^    (pass|pass-with-notes|fail):/);
     return verdict ? `    ${verdict[1]}: ${rows.filter(row => (row.verification ?? row.verdict) === verdict[1]).length}` : line;
   }).join('\n');
-  add(indexPath, withStats.replace(/\n?$/, '\n'));
+  add(indexPath, budget(Buffer.from(withStats.replace(/\n?$/, '\n'))));
   // Keyed rewrites keep CRLF bytes and tolerate spacing before the colon; a duplicated
   // status/finalized_at key is refused before any write.
   const bom = status.startsWith('\uFEFF') ? '\uFEFF' : '', statusBody = status.slice(bom.length);
@@ -382,7 +408,7 @@ async function finalize(input, s, options, counters) {
   // The execution source projection must survive status-only changes.
   const checkStatus = parseSimpleYaml(after);
   requireValue(checkStatus.plan_id === parsed.plan_id && same(checkStatus.source_binding, parsed.source_binding), 'invalid-source-binding', true);
-  add(statusPath, after);
+  add(statusPath, budget(Buffer.from(after)));
   return s.publishLifecycle(input.change_id, 'finalization', id, input, writes,
     { ok: true, state: 'finalized', archive, authority: '/aif-done', next_action: null, authorizes: [] }, guards);
 }

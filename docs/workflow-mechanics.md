@@ -115,7 +115,7 @@ The parent inspects the diff and evidence, then calls `accept`:
 }
 ```
 
-Only the current completed result can transition to `accepted`, closing that single dispatch. Any later file or evidence change blocks acceptance. Exact result/accept retries use the original submitted version, remain subject to freshness, and do not advance the version again. The helper does not update task checkboxes; the parent rechecks current evidence before doing so. Coupled/shared-file tasks run serially through fresh assignments. Canonical updates intentionally invalidate the old context.
+Only the current completed result can transition to `accepted`, closing that single dispatch. Any later file or evidence change blocks acceptance. Exact result/accept retries use the original submitted version, remain subject to freshness, and do not advance the version again. The result/accept helpers do not update task checkboxes; the parent rechecks current evidence before doing so. The separate `lifecycle-progress` action applies the closed run's exact accepted set to the canonical checklist mechanically (journal-first, quiescence-checked) and never a caller-supplied task set. Coupled/shared-file tasks run serially through fresh assignments. Canonical updates intentionally invalidate the old context.
 
 `accepted` means the parent accepted the worker report. It does not write QA, grant approval, or imply `/aif-done`. Existing [Handoff validation](handoff-validation-profile.md), `/aif-verify`, coverage, rules, and done ownership stay authoritative.
 

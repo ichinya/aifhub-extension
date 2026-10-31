@@ -250,7 +250,7 @@ test('AC1: include_all degrades per member over a corrupt request registry', asy
   const f = await single(t);
   await f.put('.ai-factory/state/work/execution/requests/not-a-uuid.json', 'corrupt\n');
   const result = await f.call('lifecycle-collect', { change_id: 'work', include_all: true });
-  assert.equal(result.state, 'uncertain'); assert.equal(result.ok, false);
+  assert.equal(result.state, 'uncertain'); assert.equal(result.ok, false); assert.equal(result.blocked, true);
   assert.equal(result.members.filter(m => m.kind === 'delivery').length, 1); // valid member still listed
   assert.equal(result.next_action.type, 'manual');
 });
@@ -261,7 +261,7 @@ test('AC1: collect reports a locally blocked delivery phase as blocked, not wait
   const recovered = await f.call('delivery-recover', { change_id: 'work', run_id: 'run-1', request_uuid: uuid(1) }, { HostClient: f.host });
   assert.equal(recovered.ok, false);
   const result = await f.call('lifecycle-collect', { change_id: 'work', members: [{ request_uuid: uuid(1) }] });
-  assert.equal(result.state, 'blocked'); assert.equal(result.ok, false);
+  assert.equal(result.state, 'blocked'); assert.equal(result.ok, false); assert.equal(result.blocked, true);
   assert.equal(result.next_action.type, 'manual');
 });
 
@@ -284,12 +284,18 @@ test('AC6: CLI exit codes classify lifecycle results (blocked 1, invalid 2, succ
   const ok = await spawn('lifecycle-collect', { change_id: 'work', members: [{ run_id: 'run-1' }] });
   assert.equal(ok.code, 0); assert.equal(ok.stderr, ''); assert.equal(JSON.parse(ok.stdout).ok, true);
   const blocked = await spawn('lifecycle-progress', { change_id: 'work', run_id: 'missing', actor: 'parent' });
-  assert.equal(blocked.code, 1); assert.equal(JSON.parse(blocked.stdout).ok, false);
+  assert.equal(blocked.code, 1); assert.equal(blocked.stderr, ''); assert.equal(JSON.parse(blocked.stdout).ok, false);
   assert.equal(JSON.parse(blocked.stdout).blocked, true);
   assert.equal(JSON.parse(blocked.stdout).code, 'missing-or-invalid-run');
   const invalid = await spawn('lifecycle-progress', { change_id: '../escape', run_id: 'run-1', actor: 'parent' });
-  assert.equal(invalid.code, 2); assert.equal(JSON.parse(invalid.stdout).code, 'invalid-change-id');
+  assert.equal(invalid.code, 2); assert.equal(invalid.stderr, ''); assert.equal(JSON.parse(invalid.stdout).code, 'invalid-change-id');
   assert.equal(JSON.parse(invalid.stdout).blocked, false);
+  // A collect refusal returned as a structured result (not a throw) must classify too.
+  await p.call('interrupt', { change_id: 'work', run_id: 'run-1', actor: 'parent', version: 1, recovery_id: 'lost', reason: 'abandoned', execution_state: 'unknown' });
+  const uncertain = await spawn('lifecycle-collect', { change_id: 'work', members: [{ run_id: 'run-1' }] });
+  assert.equal(uncertain.code, 1); assert.equal(uncertain.stderr, '');
+  const envelope = JSON.parse(uncertain.stdout);
+  assert.equal(envelope.ok, false); assert.equal(envelope.blocked, true); assert.equal(envelope.state, 'uncertain');
 });
 
 test('AC5: settlement journal is durable before record; exact retry completes publication', async t => {
@@ -392,6 +398,10 @@ test('AC6: finalizer refuses unsupported index shapes and plan-folder name colli
     // A flow/nested verification value on any listed entry defeats the flat by_verdict recount.
     'specs:\n  - id: old\n    title: Old\n    verification: {verdict: pass}\n',
     'specs:\n  - id: work\n    title: work\n\n    verdict: pass\n', // blank line inside the entry span
+    // Quoted top-level keys hide foreign lists from the section boundaries.
+    'specs:\n  - id: old\n    title: Old\n"other":\n  - id: work\n    title: Foreign\n',
+    // Entries not starting with `- id:` would be silently duplicated on replacement.
+    'specs:\n  - title: Foreign\n    id: work\n    verification: pass\n',
   ]) {
     await f.put('.ai-factory/specs/index.yaml', index);
     assert.equal((await f.call('lifecycle-finalize', input)).code, 'unsupported-spec-index');
@@ -438,6 +448,48 @@ test('AC5: publication refuses an oversized plan inventory before building all i
   const result = await f.call('lifecycle-finalize', { change_id: 'work', actor: 'parent', spec: '# Spec\n' });
   assert.equal(result.code, 'invalid-lifecycle-journal');
   await assert.rejects(f.get('.ai-factory/specs/work/spec.md'), { code: 'ENOENT' });
+});
+
+test('AC5: publication refuses an over-large plan inventory by file count before reads', async t => {
+  const f = await batch(t, { mode: 'classic' }); await f.call('lifecycle-progress', runInput);
+  await f.put(`${f.plans}/work/status.yaml`, 'status: verified\nplan_id: work\nverification:\n  verdict: pass\n');
+  for (let i = 0; i < 200; i++) await f.put(`${f.plans}/work/pad-${i}.md`, 'small\n');
+  const result = await f.call('lifecycle-finalize', { change_id: 'work', actor: 'parent', spec: '# Spec\n' });
+  assert.equal(result.code, 'invalid-lifecycle-journal');
+  await assert.rejects(f.get('.ai-factory/specs/work/spec.md'), { code: 'ENOENT' });
+});
+
+test('AC3: release succeeds with exactly one history slot of headroom', async t => {
+  const f = await single(t), input = { ...runInput, request_uuid: uuid(1) };
+  const store = await deliveryStore({ rootDir: f.root });
+  const r = await store.loadRequest('work', uuid(1));
+  while (r.history.length < DELIVERY_LIMITS.history - 1) { r.revision++; r.history.push({ revision: r.revision, phase: r.phase, at: r.updated_at }); }
+  const p = deliveryPaths('work', uuid(1));
+  await store.save(p.journal, { schema: 'aifhub.delivery-journal.v1', request_uuid: uuid(1), record_digest: digest(r), record: r });
+  await store.save(p.request, r);
+  const released = await f.call('lifecycle-release', input, { HostClient: f.host });
+  assert.equal(released.ok, true); assert.equal(released.state, 'released');
+  assert.equal(f.host.state.released.size, 1);
+});
+
+test('AC3: a release journal with inconsistent state/release conflicts before recovery', async t => {
+  const f = await single(t), input = { ...runInput, request_uuid: uuid(1) };
+  const record = { schema: 'aifhub.release-journal.v1', input_digest: digest(input), request_uuid: uuid(1),
+    binding_digest: digest((await f.record()).binding), state: 'released', release: null };
+  await f.put(lifecyclePaths('work', 'release', uuid(1)).journal, JSON.stringify({ checksum: digest(record), record }, null, 2) + '\n');
+  assert.equal((await f.call('lifecycle-release', input, { HostClient: f.host })).code, 'conflicting-lifecycle-replay');
+  assert.equal(f.host.state.counters.release_calls ?? 0, 0);
+});
+
+test('AC5: losing an applied finalization journal returns the finalizer to the fresh path (documented)', async t => {
+  const f = await batch(t, { mode: 'classic' }); await f.call('lifecycle-progress', runInput);
+  await f.put(`${f.plans}/work/status.yaml`, 'status: verified\nplan_id: work\nverification:\n  verdict: pass\n');
+  const input = { change_id: 'work', actor: 'parent', spec: '# Первый spec\n' };
+  assert.equal((await f.call('lifecycle-finalize', input)).ok, true);
+  await rm(path.join(f.root, lifecyclePaths('work', 'finalization', 'finalize').journal));
+  const again = await f.call('lifecycle-finalize', { ...input, spec: '# Повторная публикация\n' });
+  assert.equal(again.ok, true); assert.equal(again.recovered, undefined); // fresh path, not recovery
+  assert.equal(await f.get('.ai-factory/specs/work/spec.md'), '# Повторная публикация\n'); // re-publish is owner-gated
 });
 
 test('AC6: failing verification verdict blocks finalization before any archive write', async t => {
