@@ -55,6 +55,13 @@ export function createFakeHost({ state, mode = 'normal', capabilities = {}, fail
       if (!body) return null;
       return { body: host.mode === 'changed-body' ? Buffer.concat([body, Buffer.from('\nnormalized')]) : Buffer.from(body) };
     },
+    async releaseRequest({ request_uuid }) {
+      state.trace.push(['release', request_uuid]); state.counters.release_calls = (state.counters.release_calls ?? 0) + 1;
+      const request = state.requests.get(request_uuid);
+      if (request?.state !== 'completed') return { state: 'unknown' };
+      state.released ??= new Set(); state.released.add(request_uuid);
+      return { state: 'released' };
+    },
     complete(uuid) {
       const request = state.requests.get(uuid); request.state = 'completed';
       state.tombstones.get(uuid).request.state = 'completed';

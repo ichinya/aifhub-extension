@@ -4,7 +4,7 @@ import { deliveryAdmission } from './execution-state.mjs';
 import { strictQaGate } from './qa-manifest-store.mjs';
 import { DELIVERY_REQUEST_SCHEMA, DELIVERY_RECORD_SCHEMA, RECOVERY_ACTION_TYPES, DELIVERY_LIMITS, TRANSPORT_KEYS,
   deliveryPaths, deliveryStore, requestUuid, validateDeliveryRequest, validateDeliveryRecord, validateRecoveryAction,
-  frozenRequest, strictBody, readBody, validateFrozenBody, projection } from './host-delivery-store.mjs';
+  frozenRequest, strictBody, readBody, validateFrozenBody, projection, bindingFor, validCapabilities, bounded } from './host-delivery-store.mjs';
 export { DELIVERY_REQUEST_SCHEMA, DELIVERY_RECORD_SCHEMA, RECOVERY_ACTION_TYPES, validateDeliveryRequest,
   validateDeliveryRecord, validateRecoveryAction };
 // Records one bounded send/recover action may still append after the host
@@ -15,9 +15,6 @@ const same = (a, b) => canonical(a) === canonical(b);
 const common = ['change_id', 'run_id', 'request_uuid'];
 const optional = ['task_id', 'target', 'body', 'body_file', 'binding'];
 const lock = (s, change, fn) => s.lock('.ai-factory/state/execution-write.lock', () => s.lock(`${deliveryPaths(change, '00000000-0000-4000-8000-000000000000').folder}/write.lock`, fn));
-const bindingFor = ({ run, result, task_id }, target) => ({ change_id: run.change_id, run_id: run.run_id, task_id,
-  run_version_at_prepare: run.version, result_submitted_version: result.submitted_version, result_digest: result.digest,
-  source_digest: run.source.namespace_digest, context_digest: result.context_digest, worktree_digest: result.worktree_digest, target_digest: digest(target) });
 
 export async function reserveDeliverySlot(input, options = {}) {
   fields(input, ['change_id', 'run_id', 'target'], ['task_id', 'request_uuid']);
@@ -114,13 +111,6 @@ export async function prepareDelivery(input, options = {}) {
 function action(r, type, preconditions) {
   return validateRecoveryAction({ type, request_uuid: r.request_uuid, ...(preconditions ? { preconditions } : {}) });
 }
-function validCapabilities(c, r, s) {
-  const i = c?.idempotency;
-  return c?.idempotent_create === true && c.read_by_request_id === true && c.fetch_response === true
-    && c.target_kinds?.includes(r.target.kind) && /^[a-f0-9]{64}$/.test(i?.scope_digest)
-    && typeof i.continuity_token === 'string' && i.continuity_token.length > 0 && i.conflicting_payload === 'reject'
-    && (i.retention_until === 'durable' || Date.parse(i.retention_until) > Date.parse(s.now()));
-}
 function preconditions(r) {
   return { namespace_digest: r.host.namespace_digest, continuity_token: r.host.continuity_token,
     capabilities_digest: r.host.capabilities_digest, body_sha256: r.body.sha256 };
@@ -138,13 +128,6 @@ export function deliveryTransportInput(request, capabilities) {
     return { transport: 'file', stdin };
   }
   return null;
-}
-async function bounded(fn, options) {
-  const ms = options.hostTimeoutMs ?? 5000;
-  requireValue(Number.isSafeInteger(ms) && ms >= 1 && ms <= 300000, 'invalid-host-timeout');
-  let timer;
-  try { return await Promise.race([Promise.resolve().then(fn), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('host-timeout')), ms); })]); }
-  finally { clearTimeout(timer); }
 }
 async function operate(kind, s, r, fn, options, writable) {
   if (writable) {

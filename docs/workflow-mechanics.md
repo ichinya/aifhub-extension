@@ -291,3 +291,5 @@ At group boundaries use available observed setup/orientation/integration work an
 ## Доставка замороженного результата
 
 [Delivery recovery](host-delivery.md) использует отдельный request UUID registry и journal. Read/fetch не меняют execution receipts/version; uncertain не вызывает lifecycle transitions. Четыре поля существующей delivery-проекции сохраняют QA reuse; новый slot после snapshot остаётся материальным. Успешная доставка не подтверждает semantic PASS или право на settlement.
+
+[Optional lifecycle helper](host-lifecycle.md) (#231) группирует status/waits, фиксирует explicit parent settlement отдельно от receipts, выполняет verified host release и journaled exact accepted progress. Classic finalizer публикует caller-reviewed artifacts только после readiness; `/aif-done` сохраняет authority. Checklist application механический, caller task set не принимается. Host-dependent шаги без adapter дают manual_path и capability limitations. Один вызов — один bounded шаг; driver cadence остаётся вне execution lock и model loop. Live pilot — NOTRUN.
