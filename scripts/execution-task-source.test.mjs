@@ -52,6 +52,14 @@ test('task grammar ignores frontmatter, comments and code but preserves nested t
   assert.deepEqual(parseExecutionTasks('```html\n<!--\n```\n- [ ] Task 2: Preserve `<!-- literal -->`\n'),[{id:'2',checked:false,title:'Preserve `<!-- literal -->`'}]);
 });
 
+// Defect class: a leading BOM shifts every byte of line 0, so checkbox offsets must
+// compensate (+1) or mechanical replacement corrupts the line instead of checking it.
+test('BOM offsets keep line-0 checkbox positions byte-exact for replacement', () => {
+  assert.deepEqual(parseExecutionTasks('\uFEFF- [ ] 1.1 First\n- [ ] 1.2 Second\n', { locations: true }).map(t => [t.id, t.line, t.checkbox]),
+    [['1.1', 0, 4], ['1.2', 1, 3]]);
+  assert.deepEqual(parseExecutionTasks('- [ ] 1.1 First\n', { locations: true }).map(t => [t.id, t.line, t.checkbox]), [['1.1', 0, 3]]);
+});
+
 test('long sequential source IDs and classic Task N remain exact', async () => {
   const p = await project({ mode: 'classic', id: '001_'+ 'a'.repeat(85) });
   for (const name of [`${p.plans}/${p.id}.md`, `${p.plans}/${p.id}/task.md`]) await p.put(name, '- [ ] Task 12: Exact title\n');

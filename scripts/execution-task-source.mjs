@@ -54,7 +54,7 @@ export function assertAuxiliaryPaths(paths) {
 
 // Preserve inline code in titles. Exclude examples without changing the shared
 // marker parser used by other workflow owners.
-export function parseExecutionTasks(content) {
+export function parseExecutionTasks(content, { locations = false } = {}) {
   const lines = String(content).replace(/^\uFEFF/, '').split(/\r\n|\n|\r/);
   let frontmatter = lines[0] === '---', fence = null, comment = false, ordinal = 0;
   const tasks = [], seen = new Set();
@@ -70,17 +70,19 @@ export function parseExecutionTasks(content) {
       if(rawMarker && rawMarker[1][0]===fence.char && rawMarker[1].length>=fence.length && !rawMarker[2].trim())fence=null;
       continue;
     }
-    let visible = '';
+    let visible = '', rawOffset = 0;
+    const offsets = [];
+    const append = text => { visible += text; if (locations) for (let i = 0; i < text.length; i++) offsets.push(rawOffset + i); };
     while (line.length) {
-      if (comment) { const end = line.indexOf('-->'); if (end < 0) { line = ''; break; } line = line.slice(end + 3); comment = false; }
+      if (comment) { const end = line.indexOf('-->'); if (end < 0) { line = ''; break; } line = line.slice(end + 3); rawOffset += end + 3; comment = false; }
       else {
         const start=line.indexOf('<!--'),tick=line.indexOf('`');
         if(tick>=0 && (start<0 || tick<start)) {
           const marker=line.slice(tick).match(/^`+/)[0],end=line.indexOf(marker,tick+marker.length);
-          if(end>=0) { visible+=line.slice(0,end+marker.length);line=line.slice(end+marker.length);continue; }
+          if(end>=0) { append(line.slice(0,end+marker.length));line=line.slice(end+marker.length);rawOffset+=end+marker.length;continue; }
         }
-        if(start<0) { visible+=line;break; }
-        visible+=line.slice(0,start);line=line.slice(start+4);comment=true;
+        if(start<0) { append(line);break; }
+        append(line.slice(0,start));line=line.slice(start+4);rawOffset+=start+4;comment=true;
       }
     }
     line = visible;
@@ -99,7 +101,8 @@ export function parseExecutionTasks(content) {
     requireValue(!seen.has(id), 'unknown-or-ambiguous-task', true); seen.add(id);
     const title = (numbered?.[2] ?? upstream?.[2] ?? match[3]).replace(/\s+/g, ' ').trim();
     boundedText(title, 8000);
-    tasks.push({ id, checked: match[2] !== ' ', title });
+    tasks.push({ id, checked: match[2] !== ' ', title, ...(locations ? { line: index,
+      checkbox: offsets[match[0].indexOf('[') + 1] + (index === 0 && String(content).startsWith('\uFEFF') ? 1 : 0) } : {}) });
     requireValue(tasks.length <= 1000, 'too-many-tasks');
   }
   requireValue(!frontmatter, 'invalid-task-frontmatter');

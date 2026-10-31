@@ -10,6 +10,25 @@ export const RECOVERY_ACTION_TYPES = Object.freeze(['provide-capabilities', 'rea
 export const TRANSPORT_KEYS = Object.freeze(['create_calls', 'read_calls', 'fetch_calls', 'retry_creates', 'recovery_attempts',
   'verified_recoveries', 'uncertain_returns', 'identity_conflicts', 'transport_ms', 'recovery_ms', 'wait_ms', 'incomplete_intervals']);
 export const DELIVERY_LIMITS = Object.freeze({ body: 16 * 1024 * 1024, stdin: 1024 * 1024, history: 256, requests: 200 });
+// Shared adapter utilities must not import execution-state: its CLI awaits dispatch.
+export const bindingFor = ({ run, result, task_id }, target) => ({ change_id: run.change_id, run_id: run.run_id, task_id,
+  run_version_at_prepare: run.version, result_submitted_version: result.submitted_version, result_digest: result.digest,
+  source_digest: run.source.namespace_digest, context_digest: result.context_digest, worktree_digest: result.worktree_digest, target_digest: digest(target) });
+export function validCapabilities(c, r, s) {
+  const i = c?.idempotency;
+  return c?.idempotent_create === true && c.read_by_request_id === true && c.fetch_response === true
+    && c.target_kinds?.includes(r.target.kind) && /^[a-f0-9]{64}$/.test(i?.scope_digest)
+    && typeof i.continuity_token === 'string' && i.continuity_token.length > 0 && i.conflicting_payload === 'reject'
+    && (c.release_after_verify === undefined || typeof c.release_after_verify === 'boolean')
+    && (i.retention_until === 'durable' || Date.parse(i.retention_until) > Date.parse(s.now()));
+}
+export async function bounded(fn, options) {
+  const ms = options.hostTimeoutMs ?? 5000;
+  requireValue(Number.isSafeInteger(ms) && ms >= 1 && ms <= 300000, 'invalid-host-timeout');
+  let timer;
+  try { return await Promise.race([Promise.resolve().then(fn), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('host-timeout')), ms); })]); }
+  finally { clearTimeout(timer); }
+}
 const phases = ['reserved', 'prepared', 'in_flight', 'pending', 'observed_completed', 'uncertain', 'blocked', 'verified'];
 const equal = (a, b) => canonical(a) === canonical(b);
 const count = n => requireValue(Number.isSafeInteger(n) && n >= 0, 'invalid-delivery-state', true);
@@ -49,7 +68,7 @@ export function frozenRequest(r) {
 }
 export function validateDeliveryRequest(r) {
   fields(r, ['schema', 'request_uuid', 'revision', 'phase', 'slot', 'target', 'identity', 'binding', 'body', 'verdict', 'frozen_evidence',
-    'frozen_digest', 'host', 'attempt_count', 'recovery', 'history', 'transport', 'interval', 'created_at', 'updated_at']);
+    'frozen_digest', 'host', 'attempt_count', 'recovery', 'history', 'transport', 'interval', 'created_at', 'updated_at'], ['release']);
   requireValue(r.schema === DELIVERY_REQUEST_SCHEMA && phases.includes(r.phase), 'invalid-delivery-state', true);
   requestUuid(r.request_uuid); count(r.revision); requireValue(r.revision > 0, 'invalid-delivery-state', true);
   fields(r.slot, ['change_id', 'run_id', 'task_id']); executionId(r.slot.change_id); identifier(r.slot.run_id); identifier(r.slot.task_id);
@@ -98,6 +117,10 @@ export function validateDeliveryRequest(r) {
   }
   if (r.phase === 'verified') requireValue(r.host.request_state === 'completed' && r.host.delivered_body_sha256 === r.body.sha256
     && typeof r.host[r.target.kind === 'message' ? 'message_id' : 'completion_id'] === 'string' && r.recovery === null, 'invalid-delivery-state', true);
+  if (r.release !== undefined) {
+    fields(r.release, ['released_at', 'host_release_state']); date(r.release.released_at);
+    requireValue(r.phase === 'verified' && r.release.host_release_state === 'released', 'invalid-delivery-state', true);
+  }
   return r;
 }
 export function strictBody(data) {

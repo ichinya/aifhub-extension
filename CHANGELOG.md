@@ -7,6 +7,7 @@
 ## [В разработке]
 
 ### Добавлено
+- Optional host lifecycle (#231): grouped collect/typed waits, отдельный settlement с parent decision/CAS, verified host release, exact accepted progress и classic bounded finalizer с journal recovery. Offline paired service-call pilot; live NOTRUN, HELPER_MODULES inclusion отложен до release (регенерация provenance для изменённых helpers выполнена, отложено только включение новых lifecycle-модулей в манифест).
 - Lekalo provider 1.1.0 (#255): exact workflow-provider@0.8.0 discovery, read-only status/doctor/validate/readiness/trace и semantic impact/context; verdict-нормализация до gates, обязательный --no-cache, LEK-коды, явный overflow, AI Factory trace custody и идемпотентный init --adopt с dry-run/refusal. Native/LPAC, drift/generate/sync, prompt install и trace collect остаются вне адаптера.
 - Delivery recovery по request UUID (#232): reserve/prepare, checksummed registry и journal, typed uncertain, strict gate/byte verification без нового AI-аудита; injectable HostClient, общий no-shell transport, fake-host/failpoints и optional transport metrics. Production adapter и live-host измерения остаются вне первой итерации.
 - Измеритель entrypoints (#233, PR3): read-only JSON manifests source/installed, bytes/lines/sha256 и раздельные references; отдельный prompt-asset inventory/preservation guard перед update с проверкой marker pairs и installed references.
