@@ -579,12 +579,12 @@ test('AC1/6: a single producer result returns the driver to the parent without p
 
 test('AC7: executed paired single wait/settle, batch 2–5 through finalization and interrupt/re-dispatch', async t => {
   const measurements = [];
-  const measure = async (name, setup, manualSteps, groupedSteps) => {
+  const measure = async (name, setup, manualSteps, groupedSteps, floor = 2) => {
     const baseline = await setup(), candidate = await setup(); let manualCalls = 0, groupedCalls = 0;
     const call = (f, count) => async (action, input, options) => { count(); return f.call(action, input, options); };
     await manualSteps(baseline, call(baseline, () => { manualCalls++; }));
     await groupedSteps(candidate, call(candidate, () => { groupedCalls++; }));
-    assert.ok(manualCalls / groupedCalls >= 2, `${name}: ${manualCalls}/${groupedCalls}`);
+    assert.ok(manualCalls / groupedCalls >= floor, `${name}: ${manualCalls}/${groupedCalls}`);
     measurements.push({ scenario: name, manual: manualCalls, grouped: groupedCalls, ratio: manualCalls / groupedCalls });
   };
   await measure('single wait + settle', async () => { const f = await single(t); await f.close(); return f; },
@@ -612,6 +612,21 @@ test('AC7: executed paired single wait/settle, batch 2–5 through finalization 
     assert.equal((await call('lifecycle-progress', runInput)).ok, true);
     assert.equal((await call('lifecycle-finalize', { change_id: 'work', actor: 'parent', spec: '# Spec\n' })).ok, true);
   });
+  for (const n of [2, 5]) await measure(`batch ${n}: group-boundary manual → progress/finalize`, async () => {
+    const f = await batch(t, { mode: 'classic', n });
+    await f.put(`${f.plans}/work/status.yaml`, 'status: verified\nplan_id: work\nverification:\n  verdict: pass\n'); return f;
+  }, async (f, call) => {
+    // Lean baseline: one observation covers the whole batch instead of one per item.
+    const inspected = await call('inspect', { change_id: 'work', run_id: 'run-1' }); assert.equal(inspected.lifecycle, 'closed');
+    const resumed = await call('resume', { change_id: 'work', run_id: 'run-1' });
+    assert.equal(Object.values(resumed.items).every(item => item.accepted), true);
+    assert.equal((await call('lifecycle-progress', runInput)).ok, true);
+    assert.equal((await call('lifecycle-finalize', { change_id: 'work', actor: 'parent', spec: '# Spec\n' })).ok, true);
+  }, async (f, call) => {
+    assert.equal((await call('lifecycle-collect', { change_id: 'work', members: [{ run_id: 'run-1' }] })).state, 'ready');
+    assert.equal((await call('lifecycle-progress', runInput)).ok, true);
+    assert.equal((await call('lifecycle-finalize', { change_id: 'work', actor: 'parent', spec: '# Spec\n' })).ok, true);
+  }, 1);
   const interruptSetup = async () => {
     const f = await single(t, { pending: true });
     await f.call('interrupt', { ...runInput, version: 2, recovery_id: 'lost', reason: 'abandoned', execution_state: 'unknown' });
