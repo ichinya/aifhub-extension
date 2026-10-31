@@ -219,6 +219,21 @@ for (const point of ['lifecycle-after-release-intent', 'lifecycle-after-host-rel
   await f.call('lifecycle-release', input); assert.equal(f.host.state.trace.length, calls);
 });
 
+test('AC6: concurrent interrupt fails fast with state-locked while a bounded release call holds custody', async t => {
+  const f = await single(t), input = { ...runInput, request_uuid: uuid(1) };
+  let signalEntry, unblock; const entered = new Promise(r => { signalEntry = r; }), held = new Promise(r => { unblock = r; });
+  // A short hostTimeoutMs makes the in-flight call fail fast instead of hanging the suite.
+  const wrapped = { ...f.host, releaseRequest: async query => { signalEntry(); await held; return f.host.releaseRequest(query); } };
+  const release = f.call('lifecycle-release', input, { HostClient: wrapped, hostTimeoutMs: 250 });
+  await entered;
+  await assert.rejects(f.call('interrupt', { ...runInput, version: 2, recovery_id: 'recover-1', reason: 'abandoned', execution_state: 'unknown' }),
+    e => e.code === 'state-locked'); // parallel sessions never steal or wait out the lock
+  const result = await release; // the short bounded timeout fires while the call is still held
+  assert.equal(result.ok, false); assert.equal(result.code, 'lifecycle-release-unproven'); // bounded, typed, no hang
+  assertSafe(result);
+  unblock(); await new Promise(r => setImmediate(r)); // settle the wrapped host call
+});
+
 test('AC1/6: classic finalizer blocks gates, applies archive/index/status and delegates OpenSpec', async t => {
   const f = await batch(t, { mode: 'classic' }), input = { change_id: 'work', actor: 'parent', spec: '# Проверенный результат\n' };
   assert.equal((await f.call('lifecycle-finalize', input)).code, 'lifecycle-progress-required');
