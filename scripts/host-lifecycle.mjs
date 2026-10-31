@@ -2,7 +2,7 @@
 import { canonical, digest, fields, identifier, requireValue, boundedText, WorkflowError } from './workflow-state-store.mjs';
 import { history, pendingTransactions, reserves, folderFor } from './execution-transactions.mjs';
 import { executionId, parseExecutionTasks, resolveExecutionSource } from './execution-task-source.mjs';
-import { deliveryPaths, projection, requestUuid, RECOVERY_ACTION_TYPES, validateFrozenBody, bindingFor, bounded, validCapabilities } from './host-delivery-store.mjs';
+import { deliveryPaths, projection, requestUuid, RECOVERY_ACTION_TYPES, validateFrozenBody, bindingFor, bounded, validCapabilities, DELIVERY_LIMITS } from './host-delivery-store.mjs';
 import { lifecycleStore, lifecycleLock, lifecyclePaths, validateSettlement, SETTLEMENT_SCHEMA, RELEASE_SCHEMA, LIFECYCLE_LIMITS } from './host-lifecycle-store.mjs';
 import { parseProjectConfig, parseSimpleYaml } from './aif-artifact-sync.mjs';
 
@@ -45,8 +45,13 @@ function requestBinding(r, run) {
 }
 function observation(r, caps, found) {
   const scope = caps.idempotency.scope_digest, continuity = caps.idempotency.continuity_token;
+  // An absent or shape-invalid observation is a transport failure, not an identity
+  // conflict: recovery retries the read instead of asking the owner to resolve identities.
+  requireValue(found && typeof found === 'object' && !Array.isArray(found) && typeof found.state === 'string'
+    && found.identity !== undefined && found.binding !== undefined && found.target !== undefined
+    && typeof found.namespace_digest === 'string' && typeof found.continuity_token === 'string', 'delivery-observation-unavailable', true);
   requireValue(r.host.namespace_digest === scope && r.host.continuity_token === continuity, 'delivery-identity-conflict', true);
-  requireValue(found && same(found.identity, r.identity) && same(found.binding, r.binding) && same(found.target, r.target)
+  requireValue(same(found.identity, r.identity) && same(found.binding, r.binding) && same(found.target, r.target)
     && found.namespace_digest === scope && found.continuity_token === continuity, 'delivery-identity-conflict', true);
   requireValue(['pending', 'completed'].includes(found.state), 'delivery-host-state-unproven', true);
   const key = r.target.kind === 'message' ? 'message_id' : 'completion_id', other = key === 'message_id' ? 'completion_id' : 'message_id';
@@ -68,10 +73,16 @@ async function collect(input, s, options, counters) {
   requireValue(input.read_host === undefined || typeof input.read_host === 'boolean');
   requireValue((Array.isArray(input.members) && input.include_all === undefined) || (input.members === undefined && input.include_all === true));
   const { pending, h } = await scans(s, input.change_id, counters);
-  let selected = input.members;
+  let selected = input.members, corruptRegistry = false;
   if (input.include_all) {
     const inventory = await s.inventory(`${folderFor(input.change_id)}/requests`);
-    selected = [...h.runs.map(r => ({ run_id: r.run_id })), ...Object.keys(inventory).map(p => ({ request_uuid: p.split('/').at(-1).replace(/\.json$/, '') }))];
+    const requests = [];
+    for (const p of Object.keys(inventory)) {
+      const name = p.split('/').at(-1).replace(/\.json$/, '');
+      try { requestUuid(name); } catch { corruptRegistry = true; continue; } // per-member degradation
+      requests.push({ request_uuid: name });
+    }
+    selected = [...h.runs.map(r => ({ run_id: r.run_id })), ...requests];
   }
   requireValue(selected.length > 0 && selected.length <= LIFECYCLE_LIMITS.members, 'lifecycle-group-limit');
   const seen = new Set();
@@ -80,7 +91,7 @@ async function collect(input, s, options, counters) {
     const key = member.run_id ? `run:${identifier(member.run_id)}` : `request:${requestUuid(member.request_uuid)}`;
     requireValue(!seen.has(key), 'duplicate-lifecycle-member'); seen.add(key);
   }
-  const members = []; let suggestion = null, waiting = false, uncertain = false, partial = false;
+  const members = []; let suggestion = null, waiting = false, uncertain = corruptRegistry, partial = false;
   const limits = [], client = options.HostClient;
   let caps;
   for (const member of selected) {
@@ -90,7 +101,9 @@ async function collect(input, s, options, counters) {
         version: run.version, reservation_retained: reserves(run), historical: true, accepted: acceptedSet(run) };
       members.push(state);
       if (run.lifecycle === 'interrupted') {
-        uncertain = true; suggestion ??= next(run.execution_state === 'stopped' ? 'manual' : 'stop-confirm', 'Interrupted run requires owner recovery.', { run_id: run.run_id });
+        // The blocked/uncertain override below always rewrites this to manual; kept typed
+        // so future callers can read the specific owner action.
+        uncertain = true; suggestion ??= next('stop-confirm', 'Interrupted run requires owner recovery.', { run_id: run.run_id });
       } else if (run.lifecycle === 'closed') {
         await closedFresh(s, run);
         partial ||= run.kind === 'batch' && run.closure.unfinished.length > 0;
@@ -133,7 +146,9 @@ async function collect(input, s, options, counters) {
       if (state.code === 'lifecycle-capabilities-required') limits.push('host-read');
     }
   }
-  const blocked = pending.length > 0 || limits.length > 0;
+  // A delivery parked in a local blocked phase is a blocker, not a wait: the driver must
+  // stop instead of burning its budget polling a permanent identity problem.
+  const blocked = pending.length > 0 || limits.length > 0 || members.some(m => m.kind === 'delivery' && m.phase === 'blocked');
   const delivery = members.find(m => m.kind === 'delivery' && m.phase !== 'verified');
   if (delivery) suggestion = next(delivery.recovery_action?.type === 'wait-request' || !input.read_host ? 'lifecycle-collect' : 'delivery-recover',
     'Delivery requires a separate bounded recovery step.', { request_uuid: delivery.id, ...(delivery.recovery_action ? { recovery_type: delivery.recovery_action.type } : {}) });
@@ -220,6 +235,9 @@ async function release(input, s, options, counters) {
     return { ok: true, state: 'released', release: r.release, replay: true, historical: true, reservation_retained: reserves(run) };
   }
   requireValue(!pending.length, 'pending-transaction', true); await validateFrozenBody(s, r);
+  // saveRequest records the release phase write; a registry already at the history limit
+  // would release on the host and then never be able to record it.
+  requireValue(r.history.length < DELIVERY_LIMITS.history, 'delivery-history-full', true);
   const client = options.HostClient;
   requireValue(client && ['capabilities', 'readRequest', 'releaseRequest'].every(k => typeof client[k] === 'function'), 'lifecycle-capabilities-required', true);
   const caps = await hostCall(() => client.capabilities(), options, 'lifecycle-capabilities-required');
@@ -227,8 +245,11 @@ async function release(input, s, options, counters) {
   const path = lifecyclePaths(input.change_id, 'release', r.request_uuid).journal;
   let journal = await s.load(path);
   if (journal) {
-    fields(journal, ['schema', 'input_digest', 'request_uuid', 'binding_digest', 'state', 'release']);
-    requireValue(journal.schema === RELEASE_SCHEMA && journal.input_digest === digest(input) && journal.request_uuid === r.request_uuid
+    // A checksum-valid but malformed record is a custody conflict, not invalid-input.
+    const shape = journal && typeof journal === 'object' && !Array.isArray(journal)
+      && ['schema', 'input_digest', 'request_uuid', 'binding_digest', 'state', 'release'].every(k => Object.hasOwn(journal, k))
+      && Object.keys(journal).length === 6;
+    requireValue(shape && journal.schema === RELEASE_SCHEMA && journal.input_digest === digest(input) && journal.request_uuid === r.request_uuid
       && journal.binding_digest === digest(r.binding) && ['intent', 'released'].includes(journal.state), 'conflicting-lifecycle-replay', true);
   }
   if (journal?.state !== 'released') {
@@ -257,6 +278,9 @@ async function finalize(input, s, options, counters) {
     return s.applyJournal(old, 'finalization', true);
   }
   const config = parseProjectConfig(await s.textFile('.ai-factory/config.yaml') ?? ''), specs = config.paths.specs ?? '.ai-factory/specs';
+  // Non-scalar configured paths must fail with a typed code, not a raw TypeError.
+  requireValue(['specs', 'qa', 'rules', 'generated_rules', 'description', 'architecture', 'rules_file']
+    .every(key => config.paths[key] === undefined || typeof config.paths[key] === 'string'), 'tool-configuration-error');
   // Destinations may not alias canonical/evidence roots — configured overrides plus the
   // shipped defaults. Checked before source resolution so the refusal is one typed code
   // (duplicate path values are rejected separately by the shared admission source).

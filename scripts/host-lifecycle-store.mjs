@@ -100,11 +100,16 @@ export async function lifecycleStore(options = {}) {
     return recovering ? { ...j.response, recovered: true, historical: true } : j.response;
   }
   async function publish(change, kind, id, input, writes, response, guards = []) {
+    requireValue(writes.length >= 1 && writes.length <= LIFECYCLE_LIMITS.files, 'invalid-lifecycle-journal', true);
     const old = await loadJournal(change, kind, id, input);
     if (old) return apply(old, kind, true);
     const images = [];
+    let budget = 0;
     for (const [path, value] of writes) {
       const before = await s.bytes(path), after = Buffer.isBuffer(value) ? value : Buffer.from(value);
+      budget += after.length + (before?.length ?? 0);
+      // Bound the image-construction peak instead of discovering the limit afterwards.
+      requireValue(budget <= LIFECYCLE_LIMITS.bytes, 'invalid-lifecycle-journal', true);
       images.push({ path, before: before?.toString('base64') ?? null, after: after.toString('base64'),
         before_sha256: before === null ? null : digest(before), after_sha256: digest(after) });
     }
