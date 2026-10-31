@@ -406,7 +406,7 @@ export async function lifecycleCommand(action, input, options = {}) {
   } catch (error) {
     if (!(error instanceof WorkflowError)) throw error;
     return { ...base, capability_limitations: error.code === 'lifecycle-capabilities-required' ? ['host-read', ...(action === 'lifecycle-release' ? ['host-release'] : [])] : base.capability_limitations,
-      ok: false, code: error.code, state: 'blocked', reservation_retained: true,
+      ok: false, code: error.code, blocked: error.blocked, state: 'blocked', reservation_retained: true,
       next_action: next('manual', 'Resolve the reported blocker before retrying.'), service_calls: { ...counters } };
   }
 }

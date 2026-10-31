@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { execFile } from 'node:child_process';
 import { readFile, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { deliveryProject } from './fixtures/delivery-project.mjs';
+import { executionProject } from './fixtures/execution-project.mjs';
 import { createFakeHost } from './fixtures/host-delivery.mjs';
 import { createGateResult, renderGateResultBlock } from './aif-gate-result.mjs';
 import { storeFor, digest } from './workflow-state-store.mjs';
@@ -267,6 +270,26 @@ test('AC3: a checksum-valid malformed release journal conflicts instead of inval
   const path = lifecyclePaths('work', 'release', uuid(1)).journal;
   await f.put(path, JSON.stringify({ checksum: digest({ schema: 'bogus' }), record: { schema: 'bogus' } }, null, 2) + '\n');
   assert.equal((await f.call('lifecycle-release', input, { HostClient: f.host })).code, 'conflicting-lifecycle-replay');
+});
+
+test('AC6: CLI exit codes classify lifecycle results (blocked 1, invalid 2, success 0)', async t => {
+  const p = await executionProject(); t.after(p.cleanup);
+  await p.call('start', p.start());
+  const spawn = (action, input) => new Promise(resolve => {
+    const child = execFile(process.execPath, [fileURLToPath(new URL('./execution-state.mjs', import.meta.url)), action, '--json'],
+      { cwd: p.root, windowsHide: true }, (error, stdout, stderr) => resolve({ code: error ? error.code : 0, stdout, stderr }));
+    child.stdin.on('error', () => {});
+    child.stdin.end(JSON.stringify(input));
+  });
+  const ok = await spawn('lifecycle-collect', { change_id: 'work', members: [{ run_id: 'run-1' }] });
+  assert.equal(ok.code, 0); assert.equal(ok.stderr, ''); assert.equal(JSON.parse(ok.stdout).ok, true);
+  const blocked = await spawn('lifecycle-progress', { change_id: 'work', run_id: 'missing', actor: 'parent' });
+  assert.equal(blocked.code, 1); assert.equal(JSON.parse(blocked.stdout).ok, false);
+  assert.equal(JSON.parse(blocked.stdout).blocked, true);
+  assert.equal(JSON.parse(blocked.stdout).code, 'missing-or-invalid-run');
+  const invalid = await spawn('lifecycle-progress', { change_id: '../escape', run_id: 'run-1', actor: 'parent' });
+  assert.equal(invalid.code, 2); assert.equal(JSON.parse(invalid.stdout).code, 'invalid-change-id');
+  assert.equal(JSON.parse(invalid.stdout).blocked, false);
 });
 
 test('AC5: settlement journal is durable before record; exact retry completes publication', async t => {
