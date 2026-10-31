@@ -275,6 +275,49 @@ test('AC6: finalizer destination guards reject case aliases and canonical/eviden
   assert.equal(await f.get('archive-out/work/spec.md'), input.spec); // safe custom output keeps working
 });
 
+test('AC6: failing verification verdict blocks finalization before any archive write', async t => {
+  const f = await batch(t, { mode: 'classic' }); await f.call('lifecycle-progress', runInput);
+  await f.put(`${f.plans}/work/status.yaml`, 'status: verified\nplan_id: work\nverification:\n  verdict: fail\n');
+  await f.put('.ai-factory/specs/index.yaml', '# Preserve\nspecs:\n');
+  const input = { change_id: 'work', actor: 'parent', spec: '# Spec\n' };
+  assert.equal((await f.call('lifecycle-finalize', input)).code, 'lifecycle-verification-required');
+  await assert.rejects(f.get('.ai-factory/specs/work/spec.md'), { code: 'ENOENT' });
+  await assert.rejects(f.get('.ai-factory/specs/work/plan.md'), { code: 'ENOENT' });
+  assert.equal(await f.get('.ai-factory/specs/index.yaml'), '# Preserve\nspecs:\n');
+  assert.match(await f.get(`${f.plans}/work/status.yaml`), /^status: verified$/m); // not rewritten to done
+});
+
+test('AC4: BOM checklist line 0 replacement stays byte-exact through progress', async t => {
+  const f = await fixture(t, { mode: 'classic' });
+  const text = '\uFEFF- [ ] 1.1 First task\n- [ ] 1.2 Second task\n';
+  for (const p of [`${f.plans}/work.md`, `${f.plans}/work/task.md`]) await f.put(p, text);
+  await f.call('start', f.start());
+  await f.put('.ai-factory/evidence/check.md', 'Observed result.');
+  const r = await f.call('result', f.actor(1, { result: { result_id: 'result-1', status: 'completed', changed_files: [], checks: [{ name: 'fixture', exit_code: 0 }], evidence: ['.ai-factory/evidence/check.md'] } }));
+  await f.call('accept', { ...runInput, version: r.version, result_digest: r.result_digest });
+  const progress = await f.call('lifecycle-progress', runInput); assert.equal(progress.ok, true);
+  for (const p of [`${f.plans}/work.md`, `${f.plans}/work/task.md`]) {
+    const stored = await f.get(p);
+    assert.equal(stored, '\uFEFF- [x] 1.1 First task\n- [ ] 1.2 Second task\n'); // BOM kept, line-0 checkbox replaced
+    assert.equal(parseExecutionTasks(stored)[0].checked, true);
+  }
+  assert.equal((await f.call('lifecycle-progress', runInput)).historical, true);
+});
+
+test('AC5: corrupt progress journals fail closed; missing journal is the deterministic fresh path', async t => {
+  const f = await single(t); await f.close();
+  const fresh = await f.call('lifecycle-progress', runInput);
+  assert.equal(fresh.ok, true); assert.equal(fresh.state, 'progress-applied'); assert.equal(fresh.historical, undefined);
+  const journal = lifecyclePaths('work', 'progress', 'run-1').journal, checklist = 'openspec/changes/work/tasks.md', before = await f.get(checklist);
+  await f.put(journal, 'not-json');
+  const corrupt = await f.call('lifecycle-progress', runInput);
+  assert.equal(corrupt.ok, false); assert.equal(corrupt.code, 'invalid-state');
+  await f.put(journal, JSON.stringify({ checksum: '0'.repeat(64), record: { schema: 'aifhub.progress-journal.v1', journal_id: 'run-1' } }));
+  const mismatch = await f.call('lifecycle-progress', runInput);
+  assert.equal(mismatch.code, 'invalid-state');
+  assert.equal(await f.get(checklist), before); // fail-closed without recovery instructions
+});
+
 test('AC6: finalizer cannot run while an unknown worker reserves scope', async t => {
   const f = await single(t, { mode: 'classic', pending: true });
   await f.call('interrupt', { ...runInput, version: 2, recovery_id: 'unknown', reason: 'abandoned', execution_state: 'unknown' });
