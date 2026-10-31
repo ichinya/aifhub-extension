@@ -213,7 +213,12 @@ test('AC1/6: classic finalizer blocks gates, applies archive/index/status and de
   const index = await f.get('.ai-factory/specs/index.yaml'); assert.match(index, /id: old/); assert.match(index, /verification: pass-with-notes/);
   assert.ok(index.indexOf('id: "work"') < index.indexOf('stats:')); assert.match(index, /total: 2/);
   assert.equal((await f.call('lifecycle-finalize', input)).historical, true);
-  assert.equal((await f.call('lifecycle-finalize', { ...input, spec: '# Other' })).code, 'conflicting-lifecycle-replay');
+  // Refresh with a caller-reviewed new spec is a new revision, not a conflict (review F2).
+  const refreshed = await f.call('lifecycle-finalize', { ...input, spec: '# Other reviewed result\n' });
+  assert.equal(refreshed.ok, true, JSON.stringify(refreshed));
+  assert.equal(await f.get('.ai-factory/specs/work/spec.md'), '# Other reviewed result\n');
+  const replayRefresh = await f.call('lifecycle-finalize', { ...input, spec: '# Other reviewed result\n' });
+  assert.equal(replayRefresh.historical, true);
   const open = await fixture(t); const delegated = await open.call('lifecycle-finalize', input);
   assert.equal(delegated.delegated, true); assert.match(delegated.handoff, /aifhub-done-finalizer/);
 });
@@ -384,4 +389,26 @@ test('AC6: release validation is additive; new modules do not import semantic or
   const provenance = await readFile(new URL('execution-provenance.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(provenance, /'host-lifecycle(?:-store)?\.mjs'/);
   assert.ok((await readdir(new URL('.', import.meta.url))).includes('host-lifecycle.test.mjs'));
+});
+
+test('review hardening: progress recovery guards evidence; checklist third image and case-alias refused', async t => {
+  // F1: evidence drift after journal preparation is caught by guards.
+  const f = await single(t, { mode: 'classic', plans: 'plans' }); await f.close();
+  await f.call('lifecycle-progress', runInput);
+  await f.put(`${f.plans}/work.md`, (await f.get(`${f.plans}/work.md`)) + 'Drifted\n');
+  const recovered = await f.call('lifecycle-progress', runInput);
+  assert.equal(recovered.ok, false, JSON.stringify(recovered));
+  assert.equal(recovered.code, 'lifecycle-file-conflict');
+
+  // F3: Windows case-alias archive target over the source directory is refused.
+  const alias = await fixture(t, { mode: 'classic', plans: 'plans' });
+  const checked = (await alias.get(`${alias.plans}/work.md`)).replaceAll('- [ ]', '- [x]');
+  await alias.put(`${alias.plans}/work.md`, checked);
+  await alias.put(`${alias.plans}/work/task.md`, checked);
+  await alias.put(`${alias.plans}/work/status.yaml`,
+    'status: verified\nplan_id: work\nverification:\n  verdict: pass-with-notes\n');
+  await alias.put('.ai-factory/config.yaml',
+    (await alias.get('.ai-factory/config.yaml')).replace('plans: plans', 'plans: plans\n  specs: Plans'), 'utf8');
+  const blocked = await alias.call('lifecycle-finalize', { change_id: 'work', actor: 'parent', spec: '# S\n' });
+  assert.equal(blocked.code, 'unsafe-path', JSON.stringify(blocked));
 });

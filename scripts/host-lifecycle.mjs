@@ -191,6 +191,17 @@ async function progress(input, s, options, counters) {
   if (old) return s.applyJournal(old, 'progress', true);
   requireValue(!pending.length, 'pending-transaction', true); await closedFresh(s, run);
   const source = await resolveExecutionSource(s, input.change_id, run.role, run.context_paths), accepted = acceptedSet(run);
+  // Evidence and config drift after preparation is caught on recovery through
+  // journal guards (review F1); checklist drift is covered by before/after
+  // images, so the checklists themselves are deliberately not guarded.
+  const evidencePaths = run.kind === 'batch'
+    ? Object.values(run.seal?.evidence ?? {}).flatMap(e => Object.keys(e))
+    : (run.result?.evidence ?? []);
+  const guards = [];
+  for (const path of ['.ai-factory/config.yaml', ...evidencePaths]) {
+    const bytes = await s.bytes(path); requireValue(bytes !== null, 'missing-tasks', true);
+    guards.push({ path, sha256: digest(bytes) });
+  }
   const paths = source.namespace.kind === 'ai-factory-classic' ? [source.namespace.entrypoint, source.namespace.checklist] : [source.namespace.checklist];
   const writes = [];
   for (const path of paths) {
@@ -199,7 +210,7 @@ async function progress(input, s, options, counters) {
   }
   if (writes.length === 2) requireValue(same(parseExecutionTasks(writes[0][1]), parseExecutionTasks(writes[1][1])), 'classic-checklist-mismatch', true);
   return s.publishLifecycle(input.change_id, 'progress', input.run_id, input, writes,
-    { ok: true, state: 'progress-applied', accepted, next_action: next('lifecycle-finalize', 'Finalization remains owned by /aif-done.'), authorizes: [] });
+    { ok: true, state: 'progress-applied', accepted, next_action: next('lifecycle-finalize', 'Finalization remains owned by /aif-done.'), authorizes: [] }, guards);
 }
 
 async function release(input, s, options, counters) {
@@ -242,12 +253,16 @@ async function release(input, s, options, counters) {
 
 async function finalize(input, s, options, counters) {
   fields(input, ['change_id', 'actor', 'spec']); identifier(input.actor); boundedText(input.spec, 256 * 1024);
-  const id = 'finalize', old = await s.loadJournal(input.change_id, 'finalization', id, input);
-  if (old) {
+  // Finalization supports refresh: a caller-reviewed spec change is a new
+  // revision with fresh readiness, not a conflicting replay (review F2,
+  // classic-finalization.md:42). Same-bytes input stays an exact replay.
+  const id = `finalize-${digest(input.spec).slice(0, 16)}`;
+  const prior = await s.loadJournal(input.change_id, 'finalization', id, input);
+  if (prior) {
     const { pending, h } = await scans(s, input.change_id, counters);
     requireValue(!pending.length && !h.runs.some(reserves), 'lifecycle-not-quiescent', true);
     requireValue(h.runs.every(r => r.owner === input.actor), 'actor-mismatch', true);
-    return s.applyJournal(old, 'finalization', true);
+    return s.applyJournal(prior, 'finalization', true);
   }
   const source = await resolveExecutionSource(s, input.change_id, 'implement');
   if (source.delegated) return { ok: true, state: 'delegated', ...source };
@@ -261,8 +276,11 @@ async function finalize(input, s, options, counters) {
   const parsed = parseSimpleYaml(status);
   requireValue(['pass', 'pass-with-notes'].includes(parsed.verification?.verdict), 'lifecycle-verification-required', true);
   const config = parseProjectConfig(await s.textFile('.ai-factory/config.yaml') ?? ''), specs = config.paths.specs ?? '.ai-factory/specs';
-  // Prevent config aliasing from turning finalization into a source/state overwrite.
-  requireValue(specs !== base && !base.startsWith(specs + '/') && !specs.startsWith(base + '/')
+  // Prevent config aliasing from turning finalization into a source/state
+  // overwrite. Case-insensitive comparison: on Windows `plans` and `Plans`
+  // are the same directory (review F3).
+  const lowerSpecs = specs.toLowerCase(), lowerBase = base.toLowerCase();
+  requireValue(lowerSpecs !== lowerBase && !lowerBase.startsWith(lowerSpecs + '/') && !lowerSpecs.startsWith(lowerBase + '/')
     && !/^\.git(?:\/|$)/i.test(specs) && !/^\.ai-factory\/state(?:\/|$)/i.test(specs), 'unsafe-path', true);
   const archive = `${specs}/${input.change_id}`, writes = [], inventory = await s.inventory(base), guards = [];
   for (const path of Object.keys(inventory)) if (path !== statusPath) writes.push([`${archive}/${path.slice(base.length + 1)}`, await s.bytes(path)]);
