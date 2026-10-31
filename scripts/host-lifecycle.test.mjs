@@ -246,6 +246,33 @@ test('AC1: collect classifies absent and malformed host observations as unavaila
   }
 });
 
+test('AC1: observation shape checks reject non-object nested fields across collect and release', async t => {
+  const f = await single(t, { pending: true });
+  const good = () => ({ state: 'completed', identity: { request_uuid: uuid(1), body_sha256: 'a', target_kind: 'completion' },
+    binding: { change_id: 'work' }, target: { kind: 'completion' }, namespace_digest: 'n', continuity_token: 'c' });
+  for (const field of ['identity', 'binding', 'target']) {
+    for (const bad of [null, 'scalar', [], 5]) {
+      const found = good(); found[field] = bad;
+      const host = { ...f.host, readRequest: async () => found };
+      const result = await f.call('lifecycle-collect', { change_id: 'work', members: [{ request_uuid: uuid(1) }], read_host: true }, { HostClient: host });
+      assert.equal(result.members[0].code, 'delivery-observation-unavailable', `${field}=${JSON.stringify(bad)}`);
+      assert.equal(result.blocked, true);
+      assert.equal(result.members[0].recovery_action.type, 'read-request');
+    }
+  }
+  // Release refuses the same shapes before any host mutation.
+  f.host.complete(uuid(1));
+  await f.call('delivery-recover', { change_id: 'work', run_id: 'run-1', request_uuid: uuid(1) }, { HostClient: f.host });
+  const input = { ...runInput, request_uuid: uuid(1) };
+  for (const field of ['identity', 'binding', 'target']) {
+    const found = good(); found[field] = null;
+    const host = { ...f.host, readRequest: async () => found };
+    const result = await f.call('lifecycle-release', input, { HostClient: host });
+    assert.equal(result.code, 'delivery-observation-unavailable', `release ${field}`);
+    assert.equal(f.host.state.counters.release_calls ?? 0, 0);
+  }
+});
+
 test('AC1: include_all degrades per member over a corrupt request registry', async t => {
   const f = await single(t);
   await f.put('.ai-factory/state/work/execution/requests/not-a-uuid.json', 'corrupt\n');
@@ -420,6 +447,22 @@ test('AC6: finalizer refuses unsupported index shapes and plan-folder name colli
   assert.match(index, /total: 2/); assert.ok(index.indexOf('id: "work"') < index.indexOf('stats:'));
 });
 
+for (const [name, eol] of [['LF', '\n'], ['CRLF', '\r\n']]) test(`AC6: finalizer accepts recognized index keys with ${name} and preserves foreign bytes`, async t => {
+  const f = await single(t, { mode: 'classic', plans: 'plans' }); await f.close(); await f.call('lifecycle-progress', runInput);
+  await f.put('plans/work.md', (await f.get('plans/work.md')).replace('- [ ] 1.2', '- [x] 1.2'));
+  await f.put('plans/work/task.md', (await f.get('plans/work/task.md')).replace('- [ ] 1.2', '- [x] 1.2'));
+  await f.put('plans/work/status.yaml', 'status: verified\nplan_id: work\nverification:\n  verdict: pass\n');
+  await f.put('.ai-factory/specs/index.yaml', `version: 1${eol}other:${eol}  - id: keep${eol}    title: Keep${eol}specs:${eol}  - id: old${eol}    title: Old${eol}stats:${eol}  total: 1${eol}`);
+  const result = await f.call('lifecycle-finalize', { change_id: 'work', actor: 'parent', spec: '# Spec\n' });
+  assert.equal(result.ok, true); // scalar-typed top-level keys stay valid on both line endings
+  const index = await f.get('.ai-factory/specs/index.yaml');
+  assert.ok(index.includes(`version: 1${eol}`)); // foreign metadata bytes survive
+  assert.ok(index.includes(`  - id: keep${eol}`));
+  assert.match(index, /id: "work"/);
+  assert.ok(index.indexOf('id: "work"') < index.indexOf('stats:'));
+  assert.match(index, /total: 2/);
+});
+
 test('AC6: finalizer keeps CRLF status bytes and never duplicates keyed lines', async t => {
   const f = await single(t, { mode: 'classic', plans: 'plans' }); await f.close(); await f.call('lifecycle-progress', runInput);
   await f.put('plans/work.md', (await f.get('plans/work.md')).replace('- [ ] 1.2', '- [x] 1.2'));
@@ -441,19 +484,23 @@ test('AC6: non-scalar configured paths fail with a typed code', async t => {
   assert.equal(result.code, 'tool-configuration-error');
 });
 
-test('AC5: publication refuses an oversized plan inventory before building all images', async t => {
+test('AC5: publication budget refuses over-large plan inventories by count and cumulative bytes', async t => {
+  // The finalize-side accumulation check and the publisher's per-write budget check
+  // enforce the same boundary (200 writes, 4 MiB cumulative), so the refusing stage is
+  // not externally distinguishable without new instrumentation; these pins hold the
+  // exact boundary both stages share. inventory() reads content for hashing either way.
+  for (const [pads, ok] of [[192, true], [193, false]]) {
+    const f = await batch(t, { mode: 'classic' }); await f.call('lifecycle-progress', runInput);
+    await f.put(`${f.plans}/work/status.yaml`, 'status: verified\nplan_id: work\nverification:\n  verdict: pass\n');
+    for (let i = 0; i < pads; i++) await f.put(`${f.plans}/work/pad-${i}.md`, 'small\n');
+    const result = await f.call('lifecycle-finalize', { change_id: 'work', actor: 'parent', spec: '# Spec\n' });
+    assert.equal(result.ok, ok, `pads=${pads}`);
+    if (!ok) await assert.rejects(f.get('.ai-factory/specs/work/spec.md'), { code: 'ENOENT' });
+  }
+  // Cumulative overflow from several individually allowed files.
   const f = await batch(t, { mode: 'classic' }); await f.call('lifecycle-progress', runInput);
   await f.put(`${f.plans}/work/status.yaml`, 'status: verified\nplan_id: work\nverification:\n  verdict: pass\n');
-  await f.put(`${f.plans}/work/big.md`, 'x'.repeat(5 * 1024 * 1024));
-  const result = await f.call('lifecycle-finalize', { change_id: 'work', actor: 'parent', spec: '# Spec\n' });
-  assert.equal(result.code, 'invalid-lifecycle-journal');
-  await assert.rejects(f.get('.ai-factory/specs/work/spec.md'), { code: 'ENOENT' });
-});
-
-test('AC5: publication refuses an over-large plan inventory by file count before reads', async t => {
-  const f = await batch(t, { mode: 'classic' }); await f.call('lifecycle-progress', runInput);
-  await f.put(`${f.plans}/work/status.yaml`, 'status: verified\nplan_id: work\nverification:\n  verdict: pass\n');
-  for (let i = 0; i < 200; i++) await f.put(`${f.plans}/work/pad-${i}.md`, 'small\n');
+  for (const name of ['big-1.md', 'big-2.md', 'big-3.md']) await f.put(`${f.plans}/work/${name}`, 'x'.repeat(1536 * 1024));
   const result = await f.call('lifecycle-finalize', { change_id: 'work', actor: 'parent', spec: '# Spec\n' });
   assert.equal(result.code, 'invalid-lifecycle-journal');
   await assert.rejects(f.get('.ai-factory/specs/work/spec.md'), { code: 'ENOENT' });
@@ -474,11 +521,21 @@ test('AC3: release succeeds with exactly one history slot of headroom', async t 
 
 test('AC3: a release journal with inconsistent state/release conflicts before recovery', async t => {
   const f = await single(t), input = { ...runInput, request_uuid: uuid(1) };
-  const record = { schema: 'aifhub.release-journal.v1', input_digest: digest(input), request_uuid: uuid(1),
-    binding_digest: digest((await f.record()).binding), state: 'released', release: null };
-  await f.put(lifecyclePaths('work', 'release', uuid(1)).journal, JSON.stringify({ checksum: digest(record), record }, null, 2) + '\n');
-  assert.equal((await f.call('lifecycle-release', input, { HostClient: f.host })).code, 'conflicting-lifecycle-replay');
-  assert.equal(f.host.state.counters.release_calls ?? 0, 0);
+  const binding = digest((await f.record()).binding);
+  for (const release of [
+    null, // released without a record
+    { released_at: 'invalid', host_release_state: 'released' }, // non-finite timestamp
+    { released_at: '2026-10-31T00:00:00.000Z', host_release_state: 'released', extra: 1 }, // extra key
+  ]) {
+    const record = { schema: 'aifhub.release-journal.v1', input_digest: digest(input), request_uuid: uuid(1), binding_digest: binding, state: 'released', release };
+    await f.put(lifecyclePaths('work', 'release', uuid(1)).journal, JSON.stringify({ checksum: digest(record), record }, null, 2) + '\n');
+    assert.equal((await f.call('lifecycle-release', input, { HostClient: f.host })).code, 'conflicting-lifecycle-replay', JSON.stringify(release));
+    assert.equal(f.host.state.counters.release_calls ?? 0, 0);
+  }
+  const intent = { schema: 'aifhub.release-journal.v1', input_digest: digest(input), request_uuid: uuid(1), binding_digest: binding, state: 'intent',
+    release: { released_at: '2026-10-31T00:00:00.000Z', host_release_state: 'released' } };
+  await f.put(lifecyclePaths('work', 'release', uuid(1)).journal, JSON.stringify({ checksum: digest(intent), record: intent }, null, 2) + '\n');
+  assert.equal((await f.call('lifecycle-release', input, { HostClient: f.host })).code, 'conflicting-lifecycle-replay'); // intent with a record
 });
 
 test('AC5: losing an applied finalization journal returns the finalizer to the fresh path (documented)', async t => {

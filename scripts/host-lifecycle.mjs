@@ -257,7 +257,9 @@ async function release(input, s, options, counters) {
       && journal.binding_digest === digest(r.binding) && ['intent', 'released'].includes(journal.state)
       && (journal.state === 'intent' ? journal.release === null
         : !!journal.release && typeof journal.release === 'object' && !Array.isArray(journal.release)
-          && typeof journal.release.released_at === 'string' && journal.release.host_release_state === 'released'), 'conflicting-lifecycle-replay', true);
+          && Object.keys(journal.release).length === 2
+          && ['released_at', 'host_release_state'].every(k => Object.hasOwn(journal.release, k))
+          && Number.isFinite(Date.parse(journal.release.released_at)) && journal.release.host_release_state === 'released'), 'conflicting-lifecycle-replay', true);
   }
   if (journal?.state !== 'released') {
     const query = { request_uuid: r.request_uuid, namespace_digest: caps.idempotency.scope_digest };
@@ -344,7 +346,9 @@ async function finalize(input, s, options, counters) {
   let specsEnd = specsAt + 1;
   while (specsEnd < doc.length && !/^[A-Za-z_][\w-]*:/.test(doc[specsEnd])) specsEnd++;
   for (let i = 0; i < doc.length; i++) {
-    const line = doc[i];
+    // Grammar checks run on the line without its single CRLF tail; the original bytes
+    // stay untouched for publication, so line endings never change the verdict.
+    const line = doc[i].replace(/\r$/, '');
     if (!line.trim() || /^\s*#/.test(line)) continue;
     if (/^\S/.test(line)) { requireValue(/^[A-Za-z_][\w-]*:(?:\s.*)?$/.test(line), 'unsupported-spec-index', true); continue; }
     if (i <= specsAt || i >= specsEnd) continue;
@@ -392,9 +396,9 @@ async function finalize(input, s, options, counters) {
     if (/^\S/.test(line) && !line.startsWith('#')) { inStats = /^stats:/.test(line); inVerdicts = false; }
     if (!inStats) return line;
     if (/^  \S/.test(line)) inVerdicts = /^  by_verdict:/.test(line);
-    if (/^  total:/.test(line)) return `  total: ${rows.length}`;
+    if (/^  total:/.test(line)) return `  total: ${rows.length}` + (line.endsWith('\r') ? '\r' : '');
     const verdict = inVerdicts && line.match(/^    (pass|pass-with-notes|fail):/);
-    return verdict ? `    ${verdict[1]}: ${rows.filter(row => (row.verification ?? row.verdict) === verdict[1]).length}` : line;
+    return verdict ? `    ${verdict[1]}: ${rows.filter(row => (row.verification ?? row.verdict) === verdict[1]).length}` + (line.endsWith('\r') ? '\r' : '') : line;
   }).join('\n');
   add(indexPath, budget(Buffer.from(withStats.replace(/\n?$/, '\n'))));
   // Keyed rewrites keep CRLF bytes and tolerate spacing before the colon; a duplicated
