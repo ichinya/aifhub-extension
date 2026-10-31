@@ -204,6 +204,16 @@ test('AC4/5: prepared progress replay rechecks quiescence against a newer run on
   assert.equal((await f.call('lifecycle-progress', runInput)).historical, true); // applied replay stays historical
 });
 
+test('AC4/5: fresh progress refuses a reserving sibling run before the checklist write', async t => {
+  const f = await single(t); await f.close();
+  const late = await f.call('start', f.start({ run_id: 'late-worker', task_id: '1.2', scope: ['src/b.js'] }));
+  assert.equal(late.lifecycle, 'active'); // admission admits a run on the still-unchecked task
+  const checklist = 'openspec/changes/work/tasks.md', before = await f.get(checklist);
+  assert.equal((await f.call('lifecycle-progress', runInput)).code, 'lifecycle-not-quiescent');
+  assert.equal(await f.get(checklist), before); // checklist byte-identical
+  await assert.rejects(f.get(lifecyclePaths('work', 'progress', 'run-1').journal), { code: 'ENOENT' }); // no journal either
+});
+
 test('AC5: settlement journal is durable before record; exact retry completes publication', async t => {
   const f = await single(t); await f.close(); const input = { ...runInput, decision: decision() };
   await assert.rejects(f.call('lifecycle-settle', input, { failpoint: name => { if (name === 'lifecycle-after-journal') throw new Error('crash'); } }));

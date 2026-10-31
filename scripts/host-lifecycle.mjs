@@ -194,7 +194,9 @@ async function progress(input, s, options, counters) {
     if (old.state === 'prepared') requireValue(!pending.length && !h.runs.some(reserves), 'lifecycle-not-quiescent', true);
     return s.applyJournal(old, 'progress', true);
   }
-  requireValue(!pending.length, 'pending-transaction', true); await closedFresh(s, run);
+  // The fresh path races the same admission window as the prepared replay above: a
+  // sibling run on an unchecked task must not be invalidated by the checklist write.
+  requireValue(!pending.length && !h.runs.some(reserves), 'lifecycle-not-quiescent', true); await closedFresh(s, run);
   const source = await resolveExecutionSource(s, input.change_id, run.role, run.context_paths), accepted = acceptedSet(run);
   const paths = source.namespace.kind === 'ai-factory-classic' ? [source.namespace.entrypoint, source.namespace.checklist] : [source.namespace.checklist];
   const writes = [];
