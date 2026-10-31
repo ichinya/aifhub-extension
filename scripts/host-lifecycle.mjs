@@ -188,7 +188,12 @@ async function progress(input, s, options, counters) {
   fields(input, ['change_id', 'run_id', 'actor']);
   const { pending, h } = await scans(s, input.change_id, counters), run = findRun(h, input.run_id); owner(run, input);
   const old = await s.loadJournal(input.change_id, 'progress', input.run_id, input);
-  if (old) return s.applyJournal(old, 'progress', true);
+  if (old) {
+    // Admission cannot see lifecycle journals, so a prepared progress journal may race
+    // a newer run on an unchecked task; recheck quiescence before finishing the write (#268).
+    if (old.state === 'prepared') requireValue(!pending.length && !h.runs.some(reserves), 'lifecycle-not-quiescent', true);
+    return s.applyJournal(old, 'progress', true);
+  }
   requireValue(!pending.length, 'pending-transaction', true); await closedFresh(s, run);
   const source = await resolveExecutionSource(s, input.change_id, run.role, run.context_paths), accepted = acceptedSet(run);
   const paths = source.namespace.kind === 'ai-factory-classic' ? [source.namespace.entrypoint, source.namespace.checklist] : [source.namespace.checklist];

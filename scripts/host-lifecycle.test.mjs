@@ -183,6 +183,27 @@ test('AC5: third file image and conflicting journal replay block without applyin
   assert.equal(await f.get(`${f.plans}/work/task.md`), second);
 });
 
+test('AC4/5: prepared progress replay rechecks quiescence against a newer run on an unchecked task', async t => {
+  const f = await single(t); await f.close();
+  await assert.rejects(f.call('lifecycle-progress', runInput, { failpoint: name => { if (name === 'lifecycle-after-journal') throw new Error('crash'); } }));
+  const journal = lifecyclePaths('work', 'progress', 'run-1').journal;
+  assert.equal(JSON.parse(await f.get(journal)).record.state, 'prepared');
+  const checklist = 'openspec/changes/work/tasks.md', before = await f.get(checklist);
+  const late = await f.call('start', f.start({ run_id: 'late-worker', task_id: '1.2', scope: ['src/b.js'] }));
+  assert.equal(late.lifecycle, 'active'); // admission barrier cannot see lifecycle journals (#268)
+  assert.equal((await f.call('lifecycle-progress', runInput)).code, 'lifecycle-not-quiescent');
+  assert.equal(await f.get(checklist), before); // checklist byte-identical
+  assert.equal(JSON.parse(await f.get(journal)).record.state, 'prepared'); // retained for recovery
+  await f.put('.ai-factory/evidence/late.md', 'Observed late result.');
+  const result = await f.call('result', f.actor(1, { run_id: 'late-worker',
+    result: { result_id: 'result-late', status: 'completed', changed_files: [], checks: [{ name: 'fixture', exit_code: 0 }], evidence: ['.ai-factory/evidence/late.md'] } }));
+  await f.call('accept', { change_id: 'work', run_id: 'late-worker', actor: 'parent', version: result.version, result_digest: result.result_digest });
+  const recovered = await f.call('lifecycle-progress', runInput);
+  assert.equal(recovered.ok, true); assert.equal(recovered.recovered, true); assert.equal(recovered.historical, true);
+  assert.deepEqual(parseExecutionTasks(await f.get(checklist)).map(task => task.checked), [true, false]);
+  assert.equal((await f.call('lifecycle-progress', runInput)).historical, true); // applied replay stays historical
+});
+
 test('AC5: settlement journal is durable before record; exact retry completes publication', async t => {
   const f = await single(t); await f.close(); const input = { ...runInput, decision: decision() };
   await assert.rejects(f.call('lifecycle-settle', input, { failpoint: name => { if (name === 'lifecycle-after-journal') throw new Error('crash'); } }));
