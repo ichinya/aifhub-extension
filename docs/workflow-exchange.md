@@ -180,6 +180,12 @@ hashes.
   brief text because both are already canonical project artifacts; consumers
   outside the repository should treat the bundle as project-internal and use
   the evaluation export for anything public.
+- The extended runner metrics contract keeps the project-internal fields out of
+  the public record: `checks.dependencies` and `provenance.registry_digest`
+  stay in the metrics file, public records carry counts, closed-enum codes,
+  durations and the `unknowns` list verbatim. Aggregate metrics produced by the
+  read-only collector ([runner metrics](runner-metrics.md)) are observational
+  output and never become material input for execution or QA decisions.
 - Import is the consumer's responsibility: the bundle binds every fact to an
   exact `source_revision` and brief digest so a consumer can detect stale,
   mismatched, or unsupported representations and must surface an explicit
