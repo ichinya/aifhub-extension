@@ -91,8 +91,9 @@ function validateEnvelope(value) {
       portablePath(relative);
       requireValue(SHA.test(hash), 'observation-envelope-invalid', true);
     }
+    jsonValue(value);
   } catch (error) {
-    if (error instanceof WorkflowError && (error.code === 'invalid-input' || error.code === 'unsafe-path'))
+    if (error instanceof WorkflowError && ['invalid-input', 'unsafe-path', 'invalid-json-value'].includes(error.code))
       throw new WorkflowError('observation-envelope-invalid', true);
     throw error;
   }
@@ -111,7 +112,6 @@ function validateEnvelope(value) {
       requireValue(value.outcome !== 'failed' || (value.exit_code > 0), 'observation-envelope-invalid', true);
     }
   }
-  jsonValue(value);
   return value;
 }
 
@@ -195,9 +195,13 @@ const promiseExecFile = exec => (file, args, opts) => new Promise((resolve, reje
   });
 });
 
-// Launch the manifest-attested invocation. The two observed stop causes are the
-// adapter's own deadline (timeout) and the external abort signal (cancelled); the
-// error object alone never classifies the outcome.
+// Launch the manifest-attested invocation. Transport contract: callback-style
+// spawn(file, argv, options, callback), invoked asynchronously, returning a
+// child-like handle with an optional kill(). The two observed stop causes are
+// this adapter's own deadline (timeout) and the external abort signal
+// (cancelled); the error object alone never classifies the outcome. A
+// synchronous launch failure or a synchronous callback is normalized here —
+// the caller never sees a raw transport error or a TDZ window.
 function runVerifier(envelope, store, transport) {
   const root = store.root;
   const cwd = envelope.effective_cwd === '.' ? root : path.resolve(root, envelope.effective_cwd);
@@ -207,18 +211,29 @@ function runVerifier(envelope, store, transport) {
   const spawn = transport.execFile ?? execFile;
   return new Promise((resolve, reject) => {
     let timedOut = false;
-    const child = spawn(envelope.command.argv[0], envelope.command.argv.slice(1), {
-      cwd, killSignal: 'SIGTERM', windowsHide: true, env: transport.environment,
-      ...(transport.signal ? { signal: transport.signal } : {}),
-    }, error => {
-      clearTimeout(deadline);
-      if (timedOut) return resolve({ outcome: 'timeout', exit_code: null, stop: 'timeout' });
-      if (error?.code === 'ABORT_ERR') return resolve({ outcome: 'cancelled', exit_code: null, stop: 'cancelled' });
-      if (typeof error?.code === 'number') return resolve({ outcome: 'failed', exit_code: error.code, stop: 'exit' });
-      if (error) return reject(new WorkflowError('observation-exec-failed', true));
-      resolve({ outcome: 'completed', exit_code: 0, stop: null });
-    });
-    const deadline = setTimeout(() => { timedOut = true; child.kill('SIGTERM'); }, timeoutMs);
+    let settled = false;
+    let deadline = null;
+    const stopDeadline = () => { if (deadline !== null) { clearTimeout(deadline); deadline = null; } };
+    const settle = finish => { if (settled) return; settled = true; stopDeadline(); finish(); };
+    const child = (() => {
+      try {
+        return spawn(envelope.command.argv[0], envelope.command.argv.slice(1), {
+          cwd, killSignal: 'SIGTERM', windowsHide: true, env: transport.environment,
+          ...(transport.signal ? { signal: transport.signal } : {}),
+        }, error => {
+          if (timedOut) return settle(() => resolve({ outcome: 'timeout', exit_code: null, stop: 'timeout' }));
+          if (error?.code === 'ABORT_ERR') return settle(() => resolve({ outcome: 'cancelled', exit_code: null, stop: 'cancelled' }));
+          if (typeof error?.code === 'number') return settle(() => resolve({ outcome: 'failed', exit_code: error.code, stop: 'exit' }));
+          if (error) return settle(() => reject(new WorkflowError('observation-exec-failed', true)));
+          settle(() => resolve({ outcome: 'completed', exit_code: 0, stop: null }));
+        });
+      } catch { return null; }
+    })();
+    if (child === null) { reject(new WorkflowError('observation-exec-failed', true)); return; }
+    if (!settled) deadline = setTimeout(() => {
+      timedOut = true;
+      if (typeof child?.kill === 'function') child.kill('SIGTERM');
+    }, timeoutMs);
   });
 }
 
@@ -246,11 +261,16 @@ function buildReceipt(envelope, worktreeIdentity, fingerprintDigest, commandDige
 }
 
 // Verified host-attested bytes, minus the entries the recorder may not
-// materialize (QA control namespaces stay receipt-catalog-only).
+// materialize (QA control namespaces stay receipt-catalog-only). Admissibility
+// and size are checked here — strictly before the receipt and registry-complete
+// writes, so a recorder rejection can never wedge the run_id.
 async function collectRecorderArtifacts(store, envelope) {
   const artifacts = {};
   for (const [relative, hash] of Object.entries(envelope.artifacts)) {
     const data = await store.bytes(relative);
+    // The store's leaf reader already rejects oversized bytes (unsupported-file);
+    // both failures happen here, strictly before the receipt and registry-complete
+    // writes, so a recorder rejection can never wedge the run_id.
     requireValue(data !== null && digest(data) === hash, 'observation-declared-mismatch', true);
     if (!RECORDER_CONTROL_NAMES.some(name => withinCi(relative, `${store.qa}/${name}`))) artifacts[relative] = data;
   }
@@ -259,12 +279,15 @@ async function collectRecorderArtifacts(store, envelope) {
 
 // Whitelist mapping: the recorder receives exactly the observation contract —
 // never caller-supplied artifacts/supersedes/force/markdown or any other bound
-// recorder surface that would bypass host attestation.
+// recorder surface that would bypass host attestation. Custody-aliased inputs
+// (waveId, lowercase snapshotProvider) are forwarded so the adapter and the
+// recorder observe through the same sources.
 async function recordObservedResult(store, options, envelope, check, plan) {
   const recorded = await recordBoundEvidence({
     rootDir: store.root, changeId: store.target.id, flow: store.target.flow,
     namespace: store.target.namespace, qaDir: options.qaDir, planDir: options.planDir, plan: options.plan,
-    SnapshotProvider: options.SnapshotProvider, execFile: plan.execFile, environment: plan.environment,
+    SnapshotProvider: options.SnapshotProvider, snapshotProvider: options.snapshotProvider,
+    execFile: plan.execFile, environment: plan.environment, waveId: options.waveId,
     providers: options.providers, readBudget: options.readBudget,
     gate: check.gate, checkId: check.id, resultId: plan.resultId, markdown: plan.markdown,
     receiptPath: plan.receiptPath, artifacts: plan.artifacts,
@@ -276,6 +299,13 @@ async function recordObservedResult(store, options, envelope, check, plan) {
 
 const requirementsView = value => ({ gates: sorted(value?.gates ?? []),
   independent_roles: value?.independent_roles ?? [], evidence: sorted(value?.evidence ?? []) });
+// Publish-owner semantics (qa-manifest.mjs:121-124): the manifest stores the
+// union of previous + owner + explicit additions, so the live owner must be a
+// subset of the frozen sets — never byte-equal to them.
+const requirementsCovered = (owner, frozen) => sorted(owner?.gates ?? []).every(gate => sorted(frozen?.gates ?? []).includes(gate))
+  && sorted(owner?.evidence ?? []).every(ref => sorted(frozen?.evidence ?? []).includes(ref))
+  && (owner?.independent_roles ?? []).every(role => (frozen?.independent_roles ?? [])
+    .some(other => canonical(other) === canonical(role)));
 
 // One custody window: validate -> pre-observe -> run -> post-observe -> receipt
 // -> registry complete -> bound record. Nothing survives a digest inequality.
@@ -290,18 +320,22 @@ export async function ingestObservedRun(versionedResult, options = {}) {
         affected_checks: [], authorizes: [], errors: [{ code: 'hook-capability-unsupported',
           message: 'QA binding blocked: hook-capability-unsupported.' }] };
     options = { ...options, readBudget: options.readBudget ?? { bytes: 0 } };
-    // One resolved environment object is the single source of truth for the run:
-    // the same set is fingerprinted, handed to the spawn, and recorded.
-    const environment = { ...process.env, ...options.environment };
+    // One environment object is the single source of truth for the run: the
+    // library contract set (`options.environment ?? process.env`) is fingerprinted,
+    // handed to the spawn, and recorded — copied once, never merged with the
+    // parent environment (a declared-absent variable must stay absent).
+    const environment = options.environment ?? process.env;
     const observeOptions = { ...options, environment,
       execFile: options.execFile ? promiseExecFile(options.execFile) : undefined };
     const transport = { execFile: options.execFile, environment, signal: options.signal, timeoutMs: options.timeoutMs };
     const store = await qaStore(options);
     const raw = await storeFor(options.rootDir);
     const paths = observationPaths(store.qa, envelope.run_id);
-    // Attested reports live only in the canonical reports subdirectory: registry
-    // records, receipts and the lock file can never be overwritten by a run.
-    requireValue(withinCi(envelope.report_path, paths.reports), 'observation-envelope-invalid', true);
+    // Attested reports live only inside the canonical reports subdirectory (the
+    // directory entry itself is not a report path): registry records, receipts
+    // and the lock file can never be overwritten by a run.
+    requireValue(withinCi(envelope.report_path, paths.reports)
+      && envelope.report_path.toLowerCase() !== paths.reports.toLowerCase(), 'observation-envelope-invalid', true);
     const resultId = observedResultId(envelope.run_id);
     // The registry lock is the adapter's own lock. The recorder takes the QA lock
     // itself after this lock has been released: no nested capture.
@@ -309,7 +343,13 @@ export async function ingestObservedRun(versionedResult, options = {}) {
       const existing = await loadRegistryRecord(store, paths);
       if (existing && existing.state === 'complete') {
         requireValue(canonical(existing.payload) === canonical(envelope), 'observation-conflict', true);
-        const stored = await store.json(`${store.qa}/results/${resultId}.json`);
+        let stored;
+        try { stored = await store.json(`${store.qa}/results/${resultId}.json`); }
+        catch (error) {
+          if (error instanceof WorkflowError && error.code === 'invalid-qa-json')
+            throw new WorkflowError('observation-incomplete', true);
+          throw error;
+        }
         if (stored !== null) {
           // A replay confirms a check only through a stored result that really
           // belongs to this run and its receipt (review: file existence alone
@@ -327,6 +367,9 @@ export async function ingestObservedRun(versionedResult, options = {}) {
       const manifest = await store.manifest();
       const check = manifest.payload.checks.find(c => c.id === envelope.check_id);
       requireValue(check && envelope.change_id === store.target.id, 'observation-target-mismatch', true);
+      // The host declares the manifest it observed: an envelope from another wave
+      // is stale before anything runs or is written (review R2-1).
+      requireValue(envelope.manifest_digest === manifest.manifest_digest, 'observation-stale-gates', true);
       // Observed checks stay off the rules gate: a rules FAIL requires trace-backed
       // blockers the adapter cannot author, so the whole gate is unsupported here.
       requireValue(check.gate !== 'rules', 'observation-gate-unsupported', true);
@@ -334,15 +377,24 @@ export async function ingestObservedRun(versionedResult, options = {}) {
       try { block = observedGateBlock(check.gate, envelope); }
       catch { throw new WorkflowError('observation-gate-block-invalid', true); }
       // The check's required evidence catalog must be covered by the host-attested
-      // catalog before anything runs or is written.
-      for (const relative of check.required_evidence ?? [])
-        requireValue(Object.hasOwn(envelope.artifacts, relative)
-          && !RECORDER_CONTROL_NAMES.some(name => withinCi(relative, `${store.qa}/${name}`)),
-        'observation-required-evidence-unattested', true);
+      // catalog before a report-bearing run starts. Report-free negative outcomes
+      // carry no catalog by schema; they record verbatim and never reach PASS.
+      if (!REPORT_FREE_OUTCOMES.includes(envelope.outcome)) {
+        for (const relative of check.required_evidence ?? [])
+          requireValue(Object.hasOwn(envelope.artifacts, relative)
+            && !RECORDER_CONTROL_NAMES.some(name => withinCi(relative, `${store.qa}/${name}`)),
+          'observation-required-evidence-unattested', true);
+      }
+      // Recorder admissibility is cheap and checked before the launch: an
+      // attested artifact outside the qa namespace would wedge the run_id at the
+      // recorder, after the registry-complete write (review: round-1 class).
+      for (const relative of Object.keys(envelope.artifacts))
+        requireValue(withinCi(relative, store.qa), 'observation-artifact-inadmissible', true);
+      let preOwner = null;
       if (options.providers?.requirements) {
         const owner = await options.providers.requirements({ target: store.target, stage: manifest.payload.stage });
-        requireValue(canonical(requirementsView(owner)) === canonical(requirementsView(manifest.payload.requirements)),
-          'observation-stale-gates', true);
+        preOwner = requirementsView(owner);
+        requireValue(requirementsCovered(owner, manifest.payload.requirements), 'observation-stale-gates', true);
       }
       if (!existing) await saveRegistryRecord(raw, paths, { schema: OBSERVATION_RECORD_SCHEMA, state: 'pending',
         run_id: envelope.run_id, check_id: envelope.check_id, change_id: envelope.change_id,
@@ -395,10 +447,10 @@ export async function ingestObservedRun(versionedResult, options = {}) {
         ? (await options.providers.checkDefinition(check)).command : check.command;
       requireValue(canonical(secondCommand) === canonical(effectiveCommand), 'observation-custody-race', true);
       requireValue((await store.manifest()).manifest_digest === manifest.manifest_digest, 'observation-custody-race', true);
-      if (options.providers?.requirements) {
+      if (options.providers?.requirements && preOwner !== null) {
         const owner = await options.providers.requirements({ target: store.target, stage: manifest.payload.stage });
-        requireValue(canonical(requirementsView(owner)) === canonical(requirementsView(manifest.payload.requirements)),
-          'observation-custody-race', true);
+        requireValue(canonical(requirementsView(owner)) === canonical(preOwner)
+          && requirementsCovered(owner, manifest.payload.requirements), 'observation-custody-race', true);
       }
       const artifacts = await collectRecorderArtifacts(store, envelope);
       if (reportBytes !== null) {
@@ -423,19 +475,27 @@ export async function ingestObservedRun(versionedResult, options = {}) {
     if (plan.kind === 'record-only') {
       // Crash between the registry-complete write and the bound record: re-run only
       // the record stage with the same deterministic id; the recorder is idempotent
-      // for canonically equal content and rejects anything else.
+      // for canonically equal content and rejects anything else. The attested
+      // snapshot must still hold — a divergent record would fail the receipt
+      // binding forever instead of surfacing honest staleness.
       const manifest = await store.manifest();
       const check = manifest.payload.checks.find(c => c.id === plan.existing.check_id);
       requireValue(check, 'observation-target-mismatch', true);
+      requireValue(check.gate !== 'rules', 'observation-gate-unsupported', true);
       let block;
       try { block = observedGateBlock(check.gate, envelope); }
       catch { throw new WorkflowError('observation-gate-block-invalid', true); }
+      const current = await observeQaSnapshot(store, manifest.payload, observeOptions);
+      requireValue(current.worktree_identity === envelope.worktree_identity
+        && current.digest === envelope.snapshot_digest
+        && digest(current.modules) === envelope.modules_digest, 'observation-stale-source', true);
+      const fingerprints = await checkFingerprints(manifest.payload, current, observeOptions);
+      requireValue(digest({ [check.id]: fingerprints[check.id] }) === envelope.fingerprints_digest,
+        'observation-stale-gates', true);
       const artifacts = await collectRecorderArtifacts(store, envelope);
-      const observeOptions = { ...options, environment: { ...process.env, ...options.environment },
-        execFile: options.execFile ? promiseExecFile(options.execFile) : undefined };
       await recordObservedResult(store, options, envelope, check,
         { resultId, receiptPath: paths.receipt, markdown: block.markdown, artifacts,
-          execFile: observeOptions.execFile, environment: observeOptions.environment });
+          execFile: observeOptions.execFile, environment });
       return { ok: true, replayed: true, recorded: true, accepted: false, state: 'valid',
         ...registryView(plan.existing), authorizes: [] };
     }
