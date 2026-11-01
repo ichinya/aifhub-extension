@@ -25,7 +25,8 @@ const gateBody = (gate = 'verify', status = 'pass') => `${renderGateResultBlock(
 // the real fixture verifier copied into the project, a real child process per
 // verifier launch through the injectable execFile, and no Git/network anywhere.
 async function observedFixture({ mode = 'pass', requiresObserved = true, ignoredRaw = [], runId = 'run-1',
-  gate = 'verify', gates = null, flow = 'openspec', execFailpoint = null, execThrow = false, capabilities = {} } = {}) {
+  gate = 'verify', gates = null, flow = 'openspec', execFailpoint = null, execThrow = false, capabilities = {},
+  omitTimeout = false } = {}) {
   const rootDir = await realpath(await mkdtemp(path.join(os.tmpdir(), 'qa227-')));
   roots.push(rootDir);
   const verifierRel = 'tools/observed-verifier.mjs';
@@ -49,7 +50,7 @@ async function observedFixture({ mode = 'pass', requiresObserved = true, ignored
   const options = { rootDir, flow, changeId: 'sample', scope: ['src', 'tools'], checks,
     // Library contract semantics: no environment option means process.env, and a
     // cold node.exe spawn must survive a loaded CI, hence the per-mode deadline.
-    timeoutMs: mode === 'hang' ? 2000 : 15000,
+    ...(omitTimeout ? {} : { timeoutMs: mode === 'hang' ? 2000 : 15000 }),
     providers: { requirements: async () => ({ gates: [...gateList], independent_roles: [], evidence: [] }), toolchain: async () => toolchain },
     SnapshotProvider: async ({ payload }) => {
       const files = { ...model.files };
@@ -749,6 +750,39 @@ describe('review custody contracts (round 2)', () => {
     assert.equal(result.code, 'qa-refs-limit');
     assert.equal(await f.registry.lookup('run-1'), null);
     assert.equal(existsSync(path.join(f.rootDir, receiptPath(f))), false);
+  });
+  it('record-only resume refuses a run attested against a replaced manifest wave', async () => {
+    const f = await observedFixture();
+    await f.prepare();
+    const envelope = await f.issue(await f.compose());
+    const ingested = await f.ingest(envelope);
+    assert.equal(ingested.ok, true);
+    const resultFile = path.join(f.rootDir, f.qa, 'results', `${ingested.result_id}.json`);
+    await rm(resultFile); // crash window: registry-complete exists, the record does not
+    await f.prepare(); // a new wave replaces the manifest pointer
+    const resumed = await f.ingest(envelope); // exact replay of the original envelope
+    assert.equal(resumed.ok, false);
+    assert.equal(resumed.code, 'observation-stale-gates');
+    assert.equal(existsSync(resultFile), false);
+  });
+  it('a slow verifier completes under the bounded default deadline', async () => {
+    const f = await observedFixture({ mode: 'slow', omitTimeout: true });
+    await f.prepare();
+    const ingested = await f.ingest(await f.issue(await f.compose()));
+    // With the old 2s default this run was killed as timeout; the bounded
+    // 10-minute default lets real verification runs complete.
+    assert.equal(ingested.ok, true, JSON.stringify(ingested));
+    assert.equal(ingested.outcome, 'completed');
+    assert.equal(ingested.status, 'pass');
+    assert.equal((await f.publish({ HostObservationRegistry: f.registry })).accepted, true);
+  });
+  it('a verbose verifier keeps its recorded evidence beyond the 1 MiB stdio buffer', async () => {
+    const f = await observedFixture({ mode: 'verbose', omitTimeout: true });
+    await f.prepare();
+    const ingested = await f.ingest(await f.issue(await f.compose()));
+    assert.equal(ingested.ok, true, JSON.stringify(ingested));
+    assert.equal(ingested.outcome, 'completed');
+    assert.equal((await f.publish({ HostObservationRegistry: f.registry })).accepted, true);
   });
   it('orphan report bytes from an earlier attempt cannot complete a run that wrote no report', async () => {
     const f = await observedFixture({ mode: 'noreport' });
