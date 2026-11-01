@@ -2,7 +2,7 @@
 // per-request delivery snapshots, execution run records and opt-in QA results
 // into a single `aifhub.runner_metrics.v1` file for the existing
 // `exchange evaluation --runner-metrics` consumer. The collector never takes a
-// lock, never calls a HostClient, and never mutates execution/QA/delivery
+// lock, never contacts a delivery host, and never mutates execution/QA/delivery
 // state: its only write is the explicitly requested observational output file.
 // Metrics are never material input for execution or QA decisions.
 import { execFile } from 'node:child_process';
@@ -10,7 +10,7 @@ import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
-import { canonical, digest, identifier, portablePath, storeFor, requireValue } from './workflow-state-store.mjs';
+import { canonical, digest, identifier, portablePath, storeFor, requireValue, WorkflowError } from './workflow-state-store.mjs';
 import { executionId } from './execution-task-source.mjs';
 import { DELIVERY_LIMITS, TRANSPORT_KEYS, deliveryPaths, deliveryStore, requestUuid } from './host-delivery-store.mjs';
 import { RUN_SCHEMA, decode } from './execution-records.mjs';
@@ -137,8 +137,8 @@ async function defaultTrackedCheck(root, output) {
 // Every reject happens before the first write.
 async function resolveOutputPath(root, changeId, requested, options) {
   const output = requested ?? DEFAULT_OUTPUT.replace('<change>', changeId);
-  portablePath(output);
   const rejected = () => collectorError('runner_metrics_output_rejected');
+  try { portablePath(output); } catch { throw rejected(); }
   if (!output.startsWith(`${STATE_ROOT}/`)) throw rejected();
   if (withinCi(output, `${STATE_ROOT}/${changeId}/execution`)) throw rejected();
   if (withinCi(output, `${STATE_ROOT}/${changeId}/delivery`)) throw rejected();
@@ -333,8 +333,15 @@ export async function collectRunnerMetrics(options = {}) {
     const root = path.resolve(options.rootDir ?? process.cwd());
     const args = options.argv ?? [];
     const parsed = parseArguments(args);
-    const changeId = executionId(parsed.changeId);
-    const runId = parsed.runId === undefined ? undefined : identifier(parsed.runId);
+    let changeId;
+    let runId;
+    try {
+      changeId = executionId(parsed.changeId);
+      runId = parsed.runId === undefined ? undefined : identifier(parsed.runId);
+    } catch (error) {
+      if (error instanceof WorkflowError) throw collectorError('invalid_arguments');
+      throw error;
+    }
     const output = await resolveOutputPath(root, changeId, parsed.output, options);
     const store = await storeFor(root);
     const delivery = await deliveryStore({ rootDir: root });
