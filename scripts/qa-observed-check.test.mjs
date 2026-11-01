@@ -7,7 +7,7 @@ import path from 'node:path';
 import { digest, WorkflowError } from './workflow-state-store.mjs';
 import { createGateResult, renderGateResultBlock } from './aif-gate-result.mjs';
 import { prepareQaManifest, publishQaManifest, evaluateQaBinding, recordQaResult } from './qa-manifest.mjs';
-import { qaStore } from './qa-manifest-store.mjs';
+import { qaStore, QA_LIMITS } from './qa-manifest-store.mjs';
 import { allDeclaredRoots } from './qa-manifest-inputs.mjs';
 import { ingestObservedRun, observationRegistry, OBSERVED_RUN_SCHEMA } from './qa-observed-check.mjs';
 import { createFakeObservedHost, createVerifierExec, composeObservedRun } from './fixtures/host-observed.mjs';
@@ -44,7 +44,10 @@ async function observedFixture({ mode = 'pass', requiresObserved = true, ignored
     inputs: ['src/a.mjs'], requires_observed: requiresObserved,
     command: { argv: [process.execPath, verifierRel, '--mode', mode, '--report', reportRel, '--check', 'check-verify'],
       cwd: '.', definition: verifierRel }, toolchain, env_inputs: [] }];
-  const options = { rootDir, flow, changeId: 'sample', scope: ['src', 'tools'], checks, environment: {},
+  const options = { rootDir, flow, changeId: 'sample', scope: ['src', 'tools'], checks,
+    // Library contract semantics: no environment option means process.env, and a
+    // cold node.exe spawn must survive a loaded CI, hence the per-mode deadline.
+    timeoutMs: mode === 'hang' ? 2000 : 15000,
     providers: { requirements: async () => ({ gates: [gate], independent_roles: [], evidence: [] }), toolchain: async () => toolchain },
     SnapshotProvider: async ({ payload }) => {
       const files = { ...model.files };
@@ -54,7 +57,9 @@ async function observedFixture({ mode = 'pass', requiresObserved = true, ignored
       return { ...model, complete: true, files, ignored_names: ignoredRaw.filter(p => !p.startsWith(`${qa}/artifacts/`)) };
     } };
   const host = createFakeObservedHost({ capabilities });
-  options.execFile = execThrow ? () => { throw new WorkflowError('observation-exec-failed', true); }
+  // A plain Error on purpose: the adapter must normalize a synchronous launch
+  // failure into observation-exec-failed (a ready-made WorkflowError would mask it).
+  options.execFile = execThrow ? () => { throw new Error('boom'); }
     : createVerifierExec(host.state, { failpoint: execFailpoint });
   async function prepare(extra = {}) { return prepareQaManifest({ ...options, ...extra }); }
   async function compose(extra = {}, run = runId) { return composeObservedRun({ ...options, ...extra }, { runId: run, mode }); }
@@ -506,19 +511,21 @@ describe('crash and concurrency windows', () => {
 });
 
 describe('review custody contracts (round 2)', () => {
-  it('an observed run on the rules gate is rejected before any registry write', async () => {
-    const f = await observedFixture({ gate: 'rules', mode: 'fail' });
-    await f.prepare();
-    const result = await f.ingest(await f.issue(await f.compose()));
-    assert.equal(result.ok, false);
-    assert.equal(result.code, 'observation-gate-unsupported');
-    // The registry lock creates (and removes) its own directory; no record,
-    // receipt or result may exist after a pre-write rejection.
-    assert.equal(existsSync(path.join(f.rootDir, f.qa, 'artifacts/observations/receipts')), false);
-    assert.equal(await f.registry.lookup('run-1'), null);
-    assert.equal((await f.records()).length, 0);
-    assert.equal(f.host.state.counters.verifier_launches, 0);
-  });
+  for (const mode of ['fail', 'pass']) {
+    it(`an observed run on the rules gate (${mode}) is rejected before any registry write`, async () => {
+      const f = await observedFixture({ gate: 'rules', mode });
+      await f.prepare();
+      const result = await f.ingest(await f.issue(await f.compose()));
+      assert.equal(result.ok, false);
+      assert.equal(result.code, 'observation-gate-unsupported');
+      // The registry lock creates (and removes) its own directory; no record,
+      // receipt or result may exist after a pre-write rejection.
+      assert.equal(existsSync(path.join(f.rootDir, f.qa, 'artifacts/observations/receipts')), false);
+      assert.equal(await f.registry.lookup('run-1'), null);
+      assert.equal((await f.records()).length, 0);
+      assert.equal(f.host.state.counters.verifier_launches, 0);
+    });
+  }
   it('required evidence outside the host-attested catalog is rejected before the launch', async () => {
     const f = await observedFixture();
     f.checks[0].required_evidence = [`${f.qa}/report.json`];
@@ -533,15 +540,18 @@ describe('review custody contracts (round 2)', () => {
     const f = await observedFixture();
     await f.prepare();
     const envelope = await f.issue(await f.compose());
-    const result = await f.ingest(envelope, { artifacts: { [`${f.qa}/smuggled.txt`]: 'smuggled' } });
-    assert.equal(result.ok, false);
-    assert.equal(result.code, 'observation-options-conflict');
+    for (const key of ['artifacts', 'supersedes', 'force', 'markdown', 'gate', 'checkId', 'resultId', 'receiptPath', 'execution']) {
+      const result = await f.ingest(envelope, { [key]: key === 'force' ? true : 'smuggled' });
+      assert.equal(result.ok, false, key);
+      assert.equal(result.code, 'observation-options-conflict', key);
+    }
     assert.equal((await f.records()).length, 0);
+    assert.equal(f.host.state.counters.verifier_launches, 0);
   });
   it('the fingerprinted environment is the environment the verifier is spawned with', async () => {
     const f = await observedFixture();
     f.checks[0].env_inputs = ['CI'];
-    f.options.environment = { CI: 'fixture-value' };
+    f.options.environment = { ...process.env, CI: 'fixture-value' };
     await f.prepare();
     const baseExec = f.options.execFile;
     let spawnedEnv = null;
@@ -553,6 +563,108 @@ describe('review custody contracts (round 2)', () => {
     assert.equal(ingested.ok, true, JSON.stringify(ingested));
     assert.equal(spawnedEnv.CI, 'fixture-value');
     assert.equal((await f.publish({ HostObservationRegistry: f.registry })).accepted, true);
+  });
+  it('a declared-absent environment variable stays absent (no parent-env leak into the run)', async () => {
+    const f = await observedFixture();
+    f.checks[0].env_inputs = ['CI'];
+    const withoutCI = { ...process.env };
+    delete withoutCI.CI;
+    f.options.environment = withoutCI;
+    await f.prepare();
+    const ingested = await f.ingest(await f.issue(await f.compose()));
+    // With the parent-env merge bug this exact flow failed observation-stale-gates
+    // before the launch: the fingerprinted CI-absent state was masked by process.env.
+    assert.equal(ingested.ok, true, JSON.stringify(ingested));
+  });
+  it('a fresh envelope with a manifest digest from another wave is stale before intent or launch', async () => {
+    const f = await observedFixture();
+    await f.prepare();
+    const envelope = await f.issue(await f.compose());
+    const result = await f.ingest({ ...envelope, manifest_digest: digest('other-wave') });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, 'observation-stale-gates');
+    assert.equal(f.host.state.counters.verifier_launches, 0);
+    assert.equal(await f.registry.lookup('run-1'), null);
+    assert.equal((await f.records()).length, 0);
+  });
+  it('owner requirements are a subset of the frozen manifest union, not its equal', async () => {
+    const f = await observedFixture();
+    await f.prepare({ evidenceRefs: [`${f.qa}/extra.json`],
+      independentRoles: [{ check_id: 'check-verify', role: 'verify' }] });
+    const ingested = await f.ingest(await f.issue(await f.compose()));
+    // The manifest legitimately stores more than the live owner returns
+    // (explicit additions and previous waves); the old equality rejected this.
+    assert.equal(ingested.ok, true, JSON.stringify(ingested));
+  });
+  for (const mode of ['hang', 'noreport']) {
+    it(`a required-evidence check records the ${mode} outcome verbatim and never reaches PASS`, async () => {
+      const f = await observedFixture({ mode });
+      f.checks[0].required_evidence = [`${f.qa}/report.json`];
+      await f.prepare();
+      const ingested = await f.ingest(await f.issue(await f.compose()));
+      assert.equal(ingested.ok, true, JSON.stringify(ingested));
+      assert.equal(ingested.status, 'fail');
+      assert.equal(ingested.outcome, mode === 'hang' ? 'timeout' : 'missing-report');
+      const record = await recordedResult(f, ingested.result_id);
+      assert.equal(record.execution.outcome, ingested.outcome);
+      const published = await f.publish({ HostObservationRegistry: f.registry });
+      assert.equal(published.ok, false);
+      assert.equal(published.code, 'evidence-catalog-incomplete');
+    });
+  }
+  it('a synchronously-invoked transport callback cannot skip the deadline lifecycle', async () => {
+    const f = await observedFixture({ mode: 'noreport' });
+    await f.prepare();
+    const { execFile: realExecFile } = await import('node:child_process');
+    f.options.execFile = (file, argv, opts, cb) => {
+      if (file === 'git') return realExecFile(file, argv, opts, cb);
+      cb(null, '', ''); // synchronous callback: the deadline is not armed yet
+      return { kill() {} };
+    };
+    const ingested = await f.ingest(await f.issue(await f.compose()));
+    assert.equal(ingested.ok, true, JSON.stringify(ingested));
+    assert.equal(ingested.outcome, 'missing-report');
+  });
+  it('attested artifacts outside the qa namespace are inadmissible before the launch', async () => {
+    const f = await observedFixture();
+    f.model.files['outside/attested.txt'] = bytes('attested bytes');
+    await f.prepare();
+    const envelope = await f.issue(await f.compose());
+    const declared = { ...envelope,
+      artifacts: { ...envelope.artifacts, 'outside/attested.txt': digest('attested bytes') } };
+    const result = await f.ingest(declared);
+    assert.equal(result.ok, false);
+    assert.equal(result.code, 'observation-artifact-inadmissible');
+    assert.equal(f.host.state.counters.verifier_launches, 0);
+    assert.equal((await f.records()).length, 0);
+  });
+  it('an oversized attested artifact fails before the receipt and registry are written', async () => {
+    const f = await observedFixture();
+    await f.prepare();
+    const bigRel = `${f.qa}/observations-extra.bin`;
+    const big = Buffer.alloc(QA_LIMITS.blob + 1);
+    await writeFile(path.join(f.rootDir, bigRel), big);
+    const envelope = await f.issue(await f.compose());
+    const declared = { ...envelope, artifacts: { ...envelope.artifacts, [bigRel]: digest(big) } };
+    const result = await f.ingest(declared);
+    // The store's leaf reader rejects oversized bytes before any custody write.
+    assert.equal(result.ok, false);
+    assert.equal(result.code, 'unsupported-file');
+    assert.equal(await f.registry.lookup('run-1'), null);
+    assert.equal(existsSync(path.join(f.rootDir, receiptPath(f))), false);
+  });
+  it('record-only resume revalidates the attested snapshot before re-recording', async () => {
+    const f = await observedFixture();
+    await f.prepare();
+    const ingested = await f.ingest(await f.issue(await f.compose()));
+    assert.equal(ingested.ok, true);
+    const resultFile = path.join(f.rootDir, f.qa, 'results', `${ingested.result_id}.json`);
+    await rm(resultFile);
+    f.model.files['src/a.mjs'] = bytes('drifted after the run');
+    const resumed = await f.ingest(await f.issue(await f.compose()));
+    assert.equal(resumed.ok, false);
+    assert.equal(resumed.code, 'observation-stale-source');
+    assert.equal(existsSync(resultFile), false);
   });
   it('orphan report bytes from an earlier attempt cannot complete a run that wrote no report', async () => {
     const f = await observedFixture({ mode: 'noreport' });
