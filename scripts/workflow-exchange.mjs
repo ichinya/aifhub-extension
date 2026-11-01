@@ -11,6 +11,7 @@ import { normalizeChangeId } from './active-change-resolver.mjs';
 import { resolvePlanContext, resolvePlanTarget, listAdapters } from './common-plan-resolver.mjs';
 import { inspectSessionBrief } from './session-brief.mjs';
 import { parseStrictJson } from './json-strict.mjs';
+import { identifier } from './workflow-state-store.mjs';
 import { readProviderFile, writeProviderFile } from './provider-files.mjs';
 import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
 import { SDD_GATES } from './sdd-profiles.mjs';
@@ -132,6 +133,28 @@ const ARTIFACT_VOCABULARY = Object.freeze([
 
 const CREDENTIAL_RE = /-----BEGIN [A-Z ]*PRIVATE KEY-----|\b(?:sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{16,}|AKIA[A-Z0-9]{16})\b|\bBearer\s+[A-Za-z0-9._~-]{8,}|\b(?:password|api[_ -]?key|client[_ -]?secret|access[_ -]?token)\s*[:=]\s*[^\s,}]+/i;
 
+// Closed vocabularies for the extended aifhub.runner_metrics.v1 contract
+// (issue #230, stage 1). Reason codes are the recovery action types, the
+// fix-attempt ledger outcomes, the run recovery reasons, plus `unknown` for
+// samples without provable evidence — nothing outside this list is publishable.
+// The collector imports these constants so the validator stays the single
+// source of truth; the JSON schema carries the same enum (parity-tested).
+export const RUNNER_METRICS_REASON_CODES = Object.freeze([
+  'provide-capabilities', 'read-request', 'wait-request', 'fetch-response',
+  'resend-same-request', 'reconcile-host-state', 'resolve-identity-conflict',
+  'pending', 'passed', 'failed', 'blocked', 'interrupted',
+  'cancelled', 'timed_out', 'abandoned', 'unknown'
+]);
+export const RUNNER_METRICS_COVERAGES = Object.freeze(['delivery_registry', 'delivery_registry+qa']);
+export const RUNNER_METRICS_UNKNOWNS = Object.freeze([
+  'tokens', 'cost', 'tool_calls', 'model_requests', 'unlogged_requests',
+  'setup_ms', 'checks_ms', 'snapshot_hash_ms', 'wait_ms', 'run_elapsed',
+  'coordinator_accounting', 'billing', 'checks'
+]);
+const MAX_METRIC_REASONS = 32;
+const MAX_METRIC_DEPENDENCIES = 64;
+const MAX_METRIC_UNKNOWNS = 32;
+
 export function exchangeError(code) {
   const error = new Error(code);
   error.exchangeCode = code;
@@ -202,14 +225,17 @@ export function validateDesignContext(input) {
   return errors;
 }
 
-function validateRunnerMetrics(input) {
+export function validateRunnerMetrics(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw exchangeError('invalid_runner_metrics');
   if (input.schema !== RUNNER_METRICS_SCHEMA) throw exchangeError('invalid_runner_metrics');
-  const allowed = ['schema', 'run_id', 'tokens', 'cost', 'latency_ms', 'model', 'harness', 'retries', 'changed_loc', 'unrelated_changes', 'human_review_ms', 'verified_success', 'transport'];
+  const allowed = ['schema', 'run_id', 'tokens', 'cost', 'latency_ms', 'model', 'harness', 'retries', 'changed_loc', 'unrelated_changes', 'human_review_ms', 'verified_success', 'transport',
+    'attribution', 'requests', 'checks', 'phases', 'provenance', 'unknowns', 'coverage'];
   if (Object.keys(input).some((key) => !allowed.includes(key))) throw exchangeError('invalid_runner_metrics');
   const label = (value) => value === null || value === undefined || (typeof value === 'string' && value.length <= MAX_LABEL && !/[\x00-\x1f]/.test(value));
   if (!label(input.run_id)) throw exchangeError('invalid_runner_metrics');
   const intOrNull = (value) => value === null || value === undefined || (Number.isSafeInteger(value) && value >= 0);
+  const safeIdentifier = (value) => { try { identifier(value); return true; } catch { return false; } };
+  const digestOrNull = (value) => value === null || value === undefined || (typeof value === 'string' && HASH.test(value));
   if (input.transport !== undefined && input.transport !== null) {
     const keys = ['create_calls', 'read_calls', 'fetch_calls', 'retry_creates', 'recovery_attempts', 'verified_recoveries',
       'uncertain_returns', 'identity_conflicts', 'transport_ms', 'recovery_ms', 'wait_ms', 'incomplete_intervals'];
@@ -220,9 +246,9 @@ function validateRunnerMetrics(input) {
   if (input.tokens !== undefined && input.tokens !== null) {
     const tokens = input.tokens;
     if (typeof tokens !== 'object' || Array.isArray(tokens)
-      || Object.keys(tokens).some((key) => !['input', 'output', 'total', 'cache_read', 'cache_write'].includes(key))
+      || Object.keys(tokens).some((key) => !['input', 'output', 'total', 'cache_read', 'cache_write', 'reasoning'].includes(key))
       || !intOrNull(tokens.input) || !intOrNull(tokens.output) || !intOrNull(tokens.total)
-      || !intOrNull(tokens.cache_read) || !intOrNull(tokens.cache_write)) throw exchangeError('invalid_runner_metrics');
+      || !intOrNull(tokens.cache_read) || !intOrNull(tokens.cache_write) || !intOrNull(tokens.reasoning)) throw exchangeError('invalid_runner_metrics');
   }
   if (input.cost !== undefined && input.cost !== null) {
     const cost = input.cost;
@@ -244,6 +270,75 @@ function validateRunnerMetrics(input) {
       || Object.keys(value).some((key) => !allowedFields.includes(key))
       || Object.values(value).some((field) => !label(field))) throw exchangeError('invalid_runner_metrics');
   }
+  if (input.attribution !== undefined && input.attribution !== null) {
+    const attribution = input.attribution;
+    // Coordinator and worker are identifiers, not free-form labels: a
+    // path-like value must never reach the public runtime record.
+    if (typeof attribution !== 'object' || Array.isArray(attribution)
+      || Object.keys(attribution).some((key) => !['coordinator', 'worker', 'role', 'run_kind', 'runs', 'tasks'].includes(key))
+      || !(attribution.coordinator === null || attribution.coordinator === undefined || safeIdentifier(attribution.coordinator))
+      || !(attribution.worker === null || attribution.worker === undefined || safeIdentifier(attribution.worker))
+      || !(attribution.role === null || attribution.role === undefined || ['implement', 'fix'].includes(attribution.role))
+      || !(attribution.run_kind === null || attribution.run_kind === undefined || ['single', 'batch'].includes(attribution.run_kind))
+      || !intOrNull(attribution.runs) || !intOrNull(attribution.tasks)) throw exchangeError('invalid_runner_metrics');
+  }
+  if (input.requests !== undefined && input.requests !== null) {
+    const requests = input.requests;
+    const byKind = requests.by_kind;
+    const byKindValid = byKind === undefined || byKind === null || (typeof byKind === 'object' && !Array.isArray(byKind)
+      && Object.keys(byKind).every((key) => ['message', 'completion'].includes(key))
+      && Object.values(byKind).every(intOrNull));
+    if (typeof requests !== 'object' || Array.isArray(requests)
+      || Object.keys(requests).some((key) => !['total', 'verified', 'retried', 'recovered', 'incomplete', 'duplicate_responses', 'by_kind'].includes(key))
+      || !intOrNull(requests.total) || !intOrNull(requests.verified) || !intOrNull(requests.retried) || !intOrNull(requests.recovered)
+      || !intOrNull(requests.incomplete) || !intOrNull(requests.duplicate_responses) || !byKindValid) throw exchangeError('invalid_runner_metrics');
+  }
+  if (input.checks !== undefined && input.checks !== null) {
+    const checks = input.checks;
+    const count = (value) => Number.isSafeInteger(value) && value >= 0;
+    const digest = (value) => typeof value === 'string' && HASH.test(value);
+    const reasons = checks.reasons;
+    // Reason counts and dependency digests are required members of their
+    // entries (never null): the schema demands them, so the runtime gate must
+    // not accept a file the export schema would then reject.
+    const reasonsValid = reasons === undefined || reasons === null || (Array.isArray(reasons) && reasons.length <= MAX_METRIC_REASONS
+      && reasons.every((entry) => entry && typeof entry === 'object' && !Array.isArray(entry)
+        && Object.keys(entry).length === 2 && RUNNER_METRICS_REASON_CODES.includes(entry.code) && count(entry.count)));
+    const dependencies = checks.dependencies;
+    const dependenciesValid = dependencies === undefined || dependencies === null || (Array.isArray(dependencies) && dependencies.length <= MAX_METRIC_DEPENDENCIES
+      && dependencies.every((entry) => entry && typeof entry === 'object' && !Array.isArray(entry)
+        && Object.keys(entry).length === 4 && safeIdentifier(entry.check_id) && safeIdentifier(entry.wave_id)
+        && digest(entry.manifest_digest) && digest(entry.input_fingerprint)));
+    if (typeof checks !== 'object' || Array.isArray(checks)
+      || Object.keys(checks).some((key) => !['results', 'repeated', 'reasons', 'dependencies'].includes(key))
+      || !intOrNull(checks.results) || !intOrNull(checks.repeated) || !reasonsValid || !dependenciesValid) throw exchangeError('invalid_runner_metrics');
+  }
+  if (input.phases !== undefined && input.phases !== null) {
+    const phases = input.phases;
+    const keys = ['setup_ms', 'checks_ms', 'snapshot_hash_ms', 'wait_ms', 'run_elapsed_ms', 'run_record_span_ms',
+      'workers_span_sum_ms', 'pending_observed_ms', 'transport_ms', 'recovery_ms'];
+    if (typeof phases !== 'object' || Array.isArray(phases)
+      || Object.keys(phases).some((key) => !keys.includes(key))
+      || Object.values(phases).some((value) => !intOrNull(value))) throw exchangeError('invalid_runner_metrics');
+  }
+  if (input.provenance !== undefined && input.provenance !== null) {
+    const provenance = input.provenance;
+    const collector = provenance.collector;
+    const collectorValid = collector === undefined || collector === null || (typeof collector === 'object' && !Array.isArray(collector)
+      && Object.keys(collector).every((key) => ['id', 'version'].includes(key))
+      && Object.values(collector).every(label));
+    if (typeof provenance !== 'object' || Array.isArray(provenance)
+      || Object.keys(provenance).some((key) => !['requests_scanned', 'journals_scanned', 'runs_scanned', 'qa_results_scanned', 'members_skipped', 'registry_digest', 'collector'].includes(key))
+      || !intOrNull(provenance.requests_scanned) || !intOrNull(provenance.journals_scanned) || !intOrNull(provenance.runs_scanned)
+      || !intOrNull(provenance.qa_results_scanned) || !intOrNull(provenance.members_skipped)
+      || !digestOrNull(provenance.registry_digest) || !collectorValid) throw exchangeError('invalid_runner_metrics');
+  }
+  if (input.unknowns !== undefined) {
+    const unknowns = input.unknowns;
+    if (!Array.isArray(unknowns) || unknowns.length > MAX_METRIC_UNKNOWNS
+      || unknowns.some((value) => !RUNNER_METRICS_UNKNOWNS.includes(value))) throw exchangeError('invalid_runner_metrics');
+  }
+  if (input.coverage !== undefined && !RUNNER_METRICS_COVERAGES.includes(input.coverage)) throw exchangeError('invalid_runner_metrics');
   return input;
 }
 
@@ -529,7 +624,30 @@ function buildEvaluationRecord(snapshot, version, now, options) {
     changed_loc: runner?.changed_loc ?? null,
     unrelated_changes: runner?.unrelated_changes ?? null,
     human_review_ms: runner?.human_review_ms ?? null,
-    transport: runner?.transport ? { ...runner.transport } : null
+    transport: runner?.transport ? { ...runner.transport } : null,
+    // Extended runner-metrics projection (issue #230, stage 1): counts,
+    // durations and closed-enum codes only. checks.dependencies and
+    // provenance.registry_digest stay in the project-internal metrics file.
+    requests_total: runner?.requests?.total ?? null,
+    requests_verified: runner?.requests?.verified ?? null,
+    requests_retried: runner?.requests?.retried ?? null,
+    requests_recovered: runner?.requests?.recovered ?? null,
+    requests_incomplete: runner?.requests?.incomplete ?? null,
+    requests_duplicate_responses: runner?.requests?.duplicate_responses ?? null,
+    requests_message: runner?.requests?.by_kind?.message ?? null,
+    requests_completion: runner?.requests?.by_kind?.completion ?? null,
+    checks_results: runner?.checks?.results ?? null,
+    checks_repeated: runner?.checks?.repeated ?? null,
+    checks_reasons: runner?.checks?.reasons
+      ? runner.checks.reasons.map(({ code, count }) => ({ code, count }))
+      : null,
+    run_record_span_ms: runner?.phases?.run_record_span_ms ?? null,
+    workers_span_sum_ms: runner?.phases?.workers_span_sum_ms ?? null,
+    pending_observed_ms: runner?.phases?.pending_observed_ms ?? null,
+    transport_ms: runner?.phases?.transport_ms ?? null,
+    recovery_ms: runner?.phases?.recovery_ms ?? null,
+    unknowns: runner?.unknowns ?? null,
+    coverage: runner?.coverage ?? null
   };
   const record = {
     schema: EVALUATION_SCHEMA,
@@ -566,7 +684,14 @@ function buildEvaluationRecord(snapshot, version, now, options) {
     runtime: {
       run_id: runner?.run_id ?? null,
       model: runner?.model ?? null,
-      harness: runner?.harness ?? null
+      harness: runner?.harness ?? null,
+      // Execution attribution from the runner metrics file; sensitivity matches run_id.
+      coordinator: runner?.attribution?.coordinator ?? null,
+      worker: runner?.attribution?.worker ?? null,
+      role: runner?.attribution?.role ?? null,
+      run_kind: runner?.attribution?.run_kind ?? null,
+      runs: runner?.attribution?.runs ?? null,
+      tasks: runner?.attribution?.tasks ?? null
     },
     privacy: {
       contains_paths: false,

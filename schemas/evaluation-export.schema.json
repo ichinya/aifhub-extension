@@ -93,77 +93,88 @@
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "brief_bytes": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "context_manifest_entries": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "sources_count": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "tasks_total": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "tasks_completed": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "tokens_input": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "tokens_output": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "tokens_total": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "tokens_cache_read": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "tokens_cache_write": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "cost": {
           "type": [
@@ -191,35 +202,40 @@
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "retries": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "changed_loc": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "unrelated_changes": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "human_review_ms": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "transport": {
           "type": [
@@ -233,86 +249,291 @@
                 "integer",
                 "null"
               ],
-              "minimum": 0
+              "minimum": 0,
+              "maximum": 9007199254740991
             },
             "read_calls": {
               "type": [
                 "integer",
                 "null"
               ],
-              "minimum": 0
+              "minimum": 0,
+              "maximum": 9007199254740991
             },
             "fetch_calls": {
               "type": [
                 "integer",
                 "null"
               ],
-              "minimum": 0
+              "minimum": 0,
+              "maximum": 9007199254740991
             },
             "retry_creates": {
               "type": [
                 "integer",
                 "null"
               ],
-              "minimum": 0
+              "minimum": 0,
+              "maximum": 9007199254740991
             },
             "recovery_attempts": {
               "type": [
                 "integer",
                 "null"
               ],
-              "minimum": 0
+              "minimum": 0,
+              "maximum": 9007199254740991
             },
             "verified_recoveries": {
               "type": [
                 "integer",
                 "null"
               ],
-              "minimum": 0
+              "minimum": 0,
+              "maximum": 9007199254740991
             },
             "uncertain_returns": {
               "type": [
                 "integer",
                 "null"
               ],
-              "minimum": 0
+              "minimum": 0,
+              "maximum": 9007199254740991
             },
             "identity_conflicts": {
               "type": [
                 "integer",
                 "null"
               ],
-              "minimum": 0
+              "minimum": 0,
+              "maximum": 9007199254740991
             },
             "transport_ms": {
               "type": [
                 "integer",
                 "null"
               ],
-              "minimum": 0
+              "minimum": 0,
+              "maximum": 9007199254740991
             },
             "recovery_ms": {
               "type": [
                 "integer",
                 "null"
               ],
-              "minimum": 0
+              "minimum": 0,
+              "maximum": 9007199254740991
             },
             "wait_ms": {
               "type": [
                 "integer",
                 "null"
               ],
-              "minimum": 0
+              "minimum": 0,
+              "maximum": 9007199254740991
             },
             "incomplete_intervals": {
               "type": [
                 "integer",
                 "null"
               ],
-              "minimum": 0
+              "minimum": 0,
+              "maximum": 9007199254740991
             }
           }
+        },
+        "requests_total": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "requests_verified": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "requests_retried": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "requests_recovered": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "requests_incomplete": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "requests_duplicate_responses": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "requests_message": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "requests_completion": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "checks_results": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "checks_repeated": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "checks_reasons": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "enum": [
+                  "provide-capabilities",
+                  "read-request",
+                  "wait-request",
+                  "fetch-response",
+                  "resend-same-request",
+                  "reconcile-host-state",
+                  "resolve-identity-conflict",
+                  "pending",
+                  "passed",
+                  "failed",
+                  "blocked",
+                  "interrupted",
+                  "cancelled",
+                  "timed_out",
+                  "abandoned",
+                  "unknown"
+                ]
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "code",
+              "count"
+            ]
+          }
+        },
+        "run_record_span_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "workers_span_sum_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "pending_observed_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "transport_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "recovery_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "unknowns": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "maxItems": 32,
+          "items": {
+            "enum": [
+              "tokens",
+              "cost",
+              "tool_calls",
+              "model_requests",
+              "unlogged_requests",
+              "setup_ms",
+              "checks_ms",
+              "snapshot_hash_ms",
+              "wait_ms",
+              "run_elapsed",
+              "coordinator_accounting",
+              "billing",
+              "checks"
+            ]
+          }
+        },
+        "coverage": {
+          "enum": [
+            "delivery_registry",
+            "delivery_registry+qa",
+            null
+          ]
         }
       },
       "required": [
@@ -472,7 +693,8 @@
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "pattern": "^[^\\u0000-\\u001f]*$"
         },
         "model": {
           "type": [
@@ -485,6 +707,50 @@
             "object",
             "null"
           ]
+        },
+        "coordinator": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^(?!(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][0-9]|[Ll][Pp][Tt][0-9])(?:[.]|$))(?!.*[.]$)[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$"
+        },
+        "worker": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^(?!(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][0-9]|[Ll][Pp][Tt][0-9])(?:[.]|$))(?!.*[.]$)[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$"
+        },
+        "role": {
+          "enum": [
+            "implement",
+            "fix",
+            null
+          ]
+        },
+        "run_kind": {
+          "enum": [
+            "single",
+            "batch",
+            null
+          ]
+        },
+        "runs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "tasks": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 9007199254740991
         }
       },
       "required": [

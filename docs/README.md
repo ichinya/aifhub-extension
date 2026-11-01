@@ -6,6 +6,7 @@
 - [AI Factory plans across methodologies](adr/0005-ai-factory-plan-methodologies.md) — архитектура владения планами и адаптеров: classic/OpenSpec SessionBrief реализован, дальнейшие provider-интеграции имеют отдельные границы приёмки.
 - [SDD profiles and SessionBrief (P0)](sdd-profiles.md) — глубина planning, независимые quality gates, compiler/status и точный digest implementation context для classic/OpenSpec; [native classic contract](classic-session-brief.md), [ADR 0004](adr/0004-sdd-profiles-and-session-brief.md).
 - [Workflow exchange exports (P2)](workflow-exchange.md) — versioned registry/bundle/evaluation exports для кросс-проектных consumers (aifhub#29, orkora#229), lineage vocabulary, evidence classes и privacy boundaries.
+- [Runner metrics collector (#230, этап 1)](runner-metrics.md) — read-only агрегация delivery snapshots, run-записей и opt-in QA-результатов в один `aifhub.runner_metrics.v1`: CLI-контракт, семантика unknown/zero, две дедупликации, record-span оговорки и граница невмешательства.
 
 Эта документация описывает workflow AIFHub Extension v1:
 
