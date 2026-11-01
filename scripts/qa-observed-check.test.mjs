@@ -25,11 +25,11 @@ const gateBody = (gate = 'verify', status = 'pass') => `${renderGateResultBlock(
 // the real fixture verifier copied into the project, a real child process per
 // verifier launch through the injectable execFile, and no Git/network anywhere.
 async function observedFixture({ mode = 'pass', requiresObserved = true, ignoredRaw = [], runId = 'run-1',
-  gate = 'verify', execFailpoint = null, execThrow = false, capabilities = {} } = {}) {
+  gate = 'verify', flow = 'openspec', execFailpoint = null, execThrow = false, capabilities = {} } = {}) {
   const rootDir = await realpath(await mkdtemp(path.join(os.tmpdir(), 'qa227-')));
   roots.push(rootDir);
   const verifierRel = 'tools/observed-verifier.mjs';
-  const qa = '.ai-factory/qa/sample';
+  const qa = flow === 'classic' ? '.ai-factory/plans/sample' : '.ai-factory/qa/sample';
   const reportRel = `${qa}/artifacts/observations/reports/${runId}.json`;
   await mkdir(path.join(rootDir, 'tools'), { recursive: true });
   const verifierBytes = await readFile(new URL('./fixtures/observed-verifier.mjs', import.meta.url));
@@ -44,7 +44,7 @@ async function observedFixture({ mode = 'pass', requiresObserved = true, ignored
     inputs: ['src/a.mjs'], requires_observed: requiresObserved,
     command: { argv: [process.execPath, verifierRel, '--mode', mode, '--report', reportRel, '--check', 'check-verify'],
       cwd: '.', definition: verifierRel }, toolchain, env_inputs: [] }];
-  const options = { rootDir, flow: 'openspec', changeId: 'sample', scope: ['src', 'tools'], checks, environment: {},
+  const options = { rootDir, flow, changeId: 'sample', scope: ['src', 'tools'], checks, environment: {},
     providers: { requirements: async () => ({ gates: [gate], independent_roles: [], evidence: [] }), toolchain: async () => toolchain },
     SnapshotProvider: async ({ payload }) => {
       const files = { ...model.files };
@@ -63,7 +63,7 @@ async function observedFixture({ mode = 'pass', requiresObserved = true, ignored
   async function publish(extra = {}) { return publishQaManifest({ ...options, expectedPublication: null, ...extra }); }
   async function inspect(extra = {}) { return evaluateQaBinding({ ...options, ...extra }); }
   async function records() { return (await qaStore(options)).results(); }
-  const registry = observationRegistry(rootDir, 'sample');
+  const registry = observationRegistry(rootDir, 'sample', { flow });
   return { rootDir, qa, model, checks, toolchain, options, host, ignoredRaw, runId, mode, reportRel, verifierRel,
     prepare, compose, issue, ingest, publish, inspect, records, registry };
 }
@@ -132,7 +132,8 @@ describe('AC1: hook observed run binds the exact change revision', () => {
     `${'.ai-factory/qa/sample'}/artifacts/observations/reports/run-1.json`, 'other/cache']]) {
     it(`publishes a real verifier run through the injected registry (ignored_names: ${ignoredRaw.length})`, async () => {
       const f = await observedFixture({ ignoredRaw });
-      assert.equal((await f.prepare()).ok, true, JSON.stringify(await f.prepare()));
+      const prepared = await f.prepare();
+      assert.equal(prepared.ok, true, JSON.stringify(prepared));
       const ingested = await f.ingest(await f.issue(await f.compose()));
       assert.equal(ingested.ok, true, JSON.stringify(ingested));
       assert.equal(ingested.accepted, false);
@@ -501,6 +502,201 @@ describe('crash and concurrency windows', () => {
     const names = await readdir(path.join(f.rootDir, f.qa, 'artifacts/observations/receipts'));
     assert.deepEqual(names, ['run-1.json']);
     assert.equal((await f.records())[0].execution.outcome, 'timeout');
+  });
+});
+
+describe('review custody contracts (round 2)', () => {
+  it('an observed run on the rules gate is rejected before any registry write', async () => {
+    const f = await observedFixture({ gate: 'rules', mode: 'fail' });
+    await f.prepare();
+    const result = await f.ingest(await f.issue(await f.compose()));
+    assert.equal(result.ok, false);
+    assert.equal(result.code, 'observation-gate-unsupported');
+    // The registry lock creates (and removes) its own directory; no record,
+    // receipt or result may exist after a pre-write rejection.
+    assert.equal(existsSync(path.join(f.rootDir, f.qa, 'artifacts/observations/receipts')), false);
+    assert.equal(await f.registry.lookup('run-1'), null);
+    assert.equal((await f.records()).length, 0);
+    assert.equal(f.host.state.counters.verifier_launches, 0);
+  });
+  it('required evidence outside the host-attested catalog is rejected before the launch', async () => {
+    const f = await observedFixture();
+    f.checks[0].required_evidence = [`${f.qa}/report.json`];
+    await f.prepare();
+    const result = await f.ingest(await f.issue(await f.compose()));
+    assert.equal(result.ok, false);
+    assert.equal(result.code, 'observation-required-evidence-unattested');
+    assert.equal(f.host.state.counters.verifier_launches, 0);
+    assert.equal((await f.records()).length, 0);
+  });
+  it('recorder-only caller options are rejected and never leak into the bound record', async () => {
+    const f = await observedFixture();
+    await f.prepare();
+    const envelope = await f.issue(await f.compose());
+    const result = await f.ingest(envelope, { artifacts: { [`${f.qa}/smuggled.txt`]: 'smuggled' } });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, 'observation-options-conflict');
+    assert.equal((await f.records()).length, 0);
+  });
+  it('the fingerprinted environment is the environment the verifier is spawned with', async () => {
+    const f = await observedFixture();
+    f.checks[0].env_inputs = ['CI'];
+    f.options.environment = { CI: 'fixture-value' };
+    await f.prepare();
+    const baseExec = f.options.execFile;
+    let spawnedEnv = null;
+    f.options.execFile = (file, argv, opts, cb) => {
+      if (file !== 'git') spawnedEnv = opts.env;
+      return baseExec(file, argv, opts, cb);
+    };
+    const ingested = await f.ingest(await f.issue(await f.compose()));
+    assert.equal(ingested.ok, true, JSON.stringify(ingested));
+    assert.equal(spawnedEnv.CI, 'fixture-value');
+    assert.equal((await f.publish({ HostObservationRegistry: f.registry })).accepted, true);
+  });
+  it('orphan report bytes from an earlier attempt cannot complete a run that wrote no report', async () => {
+    const f = await observedFixture({ mode: 'noreport' });
+    await f.prepare();
+    const stale = bytes('stale report from a previous attempt');
+    await mkdir(path.join(f.rootDir, f.qa, 'artifacts/observations/reports'), { recursive: true });
+    await writeFile(realReport(f), stale);
+    const envelope = await f.issue(await f.compose());
+    const declared = { ...envelope, outcome: 'completed', exit_code: 0,
+      report_sha256: digest(stale), artifacts: { [envelope.report_path]: digest(stale) } };
+    const result = await f.ingest(declared);
+    assert.equal(result.ok, false);
+    assert.equal(result.code, 'observation-declared-mismatch');
+    assert.equal((await f.records()).length, 0);
+    assert.equal(await f.registry.lookup('run-1'), null);
+    assert.equal(f.host.state.counters.verifier_launches, 1);
+  });
+  it('owner requirements changed after prepare stale the ingestion before the launch', async () => {
+    const f = await observedFixture();
+    await f.prepare();
+    f.options.providers.requirements = async () => ({ gates: ['verify', 'review'], independent_roles: [], evidence: [] });
+    const result = await f.ingest(await f.issue(await f.compose()));
+    assert.equal(result.ok, false);
+    assert.equal(result.code, 'observation-stale-gates');
+    assert.equal((await f.records()).length, 0);
+  });
+  it('requirements drift between the pre- and post-run reads blocks the custody window', async () => {
+    const f = await observedFixture({ execFailpoint: async () => {
+      f.options.providers.requirements = async () => ({ gates: ['verify'], independent_roles: [], evidence: ['drift'] });
+    } });
+    await f.prepare();
+    const result = await f.ingest(await f.issue(await f.compose()));
+    assert.equal(result.ok, false);
+    assert.equal(result.code, 'observation-custody-race');
+    assert.equal((await f.records()).length, 0);
+    assert.equal(await f.registry.lookup('run-1'), null);
+  });
+  it('a conflicting payload under an existing pending intent is rejected without touching it', async () => {
+    const f = await observedFixture({ execThrow: true });
+    await f.prepare();
+    const envelope = await f.issue(await f.compose());
+    assert.equal((await f.ingest(envelope)).code, 'observation-exec-failed');
+    const before = await readFile(path.join(f.rootDir, recordPath(f)));
+    const conflicting = await f.ingest({ ...envelope, manifest_digest: digest('other-manifest') });
+    assert.equal(conflicting.ok, false);
+    assert.equal(conflicting.code, 'observation-conflict');
+    assert.deepEqual(await readFile(path.join(f.rootDir, recordPath(f))), before);
+  });
+  it('a corrupted registry record fails closed and preserves the bytes', async () => {
+    const f = await observedFixture({ execThrow: true });
+    await f.prepare();
+    const envelope = await f.issue(await f.compose());
+    assert.equal((await f.ingest(envelope)).code, 'observation-exec-failed');
+    const recordFile = path.join(f.rootDir, recordPath(f));
+    await writeFile(recordFile, '{"corrupted":');
+    const before = await readFile(recordFile);
+    const result = await f.ingest(envelope);
+    assert.equal(result.ok, false);
+    assert.equal(result.code, 'observation-registry-tampered');
+    assert.deepEqual(await readFile(recordFile), before);
+  });
+  it('a stored result that does not belong to the run fails the replay instead of confirming it', async () => {
+    const f = await observedFixture();
+    await f.prepare();
+    const ingested = await f.ingest(await f.issue(await f.compose()));
+    assert.equal(ingested.ok, true);
+    const resultFile = path.join(f.rootDir, f.qa, 'results', `${ingested.result_id}.json`);
+    await writeFile(resultFile, '{"checksum":"fabricated","record":{}}');
+    const replay = await f.ingest(await f.issue(await f.compose()));
+    assert.equal(replay.ok, false);
+    assert.equal(replay.code, 'observation-incomplete');
+  });
+  it('the fake host refuses re-issuing a run under a different payload', async () => {
+    const f = await observedFixture();
+    await f.prepare();
+    await f.issue(await f.compose());
+    const reissued = { ...(await f.compose()), snapshot_digest: digest('other-snapshot') };
+    await assert.rejects(() => f.issue(reissued), /conflicting-payload/);
+  });
+  it('classic flow stores observations under the plan folder namespace', async () => {
+    const f = await observedFixture({ flow: 'classic' });
+    const prepared = await f.prepare();
+    assert.equal(prepared.ok, true, JSON.stringify(prepared));
+    const ingested = await f.ingest(await f.issue(await f.compose()));
+    assert.equal(ingested.ok, true, JSON.stringify(ingested));
+    assert.ok(ingested.receipt_path.startsWith('.ai-factory/plans/sample/artifacts/observations/'),
+      ingested.receipt_path);
+    assert.ok(existsSync(path.join(f.rootDir, '.ai-factory/plans/sample/artifacts/observations/receipts/run-1.json')));
+    assert.equal((await f.inspect({ HostObservationRegistry: f.registry, requirePublication: false })).state, 'valid');
+  });
+  it('one callback-style execFile multiplexes git snapshot calls and the verifier without a SnapshotProvider', async () => {
+    const rootDir = await realpath(await mkdtemp(path.join(os.tmpdir(), 'qa227fs-')));
+    roots.push(rootDir);
+    const verifierRel = 'tools/observed-verifier.mjs';
+    const qa = '.ai-factory/qa/sample';
+    await mkdir(path.join(rootDir, 'tools'), { recursive: true });
+    await mkdir(path.join(rootDir, 'src'), { recursive: true });
+    await writeFile(path.join(rootDir, verifierRel), await readFile(new URL('./fixtures/observed-verifier.mjs', import.meta.url)));
+    await writeFile(path.join(rootDir, 'src/a.mjs'), 'real bytes');
+    const toolchain = [{ name: 'fake-node', sha256: digest('runtime') }];
+    const check = { id: 'check-verify', gate: 'verify', profile: 'declared.v1', dependencies_complete: true,
+      inputs: ['src/a.mjs'], requires_observed: true,
+      command: { argv: [process.execPath, verifierRel, '--mode', 'pass', '--report',
+        `${qa}/artifacts/observations/reports/run-1.json`, '--check', 'check-verify'], cwd: '.', definition: verifierRel },
+      toolchain, env_inputs: [] };
+    const options = { rootDir, flow: 'openspec', changeId: 'sample', scope: ['src', 'tools'], checks: [check],
+      environment: {},
+      providers: { requirements: async () => ({ gates: ['verify'], independent_roles: [], evidence: [] }),
+        toolchain: async () => toolchain } };
+    const { execFile: realExecFile } = await import('node:child_process');
+    const trace = [];
+    let launches = 0;
+    const callbackExec = (file, argv, opts, cb) => {
+      trace.push([file, ...argv]);
+      if (file === 'git') {
+        const stdout = argv.includes('--cached') ? `src/a.mjs${String.fromCharCode(0)}` : '';
+        return cb(null, stdout, '');
+      }
+      launches += 1;
+      return realExecFile(file, argv, opts, cb);
+    };
+    // Snapshot consumers take the promisified shape; the adapter wraps its own transport.
+    const wrapped = (file, args, opts) => new Promise((resolve, reject) => {
+      callbackExec(file, args, opts, (error, stdout, stderr) => {
+        if (error) { error.stdout = stdout; error.stderr = stderr; reject(error); return; }
+        resolve({ stdout, stderr });
+      });
+    });
+    const prepared = await prepareQaManifest({ ...options, execFile: wrapped });
+    assert.equal(prepared.ok, true, JSON.stringify(prepared));
+    const envelope = await composeObservedRun({ ...options, execFile: wrapped }, { runId: 'run-1' });
+    const ingested = await ingestObservedRun(envelope, { ...options, execFile: callbackExec });
+    assert.equal(ingested.ok, true, JSON.stringify(ingested));
+    assert.equal(launches, 1);
+    assert.ok(trace.some(entry => entry[0] === 'git'), 'git snapshot calls must be multiplexed');
+    const registry = observationRegistry(rootDir, 'sample');
+    const trusted = await registry.lookup('run-1');
+    assert.equal(trusted.receipt_path, `${qa}/artifacts/observations/receipts/run-1.json`);
+    const store = await qaStore(options);
+    const record = (await store.results()).find(r => r.id === ingested.result_id);
+    const receiptBytes = await store.bytes(record.execution.receipt.path);
+    const receipt = JSON.parse(receiptBytes.toString('utf8'));
+    assert.equal(receipt.input_fingerprints_digest, digest(record.input_fingerprints));
+    assert.equal(trusted.receipt_sha256, digest(receiptBytes));
   });
 });
 
