@@ -198,9 +198,10 @@ async function outputActuallyIgnored(root, output) {
 // the project-wide execution lock, the active-change pointer and the exchange
 // namespace. Mirrors the assertAuxiliaryPaths boundary
 // (scripts/execution-task-source.mjs).
-function stateNamespaceConflict(output) {
+function stateNamespaceConflict(output, changeId) {
   const parts = output.slice(STATE_ROOT.length + 1).split('/');
   if (parts.length < 2) return true; // no file directly in the state root
+  if (parts[0].toLowerCase() !== changeId.toLowerCase()) return true; // another change runtime namespace
   if (withinCi(output, `${STATE_ROOT}/exchange`)) return true;
   const head = parts[0].toLowerCase();
   if (head === 'execution-write.lock' || head === 'current.yaml') return true;
@@ -260,7 +261,7 @@ async function resolveOutputPath(root, changeId, requested, options) {
   const rejected = () => collectorError('runner_metrics_output_rejected');
   try { portablePath(output); } catch { throw rejected(); }
   if (!output.startsWith(`${STATE_ROOT}/`)) throw rejected();
-  if (stateNamespaceConflict(output)) throw rejected();
+  if (stateNamespaceConflict(output, changeId)) throw rejected();
   await assertNoFileShadow(root, output, (filename) => lstat(filename));
   await assertLeafIsMetricsOutput(root, output);
   const qaRoot = await resolveQaRoot(root);
@@ -716,7 +717,9 @@ export async function collectRunnerMetrics(options = {}) {
         collector: { id: COLLECTOR_ID, version: await collectorVersion(root) }
       },
       unknowns: [...unknowns].sort(),
-      coverage: parsed.includeQa ? RUNNER_METRICS_COVERAGES[1] : RUNNER_METRICS_COVERAGES[0]
+      // Coverage declares the successfully read scope: an unreadable (or
+      // opted-out) checks block means the QA half was not actually observed.
+      coverage: checks !== null ? RUNNER_METRICS_COVERAGES[1] : RUNNER_METRICS_COVERAGES[0]
     };
     // Final self-check before the single write: the aggregate must satisfy the
     // same runtime contract the export gate applies (per-record safe integers

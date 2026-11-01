@@ -55,7 +55,9 @@ fingerprint-ов), вне теней над корневыми файлами st
 границы: единственное допустимое уже существующее содержимое — прежний
 runner-metrics output (файл с `schema: aifhub.runner_metrics.v1`); review/tracer
 receipts, plan-compliance и любые чужие файлы не перезаписываются никогда.
-Guard fail-closed: если безопасность назначения не может быть проверена
+Запись возможна только в каталоге собственного change
+(`state/<changeId>/**` минус его control-namespace) — чужие runtime-каталоги
+отвергаются целиком, включая создание новых файлов. Guard fail-closed: если безопасность назначения не может быть проверена
 (enroll-ленный QA без читаемого manifest-указателя — включая состояние после
 сбоя публикации, когда `enrollment.json` уже записан, а `manifest.json` ещё
 нет; ошибка git внутри репозитория — EPERM, dubious ownership, повреждённый
@@ -187,11 +189,24 @@ run-записи (`run.items`), а не по delivery-покрытию.
 
 ## Checks (opt-in `--include-qa`)
 
+Checks-блок — **change-scoped**: qa-результаты v1 не несут run-привязки,
+поэтому `--run` сужает requests/runs/attribution, но не checks; `coverage`
+заявляет успешно прочитанный scope — нечитаемый (или выключенный) checks-блок
+оставляет `coverage = delivery_registry` и `checks = null`, а не заявку `+qa`.
+Ограничение: в classic-проектах (`artifactProtocol: ai-factory`) qa-результаты
+живут в каталоге плана, а v1 читает только OpenSpec QA root
+(`paths.qa`/`.ai-factory/qa/<id>`) — classic plan-dir QA collection остаётся
+вне declared inputs v1 (кандидат в follow-up этапа 2).
+
 - `checks.repeated` — число qa-результатов с `supersedes ≠ null`
   (corrective-цепочки).
 - `checks.reasons` — только коды закрытого allow-list: recovery action types
   delivery-членов, ledger `outcome`, run `recovery.reason`, плюс `unknown`.
-  `binding_code` — открытое множество: код вне allow-list публикуется как
+  Ledger `outcome` входит в словарь кодов, но **не сэмплируется** в v1:
+  `fix-attempts.json` не входит в declared inputs (см. design change), поэтому
+  fix-attempt исходы появляются в `reasons` только после включения ledger в
+  источники (follow-up). `binding_code` — открытое множество: код вне
+  allow-list публикуется как
   `unknown`; `binding_code = null` не даёт выборки. Явное наблюдение причины
   повторной проверки в момент решения — этап 2.
 - `checks.dependencies` — `[{check_id, manifest_digest, wave_id,

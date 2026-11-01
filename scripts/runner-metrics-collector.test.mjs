@@ -418,6 +418,9 @@ test('unreadable qa store degrades the checks block instead of guessing', async 
   assert.equal(result.metrics.checks, null);
   assert.equal(result.metrics.unknowns.includes('checks'), true);
   assert.equal(result.metrics.provenance.qa_results_scanned, null);
+  // Coverage declares the successfully read scope: the unreadable QA half
+  // is not claimed even though --include-qa was requested.
+  assert.equal(result.metrics.coverage, "delivery_registry");
   // Without the opt-in the checks block is null by design, not by failure.
   const off = await f.collect();
   assert.equal(off.outcome, 'collected');
@@ -630,6 +633,8 @@ test('output guard rejects control namespaces, unignored areas, backslashes and 
     // are protected with the same wildcard rule (assertAuxiliaryPaths
     // precedent): the collector writes only into its own change directory.
     ['--output', '.ai-factory/state/other/status.json'],
+    ['--output', '.ai-factory/state/other/something-new.json'],
+    ['--output', '.ai-factory/state/other/tracer/decision.json'],
     ['--output', '.ai-factory/state/other/execution/runs/probe.json'],
     ['--output', '.ai-factory/state/other/delivery/probe.json'],
     ['--output', '.ai-factory/state/exchange/fingerprint-salt.json'],
