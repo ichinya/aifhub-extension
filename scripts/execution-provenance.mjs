@@ -85,6 +85,9 @@ export async function helperCliMain(moduleUrl, execute) {
     try { input = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks))); }
     catch { throw { code: 'invalid-json' }; }
     const result = await execute(action, input);
+    // Lifecycle refusals return as results instead of throwing; the published 0/1/2
+    // contract still applies (blocked/conflict -> 1, invalid -> 2).
+    if (result && result.ok === false && typeof result.blocked === 'boolean') process.exitCode = result.blocked ? 1 : 2;
     process.stdout.write(JSON.stringify({ ok: true, ...result }) + '\n');
   } catch (error) {
     const known = ['invalid-arguments', 'input-too-large', 'invalid-json', 'invalid-input'];

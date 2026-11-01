@@ -110,6 +110,9 @@ export async function executionCommand(action,input,options={}) {
     return helperDiagnostics();
   }
   await loadRuntime();
+  if (typeof action === 'string' && action.startsWith('lifecycle-')) {
+    return (await import('./host-lifecycle.mjs')).lifecycleCommand(action, input, { ...options, lifecycleFreshness });
+  }
   if (typeof action === 'string' && action.startsWith('delivery-')) {
     return (await import('./host-delivery.mjs')).deliveryCommand(action, input, options);
   }
@@ -254,6 +257,17 @@ export async function executionCommand(action,input,options={}) {
   await options.beforeLock?.();
   // Fixed lock order. An orphan is never reclaimed using age or a PID guess.
   return store.lock('.ai-factory/state/execution-write.lock',()=>store.lock(`${folder}/write.lock`,execute));
+}
+
+// Same freshness sequence as resume, with an already validated run (no history rescan).
+export async function lifecycleFreshness(store, run) {
+  await loadRuntime();
+  requireValue(run.schema === RUN_SCHEMA && !run.legacy, 'upgrade-required', true);
+  requireValue(run.lifecycle !== 'interrupted', 'run-interrupted', true);
+  const snapshot = await current(store, run);
+  requireValue(same(snapshot, run.checkpoint.worktree), 'stale-checkpoint', true);
+  if (run.seal) await freshSeal(store, run, snapshot); else await freshResult(store, run, snapshot);
+  return snapshot;
 }
 
 // Delivery borrows freshness from the execution owner; it never creates a result/receipt.
