@@ -22,10 +22,15 @@ export function createFakeHost({ state, mode = 'normal', capabilities = {}, fail
         state.requests.set(uuid, structuredClone(old.request)); return structuredClone(old.request);
       }
       const caps = await host.capabilities(), kind = input.target.kind;
+      // shared-completion models host-side payload dedup: different request UUIDs
+      // carrying the same bytes resolve to one host id, which is the fixture the
+      // runner-metrics collector uses for its response-deduplication matrix.
+      const shared = host.mode === 'shared-completion';
+      const hostId = (prefix) => shared ? `${prefix}-${input.identity.body_sha256}` : `${prefix}-${uuid}`;
       const request = { state: host.mode === 'pending' ? 'pending' : 'completed', identity: structuredClone(input.identity),
         binding: structuredClone(input.binding), target: structuredClone(input.target), namespace_digest: caps.idempotency.scope_digest,
-        continuity_token: state.epoch, message_id: kind === 'message' ? `message-${uuid}` : null,
-        completion_id: kind === 'completion' ? `completion-${uuid}` : null };
+        continuity_token: state.epoch, message_id: kind === 'message' ? hostId('message') : null,
+        completion_id: kind === 'completion' ? hostId('completion') : null };
       state.requests.set(uuid, request); state.tombstones.set(uuid, { signature, request: structuredClone(request) });
       state[kind === 'message' ? 'messages' : 'completions'].push({ request_uuid: uuid, body_sha256: digest(input.body) });
       state.responses.set(uuid, Buffer.from(input.body));
