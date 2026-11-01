@@ -313,6 +313,183 @@
               "minimum": 0
             }
           }
+        },
+        "requests_total": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "requests_verified": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "requests_retried": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "requests_recovered": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "requests_incomplete": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "requests_duplicate_responses": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "requests_message": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "requests_completion": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "checks_results": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "checks_repeated": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "checks_reasons": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "enum": [
+                  "provide-capabilities",
+                  "read-request",
+                  "wait-request",
+                  "fetch-response",
+                  "resend-same-request",
+                  "reconcile-host-state",
+                  "resolve-identity-conflict",
+                  "pending",
+                  "passed",
+                  "failed",
+                  "blocked",
+                  "interrupted",
+                  "cancelled",
+                  "timed_out",
+                  "abandoned",
+                  "unknown"
+                ]
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "code",
+              "count"
+            ]
+          }
+        },
+        "run_record_span_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "workers_span_sum_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "pending_observed_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "transport_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "recovery_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "unknowns": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "maxItems": 32,
+          "items": {
+            "enum": [
+              "tokens",
+              "cost",
+              "tool_calls",
+              "model_requests",
+              "unlogged_requests",
+              "setup_ms",
+              "checks_ms",
+              "snapshot_hash_ms",
+              "wait_ms",
+              "run_elapsed",
+              "coordinator_accounting",
+              "billing",
+              "checks"
+            ]
+          }
+        },
+        "coverage": {
+          "enum": [
+            "delivery_registry",
+            "delivery_registry+qa",
+            null
+          ]
         }
       },
       "required": [
@@ -485,6 +662,46 @@
             "object",
             "null"
           ]
+        },
+        "coordinator": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "worker": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "enum": [
+            "implement",
+            "fix",
+            null
+          ]
+        },
+        "run_kind": {
+          "enum": [
+            "single",
+            "batch",
+            null
+          ]
+        },
+        "runs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "tasks": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
         }
       },
       "required": [

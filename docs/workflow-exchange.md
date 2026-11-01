@@ -108,12 +108,20 @@ is mandatory and uses the aifhub#29 vocabulary: `synthetic_fixture`,
   stable across exports but the change ID cannot be recovered from it.
 - `metrics` — measured values only: brief byte budget, context-manifest and
   source counts, task totals, plus tokens/cost/latency when a runner metrics
-  file is supplied. Everything else stays `null`; nothing is estimated.
+  file is supplied. When the extended runner metrics contract is supplied,
+  aggregate request counters, checks counts with closed-enum reason codes,
+  derived record-span durations, the `unknowns` list and the `coverage` marker
+  are projected under fixed names (`requests_*`, `checks_*`, `*_span_ms`,
+  `pending_observed_ms`, `transport_ms`, `recovery_ms`). Everything else stays
+  `null`; nothing is estimated, and no new names are added to the schema's
+  `metrics.required` list (the `transport` precedent).
 - `outcomes` — session-brief status, plan-compliance outcome and drift counts,
   review outcome summaries (mode, outcome, finding count, same-session
   fallback), and the tracer decision. No findings text, no diff content.
 - `runtime` — run id, model, and harness identity from the runner metrics
-  file.
+  file, plus execution attribution (`coordinator`/`worker`/`role`/`run_kind`/
+  `runs`/`tasks`) at the same sensitivity level as `run_id` when the file
+  carries an `attribution` block.
 - `privacy` — explicit `false` flags for paths, prompts, source content,
   transcripts, and change ID. `exchange_notes` in this record carry codes
   only — note details may contain project-relative paths and stay internal to
@@ -123,12 +131,32 @@ is mandatory and uses the aifhub#29 vocabulary: `synthetic_fixture`,
 ### `aifhub.runner_metrics.v1`
 
 Optional input file passed via `--runner-metrics`. Strict allow-list:
-`run_id`, `tokens` (`input`/`output`/`total`/`cache_read`/`cache_write`),
-`cost` (`amount` + ISO currency), `latency_ms`, `retries`, `changed_loc`,
-`unrelated_changes`, `human_review_ms`, `verified_success`, `model`
-(`provider`/`id`/`version`), `harness` (`id`/`version`). Unknown fields or
-non-numeric values reject the export with `invalid_runner_metrics`; the file
-must live inside the project root.
+`run_id`, `tokens` (`input`/`output`/`total`/`cache_read`/`cache_write`/
+`reasoning`), `cost` (`amount` + ISO currency), `latency_ms`, `retries`,
+`changed_loc`, `unrelated_changes`, `human_review_ms`, `verified_success`,
+`model` (`provider`/`id`/`version`), `harness` (`id`/`version`), `transport`
+(`create_calls`/`read_calls`/`fetch_calls`/`retry_creates`/`recovery_attempts`/
+`verified_recoveries`/`uncertain_returns`/`identity_conflicts`/`transport_ms`/
+`recovery_ms`/`wait_ms`/`incomplete_intervals`), `attribution`
+(`coordinator`/`worker`/`role`/`run_kind`/`runs`/`tasks`), `requests`
+(`total`/`verified`/`retried`/`recovered`/`incomplete`/`duplicate_responses`/
+`by_kind`), `checks` (`results`/`repeated`/`reasons`/`dependencies`), `phases`
+(`setup_ms`/`checks_ms`/`snapshot_hash_ms`/`wait_ms`/`run_elapsed_ms`/
+`run_record_span_ms`/`workers_span_sum_ms`/`pending_observed_ms`/`transport_ms`/
+`recovery_ms`), `provenance` (`requests_scanned`/`journals_scanned`/
+`runs_scanned`/`qa_results_scanned`/`members_skipped`/`registry_digest`/
+`collector`), `unknowns` (bounded closed enum) and `coverage` (closed enum).
+Counters are non-negative safe integers or `null`; all objects are closed
+(`additionalProperties: false`). Unknown fields or invalid values reject the
+export with `invalid_runner_metrics`; the file must live inside the project
+root.
+
+The aggregate fields (issue #230, stage 1) are produced by the read-only
+collector documented in `docs/runner-metrics.md`. Two fields deliberately never
+reach the public evaluation record: `checks.dependencies` and
+`provenance.registry_digest` stay in the project-internal metrics file, and
+`phases.run_record_span_ms`/`workers_span_sum_ms`/`pending_observed_ms` are
+record-span observations, not measured compute durations.
 
 ## Optional `design.context.json`
 
