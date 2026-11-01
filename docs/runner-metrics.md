@@ -43,14 +43,23 @@ observational output-файл. Путь `--output` валидируется: п�
 git-репозитория фактический ignored-статус проверяется `git check-ignore`,
 не только префиксом), вне control-namespace ЛЮБОГО change — `state/<seg>/execution/**`,
 `state/<seg>/delivery/**`, `state/<seg>/status.json` (wildcard, прецедент
-`assertAuxiliaryPaths`), вне `state/exchange/**` (HMAC-salt exchange
-fingerprint-ов) и файлов непосредственно в корне `state/`, вне configured QA
-root (default `.ai-factory/qa`; `paths.qa` из `.ai-factory/config.yaml`,
-небезопасное значение откатывается к дефолту) и declared QA input roots, вне
-tracked-путей — иначе `runner_metrics_output_rejected` до первой записи.
-Guard fail-closed: если безопасность назначения не может быть проверена
-(за enrol-ленный QA manifest нечитаем, git-проверка внутри репозитория падает),
-запись отвергается, а не разрешается по умолчанию. Метрики никогда не становятся
+`assertAuxiliaryPaths`; file-namespace держат prefix-семантику — вложенность
+под `status.json` тоже отвергается), вне `state/exchange/**` (HMAC-salt exchange
+fingerprint-ов), вне теней над корневыми файлами state (`execution-write.lock`,
+`current.yaml`) и — общий барьер — вне вложенности под ЛЮБОЙ существующий
+файл-предок (lstat-проверка: output не может материализовать каталог-тень
+поверх контрольного файла), вне configured QA root (default `.ai-factory/qa`;
+`paths.qa` из `.ai-factory/config.yaml`, небезопасное значение откатывается к
+дефолту) и declared QA input roots, вне tracked-путей — иначе
+`runner_metrics_output_rejected` до первой записи. Guard fail-closed: если
+безопасность назначения не может быть проверена (enroll-ленный QA без читаемого
+manifest-указателя — включая состояние после сбоя публикации, когда
+`enrollment.json` уже записан, а `manifest.json` ещё нет; ошибка git внутри
+репозитория — EPERM, dubious ownership, повреждённый `.git`; negated gitignore
+правило), запись отвергается, а не разрешается по умолчанию; только честный
+вердикт git «not a git repository» делает tracked/ignore-проверки недостижимыми.
+Ограничение: change с id `exchange` не может собирать output (его каталог
+зарезервирован под salt-namespace). Метрики никогда не становятся
 material input: дефолтный путь не входит ни в declared QA roots, ни в закрытые
 metadata-namespace (`<id>/delivery`, `<id>/status.json` любого change), поэтому
 существование output-файла не меняет binding fingerprints и snapshot digest-ы,
@@ -102,8 +111,14 @@ Lock не берётся. По scanned member-файлам `requests/` и `deliv
 directory union пере-листингуется: появившийся в скане request не теряется
 (он дочитывается и входит в `requests.total`), исчезнувшая запись листинга и
 любое расхождение digest-ов дают note `scan_inconsistent`, outcome `degraded` —
-смешанный/неполный срез никогда не молчаливый и не fail. Классификация ошибок
-чтения: `file-changed`/`unsupported-file`/`delivery-request-missing` →
+смешанный/неполный срез никогда не молчаливый и не fail. Та же полнота
+применяется к `runs/` (run, опубликованный mid-scan, дочитывается и входит в
+attribution). Provenance-счётчики `requests_scanned`/`journals_scanned`/
+`runs_scanned`/`unreadable`-вклад `members_skipped` отражают финальный
+листинг (наблюдаемое конечное состояние реестра), а не сумму двух проходов:
+стабильно нечитаемое имя считается один раз, late member входит в scanned
+наравне с `requests.total`. Классификация ошибок чтения:
+`file-changed`/`unsupported-file`/`delivery-request-missing` →
 race-класс (`scan_inconsistent`); `invalid-*`/`delivery-*` (отказ валидации
 содержимого) → `member_skipped`.
 

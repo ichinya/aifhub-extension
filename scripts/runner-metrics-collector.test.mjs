@@ -517,6 +517,9 @@ test('parity: old minimal snapshot stays valid, unknown keys rejected by both ga
     { ...oldMinimal, attribution: { coordinator: 'D:\sensitive\project', runs: 1, tasks: 0 } },
     { ...oldMinimal, tokens: { reasoning: 9007199254740992 } },
     { ...oldMinimal, run_id: 'r'.repeat(201) },
+    { ...oldMinimal, run_id: 'bad\u0001id' },
+    { ...oldMinimal, attribution: { worker: 'CON', runs: 1, tasks: 0 } },
+    { ...oldMinimal, attribution: { coordinator: 'worker.', runs: 1, tasks: 0 } },
     { ...oldMinimal, checks: { results: 1, dependencies: [{ check_id: 'has space', manifest_digest: 'a'.repeat(64), wave_id: 'w', input_fingerprint: 'b'.repeat(64) }] } }
   ];
   for (const probe of probes) {
@@ -559,6 +562,12 @@ test('output guard rejects control namespaces, unignored areas, backslashes and 
     ['--output', `.ai-factory/state/${f.id}/execution/runs/metrics.json`],
     ['--output', `.ai-factory/state/${f.id}/delivery/metrics.json`],
     ['--output', `.ai-factory/state/${f.id}/status.json`],
+    // File namespaces keep prefix semantics: nesting below them would create
+    // a shadow directory over a control file and break later readers/writers.
+    ['--output', `.ai-factory/state/${f.id}/status.json/sub.json`],
+    ['--output', `.ai-factory/state/${f.id}/status.json/nested/deeper.json`],
+    ['--output', '.ai-factory/state/execution-write.lock/sub.json'],
+    ['--output', '.ai-factory/state/current.yaml/sub.json'],
     // Control namespaces of OTHER changes and the shared exchange namespace
     // are protected with the same wildcard rule (assertAuxiliaryPaths
     // precedent): the collector writes only into its own change directory.
@@ -584,6 +593,62 @@ test('output guard rejects control namespaces, unignored areas, backslashes and 
   const custom = await f.collect(['--output', `.ai-factory/state/${f.id}/runner-metrics.custom.json`]);
   assert.equal(custom.outcome, 'collected');
   assert.equal(custom.written, `.ai-factory/state/${f.id}/runner-metrics.custom.json`);
+});
+
+test('output cannot nest below an existing file (shadow barrier)', async (t) => {
+  const f = await fixture(t);
+  const first = await f.collect();
+  assert.equal(first.outcome, 'collected');
+  const outputPath = path.join(f.root, '.ai-factory', 'state', f.id, 'runner-metrics.json');
+  const before = await readFile(outputPath);
+  const result = await f.collect(['--output', `.ai-factory/state/${f.id}/runner-metrics.json/x.json`]);
+  assert.equal(result.outcome, 'failed');
+  assert.equal(result.errors[0].code, 'runner_metrics_output_rejected');
+  assert.deepEqual(await readFile(outputPath), before);
+});
+
+test('a broken git repository fails the output guard closed', async (t) => {
+  const root = await mkdtemp(path.join(tmpdir(), 'runner-metrics-git-broken-'));
+  t.after(() => rm(root, { recursive: true, force: true, maxRetries: 3 }));
+  const git = async (args) => exec('git', args, { cwd: root });
+  await mkdir(path.join(root, 'openspec', 'changes', 'work'), { recursive: true });
+  await mkdir(path.join(root, '.ai-factory'), { recursive: true });
+  await writeFile(path.join(root, '.gitignore'), '.ai-factory/\n');
+  await writeFile(path.join(root, 'openspec', 'changes', 'work', 'proposal.md'), '# P\n');
+  await writeFile(path.join(root, 'openspec', 'changes', 'work', 'tasks.md'), '- [ ] 1.1 Task\n');
+  await writeFile(path.join(root, '.ai-factory', 'config.yaml'), 'aifhub:\n  tools:\n    openspec: true\n');
+  await git(['init', '--initial-branch=main']);
+  await git(['config', 'user.email', 'fixture@example.com']);
+  await git(['config', 'user.name', 'fixture']);
+  await git(['add', '.']);
+  await git(['commit', '-m', 'init']);
+  // A repository whose admin file is unreadable garbage is not the same as
+  // "not a repository": the ignored/tracked status cannot be verified, so the
+  // guard fails closed instead of skipping the git checks.
+  await rm(path.join(root, '.git'), { recursive: true, force: true });
+  await writeFile(path.join(root, '.git'), 'garbage\n');
+  const result = await collectRunnerMetrics({ rootDir: root, argv: ['--change', 'work'] });
+  assert.equal(result.outcome, 'failed');
+  assert.equal(result.errors[0].code, 'runner_metrics_output_rejected');
+});
+
+test('enrollment without a manifest pointer fails the output guard closed', async (t) => {
+  const f = await fixture(t);
+  const options = qaOptions(f);
+  assert.equal((await prepareQaManifest(options)).ok, true);
+  // Simulate a crashed publication: the producer writes enrollment.json
+  // before manifest.json, so an enrolled change may temporarily lack the
+  // manifest pointer. Declared roots are unverifiable then — fail closed.
+  await rm(path.join(f.root, '.ai-factory', 'qa', 'work', 'manifest.json'));
+  for (const argv of [[], ['--output', `.ai-factory/state/${f.id}/runner-metrics.custom.json`]]) {
+    const result = await f.collect(argv);
+    assert.equal(result.outcome, 'failed', JSON.stringify(argv));
+    assert.equal(result.errors[0].code, 'runner_metrics_output_rejected', JSON.stringify(argv));
+  }
+  // Neither enrollment nor manifest: unenrolled, no declared roots.
+  const unenrolled = await deliveryProject(t); t.after(unenrolled.cleanup);
+  const clean = await collectRunnerMetrics({ rootDir: unenrolled.root, argv: ['--change', unenrolled.id] });
+  assert.equal(clean.outcome, 'collected');
 });
 
 test('a member file that moves under the collector degrades the scan as scan_inconsistent', async (t) => {
@@ -623,8 +688,43 @@ test('a request published mid-scan joins the union and marks the scan inconsiste
   } });
   assert.equal(result.outcome, 'degraded');
   assert.ok(result.notes.some((note) => note.code === 'scan_inconsistent'));
-  // The late writer is still read: total does not under-report the registry.
+  // The late writer is still read: total does not under-report the registry,
+  // and the provenance scan counters reflect the final listing state.
   assert.equal(result.metrics.requests.total, 2);
+  assert.equal(result.metrics.provenance.requests_scanned, 2);
+  assert.equal(result.metrics.provenance.journals_scanned, 2);
+  assert.equal(result.metrics.provenance.members_skipped, 0);
+});
+
+test('a stable unreadable registry name counts once in the final-listing provenance', async (t) => {
+  const f = await fixture(t);
+  assert.equal((await f.send()).delivery_verified, true);
+  await f.put(`${f.paths.folder}/requests/not-a-uuid.json`, '{"x":1}');
+  const result = await f.collect();
+  assert.equal(result.outcome, 'degraded');
+  assert.ok(result.notes.some((note) => note.code === 'member_skipped'));
+  assert.equal(result.metrics.provenance.members_skipped, 1);
+  assert.equal(result.metrics.provenance.requests_scanned, 2);
+  assert.equal(result.metrics.requests.total, 1);
+});
+
+test('a run published mid-scan joins the sample and marks the scan inconsistent', async (t) => {
+  const f = await deliveryProject(t); t.after(f.cleanup);
+  const s = await deliveryStore({ rootDir: f.root });
+  const folder = `.ai-factory/state/${f.id}/execution`;
+  await f.call('start', f.start());
+  let primed = false;
+  const result = await collectRunnerMetrics({ rootDir: f.root, argv: ['--change', f.id], runReader: async (id) => {
+    if (!primed) {
+      primed = true;
+      await f.call('start', f.start({ run_id: 'run-2', task_id: '1.2', scope: ['src/b.js'] }));
+    }
+    return s.load(`${folder}/runs/${id}.json`);
+  } });
+  assert.equal(result.outcome, 'degraded');
+  assert.ok(result.notes.some((note) => note.code === 'scan_inconsistent'));
+  assert.equal(result.metrics.provenance.runs_scanned, 2);
+  assert.equal(result.metrics.attribution.runs, 2);
 });
 
 test('batch runs contribute their manifest task vocabulary to attribution.tasks', async (t) => {

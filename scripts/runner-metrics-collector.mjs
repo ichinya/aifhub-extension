@@ -6,7 +6,7 @@
 // state: its only write is the explicitly requested observational output file.
 // Metrics are never material input for execution or QA decisions.
 import { execFile } from 'node:child_process';
-import { readdir } from 'node:fs/promises';
+import { lstat, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
@@ -116,15 +116,22 @@ async function resolveQaRoot(root) {
 }
 
 // Declared QA input roots only exist while the change is enrolled. The guard
-// is fail-closed: an enrolled change whose manifest cannot be read leaves the
-// safety of the destination unverifiable, so every output path is rejected
-// until the QA custody is consistent again. A missing manifest pointer simply
-// means "not enrolled" and contributes no declared roots.
+// is fail-closed: an enrolled change whose manifest cannot be read — or whose
+// enrollment exists while the manifest pointer is missing (the producer writes
+// enrollment.json before manifest.json, so a crashed publication leaves
+// exactly that state) — leaves the safety of the destination unverifiable, and
+// every output path is rejected until QA custody is consistent again. Only a
+// change with neither enrollment nor manifest is unenrolled and contributes no
+// declared roots.
 async function declaredQaRoots(root, changeId, qaRoot) {
-  let pointer;
-  try { pointer = await readProviderFile(root, `${qaRoot}/${changeId}/manifest.json`, MAX_CONFIG_BYTES); }
-  catch { throw collectorError('runner_metrics_output_rejected'); }
-  if (pointer === null) return [];
+  const readPointer = async (name) => {
+    try { return await readProviderFile(root, `${qaRoot}/${changeId}/${name}`, MAX_CONFIG_BYTES); }
+    catch { throw collectorError('runner_metrics_output_rejected'); }
+  };
+  const enrollment = await readPointer('enrollment.json');
+  const pointer = await readPointer('manifest.json');
+  if (enrollment === null && pointer === null) return [];
+  if (pointer === null) throw collectorError('runner_metrics_output_rejected');
   try {
     const store = await qaStore({ rootDir: root, changeId, qaDir: `${qaRoot}/${changeId}` });
     const manifest = await store.manifest();
@@ -137,7 +144,15 @@ async function gitInWorkTree(root) {
     const { stdout } = await exec('git', ['rev-parse', '--is-inside-work-tree'],
       { cwd: root, windowsHide: true, maxBuffer: 64 * 1024, timeout: 10000 });
     return stdout.toString('utf8').trim() === 'true';
-  } catch { return false; } // outside any git repository: no tracked file can exist
+  } catch (error) {
+    // Only git's own "not a repository" verdict means tracked checks are
+    // vacuous. Every other failure (spawn error, permissions, dubious
+    // ownership, corrupt repository) leaves the ignored/tracked status
+    // unverifiable and must fail closed instead of skipping the checks.
+    const stderr = String(error?.stderr ?? '');
+    if (error?.code === 128 && /not a git repository/i.test(stderr)) return false;
+    throw error;
+  }
 }
 
 async function defaultTrackedCheck(root, output) {
@@ -159,20 +174,40 @@ async function outputActuallyIgnored(root, output) {
   return outcome;
 }
 
-// Control namespaces are protected for every change directory, not just the
-// target change: a concurrent reader of any change depends on exact bytes in
-// its execution/delivery namespaces and status.json, the exchange namespace
-// holds the HMAC fingerprint salt, and nothing may shadow the project-wide
-// execution lock. Mirrors the assertAuxiliaryPaths boundary
+// Known control FILE namespaces keep prefix semantics: writing below them
+// would materialize a shadow directory over a control file and break every
+// later reader/writer of that file. This covers status.json of every change,
+// the project-wide execution lock, the active-change pointer and the exchange
+// namespace. Mirrors the assertAuxiliaryPaths boundary
 // (scripts/execution-task-source.mjs).
 function stateNamespaceConflict(output) {
   const parts = output.slice(STATE_ROOT.length + 1).split('/');
   if (parts.length < 2) return true; // no file directly in the state root
-  if (parts[0].toLowerCase() === 'exchange') return true;
+  if (withinCi(output, `${STATE_ROOT}/exchange`)) return true;
+  const head = parts[0].toLowerCase();
+  if (head === 'execution-write.lock' || head === 'current.yaml') return true;
   const second = parts[1].toLowerCase();
   if (second === 'execution' || second === 'delivery') return true;
-  if (parts.length === 2 && second === 'status.json') return true;
+  if (second === 'status.json') return true;
   return false;
+}
+
+// General barrier behind the name rules: an output must never nest below an
+// existing non-directory entry (a control file created after the rules above
+// were written, or any other root-level file such as current.yaml). Unreadable
+// ancestors fail closed as well.
+async function assertNoFileShadow(root, output, lstatEntry) {
+  const parts = output.split('/');
+  let probe = '';
+  for (let index = 0; index < parts.length - 1; index += 1) {
+    probe = probe ? `${probe}/${parts[index]}` : parts[index];
+    let info;
+    try { info = await lstatEntry(path.join(root, probe)); } catch (error) {
+      if (error?.code === 'ENOENT') continue;
+      throw collectorError('runner_metrics_output_rejected');
+    }
+    if (!info.isDirectory()) throw collectorError('runner_metrics_output_rejected');
+  }
 }
 
 // The output must land in the fully gitignored `.ai-factory/state/**` area so
@@ -187,6 +222,7 @@ async function resolveOutputPath(root, changeId, requested, options) {
   try { portablePath(output); } catch { throw rejected(); }
   if (!output.startsWith(`${STATE_ROOT}/`)) throw rejected();
   if (stateNamespaceConflict(output)) throw rejected();
+  await assertNoFileShadow(root, output, (filename) => lstat(filename));
   const qaRoot = await resolveQaRoot(root);
   if (withinCi(output, qaRoot)) throw rejected();
   for (const declared of await declaredQaRoots(root, changeId, qaRoot)) {
@@ -322,36 +358,63 @@ async function scanMembers(delivery, store, changeId, runId, notes, memberReader
       if (member.ok && member.record.slot.run_id !== runId) members.delete(uuid);
     }
   }
+  // Scanned counters reflect the final listing (the observed end state of the
+  // registry), not the sum of both passes: a stable unreadable name counts
+  // once, and a late-appearing member is included in the scanned counts just
+  // like it is included in `requests.total`.
   return {
     members,
-    requestScanned: first.requestScanned,
-    journalScanned: first.journalScanned,
+    requestScanned: second.requestScanned,
+    journalScanned: second.journalScanned,
     race,
-    unreadableNames: first.unreadableNames + second.unreadableNames
+    unreadableNames: second.unreadableNames
   };
 }
 
-async function scanRuns(store, changeId, runId, notes) {
+async function scanRuns(store, changeId, runId, notes, runReader) {
   const folder = `${STATE_ROOT}/${changeId}/execution/runs`;
-  const entries = await listEntries(store, folder);
-  const runs = [];
-  let skipped = 0;
-  for (const entry of entries) {
-    const fail = () => { skipped += 1; note(notes, 'member_skipped'); };
-    if (!entry.isFile() || !entry.name.endsWith('.json')) { fail(); continue; }
-    const id = entry.name.slice(0, -5);
-    try {
-      identifier(id);
-      const text = await store.textFile(`${folder}/${entry.name}`);
-      requireValue(text !== null, 'invalid-state');
-      const record = decode(text);
-      await validateHistoricalRun(store, record);
-      requireValue(record.run_id === id && record.change_id === changeId, 'invalid-run-catalogue');
-      if (runId !== undefined && record.run_id !== runId) continue;
-      runs.push(record);
-    } catch { fail(); }
+  const readRun = runReader ?? (async (id, filename) => {
+    const text = await store.textFile(filename);
+    requireValue(text !== null, 'invalid-state');
+    const record = decode(text);
+    await validateHistoricalRun(store, record);
+    requireValue(record.run_id === id && record.change_id === changeId, 'invalid-run-catalogue');
+    return record;
+  });
+  const readBatch = async (entries) => {
+    const runs = [];
+    let skipped = 0;
+    for (const entry of entries) {
+      const fail = () => { skipped += 1; note(notes, 'member_skipped'); };
+      if (!entry.isFile() || !entry.name.endsWith('.json')) { fail(); continue; }
+      const id = entry.name.slice(0, -5);
+      try {
+        identifier(id);
+        const record = await readRun(id, `${folder}/${entry.name}`);
+        if (runId !== undefined && record.run_id !== runId) continue;
+        runs.push(record);
+      } catch { fail(); }
+    }
+    return { runs, skipped };
+  };
+  const first = await listEntries(store, folder);
+  const { runs, skipped } = await readBatch(first);
+  // Same completeness rule as the delivery members: a run published mid-scan
+  // is read and joins attribution instead of silently narrowing the sample,
+  // and any listing change marks the scan inconsistent.
+  const second = await listEntries(store, folder);
+  let race = false;
+  const late = second.filter((entry) => !first.some((entry2) => entry2.name === entry.name));
+  for (const entry of first) {
+    if (!second.some((entry2) => entry2.name === entry.name)) race = true;
   }
-  return { runs, scanned: entries.length, skipped };
+  if (late.length > 0) {
+    race = true;
+    const more = await readBatch(late);
+    runs.push(...more.runs);
+  }
+  if (race) note(notes, 'scan_inconsistent');
+  return { runs, scanned: second.length, skipped, race };
 }
 
 function pendingObservedMs(validMembers) {
@@ -451,12 +514,12 @@ export async function collectRunnerMetrics(options = {}) {
     const store = await storeFor(root);
     const delivery = await deliveryStore({ rootDir: root });
     const scan = await scanMembers(delivery, store, changeId, runId, notes, options.memberReader);
-    const runScan = await scanRuns(store, changeId, runId, notes);
+    const runScan = await scanRuns(store, changeId, runId, notes, options.runReader);
     if (runId !== undefined && scan.members.size === 0 && runScan.runs.length === 0) note(notes, 'run_filter_empty');
     const validMembers = [...scan.members.values()].filter((member) => member.ok);
     const membersSkipped = scan.members.size - validMembers.length + runScan.skipped + scan.unreadableNames;
     if (membersSkipped > 0) note(notes, 'member_skipped');
-    const degraded = membersSkipped > 0 || scan.race;
+    const degraded = membersSkipped > 0 || scan.race || runScan.race;
 
     // Snapshot dedup is implicit: each UUID contributes its single resolved
     // image exactly once; revisions are never summed and per-counter maxima

@@ -12,7 +12,8 @@
         "string",
         "null"
       ],
-      "maxLength": 200
+      "maxLength": 200,
+      "pattern": "^[^\\u0000-\\u001f]*$"
     },
     "tokens": {
       "type": [
@@ -309,7 +310,7 @@
             "null"
           ],
           "maxLength": 200,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$"
+          "pattern": "^(?!(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][0-9]|[Ll][Pp][Tt][0-9])$)(?!.*[.]$)[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$"
         },
         "worker": {
           "type": [
@@ -317,7 +318,7 @@
             "null"
           ],
           "maxLength": 200,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$"
+          "pattern": "^(?!(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][0-9]|[Ll][Pp][Tt][0-9])$)(?!.*[.]$)[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$"
         },
         "role": {
           "enum": [
@@ -510,7 +511,7 @@
             "properties": {
               "check_id": {
                 "type": "string",
-                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$"
+                "pattern": "^(?!(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][0-9]|[Ll][Pp][Tt][0-9])$)(?!.*[.]$)[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$"
               },
               "manifest_digest": {
                 "type": "string",
@@ -518,7 +519,7 @@
               },
               "wave_id": {
                 "type": "string",
-                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$"
+                "pattern": "^(?!(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][0-9]|[Ll][Pp][Tt][0-9])$)(?!.*[.]$)[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$"
               },
               "input_fingerprint": {
                 "type": "string",
@@ -690,14 +691,16 @@
                 "string",
                 "null"
               ],
-              "maxLength": 200
+              "maxLength": 200,
+              "pattern": "^[^\\u0000-\\u001f]*$"
             },
             "version": {
               "type": [
                 "string",
                 "null"
               ],
-              "maxLength": 200
+              "maxLength": 200,
+              "pattern": "^[^\\u0000-\\u001f]*$"
             }
           }
         }
