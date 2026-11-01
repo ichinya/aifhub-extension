@@ -4,7 +4,7 @@
 import { open } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import path from 'node:path';
-import { digest, canonical, identifier, portablePath, requireValue, fields, storeFor, WorkflowError } from './workflow-state-store.mjs';
+import { digest, canonical, identifier, portablePath, requireValue, storeFor, WorkflowError } from './workflow-state-store.mjs';
 import { qaStore, qaTarget, qaFailure, withinCi, jsonValue, QA_LIMITS } from './qa-manifest-store.mjs';
 import { observeQaSnapshot, checkFingerprints } from './qa-manifest-inputs.mjs';
 import { createGateResult, renderGateResultBlock } from './aif-gate-result.mjs';
@@ -19,7 +19,6 @@ export const OBSERVED_CHECK_RECEIPT_SCHEMA = 'aifhub.observed-check.v1';
 // outcome into a `warn` gate status: a publish accepts any non-`fail` gate.
 export const OBSERVED_OUTCOMES = Object.freeze(['completed', 'failed', 'timeout', 'cancelled', 'unsupported', 'missing-report']);
 const SHA = /^[a-f0-9]{64}$/;
-const REPORT_FREE_OUTCOMES = ['timeout', 'cancelled', 'missing-report'];
 
 // Deterministic replay key: a crash after installing the result must not grow a
 // second corrective record (a random id would auto-supersede the open tip).
@@ -38,14 +37,20 @@ function observationPaths(qa, runId) {
 // Strict closed-shape validation of the versioned producer envelope. Unknown
 // fields, malformed digests and inconsistent declarations are typed rejections
 // before any state is touched.
+const ENVELOPE_FIELDS = Object.freeze(['schema', 'run_id', 'check_id', 'covered_checks', 'change_id', 'manifest_digest',
+  'command', 'effective_cwd', 'worktree_identity', 'snapshot_digest', 'fingerprints_digest',
+  'modules_digest', 'outcome', 'exit_code', 'report_path', 'report_sha256', 'artifacts']);
+const COMMAND_FIELDS = Object.freeze(['argv', 'cwd', 'definition']);
+const NO_EXIT_OUTCOMES = Object.freeze(['timeout', 'cancelled']);
+const REPORT_FREE_OUTCOMES = Object.freeze(['timeout', 'cancelled', 'missing-report']);
+
 function validateEnvelope(value) {
   requireValue(value && typeof value === 'object' && !Array.isArray(value), 'observation-envelope-invalid', true);
   // An unsupported capability is an adapter-level blocker detected before strict
   // validation: no verifier launch, no receipt, no registry record.
   if (value.schema === OBSERVED_RUN_SCHEMA && value.outcome === 'unsupported') return null;
-  fields(value, ['schema', 'run_id', 'check_id', 'covered_checks', 'change_id', 'manifest_digest',
-    'command', 'effective_cwd', 'worktree_identity', 'snapshot_digest', 'fingerprints_digest',
-    'modules_digest', 'outcome', 'exit_code', 'report_path', 'report_sha256', 'artifacts']);
+  requireValue(Object.keys(value).every(k => ENVELOPE_FIELDS.includes(k))
+    && ENVELOPE_FIELDS.every(k => Object.hasOwn(value, k)), 'observation-envelope-invalid', true);
   requireValue(value.schema === OBSERVED_RUN_SCHEMA, 'observation-envelope-invalid', true);
   identifier(value.run_id); identifier(value.check_id); identifier(value.change_id);
   requireValue(Array.isArray(value.covered_checks) && value.covered_checks.length === 1
@@ -54,7 +59,8 @@ function validateEnvelope(value) {
   for (const key of ['manifest_digest', 'snapshot_digest', 'fingerprints_digest', 'modules_digest'])
     requireValue(SHA.test(value[key]), 'observation-envelope-invalid', true);
   requireValue(value.command && typeof value.command === 'object' && !Array.isArray(value.command), 'observation-envelope-invalid', true);
-  fields(value.command, ['argv', 'cwd', 'definition']);
+  requireValue(Object.keys(value.command).every(k => COMMAND_FIELDS.includes(k))
+    && COMMAND_FIELDS.every(k => Object.hasOwn(value.command, k)), 'observation-envelope-invalid', true);
   requireValue(Array.isArray(value.command.argv) && value.command.argv.length > 0
     && value.command.argv.every(a => typeof a === 'string' && a.length > 0 && !a.includes('\0')), 'observation-envelope-invalid', true);
   requireValue(typeof value.command.cwd === 'string', 'observation-envelope-invalid', true);
@@ -74,14 +80,20 @@ function validateEnvelope(value) {
     portablePath(relative);
     requireValue(SHA.test(hash), 'observation-envelope-invalid', true);
   }
-  if (REPORT_FREE_OUTCOMES.includes(value.outcome)) {
+  if (NO_EXIT_OUTCOMES.includes(value.outcome)) {
     requireValue(value.exit_code === null && value.report_sha256 === null
       && Object.keys(value.artifacts).length === 0, 'observation-envelope-invalid', true);
   } else {
-    requireValue(Number.isInteger(value.exit_code) && SHA.test(value.report_sha256)
-      && value.artifacts[value.report_path] === value.report_sha256, 'observation-declared-mismatch', true);
-    requireValue(value.outcome !== 'completed' || value.exit_code === 0, 'observation-envelope-invalid', true);
-    requireValue(value.outcome !== 'failed' || (value.exit_code > 0), 'observation-envelope-invalid', true);
+    requireValue(Number.isInteger(value.exit_code), 'observation-envelope-invalid', true);
+    if (value.outcome === 'missing-report') {
+      requireValue(value.exit_code === 0 && value.report_sha256 === null
+        && Object.keys(value.artifacts).length === 0, 'observation-envelope-invalid', true);
+    } else {
+      requireValue(SHA.test(value.report_sha256) && value.artifacts[value.report_path] === value.report_sha256,
+        'observation-declared-mismatch', true);
+      requireValue(value.outcome !== 'completed' || value.exit_code === 0, 'observation-envelope-invalid', true);
+      requireValue(value.outcome !== 'failed' || (value.exit_code > 0), 'observation-envelope-invalid', true);
+    }
   }
   jsonValue(value);
   return value;
