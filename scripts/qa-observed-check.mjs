@@ -257,6 +257,14 @@ export async function ingestObservedRun(versionedResult, options = {}) {
       const effectiveCommand = options.providers?.checkDefinition
         ? (await options.providers.checkDefinition(check)).command : check.command;
       const commandDigest = digest(effectiveCommand);
+      // The hook envelope is untrusted input: the adapter may only launch the
+      // manifest-attested invocation. A substituted argv, cwd or definition is a
+      // declared mismatch rejected before any process is spawned (review: the
+      // receipt digest alone cannot bind the actual spawn). The effective cwd is
+      // bound to the same command so relative argv resolution cannot be redirected
+      // to a different file inside the worktree.
+      requireValue(canonical(envelope.command) === canonical(effectiveCommand), 'observation-declared-mismatch', true);
+      requireValue(envelope.effective_cwd === effectiveCommand.cwd, 'observation-declared-mismatch', true);
       await raw.target(envelope.report_path, true);
       let observed = await runVerifier(envelope, store, options);
       if (observed.outcome === 'completed') {

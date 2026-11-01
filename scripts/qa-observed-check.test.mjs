@@ -401,6 +401,29 @@ describe('AC5: negative outcomes stay distinct blockers, never warn-PASS', () =>
     assert.equal((await f.records()).length, 0);
     assert.equal(await f.registry.lookup('run-1'), null);
   });
+  it('a hook-substituted invocation is never launched: the manifest command binds the spawn', async () => {
+    const f = await observedFixture({ mode: 'pass' });
+    await f.prepare();
+    const envelope = await f.issue(await f.compose());
+    const result = await f.ingest({ ...envelope,
+      command: { ...envelope.command, argv: [process.execPath, '-e', 'process.exit(0)'] } });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, 'observation-declared-mismatch');
+    assert.equal(f.host.state.counters.verifier_launches, 0);
+    assert.equal((await f.records()).length, 0);
+    assert.equal(await f.registry.lookup('run-1'), null);
+    assert.equal(existsSync(path.join(f.rootDir, realReport(f))), false);
+  });
+  it('a substituted effective cwd cannot redirect relative argv resolution', async () => {
+    const f = await observedFixture({ mode: 'pass' });
+    await f.prepare();
+    const envelope = await f.issue(await f.compose());
+    const result = await f.ingest({ ...envelope, effective_cwd: 'src' });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, 'observation-declared-mismatch');
+    assert.equal(f.host.state.counters.verifier_launches, 0);
+    assert.equal((await f.records()).length, 0);
+  });
   it('report bytes tampered after a successful ingest fail the binding catalog', async () => {
     const f = await observedFixture();
     await f.prepare();
