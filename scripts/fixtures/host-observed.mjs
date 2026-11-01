@@ -15,6 +15,8 @@ export const OBSERVED_MODE_OUTCOMES = Object.freeze({
   hang: { outcome: 'timeout', exit_code: null },
   cancel: { outcome: 'cancelled', exit_code: null },
   noreport: { outcome: 'missing-report', exit_code: 0 },
+  slow: { outcome: 'completed', exit_code: 0 },
+  verbose: { outcome: 'completed', exit_code: 0 },
 });
 
 export function createFakeObservedHost({ state, capabilities = {}, failpoint } = {}) {

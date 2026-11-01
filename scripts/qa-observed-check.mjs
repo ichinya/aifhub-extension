@@ -207,7 +207,10 @@ function runVerifier(envelope, store, transport) {
   const cwd = envelope.effective_cwd === '.' ? root : path.resolve(root, envelope.effective_cwd);
   const relative = path.relative(root, cwd);
   requireValue(relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative)), 'observation-target-mismatch', true);
-  const timeoutMs = Number.isInteger(transport.timeoutMs) && transport.timeoutMs > 0 ? transport.timeoutMs : 2000;
+  // Bounded default (10 minutes): a hung transport is stopped by the deadline
+  // with the full stop/bounded-cancellation contract, while real verification
+  // runs far exceed short fixture defaults (Devin PR review).
+  const timeoutMs = Number.isInteger(transport.timeoutMs) && transport.timeoutMs > 0 ? transport.timeoutMs : 600000;
   const spawn = transport.execFile ?? execFile;
   return new Promise((resolve, reject) => {
     let timedOut = false;
@@ -219,6 +222,10 @@ function runVerifier(envelope, store, transport) {
       try {
         return spawn(envelope.command.argv[0], envelope.command.argv.slice(1), {
           cwd, killSignal: 'SIGTERM', windowsHide: true, env: transport.environment,
+          // Verbose verifiers must not lose recorded evidence to the 1 MiB
+          // default stdio buffer (Devin PR review); bytes are discarded, the
+          // receipt binds digests instead.
+          maxBuffer: QA_LIMITS.blob,
           ...(transport.signal ? { signal: transport.signal } : {}),
         }, error => {
           if (timedOut) return settle(() => resolve({ outcome: 'timeout', exit_code: null, stop: 'timeout' }));
@@ -504,6 +511,9 @@ export async function ingestObservedRun(versionedResult, options = {}) {
       const check = manifest.payload.checks.find(c => c.id === plan.existing.check_id);
       requireValue(check, 'observation-target-mismatch', true);
       requireValue(check.gate !== 'rules', 'observation-gate-unsupported', true);
+      // A new wave replaces the manifest pointer: recording an earlier run against
+      // it would let publication accept pre-wave evidence (Devin PR review).
+      requireValue(envelope.manifest_digest === manifest.manifest_digest, 'observation-stale-gates', true);
       let block;
       try { block = observedGateBlock(check.gate, envelope); }
       catch { throw new WorkflowError('observation-gate-block-invalid', true); }

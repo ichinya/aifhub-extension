@@ -32,6 +32,24 @@ async function main() {
     return;
   }
   if (mode === 'noreport') return; // exits cleanly without writing a report
+  if (mode === 'slow') { // outlives the old 2s fixture default, completes cleanly
+    await new Promise(resolve => setTimeout(resolve, 2500));
+    if (report) {
+      await mkdir(path.dirname(path.resolve(report)), { recursive: true });
+      await writeFile(report, observedVerifierReport({ mode, check_id: checkId }));
+    }
+    process.exitCode = 0;
+    return;
+  }
+  if (mode === 'verbose') { // emits more stdout than the 1 MiB default stdio buffer
+    if (report) {
+      await mkdir(path.dirname(path.resolve(report)), { recursive: true });
+      await writeFile(report, observedVerifierReport({ mode, check_id: checkId }));
+    }
+    process.stdout.write(`x${'x'.repeat(1024 * 1024)}\n`);
+    process.exitCode = 0;
+    return;
+  }
   if (mode === 'hang' || mode === 'cancel') { await new Promise(resolve => setTimeout(resolve, 30000)); return; }
   if (mode === 'unsupported') { process.exitCode = 3; return; }
   process.exitCode = 64;
