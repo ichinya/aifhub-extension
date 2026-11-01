@@ -258,7 +258,13 @@ export async function ingestObservedRun(versionedResult, options = {}) {
         ? (await options.providers.checkDefinition(check)).command : check.command;
       const commandDigest = digest(effectiveCommand);
       await raw.target(envelope.report_path, true);
-      const observed = await runVerifier(envelope, store, options);
+      let observed = await runVerifier(envelope, store, options);
+      if (observed.outcome === 'completed') {
+        // Availability refinement: a clean exit without a report at the declared
+        // path is a distinct missing-report outcome, never a silent PASS.
+        if (await store.bytes(envelope.report_path) === null)
+          observed = { outcome: 'missing-report', exit_code: 0, stop: null };
+      }
       requireValue(observed.outcome === envelope.outcome && observed.exit_code === envelope.exit_code,
         'observation-declared-mismatch', true);
       let reportBytes = null;
