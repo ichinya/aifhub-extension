@@ -232,7 +232,15 @@ function runVerifier(envelope, store, transport) {
     if (child === null) { reject(new WorkflowError('observation-exec-failed', true)); return; }
     if (!settled) deadline = setTimeout(() => {
       timedOut = true;
-      if (typeof child?.kill === 'function') child.kill('SIGTERM');
+      // Bounded cancellation: a transport without a stop mechanism refuses typed
+      // instead of leaving the ingestion pending forever (it would hold the
+      // registry lock); a failing stop is normalized; a killed transport gets one
+      // bounded grace window before the run fails closed.
+      if (typeof child?.kill !== 'function')
+        return settle(() => reject(new WorkflowError('observation-stop-unsupported', true)));
+      try { child.kill('SIGTERM'); }
+      catch { return settle(() => reject(new WorkflowError('observation-exec-failed', true))); }
+      deadline = setTimeout(() => settle(() => reject(new WorkflowError('observation-exec-failed', true))), timeoutMs);
     }, timeoutMs);
   });
 }
@@ -298,7 +306,11 @@ async function recordObservedResult(store, options, envelope, check, plan) {
 }
 
 const requirementsView = value => ({ gates: sorted(value?.gates ?? []),
-  independent_roles: value?.independent_roles ?? [], evidence: sorted(value?.evidence ?? []) });
+  // Roles are deep-copied per snapshot: a provider mutating its cached array
+  // in place mid-run must not turn the pre/post owner comparison into a
+  // self-comparison (review R3-2).
+  independent_roles: (value?.independent_roles ?? []).map(role => ({ ...role })),
+  evidence: sorted(value?.evidence ?? []) });
 // Publish-owner semantics (qa-manifest.mjs:121-124): the manifest stores the
 // union of previous + owner + explicit additions, so the live owner must be a
 // subset of the frozen sets — never byte-equal to them.
@@ -321,10 +333,12 @@ export async function ingestObservedRun(versionedResult, options = {}) {
           message: 'QA binding blocked: hook-capability-unsupported.' }] };
     options = { ...options, readBudget: options.readBudget ?? { bytes: 0 } };
     // One environment object is the single source of truth for the run: the
-    // library contract set (`options.environment ?? process.env`) is fingerprinted,
-    // handed to the spawn, and recorded — copied once, never merged with the
-    // parent environment (a declared-absent variable must stay absent).
-    const environment = options.environment ?? process.env;
+    // library contract set (`options.environment ?? process.env`) is copied once
+    // — fingerprinted, handed to the spawn, and recorded from the same defensive
+    // copy, so a caller mutating its own object mid-window cannot change what the
+    // verifier executes. Never merged with the parent environment: a
+    // declared-absent variable stays absent.
+    const environment = { ...(options.environment ?? process.env) };
     const observeOptions = { ...options, environment,
       execFile: options.execFile ? promiseExecFile(options.execFile) : undefined };
     const transport = { execFile: options.execFile, environment, signal: options.signal, timeoutMs: options.timeoutMs };
@@ -453,6 +467,14 @@ export async function ingestObservedRun(versionedResult, options = {}) {
           && requirementsCovered(owner, manifest.payload.requirements), 'observation-custody-race', true);
       }
       const artifacts = await collectRecorderArtifacts(store, envelope);
+      // Bound the recorder's reference budget before any custody write: the
+      // recorder-artifact catalog plus the evidence body and the receipt must fit
+      // QA_LIMITS.refs, or recordBoundEvidence would fail after the
+      // registry-complete write and irreversibly wedge the run_id (review R3-4).
+      const existingRefs = new Set((await store.results()).flatMap(record => [record.evidence.path,
+        ...Object.values(record.artifacts).map(ref => ref.path),
+        ...(record.execution.receipt ? [record.execution.receipt.path] : [])]));
+      requireValue(existingRefs.size + Object.keys(artifacts).length + 2 <= QA_LIMITS.refs, 'qa-refs-limit', true);
       if (reportBytes !== null) {
         const reread = await store.bytes(envelope.report_path);
         requireValue(reread !== null && reread.equals(reportBytes), 'observation-custody-race', true);
