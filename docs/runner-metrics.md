@@ -39,16 +39,23 @@ Collector не меняет execution/QA/delivery state: только read-пр�
 delivery-команды с host-вызовами, reserve/recover/release и повторный
 `evaluateQaBinding` запрещены. Единственная запись — явно назначенный
 observational output-файл. Путь `--output` валидируется: проект-относительный,
-внутри root, в целиком gitignored-области `.ai-factory/state/**`, вне
-`.ai-factory/state/<id>/execution/**`, `<id>/delivery/**`, `<id>/status.json`,
-вне configured QA root (default `.ai-factory/qa`, `paths.qa` из
-`.ai-factory/config.yaml`) и declared QA input roots, вне tracked-путей — иначе
-`runner_metrics_output_rejected` до первой записи. Метрики никогда не становятся
+внутри root, в целиком gitignored-области `.ai-factory/state/**` (внутри
+git-репозитория фактический ignored-статус проверяется `git check-ignore`,
+не только префиксом), вне control-namespace ЛЮБОГО change — `state/<seg>/execution/**`,
+`state/<seg>/delivery/**`, `state/<seg>/status.json` (wildcard, прецедент
+`assertAuxiliaryPaths`), вне `state/exchange/**` (HMAC-salt exchange
+fingerprint-ов) и файлов непосредственно в корне `state/`, вне configured QA
+root (default `.ai-factory/qa`; `paths.qa` из `.ai-factory/config.yaml`,
+небезопасное значение откатывается к дефолту) и declared QA input roots, вне
+tracked-путей — иначе `runner_metrics_output_rejected` до первой записи.
+Guard fail-closed: если безопасность назначения не может быть проверена
+(за enrol-ленный QA manifest нечитаем, git-проверка внутри репозитория падает),
+запись отвергается, а не разрешается по умолчанию. Метрики никогда не становятся
 material input: дефолтный путь не входит ни в declared QA roots, ни в закрытые
-metadata-namespace (`<id>/delivery`, `<id>/status.json`), поэтому существование
-output-файла не меняет binding fingerprints и snapshot digest-ы, построенные
-после его появления (membership в списке gitignored-имён — единственное
-наблюдаемое следствие, общее для любого runtime-файла этой области).
+metadata-namespace (`<id>/delivery`, `<id>/status.json` любого change), поэтому
+существование output-файла не меняет binding fingerprints и snapshot digest-ы,
+построенные после его появления (membership в списке gitignored-имён —
+единственное наблюдаемое следствие, общее для любого runtime-файла этой области).
 
 ## Формулы агрегации
 
@@ -91,11 +98,14 @@ host id не доказывает verify (id персистится до fetch).
 
 Lock не берётся. По scanned member-файлам `requests/` и `delivery-journals/`
 выполняется один bounded повторный read digest-ов (inventory всего `execution/`
-не читается — он дайджестил бы `request-bodies/`). Расхождение → note
-`scan_inconsistent`, outcome `degraded`: смешанный срез никогда не молчаливый и
-не fail. Классификация ошибок чтения: `file_changed`/`unsupported-file`/
-`delivery-request-missing` → race-класс (`scan_inconsistent`);
-`invalid-*`/`delivery-*` (отказ валидации содержимого) → `member_skipped`.
+не читается — он дайджестил бы `request-bodies/`). После content-прохода
+directory union пере-листингуется: появившийся в скане request не теряется
+(он дочитывается и входит в `requests.total`), исчезнувшая запись листинга и
+любое расхождение digest-ов дают note `scan_inconsistent`, outcome `degraded` —
+смешанный/неполный срез никогда не молчаливый и не fail. Классификация ошибок
+чтения: `file-changed`/`unsupported-file`/`delivery-request-missing` →
+race-класс (`scan_inconsistent`); `invalid-*`/`delivery-*` (отказ валидации
+содержимого) → `member_skipped`.
 
 ## Честность unknown и zero
 
@@ -138,7 +148,11 @@ durations:
 
 У всех трёх оговорка одна: **record-span, не compute**. Legacy run-записи
 (v1-схема или `run.legacy`-маркер) не имеют timestamps: они дают
-`attribution.run_kind = null` и исключаются из span-полей.
+`attribution.run_kind = null` и исключаются из span-полей. Записи с
+перевёрнутыми часами (`updated_at` раньше `created_at`, например перевод часов
+назад) тоже исключаются из span-полей: отрицательный span не публикуется.
+`attribution.tasks` для batch-записей считается по словарю задач самой
+run-записи (`run.items`), а не по delivery-покрытию.
 
 ## Checks (opt-in `--include-qa`)
 

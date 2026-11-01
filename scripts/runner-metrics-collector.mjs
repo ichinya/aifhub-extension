@@ -40,7 +40,7 @@ const BASE_UNKNOWNS = Object.freeze(RUNNER_METRICS_UNKNOWNS.filter((value) => va
 // versus a member whose persisted content fails validation: the former is a
 // scan-level inconsistency, the latter a per-member skip. Both degrade the
 // collection honestly; neither silently narrows the reported sample.
-const RACE_CODES = Object.freeze(new Set(['file_changed', 'unsupported-file', 'delivery-request-missing']));
+const RACE_CODES = Object.freeze(new Set(['file-changed', 'unsupported-file', 'delivery-request-missing']));
 
 const exec = promisify(execFile);
 
@@ -101,55 +101,106 @@ async function readConfiguredQaRoot(root) {
       const match = line.match(/^\s{2}([A-Za-z0-9_-]+):\s*["']?([^"'\r\n#]+?)["']?\s*(?:#.*)?$/);
       if (match) paths[match[1]] = match[2].trim();
     }
-    return typeof paths.qa === 'string' && paths.qa.length > 0 ? paths.qa : DEFAULT_QA_ROOT;
+    return typeof paths.qa === 'string' && paths.qa.length > 0 ? safeQaRoot(paths.qa) : DEFAULT_QA_ROOT;
   } catch { return DEFAULT_QA_ROOT; }
 }
 
-async function resolveQaRoot(root) {
-  const qaRoot = await readConfiguredQaRoot(root);
-  portablePath(qaRoot);
-  return qaRoot;
+// A configured value that fails the portable-path check falls back to the
+// default QA root, exactly like a malformed or missing config section.
+function safeQaRoot(value) {
+  try { portablePath(value); return value; } catch { return DEFAULT_QA_ROOT; }
 }
 
-// Declared QA input roots only exist while the change is enrolled; the pointer
-// read is best-effort and read-only. Anything the guard cannot resolve keeps
-// the fixed protections: the gitignored state area, the execution/delivery
-// namespaces and the whole configured QA root.
+async function resolveQaRoot(root) {
+  return readConfiguredQaRoot(root);
+}
+
+// Declared QA input roots only exist while the change is enrolled. The guard
+// is fail-closed: an enrolled change whose manifest cannot be read leaves the
+// safety of the destination unverifiable, so every output path is rejected
+// until the QA custody is consistent again. A missing manifest pointer simply
+// means "not enrolled" and contributes no declared roots.
 async function declaredQaRoots(root, changeId, qaRoot) {
+  let pointer;
+  try { pointer = await readProviderFile(root, `${qaRoot}/${changeId}/manifest.json`, MAX_CONFIG_BYTES); }
+  catch { throw collectorError('runner_metrics_output_rejected'); }
+  if (pointer === null) return [];
   try {
     const store = await qaStore({ rootDir: root, changeId, qaDir: `${qaRoot}/${changeId}` });
     const manifest = await store.manifest();
     return allDeclaredRoots(manifest.payload);
-  } catch { return []; }
+  } catch { throw collectorError('runner_metrics_output_rejected'); }
+}
+
+async function gitInWorkTree(root) {
+  try {
+    const { stdout } = await exec('git', ['rev-parse', '--is-inside-work-tree'],
+      { cwd: root, windowsHide: true, maxBuffer: 64 * 1024, timeout: 10000 });
+    return stdout.toString('utf8').trim() === 'true';
+  } catch { return false; } // outside any git repository: no tracked file can exist
 }
 
 async function defaultTrackedCheck(root, output) {
-  try {
-    const { stdout } = await exec('git', ['ls-files', '--cached', '--', output],
-      { cwd: root, windowsHide: true, maxBuffer: 1024 * 1024, timeout: 10000 });
-    return stdout.split('\0').some((entry) => entry.trim().length > 0);
-  } catch { return false; }
+  if (!await gitInWorkTree(root)) return false;
+  // Inside a repository the check is authoritative and fail-closed: a failing
+  // git call propagates so the guard rejects instead of assuming "untracked".
+  const { stdout } = await exec('git', ['ls-files', '--cached', '-z', '--', output],
+    { cwd: root, windowsHide: true, maxBuffer: 1024 * 1024, timeout: 10000 });
+  return stdout.split('\0').some((entry) => entry.length > 0);
+}
+
+async function outputActuallyIgnored(root, output) {
+  const outcome = await exec('git', ['check-ignore', '-q', '--', output],
+    { cwd: root, windowsHide: true, maxBuffer: 64 * 1024, timeout: 10000 })
+    .then(() => true, (error) => {
+      if (error.code === 1) return false; // git's own verdict: not ignored
+      throw error; // git failed: cannot verify the destination is safe
+    });
+  return outcome;
+}
+
+// Control namespaces are protected for every change directory, not just the
+// target change: a concurrent reader of any change depends on exact bytes in
+// its execution/delivery namespaces and status.json, the exchange namespace
+// holds the HMAC fingerprint salt, and nothing may shadow the project-wide
+// execution lock. Mirrors the assertAuxiliaryPaths boundary
+// (scripts/execution-task-source.mjs).
+function stateNamespaceConflict(output) {
+  const parts = output.slice(STATE_ROOT.length + 1).split('/');
+  if (parts.length < 2) return true; // no file directly in the state root
+  if (parts[0].toLowerCase() === 'exchange') return true;
+  const second = parts[1].toLowerCase();
+  if (second === 'execution' || second === 'delivery') return true;
+  if (parts.length === 2 && second === 'status.json') return true;
+  return false;
 }
 
 // The output must land in the fully gitignored `.ai-factory/state/**` area so
 // it can never surface as an untracked changed path in a QA snapshot, and it
 // must not collide with any control namespace a later reader depends on.
-// Every reject happens before the first write.
+// Every reject happens before the first write; every unverifiable safety
+// property (unreadable QA manifest, failing git check, negated gitignore rule)
+// rejects as well instead of assuming the destination is safe.
 async function resolveOutputPath(root, changeId, requested, options) {
   const output = requested ?? DEFAULT_OUTPUT.replace('<change>', changeId);
   const rejected = () => collectorError('runner_metrics_output_rejected');
   try { portablePath(output); } catch { throw rejected(); }
   if (!output.startsWith(`${STATE_ROOT}/`)) throw rejected();
-  if (withinCi(output, `${STATE_ROOT}/${changeId}/execution`)) throw rejected();
-  if (withinCi(output, `${STATE_ROOT}/${changeId}/delivery`)) throw rejected();
-  if (withinCi(output, `${STATE_ROOT}/${changeId}/status.json`)) throw rejected();
-  if (withinCi(output, `${STATE_ROOT}/execution-write.lock`)) throw rejected();
+  if (stateNamespaceConflict(output)) throw rejected();
   const qaRoot = await resolveQaRoot(root);
   if (withinCi(output, qaRoot)) throw rejected();
   for (const declared of await declaredQaRoots(root, changeId, qaRoot)) {
     if (withinCi(output, declared)) throw rejected();
   }
-  if (await (options.trackedCheck ?? defaultTrackedCheck)(root, output)) throw rejected();
+  try {
+    if (await gitInWorkTree(root)) {
+      if (!await outputActuallyIgnored(root, output)) throw rejected();
+    }
+    if (await (options.trackedCheck ?? defaultTrackedCheck)(root, output)) throw rejected();
+  } catch (error) {
+    if (error?.collectorCode) throw error;
+    throw rejected();
+  }
   return output;
 }
 
@@ -167,12 +218,16 @@ async function fileDigest(store, relative) {
   return bytes === null ? null : digest(bytes);
 }
 
-// Delivery member semantics mirror `loadRequest`: the journal wins on a higher
-// revision, equal revisions must agree byte-for-byte (a conflict skips the
-// member), and journal-only members from an interrupted writer stay in the
-// union. Nothing is ever materialized back into the registry.
-async function scanMembers(delivery, store, changeId, runId, notes) {
-  const folder = `${STATE_ROOT}/${changeId}/execution`;
+// The race/skip classification is exported for the injection test: read errors
+// that mean "the file moved under us" degrade the whole scan
+// (scan_inconsistent), errors that mean "this member's bytes fail validation"
+// skip only that member (member_skipped). The store spells the concurrent
+// modification code `file-changed` (scripts/workflow-state-store.mjs).
+export function classifyMemberError(code) {
+  return RACE_CODES.has(code) ? 'scan_inconsistent' : 'member_skipped';
+}
+
+async function listUnion(store, folder) {
   const requestEntries = await listEntries(store, `${folder}/requests`);
   const journalEntries = await listEntries(store, `${folder}/delivery-journals`);
   const union = new Set();
@@ -182,10 +237,25 @@ async function scanMembers(delivery, store, changeId, runId, notes) {
     try { requestUuid(entry.name.slice(0, -5)); } catch { unreadableNames += 1; continue; }
     union.add(entry.name.slice(0, -5));
   }
-  const uuids = [...union].sort();
-  const digestPass = async () => {
+  return { union, requestScanned: requestEntries.length, journalScanned: journalEntries.length, unreadableNames };
+}
+
+// Delivery member semantics mirror `loadRequest`: the journal wins on a higher
+// revision, equal revisions must agree byte-for-byte (a conflict skips the
+// member), and journal-only members from an interrupted writer stay in the
+// union. Nothing is ever materialized back into the registry. The directory
+// union is re-listed after the content pass: a request that appears (or a
+// listing entry that disappears) mid-scan marks the whole scan inconsistent
+// instead of publishing a silently narrowed registry, and late-appearing
+// members are still read so `requests.total` does not under-report.
+async function scanMembers(delivery, store, changeId, runId, notes, memberReader) {
+  const folder = `${STATE_ROOT}/${changeId}/execution`;
+  const readMember = memberReader ?? ((change, uuid) => delivery.loadRequest(change, uuid));
+  const first = await listUnion(store, folder);
+  const uuids = [...first.union].sort();
+  const digestPass = async (scope) => {
     const map = new Map();
-    for (const uuid of uuids) {
+    for (const uuid of scope) {
       const { request, journal } = deliveryPaths(changeId, uuid);
       try {
         map.set(uuid, { ok: true, value: [await fileDigest(store, request), await fileDigest(store, journal)] });
@@ -195,25 +265,54 @@ async function scanMembers(delivery, store, changeId, runId, notes) {
     }
     return map;
   };
-  const before = await digestPass();
+  const before = await digestPass(uuids);
   const members = new Map();
+  let race = false;
   for (const uuid of uuids) {
     try {
-      const record = await delivery.loadRequest(changeId, uuid);
+      const record = await readMember(changeId, uuid);
       members.set(uuid, { ok: true, record, recordDigest: digest(record) });
     } catch (error) {
       const code = error?.code ?? 'unknown';
-      members.set(uuid, { ok: false, race: RACE_CODES.has(code), code });
+      const classification = classifyMemberError(code);
+      if (classification === 'scan_inconsistent') race = true;
+      members.set(uuid, { ok: false, race: classification === 'scan_inconsistent', code });
     }
   }
-  const after = await digestPass();
-  let race = false;
+  const after = await digestPass(uuids);
   for (const uuid of uuids) {
-    const first = before.get(uuid);
+    const initial = before.get(uuid);
     const second = after.get(uuid);
-    const stable = first?.ok && second?.ok
-      && first.value[0] === second.value[0] && first.value[1] === second.value[1];
+    const stable = initial?.ok && second?.ok
+      && initial.value[0] === second.value[0] && initial.value[1] === second.value[1];
     if (!stable || members.get(uuid).race) race = true;
+  }
+  // Late writers: reconcile the directory listing itself.
+  const second = await listUnion(store, folder);
+  const late = [...second.union].filter((uuid) => !first.union.has(uuid)).sort();
+  for (const uuid of first.union) {
+    if (!second.union.has(uuid)) race = true; // listing entry vanished mid-scan
+  }
+  if (late.length > 0) {
+    race = true;
+    const lateBefore = await digestPass(late);
+    for (const uuid of late) {
+      try {
+        const record = await readMember(changeId, uuid);
+        members.set(uuid, { ok: true, record, recordDigest: digest(record) });
+      } catch (error) {
+        const code = error?.code ?? 'unknown';
+        members.set(uuid, { ok: false, race: classifyMemberError(code) === 'scan_inconsistent', code });
+      }
+    }
+    const lateAfter = await digestPass(late);
+    for (const uuid of late) {
+      const initial = lateBefore.get(uuid);
+      const final = lateAfter.get(uuid);
+      const stable = initial?.ok && final?.ok
+        && initial.value[0] === final.value[0] && initial.value[1] === final.value[1];
+      if (!stable) race = true;
+    }
   }
   if (race) note(notes, 'scan_inconsistent');
   if (runId !== undefined) {
@@ -223,7 +322,13 @@ async function scanMembers(delivery, store, changeId, runId, notes) {
       if (member.ok && member.record.slot.run_id !== runId) members.delete(uuid);
     }
   }
-  return { members, requestScanned: requestEntries.length, journalScanned: journalEntries.length, race, unreadableNames };
+  return {
+    members,
+    requestScanned: first.requestScanned,
+    journalScanned: first.journalScanned,
+    race,
+    unreadableNames: first.unreadableNames + second.unreadableNames
+  };
 }
 
 async function scanRuns(store, changeId, runId, notes) {
@@ -345,7 +450,7 @@ export async function collectRunnerMetrics(options = {}) {
     const output = await resolveOutputPath(root, changeId, parsed.output, options);
     const store = await storeFor(root);
     const delivery = await deliveryStore({ rootDir: root });
-    const scan = await scanMembers(delivery, store, changeId, runId, notes);
+    const scan = await scanMembers(delivery, store, changeId, runId, notes, options.memberReader);
     const runScan = await scanRuns(store, changeId, runId, notes);
     if (runId !== undefined && scan.members.size === 0 && runScan.runs.length === 0) note(notes, 'run_filter_empty');
     const validMembers = [...scan.members.values()].filter((member) => member.ok);
@@ -397,7 +502,13 @@ export async function collectRunnerMetrics(options = {}) {
     for (const run of runScan.runs) runIds.add(run.run_id);
     const taskIds = new Set();
     for (const member of validMembers) taskIds.add(member.record.slot.task_id);
-    for (const run of runScan.runs) if (run.task_id !== null && run.task_id !== undefined) taskIds.add(run.task_id);
+    for (const run of runScan.runs) {
+      if (run.task_id !== null && run.task_id !== undefined) taskIds.add(run.task_id);
+      // Batch runs carry their task vocabulary in the manifest/items map, not
+      // in run.task_id (which is null there); counting from the run record
+      // keeps `attribution.tasks` independent of delivery coverage.
+      if (run.kind === 'batch') for (const taskId of Object.keys(run.items ?? {})) taskIds.add(taskId);
+    }
     const singleRun = runIds.size === 1 ? runScan.runs.find((run) => run.run_id === [...runIds][0]) ?? null : null;
     const attribution = {
       coordinator: singleRun ? singleRun.owner : null,
@@ -411,8 +522,11 @@ export async function collectRunnerMetrics(options = {}) {
     // Derived record-span durations: names are deliberately not measurable
     // duration names (`run_wall_ms` is banned). Spans come from run-record
     // timestamps, not from any phase instrumentation, and exclude legacy
-    // records without timestamps.
-    const spanRuns = runScan.runs.filter((run) => !isLegacyRun(run));
+    // records without timestamps as well as records with an inverted clock
+    // (updated_at before created_at, e.g. a backward clock adjustment) whose
+    // span would be negative and therefore unusable.
+    const spanRuns = runScan.runs.filter((run) => !isLegacyRun(run)
+      && Date.parse(run.updated_at) >= Date.parse(run.created_at));
     const phases = {
       setup_ms: null,
       checks_ms: null,

@@ -26,42 +26,48 @@
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "output": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "total": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "cache_read": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "cache_write": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "reasoning": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         }
       }
     },
@@ -91,35 +97,40 @@
         "integer",
         "null"
       ],
-      "minimum": 0
+      "minimum": 0,
+      "maximum": 9007199254740991
     },
     "retries": {
       "type": [
         "integer",
         "null"
       ],
-      "minimum": 0
+      "minimum": 0,
+      "maximum": 9007199254740991
     },
     "changed_loc": {
       "type": [
         "integer",
         "null"
       ],
-      "minimum": 0
+      "minimum": 0,
+      "maximum": 9007199254740991
     },
     "unrelated_changes": {
       "type": [
         "integer",
         "null"
       ],
-      "minimum": 0
+      "minimum": 0,
+      "maximum": 9007199254740991
     },
     "human_review_ms": {
       "type": [
         "integer",
         "null"
       ],
-      "minimum": 0
+      "minimum": 0,
+      "maximum": 9007199254740991
     },
     "verified_success": {
       "type": [
@@ -192,84 +203,96 @@
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "read_calls": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "fetch_calls": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "retry_creates": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "recovery_attempts": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "verified_recoveries": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "uncertain_returns": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "identity_conflicts": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "transport_ms": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "recovery_ms": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "wait_ms": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "incomplete_intervals": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         }
       }
     },
@@ -285,14 +308,16 @@
             "string",
             "null"
           ],
-          "maxLength": 200
+          "maxLength": 200,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$"
         },
         "worker": {
           "type": [
             "string",
             "null"
           ],
-          "maxLength": 200
+          "maxLength": 200,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$"
         },
         "role": {
           "enum": [
@@ -313,14 +338,16 @@
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "tasks": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         }
       }
     },
@@ -336,42 +363,48 @@
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "verified": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "retried": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "recovered": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "incomplete": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "duplicate_responses": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "by_kind": {
           "type": [
@@ -385,14 +418,16 @@
                 "integer",
                 "null"
               ],
-              "minimum": 0
+              "minimum": 0,
+              "maximum": 9007199254740991
             },
             "completion": {
               "type": [
                 "integer",
                 "null"
               ],
-              "minimum": 0
+              "minimum": 0,
+              "maximum": 9007199254740991
             }
           }
         }
@@ -410,14 +445,16 @@
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "repeated": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "reasons": {
           "type": [
@@ -451,7 +488,8 @@
               },
               "count": {
                 "type": "integer",
-                "minimum": 0
+                "minimum": 0,
+                "maximum": 9007199254740991
               }
             },
             "required": [
@@ -471,14 +509,16 @@
             "additionalProperties": false,
             "properties": {
               "check_id": {
-                "type": "string"
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$"
               },
               "manifest_digest": {
                 "type": "string",
                 "pattern": "^[a-f0-9]{64}$"
               },
               "wave_id": {
-                "type": "string"
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$"
               },
               "input_fingerprint": {
                 "type": "string",
@@ -507,70 +547,80 @@
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "checks_ms": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "snapshot_hash_ms": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "wait_ms": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "run_elapsed_ms": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "run_record_span_ms": {
           "type": [
             "integer",
             "null"
           ],
-            "minimum": 0
-          },
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
         "workers_span_sum_ms": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "pending_observed_ms": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "transport_ms": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "recovery_ms": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         }
       }
     },
@@ -586,35 +636,40 @@
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "journals_scanned": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "runs_scanned": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "qa_results_scanned": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "members_skipped": {
           "type": [
             "integer",
             "null"
           ],
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "registry_digest": {
           "type": [

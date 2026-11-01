@@ -1,7 +1,9 @@
 // Executable JSON-Schema subset validator shared by extension metadata checks
 // and runner-metrics parity gates. Supports the keywords the repository
 // schemas actually use: $ref, oneOf, type, const, enum, pattern, format,
-// items, properties/required/additionalProperties and dependentRequired.
+// items, properties/required/additionalProperties, dependentRequired, and the
+// numeric/string/array bounds minimum, maximum, minLength, maxLength,
+// minItems and maxItems that keep the schema↔runtime parity gate two-sided.
 // Anything outside this subset is ignored, so callers must not treat a clean
 // result as full draft-2020-12 compliance.
 
@@ -106,6 +108,14 @@ export function validateJsonAgainstSchema(value, schema, options = {}) {
       }
     }
 
+    if (schema.minLength !== undefined && value.length < schema.minLength) {
+      errors.push({ path, message: `expected at least ${schema.minLength} characters` });
+    }
+
+    if (schema.maxLength !== undefined && value.length > schema.maxLength) {
+      errors.push({ path, message: `expected at most ${schema.maxLength} characters` });
+    }
+
     if (schema.format === 'uri') {
       try {
         const parsed = new URL(value);
@@ -118,14 +128,34 @@ export function validateJsonAgainstSchema(value, schema, options = {}) {
     }
   }
 
-  if (Array.isArray(value) && schema.items) {
-    for (const [index, item] of value.entries()) {
-      errors.push(
-        ...validateJsonAgainstSchema(item, schema.items, {
-          rootSchema,
-          path: `${path}[${index}]`
-        })
-      );
+  if (typeof value === 'number') {
+    if (schema.minimum !== undefined && value < schema.minimum) {
+      errors.push({ path, message: `expected at least ${schema.minimum}` });
+    }
+
+    if (schema.maximum !== undefined && value > schema.maximum) {
+      errors.push({ path, message: `expected at most ${schema.maximum}` });
+    }
+  }
+
+  if (Array.isArray(value)) {
+    if (schema.minItems !== undefined && value.length < schema.minItems) {
+      errors.push({ path, message: `expected at least ${schema.minItems} items` });
+    }
+
+    if (schema.maxItems !== undefined && value.length > schema.maxItems) {
+      errors.push({ path, message: `expected at most ${schema.maxItems} items` });
+    }
+
+    if (schema.items) {
+      for (const [index, item] of value.entries()) {
+        errors.push(
+          ...validateJsonAgainstSchema(item, schema.items, {
+            rootSchema,
+            path: `${path}[${index}]`
+          })
+        );
+      }
     }
   }
 

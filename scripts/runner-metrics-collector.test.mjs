@@ -12,7 +12,7 @@ import { createGateResult, renderGateResultBlock } from './aif-gate-result.mjs';
 import { canonical, digest } from './workflow-state-store.mjs';
 import { deliveryPaths, deliveryStore } from './host-delivery-store.mjs';
 import { history } from './execution-transactions.mjs';
-import { collectRunnerMetrics, projectChecks, runCollectorCommand } from './runner-metrics-collector.mjs';
+import { classifyMemberError, collectRunnerMetrics, projectChecks, runCollectorCommand } from './runner-metrics-collector.mjs';
 import { validateJsonAgainstSchema } from './json-schema-subset.mjs';
 import { exportEvaluation } from './workflow-exchange.mjs';
 import { qaStore } from './qa-manifest-store.mjs';
@@ -507,7 +507,17 @@ test('parity: old minimal snapshot stays valid, unknown keys rejected by both ga
     { ...oldMinimal, checks: { results: 1, reasons: [{ code: 'made-up-code', count: 1 }] } },
     { ...oldMinimal, unknowns: ['not_in_enum'] },
     { ...oldMinimal, coverage: 'everything' },
-    { ...oldMinimal, checks: { results: 1, dependencies: [{ check_id: 'c', manifest_digest: 'nothex', wave_id: 'w', input_fingerprint: 'nothex' }] } }
+    { ...oldMinimal, checks: { results: 1, dependencies: [{ check_id: 'c', manifest_digest: 'nothex', wave_id: 'w', input_fingerprint: 'nothex' }] } },
+    // Review-identified divergence classes: null members where the schema
+    // requires real values, non-identifier ids, out-of-safe-range counters
+    // and over-long labels must be rejected by BOTH gates.
+    { ...oldMinimal, checks: { results: 1, reasons: [{ code: 'wait-request', count: null }] } },
+    { ...oldMinimal, checks: { results: 1, dependencies: [{ check_id: 'c', manifest_digest: 'a'.repeat(64), wave_id: 'w', input_fingerprint: null }] } },
+    { ...oldMinimal, attribution: { coordinator: 'src/private.js', runs: 1, tasks: 0 } },
+    { ...oldMinimal, attribution: { coordinator: 'D:\sensitive\project', runs: 1, tasks: 0 } },
+    { ...oldMinimal, tokens: { reasoning: 9007199254740992 } },
+    { ...oldMinimal, run_id: 'r'.repeat(201) },
+    { ...oldMinimal, checks: { results: 1, dependencies: [{ check_id: 'has space', manifest_digest: 'a'.repeat(64), wave_id: 'w', input_fingerprint: 'b'.repeat(64) }] } }
   ];
   for (const probe of probes) {
     assert.ok(validateJsonAgainstSchema(probe, runnerSchema).length > 0, `schema must reject ${JSON.stringify(probe)}`);
@@ -549,6 +559,14 @@ test('output guard rejects control namespaces, unignored areas, backslashes and 
     ['--output', `.ai-factory/state/${f.id}/execution/runs/metrics.json`],
     ['--output', `.ai-factory/state/${f.id}/delivery/metrics.json`],
     ['--output', `.ai-factory/state/${f.id}/status.json`],
+    // Control namespaces of OTHER changes and the shared exchange namespace
+    // are protected with the same wildcard rule (assertAuxiliaryPaths
+    // precedent): the collector writes only into its own change directory.
+    ['--output', '.ai-factory/state/other/status.json'],
+    ['--output', '.ai-factory/state/other/execution/runs/probe.json'],
+    ['--output', '.ai-factory/state/other/delivery/probe.json'],
+    ['--output', '.ai-factory/state/exchange/fingerprint-salt.json'],
+    ['--output', '.ai-factory/state/loose.json'],
     ['--output', 'metrics/runner-metrics.json'],
     ['--output', 'a\\b.json'],
     ['--output', '/absolute/path.json']
@@ -566,6 +584,131 @@ test('output guard rejects control namespaces, unignored areas, backslashes and 
   const custom = await f.collect(['--output', `.ai-factory/state/${f.id}/runner-metrics.custom.json`]);
   assert.equal(custom.outcome, 'collected');
   assert.equal(custom.written, `.ai-factory/state/${f.id}/runner-metrics.custom.json`);
+});
+
+test('a member file that moves under the collector degrades the scan as scan_inconsistent', async (t) => {
+  const f = await fixture(t);
+  assert.equal((await f.send()).delivery_verified, true);
+  let calls = 0;
+  const result = await f.collect([], { memberReader: async () => {
+    calls += 1;
+    throw Object.assign(new Error('moved'), { code: 'file-changed' });
+  } });
+  assert.equal(calls, 1);
+  assert.equal(result.outcome, 'degraded');
+  assert.ok(result.notes.some((note) => note.code === 'scan_inconsistent'));
+  // The store's concurrent-modification code is the race class, not a skip:
+  // total stays intact while the aggregate counters are marked lower bounds.
+  assert.equal(result.metrics.requests.total, 1);
+  assert.equal(result.metrics.requests.verified, 0);
+  assert.equal(result.metrics.provenance.members_skipped, 1);
+  // Classification contract: store race codes vs content-validation codes.
+  assert.equal(classifyMemberError('file-changed'), 'scan_inconsistent');
+  assert.equal(classifyMemberError('unsupported-file'), 'scan_inconsistent');
+  assert.equal(classifyMemberError('delivery-request-missing'), 'scan_inconsistent');
+  assert.equal(classifyMemberError('invalid-delivery-state'), 'member_skipped');
+  assert.equal(classifyMemberError('delivery-identity-conflict'), 'member_skipped');
+});
+
+test('a request published mid-scan joins the union and marks the scan inconsistent', async (t) => {
+  const f = await fixture(t, { host: createFakeHost({ mode: 'shared-completion' }) });
+  assert.equal((await f.send()).delivery_verified, true);
+  let primed = false;
+  const result = await f.collect([], { memberReader: async (change, uuid) => {
+    if (!primed) {
+      primed = true;
+      await addRequest(f);
+    }
+    return f.s.loadRequest(change, uuid);
+  } });
+  assert.equal(result.outcome, 'degraded');
+  assert.ok(result.notes.some((note) => note.code === 'scan_inconsistent'));
+  // The late writer is still read: total does not under-report the registry.
+  assert.equal(result.metrics.requests.total, 2);
+});
+
+test('batch runs contribute their manifest task vocabulary to attribution.tasks', async (t) => {
+  const f = await deliveryProject(t); t.after(f.cleanup);
+  const report = '.ai-factory/evidence/work/security.md';
+  await f.put(report, gateBody());
+  const manifest = [
+    { task_id: '1.1', files: ['src/a.js'], expected_change: 'a', dependencies: [], check: 'node --test' },
+    { task_id: '1.2', files: ['src/b.js'], expected_change: 'b', dependencies: [], check: 'node --test' }
+  ];
+  await f.call('batch-start', { change_id: f.id, run_id: 'batch-1', owner: 'parent', worker: 'worker-a',
+    role: 'implement', manifest, preflight_paths: ['src/a.js'] });
+  // No delivery requests at all: tasks still count both batch items.
+  let result = await collectRunnerMetrics({ rootDir: f.root, argv: ['--change', f.id] });
+  assert.equal(result.outcome, 'collected');
+  assert.equal(result.metrics.attribution.runs, 1);
+  assert.equal(result.metrics.attribution.run_kind, 'batch');
+  assert.equal(result.metrics.attribution.tasks, 2);
+  // With partial delivery coverage the count stays run-record driven: batch
+  // deliveries admit only after the seal, so the flow is start → seal → reserve.
+  await f.call('batch-seal', { change_id: f.id, run_id: 'batch-1', actor: 'worker-a', version: 1,
+    evidence: { '1.1': [report], '1.2': [report] } });
+  await f.call('delivery-reserve', { change_id: f.id, run_id: 'batch-1', task_id: '1.1',
+    request_uuid: randomUUID(), target: { kind: 'completion', locator: 'worker-1' } });
+  result = await collectRunnerMetrics({ rootDir: f.root, argv: ['--change', f.id] });
+  assert.equal(result.metrics.attribution.tasks, 2);
+  assert.equal(result.metrics.requests.total, 1);
+});
+
+test('inverted run-record clocks are excluded from span fields', async (t) => {
+  const f = await fixture(t);
+  const record = await f.s.load(`${f.paths.folder}/runs/run-1.json`);
+  record.created_at = new Date(Date.parse(record.updated_at) + 3_600_000).toISOString();
+  await f.s.save(`${f.paths.folder}/runs/run-1.json`, record);
+  const result = await f.collect();
+  // A backward clock adjustment yields a negative span, which is unusable:
+  // the run drops out of the span fields instead of publishing -ms values
+  // that would violate the non-negative schema bounds.
+  assert.equal(result.outcome, 'collected');
+  assert.equal(result.metrics.phases.run_record_span_ms, null);
+  assert.equal(result.metrics.phases.workers_span_sum_ms, null);
+  assert.equal(result.metrics.attribution.coordinator, 'parent');
+});
+
+test('configured paths.qa routes the opt-in qa read and guards the custom root', async (t) => {
+  const f = await fixture(t);
+  await f.put('.ai-factory/config.yaml', 'aifhub:\n  tools:\n    openspec: true\npaths:\n  qa: .ai-factory/state/custom-qa\n');
+  const options = { ...qaOptions(f), qaDir: '.ai-factory/state/custom-qa/work' };
+  assert.equal((await prepareQaManifest(options)).ok, true);
+  await recordQaResult({ ...options, gate: 'verify', resultId: 'qa-1', markdown: gateBody('verify').toString('utf8') });
+  // A pathological qa root inside the state area is guard-protected as a whole.
+  const guarded = await f.collect(['--output', '.ai-factory/state/custom-qa/probe.json']);
+  assert.equal(guarded.outcome, 'failed');
+  assert.equal(guarded.errors[0].code, 'runner_metrics_output_rejected');
+  const result = await f.collect(['--include-qa']);
+  assert.equal(result.outcome, 'collected');
+  assert.equal(result.metrics.checks.results, 1);
+});
+
+test('an unsafe configured paths.qa falls back to the default qa root', async (t) => {
+  const f = await fixture(t);
+  await f.put('.ai-factory/config.yaml', 'aifhub:\n  tools:\n    openspec: true\npaths:\n  qa: ..\\evil\n');
+  const result = await f.collect(['--include-qa']);
+  assert.equal(result.outcome, 'collected');
+  assert.equal(result.metrics.checks.results, 0);
+});
+
+test('an enrolled but unreadable qa manifest fails the output guard closed', async (t) => {
+  const f = await fixture(t);
+  const options = qaOptions(f);
+  assert.equal((await prepareQaManifest(options)).ok, true);
+  // Corrupt the manifest pointer: the guard can no longer verify that the
+  // destination is outside the declared QA roots, so every output path —
+  // including the default one — is rejected instead of assumed safe.
+  await f.put('.ai-factory/qa/work/manifest.json', '{pointer');
+  for (const argv of [[], ['--output', `.ai-factory/state/${f.id}/runner-metrics.custom.json`]]) {
+    const result = await f.collect(argv);
+    assert.equal(result.outcome, 'failed', JSON.stringify(argv));
+    assert.equal(result.errors[0].code, 'runner_metrics_output_rejected', JSON.stringify(argv));
+  }
+  // A missing manifest pointer is just "not enrolled": no declared roots.
+  const unenrolled = await deliveryProject(t); t.after(unenrolled.cleanup);
+  const clean = await collectRunnerMetrics({ rootDir: unenrolled.root, argv: ['--change', unenrolled.id] });
+  assert.equal(clean.outcome, 'collected');
 });
 
 test('existing output never changes a qa snapshot digest; reruns are idempotent', async (t) => {

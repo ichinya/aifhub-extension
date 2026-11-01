@@ -272,9 +272,12 @@ function validateRunnerMetrics(input) {
   }
   if (input.attribution !== undefined && input.attribution !== null) {
     const attribution = input.attribution;
+    // Coordinator and worker are identifiers, not free-form labels: a
+    // path-like value must never reach the public runtime record.
     if (typeof attribution !== 'object' || Array.isArray(attribution)
       || Object.keys(attribution).some((key) => !['coordinator', 'worker', 'role', 'run_kind', 'runs', 'tasks'].includes(key))
-      || !label(attribution.coordinator) || !label(attribution.worker)
+      || !(attribution.coordinator === null || attribution.coordinator === undefined || safeIdentifier(attribution.coordinator))
+      || !(attribution.worker === null || attribution.worker === undefined || safeIdentifier(attribution.worker))
       || !(attribution.role === null || attribution.role === undefined || ['implement', 'fix'].includes(attribution.role))
       || !(attribution.run_kind === null || attribution.run_kind === undefined || ['single', 'batch'].includes(attribution.run_kind))
       || !intOrNull(attribution.runs) || !intOrNull(attribution.tasks)) throw exchangeError('invalid_runner_metrics');
@@ -292,15 +295,20 @@ function validateRunnerMetrics(input) {
   }
   if (input.checks !== undefined && input.checks !== null) {
     const checks = input.checks;
+    const count = (value) => Number.isSafeInteger(value) && value >= 0;
+    const digest = (value) => typeof value === 'string' && HASH.test(value);
     const reasons = checks.reasons;
+    // Reason counts and dependency digests are required members of their
+    // entries (never null): the schema demands them, so the runtime gate must
+    // not accept a file the export schema would then reject.
     const reasonsValid = reasons === undefined || reasons === null || (Array.isArray(reasons) && reasons.length <= MAX_METRIC_REASONS
       && reasons.every((entry) => entry && typeof entry === 'object' && !Array.isArray(entry)
-        && Object.keys(entry).length === 2 && RUNNER_METRICS_REASON_CODES.includes(entry.code) && intOrNull(entry.count)));
+        && Object.keys(entry).length === 2 && RUNNER_METRICS_REASON_CODES.includes(entry.code) && count(entry.count)));
     const dependencies = checks.dependencies;
     const dependenciesValid = dependencies === undefined || dependencies === null || (Array.isArray(dependencies) && dependencies.length <= MAX_METRIC_DEPENDENCIES
       && dependencies.every((entry) => entry && typeof entry === 'object' && !Array.isArray(entry)
         && Object.keys(entry).length === 4 && safeIdentifier(entry.check_id) && safeIdentifier(entry.wave_id)
-        && digestOrNull(entry.manifest_digest) && digestOrNull(entry.input_fingerprint)));
+        && digest(entry.manifest_digest) && digest(entry.input_fingerprint)));
     if (typeof checks !== 'object' || Array.isArray(checks)
       || Object.keys(checks).some((key) => !['results', 'repeated', 'reasons', 'dependencies'].includes(key))
       || !intOrNull(checks.results) || !intOrNull(checks.repeated) || !reasonsValid || !dependenciesValid) throw exchangeError('invalid_runner_metrics');
