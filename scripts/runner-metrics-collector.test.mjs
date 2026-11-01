@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -520,6 +521,10 @@ test('parity: old minimal snapshot stays valid, unknown keys rejected by both ga
     { ...oldMinimal, run_id: 'bad\u0001id' },
     { ...oldMinimal, attribution: { worker: 'CON', runs: 1, tasks: 0 } },
     { ...oldMinimal, attribution: { coordinator: 'worker.', runs: 1, tasks: 0 } },
+    // Reserved names also fail as a prefix before a dot (portablePath
+    // continuation rule), and label fields reject control characters.
+    { ...oldMinimal, attribution: { coordinator: 'CON.x', runs: 1, tasks: 0 } },
+    { ...oldMinimal, model: { id: 'badid' } },
     { ...oldMinimal, checks: { results: 1, dependencies: [{ check_id: 'has space', manifest_digest: 'a'.repeat(64), wave_id: 'w', input_fingerprint: 'b'.repeat(64) }] } }
   ];
   for (const probe of probes) {
@@ -553,6 +558,59 @@ test('non-interference: byte identity, no lock files, static dependency graph', 
   assert.doesNotMatch(source, /evaluateQaBinding|auditor|dispatchAudit|qa-bound-evidence/);
   assert.doesNotMatch(source, /HostClient|delivery-inspect|reserveDeliverySlot|prepareDelivery|deliverPreparedRequest|recoverDelivery/);
   assert.doesNotMatch(source, /\.lock\(|ensureRuntimeGitignore|\bstore\.(write|save|remove)\(|\bdelivery\.(write|save|remove|project)\(/);
+});
+
+test('the destination leaf may only replace a previous runner-metrics output', async (t) => {
+  const f = await fixture(t);
+  // Review receipts, tracer decisions and unrelated files under state/ are
+  // exchange-consumed evidence: the collector must never replace them.
+  const receipt = '.ai-factory/state/work/reviews/r1/ai-cross-context-review.json';
+  await f.put(receipt, '{"schema":"aifhub.ai_cross_context_review.v1"}');
+  const receiptResult = await f.collect(['--output', receipt]);
+  assert.equal(receiptResult.outcome, 'failed');
+  assert.equal(receiptResult.errors[0].code, 'runner_metrics_output_rejected');
+  assert.equal(await f.get(receipt), '{"schema":"aifhub.ai_cross_context_review.v1"}');
+  const foreign = '.ai-factory/state/other/tracer/decision.json';
+  await f.put(foreign, '{"decision":"promote"}');
+  const foreignResult = await f.collect(['--output', foreign]);
+  assert.equal(foreignResult.outcome, 'failed');
+  assert.equal(await f.get(foreign), '{"decision":"promote"}');
+  const junk = '.ai-factory/state/work/notes/keep.txt';
+  await f.put(junk, 'keep me');
+  const junkResult = await f.collect(['--output', junk]);
+  assert.equal(junkResult.outcome, 'failed');
+  assert.equal(await f.get(junk), 'keep me');
+  // A previous metrics output at the destination remains replaceable.
+  for (let index = 0; index < 2; index += 1) {
+    const again = await f.collect(['--output', '.ai-factory/state/work/runner-metrics.custom.json']);
+    assert.equal(again.outcome, 'collected');
+  }
+});
+
+test('a poisoned GIT_DIR environment cannot bypass the ignored/tracked checks', async (t) => {
+  // A repository without an ignore rule for .ai-factory: the output would
+  // surface as an untracked path, so the guard must reject — which requires
+  // the git checks to actually run despite the poisoned environment.
+  const root = await mkdtemp(path.join(tmpdir(), 'runner-metrics-git-env-'));
+  t.after(() => rm(root, { recursive: true, force: true, maxRetries: 3 }));
+  const git = async (args) => exec('git', args, { cwd: root });
+  await mkdir(path.join(root, 'openspec', 'changes', 'work'), { recursive: true });
+  await mkdir(path.join(root, '.ai-factory'), { recursive: true });
+  await writeFile(path.join(root, 'openspec', 'changes', 'work', 'proposal.md'), '# P\n');
+  await writeFile(path.join(root, 'openspec', 'changes', 'work', 'tasks.md'), '- [ ] 1.1 Task\n');
+  await writeFile(path.join(root, '.ai-factory', 'config.yaml'), 'aifhub:\n  tools:\n    openspec: true\n');
+  await git(['init', '--initial-branch=main']);
+  await git(['config', 'user.email', 'fixture@example.com']);
+  await git(['config', 'user.name', 'fixture']);
+  await git(['add', '.']);
+  await git(['commit', '-m', 'init']);
+  process.env.GIT_DIR = path.join(root, 'no-such-git-dir');
+  try {
+    const result = await collectRunnerMetrics({ rootDir: root, argv: ['--change', 'work'] });
+    assert.equal(result.outcome, 'failed');
+    assert.equal(result.errors[0].code, 'runner_metrics_output_rejected');
+    assert.equal(existsSync(path.join(root, '.ai-factory', 'state', 'work', 'runner-metrics.json')), false);
+  } finally { delete process.env.GIT_DIR; }
 });
 
 test('output guard rejects control namespaces, unignored areas, backslashes and tracked paths', async (t) => {
@@ -725,6 +783,65 @@ test('a run published mid-scan joins the sample and marks the scan inconsistent'
   assert.ok(result.notes.some((note) => note.code === 'scan_inconsistent'));
   assert.equal(result.metrics.provenance.runs_scanned, 2);
   assert.equal(result.metrics.attribution.runs, 2);
+});
+
+test('a run record updated mid-scan marks the scan inconsistent', async (t) => {
+  const f = await fixture(t);
+  let primed = false;
+  const result = await f.collect([], { runReader: async (id) => {
+    if (!primed) {
+      primed = true;
+      // Run records are rewritten on transitions: an accept during the scan
+      // changes run-1 bytes under a stable name, which must not survive as a
+      // silently mixed slice.
+      const run = await f.s.load(`${f.paths.folder}/runs/${id}.json`);
+      await f.call('accept', { ...f.actor(2), actor: 'parent', result_digest: run.result.digest });
+    }
+    return f.s.load(`${f.paths.folder}/runs/${id}.json`);
+  } });
+  assert.equal(result.outcome, 'degraded');
+  assert.ok(result.notes.some((note) => note.code === 'scan_inconsistent'));
+  assert.equal(result.metrics.attribution.runs, 1);
+});
+
+test('an invalid late-published run counts toward members_skipped', async (t) => {
+  const f = await deliveryProject(t); t.after(f.cleanup);
+  const s = await deliveryStore({ rootDir: f.root });
+  const folder = `.ai-factory/state/${f.id}/execution`;
+  await f.call('start', f.start());
+  let primed = false;
+  const result = await collectRunnerMetrics({ rootDir: f.root, argv: ['--change', f.id], runReader: async (id) => {
+    if (!primed) {
+      primed = true;
+      await f.put(`${folder}/runs/09-invalid.json`, '{oops');
+    }
+    return s.load(`${folder}/runs/${id}.json`);
+  } });
+  assert.equal(result.outcome, 'degraded');
+  assert.ok(result.notes.some((note) => note.code === 'scan_inconsistent'));
+  assert.ok(result.notes.some((note) => note.code === 'member_skipped'));
+  assert.equal(result.metrics.provenance.runs_scanned, 2);
+  assert.equal(result.metrics.provenance.members_skipped, 1);
+});
+
+test('an aggregate overflow fails closed instead of publishing an invalid file', async (t) => {
+  const f = await fixture(t, { host: createFakeHost({ mode: 'shared-completion' }) });
+  assert.equal((await f.send()).delivery_verified, true);
+  const second = await addRequest(f);
+  const MAX = Number.MAX_SAFE_INTEGER;
+  for (const uuid of [f.uuid, second.input.request_uuid]) {
+    const record = await f.s.loadRequest(f.id, uuid);
+    record.transport.transport_ms = MAX;
+    await f.s.saveRequest(record);
+  }
+  const result = await f.collect();
+  // Each persisted counter is a safe integer, but their sum is not: the
+  // final self-check refuses to publish an aggregate the export gate would
+  // reject.
+  assert.equal(result.outcome, 'failed');
+  assert.equal(result.errors[0].code, 'runner_metrics_aggregate_unrepresentable');
+  assert.equal(result.written, null);
+  assert.equal(existsSync(path.join(f.root, '.ai-factory', 'state', 'work', 'runner-metrics.json')), false);
 });
 
 test('batch runs contribute their manifest task vocabulary to attribution.tasks', async (t) => {

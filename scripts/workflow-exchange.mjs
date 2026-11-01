@@ -225,7 +225,7 @@ export function validateDesignContext(input) {
   return errors;
 }
 
-function validateRunnerMetrics(input) {
+export function validateRunnerMetrics(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw exchangeError('invalid_runner_metrics');
   if (input.schema !== RUNNER_METRICS_SCHEMA) throw exchangeError('invalid_runner_metrics');
   const allowed = ['schema', 'run_id', 'tokens', 'cost', 'latency_ms', 'model', 'harness', 'retries', 'changed_loc', 'unrelated_changes', 'human_review_ms', 'verified_success', 'transport',

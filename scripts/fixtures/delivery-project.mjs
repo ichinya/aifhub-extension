@@ -1,8 +1,12 @@
 // Test-only Git observation injection; actual execution validators/freshness/store stay intact.
 import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
 import path from 'node:path';
+import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import { fakeRepository } from './snapshot-test.mjs';
+
+const git = promisify(execFile);
 
 export async function deliveryProject(t, { mode = 'openspec', plans = '.ai-factory/plans' } = {}) {
   const id = 'work', proposal = `openspec/changes/${id}/proposal.md`, tasks = `openspec/changes/${id}/tasks.md`;
@@ -21,6 +25,14 @@ export async function deliveryProject(t, { mode = 'openspec', plans = '.ai-facto
       'verify.md': '# Verify\n', 'status.yaml': `status: planned\nplan_id: ${id}\n` })) await put(`${plans}/${id}/${name}`, text);
   }
   const modules = {}, slot = `delivery-test-${randomUUID()}`;
+  // A real repository backs the fixture: read-only helpers that shell out to
+  // git (the runner-metrics collector) must see an honest repository instead
+  // of a fake .git entry, while execution flows keep the injected observer.
+  await git('git', ['init', '-q'], { cwd: f.root });
+  await git('git', ['config', 'user.email', 'fixture@example.invalid'], { cwd: f.root });
+  await git('git', ['config', 'user.name', 'fixture'], { cwd: f.root });
+  await git('git', ['add', '.'], { cwd: f.root });
+  await git('git', ['commit', '-qm', 'fixture'], { cwd: f.root });
   globalThis[slot] = {};
   t.after(() => { delete globalThis[slot]; });
   async function load(name, edit = source => source) {

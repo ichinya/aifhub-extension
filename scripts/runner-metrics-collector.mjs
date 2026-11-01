@@ -19,7 +19,7 @@ import { QA_LIMITS, qaStore } from './qa-manifest-store.mjs';
 import { allDeclaredRoots } from './qa-manifest-inputs.mjs';
 import { parseStrictJson } from './json-strict.mjs';
 import { readProviderFile, writeProviderFile } from './provider-files.mjs';
-import { RUNNER_METRICS_COVERAGES, RUNNER_METRICS_REASON_CODES, RUNNER_METRICS_UNKNOWNS } from './workflow-exchange.mjs';
+import { RUNNER_METRICS_COVERAGES, RUNNER_METRICS_REASON_CODES, RUNNER_METRICS_UNKNOWNS, validateRunnerMetrics } from './workflow-exchange.mjs';
 
 const RUNNER_METRICS_SCHEMA = 'aifhub.runner_metrics.v1';
 const QA_RESULT_SCHEMA = 'aifhub.qa-result.v1';
@@ -139,20 +139,38 @@ async function declaredQaRoots(root, changeId, qaRoot) {
   } catch { throw collectorError('runner_metrics_output_rejected'); }
 }
 
+// Git reads repository location from the environment; a bogus GIT_DIR (or
+// work-tree/index override) can make even an existing repository answer
+// "not a git repository", which would silently skip the ignored/tracked
+// checks. The collector always asks git about the pristine project root, so
+// those overrides are stripped for every call.
+function gitEnv() {
+  const env = { ...process.env };
+  for (const key of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR', 'GIT_CONFIG_PARAMETERS']) delete env[key];
+  return env;
+}
+
 async function gitInWorkTree(root) {
+  let verdict;
   try {
-    const { stdout } = await exec('git', ['rev-parse', '--is-inside-work-tree'],
-      { cwd: root, windowsHide: true, maxBuffer: 64 * 1024, timeout: 10000 });
-    return stdout.toString('utf8').trim() === 'true';
+    verdict = await exec('git', ['rev-parse', '--is-inside-work-tree'],
+      { cwd: root, env: gitEnv(), windowsHide: true, maxBuffer: 64 * 1024, timeout: 10000 });
   } catch (error) {
-    // Only git's own "not a repository" verdict means tracked checks are
-    // vacuous. Every other failure (spawn error, permissions, dubious
-    // ownership, corrupt repository) leaves the ignored/tracked status
-    // unverifiable and must fail closed instead of skipping the checks.
-    const stderr = String(error?.stderr ?? '');
-    if (error?.code === 128 && /not a git repository/i.test(stderr)) return false;
-    throw error;
+    if (error?.code !== 128) throw error;
+    // Exit 128 has two very different meanings: an honest "no repository
+    // here" (no .git entry — tracked checks are vacuous) versus a repository
+    // entry git refuses to read (corrupt .git directory or gitfile, blocked
+    // by permissions — the ignored/tracked status is unverifiable and the
+    // guard must fail closed). The message is locale-dependent; the presence
+    // of the .git entry is not.
+    let dotGit = null;
+    try { dotGit = await lstat(path.join(root, '.git')); } catch (statError) {
+      if (statError?.code !== 'ENOENT') throw error;
+    }
+    if (dotGit !== null) throw error;
+    return false;
   }
+  return verdict.stdout.toString('utf8').trim() === 'true';
 }
 
 async function defaultTrackedCheck(root, output) {
@@ -160,13 +178,13 @@ async function defaultTrackedCheck(root, output) {
   // Inside a repository the check is authoritative and fail-closed: a failing
   // git call propagates so the guard rejects instead of assuming "untracked".
   const { stdout } = await exec('git', ['ls-files', '--cached', '-z', '--', output],
-    { cwd: root, windowsHide: true, maxBuffer: 1024 * 1024, timeout: 10000 });
+    { cwd: root, env: gitEnv(), windowsHide: true, maxBuffer: 1024 * 1024, timeout: 10000 });
   return stdout.split('\0').some((entry) => entry.length > 0);
 }
 
 async function outputActuallyIgnored(root, output) {
   const outcome = await exec('git', ['check-ignore', '-q', '--', output],
-    { cwd: root, windowsHide: true, maxBuffer: 64 * 1024, timeout: 10000 })
+    { cwd: root, env: gitEnv(), windowsHide: true, maxBuffer: 64 * 1024, timeout: 10000 })
     .then(() => true, (error) => {
       if (error.code === 1) return false; // git's own verdict: not ignored
       throw error; // git failed: cannot verify the destination is safe
@@ -210,6 +228,27 @@ async function assertNoFileShadow(root, output, lstatEntry) {
   }
 }
 
+// The leaf itself is part of the boundary: the only pre-existing content a
+// metrics destination may hold is a previous runner-metrics output. Anything
+// else already sitting at the path (review receipts, tracer decisions,
+// plan-compliance receipts, unrelated files) must not be silently replaced.
+async function assertLeafIsMetricsOutput(root, output) {
+  let info;
+  try { info = await lstat(path.join(root, output)); } catch (error) {
+    if (error?.code === 'ENOENT') return;
+    throw collectorError('runner_metrics_output_rejected');
+  }
+  if (!info.isFile()) throw collectorError('runner_metrics_output_rejected');
+  try {
+    const bytes = await readProviderFile(root, output, 4 * 1024 * 1024);
+    const parsed = bytes === null ? null : parseStrictJson(bytes.toString('utf8'));
+    if (parsed?.schema !== RUNNER_METRICS_SCHEMA) throw collectorError('runner_metrics_output_rejected');
+  } catch (error) {
+    if (error?.collectorCode) throw error;
+    throw collectorError('runner_metrics_output_rejected');
+  }
+}
+
 // The output must land in the fully gitignored `.ai-factory/state/**` area so
 // it can never surface as an untracked changed path in a QA snapshot, and it
 // must not collide with any control namespace a later reader depends on.
@@ -223,6 +262,7 @@ async function resolveOutputPath(root, changeId, requested, options) {
   if (!output.startsWith(`${STATE_ROOT}/`)) throw rejected();
   if (stateNamespaceConflict(output)) throw rejected();
   await assertNoFileShadow(root, output, (filename) => lstat(filename));
+  await assertLeafIsMetricsOutput(root, output);
   const qaRoot = await resolveQaRoot(root);
   if (withinCi(output, qaRoot)) throw rejected();
   for (const declared of await declaredQaRoots(root, changeId, qaRoot)) {
@@ -397,21 +437,48 @@ async function scanRuns(store, changeId, runId, notes, runReader) {
     }
     return { runs, skipped };
   };
+  // Run records are rewritten on every transition, so like the delivery
+  // members each scanned file gets a digest before/after its content read: a
+  // record updated mid-scan (stable name, new revision) must not survive as a
+  // silently mixed slice.
+  const digestPass = async (entries) => {
+    const map = new Map();
+    for (const entry of entries) {
+      try { map.set(entry.name, { ok: true, value: await fileDigest(store, `${folder}/${entry.name}`) }); } catch (error) {
+        map.set(entry.name, { ok: false, code: error?.code ?? 'unknown' });
+      }
+    }
+    return map;
+  };
+  const stableDigests = (first, second) => {
+    for (const [name, initial] of first) {
+      const final = second.get(name);
+      if (!initial.ok || !final?.ok || initial.value !== final.value) return false;
+    }
+    return true;
+  };
   const first = await listEntries(store, folder);
-  const { runs, skipped } = await readBatch(first);
+  const before = await digestPass(first);
+  const { runs, skipped: firstSkipped } = await readBatch(first);
+  let skipped = firstSkipped;
+  const after = await digestPass(first);
+  let race = !stableDigests(before, after);
   // Same completeness rule as the delivery members: a run published mid-scan
   // is read and joins attribution instead of silently narrowing the sample,
   // and any listing change marks the scan inconsistent.
   const second = await listEntries(store, folder);
-  let race = false;
   const late = second.filter((entry) => !first.some((entry2) => entry2.name === entry.name));
   for (const entry of first) {
     if (!second.some((entry2) => entry2.name === entry.name)) race = true;
   }
   if (late.length > 0) {
     race = true;
+    const lateBefore = await digestPass(late);
     const more = await readBatch(late);
+    skipped += more.skipped;
     runs.push(...more.runs);
+    const lateAfter = await digestPass(late);
+    if (!stableDigests(lateBefore, lateAfter)) race = true;
   }
   if (race) note(notes, 'scan_inconsistent');
   return { runs, scanned: second.length, skipped, race };
@@ -651,6 +718,14 @@ export async function collectRunnerMetrics(options = {}) {
       unknowns: [...unknowns].sort(),
       coverage: parsed.includeQa ? RUNNER_METRICS_COVERAGES[1] : RUNNER_METRICS_COVERAGES[0]
     };
+    // Final self-check before the single write: the aggregate must satisfy the
+    // same runtime contract the export gate applies (per-record safe integers
+    // can still overflow into an unsafe sum). An unpublishable aggregate is a
+    // hard failure, never a silently written collected file.
+    try { validateRunnerMetrics(metrics); } catch (error) {
+      if (error?.exchangeCode === 'invalid_runner_metrics') throw collectorError('runner_metrics_aggregate_unrepresentable');
+      throw error;
+    }
     await writeProviderFile(root, output, metrics);
     const qaUnreadable = notes.has('qa_results_unreadable');
     return {

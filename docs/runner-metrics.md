@@ -51,15 +51,27 @@ fingerprint-ов), вне теней над корневыми файлами st
 поверх контрольного файла), вне configured QA root (default `.ai-factory/qa`;
 `paths.qa` из `.ai-factory/config.yaml`, небезопасное значение откатывается к
 дефолту) и declared QA input roots, вне tracked-путей — иначе
-`runner_metrics_output_rejected` до первой записи. Guard fail-closed: если
-безопасность назначения не может быть проверена (enroll-ленный QA без читаемого
-manifest-указателя — включая состояние после сбоя публикации, когда
-`enrollment.json` уже записан, а `manifest.json` ещё нет; ошибка git внутри
-репозитория — EPERM, dubious ownership, повреждённый `.git`; negated gitignore
-правило), запись отвергается, а не разрешается по умолчанию; только честный
-вердикт git «not a git repository» делает tracked/ignore-проверки недостижимыми.
-Ограничение: change с id `exchange` не может собирать output (его каталог
-зарезервирован под salt-namespace). Метрики никогда не становятся
+`runner_metrics_output_rejected` до первой записи. Лист назначения — часть
+границы: единственное допустимое уже существующее содержимое — прежний
+runner-metrics output (файл с `schema: aifhub.runner_metrics.v1`); review/tracer
+receipts, plan-compliance и любые чужие файлы не перезаписываются никогда.
+Guard fail-closed: если безопасность назначения не может быть проверена
+(enroll-ленный QA без читаемого manifest-указателя — включая состояние после
+сбоя публикации, когда `enrollment.json` уже записан, а `manifest.json` ещё
+нет; ошибка git внутри репозитория — EPERM, dubious ownership, повреждённый
+`.git`-каталог или gitfile; negated gitignore правило), запись отвергается, а
+не разрешается по умолчанию. Git вызывается с очищенным окружением
+(`GIT_DIR`/`GIT_WORK_TREE`/`GIT_INDEX_FILE`/`GIT_COMMON_DIR`/
+`GIT_CONFIG_PARAMETERS` удаляются — отравленный env не может заставить git
+отрицать реальный репозиторий), а вердикт «not a git repository» засчитывается
+только при отсутствии `.git`-входа в корне (сообщение locale-зависимо, вход —
+нет); `.git` есть, а git его не читает — fail-closed. Только в этом честном
+случае tracked/ignore-проверки недостижимы. Ограничение: change с id `exchange`
+не может собирать output (его каталог зарезервирован под salt-namespace).
+Агрегат проходит финальную self-проверку тем же runtime-контрактом, что и
+export-гейт: сумма safe-integer счётчиков, превысившая `MAX_SAFE_INTEGER`,
+даёт `runner_metrics_aggregate_unrepresentable` (exit 2) вместо записи
+невалидного файла. Метрики никогда не становятся
 material input: дефолтный путь не входит ни в declared QA roots, ни в закрытые
 metadata-namespace (`<id>/delivery`, `<id>/status.json` любого change), поэтому
 существование output-файла не меняет binding fingerprints и snapshot digest-ы,
@@ -117,7 +129,11 @@ attribution). Provenance-счётчики `requests_scanned`/`journals_scanned`/
 `runs_scanned`/`unreadable`-вклад `members_skipped` отражают финальный
 листинг (наблюдаемое конечное состояние реестра), а не сумму двух проходов:
 стабильно нечитаемое имя считается один раз, late member входит в scanned
-наравне с `requests.total`. Классификация ошибок чтения:
+наравне с `requests.total`. Run-записи переписываются на каждом transition,
+поэтому каждый отсканированный run-файл получает digest до/после чтения:
+обновление записи mid-scan (стабильное имя, новая ревизия) даёт
+`scan_inconsistent`, как и изменение листинга; skipped поздней порции входят в
+`members_skipped`. Классификация ошибок чтения:
 `file-changed`/`unsupported-file`/`delivery-request-missing` →
 race-класс (`scan_inconsistent`); `invalid-*`/`delivery-*` (отказ валидации
 содержимого) → `member_skipped`.
