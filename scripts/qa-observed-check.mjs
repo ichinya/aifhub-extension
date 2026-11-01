@@ -3,6 +3,7 @@
 // authority stay with their existing owners.
 import { open } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
+import path from 'node:path';
 import { digest, canonical, identifier, portablePath, requireValue, fields, storeFor, WorkflowError } from './workflow-state-store.mjs';
 import { qaStore, qaTarget, qaFailure, withinCi, jsonValue, QA_LIMITS } from './qa-manifest-store.mjs';
 import { observeQaSnapshot, checkFingerprints } from './qa-manifest-inputs.mjs';
@@ -140,4 +141,162 @@ export function observationRegistry(rootDir, changeId, options = {}) {
     return record && record.state === 'complete' ? registryView(record) : null;
   }
   return { lookup, qa: target.qa };
+}
+
+// Launch the verifier declared by the envelope through the injectable execFile.
+// The stop cause is observed explicitly from the transport error: an abort
+// rejection is `cancelled`, the configured timeout is `timeout`, a numeric exit
+// code is `failed` — no killed+signal heuristics.
+function runVerifier(envelope, store, options) {
+  const root = store.root;
+  const cwd = envelope.effective_cwd === '.' ? root : path.resolve(root, envelope.effective_cwd);
+  const relative = path.relative(root, cwd);
+  requireValue(relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative)), 'observation-target-mismatch', true);
+  const timeoutMs = Number.isInteger(options.timeoutMs) && options.timeoutMs > 0 ? options.timeoutMs : 2000;
+  const spawn = options.execFile ?? execFile;
+  return new Promise((resolve, reject) => {
+    spawn(envelope.command.argv[0], envelope.command.argv.slice(1), {
+      cwd, timeout: timeoutMs, killSignal: 'SIGTERM', windowsHide: true,
+      ...(options.signal ? { signal: options.signal } : {}),
+    }, (error, stdout, stderr) => {
+      if (error?.code === 'ABORT_ERR') return resolve({ outcome: 'cancelled', exit_code: null, stop: 'cancelled' });
+      if (error?.killed === true && error.code === null && typeof error.signal === 'string')
+        return resolve({ outcome: 'timeout', exit_code: null, stop: 'timeout' });
+      if (typeof error?.code === 'number') return resolve({ outcome: 'failed', exit_code: error.code, stop: 'exit' });
+      if (error) return reject(new WorkflowError('observation-exec-failed', true));
+      resolve({ outcome: 'completed', exit_code: 0, stop: null, stdout, stderr });
+    });
+  });
+}
+
+// The adapter authors the only honest gate block: `pass` exclusively for a
+// completed zero-exit run. Every negative outcome is a `fail` block — never
+// `warn`, because the publisher accepts any non-`fail` gate.
+function observedGateBlock(gate, envelope) {
+  const passed = envelope.outcome === 'completed' && envelope.exit_code === 0;
+  const status = passed ? 'pass' : 'fail';
+  const markdown = renderGateResultBlock(createGateResult({ gate, status,
+    blockers: passed ? [] : [{ id: 'hook-observation', severity: 'error',
+      summary: `observed run ${envelope.run_id} finished with outcome ${envelope.outcome}` }],
+    affectedFiles: [],
+    suggestedNext: passed ? null : { command: '/aif-fix', reason: `observed check ${envelope.check_id} reported ${envelope.outcome}` } }));
+  return { status, markdown: `${markdown}\n` };
+}
+
+function buildReceipt(envelope, worktreeIdentity, fingerprintDigest, commandDigest) {
+  const artifacts = {};
+  for (const relative of Object.keys(envelope.artifacts).sort()) artifacts[relative] = envelope.artifacts[relative];
+  const receipt = { schema: OBSERVED_CHECK_RECEIPT_SCHEMA, run_id: envelope.run_id, check_id: envelope.check_id,
+    worktree_identity: worktreeIdentity, input_fingerprints_digest: fingerprintDigest,
+    command_digest: commandDigest, exit_code: envelope.exit_code, outcome: envelope.outcome, artifacts };
+  return { receipt, bytes: Buffer.from(JSON.stringify(receipt)) };
+}
+
+async function recordObservedResult(store, options, envelope, check, plan) {
+  const recorded = await recordBoundEvidence({ ...options, rootDir: store.root, changeId: store.target.id,
+    flow: store.target.flow, namespace: store.target.namespace, gate: check.gate, checkId: check.id,
+    resultId: plan.resultId, markdown: plan.markdown, receiptPath: plan.receiptPath,
+    execution: { kind: 'host-observed', exit_code: envelope.exit_code, outcome: envelope.outcome } });
+  requireValue(recorded.ok, recorded.code ?? 'observation-incomplete', true);
+  return recorded;
+}
+
+// One custody window: validate -> pre-observe -> run -> post-observe -> receipt
+// -> registry complete -> bound record. Nothing survives a digest inequality.
+export async function ingestObservedRun(versionedResult, options = {}) {
+  try {
+    requireValue(options.rootDir, 'invalid-input', true);
+    const envelope = validateEnvelope(versionedResult);
+    if (envelope === null)
+      return { ok: false, enrolled: false, state: 'blocked', code: 'hook-capability-unsupported',
+        affected_checks: [], authorizes: [], errors: [{ code: 'hook-capability-unsupported',
+          message: 'QA binding blocked: hook-capability-unsupported.' }] };
+    options = { ...options, readBudget: options.readBudget ?? { bytes: 0 } };
+    const store = await qaStore(options);
+    const raw = await storeFor(options.rootDir);
+    const paths = observationPaths(store.qa, envelope.run_id);
+    requireValue(withinCi(envelope.report_path, paths.dir), 'observation-envelope-invalid', true);
+    const resultId = observedResultId(envelope.run_id);
+    // The registry lock is the adapter's own lock. The recorder takes the QA lock
+    // itself after this lock has been released: no nested capture.
+    const plan = await raw.lock(paths.lock, async () => {
+      const existing = await readRegistryRecord(store, paths, envelope.run_id);
+      if (existing && existing.state === 'complete') {
+        requireValue(canonical(existing.payload) === canonical(envelope), 'observation-conflict', true);
+        if (await store.bytes(`${store.qa}/results/${resultId}.json`) !== null)
+          return { kind: 'replay', existing };
+        return { kind: 'record-only', existing }; // crash after registry-complete, before the record
+      }
+      if (existing) requireValue(existing.payload_digest === digest(envelope), 'observation-conflict', true);
+      else await saveRegistryRecord(raw, paths, { schema: OBSERVATION_RECORD_SCHEMA, state: 'pending',
+        run_id: envelope.run_id, check_id: envelope.check_id, change_id: envelope.change_id,
+        result_id: resultId, payload: envelope, payload_digest: digest(envelope) });
+      const manifest = await store.manifest();
+      const check = manifest.payload.checks.find(c => c.id === envelope.check_id);
+      requireValue(check && envelope.change_id === store.target.id, 'observation-target-mismatch', true);
+      requireValue(envelope.manifest_digest === manifest.manifest_digest, 'observation-stale-gates', true);
+      const current = await observeQaSnapshot(store, manifest.payload, options);
+      requireValue(current.worktree_identity === envelope.worktree_identity, 'observation-stale-source', true);
+      requireValue(current.digest === envelope.snapshot_digest, 'observation-stale-source', true);
+      requireValue(digest(current.modules) === envelope.modules_digest, 'observation-stale-source', true);
+      const fingerprints = await checkFingerprints(manifest.payload, current, options);
+      const fingerprintDigest = digest({ [check.id]: fingerprints[check.id] });
+      requireValue(fingerprintDigest === envelope.fingerprints_digest, 'observation-stale-gates', true);
+      const effectiveCommand = options.providers?.checkDefinition
+        ? (await options.providers.checkDefinition(check)).command : check.command;
+      const commandDigest = digest(effectiveCommand);
+      await raw.target(envelope.report_path, true);
+      const observed = await runVerifier(envelope, store, options);
+      requireValue(observed.outcome === envelope.outcome && observed.exit_code === envelope.exit_code,
+        'observation-declared-mismatch', true);
+      let reportBytes = null;
+      if (envelope.report_sha256 !== null) {
+        reportBytes = await store.bytes(envelope.report_path);
+        requireValue(reportBytes !== null && digest(reportBytes) === envelope.report_sha256, 'observation-declared-mismatch', true);
+      }
+      const second = await observeQaSnapshot(store, manifest.payload, options);
+      requireValue(second.digest === current.digest, 'observation-custody-race', true);
+      for (const [relative, hash] of Object.entries(envelope.artifacts)) {
+        const data = await store.bytes(relative);
+        requireValue(data !== null && digest(data) === hash, 'observation-declared-mismatch', true);
+      }
+      if (reportBytes !== null) {
+        const reread = await store.bytes(envelope.report_path);
+        requireValue(reread !== null && reread.equals(reportBytes), 'observation-custody-race', true);
+      }
+      const { receipt, bytes } = buildReceipt(envelope, current.worktree_identity, fingerprintDigest, commandDigest);
+      await writeExclusive(raw, paths.receipt, bytes);
+      await saveRegistryRecord(raw, paths, { schema: OBSERVATION_RECORD_SCHEMA, state: 'complete',
+        run_id: envelope.run_id, check_id: envelope.check_id, change_id: envelope.change_id,
+        result_id: resultId, payload: envelope, payload_digest: digest(envelope),
+        worktree_identity: receipt.worktree_identity, exit_code: receipt.exit_code,
+        outcome: receipt.outcome, receipt_path: paths.receipt, receipt_sha256: digest(bytes) });
+      const block = observedGateBlock(check.gate, envelope);
+      return { kind: 'fresh', check, block, receiptSha256: digest(bytes) };
+    });
+    if (plan.kind === 'replay') {
+      // Exact replay is a no-op: no verifier relaunch, no freshness update, no new record.
+      return { ok: true, replayed: true, recorded: false, accepted: false, state: 'valid',
+        ...registryView(plan.existing), authorizes: [] };
+    }
+    if (plan.kind === 'record-only') {
+      // Crash between the registry-complete write and the bound record: re-run only
+      // the record stage with the same deterministic id; the recorder is idempotent
+      // for canonically equal content and rejects anything else.
+      const manifest = await store.manifest();
+      const check = manifest.payload.checks.find(c => c.id === plan.existing.check_id);
+      requireValue(check, 'observation-target-mismatch', true);
+      const block = observedGateBlock(check.gate, envelope);
+      await recordObservedResult(store, options, envelope, check,
+        { resultId, receiptPath: paths.receipt, markdown: block.markdown });
+      return { ok: true, replayed: true, recorded: true, accepted: false, state: 'valid',
+        ...registryView(plan.existing), authorizes: [] };
+    }
+    await recordObservedResult(store, options, envelope, plan.check,
+      { resultId, receiptPath: paths.receipt, markdown: plan.block.markdown });
+    return { ok: true, replayed: false, recorded: true, accepted: false, state: 'valid',
+      result_id: resultId, check_id: plan.check.id, gate: plan.check.gate, run_id: envelope.run_id,
+      receipt_path: paths.receipt, receipt_sha256: plan.receiptSha256, outcome: envelope.outcome,
+      exit_code: envelope.exit_code, status: plan.block.status, authorizes: [] };
+  } catch (error) { return qaFailure(error); }
 }
