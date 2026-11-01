@@ -25,7 +25,7 @@ const gateBody = (gate = 'verify', status = 'pass') => `${renderGateResultBlock(
 // the real fixture verifier copied into the project, a real child process per
 // verifier launch through the injectable execFile, and no Git/network anywhere.
 async function observedFixture({ mode = 'pass', requiresObserved = true, ignoredRaw = [], runId = 'run-1',
-  gate = 'verify', flow = 'openspec', execFailpoint = null, execThrow = false, capabilities = {} } = {}) {
+  gate = 'verify', gates = null, flow = 'openspec', execFailpoint = null, execThrow = false, capabilities = {} } = {}) {
   const rootDir = await realpath(await mkdtemp(path.join(os.tmpdir(), 'qa227-')));
   roots.push(rootDir);
   const verifierRel = 'tools/observed-verifier.mjs';
@@ -36,19 +36,21 @@ async function observedFixture({ mode = 'pass', requiresObserved = true, ignored
   await writeFile(path.join(rootDir, verifierRel), verifierBytes);
   // The verifier exists in the project from the start, so definition-byte drift
   // is a plain file mutation (the AC2 attribution channel).
-  const model = { files: { 'src/a.mjs': bytes('a'), '.ai-factory/config.yaml': bytes('rules:\n  base: base.md\n'),
+  const model = { files: { 'src/a.mjs': bytes('a'), 'src/b.mjs': bytes('b'), '.ai-factory/config.yaml': bytes('rules:\n  base: base.md\n'),
     [verifierRel]: verifierBytes },
     ignored_names: [], modules: { helper: digest('helper') }, worktree_identity: digest(rootDir), actual_diff: digest('same HEAD/diff') };
   const toolchain = [{ name: 'fake-node', sha256: digest('runtime') }];
-  const checks = [{ id: 'check-verify', gate, profile: 'declared.v1', dependencies_complete: true,
-    inputs: ['src/a.mjs'], requires_observed: requiresObserved,
-    command: { argv: [process.execPath, verifierRel, '--mode', mode, '--report', reportRel, '--check', 'check-verify'],
-      cwd: '.', definition: verifierRel }, toolchain, env_inputs: [] }];
+  const gateList = gates ?? [gate];
+  const checks = gateList.map((gateName, index) => ({ id: `check-${gateName}`, gate: gateName,
+    profile: 'declared.v1', dependencies_complete: true,
+    inputs: index ? ['src/b.mjs'] : ['src/a.mjs'], requires_observed: requiresObserved,
+    command: { argv: [process.execPath, verifierRel, '--mode', mode, '--report', reportRel, '--check', `check-${gateName}`],
+      cwd: '.', definition: verifierRel }, toolchain, env_inputs: [] }));
   const options = { rootDir, flow, changeId: 'sample', scope: ['src', 'tools'], checks,
     // Library contract semantics: no environment option means process.env, and a
     // cold node.exe spawn must survive a loaded CI, hence the per-mode deadline.
     timeoutMs: mode === 'hang' ? 2000 : 15000,
-    providers: { requirements: async () => ({ gates: [gate], independent_roles: [], evidence: [] }), toolchain: async () => toolchain },
+    providers: { requirements: async () => ({ gates: [...gateList], independent_roles: [], evidence: [] }), toolchain: async () => toolchain },
     SnapshotProvider: async ({ payload }) => {
       const files = { ...model.files };
       for (const root of allDeclaredRoots(payload)) if (!Object.keys(files).some(p => p === root || p.startsWith(`${root}/`))) files[root] = null;
@@ -665,6 +667,88 @@ describe('review custody contracts (round 2)', () => {
     assert.equal(resumed.ok, false);
     assert.equal(resumed.code, 'observation-stale-source');
     assert.equal(existsSync(resultFile), false);
+  });
+  it('a caller-owned environment mutated in flight cannot change the spawned environment', async () => {
+    const f = await observedFixture();
+    f.checks[0].env_inputs = ['CI'];
+    const callerEnv = { CI: 'declared' };
+    f.options.environment = callerEnv;
+    await f.prepare();
+    const original = f.options.execFile;
+    let spawnedCI = null;
+    f.options.execFile = (file, argv, opts, cb) => {
+      if (file === 'git') return original(file, argv, opts, cb);
+      callerEnv.CI = 'mutated-in-flight'; // between pre-fingerprint and spawn...
+      spawnedCI = opts.env.CI;            // ...the spawn must still see the defensive copy
+      return original(file, argv, opts, (error, stdout, stderr) => {
+        callerEnv.CI = 'declared';        // ...and restored before the post reads
+        cb(error, stdout, stderr);
+      });
+    };
+    const ingested = await f.ingest(await f.issue(await f.compose()));
+    assert.equal(ingested.ok, true, JSON.stringify(ingested));
+    assert.equal(spawnedCI, 'declared');
+    assert.equal((await f.publish({ HostObservationRegistry: f.registry })).accepted, true);
+  });
+  it('an in-place provider roles mutation cannot pass the pre/post owner comparison', async () => {
+    const f = await observedFixture({ gates: ['verify', 'review'] });
+    const roles = [{ check_id: 'check-verify', role: 'verify' }, { check_id: 'check-review', role: 'review' }];
+    f.options.providers.requirements = async () => ({ gates: ['verify', 'review'], independent_roles: roles, evidence: [] });
+    await f.prepare({ independentRoles: roles });
+    const original = f.options.execFile;
+    f.options.execFile = (file, argv, opts, cb) => {
+      if (file !== 'git') roles.reverse(); // in-place mutation while the run is in flight
+      return original(file, argv, opts, cb);
+    };
+    const result = await f.ingest(await f.issue(await f.compose()));
+    // Both subset checks still pass after the reorder; only the copied pre/post
+    // owner snapshots catch the drift.
+    assert.equal(result.ok, false);
+    assert.equal(result.code, 'observation-custody-race');
+    assert.equal((await f.records()).length, 0);
+  });
+  it('a transport without a stop mechanism refuses typed instead of hanging the lock', async () => {
+    const f = await observedFixture({ mode: 'hang' });
+    f.options.timeoutMs = 200;
+    await f.prepare();
+    const result = await f.ingest(await f.issue(await f.compose()), {
+      execFile: () => ({ /* no kill, no callback ever */ }) });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, 'observation-stop-unsupported');
+    assert.equal(await f.registry.lookup('run-1'), null);
+  });
+  it('a failing stop is normalized and a killed transport gets a bounded grace window', async () => {
+    const f = await observedFixture({ mode: 'hang' });
+    f.options.timeoutMs = 200;
+    await f.prepare();
+    const failing = await f.ingest(await f.issue(await f.compose()), {
+      execFile: () => ({ kill() { throw new Error('no'); } }) });
+    assert.equal(failing.ok, false);
+    assert.equal(failing.code, 'observation-exec-failed');
+    const grace = await f.ingest(await f.issue(await f.compose()), {
+      execFile: () => ({ kill() { /* stop ok, but no callback ever fires */ } }) });
+    assert.equal(grace.ok, false);
+    assert.equal(grace.code, 'observation-exec-failed');
+    assert.equal(await f.registry.lookup('run-1'), null);
+  });
+  it('a reference budget overflow refuses before any custody write', async () => {
+    const f = await observedFixture();
+    const extra = {};
+    await mkdir(path.join(f.rootDir, f.qa, 'attest'), { recursive: true });
+    for (let i = 0; i < QA_LIMITS.refs - 1; i++) {
+      const rel = `${f.qa}/attest/file-${i}.txt`;
+      f.model.files[rel] = bytes(`attested-${i}`);
+      await writeFile(path.join(f.rootDir, rel), `attested-${i}`);
+      extra[rel] = digest(`attested-${i}`);
+    }
+    await f.prepare();
+    const envelope = await f.issue(await f.compose());
+    const declared = { ...envelope, artifacts: { ...envelope.artifacts, ...extra } };
+    const result = await f.ingest(declared);
+    assert.equal(result.ok, false);
+    assert.equal(result.code, 'qa-refs-limit');
+    assert.equal(await f.registry.lookup('run-1'), null);
+    assert.equal(existsSync(path.join(f.rootDir, receiptPath(f))), false);
   });
   it('orphan report bytes from an earlier attempt cannot complete a run that wrote no report', async () => {
     const f = await observedFixture({ mode: 'noreport' });
