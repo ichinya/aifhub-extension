@@ -227,7 +227,13 @@ export async function executionCommand(action,input,options={}) {
     if(input.instruction_composition_status!==undefined)run.instruction_composition_status=input.instruction_composition_status;
     if(action==='checkpoint') {
       requireValue(run.lifecycle==='active' && run.status==='started','run-terminal',true);
-      run.checkpoint={worktree:snapshot,progress:progressRecord(input.progress)}; advance(run); await saveRun(store,filename,run); return view(run);
+      // Per-checkpoint binding: the composition digest observed at this
+      // checkpoint stays addressable from the stored checkpoint even after
+      // later actions advance the run-level field (review R4).
+      run.checkpoint={worktree:snapshot,progress:progressRecord(input.progress),
+        ...(input.instruction_composition_digest!==undefined?{instruction_composition_digest:input.instruction_composition_digest}:{}),
+        ...(input.instruction_composition_status!==undefined?{instruction_composition_status:input.instruction_composition_status}:{})};
+      advance(run); await saveRun(store,filename,run); return view(run);
     }
     if(action.startsWith('attempt-')) {
       requireValue(run.kind==='single' && run.role==='fix' && run.status==='started' && run.lifecycle==='active','fix-run-required');

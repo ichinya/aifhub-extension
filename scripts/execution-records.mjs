@@ -185,7 +185,8 @@ export function validateRun(run, {predecessors=[]}={}) {
   integer(run.version); enumeration(run.status,['started','completed','failed','blocked','cancelled','timed_out','accepted']);
   compositionDigest(run.instruction_composition_digest); compositionStatus(run.instruction_composition_status);
   contextRecord(run.context); snapshot(run.initial_worktree);
-  fields(run.checkpoint,['worktree','progress']); snapshot(run.checkpoint.worktree); progressRecord(run.checkpoint.progress);
+  fields(run.checkpoint,['worktree','progress'],['instruction_composition_digest','instruction_composition_status']); snapshot(run.checkpoint.worktree); progressRecord(run.checkpoint.progress);
+  compositionDigest(run.checkpoint.instruction_composition_digest); compositionStatus(run.checkpoint.instruction_composition_status);
   requireValue(canonical(run.initial_worktree.submodules ?? {}) === canonical(run.checkpoint.worktree.submodules ?? {}), 'invalid-state');
   if(run.result) resultRecord(run.result,run,run.task_id);
   if(run.accepted_by!==undefined) requireValue(run.accepted_by===run.owner && run.status==='accepted','invalid-state');
