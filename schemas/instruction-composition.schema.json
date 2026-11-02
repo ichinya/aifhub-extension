@@ -121,6 +121,10 @@
             "type": "integer",
             "minimum": 0
           },
+          "declared_index": {
+            "type": "integer",
+            "minimum": 0
+          },
           "ordinal": {
             "type": "integer",
             "minimum": 0
@@ -135,6 +139,7 @@
           "position",
           "path",
           "offset",
+          "declared_index",
           "ordinal",
           "component_index"
         ]

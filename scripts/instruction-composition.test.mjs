@@ -435,3 +435,135 @@ describe('instruction composition QA namespace', () => {
     }
   });
 });
+
+describe('instruction composition review coverage', () => {
+  it('malformed extension manifests degrade instead of throwing (producer never throws)', async () => {
+    const ledger = JSON.stringify({ agents: [{ id: 'claude' }] });
+    for (const [manifest, expected] of [
+      ['{ "skills": "oops" }', 'extension-manifest-corrupt'],
+      ['{ "injections": 5 }', 'extension-manifest-corrupt'],
+      ['{ "agentFiles": {} }', 'extension-manifest-corrupt'],
+      ['{ "skills": { "a": 1 } }', 'extension-manifest-corrupt'],
+      ['"text"', 'extension-manifest-corrupt'],
+      ['{}', 'extension-surface-empty'],
+      ['{ "skills": [] }', 'extension-surface-empty'],
+    ]) {
+      await put('.ai-factory.json', ledger);
+      await put('.ai-factory/extensions/aifhub-extension/extension.json', manifest);
+      const baseline = await buildCompositionBaseline(root);
+      assert.equal(baseline.status, 'unavailable', manifest);
+      assert.equal(baseline.digest, null, manifest);
+      assert.equal(baseline.degradation === 'extension-manifest-corrupt' || baseline.degradation === 'extension-surface-empty',
+        true, `${manifest}: ${baseline.degradation}`);
+      assert.equal(baseline.degradation, expected, manifest);
+    }
+  });
+
+  it('injection-only entrypoints and their context layers join the surface (review F1)', async () => {
+    await put('.ai-factory.json', JSON.stringify({ agents: [{ id: 'claude' }] }));
+    await put('.ai-factory/extensions/aifhub-extension/extension.json', JSON.stringify({
+      injections: [{ target: 'aif-fix', position: 'prepend', file: './injections/core/aif-fix-head.md' }],
+    }));
+    await put('.ai-factory/extensions/aifhub-extension/injections/core/aif-fix-head.md', 'fix head\n');
+    await mkdir(path.dirname(path.join(root, '.claude/skills/aif-fix/SKILL.md')), { recursive: true });
+    await mkdir(path.join(root, '.claude/agents'), { recursive: true });
+    await put('.claude/skills/aif-fix/SKILL.md', '# fix body outside markers\n<!-- aif-ext:aifhub-extension:aif-fix:prepend:start -->\nfix head\n<!-- aif-ext:aifhub-extension:aif-fix:prepend:end -->\n');
+    await put('.ai-factory/skill-context/aif-fix/SKILL.md', 'fix individual context\n');
+    const baseline = await buildCompositionBaseline(root);
+    const manifest = manifestFor(baseline, '.claude');
+    assert.equal(manifest.status, 'verified');
+    const entrypoint = componentOf(manifest, 'runtime_skill_entrypoint')[0];
+    assert.equal(entrypoint.path, '.claude/skills/aif-fix/SKILL.md');
+    assert.equal(entrypoint.sha256, digest(Buffer.from('# fix body outside markers\n<!-- aif-ext:aifhub-extension:aif-fix:prepend:start -->\nfix head\n<!-- aif-ext:aifhub-extension:aif-fix:prepend:end -->\n')));
+    assert.deepEqual(manifest.payload.skill_context_order.map(entry => entry.role), ['project_skill_context_individual']);
+    // Editing the upstream body outside the marker block changes the digest.
+    const before = baseline.digest;
+    await put('.claude/skills/aif-fix/SKILL.md', '# changed body outside markers\n');
+    assert.notEqual((await buildCompositionBaseline(root)).digest, before);
+  });
+
+  it('injection_order offsets are byte offsets and carry the declared index (review F8)', async () => {
+    const nonAscii = 'предисловие-перед-маркером\n';
+    const entrypointBody = `${nonAscii}<!-- aif-ext:aifhub-extension:aif-implement:prepend:start -->\n${INJECTION_SOURCE}<!-- aif-ext:aifhub-extension:aif-implement:prepend:end -->\n`;
+    await put('.claude/skills/aif-implement/SKILL.md', entrypointBody);
+    const baseline = await buildCompositionBaseline(root);
+    const order = manifestFor(baseline, '.claude').payload.injection_order[0];
+    const [start] = injectionMarkerPairOf('aif-implement', 'prepend');
+    assert.equal(order.offset, Buffer.from(entrypointBody, 'utf8').indexOf(Buffer.from(start, 'utf8')));
+    assert.notEqual(order.offset, entrypointBody.indexOf(start)); // UTF-16 index differs for non-ASCII prefixes
+    assert.equal(order.declared_index, 0);
+    assert.equal(order.ordinal, 0);
+  });
+
+  it('consumption re-hashes the whole prepared surface and binds declarations to prepared hashes (review F10)', async () => {
+    const baseline = await buildCompositionBaseline(root);
+    await prepareCompositionAttempt(root, 'change-f10', 'attempt-1', baseline);
+    const referencePath = path.join(root, '.ai-factory/extensions/aifhub-extension/injections/references/aif-implement/openspec-native.md');
+    const original = await readFile(referencePath, 'utf8');
+    await writeFile(referencePath, `${original}changed-after-prepare\n`);
+    const manifest = manifestFor(baseline, '.claude');
+    const required = requiredDeclaration(manifest);
+    const staleDeclaration = await recordCompositionConsumption(root, 'change-f10', {
+      attemptId: 'attempt-1', runtimeId: '.claude', declaration: { references: required },
+    });
+    // Extension-layer bytes changed after prepare: stale, even though the
+    // declaration echoes the prepared hashes.
+    assert.equal(staleDeclaration.status, 'stale');
+    assert.equal(staleDeclaration.assessment.freshness, 'stale');
+    assert.ok(staleDeclaration.rehash.some(entry => entry.path.endsWith('openspec-native.md') && entry.match === false));
+    // New bytes attested against the old prepared snapshot cannot verify.
+    const forgedCurrent = required.map(reference => reference.path.endsWith('openspec-native.md')
+      ? { path: reference.path, sha256: digest(Buffer.from(`${original}changed-after-prepare\n`)) } : reference);
+    const forgedResult = await recordCompositionConsumption(root, 'change-f10', {
+      attemptId: 'attempt-1', runtimeId: '.claude', declaration: { references: forgedCurrent },
+    });
+    assert.equal(forgedResult.status, 'stale'); // rehash still flags the drift
+    await writeFile(referencePath, original);
+    const restored = await recordCompositionConsumption(root, 'change-f10', {
+      attemptId: 'attempt-1', runtimeId: '.claude', declaration: { references: required },
+    });
+    assert.equal(restored.status, 'verified');
+  });
+
+  it('consumption inherits prepared incompleteness and rejects a foreign prepared record (review F6/F11)', async () => {
+    await rm(path.join(root, '.claude/skills/aif-implement/SKILL.md'));
+    const incomplete = await buildCompositionBaseline(root);
+    assert.equal(incomplete.status, 'incomplete');
+    await prepareCompositionAttempt(root, 'change-f6', 'attempt-1', incomplete);
+    const consumed = await recordCompositionConsumption(root, 'change-f6', { attemptId: 'attempt-1', runtimeId: '.claude' });
+    assert.equal(consumed.status, 'incomplete');
+    assert.equal(consumed.assessment.completeness, 'fail');
+    assert.ok(consumed.reasons.includes('prepared-incomplete'));
+    assert.ok(consumed.reasons.some(reason => reason.startsWith('prepared-gap:')));
+    await assert.rejects(
+      () => recordCompositionConsumption(root, 'change-f6', {
+        attemptId: 'attempt-1', runtimeId: '.claude', expectedIndexDigest: 'c'.repeat(64),
+      }),
+      /composition-prepared-mismatch/,
+    );
+    // Matching index digest, different runtime: the .codex prepared surface is
+    // verified in this fixture, so the consumption is honest unverified.
+    const otherRuntime = await recordCompositionConsumption(root, 'change-f6', {
+      attemptId: 'attempt-1', runtimeId: '.codex', expectedIndexDigest: incomplete.digest,
+    });
+    assert.equal(otherRuntime.status, 'unverified');
+    await assert.rejects(
+      () => recordCompositionConsumption(root, 'change-f6', { attemptId: 'missing-attempt', runtimeId: '.claude' }),
+      /composition-prepared-missing/,
+    );
+  });
+
+  it('prepared records are deterministic: retries rewrite identical CAS content (review F15)', async () => {
+    const baseline = await buildCompositionBaseline(root);
+    const first = await prepareCompositionAttempt(root, 'change-det', 'attempt-1', baseline);
+    const second = await prepareCompositionAttempt(root, 'change-det', 'attempt-1', baseline);
+    assert.deepEqual(second, first);
+    const store = await compositionStore(root, 'change-det');
+    assert.equal((await store.readConsumptions('attempt-1', '.claude')).length, 0);
+  });
+});
+
+function injectionMarkerPairOf(target, position) {
+  const prefix = `<!-- aif-ext:aifhub-extension:${target}:${position}:`;
+  return [`${prefix}start -->`, `${prefix}end -->`];
+}

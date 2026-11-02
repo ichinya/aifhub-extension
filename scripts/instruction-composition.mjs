@@ -75,6 +75,9 @@ async function readBounded(root, relative) {
   }
   try { return { code: null, data: await readFile(current) }; }
   catch (error) {
+    // ENOENT between the per-segment lstat and the content read is a lost race,
+    // not an internal bug (review F13).
+    if (error.code === 'ENOENT') return { code: 'absent' };
     if (['EACCES', 'EPERM', 'EISDIR'].includes(error.code)) return { code: 'unreadable' };
     throw error;
   }
@@ -149,9 +152,19 @@ async function collectRuntimeComposition(root, extension, runtimeIdValue, dirs) 
     };
     return { payload: manifest, status: 'unavailable' };
   }
-  const skillTargets = [...new Set((extension.skills ?? []).map(skill => path.posix.basename(String(skill))))].sort(compareStrings);
-  const unsafe = value => !/^[\w-]+$/.test(value);
-  requireValue(skillTargets.every(target => !unsafe(target)), 'unsafe-composition-manifest');
+  // Composition surface (review F1): published entrypoints and their
+  // skill-context layers come from the union of extension.skills and the
+  // injection targets — the main implement/fix/plan/verify entrypoints are
+  // declared only as injection targets, and their full SKILL.md body outside
+  // the marker block must change the digest too.
+  const injections = [...(extension.injections ?? [])];
+  requireValue(injections.every(injection => injection && typeof injection === 'object' && !Array.isArray(injection)
+    && /^[\w-]+$/.test(String(injection?.target)) && ['prepend', 'append'].includes(injection?.position)), 'unsafe-composition-manifest');
+  const skillTargets = [...new Set([
+    ...(extension.skills ?? []).map(skill => path.posix.basename(String(skill ?? ''))),
+    ...injections.map(injection => String(injection.target)),
+  ])].sort(compareStrings);
+  requireValue(skillTargets.every(target => /^[\w-]+$/.test(target)), 'unsafe-composition-manifest');
   for (const target of skillTargets) {
     await component(`${skillsRoot}/${target}/SKILL.md`, 'runtime_skill_entrypoint');
     // Published per-skill reference copies are observed inventory, not required.
@@ -167,11 +180,11 @@ async function collectRuntimeComposition(root, extension, runtimeIdValue, dirs) 
     .map(agent => String(agent?.target)).sort(compareStrings);
   requireValue(agentTargets.every(target => /^[\w.-]+$/.test(target)), 'unsafe-composition-manifest');
   for (const target of agentTargets) await component(`${agentsRoot}/${target}`, 'runtime_agent_entrypoint');
-  const injections = [...(extension.injections ?? [])].sort((a, b) => compareStrings(String(a?.target), String(b?.target)) || compareStrings(String(a?.position), String(b?.position)));
-  requireValue(injections.every(injection => /^[\w-]+$/.test(String(injection?.target))
-    && ['prepend', 'append'].includes(injection?.position)), 'unsafe-composition-manifest');
+  const declaredInjections = injections.map((injection, declared_index) => ({ injection, declared_index }))
+    .sort((a, b) => compareStrings(String(a.injection.target), String(b.injection.target))
+      || compareStrings(String(a.injection.position), String(b.injection.position)) || a.declared_index - b.declared_index);
   const extensionSourceOf = injection => `${EXTENSION_ROOT}/${String(injection.file).replace(/^\.\//, '')}`;
-  for (const injection of injections) {
+  for (const { injection, declared_index } of declaredInjections) {
     await component(extensionSourceOf(injection), 'extension_injection_source');
     const published = `${skillsRoot}/${injection.target}/SKILL.md`;
     const found = await readBounded(root, published);
@@ -185,10 +198,16 @@ async function collectRuntimeComposition(root, extension, runtimeIdValue, dirs) 
     const [start] = injectionMarkerPair(injection.target, injection.position);
     const role = injection.position === 'prepend' ? 'runtime_injection_prepend' : 'runtime_injection_append';
     const componentIndex = addComponent(published, Buffer.from(block, 'utf8'), role);
-    injectionEntries.push({ target: injection.target, position: injection.position, path: published, offset: found.data.toString('utf8').indexOf(start), component_index: componentIndex });
+    // Byte offset in the published file (review F8): Buffer indexOf over raw
+    // bytes, not a UTF-16 index of the decoded string.
+    injectionEntries.push({
+      target: injection.target, position: injection.position, path: published,
+      offset: found.data.indexOf(Buffer.from(start, 'utf8')), declared_index, component_index: componentIndex,
+    });
   }
   // Document order (contract decision 15): ascending byte offset per published
-  // file; the declarative extension.json index stays separate from the ordinal.
+  // file; the declarative extension.json index rides along per entry and stays
+  // separate from the published ordinal.
   injectionEntries.sort((a, b) => compareStrings(a.path, b.path) || a.offset - b.offset || compareStrings(a.target, b.target) || compareStrings(a.position, b.position));
   const injectionOrder = injectionEntries.map((entry, ordinal) => ({ ...entry, ordinal }));
   const publishedSkillBases = skillTargets.filter(target => components.some(item => item.path === `${skillsRoot}/${target}/SKILL.md`));
@@ -237,10 +256,15 @@ async function collectRuntimeComposition(root, extension, runtimeIdValue, dirs) 
     for (const entry of (await readdir(path.join(root, relative), { withFileTypes: true })).sort((a, b) => compareStrings(a.name, b.name))) {
       const child = `${relative}/${entry.name}`;
       if (entry.isDirectory()) await walk(child);
-      else if (entry.isFile() && !declaredTargets.has(`${REFERENCE_DIR}/${child.slice(candidateRoot.length + 1)}`)) {
+      else {
+        // Declared targets are inventoried as extension_reference above; every
+        // other non-directory entry must be visible as a component or a
+        // missing/unsafe record instead of silently disappearing from the
+        // candidate inventory (review F16).
+        if (declaredTargets.has(`${REFERENCE_DIR}/${child.slice(candidateRoot.length + 1)}`)) continue;
         const found = await readBounded(root, child);
-        if (!found.code) addComponent(child, found.data, 'reference_candidate');
-        else markMissing(child, 'reference_candidate', found.code);
+        if (found.code) markMissing(child, 'reference_candidate', found.code);
+        else addComponent(child, found.data, 'reference_candidate');
       }
     }
   };
@@ -273,6 +297,15 @@ export async function buildCompositionBaseline(rootDir = process.cwd()) {
     if (installation === null) return unavailable('ledger-absent');
     const extension = await readExtensionManifest(root);
     if (extension === null) return unavailable('extension-unavailable');
+    // Malformed-but-valid JSON degrades instead of throwing (review F13 /
+    // devin blocker): wrong shapes are producer-environmental failures.
+    requireValue(extension && typeof extension === 'object' && !Array.isArray(extension), 'extension-manifest-corrupt');
+    for (const field of ['skills', 'injections', 'agentFiles']) {
+      requireValue(extension[field] === undefined || Array.isArray(extension[field]), 'extension-manifest-corrupt');
+    }
+    if (!(extension.skills?.length || extension.injections?.length || extension.agentFiles?.length)) {
+      return unavailable('extension-surface-empty');
+    }
     const runtimes = configuredRuntimes(installation);
     // ledgerRuntimeDirs throws a plain Error on unsafe installed layouts; the
     // producer degrades instead of surfacing it as an exception.
@@ -332,15 +365,17 @@ export function validateCompositionManifest(value) {
     requireValue(!nonInjectionPaths.has(item.path), 'invalid-composition-manifest');
     nonInjectionPaths.add(item.path);
   }
-  requireValue(Array.isArray(value.injection_order), 'invalid-composition-manifest');
+  requireValue(Array.isArray(value.injection_order) && value.injection_order.length <= MAX_COMPONENTS, 'invalid-composition-manifest');
   let previous = null;
   for (const entry of value.injection_order) {
-    requireValue(entry && typeof entry === 'object' && !Array.isArray(entry) && Object.keys(entry).length === 6, 'invalid-composition-manifest');
+    requireValue(entry && typeof entry === 'object' && !Array.isArray(entry) && Object.keys(entry).length === 7, 'invalid-composition-manifest');
     requireValue(/^[\w-]+$/.test(entry.target) && ['prepend', 'append'].includes(entry.position), 'invalid-composition-manifest');
     portablePath(entry.path);
     requireValue(Number.isSafeInteger(entry.offset) && entry.offset >= 0
       && Number.isSafeInteger(entry.ordinal) && entry.ordinal >= 0
-      && Number.isSafeInteger(entry.component_index) && entry.component_index < value.components.length, 'invalid-composition-manifest');
+      && Number.isSafeInteger(entry.declared_index) && entry.declared_index >= 0
+      && Number.isSafeInteger(entry.component_index) && entry.component_index >= 0
+      && entry.component_index < value.components.length, 'invalid-composition-manifest');
     const component = value.components[entry.component_index];
     requireValue(component.path === entry.path && component.role === (entry.position === 'prepend' ? 'runtime_injection_prepend' : 'runtime_injection_append'), 'invalid-composition-manifest');
     if (previous) requireValue(previous.path < entry.path || (previous.path === entry.path && previous.offset <= entry.offset), 'invalid-composition-manifest');
@@ -363,7 +398,8 @@ export function validateCompositionManifest(value) {
     requireValue(entry && typeof entry === 'object' && !Array.isArray(entry) && Object.keys(entry).length === 3
       && typeof entry.source === 'string' && typeof entry.target === 'string', 'invalid-composition-manifest');
     portablePath(entry.source); portablePath(entry.target);
-    requireValue(Number.isSafeInteger(entry.component_index) && entry.component_index < value.components.length, 'invalid-composition-manifest');
+    requireValue(Number.isSafeInteger(entry.component_index) && entry.component_index >= 0
+      && entry.component_index < value.components.length, 'invalid-composition-manifest');
     const component = value.components[entry.component_index];
     requireValue(component.path === `${EXTENSION_ROOT}/${entry.target}` && component.role === 'extension_reference', 'invalid-composition-manifest');
   }
@@ -439,11 +475,27 @@ export async function compositionStore(rootDir, changeId) {
       await writeImmutable(`${base}/manifests/${manifestDigest}.json`, value);
       return manifestDigest;
     },
-    readIndex: indexDigest => { requireValue(HASH.test(indexDigest), 'invalid-composition-index', true); return readJson(`${base}/indexes/${indexDigest}.json`); },
-    readManifest: manifestDigest => { requireValue(HASH.test(manifestDigest), 'invalid-composition-manifest', true); return readJson(`${base}/manifests/${manifestDigest}.json`); },
+    // Readers validate the stored shape and re-bind content to the digest in
+    // the filename: a CAS file tampered after creation is rejected (review F14).
+    readIndex: async indexDigest => {
+      requireValue(HASH.test(indexDigest), 'invalid-composition-index', true);
+      const value = await readJson(`${base}/indexes/${indexDigest}.json`);
+      if (value !== null) { validateCompositionIndex(value); requireValue(digest(value) === indexDigest, 'composition-digest-mismatch', true); }
+      return value;
+    },
+    readManifest: async manifestDigest => {
+      requireValue(HASH.test(manifestDigest), 'invalid-composition-manifest', true);
+      const value = await readJson(`${base}/manifests/${manifestDigest}.json`);
+      if (value !== null) { validateCompositionManifest(value); requireValue(digest(value) === manifestDigest, 'composition-digest-mismatch', true); }
+      return value;
+    },
     preparedPath: (attemptId, runtimeIdValue) => `${base}/attempts/${identifier(attemptId)}/${portablePath(runtimeIdValue)}/prepared.json`,
     consumptionPath: (attemptId, runtimeIdValue, consumptionId) => `${base}/attempts/${identifier(attemptId)}/${portablePath(runtimeIdValue)}/consumptions/${identifier(consumptionId)}.json`,
-    readPrepared: async (attemptId, runtimeIdValue) => readJson(`${base}/attempts/${identifier(attemptId)}/${portablePath(runtimeIdValue)}/prepared.json`),
+    readPrepared: async (attemptId, runtimeIdValue) => {
+      const value = await readJson(`${base}/attempts/${identifier(attemptId)}/${portablePath(runtimeIdValue)}/prepared.json`);
+      if (value !== null) validatePrepared(value);
+      return value;
+    },
     async readConsumptions(attemptId, runtimeIdValue) {
       const directory = `${base}/attempts/${identifier(attemptId)}/${portablePath(runtimeIdValue)}/consumptions`;
       const entries = await readdir(await store.target(directory)).catch(error => {
@@ -473,25 +525,30 @@ export async function compositionStore(rootDir, changeId) {
 }
 
 function validatePrepared(value) {
+  // No timestamp: the record is fully derived from the manifest and index, so
+  // retries produce byte-identical CAS content (review F15).
   requireValue(value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 10, 'invalid-composition-prepared');
   requireValue(value.schema === PREPARED_SCHEMA, 'invalid-composition-prepared');
   identifier(value.attempt_id); runtimeId(value.runtime_id); identifier(value.change_id);
   requireValue(HASH.test(value.index_digest) && HASH.test(value.manifest_digest) && COMPOSITION_STATUSES.includes(value.status), 'invalid-composition-prepared');
-  requireValue(typeof value.created_at === 'string' && Number.isFinite(Date.parse(value.created_at)), 'invalid-composition-prepared');
   requireValue(Array.isArray(value.components) && value.components.length <= MAX_COMPONENTS, 'invalid-composition-prepared');
   for (const item of value.components) {
     requireValue(item && typeof item === 'object' && !Array.isArray(item) && Object.keys(item).length === 3
       && COMPOSITION_ROLES.includes(item.role) && HASH.test(item.sha256), 'invalid-composition-prepared');
     portablePath(item.path);
   }
-  // Marker selectors ride along so consumption can re-extract block bytes.
+  // Marker selectors ride along so consumption can re-extract block bytes;
+  // required gaps ride along so consumption inherits prepared incompleteness.
   requireValue(Array.isArray(value.injection_order) && value.injection_order.length <= MAX_COMPONENTS, 'invalid-composition-prepared');
   for (const entry of value.injection_order) {
-    requireValue(entry && typeof entry === 'object' && !Array.isArray(entry) && Object.keys(entry).length === 6
+    requireValue(entry && typeof entry === 'object' && !Array.isArray(entry) && Object.keys(entry).length === 7
       && ['prepend', 'append'].includes(entry.position)
-      && Number.isSafeInteger(entry.component_index) && entry.component_index < value.components.length, 'invalid-composition-prepared');
+      && Number.isSafeInteger(entry.component_index) && entry.component_index >= 0
+      && entry.component_index < value.components.length, 'invalid-composition-prepared');
     portablePath(entry.path);
   }
+  requireValue(Array.isArray(value.required_gaps) && value.required_gaps.length <= MAX_COMPONENTS
+    && value.required_gaps.every(gap => typeof gap === 'string' && gap.length > 0), 'invalid-composition-prepared');
   return value;
 }
 
@@ -546,7 +603,7 @@ export async function prepareCompositionAttempt(rootDir, changeId, attemptId, ba
       schema: PREPARED_SCHEMA, change_id: changeId, attempt_id: attemptId, runtime_id: manifest.runtime_id,
       index_digest: baseline.digest, manifest_digest: manifest.manifest_digest, status: manifest.status,
       components: manifest.payload.components, injection_order: manifest.payload.injection_order,
-      created_at: options.now ?? now(),
+      required_gaps: manifest.payload.required_gaps,
     };
     await store.writePrepared(attemptId, manifest.runtime_id, record);
     prepared.push(record);
@@ -555,22 +612,26 @@ export async function prepareCompositionAttempt(rootDir, changeId, attemptId, ba
   return { index_digest: baseline.digest, prepared };
 }
 
-// Consumption gate: re-hash the published layer through the file-identity
-// pattern (readLeaf), validate the agent declaration against the prepared set,
-// and persist one immutable consumption record (contract decision 8/9).
+// Consumption gate: re-hash the whole prepared surface through the
+// file-identity pattern (readLeaf), validate the agent declaration against the
+// prepared set (declared sha must equal the prepared hash AND the current
+// bytes), inherit prepared incompleteness, and persist one immutable
+// consumption record (contract decision 8/9; review F6/F10).
 export async function recordCompositionConsumption(rootDir, changeId, input) {
   const attemptId = identifier(input.attemptId);
   const runtimeIdValue = runtimeId(input.runtimeId);
   const store = await compositionStore(rootDir, changeId);
   const prepared = await store.readPrepared(attemptId, runtimeIdValue);
   requireValue(prepared, 'composition-prepared-missing', true);
+  // A consumption bound to a pinned baseline index must use the prepared
+  // record pinned to exactly that index (review F11).
+  requireValue(input.expectedIndexDigest === undefined || prepared.index_digest === input.expectedIndexDigest, 'composition-prepared-mismatch', true);
   const reasons = [];
   const rehash = [];
   let freshness = 'pass';
   const markerFor = component => prepared.injection_order?.find(entry => entry.component_index === prepared.components.indexOf(component)
     && entry.path === component.path) ?? null;
   for (const component of prepared.components) {
-    if (!component.role.startsWith('runtime_')) continue;
     let observed = null;
     try {
       const leaf = await store.readLeaf(component.path);
@@ -578,10 +639,12 @@ export async function recordCompositionConsumption(rootDir, changeId, input) {
         if (INJECTION_BLOCK_ROLES.includes(component.role)) {
           // Block identity: re-extract the exact bytes between marker pairs
           // from the current published file; whole-file equality is checked
-          // separately through the entrypoint component.
+          // separately through the entrypoint component. A broken marker pair
+          // is a drift observation, not a gate crash (review F12).
           const marker = markerFor(component);
           const text = leaf.data.toString('utf8');
-          observed = marker && text ? digest(Buffer.from(publishedInjectionBlock(text, marker.target, marker.position), 'utf8')) : null;
+          try { observed = marker && text ? digest(Buffer.from(publishedInjectionBlock(text, marker.target, marker.position), 'utf8')) : null; }
+          catch { observed = null; }
         } else observed = digest(leaf.data);
       }
     } catch (error) {
@@ -610,8 +673,14 @@ export async function recordCompositionConsumption(rootDir, changeId, input) {
     observedBytes.set(componentPath, value);
     return value;
   };
+  // Prepared incompleteness is inherited: a partial prepared surface can never
+  // attest a verified consumption (review F6).
+  let completeness = prepared.status === 'verified' ? 'pass' : 'fail';
+  if (prepared.status !== 'verified') {
+    reasons.push(`prepared-${prepared.status}`);
+    for (const gap of (prepared.required_gaps ?? []).slice(0, 20)) reasons.push(`prepared-gap:${gap}`);
+  }
   const declaration = input.declaration === undefined ? null : input.declaration;
-  let completeness = 'pass';
   let declarationVerification = 'unverified';
   let candidateDeclared = false;
   if (declaration !== null) {
@@ -635,15 +704,23 @@ export async function recordCompositionConsumption(rootDir, changeId, input) {
           completeness = 'fail'; declarationVerification = 'fail'; reasons.push('reference-outside-prepared'); continue;
         }
         const observed = await currentHash(componentPath);
-        if (observed !== reference.sha256) { completeness = 'fail'; declarationVerification = 'fail'; reasons.push(`reference-sha-mismatch:${componentPath}`); continue; }
+        // Declared sha must equal the prepared hash (membership in the pinned
+        // snapshot) and the current bytes (review F10): bytes changed after
+        // prepare are attested stale by the rehash, never verified.
+        if (observed !== reference.sha256 || component.sha256 !== reference.sha256) {
+          completeness = 'fail'; declarationVerification = 'fail'; reasons.push(`reference-sha-mismatch:${componentPath}`); continue;
+        }
         if (component.role === 'reference_candidate') candidateDeclared = true;
       }
       for (const required of requiredReferenceTargets(runtimeIdValue)) {
         const componentPath = `${EXTENSION_ROOT}/${required}`;
         if (!seen.has(componentPath)) { completeness = 'fail'; declarationVerification = 'fail'; reasons.push(`required-reference-undeclared:${componentPath}`); continue; }
+        const component = byPath.get(componentPath);
         const observed = await currentHash(componentPath);
         const declared = references.find(reference => reference.path === componentPath);
-        if (!observed || declared.sha256 !== observed) { completeness = 'fail'; declarationVerification = 'fail'; reasons.push(`required-reference-sha-mismatch:${componentPath}`); }
+        if (!observed || declared.sha256 !== observed || component.sha256 !== declared.sha256) {
+          completeness = 'fail'; declarationVerification = 'fail'; reasons.push(`required-reference-sha-mismatch:${componentPath}`);
+        }
       }
       if (completeness === 'pass' && candidateDeclared) { declarationVerification = 'unverified'; reasons.push('candidate-reference-unverified'); }
     }
@@ -688,6 +765,9 @@ export async function rebaseCompositions(rootDir = process.cwd(), options = {}) 
     if (error.code === 'ENOENT') return results;
     throw error;
   }
+  // The baseline does not depend on the change id: build it once and reuse it
+  // for every change directory (review F17 perf).
+  const baseline = await buildCompositionBaseline(root);
   for (const entry of entries.sort((a, b) => compareStrings(a.name, b.name))) {
     if (!entry.isDirectory()) continue;
     const changeId = entry.name;
@@ -698,7 +778,6 @@ export async function rebaseCompositions(rootDir = process.cwd(), options = {}) 
       throw error;
     }
     if (!hasCompositions) continue;
-    const baseline = await buildCompositionBaseline(root);
     if (!baseline.ok || baseline.digest === null) {
       results.push({ change_id: changeId, status: 'unavailable', degradation: baseline.degradation });
       continue;
