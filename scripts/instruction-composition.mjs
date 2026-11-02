@@ -36,8 +36,9 @@ const SKILL_CONTEXT_ROLES = Object.freeze(['project_skill_context_global', 'proj
   'project_skill_context_individual', 'project_skill_context_legacy_fallback']);
 const REFERENCE_ROLES = Object.freeze(['runtime_reference', 'extension_reference', 'extension_support', 'reference_candidate']);
 // Required composition: declared published entrypoints, injected blocks, and
-// their extension sources. Skill-context layers and references are observed
-// inventory: absent optional context degrades without a required gap.
+// their extension sources, plus the validatable reference surface (decision 16
+// routes below). Absent optional skill-context layers and candidate inventory
+// degrade without a required gap.
 const REQUIRED_ROLES = Object.freeze(['runtime_skill_entrypoint', 'runtime_agent_entrypoint',
   ...INJECTION_BLOCK_ROLES, 'extension_injection_source']);
 const BUILD_SKILL_BASENAMES = Object.freeze(['aif-fix', 'aif-implement', 'aif-plan', 'aif-verify', 'aif-improve']);
@@ -54,10 +55,15 @@ const compareStrings = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 
 // Bounded project-relative read: rejects symlinked segments, hardlinks, and
 // oversized files before any content read (FS class per workflow-mechanics).
+// The content read binds to the opened file descriptor and revalidates its
+// pathname identity around the read (workflow-state-store readLeaf pattern):
+// a replacement between the per-segment walk and the read cannot redirect it
+// to bytes outside the checked path (review round three).
 async function readBounded(root, relative) {
   portablePath(relative);
-  let current = root, total = 0;
+  let current = root;
   const parts = relative.split('/');
+  let leaf = null;
   for (const [index, part] of parts.entries()) {
     current = path.join(current, part);
     let info;
@@ -72,15 +78,50 @@ async function readBounded(root, relative) {
       continue;
     }
     if (!info.isFile() || info.nlink !== 1 || info.size > MAX_FILE_BYTES) return { code: 'unsafe' };
+    leaf = info;
   }
-  try { return { code: null, data: await readFile(current) }; }
+  const sameIdentity = (stats, other) => stats !== null && other !== null
+    && Number(stats.dev) === Number(other.dev) && Number(stats.ino) === Number(other.ino);
+  let file;
+  try { file = await open(current, 'r'); }
   catch (error) {
-    // ENOENT between the per-segment lstat and the content read is a lost race,
-    // not an internal bug (review F13).
+    // ENOENT between the per-segment walk and the open is a lost race, not an
+    // internal bug (review F13).
     if (error.code === 'ENOENT') return { code: 'absent' };
     if (['EACCES', 'EPERM', 'EISDIR'].includes(error.code)) return { code: 'unreadable' };
     throw error;
   }
+  try {
+    const before = await file.stat({ bigint: true });
+    if (!before.isFile() || before.nlink !== 1n || before.size > BigInt(MAX_FILE_BYTES)) return { code: 'unsafe' };
+    // Identity must be observable on this platform (workflow-state-store
+    // contract); a zero dev/ino cannot be revalidated and degrades honestly.
+    if (!(before.dev > 0n) || !(before.ino > 0n)) return { code: 'unsafe' };
+    // The opened inode is still the file the walk checked...
+    if (!sameIdentity(before, leaf)) return { code: 'unsafe' };
+    // ...and the pathname still resolves to it (no replacement happened).
+    const named = await lstat(current, { bigint: true }).catch(() => null);
+    if (!named || named.isSymbolicLink() || !sameIdentity(named, before)
+      || named.size !== before.size || named.mode !== before.mode) return { code: 'unsafe' };
+    const buffer = Buffer.alloc(Number(before.size) + 1);
+    let length = 0;
+    while (length < buffer.length) {
+      const { bytesRead } = await file.read(buffer, length, buffer.length - length, null);
+      if (bytesRead === 0) break;
+      length += bytesRead;
+    }
+    if (length !== Number(before.size)) return { code: 'unsafe' };
+    // Content stable under the open fd for the whole read...
+    const after = await file.stat({ bigint: true });
+    if (after.nlink !== 1n || before.size !== after.size || before.mtimeNs !== after.mtimeNs
+      || before.ctimeNs !== after.ctimeNs || before.mode !== after.mode) return { code: 'unsafe' };
+    // ...and the pathname still resolves to the same file afterwards.
+    const renamed = await lstat(current, { bigint: true }).catch(() => null);
+    if (!renamed || renamed.isSymbolicLink() || !sameIdentity(renamed, after)
+      || renamed.size !== after.size || renamed.mtimeNs !== after.mtimeNs
+      || renamed.ctimeNs !== after.ctimeNs || renamed.mode !== after.mode) return { code: 'unsafe' };
+    return { code: null, data: buffer.subarray(0, length) };
+  } finally { await file.close(); }
 }
 
 function runtimeId(value) { requireValue(typeof value === 'string' && /^\.[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value) && !value.endsWith('.') , 'invalid-runtime-id'); return value; }
@@ -100,8 +141,13 @@ function configuredRuntimes(installation) {
 }
 
 function requiredReferenceTargets(runtimeIdValue) {
-  // Validatable set (contract decision 16): implement mode refs (both
-  // methodologies), done triple, worker ref by runtime, QUESTION-TOOL example.
+  // Validatable reference surface (contract decision 16): implement mode refs
+  // (both methodologies), done triple, worker ref by runtime, QUESTION-TOOL
+  // example. It bounds the baseline's required-gap promise: a missing member
+  // makes the surface incomplete. The consumption gate demands only the
+  // mode/runtime subset of it for declarations (review round three) — honest
+  // reporting covers actually consumed references, undeclared members of this
+  // surface stay unverified, not incomplete (user decision 1).
   const targets = [
     ...PROMPT_REFERENCES['injections/core/aif-implement-plan-folder.md'],
     ...PROMPT_REFERENCES['skills/aif-done/SKILL.md'],
@@ -269,7 +315,13 @@ async function collectRuntimeComposition(root, extension, runtimeIdValue, dirs) 
     }
   };
   await walk(candidateRoot);
-  const requiredMissing = missing.filter(entry => REQUIRED_ROLES.includes(entry.role));
+  // Required gaps: structural roles plus the validatable reference surface —
+  // a promised decision-16 route missing from the installed surface is an
+  // incomplete composition, not an observed-inventory absence (review round
+  // three: the consumption gate cannot verify declarations for a route the
+  // baseline failed to promise).
+  const requiredReferencePaths = new Set(requiredReferenceTargets(runtimeIdValue).map(target => `${EXTENSION_ROOT}/${target}`));
+  const requiredMissing = missing.filter(entry => REQUIRED_ROLES.includes(entry.role) || requiredReferencePaths.has(entry.path));
   const status = requiredMissing.length ? 'incomplete' : 'verified';
   return {
     payload: {
@@ -418,7 +470,8 @@ export function validateCompositionManifest(value) {
 export function compositionStatus(value) {
   requireValue(value && typeof value === 'object' && !Array.isArray(value), 'invalid-composition-manifest');
   if (value.missing.some(entry => entry.reason === 'runtime-absent')) return 'unavailable';
-  return value.missing.some(entry => REQUIRED_ROLES.includes(entry.role)) ? 'incomplete' : 'verified';
+  const required = new Set(requiredReferenceTargets(value.runtime?.id).map(target => `${EXTENSION_ROOT}/${target}`));
+  return value.missing.some(entry => REQUIRED_ROLES.includes(entry.role) || required.has(entry.path)) ? 'incomplete' : 'verified';
 }
 
 export function validateCompositionIndex(value) {
@@ -721,7 +774,25 @@ export async function recordCompositionConsumption(rootDir, changeId, input) {
         }
         if (component.role === 'reference_candidate') candidateDeclared = true;
       }
-      for (const required of requiredReferenceTargets(runtimeIdValue)) {
+      // Required-to-declare subset (contract decision 16 as written: implement
+      // reference "openspec-native/classic-sdd по methodology", worker
+      // reference "по runtime"). The rest of the validatable surface (done
+      // triple, QUESTION-TOOL example) is validated when declared but never
+      // demanded: the published worker instructions mandate reporting only
+      // actually consumed references, and undeclared members stay unverified,
+      // not incomplete (user decision 1 "не имитировать наблюдение";
+      // review round three). Declaring both mode references is ambiguous —
+      // the plan-folder injection mandates reading only the selected one.
+      const modeReferences = PROMPT_REFERENCES['injections/core/aif-implement-plan-folder.md'];
+      const declaredMode = modeReferences.filter(reference => seen.has(`${EXTENSION_ROOT}/${reference}`));
+      if (declaredMode.length !== 1) {
+        completeness = 'fail'; declarationVerification = 'fail';
+        pushReason(declaredMode.length === 0 ? 'mode-reference-undeclared' : 'mode-reference-ambiguous');
+      }
+      const workerReference = (runtimeIdValue === '.codex'
+        ? PROMPT_REFERENCES['agent-files/codex/aifhub-implement-worker.toml']
+        : PROMPT_REFERENCES['agent-files/claude/aifhub-implement-worker.md'])[0];
+      for (const required of [...declaredMode, workerReference]) {
         const componentPath = `${EXTENSION_ROOT}/${required}`;
         if (!seen.has(componentPath)) { completeness = 'fail'; declarationVerification = 'fail'; pushReason(`required-reference-undeclared:${reasonPath(componentPath)}`); continue; }
         const component = byPath.get(componentPath);

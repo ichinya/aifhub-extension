@@ -108,6 +108,21 @@ it('the write-gate enforces the composition binding and renders its own trace se
     injections: [{ target: 'aif-implement', position: 'prepend', file: './injections/core/aif-implement-head.md' }],
   }));
   await put(root, '.ai-factory/extensions/aifhub-extension/injections/core/aif-implement-head.md', 'managed body\n');
+  // Validatable reference surface (decision 16 routes): absent members are
+  // required gaps since review round three, so the fixture installs them like
+  // a real published extension does.
+  for (const reference of [
+    'injections/references/aif-implement/openspec-native.md',
+    'injections/references/aif-implement/classic-sdd.md',
+    'skills/aif-done/references/openspec-finalization.md',
+    'skills/aif-done/references/classic-finalization.md',
+    'skills/aif-done/references/finalization-contract.md',
+    'injections/references/aif-implement/worker-claude.md',
+    'skills/shared/references/question-tool/examples.md',
+  ]) {
+    await mkdir(path.dirname(path.join(root, `.ai-factory/extensions/aifhub-extension/${reference}`)), { recursive: true });
+    await put(root, `.ai-factory/extensions/aifhub-extension/${reference}`, `reference: ${reference}\n`);
+  }
   await mkdir(path.dirname(path.join(root, skillPath)), { recursive: true });
   await mkdir(path.join(root, '.claude/agents'), { recursive: true });
   await put(root, skillPath, `# skill\n${markers[0]}\nmanaged body\n${markers[1]}\n`);
@@ -137,7 +152,10 @@ it('the write-gate enforces the composition binding and renders its own trace se
   assert.ok(!receipt.receipt.blocked_reasons.includes('trace_session_brief_stale'));
   assert.ok(!receipt.receipt.blocked_reasons.includes('trace_session_brief_unbound'));
   assert.equal(receipt.receipt.instruction_composition_digest, hook);
-  assert.equal(receipt.receipt.instruction_composition_status, 'verified');
+  // Review round three: the trace carries the digest binding but no
+  // structured consumption, so the honest status is unverified — digest
+  // equality alone never claims validated declarations (user decision 1).
+  assert.equal(receipt.receipt.instruction_composition_status, 'unverified');
   assert.deepEqual(receipt.receipt.composition_drift, []);
   // Advisory policy: a bound trace without a composition section (hand-written
   // or legacy helper) is recorded as drift but never blocks compliance.

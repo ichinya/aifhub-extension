@@ -664,6 +664,13 @@ async function assertCompositionTraceBinding(changeId, trace, options = {}) {
     // not claim verified next to an unverified consumption (review R2).
     if (record.status === 'unverified') result.status = 'unverified';
     result.consumption = { consumption_id: record.consumption_id, status: record.status, assessment: record.assessment };
+  } else if (result.status === 'verified') {
+    // No structured consumption was supplied, so nothing about reference
+    // declarations was validated: the rendered status must not claim verified
+    // (user decision 1 — "не имитировать наблюдение"; review R2 principle
+    // extended to the absent record, review round three). The digest binding
+    // itself stays enforced; the surface verdict travels as before.
+    result.status = 'unverified';
   }
   return result;
 }

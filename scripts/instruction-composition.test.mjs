@@ -15,7 +15,7 @@ import { prepareQaManifest } from './qa-manifest.mjs';
 import { qaStore } from './qa-manifest-store.mjs';
 import { observeQaSnapshot } from './qa-manifest-inputs.mjs';
 import {
-  COMPOSITION_INDEX_SCHEMA, COMPOSITION_SCHEMA, buildCompositionBaseline, compositionStore,
+  COMPOSITION_INDEX_SCHEMA, COMPOSITION_SCHEMA, buildCompositionBaseline, compositionStore, compositionStatus,
   prepareCompositionAttempt, recordCompositionConsumption,
   rebaseCompositions, validateCompositionIndex, validateCompositionManifest,
 } from './instruction-composition.mjs';
@@ -266,7 +266,7 @@ describe('instruction composition CAS store and consumed validation', () => {
     assert.ok(noDeclaration.reasons.includes('declaration-absent'));
     assert.equal(noDeclaration.assessment.completeness, 'pass');
     const manifest = manifestFor(baseline, '.claude');
-    const declaration = { references: requiredDeclaration(manifest) };
+    const declaration = { references: consumptionDeclaration(manifest) };
     const verified = await recordCompositionConsumption(root, 'change-live', { attemptId: 'attempt-1', runtimeId: '.claude', declaration });
     assert.equal(verified.status, 'verified');
     assert.deepEqual(verified.assessment, { completeness: 'pass', freshness: 'pass', declaration_verification: 'pass' });
@@ -277,15 +277,34 @@ describe('instruction composition CAS store and consumed validation', () => {
     const baseline = await buildCompositionBaseline(root);
     await prepareCompositionAttempt(root, 'change-decl', 'attempt-1', baseline);
     const manifest = manifestFor(baseline, '.claude');
-    const required = requiredDeclaration(manifest);
-    const forged = required.map(reference => reference.path.endsWith('openspec-native.md')
+    const required = consumptionDeclaration(manifest);
+    const forged = required.map(reference => reference.path.endsWith('classic-sdd.md')
       ? { ...reference, sha256: 'f'.repeat(64) } : reference);
     const forgedResult = await recordCompositionConsumption(root, 'change-decl', { attemptId: 'attempt-1', runtimeId: '.claude', declaration: { references: forged } });
     assert.equal(forgedResult.status, 'incomplete');
     assert.ok(forgedResult.reasons.some(reason => reason.startsWith('reference-sha-mismatch:')));
-    const incomplete = await recordCompositionConsumption(root, 'change-decl', { attemptId: 'attempt-1', runtimeId: '.claude', declaration: { references: required.slice(1) } });
+    const incomplete = await recordCompositionConsumption(root, 'change-decl', {
+      attemptId: 'attempt-1', runtimeId: '.claude',
+      declaration: { references: required.filter(reference => !reference.path.endsWith('worker-claude.md')) },
+    });
     assert.equal(incomplete.status, 'incomplete');
     assert.ok(incomplete.reasons.some(reason => reason.startsWith('required-reference-undeclared:')));
+    // Review round three: an honest declaration needs no done triple — the
+    // required set is the mode/runtime subset (contract decision 16 as
+    // written); both or neither mode references fail with distinct reasons.
+    const noMode = await recordCompositionConsumption(root, 'change-decl', {
+      attemptId: 'attempt-1', runtimeId: '.claude',
+      declaration: { references: required.filter(reference => !reference.path.endsWith('classic-sdd.md')) },
+    });
+    assert.equal(noMode.status, 'incomplete');
+    assert.ok(noMode.reasons.includes('mode-reference-undeclared'));
+    const openspecComponent = manifest.payload.components.find(item => item.path.endsWith('openspec-native.md'));
+    const bothModes = await recordCompositionConsumption(root, 'change-decl', {
+      attemptId: 'attempt-1', runtimeId: '.claude',
+      declaration: { references: [...required, { path: openspecComponent.path, sha256: openspecComponent.sha256 }] },
+    });
+    assert.equal(bothModes.status, 'incomplete');
+    assert.ok(bothModes.reasons.includes('mode-reference-ambiguous'));
     const outside = await recordCompositionConsumption(root, 'change-decl', {
       attemptId: 'attempt-1', runtimeId: '.claude',
       declaration: { references: [...required, { path: 'outside/aif-roadmap/extra.md', sha256: 'a'.repeat(64) }] },
@@ -364,17 +383,17 @@ describe('instruction composition CAS store and consumed validation', () => {
   });
 });
 
-function requiredDeclaration(manifest) {
+// Honest consumed declaration (review round three): exactly one implement
+// mode reference plus this runtime's worker reference. The rest of the
+// validatable surface is optional and only validated when declared.
+function consumptionDeclaration(manifest, mode = 'classic') {
   const workerTarget = manifest.payload.runtime.id === '.codex'
     ? 'injections/references/aif-implement/worker-codex.md'
     : 'injections/references/aif-implement/worker-claude.md';
   const targets = new Set([
-    'injections/references/aif-implement/openspec-native.md',
-    'injections/references/aif-implement/classic-sdd.md',
-    'skills/aif-done/references/openspec-finalization.md',
-    'skills/aif-done/references/classic-finalization.md',
-    'skills/aif-done/references/finalization-contract.md',
-    'skills/shared/references/question-tool/examples.md',
+    mode === 'openspec'
+      ? 'injections/references/aif-implement/openspec-native.md'
+      : 'injections/references/aif-implement/classic-sdd.md',
     workerTarget,
   ]);
   return manifest.payload.components
@@ -502,7 +521,7 @@ describe('instruction composition review coverage', () => {
     const original = await readFile(referencePath, 'utf8');
     await writeFile(referencePath, `${original}changed-after-prepare\n`);
     const manifest = manifestFor(baseline, '.claude');
-    const required = requiredDeclaration(manifest);
+    const required = consumptionDeclaration(manifest, 'openspec');
     const staleDeclaration = await recordCompositionConsumption(root, 'change-f10', {
       attemptId: 'attempt-1', runtimeId: '.claude', declaration: { references: required },
     });
@@ -523,6 +542,23 @@ describe('instruction composition review coverage', () => {
       attemptId: 'attempt-1', runtimeId: '.claude', declaration: { references: required },
     });
     assert.equal(restored.status, 'verified');
+  });
+
+  it('missing validatable reference is a required gap (review round three)', async () => {
+    await rm(path.join(root, '.ai-factory/extensions/aifhub-extension/skills/aif-done/references/openspec-finalization.md'));
+    const baseline = await buildCompositionBaseline(root);
+    assert.equal(baseline.status, 'incomplete');
+    const manifest = manifestFor(baseline, '.claude');
+    assert.ok(manifest.payload.required_gaps.some(gap => gap.includes('openspec-finalization.md')), JSON.stringify(manifest.payload.required_gaps));
+    assert.equal(compositionStatus(manifest.payload), 'incomplete');
+  });
+
+  it('a missing runtime worker reference is a required gap for that runtime only (review round three)', async () => {
+    await rm(path.join(root, '.ai-factory/extensions/aifhub-extension/injections/references/aif-implement/worker-codex.md'));
+    const baseline = await buildCompositionBaseline(root);
+    assert.equal(manifestFor(baseline, '.codex').status, 'incomplete');
+    assert.equal(manifestFor(baseline, '.claude').status, 'verified');
+    assert.ok(manifestFor(baseline, '.codex').payload.required_gaps.some(gap => gap.includes('worker-codex.md')));
   });
 
   it('consumption inherits prepared incompleteness and rejects a foreign prepared record (review F6/F11)', async () => {
