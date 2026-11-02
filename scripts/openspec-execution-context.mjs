@@ -3,7 +3,8 @@ import { createHash } from 'node:crypto';
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
-import { assertSessionBriefBinding, inspectSessionBrief } from './session-brief.mjs';
+import { assertSessionBriefBinding, inspectSessionBrief, sessionBriefPaths } from './session-brief.mjs';
+import { buildCompositionBaseline, recordCompositionConsumption } from './instruction-composition.mjs';
 import { resolvePlanTarget, resolvePlanContext } from './common-plan-resolver.mjs';
 
 import {
@@ -45,6 +46,21 @@ export async function buildImplementationContext(options = {}) {
   }
 
   const sessionBrief = await inspectSessionBrief({ ...options, rootDir, changeId: resolverResult.changeId, includeBrief: true });
+  // Existing fail-closed channel (composition drift policy), checked first so
+  // observed instruction drift carries its own code even when the brief went
+  // stale in the same update. Null hooks (unavailable degradation) stay
+  // advisory and fall through to the brief gate.
+  const composition = await compositionBindingStatus(resolverResult.changeId, { rootDir });
+  if (composition.status === 'stale' || composition.status === 'unavailable-pinned') {
+    return {
+      ...createContextFailure({ resolverResult, errors: [{
+        code: 'instruction-composition-stale',
+        message: 'Return to the planning owner to recompile: the observed instruction composition no longer matches the baseline pinned by the SessionBrief.'
+      }] }),
+      sessionBrief,
+      owner_handoff: sessionBrief.owner_handoff ?? null
+    };
+  }
   if (!sessionBrief.ok) {
     return {
       ...createContextFailure({ resolverResult, errors: [{
@@ -98,6 +114,7 @@ export async function buildImplementationContext(options = {}) {
     canonicalArtifacts: sessionBrief.status === 'valid'
       ? briefSourceReferences(canonical.canonicalArtifacts, sessionBrief.sources)
       : canonical.canonicalArtifacts,
+    instructionComposition: composition,
     sessionBrief,
     generatedRules: sessionBrief.status === 'valid'
       ? briefSourceReferences(generatedRules.generatedRules, sessionBrief.sources)
@@ -524,6 +541,10 @@ async function writeTrace({ changeId, trace, options, type, directoryName }) {
 
   const runId = normalizeRunId(options.runId ?? createDefaultRunId(options));
   const rootDir = resolveRootDir(options);
+  // Existing fail-closed channel: the composition binding next to the brief
+  // binding. Codes distinguish brief mismatch, missing composition binding,
+  // and observed instruction drift; context_digest is not overloaded.
+  const composition = await assertCompositionTraceBinding(normalized.changeId, trace, { ...options, rootDir });
   await assertSessionBriefBinding(normalized.changeId, trace?.sessionBriefDigest, { ...options, rootDir });
   const layout = await ensureRuntimeLayout(normalized.changeId, {
     rootDir,
@@ -544,7 +565,8 @@ async function writeTrace({ changeId, trace, options, type, directoryName }) {
   await writeFile(targetPath, renderTraceMarkdown({
     changeId: normalized.changeId,
     trace,
-    type
+    type,
+    composition
   }), 'utf8');
 
   return {
@@ -553,9 +575,77 @@ async function writeTrace({ changeId, trace, options, type, directoryName }) {
     runId,
     path: targetPath,
     relativePath: toPosix(path.relative(rootDir, targetPath)),
+    instructionComposition: composition,
     warnings: [],
     errors: []
   };
+}
+
+const COMPOSITION_DIGEST = /^[a-f0-9]{64}$/;
+
+function compositionBindingError(code) {
+  const error = new Error(code);
+  error.code = code;
+  return error;
+}
+
+// Read the composition baseline digest pinned by the STORED brief (compile-time
+// observation). Read directly so a stale brief still yields its pinned hook and
+// drift is reported with the composition code, not only the brief code.
+async function readPinnedCompositionDigest(changeId, rootDir) {
+  try {
+    const raw = await readFile(path.join(rootDir, sessionBriefPaths(changeId).json), 'utf8');
+    const parsed = JSON.parse(raw);
+    const digest = parsed?.instruction_composition_digest;
+    return typeof digest === 'string' && COMPOSITION_DIGEST.test(digest) ? digest : null;
+  } catch { return null; }
+}
+
+// Compare the pinned composition baseline against the currently observed
+// instruction surface (same-runtime digest from the single producer). Advisory
+// for null hooks; never throws for environmental failures.
+async function compositionBindingStatus(changeId, options = {}) {
+  const rootDir = resolveRootDir(options);
+  const pinned = await readPinnedCompositionDigest(changeId, rootDir);
+  if (pinned === null) return { pinned: null, digest: null, status: 'unavailable' };
+  const current = await buildCompositionBaseline(rootDir);
+  if (current.digest === null) return { pinned, digest: null, status: 'unavailable-pinned' };
+  return { pinned, digest: current.digest, status: current.digest === pinned ? 'verified' : 'stale' };
+}
+
+// Trace write-gate. A null hook keeps traces writable (unavailable degradation,
+// legacy briefs, disabled projects); a non-null hook requires the caller to
+// echo the pinned baseline digest and the baseline to still match the observed
+// surface. Runs before the brief binding so drift carries its own code; the
+// brief binding authority still runs afterwards, unchanged.
+async function assertCompositionTraceBinding(changeId, trace, options = {}) {
+  const rootDir = resolveRootDir(options);
+  const composition = await compositionBindingStatus(changeId, { ...options, rootDir });
+  if (composition.status === 'unavailable') return { pinned: null, digest: null, status: 'unavailable' };
+  const declared = trace?.instructionCompositionDigest ?? null;
+  if (typeof declared !== 'string' || !COMPOSITION_DIGEST.test(declared)) {
+    throw compositionBindingError('instruction_composition_binding_missing');
+  }
+  if (declared !== composition.pinned) throw compositionBindingError('instruction_composition_mismatch');
+  if (composition.status === 'stale') throw compositionBindingError('instruction_composition_stale');
+  if (composition.status === 'unavailable-pinned') throw compositionBindingError('instruction_composition_unavailable');
+  const result = { pinned: composition.pinned, digest: composition.digest, status: composition.status };
+  // Optional structured consumption: when the caller reports the attempt and
+  // the agent declaration, the write-gate records the immutable consumption
+  // and refuses stale or incomplete verdicts (contract decisions 8/11).
+  const consumption = trace?.instructionComposition;
+  if (consumption && typeof consumption === 'object' && !Array.isArray(consumption)) {
+    const record = await recordCompositionConsumption(rootDir, changeId, {
+      attemptId: consumption.attemptId,
+      runtimeId: consumption.runtimeId,
+      declaration: consumption.declaration ?? undefined,
+      predecessorConsumptionId: consumption.predecessorConsumptionId
+    });
+    if (record.status === 'stale') throw compositionBindingError('instruction_composition_stale');
+    if (record.status === 'incomplete') throw compositionBindingError('instruction_composition_consumption_incomplete');
+    result.consumption = { consumption_id: record.consumption_id, status: record.status, assessment: record.assessment };
+  }
+  return result;
 }
 
 function assertSafeTraceStatePath(rootDir, statePath) {
@@ -576,7 +666,7 @@ function assertSafeTraceStatePath(rootDir, statePath) {
   }
 }
 
-function renderTraceMarkdown({ changeId, trace, type }) {
+function renderTraceMarkdown({ changeId, trace, type, composition = null }) {
   const nextStep = trace?.nextStep ?? `/aif-verify ${changeId}`;
   const lines = [
     `# ${type} Trace: ${changeId}`,
@@ -591,6 +681,12 @@ function renderTraceMarkdown({ changeId, trace, type }) {
     '',
     ...(trace?.sessionBriefDigest ? [
       '## SessionBrief binding', '', `Digest: ${trace.sessionBriefDigest}`, ''
+    ] : []),
+    // Own H2 section only: the SessionBrief binding section must keep its
+    // single `Digest:` line for plan-compliance parsing.
+    ...(composition?.digest ? [
+      '## Instruction composition', '', `Digest: ${composition.digest}`, `Status: ${composition.status}`,
+      ...(composition.consumption ? [`Consumption: ${composition.consumption.consumption_id} ${composition.consumption.status}`] : []), ''
     ] : []),
     '## Generated rules read',
     '',
