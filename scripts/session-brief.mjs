@@ -10,7 +10,7 @@ import { parseSimpleYaml } from './aif-artifact-sync.mjs';
 import { parseToolConfig } from './tool-config.mjs';
 import { resolveAiFactoryVersion } from './ai-factory-version-resolver.mjs';
 import { resolvePlanContext, resolvePlanTarget } from './common-plan-resolver.mjs';
-import { buildCompositionBaseline, compositionStore } from './instruction-composition.mjs';
+import { buildCompositionBaseline, compositionStore, prepareCompositionAttempt } from './instruction-composition.mjs';
 import { parseStrictJson } from './json-strict.mjs';
 import {
   SDD_POLICY_PATH, selectSddProfile, sddError, validateSddPolicy
@@ -264,14 +264,21 @@ async function buildSnapshot(options, explicitCompile) {
       const composition = await buildCompositionBaseline(root);
       let compositionDigest = composition.digest;
       if (explicitCompile && compositionDigest !== null) {
-        // Compile persists the per-runtime manifests plus the baseline index
-        // as immutable content-addressed records; inspect never rewrites the
-        // pinned baseline. A storage failure degrades the hook to null
-        // instead of failing the compile.
+        // Compile persists the per-runtime manifests, the baseline index, and
+        // the per-attempt prepared records as immutable content-addressed
+        // records (contract decision 8: prepared is fixed at compile; review
+        // F2 — otherwise the consumption gate could never find a prepared
+        // record). The prepared attempt id is derived from the index digest,
+        // so recompiles of identical inputs reuse the same CAS entries and
+        // the write-gate can resolve it from the pinned digest alone.
+        // Inspect never rewrites the pinned baseline. A storage failure
+        // degrades the hook to null instead of failing the compile.
         try {
+          const attemptId = `compile-${compositionDigest.slice(0, 16)}`;
           const compositions = await compositionStore(root, changeId);
           for (const manifest of composition.manifests) await compositions.writeManifest(manifest.payload);
           if (await compositions.writeIndex(composition.index) !== compositionDigest) compositionDigest = null;
+          else await prepareCompositionAttempt(root, changeId, attemptId, composition);
         } catch { compositionDigest = null; }
       }
       const fields = {

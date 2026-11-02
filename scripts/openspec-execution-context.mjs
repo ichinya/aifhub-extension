@@ -591,11 +591,14 @@ function compositionBindingError(code) {
 
 // Read the composition baseline digest pinned by the STORED brief (compile-time
 // observation). Read directly so a stale brief still yields its pinned hook and
-// drift is reported with the composition code, not only the brief code.
+// drift is reported with the composition code, not only the brief code. The
+// read is size-bounded (briefs are capped at 2 MiB by the compiler; anything
+// larger is foreign and degrades to a null hook) and fully guarded.
 async function readPinnedCompositionDigest(changeId, rootDir) {
   try {
-    const raw = await readFile(path.join(rootDir, sessionBriefPaths(changeId).json), 'utf8');
-    const parsed = JSON.parse(raw);
+    const raw = await readFile(path.join(rootDir, sessionBriefPaths(changeId).json));
+    if (raw.length === 0 || raw.length > 2 * 1024 * 1024) return null;
+    const parsed = JSON.parse(raw.toString('utf8'));
     const digest = parsed?.instruction_composition_digest;
     return typeof digest === 'string' && COMPOSITION_DIGEST.test(digest) ? digest : null;
   } catch { return null; }
@@ -603,25 +606,36 @@ async function readPinnedCompositionDigest(changeId, rootDir) {
 
 // Compare the pinned composition baseline against the currently observed
 // instruction surface (same-runtime digest from the single producer). Advisory
-// for null hooks; never throws for environmental failures.
+// for null hooks; never throws for environmental failures. Digest equality
+// alone is not "verified": the per-runtime surface statuses travel with the
+// comparison, so an incomplete/unavailable runtime renders its honest status
+// (review F6).
 async function compositionBindingStatus(changeId, options = {}) {
   const rootDir = resolveRootDir(options);
   const pinned = await readPinnedCompositionDigest(changeId, rootDir);
   if (pinned === null) return { pinned: null, digest: null, status: 'unavailable' };
   const current = await buildCompositionBaseline(rootDir);
   if (current.digest === null) return { pinned, digest: null, status: 'unavailable-pinned' };
-  return { pinned, digest: current.digest, status: current.digest === pinned ? 'verified' : 'stale' };
+  if (current.digest !== pinned) return { pinned, digest: current.digest, status: 'stale' };
+  // Per-runtime statuses are the worst-case surface verdict; 'unavailable'
+  // here means declared runtime directories are absent, not that the ledger
+  // or the producer is missing.
+  const surface = current.status === 'verified' ? 'verified' : current.status;
+  return { pinned, digest: current.digest, status: surface };
 }
 
 // Trace write-gate. A null hook keeps traces writable (unavailable degradation,
 // legacy briefs, disabled projects); a non-null hook requires the caller to
 // echo the pinned baseline digest and the baseline to still match the observed
 // surface. Runs before the brief binding so drift carries its own code; the
-// brief binding authority still runs afterwards, unchanged.
+// brief binding authority still runs afterwards, unchanged. Digest equality
+// with an incomplete/unavailable surface stays advisory-honest: it renders the
+// real status and any consumption attempt fails incomplete, without inventing
+// a second drift authority (review F6).
 async function assertCompositionTraceBinding(changeId, trace, options = {}) {
   const rootDir = resolveRootDir(options);
   const composition = await compositionBindingStatus(changeId, { ...options, rootDir });
-  if (composition.status === 'unavailable') return { pinned: null, digest: null, status: 'unavailable' };
+  if (composition.status === 'unavailable' && composition.pinned === null) return { pinned: null, digest: null, status: 'unavailable' };
   const declared = trace?.instructionCompositionDigest ?? null;
   if (typeof declared !== 'string' || !COMPOSITION_DIGEST.test(declared)) {
     throw compositionBindingError('instruction_composition_binding_missing');
@@ -630,16 +644,19 @@ async function assertCompositionTraceBinding(changeId, trace, options = {}) {
   if (composition.status === 'stale') throw compositionBindingError('instruction_composition_stale');
   if (composition.status === 'unavailable-pinned') throw compositionBindingError('instruction_composition_unavailable');
   const result = { pinned: composition.pinned, digest: composition.digest, status: composition.status };
-  // Optional structured consumption: when the caller reports the attempt and
-  // the agent declaration, the write-gate records the immutable consumption
-  // and refuses stale or incomplete verdicts (contract decisions 8/11).
+  // Optional structured consumption: when the caller reports the agent
+  // declaration, the write-gate records the immutable consumption against the
+  // prepared attempt pinned by THIS baseline index (compile derives the
+  // attempt id from the digest, review F2/F11) and refuses stale or
+  // incomplete verdicts (contract decisions 8/11).
   const consumption = trace?.instructionComposition;
   if (consumption && typeof consumption === 'object' && !Array.isArray(consumption)) {
     const record = await recordCompositionConsumption(rootDir, changeId, {
-      attemptId: consumption.attemptId,
+      attemptId: consumption.attemptId ?? `compile-${composition.pinned.slice(0, 16)}`,
       runtimeId: consumption.runtimeId,
       declaration: consumption.declaration ?? undefined,
-      predecessorConsumptionId: consumption.predecessorConsumptionId
+      predecessorConsumptionId: consumption.predecessorConsumptionId,
+      expectedIndexDigest: composition.pinned
     });
     if (record.status === 'stale') throw compositionBindingError('instruction_composition_stale');
     if (record.status === 'incomplete') throw compositionBindingError('instruction_composition_consumption_incomplete');

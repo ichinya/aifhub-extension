@@ -179,6 +179,20 @@ it('the write-gate enforces the composition binding and renders its own trace se
     }, { ...options, runId: 'composition-consumption' }),
     /instruction_composition_consumption_incomplete/,
   );
+  // Echoing a foreign digest fails the mismatch code, and a producer that
+  // degraded after compile fails the unavailable code (review F13/F6 family).
+  await assert.rejects(
+    writeExecutionTrace(id, { sessionBriefDigest: recompiled.digest, instructionCompositionDigest: 'e'.repeat(64), changedFiles: [] }, { ...options, runId: 'composition-mismatch' }),
+    /instruction_composition_mismatch/,
+  );
+  await rm(path.join(root, '.ai-factory.json'));
+  await assert.rejects(
+    writeExecutionTrace(id, { sessionBriefDigest: recompiled.digest, instructionCompositionDigest: freshHook, changedFiles: [] }, { ...options, runId: 'composition-unavailable' }),
+    /instruction_composition_unavailable/,
+  );
+  const degradedContext = await buildImplementationContext({ ...options, detectOpenSpec: () => { throw new Error('classic must not detect'); } });
+  assert.equal(degradedContext.ok, false);
+  assert.ok(degradedContext.errors.some(error => error.code === 'instruction-composition-stale'));
 });
 
 it('classic status progress is excluded from revision, companion drift is stale', async () => {
