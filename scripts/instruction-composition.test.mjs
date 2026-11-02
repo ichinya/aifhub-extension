@@ -4,17 +4,24 @@
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { link, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { digest } from './workflow-state-store.mjs';
+import { prepareQaManifest } from './qa-manifest.mjs';
+import { qaStore } from './qa-manifest-store.mjs';
+import { observeQaSnapshot } from './qa-manifest-inputs.mjs';
 import {
   COMPOSITION_INDEX_SCHEMA, COMPOSITION_SCHEMA, buildCompositionBaseline, compositionStore,
   prepareCompositionAttempt, recordCompositionConsumption,
   rebaseCompositions, validateCompositionIndex, validateCompositionManifest,
 } from './instruction-composition.mjs';
 import { publishedInjectionBlock } from './prompt-assets.mjs';
+
+const execAsync = promisify(execFile);
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let root;
@@ -374,3 +381,57 @@ function requiredDeclaration(manifest) {
     .filter(item => targets.has(item.path.replace('.ai-factory/extensions/aifhub-extension/', '')))
     .map(item => ({ path: item.path, sha256: item.sha256 }));
 }
+
+describe('instruction composition QA namespace', () => {
+  it('a composition record written between enroll and publish does not drift the QA snapshot', async () => {
+    const qaRoot = await mkdtemp(path.join(os.tmpdir(), 'aif-composition-qa-'));
+    try {
+      const git = async args => execAsync('git', args, { cwd: qaRoot });
+      await mkdir(path.join(qaRoot, 'src'), { recursive: true });
+      await mkdir(path.join(qaRoot, 'openspec/changes/work'), { recursive: true });
+      await mkdir(path.join(qaRoot, '.ai-factory'), { recursive: true });
+      await writeFile(path.join(qaRoot, '.gitignore'), '.ai-factory/\n');
+      await writeFile(path.join(qaRoot, 'src/a.js'), 'source\n');
+      await writeFile(path.join(qaRoot, 'openspec/changes/work/proposal.md'), '# Proposal\n');
+      await writeFile(path.join(qaRoot, 'openspec/changes/work/tasks.md'), '- [ ] 1.1 Task\n');
+      await writeFile(path.join(qaRoot, '.ai-factory/config.yaml'), 'aifhub:\n  tools:\n    openspec: true\n');
+      await git(['init', '--initial-branch=main']);
+      await git(['config', 'user.email', 'fixture@example.com']);
+      await git(['config', 'user.name', 'fixture']);
+      await git(['add', '.']);
+      await git(['commit', '-m', 'init']);
+      const toolchain = [{ name: 'fixture-node', sha256: digest('node') }];
+      const check = { id: 'check-verify', gate: 'verify', profile: 'declared.v1', dependencies_complete: true, inputs: ['src'],
+        command: { argv: ['fake'], cwd: '.' }, toolchain, env_inputs: [], requires_observed: false };
+      const options = { rootDir: qaRoot, changeId: 'work', scope: ['src'], checks: [check], environment: {},
+        providers: { requirements: async () => ({ gates: ['verify'], independent_roles: [], evidence: [] }), toolchain: async () => toolchain } };
+      assert.equal((await prepareQaManifest(options)).ok, true, 'qa enrollment needs a real git worktree');
+      const store = await qaStore(options);
+      const { payload } = await store.manifest();
+      const before = await observeQaSnapshot(store, payload);
+      // Write-gate activity lands after enrollment: a fresh attempt with one
+      // consumption record under the closed compositions namespace.
+      const baseline = await buildCompositionBaseline(qaRoot);
+      void baseline; // no installed ledger in this fixture: unavailable degradation is fine
+      const compositions = await compositionStore(qaRoot, 'work');
+      const index = { schema: COMPOSITION_INDEX_SCHEMA, normalization_version: 1,
+        compositions: [{ runtime_id: '.fixture', manifest_digest: 'a'.repeat(64), manifest_ref: `compositions/manifests/${'a'.repeat(64)}.json`, status: 'unavailable' }] };
+      await compositions.writeIndex(index);
+      await compositions.writeConsumption('attempt-1', '.fixture', {
+        schema: 'aifhub.instruction_composition_consumption.v1', change_id: 'work', attempt_id: 'attempt-1',
+        runtime_id: '.fixture', consumption_id: 'consumption-1', index_digest: 'a'.repeat(64), manifest_digest: 'b'.repeat(64),
+        declaration: null, rehash: [], assessment: { completeness: 'pass', freshness: 'pass', declaration_verification: 'unverified' },
+        status: 'unverified', reasons: ['declaration-absent'], created_at: '2026-11-02T00:00:00.000Z',
+      });
+      const after = await observeQaSnapshot(store, payload);
+      // Same projections: the closed namespace never enters ignored_names or
+      // changed_paths, so publish/inspect sees no ignored-membership-drift.
+      assert.deepEqual(after.ignored_names, before.ignored_names);
+      assert.deepEqual(after.changed_paths, before.changed_paths);
+      assert.ok(!Object.keys(after.files).some(p => p.includes('compositions')));
+      assert.ok(!after.ignored_names.some(p => p.includes('compositions')));
+    } finally {
+      await rm(qaRoot, { recursive: true, force: true, maxRetries: 3 });
+    }
+  });
+});

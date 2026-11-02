@@ -88,6 +88,10 @@ export async function observeQaSnapshot(store, payload, options = {}) {
   requireValue(observed.files && typeof observed.files === 'object', 'snapshot-incomplete', true);
   const names = Object.keys(observed.files);
   requireValue(names.length <= QA_LIMITS.files, 'qa-files-limit', true);
+  // Closed runtime namespace (#252): per-attempt composition records are
+  // written on the write-gate between QA waves, so every snapshot projection
+  // excludes them regardless of the snapshot provider in front of the store.
+  const compositionsNamespace = p => within(p, `.ai-factory/state/${payload.target.id}/compositions`);
   const collision = new Map();
   const directoryCase = new Map();
   function registerPath(relative) {
@@ -130,7 +134,7 @@ export async function observeQaSnapshot(store, payload, options = {}) {
   requireValue(new Set([...names, ...ignored]).size <= QA_LIMITS.files, 'qa-files-limit', true);
   requireValue(observed.modules && Object.keys(observed.modules).length > 0
     && Object.values(observed.modules).every(hash => SHA.test(hash)), 'module-identity-unproven', true);
-  const changedPaths = sorted(observed.changed_paths ?? []);
+  const changedPaths = sorted((observed.changed_paths ?? []).filter(p => !compositionsNamespace(p)));
   requireValue(changedPaths.length <= QA_LIMITS.files, 'qa-files-limit', true);
   for (const p of changedPaths) {
     sourcePath(p);
@@ -196,7 +200,8 @@ async function filesystemSnapshot(store, payload, options) {
     || ['manifest.json', 'enrollment.json', 'publication.json', 'qa.lock', 'verify.md',
       ...(payload.target.flow === 'classic' ? ['gates'] : ['rules.md']), 'review.md', 'security.md', 'coverage.json', 'done-readiness.json', '.gitignore', 'raw', 'openspec-validation.json', 'openspec-status.json']
       .some(name => withinCi(p, `${store.qa}/${name}`));
-  const excluded = p => within(p, '.git') || qaInternal(p);
+  const excluded = p => within(p, '.git') || qaInternal(p)
+    || within(p, `.ai-factory/state/${payload.target.id}/compositions`);
   requireValue(!roots.some(excluded), 'self-referential-input', true);
   const names = new Set(visible.filter(p => !excluded(p)));
   const directories = new Set();

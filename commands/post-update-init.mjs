@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { runInstalledScript } from './run-installed-script.mjs';
 import { HELPER_MODULES, helperBaseline, helperBytes, sha256 } from '../scripts/execution-provenance.mjs';
 import { preservePromptAssets, finishPromptPreservation, validateInstalledPromptAssets, recordPromptBaseline } from '../scripts/prompt-assets.mjs';
+import { rebaseCompositions } from '../scripts/instruction-composition.mjs';
 
 const registered = new WeakSet();
 const EXTENSION_NAME = 'aifhub-extension';
@@ -80,6 +81,19 @@ export function registerPostUpdateInit(program, moduleUrl, options = {}) {
         throw new Error('initialization_failed');
       }
       await recordPromptBaseline(state.rootDir);
+      // Composition rebasing (#252): every change directory that already owns
+      // a compositions namespace gets a fresh immutable baseline index after
+      // the update; the previous index files stay addressable and bindings
+      // against them read stale until recompiled. Advisory: a rebasing failure
+      // is reported, not escalated to an update failure.
+      try {
+        const rebased = await rebaseCompositions(state.rootDir);
+        for (const entry of rebased) {
+          processLike.stdout.write(`AIFHub: rebased instruction composition baseline for ${entry.change_id} (index ${entry.status === 'unavailable' ? `unavailable: ${entry.degradation}` : entry.index_digest}).\n`);
+        }
+      } catch (error) {
+        processLike.stderr.write(`AIFHub: composition baseline rebasing failed (${error?.code ?? error?.message ?? 'unknown'}); existing bindings stay pinned to their previous index. Run ai-factory aifhub-session-brief compile per change to rebuild.\n`);
+      }
     } catch {
       if (Number(processLike.exitCode ?? 0) === 0) processLike.exitCode = 1;
       processLike.stderr.write('AIFHub: post-update initialization failed. Resolve the setup error and retry ai-factory aifhub-mode init --json.\n');
