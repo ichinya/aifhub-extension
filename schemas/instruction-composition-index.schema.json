@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Instruction composition baseline index v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "aifhub.instruction_composition_index.v1"
+    },
+    "normalization_version": {
+      "const": 1
+    },
+    "compositions": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "runtime_id": {
+            "type": "string",
+            "pattern": "^\\.[A-Za-z0-9][A-Za-z0-9._-]*$"
+          },
+          "manifest_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "manifest_ref": {
+            "type": "string",
+            "pattern": "^compositions/manifests/[a-f0-9]{64}\\.json$"
+          },
+          "status": {
+            "enum": [
+              "unavailable",
+              "incomplete",
+              "unverified",
+              "stale",
+              "verified"
+            ]
+          }
+        },
+        "required": [
+          "runtime_id",
+          "manifest_digest",
+          "manifest_ref",
+          "status"
+        ]
+      }
+    }
+  },
+  "required": [
+    "schema",
+    "normalization_version",
+    "compositions"
+  ]
+}

@@ -1,0 +1,246 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Instruction composition manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "aifhub.instruction_composition.v1"
+    },
+    "normalization_version": {
+      "const": 1
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^\\.[A-Za-z0-9][A-Za-z0-9._-]*$"
+        },
+        "skills_dir": {
+          "type": "string",
+          "pattern": "^[^\\\\:*?\"<>|\\x00-\\x1f]+$"
+        },
+        "agents_dir": {
+          "type": "string",
+          "pattern": "^[^\\\\:*?\"<>|\\x00-\\x1f]+$"
+        }
+      },
+      "required": [
+        "id",
+        "skills_dir",
+        "agents_dir"
+      ]
+    },
+    "surface": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "extension_root": {
+          "type": "string",
+          "pattern": "^[^\\\\:*?\"<>|\\x00-\\x1f]+$"
+        },
+        "skills_root": {
+          "type": "string",
+          "pattern": "^[^\\\\:*?\"<>|\\x00-\\x1f]+$"
+        },
+        "agents_root": {
+          "type": "string",
+          "pattern": "^[^\\\\:*?\"<>|\\x00-\\x1f]+$"
+        }
+      },
+      "required": [
+        "extension_root",
+        "skills_root",
+        "agents_root"
+      ]
+    },
+    "components": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^[^\\\\:*?\"<>|\\x00-\\x1f]+$"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "role": {
+            "enum": [
+              "runtime_skill_entrypoint",
+              "runtime_agent_entrypoint",
+              "runtime_injection_prepend",
+              "runtime_injection_append",
+              "extension_injection_source",
+              "project_skill_context_global",
+              "project_skill_context_build",
+              "project_skill_context_individual",
+              "project_skill_context_legacy_fallback",
+              "runtime_reference",
+              "extension_reference",
+              "extension_support",
+              "reference_candidate"
+            ]
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "role"
+        ]
+      }
+    },
+    "injection_order": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "type": "string",
+            "pattern": "^[\\w-]+$"
+          },
+          "position": {
+            "enum": [
+              "prepend",
+              "append"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^[^\\\\:*?\"<>|\\x00-\\x1f]+$"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "ordinal": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "component_index": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "target",
+          "position",
+          "path",
+          "offset",
+          "ordinal",
+          "component_index"
+        ]
+      }
+    },
+    "skill_context_order": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^[^\\\\:*?\"<>|\\x00-\\x1f]+$"
+          },
+          "role": {
+            "enum": [
+              "project_skill_context_global",
+              "project_skill_context_build",
+              "project_skill_context_individual",
+              "project_skill_context_legacy_fallback"
+            ]
+          }
+        },
+        "required": [
+          "path",
+          "role"
+        ]
+      }
+    },
+    "selected_references": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "source": {
+            "type": "string",
+            "pattern": "^[^\\\\:*?\"<>|\\x00-\\x1f]+$"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[^\\\\:*?\"<>|\\x00-\\x1f]+$"
+          },
+          "component_index": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "source",
+          "target",
+          "component_index"
+        ]
+      }
+    },
+    "missing": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^[^\\\\:*?\"<>|\\x00-\\x1f]+$"
+          },
+          "role": {
+            "$ref": "#/properties/components/items/properties/role"
+          },
+          "reason": {
+            "enum": [
+              "absent",
+              "unreadable",
+              "unsafe",
+              "runtime-absent"
+            ]
+          }
+        },
+        "required": [
+          "path",
+          "role",
+          "reason"
+        ]
+      }
+    },
+    "required_gaps": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "schema",
+    "normalization_version",
+    "runtime",
+    "surface",
+    "components",
+    "injection_order",
+    "skill_context_order",
+    "selected_references",
+    "missing",
+    "required_gaps"
+  ]
+}
