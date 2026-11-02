@@ -182,6 +182,19 @@ describe('persistent no-progress guard', () => {
     assert.equal(inspected.instruction_composition_digest, 'a'.repeat(64));
     assert.equal(inspected.instruction_composition_status, 'verified');
   });
+  it('binds the composition digest per checkpoint and per result without backfill', async () => {
+    await call('start', { ...startInput, role: 'fix', instruction_composition_digest: 'a'.repeat(64), instruction_composition_status: 'verified' });
+    await put(trace, 'checkpoint evidence\n');
+    await call('checkpoint', { ...worker(), progress: { completed_steps: ['step'], next_step: 'next' }, instruction_composition_digest: 'b'.repeat(64), instruction_composition_status: 'verified' });
+    await call('result', { ...worker(2), result: { result_id: 'bound-result', status: 'blocked', changed_files: [], checks: [], evidence: [] }, instruction_composition_digest: 'c'.repeat(64), instruction_composition_status: 'verified' });
+    const store = await storeFor(root);
+    const stored = await store.load(`.ai-factory/state/${change}/execution/runs/${runInput.run_id}.json`);
+    // The checkpoint keeps its own observed binding even after the result
+    // advanced the run-level field: no backfill, per-record recovery.
+    assert.equal(stored.checkpoint.instruction_composition_digest, 'b'.repeat(64));
+    assert.equal(stored.result.instruction_composition_digest, 'c'.repeat(64));
+    assert.equal(stored.instruction_composition_digest, 'c'.repeat(64));
+  });
   it('prevents a terminal worker response from stranding its pending check', async () => {
     await call('start', { ...startInput, role: 'fix' });
     await begin();

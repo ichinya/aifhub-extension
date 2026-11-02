@@ -567,3 +567,33 @@ function injectionMarkerPairOf(target, position) {
   const prefix = `<!-- aif-ext:aifhub-extension:${target}:${position}:`;
   return [`${prefix}start -->`, `${prefix}end -->`];
 }
+
+describe('instruction composition review round two', () => {
+  it('caps the ordered and inventory arrays like the schema (review R5)', async () => {
+    const baseline = await buildCompositionBaseline(root);
+    const payload = manifestFor(baseline, '.claude').payload;
+    for (const field of ['skill_context_order', 'selected_references', 'missing', 'required_gaps']) {
+      const inflated = structuredClone(payload);
+      const entry = field === 'required_gaps' ? 'gap' : field === 'missing'
+        ? { path: '.ai-factory/extensions/aifhub-extension/x', role: 'reference_candidate', reason: 'absent' }
+        : field === 'skill_context_order'
+          ? { path: '.ai-factory/skill-context/global-skill-context.md', role: 'project_skill_context_global' }
+          : { source: 'skills/aif-done/SKILL.md', target: 'skills/aif-done/references/finalization-contract.md', component_index: 0 };
+      inflated[field] = Array.from({ length: 4097 }, () => structuredClone(entry));
+      assert.throws(() => validateCompositionManifest(inflated), /invalid-composition-manifest/, field);
+    }
+  });
+
+  it('reports drift on exotic candidate paths as stale, not as a validation failure (review R6)', async () => {
+    const exotic = '.ai-factory/extensions/aifhub-extension/injections/references/aif-roadmap/has space-кириллица.md';
+    await put(exotic, 'exotic candidate\n');
+    const baseline = await buildCompositionBaseline(root);
+    assert.equal(baseline.status, 'verified');
+    await prepareCompositionAttempt(root, 'change-r6', 'attempt-1', baseline);
+    await put(exotic, 'drifted exotic candidate\n');
+    const consumed = await recordCompositionConsumption(root, 'change-r6', { attemptId: 'attempt-1', runtimeId: '.claude' });
+    assert.equal(consumed.status, 'stale');
+    assert.ok(consumed.reasons.every(reason => /^[a-z0-9._:/-]{1,200}$/i.test(reason)));
+    assert.ok(consumed.reasons.length <= 100);
+  });
+});

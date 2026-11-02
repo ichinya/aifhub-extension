@@ -169,6 +169,18 @@ it('the write-gate enforces the composition binding and renders its own trace se
   assert.equal(recompiled.ok, true, JSON.stringify(recompiled));
   const freshHook = (await inspectSessionBrief({ ...options, includeBrief: true })).brief.instruction_composition_digest;
   assert.notEqual(freshHook, hook);
+  // An unverified consumption (no declaration) degrades the rendered status
+  // instead of claiming verified (review R2).
+  const unverified = await writeExecutionTrace(id, {
+    sessionBriefDigest: recompiled.digest, instructionCompositionDigest: freshHook,
+    instructionComposition: { runtimeId: '.claude' },
+    changedFiles: [],
+  }, { ...options, runId: 'composition-unverified' });
+  assert.equal(unverified.instructionComposition.status, 'unverified');
+  assert.match(await readFile(unverified.path, 'utf8'), /Status: unverified/);
+  const unverifiedReceipt = await checkPlanCompliance({ ...options, runId: 'composition-unverified', changedFiles: [] });
+  assert.equal(unverifiedReceipt.ok, true, JSON.stringify(unverifiedReceipt.receipt?.blocked_reasons ?? unverifiedReceipt));
+  assert.equal(unverifiedReceipt.receipt.instruction_composition_status, 'unverified');
   const baseline = await buildCompositionBaseline(root);
   await prepareCompositionAttempt(root, id, 'attempt-1', baseline);
   await assert.rejects(
