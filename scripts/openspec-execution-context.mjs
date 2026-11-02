@@ -660,6 +660,9 @@ async function assertCompositionTraceBinding(changeId, trace, options = {}) {
     });
     if (record.status === 'stale') throw compositionBindingError('instruction_composition_stale');
     if (record.status === 'incomplete') throw compositionBindingError('instruction_composition_consumption_incomplete');
+    // An unverified consumption degrades the rendered status: the trace must
+    // not claim verified next to an unverified consumption (review R2).
+    if (record.status === 'unverified') result.status = 'unverified';
     result.consumption = { consumption_id: record.consumption_id, status: record.status, assessment: record.assessment };
   }
   return result;

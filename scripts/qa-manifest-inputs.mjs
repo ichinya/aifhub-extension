@@ -187,13 +187,6 @@ async function filesystemSnapshot(store, payload, options) {
       maxBuffer: QA_LIMITS.blob, timeout: 30000 });
     return String(value.stdout ?? value);
   }
-  const visible = (await git(['ls-files', '--cached', '--others', '--exclude-standard', '-z'])).split('\0').filter(Boolean);
-  const ignored = (await git(['ls-files', '--others', '--ignored', '--exclude-standard', '-z'])).split('\0').filter(Boolean);
-  const stage = await git(['ls-files', '--stage', '-z']);
-  requireValue(!/(?:^|\0)160000 /.test(stage), 'submodule-identity-unproven', true);
-  const actualDiff = await git(['diff', '--no-ext-diff', '--no-textconv', '--binary', 'HEAD', '--']);
-  const changedPaths = sorted([...(await git(['diff', '--no-ext-diff', '--no-textconv', '--name-only', '-z', 'HEAD', '--'])).split('\0'),
-    ...(await git(['ls-files', '--others', '--exclude-standard', '-z'])).split('\0')].filter(Boolean));
   const roots = allDeclaredRoots(payload);
   const qaInternal = p => within(p, `${store.qa}/waves`) || within(p, `${store.qa}/results`)
     || within(p, `${store.qa}/bodies`) || within(p, `${store.qa}/artifacts`)
@@ -203,6 +196,16 @@ async function filesystemSnapshot(store, payload, options) {
       .some(name => withinCi(p, `${store.qa}/${name}`));
   const excluded = p => within(p, '.git') || qaInternal(p)
     || within(p, `.ai-factory/state/${payload.target.id}/compositions`);
+  const visible = (await git(['ls-files', '--cached', '--others', '--exclude-standard', '-z'])).split('\0').filter(Boolean);
+  // Closed namespaces are excluded before the catalog limits: a flood of
+  // gitignored paths under compositions/ must not fail the snapshot when the
+  // projected inventory is clean (review R7).
+  const ignored = (await git(['ls-files', '--others', '--ignored', '--exclude-standard', '-z'])).split('\0').filter(Boolean).filter(p => !excluded(p));
+  const stage = await git(['ls-files', '--stage', '-z']);
+  requireValue(!/(?:^|\0)160000 /.test(stage), 'submodule-identity-unproven', true);
+  const actualDiff = await git(['diff', '--no-ext-diff', '--no-textconv', '--binary', 'HEAD', '--']);
+  const changedPaths = sorted([...(await git(['diff', '--no-ext-diff', '--no-textconv', '--name-only', '-z', 'HEAD', '--'])).split('\0'),
+    ...(await git(['ls-files', '--others', '--exclude-standard', '-z'])).split('\0')].filter(Boolean));
   requireValue(!roots.some(excluded), 'self-referential-input', true);
   const names = new Set(visible.filter(p => !excluded(p)));
   const directories = new Set();

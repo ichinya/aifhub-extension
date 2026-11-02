@@ -382,7 +382,7 @@ export function validateCompositionManifest(value) {
     previous = entry;
   }
   requireValue(new Set(value.injection_order.map(entry => entry.ordinal)).size === value.injection_order.length, 'invalid-composition-manifest');
-  requireValue(Array.isArray(value.skill_context_order), 'invalid-composition-manifest');
+  requireValue(Array.isArray(value.skill_context_order) && value.skill_context_order.length <= MAX_COMPONENTS, 'invalid-composition-manifest');
   for (const entry of value.skill_context_order) {
     requireValue(entry && typeof entry === 'object' && !Array.isArray(entry) && Object.keys(entry).length === 2
       && SKILL_CONTEXT_ROLES.includes(entry.role), 'invalid-composition-manifest');
@@ -393,7 +393,7 @@ export function validateCompositionManifest(value) {
       : /^\.ai-factory\/skill-context\/[\w-]+-plus\/SKILL\.md$/.test(entry.path), 'invalid-composition-manifest');
     requireValue(value.components.some(item => item.path === entry.path && item.role === entry.role), 'invalid-composition-manifest');
   }
-  requireValue(Array.isArray(value.selected_references), 'invalid-composition-manifest');
+  requireValue(Array.isArray(value.selected_references) && value.selected_references.length <= MAX_COMPONENTS, 'invalid-composition-manifest');
   for (const entry of value.selected_references) {
     requireValue(entry && typeof entry === 'object' && !Array.isArray(entry) && Object.keys(entry).length === 3
       && typeof entry.source === 'string' && typeof entry.target === 'string', 'invalid-composition-manifest');
@@ -403,7 +403,8 @@ export function validateCompositionManifest(value) {
     const component = value.components[entry.component_index];
     requireValue(component.path === `${EXTENSION_ROOT}/${entry.target}` && component.role === 'extension_reference', 'invalid-composition-manifest');
   }
-  requireValue(Array.isArray(value.missing) && Array.isArray(value.required_gaps), 'invalid-composition-manifest');
+  requireValue(Array.isArray(value.missing) && value.missing.length <= MAX_COMPONENTS
+    && Array.isArray(value.required_gaps) && value.required_gaps.length <= MAX_COMPONENTS, 'invalid-composition-manifest');
   for (const entry of value.missing) {
     requireValue(entry && typeof entry === 'object' && !Array.isArray(entry) && Object.keys(entry).length === 3
       && COMPOSITION_ROLES.includes(entry.role) && ['absent', 'unreadable', 'unsafe', 'runtime-absent'].includes(entry.reason), 'invalid-composition-manifest');
@@ -507,6 +508,7 @@ export async function compositionStore(rootDir, changeId) {
         requireValue(name.endsWith('.json'), 'invalid-composition-json', true);
         const record = await readJson(`${directory}/${name}`);
         requireValue(record?.consumption_id === name.slice(0, -5), 'invalid-composition-json', true);
+        validateConsumption(record);
         records.push(record);
       }
       return records;
@@ -626,7 +628,14 @@ export async function recordCompositionConsumption(rootDir, changeId, input) {
   // A consumption bound to a pinned baseline index must use the prepared
   // record pinned to exactly that index (review F11).
   requireValue(input.expectedIndexDigest === undefined || prepared.index_digest === input.expectedIndexDigest, 'composition-prepared-mismatch', true);
+  // Reasons are charset- and count-bounded (validator contract): paths outside
+  // the portable reason alphabet degrade to a short content digest (review R6).
+  const reasonPath = value => /^[a-z0-9._:/-]{1,150}$/i.test(value) ? value : `sha-${digest(value).slice(0, 16)}`;
   const reasons = [];
+  const pushReason = reason => {
+    if (reasons.length < 90) reasons.push(reason);
+    else if (reasons.length === 90) reasons.push('reasons-truncated');
+  };
   const rehash = [];
   let freshness = 'pass';
   const markerFor = component => prepared.injection_order?.find(entry => entry.component_index === prepared.components.indexOf(component)
@@ -650,10 +659,10 @@ export async function recordCompositionConsumption(rootDir, changeId, input) {
     } catch (error) {
       if (!(error instanceof WorkflowError)) throw error;
       observed = null;
-      reasons.push(`rehash-unsupported:${component.path}`);
+      pushReason(`rehash-unsupported:${reasonPath(component.path)}`);
     }
     const match = observed === component.sha256;
-    if (!match) { freshness = 'stale'; reasons.push(`rehash-mismatch:${component.path}`); }
+    if (!match) { freshness = 'stale'; pushReason(`rehash-mismatch:${reasonPath(component.path)}`); }
     rehash.push({ path: component.path, role: component.role, expected_sha256: component.sha256, observed_sha256: observed, match });
   }
   const byPath = new Map();
@@ -677,8 +686,8 @@ export async function recordCompositionConsumption(rootDir, changeId, input) {
   // attest a verified consumption (review F6).
   let completeness = prepared.status === 'verified' ? 'pass' : 'fail';
   if (prepared.status !== 'verified') {
-    reasons.push(`prepared-${prepared.status}`);
-    for (const gap of (prepared.required_gaps ?? []).slice(0, 20)) reasons.push(`prepared-gap:${gap}`);
+    pushReason(`prepared-${prepared.status}`);
+    for (const gap of (prepared.required_gaps ?? []).slice(0, 20)) pushReason(`prepared-gap:${reasonPath(gap)}`);
   }
   const declaration = input.declaration === undefined ? null : input.declaration;
   let declarationVerification = 'unverified';
@@ -689,42 +698,42 @@ export async function recordCompositionConsumption(rootDir, changeId, input) {
     if (!Array.isArray(references)) {
       completeness = 'fail';
       declarationVerification = 'fail';
-      reasons.push('declaration-malformed');
+      pushReason('declaration-malformed');
     } else {
       const seen = new Set();
       for (const reference of references) {
         const componentPath = typeof reference?.path === 'string' ? reference.path : null;
-        if (componentPath === null || seen.has(componentPath)) { completeness = 'fail'; declarationVerification = 'fail'; reasons.push('declaration-duplicate-or-malformed'); continue; }
+        if (componentPath === null || seen.has(componentPath)) { completeness = 'fail'; declarationVerification = 'fail'; pushReason('declaration-duplicate-or-malformed'); continue; }
         seen.add(componentPath);
         const component = byPath.get(componentPath);
         // Namespace rule (design): runtime root and extension root are two
         // distinct namespaces; role and path must agree with each other.
         if (!component || (component.role.startsWith('runtime_') && !component.path.startsWith(`${runtimeRoot}/`))
           || (!component.role.startsWith('runtime_') && !component.path.startsWith(`${EXTENSION_ROOT}/`))) {
-          completeness = 'fail'; declarationVerification = 'fail'; reasons.push('reference-outside-prepared'); continue;
+          completeness = 'fail'; declarationVerification = 'fail'; pushReason('reference-outside-prepared'); continue;
         }
         const observed = await currentHash(componentPath);
         // Declared sha must equal the prepared hash (membership in the pinned
         // snapshot) and the current bytes (review F10): bytes changed after
         // prepare are attested stale by the rehash, never verified.
         if (observed !== reference.sha256 || component.sha256 !== reference.sha256) {
-          completeness = 'fail'; declarationVerification = 'fail'; reasons.push(`reference-sha-mismatch:${componentPath}`); continue;
+          completeness = 'fail'; declarationVerification = 'fail'; pushReason(`reference-sha-mismatch:${reasonPath(componentPath)}`); continue;
         }
         if (component.role === 'reference_candidate') candidateDeclared = true;
       }
       for (const required of requiredReferenceTargets(runtimeIdValue)) {
         const componentPath = `${EXTENSION_ROOT}/${required}`;
-        if (!seen.has(componentPath)) { completeness = 'fail'; declarationVerification = 'fail'; reasons.push(`required-reference-undeclared:${componentPath}`); continue; }
+        if (!seen.has(componentPath)) { completeness = 'fail'; declarationVerification = 'fail'; pushReason(`required-reference-undeclared:${reasonPath(componentPath)}`); continue; }
         const component = byPath.get(componentPath);
         const observed = await currentHash(componentPath);
         const declared = references.find(reference => reference.path === componentPath);
         if (!observed || declared.sha256 !== observed || component.sha256 !== declared.sha256) {
-          completeness = 'fail'; declarationVerification = 'fail'; reasons.push(`required-reference-sha-mismatch:${componentPath}`);
+          completeness = 'fail'; declarationVerification = 'fail'; pushReason(`required-reference-sha-mismatch:${reasonPath(componentPath)}`);
         }
       }
-      if (completeness === 'pass' && candidateDeclared) { declarationVerification = 'unverified'; reasons.push('candidate-reference-unverified'); }
+      if (completeness === 'pass' && candidateDeclared) { declarationVerification = 'unverified'; pushReason('candidate-reference-unverified'); }
     }
-  } else reasons.push('declaration-absent');
+  } else pushReason('declaration-absent');
   const status = freshness === 'stale' ? 'stale' : completeness === 'fail' ? 'incomplete'
     : declarationVerification === 'unverified' ? 'unverified' : 'verified';
   const consumptionId = input.consumptionId ?? `consumption-${randomUUID()}`;
