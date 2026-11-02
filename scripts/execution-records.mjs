@@ -127,7 +127,10 @@ export function matchesLegacyPredecessor(run, old) {
 function transitionReceipt(run, action, additions, values, key=action) {
   const saved=run.receipts[key];
   requireValue(saved && saved.action===action,'invalid-state');
-  fields(saved.output,['schema','change_id','run_id','kind','lifecycle','execution_state','version','receipt_digest',...additions]);
+  // Receipt outputs may carry the additive composition binding from the run
+  // (review F4); the digest over the output body already covers them.
+  fields(saved.output,['schema','change_id','run_id','kind','lifecycle','execution_state','version','receipt_digest'],['instruction_composition_digest','instruction_composition_status',...additions]);
+  compositionDigest(saved.output.instruction_composition_digest); compositionStatus(saved.output.instruction_composition_status);
   for(const [key,value] of Object.entries(values))requireValue(canonical(saved.output[key])===canonical(value),'invalid-state');
   return saved;
 }

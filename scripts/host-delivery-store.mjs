@@ -13,7 +13,11 @@ export const DELIVERY_LIMITS = Object.freeze({ body: 16 * 1024 * 1024, stdin: 10
 // Shared adapter utilities must not import execution-state: its CLI awaits dispatch.
 export const bindingFor = ({ run, result, task_id }, target) => ({ change_id: run.change_id, run_id: run.run_id, task_id,
   run_version_at_prepare: run.version, result_submitted_version: result.submitted_version, result_digest: result.digest,
-  source_digest: run.source.namespace_digest, context_digest: result.context_digest, worktree_digest: result.worktree_digest, target_digest: digest(target) });
+  source_digest: run.source.namespace_digest, context_digest: result.context_digest, worktree_digest: result.worktree_digest, target_digest: digest(target),
+  // Additive composition binding travels with the frozen result when present;
+  // historical results bind without it (review F4).
+  ...(result.instruction_composition_digest !== undefined ? { instruction_composition_digest: result.instruction_composition_digest }
+    : run.instruction_composition_digest !== undefined ? { instruction_composition_digest: run.instruction_composition_digest } : {}) });
 export function validCapabilities(c, r, s) {
   const i = c?.idempotency;
   return c?.idempotent_create === true && c.read_by_request_id === true && c.fetch_response === true

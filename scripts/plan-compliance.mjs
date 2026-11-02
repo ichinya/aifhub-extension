@@ -80,7 +80,9 @@ async function findTrace(root, changeId, runId) {
   const sessionBriefDigest = binding?.match(/^Digest: ([a-f0-9]{64})$/m)?.[1] ?? null;
   const composition = parseTraceSection(content, 'Instruction composition');
   const instructionCompositionDigest = composition?.match(/^Digest: ([a-f0-9]{64})$/m)?.[1] ?? null;
-  const instructionCompositionStatus = composition?.match(/^Status: ([a-z_]+)$/m)?.[1] ?? null;
+  // Whitelist the emitted status enum: the receipt field is schema-enum bound,
+  // so an arbitrary word in a hand-written trace must not flow through.
+  const instructionCompositionStatus = composition?.match(/^Status: (unavailable|incomplete|unverified|stale|verified)$/m)?.[1] ?? null;
   const run = selected.name.replace(/\.md$/, '');
   const acceptanceImpact = traceAcceptanceImpact(content);
   return { runId: run, changedFiles, sessionBriefDigest, instructionCompositionDigest, instructionCompositionStatus, acceptanceImpact };

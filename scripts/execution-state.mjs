@@ -90,7 +90,9 @@ function view(run) {
   return base;
 }
 function receipt(run,action,input,key,extra={}) {
-  const output={schema:RUN_SCHEMA,change_id:run.change_id,run_id:run.run_id,kind:run.kind,lifecycle:run.lifecycle,execution_state:run.execution_state,version:run.version,...extra};
+  const output={schema:RUN_SCHEMA,change_id:run.change_id,run_id:run.run_id,kind:run.kind,lifecycle:run.lifecycle,execution_state:run.execution_state,version:run.version,
+    ...(run.instruction_composition_digest!==undefined?{instruction_composition_digest:run.instruction_composition_digest}:{}),
+    ...(run.instruction_composition_status!==undefined?{instruction_composition_status:run.instruction_composition_status}:{}),...extra};
   output.receipt_digest=digest(output);
   run.receipts[key]={action,input_digest:digest(input),submitted_version:input.version,output}; return output;
 }
@@ -103,7 +105,9 @@ function advance(run) { run.version++; run.updated_at=now(); }
 async function saveRun(store,filename,run) { await validateHistoricalRun(store,run); await store.save(filename,run); }
 function resultEnvelope(run,task,payload,snapshot,evidence) {
   const value={...payload,change_id:run.change_id,task_id:task,run_id:run.run_id,base_revision:snapshot.head,
-    context_digest:run.context.digest,worktree_digest:digest(snapshot),evidence_digests:evidence,payload_digest:digest(payload),submitted_version:run.version};
+    context_digest:run.context.digest,worktree_digest:digest(snapshot),evidence_digests:evidence,payload_digest:digest(payload),submitted_version:run.version,
+    ...(run.instruction_composition_digest!==undefined?{instruction_composition_digest:run.instruction_composition_digest}:{}),
+    ...(run.instruction_composition_status!==undefined?{instruction_composition_status:run.instruction_composition_status}:{})};
   return {...value,digest:digest(value)};
 }
 function transactionId(action,input) { return digest(`${action}:${input.run_id??''}:${input.recovery_id??input.upgrade_id??''}`).slice(0,64); }
@@ -259,7 +263,9 @@ export async function executionCommand(action,input,options={}) {
         requireValue(input.result_digest===item.result.digest,'result-mismatch',true); item.accepted=true; extra={...extra,task_id:input.task_id,result_digest:item.result.digest};
       } else if(action==='batch-close') {
         const accepted=Object.keys(run.items).filter(k=>run.items[k].accepted).sort(),unfinished=Object.keys(run.items).filter(k=>!run.items[k].accepted).sort();
-        run.closure={accepted,unfinished,context_digest:run.context.digest,worktree_digest:digest(snapshot),seal_digest:run.seal.digest};
+        run.closure={accepted,unfinished,context_digest:run.context.digest,worktree_digest:digest(snapshot),seal_digest:run.seal.digest,
+          ...(run.instruction_composition_digest!==undefined?{instruction_composition_digest:run.instruction_composition_digest}:{}),
+          ...(run.instruction_composition_status!==undefined?{instruction_composition_status:run.instruction_composition_status}:{})};
         run.lifecycle='closed'; run.execution_state='stopped'; extra={...extra,accepted,unfinished};
       }
     }
@@ -346,7 +352,9 @@ async function interrupt(store,folder,filename,h,original,input,options) {
   const pending=ledger.attempts.filter(a=>a.run_id===run.run_id && a.outcome==='pending');
   for(const a of pending) { a.outcome='interrupted'; a.recovery_id=input.recovery_id; }
   run.recovery={recovery_id:input.recovery_id,reason:input.reason,execution_state:input.execution_state,evidence,
-    pending_attempts:pending.map(a=>a.attempt_id),drift:await drift(store,original),interrupted_at:now()};
+    pending_attempts:pending.map(a=>a.attempt_id),drift:await drift(store,original),interrupted_at:now(),
+    ...(input.instruction_composition_digest!==undefined?{instruction_composition_digest:input.instruction_composition_digest}:{}),
+    ...(input.instruction_composition_status!==undefined?{instruction_composition_status:input.instruction_composition_status}:{})};
   run.lifecycle='interrupted'; run.execution_state=input.execution_state; advance(run);
   const output=receipt(run,'interrupt',input,'interrupt',{recovery_id:input.recovery_id}); await validateHistoricalRun(store,run,original); validateLedger(ledger);
   const writes=[]; if(!h.source)writes.push([`${folder}/source.json`,{schema:SOURCE_SCHEMA,source:run.source}]);

@@ -86,12 +86,13 @@ export async function observeQaSnapshot(store, payload, options = {}) {
   requireValue(observed && observed.complete === true && typeof observed.worktree_identity === 'string'
     && observed.worktree_identity.length > 0, 'snapshot-incomplete', true);
   requireValue(observed.files && typeof observed.files === 'object', 'snapshot-incomplete', true);
-  const names = Object.keys(observed.files);
-  requireValue(names.length <= QA_LIMITS.files, 'qa-files-limit', true);
   // Closed runtime namespace (#252): per-attempt composition records are
   // written on the write-gate between QA waves, so every snapshot projection
-  // excludes them regardless of the snapshot provider in front of the store.
+  // (files, directory_names, ignored_names, changed_paths) excludes them
+  // regardless of the snapshot provider in front of the store (review F7).
   const compositionsNamespace = p => within(p, `.ai-factory/state/${payload.target.id}/compositions`);
+  const names = Object.keys(observed.files).filter(p => !compositionsNamespace(p));
+  requireValue(names.length <= QA_LIMITS.files, 'qa-files-limit', true);
   const collision = new Map();
   const directoryCase = new Map();
   function registerPath(relative) {
@@ -103,7 +104,7 @@ export async function observeQaSnapshot(store, payload, options = {}) {
       directoryCase.set(prefix.toLowerCase(), prefix);
     }
   }
-  const directories = new Set(observed.directory_names ?? []);
+  const directories = new Set((observed.directory_names ?? []).filter(p => !compositionsNamespace(p)));
   requireValue(directories.size <= QA_LIMITS.files && [...directories].every(p => Object.hasOwn(observed.files, p)
     && observed.files[p] === null), 'directory-catalog-invalid', true);
   let bytes = 0;
@@ -123,7 +124,7 @@ export async function observeQaSnapshot(store, payload, options = {}) {
     files[relative] = data === null ? { kind: directories.has(relative) ? 'directory' : 'missing' } : { kind: 'file', sha256: digest(data),
       projection: material ? null : metadataProjection(relative, data) };
   }
-  const ignored = sorted(observed.ignored_names ?? []);
+  const ignored = sorted((observed.ignored_names ?? []).filter(p => !compositionsNamespace(p)));
   requireValue(ignored.length <= QA_LIMITS.files, 'qa-files-limit', true);
   for (const p of ignored) {
     sourcePath(p);
@@ -208,6 +209,10 @@ async function filesystemSnapshot(store, payload, options) {
   // Inventory declared ignored roots, plus the two closed metadata namespaces.
   const scanRoots = sorted([...roots, `.ai-factory/state/${payload.target.id}/delivery`, `.ai-factory/state/${payload.target.id}/status.json`]);
   async function walk(relative, tombstone = true) {
+    // A declared root may be an ancestor of the closed compositions namespace
+    // (e.g. a scope covering all of .ai-factory/state): the closed namespace
+    // never enters the snapshot even below a declared root (review F7).
+    if (excluded(relative)) return;
     sourcePath(relative);
     const filename = await store.safeTarget(relative);
     let info;

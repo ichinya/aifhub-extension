@@ -181,7 +181,9 @@ async function settle(input, s, options, counters) {
   const timestamp = s.now(), record = validateSettlement({ schema: SETTLEMENT_SCHEMA, settlement_id: run.run_id, change_id: run.change_id,
     run_id: run.run_id, kind: run.kind, binding: { manifest_digest: digest(run.manifest ?? { task_id: run.task_id, scope: run.scope }),
       seal_digest: run.seal?.digest ?? null, closure_digest: run.closure ? digest(run.closure) : null, context_digest: run.context.digest,
-      worktree_digest: digest(run.checkpoint.worktree), source_digest: run.source.namespace_digest, accepted: acceptedSet(run),
+      worktree_digest: digest(run.checkpoint.worktree), source_digest: run.source.namespace_digest,
+      ...(run.instruction_composition_digest !== undefined ? { instruction_composition_digest: run.instruction_composition_digest } : {}),
+      accepted: acceptedSet(run),
       results: results(run).map(({ task_id, result }) => ({ task_id, result_digest: result.digest, evidence_digest: digest(result.evidence_digests) })) },
     deliveries, decision: structuredClone(input.decision), input_digest: digest(input), revision: 1, created_at: timestamp, updated_at: timestamp });
   const path = lifecyclePaths(input.change_id, 'settlement', input.run_id).record;
