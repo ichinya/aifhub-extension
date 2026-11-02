@@ -102,11 +102,12 @@ export function validateDeliveryRequest(r) {
   } else {
     fields(r.identity, ['request_uuid', 'body_sha256', 'target_kind']);
     requireValue(r.identity.request_uuid === r.request_uuid && r.identity.body_sha256 === r.body.sha256 && r.identity.target_kind === r.target.kind, 'invalid-delivery-state', true);
-    fields(r.binding, ['change_id', 'run_id', 'task_id', 'run_version_at_prepare', 'result_submitted_version', 'result_digest', 'source_digest', 'context_digest', 'worktree_digest', 'target_digest']);
+    fields(r.binding, ['change_id', 'run_id', 'task_id', 'run_version_at_prepare', 'result_submitted_version', 'result_digest', 'source_digest', 'context_digest', 'worktree_digest', 'target_digest'], ['instruction_composition_digest']);
     for (const k of ['change_id', 'run_id', 'task_id']) requireValue(r.binding[k] === r.slot[k], 'invalid-delivery-state', true);
     count(r.binding.run_version_at_prepare); count(r.binding.result_submitted_version);
     requireValue(r.binding.run_version_at_prepare > r.binding.result_submitted_version && r.binding.result_submitted_version > 0, 'invalid-delivery-state', true);
     for (const k of ['result_digest', 'source_digest', 'context_digest', 'worktree_digest', 'target_digest']) hash(r.binding[k]);
+    if (r.binding.instruction_composition_digest !== undefined) hash(r.binding.instruction_composition_digest);
     requireValue(r.binding.target_digest === digest(r.target), 'invalid-delivery-state', true);
     fields(r.verdict, ['gate', 'gate_result_sha256']); hash(r.verdict.gate_result_sha256);
     requireValue(['verify', 'rules', 'review', 'security'].includes(r.verdict.gate), 'invalid-delivery-state', true);

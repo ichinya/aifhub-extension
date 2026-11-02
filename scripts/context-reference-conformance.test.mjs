@@ -449,10 +449,15 @@ function assertReadScope(telemetry, oracle, changeId, optionalConsumerProbes = [
   assert.equal(telemetry.status, 'observed', JSON.stringify(telemetry.reasons));
   assert.equal(telemetry.openHandlesAtStop, 0);
   assert.deepEqual(telemetry.unattributedReads, []);
+  // The instruction-composition producer probes the installed ledger and the
+  // installed extension surface on every compile (#252); without an installed
+  // extension these are exactly the two fixed probe paths.
+  const compositionSurface = file => file === '.ai-factory.json'
+    || file.startsWith('.ai-factory/extensions/aifhub-extension/');
   for (const [file, row] of Object.entries(telemetry.perPath)) {
     if (row.bytesRead > 0 || row.opens > 0) {
       assert.ok(file in oracle.include || optionalConsumerProbes.includes(file) || file.startsWith(`.ai-factory/state/${changeId}/`)
-        || file === '.ai-factory/state/.gitignore', `unexpected content-read path: ${file}`);
+        || file === '.ai-factory/state/.gitignore' || compositionSurface(file), `unexpected content-read path: ${file}`);
     }
   }
 }

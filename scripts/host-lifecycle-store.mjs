@@ -28,9 +28,10 @@ export function validateSettlement(r) {
   fields(r.decision, ['actor', 'outcome', 'decided_at']); identifier(r.decision.actor);
   requireValue(['settled', 'partial', 'rejected'].includes(r.decision.outcome) && typeof r.decision.decided_at === 'string'
     && Number.isFinite(Date.parse(r.decision.decided_at)), 'invalid-lifecycle-record', true);
-  fields(r.binding, ['manifest_digest', 'seal_digest', 'closure_digest', 'context_digest', 'worktree_digest', 'source_digest', 'accepted', 'results']);
+  fields(r.binding, ['manifest_digest', 'seal_digest', 'closure_digest', 'context_digest', 'worktree_digest', 'source_digest', 'accepted', 'results'], ['instruction_composition_digest']);
   for (const key of ['manifest_digest', 'context_digest', 'worktree_digest', 'source_digest']) hash(r.binding[key]);
   for (const key of ['seal_digest', 'closure_digest']) if (r.binding[key] !== null) hash(r.binding[key]);
+  if (r.binding.instruction_composition_digest !== undefined) hash(r.binding.instruction_composition_digest);
   requireValue(Array.isArray(r.binding.accepted) && new Set(r.binding.accepted).size === r.binding.accepted.length && r.binding.accepted.length <= 5, 'invalid-lifecycle-record', true);
   r.binding.accepted.forEach(identifier);
   requireValue(Array.isArray(r.binding.results) && r.binding.results.length <= 5, 'invalid-lifecycle-record', true);

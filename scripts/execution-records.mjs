@@ -7,7 +7,12 @@ export const RUN_SCHEMA = 'aifhub.execution.v2';
 export const LEDGER_SCHEMA = 'aifhub.fix-attempts.v2';
 export const SOURCE_SCHEMA = 'aifhub.execution-source.v1';
 export const TX_SCHEMA = 'aifhub.execution-transaction.v1';
+export const COMPOSITION_STATUSES = ['unavailable', 'incomplete', 'unverified', 'stale', 'verified'];
 export const hash = value => requireValue(typeof value === 'string' && /^[a-f0-9]{64}$/.test(value), 'invalid-state');
+// Additive composition binding (#252): optional next to context_digest, never
+// a replacement; historical records without the fields stay valid.
+export const compositionDigest = value => { if (value !== undefined && value !== null) hash(value); return value; };
+export const compositionStatus = value => { if (value !== undefined) enumeration(value, COMPOSITION_STATUSES); return value; };
 const integer = n => requireValue(Number.isSafeInteger(n) && n >= 1, 'invalid-state');
 const enumeration = (v, values) => requireValue(values.includes(v), 'invalid-state');
 const object = v => requireValue(v && typeof v === 'object' && !Array.isArray(v), 'invalid-state');
@@ -71,11 +76,12 @@ export function resultPayload(input) {
   return {...input, changed_files:[...input.changed_files].sort(), evidence:[...input.evidence].sort()};
 }
 export function resultRecord(value, run, task) {
-  const extra = ['change_id','task_id','run_id','base_revision','context_digest','worktree_digest','evidence_digests','payload_digest','submitted_version','digest'];
+  const extra = ['change_id','task_id','run_id','base_revision','context_digest','worktree_digest','evidence_digests','payload_digest','submitted_version','digest','instruction_composition_digest','instruction_composition_status'];
   const payload = Object.fromEntries(Object.entries(value).filter(([k])=>!extra.includes(k)));
   resultPayload(payload);
   requireValue(value.change_id===run.change_id && value.run_id===run.run_id && value.task_id===task && value.base_revision===run.initial_worktree.head && value.context_digest===run.context.digest, 'invalid-state');
   hash(value.worktree_digest); refs(value.evidence_digests); integer(value.submitted_version);
+  compositionDigest(value.instruction_composition_digest); compositionStatus(value.instruction_composition_status);
   requireValue(canonical(Object.keys(value.evidence_digests).sort())===canonical(payload.evidence) && value.payload_digest===digest(payload), 'invalid-state');
   const {digest: checksum,...rest}=value; requireValue(checksum===digest(rest),'invalid-state');
 }
@@ -83,7 +89,8 @@ function receipt(value) {
   fields(value,['action','input_digest','submitted_version','output']);
   enumeration(value.action,['result','accept','batch-seal','batch-result','batch-accept','batch-close','interrupt','stop-confirm','upgrade']);
   hash(value.input_digest); integer(value.submitted_version);
-  fields(value.output,['schema','change_id','run_id','kind','lifecycle','execution_state','version'],['receipt_digest','seal_digest','result_digest','task_id','accepted','unfinished','recovery_id','confirmation_id']);
+  fields(value.output,['schema','change_id','run_id','kind','lifecycle','execution_state','version'],['receipt_digest','seal_digest','result_digest','task_id','accepted','unfinished','recovery_id','confirmation_id','instruction_composition_digest','instruction_composition_status']);
+  compositionDigest(value.output.instruction_composition_digest); compositionStatus(value.output.instruction_composition_status);
   requireValue(value.output.schema===RUN_SCHEMA,'invalid-state'); executionId(value.output.change_id); identifier(value.output.run_id); integer(value.output.version);
   enumeration(value.output.kind,['single','batch']); enumeration(value.output.lifecycle,['active','sealed','closed','interrupted']); enumeration(value.output.execution_state,['running','unknown','stopped']);
   for (const k of ['receipt_digest','seal_digest','result_digest']) if(value.output[k]!==undefined) hash(value.output[k]);
@@ -168,11 +175,12 @@ function batchReceipts(run) {
 export function validateRun(run, {predecessors=[]}={}) {
   const legacy=run?.schema==='aifhub.execution.v1';
   requireValue(legacy || run?.schema===RUN_SCHEMA,'unsupported-run-schema');
-  fields(run,['schema','change_id','run_id','task_id','owner','worker','role','scope','context_paths','version','status','context','initial_worktree','checkpoint',...(!legacy?['kind','lifecycle','execution_state','source','receipts','created_at','updated_at']:[])], ['result','accepted_by',...(!legacy?['manifest','preflight','items','seal','closure','recovery','confirmation','legacy']:[])]);
+  fields(run,['schema','change_id','run_id','task_id','owner','worker','role','scope','context_paths','version','status','context','initial_worktree','checkpoint',...(!legacy?['kind','lifecycle','execution_state','source','receipts','created_at','updated_at']:[])], ['result','accepted_by',...(!legacy?['manifest','preflight','items','seal','closure','recovery','confirmation','legacy','instruction_composition_digest','instruction_composition_status']:[])]);
   executionId(run.change_id); identifier(run.run_id); if(run.task_id!==null || legacy) identifier(run.task_id);
   identifier(run.owner); identifier(run.worker); enumeration(run.role,['implement','fix']);
   requireValue(stringList(run.scope).length>0,'invalid-state'); run.scope.forEach(portablePath); assertAuxiliaryPaths(run.context_paths);
   integer(run.version); enumeration(run.status,['started','completed','failed','blocked','cancelled','timed_out','accepted']);
+  compositionDigest(run.instruction_composition_digest); compositionStatus(run.instruction_composition_status);
   contextRecord(run.context); snapshot(run.initial_worktree);
   fields(run.checkpoint,['worktree','progress']); snapshot(run.checkpoint.worktree); progressRecord(run.checkpoint.progress);
   requireValue(canonical(run.initial_worktree.submodules ?? {}) === canonical(run.checkpoint.worktree.submodules ?? {}), 'invalid-state');
@@ -197,7 +205,8 @@ export function validateRun(run, {predecessors=[]}={}) {
   if(run.legacy) { fields(run.legacy,['predecessor_digest']); hash(run.legacy.predecessor_digest); }
   if(run.legacy)requireValue(inherited && run.lifecycle==='interrupted','invalid-state');
   if(run.recovery) {
-    fields(run.recovery,['recovery_id','reason','execution_state','evidence','pending_attempts','drift','interrupted_at']);
+    fields(run.recovery,['recovery_id','reason','execution_state','evidence','pending_attempts','drift','interrupted_at'],['instruction_composition_digest','instruction_composition_status']);
+    compositionDigest(run.recovery.instruction_composition_digest); compositionStatus(run.recovery.instruction_composition_status);
     identifier(run.recovery.recovery_id); enumeration(run.recovery.reason,['cancelled','timed_out','abandoned']); enumeration(run.recovery.execution_state,['stopped','running','unknown']); evidenceRefs(run.recovery.evidence);
     stringList(run.recovery.pending_attempts,1000).forEach(identifier); stringList(run.recovery.drift,8).forEach(d=>enumeration(d,['source-unavailable','source','context','revision','worktree','evidence']));
     requireValue(typeof run.recovery.interrupted_at==='string' && Number.isFinite(Date.parse(run.recovery.interrupted_at)) && run.lifecycle==='interrupted','invalid-state');
@@ -222,7 +231,7 @@ export function validateRun(run, {predecessors=[]}={}) {
     for(const [id,item] of Object.entries(run.items)) { fields(item,[],['result','accepted']); if(item.result) resultRecord(item.result,run,id); if(item.accepted!==undefined) requireValue(item.accepted===true && item.result?.status==='completed','invalid-state'); }
     if(run.seal) { fields(run.seal,['worktree','evidence','digest']); snapshot(run.seal.worktree); object(run.seal.evidence); requireValue(canonical(Object.keys(run.seal.evidence).sort())===canonical(Object.keys(run.items).sort()),'invalid-state'); Object.values(run.seal.evidence).forEach(v=>refs(v)); requireValue(run.seal.digest===digest({worktree:run.seal.worktree,evidence:run.seal.evidence}),'invalid-state'); }
     if(['sealed','closed'].includes(run.lifecycle)) requireValue(Boolean(run.seal),'invalid-state');
-    if(run.closure) { fields(run.closure,['accepted','unfinished','context_digest','worktree_digest','seal_digest']); stringList(run.closure.accepted,5); stringList(run.closure.unfinished,5); for(const k of ['context_digest','worktree_digest','seal_digest']) hash(run.closure[k]); requireValue(run.lifecycle==='closed' && canonical(run.closure.accepted)===canonical(Object.keys(run.items).filter(k=>run.items[k].accepted).sort()) && canonical(run.closure.unfinished)===canonical(Object.keys(run.items).filter(k=>!run.items[k].accepted).sort()),'invalid-state'); }
+    if(run.closure) { fields(run.closure,['accepted','unfinished','context_digest','worktree_digest','seal_digest'],['instruction_composition_digest','instruction_composition_status']); stringList(run.closure.accepted,5); stringList(run.closure.unfinished,5); for(const k of ['context_digest','worktree_digest','seal_digest']) hash(run.closure[k]); compositionDigest(run.closure.instruction_composition_digest); compositionStatus(run.closure.instruction_composition_status); requireValue(run.lifecycle==='closed' && canonical(run.closure.accepted)===canonical(Object.keys(run.items).filter(k=>run.items[k].accepted).sort()) && canonical(run.closure.unfinished)===canonical(Object.keys(run.items).filter(k=>!run.items[k].accepted).sort()),'invalid-state'); }
     if(run.seal) {
       requireValue(canonical(run.seal.worktree)===canonical(run.checkpoint.worktree) && run.receipts['batch-seal']?.output.seal_digest===run.seal.digest,'invalid-state');
       for(const [id,item] of Object.entries(run.items)) {
@@ -264,9 +273,10 @@ export function validateLedger(ledger) {
   fields(ledger,['schema','attempts'],ledger.schema===LEDGER_SCHEMA?['aliases']:[]);
   requireValue(Array.isArray(ledger.attempts) && ledger.attempts.length<=1000,'invalid-attempt-ledger'); const ids=new Set();
   for(const a of ledger.attempts) {
-    fields(a,['attempt_id','run_id','worker','fingerprint','budget','identity','hypothesis','worktree_digest','outcome'],['evidence','recovery_id']);
+    fields(a,['attempt_id','run_id','worker','fingerprint','budget','identity','hypothesis','worktree_digest','outcome'],['evidence','recovery_id','instruction_composition_digest','instruction_composition_status']);
     for(const k of ['attempt_id','run_id','worker']) identifier(a[k]); requireValue(!ids.has(a.attempt_id),'invalid-attempt-ledger'); ids.add(a.attempt_id);
     for(const k of ['fingerprint','budget','worktree_digest']) hash(a[k]); boundedText(a.hypothesis); enumeration(a.outcome,['pending','passed','failed','blocked','interrupted']);
+    compositionDigest(a.instruction_composition_digest); compositionStatus(a.instruction_composition_status);
     fields(a.identity,['task_id','finding_id','context','check','environment','inputs']); identifier(a.identity.task_id); identifier(a.identity.finding_id); hash(a.identity.context); boundedText(a.identity.check,500); hash(a.identity.environment); evidenceRefs(a.identity.inputs);
     const {check,...budget}=a.identity;
     requireValue(a.fingerprint===digest({...a.identity,worktree:a.worktree_digest}) && a.budget===digest(budget),'invalid-attempt-ledger');

@@ -24,20 +24,23 @@ async function loadRuntime() {
 }
 
 const common=['change_id','run_id'], mutation=[...common,'actor','version'];
+// Composition binding rides as optional input next to context-bearing actions;
+// it never enters the budget/fingerprint identity (contract decision 13).
+const composition=['instruction_composition_digest','instruction_composition_status'];
 const contracts={
   diagnostics:[[],[]],
-  start:[[...common,'task_id','owner','worker','role','scope'],['context_paths']],
-  'batch-start':[[...common,'owner','worker','role','manifest','preflight_paths'],['context_paths']],
+  start:[[...common,'task_id','owner','worker','role','scope'],['context_paths',...composition]],
+  'batch-start':[[...common,'owner','worker','role','manifest','preflight_paths'],['context_paths',...composition]],
   resume:[common,[]], inspect:[['change_id'],['run_id']],
-  checkpoint:[[...mutation,'progress'],[]], result:[[...mutation,'result'],[]], accept:[[...mutation,'result_digest'],[]],
+  checkpoint:[[...mutation,'progress'],[...composition]], result:[[...mutation,'result'],[...composition]], accept:[[...mutation,'result_digest'],[...composition]],
   'batch-seal':[[...mutation,'evidence'],[]],
   'batch-result':[[...mutation,'task_id','seal_digest','result'],[]],
   'batch-accept':[[...mutation,'task_id','seal_digest','result_digest'],[]],
   'batch-close':[[...mutation,'seal_digest'],[]],
-  interrupt:[[...mutation,'recovery_id','reason','execution_state'],['evidence']],
+  interrupt:[[...mutation,'recovery_id','reason','execution_state'],['evidence',...composition]],
   'stop-confirm':[[...mutation,'recovery_id','confirmation_id','evidence'],[]],
   upgrade:[['change_id','actor','upgrade_id','predecessor_inventory_digest'],[]],
-  'attempt-begin':[[...mutation,'finding_id','hypothesis','check','environment_revision','input_paths'],[]],
+  'attempt-begin':[[...mutation,'finding_id','hypothesis','check','environment_revision','input_paths'],[...composition]],
   'attempt-check':[[...mutation,'finding_id','hypothesis','check','environment_revision','input_paths'],[]],
   'attempt-finish':[[...mutation,'attempt_id','outcome','evidence'],[]],
 };
@@ -79,6 +82,9 @@ function view(run) {
     lifecycle:run.lifecycle??(reserves(run)?'active':'closed'),execution_state:run.execution_state??'unknown',
     base_revision:run.initial_worktree.head,context_digest:run.context.digest,checkpoint_digest:digest(run.checkpoint.worktree),
     scope:run.scope,progress:run.checkpoint.progress,result:run.result??null,accepted_by:run.accepted_by??null,source:run.source??null};
+  // Historical records project without the fields (undefined never renders).
+  if(run.instruction_composition_digest!==undefined)base.instruction_composition_digest=run.instruction_composition_digest;
+  if(run.instruction_composition_status!==undefined)base.instruction_composition_status=run.instruction_composition_status;
   if(run.kind==='batch')Object.assign(base,{items:run.items,seal_digest:run.seal?.digest??null,closure:run.closure??null});
   if(run.recovery)Object.assign(base,{recovery_id:run.recovery.recovery_id,pending_attempts:run.recovery.pending_attempts,drift:run.recovery.drift});
   return base;
@@ -153,6 +159,8 @@ export async function executionCommand(action,input,options={}) {
         return {schema:run.schema,change_id:change,run_id:id,kind:run.kind??'single',version:run.version,status:run.status,
           lifecycle:run.lifecycle??(reserves(run)?'active':'closed'),execution_state:run.execution_state??'unknown',
           context_digest:run.context.digest,checkpoint_digest:digest(run.checkpoint.worktree),record_digest:digest(run),
+          ...(run.instruction_composition_digest!==undefined?{instruction_composition_digest:run.instruction_composition_digest}:{}),
+          ...(run.instruction_composition_status!==undefined?{instruction_composition_status:run.instruction_composition_status}:{}),
           pending_attempts:(h.ledger?.attempts??[]).filter(a=>a.run_id===id && a.outcome==='pending').map(a=>a.attempt_id),
           recovery_id:run.recovery?.recovery_id??null,pending_transactions:pending.filter(p=>p.folder===folder).map(p=>p.tx.id),historical:true};
       }
@@ -183,6 +191,8 @@ export async function executionCommand(action,input,options={}) {
         initial_worktree:snapshot,checkpoint:{worktree:snapshot,progress:{completed_steps:[],next_step:'Execute the assigned task.'}},
         receipts:{},created_at:timestamp,updated_at:timestamp};
       if(run.kind==='batch')Object.assign(run,{manifest:structuredClone(input.manifest),preflight:preflight.refs,items:Object.fromEntries(input.manifest.map(i=>[i.task_id,{}]))});
+      if(input.instruction_composition_digest!==undefined)run.instruction_composition_digest=input.instruction_composition_digest;
+      if(input.instruction_composition_status!==undefined)run.instruction_composition_status=input.instruction_composition_status;
       validateRun(run); const writes=[];
       if(!h.source)writes.push([`${folder}/source.json`,{schema:SOURCE_SCHEMA,source:run.source}]);
       if(!h.ledger)writes.push([`${folder}/fix-attempts.json`,{schema:LEDGER_SCHEMA,attempts:[],aliases:[]}]);
@@ -209,6 +219,8 @@ export async function executionCommand(action,input,options={}) {
     if(old) { const snapshot=await current(store,run); if(run.kind==='batch')await freshSeal(store,run,snapshot); else await freshResult(store,run,snapshot); return old; }
     actor(run,input,owner); requireValue(run.lifecycle!=='closed','run-terminal',true);
     const snapshot=await current(store,run);
+    if(input.instruction_composition_digest!==undefined)run.instruction_composition_digest=input.instruction_composition_digest;
+    if(input.instruction_composition_status!==undefined)run.instruction_composition_status=input.instruction_composition_status;
     if(action==='checkpoint') {
       requireValue(run.lifecycle==='active' && run.status==='started','run-terminal',true);
       run.checkpoint={worktree:snapshot,progress:progressRecord(input.progress)}; advance(run); await saveRun(store,filename,run); return view(run);
@@ -372,7 +384,9 @@ async function attempt(store,folder,run,snapshot,original,action,input) {
     requireValue(!ledger.attempts.some(a=>fingerprints.has(a.fingerprint) && ['pending','failed','blocked','interrupted'].includes(a.outcome)),'no-progress',true);
     requireValue(!pending,'pending-attempt',true);
     requireValue(ledger.attempts.length<1000,'attempt-ledger-full',true);
-    const entry={attempt_id:randomUUID(),run_id:run.run_id,worker:run.worker,fingerprint,budget,identity,hypothesis:input.hypothesis,worktree_digest:digest(snapshot),outcome:'pending'};
+    const entry={attempt_id:randomUUID(),run_id:run.run_id,worker:run.worker,fingerprint,budget,identity,hypothesis:input.hypothesis,worktree_digest:digest(snapshot),outcome:'pending',
+      ...(input.instruction_composition_digest!==undefined?{instruction_composition_digest:input.instruction_composition_digest}:{}),
+      ...(input.instruction_composition_status!==undefined?{instruction_composition_status:input.instruction_composition_status}:{})};
     ledger.attempts.push(entry); validateLedger(ledger); await store.save(`${folder}/fix-attempts.json`,ledger);
     return {attempt_id:entry.attempt_id,outcome:entry.outcome,fingerprint};
   }

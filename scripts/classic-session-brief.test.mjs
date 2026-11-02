@@ -136,6 +136,23 @@ it('the write-gate enforces the composition binding and renders its own trace se
   assert.equal(receipt.ok, true, JSON.stringify(receipt.receipt?.blocked_reasons ?? receipt));
   assert.ok(!receipt.receipt.blocked_reasons.includes('trace_session_brief_stale'));
   assert.ok(!receipt.receipt.blocked_reasons.includes('trace_session_brief_unbound'));
+  assert.equal(receipt.receipt.instruction_composition_digest, hook);
+  assert.equal(receipt.receipt.instruction_composition_status, 'verified');
+  assert.deepEqual(receipt.receipt.composition_drift, []);
+  // Advisory policy: a bound trace without a composition section (hand-written
+  // or legacy helper) is recorded as drift but never blocks compliance.
+  await mkdir(path.dirname(path.join(root, `.ai-factory/state/${id}/implementation/legacy.md`)), { recursive: true });
+  await put(root, `.ai-factory/state/${id}/implementation/legacy.md`, [
+    `# Implementation Trace: ${id}`, '', '## Summary', '', 'legacy helper trace', '',
+    '## SessionBrief binding', '', `Digest: ${compiled.digest}`, '', '## Changed files', '', '- none', '',
+    '## Next step', '', `/aif-verify ${id}`, '',
+  ].join('\n'));
+  const legacyReceipt = await checkPlanCompliance({ ...options, runId: 'legacy', changedFiles: [] });
+  assert.equal(legacyReceipt.ok, true, JSON.stringify(legacyReceipt.receipt?.blocked_reasons ?? legacyReceipt));
+  assert.deepEqual(legacyReceipt.receipt.composition_drift, ['trace_instruction_composition_missing']);
+  assert.equal(legacyReceipt.receipt.instruction_composition_status, 'unverified');
+  // Not blocked: the composition observation stays advisory on this surface.
+  assert.notEqual(legacyReceipt.receipt.outcome, 'blocked');
   // Observed instruction drift after compile fails the write-gate with the
   // distinct drift code.
   await put(root, skillPath, `# skill changed\n${markers[0]}\nmanaged body\n${markers[1]}\n`);

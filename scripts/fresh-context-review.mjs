@@ -241,6 +241,11 @@ function buildReceipt(snapshot) {
     too_large: target.tooLarge ?? false
   };
   receipt.session_brief_digest = brief?.digest ?? null;
+  // Advisory projection only: fresh-review never blocks on composition drift
+  // (fail-closed stays on the SessionBrief binding channel).
+  receipt.instruction_composition_digest = brief?.instruction_composition_digest ?? null;
+  receipt.instruction_composition_status = brief?.instruction_composition_digest === null || brief?.instruction_composition_digest === undefined
+    ? 'unavailable' : 'unverified';
   receipt.source_revisions = snapshot.sourceRevisions;
   receipt.acceptance_criteria = brief?.acceptance_criteria ?? [];
   receipt.acceptance_examples = brief?.acceptance_examples ?? [];

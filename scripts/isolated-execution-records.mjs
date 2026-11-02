@@ -104,8 +104,9 @@ export function isolationState(record) {
   contextRecord(start.context); snapshot(start.baseline); evidence(start.preflight, start.input.preflight_paths);
   fields(start.bindings, start.input.assignments.map(a => a.task_id));
   for (const item of start.input.assignments) {
-    const binding = start.bindings[item.task_id]; fields(binding, ['identity', 'branch', 'run_digest']);
+    const binding = start.bindings[item.task_id]; fields(binding, ['identity', 'branch', 'run_digest'], ['instruction_composition_digest']);
     gitIdentity(binding.identity); boundedText(binding.branch, 300); hash(binding.run_digest);
+    if (binding.instruction_composition_digest !== undefined) hash(binding.instruction_composition_digest);
     requireValue(path.resolve(item.root).toLowerCase() === binding.identity.root.toLowerCase() && binding.identity.common === start.identity.common && binding.identity.root !== start.identity.root && binding.identity.git_dir !== start.identity.git_dir, 'invalid-isolation-binding');
   }
   requireValue(Array.isArray(record.events) && record.events.length <= 40, 'invalid-isolation-journal');
