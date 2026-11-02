@@ -196,7 +196,7 @@ Checks-блок — **change-scoped**: qa-результаты v1 не несу�
 Ограничение: в classic-проектах (`artifactProtocol: ai-factory`) qa-результаты
 живут в каталоге плана, а v1 читает только OpenSpec QA root
 (`paths.qa`/`.ai-factory/qa/<id>`) — classic plan-dir QA collection остаётся
-вне declared inputs v1 (кандидат в follow-up этапа 2).
+вне declared inputs v1 (кандидат в follow-up #270).
 
 - `checks.repeated` — число qa-результатов с `supersedes ≠ null`
   (corrective-цепочки).
@@ -205,7 +205,7 @@ Checks-блок — **change-scoped**: qa-результаты v1 не несу�
   Ledger `outcome` входит в словарь кодов, но **не сэмплируется** в v1:
   `fix-attempts.json` не входит в declared inputs (см. design change), поэтому
   fix-attempt исходы появляются в `reasons` только после включения ledger в
-  источники (follow-up). `binding_code` — открытое множество: код вне
+  источники (follow-up #270). `binding_code` — открытое множество: код вне
   allow-list публикуется как
   `unknown`; `binding_code = null` не даёт выборки. Явное наблюдение причины
   повторной проверки в момент решения — этап 2.
@@ -222,8 +222,9 @@ Checks-блок — **change-scoped**: qa-результаты v1 не несу�
 
 `service_calls`/`host_reads`/`host_releases` не входят в `runner_metrics` — это
 граница coordination-dispatch; их агрегирует отдельный follow-up (#266) поверх
-измерителя #230. Этап 2 (явный follow-up issue, создаётся финализатором до
-закрытия #230): инструментирование `setup/checks/snapshot-hash/wait` и
+измерителя #230. Этап 2 — follow-up issue
+[#270](https://github.com/ichinya/aifhub-extension/issues/270):
+инструментирование `setup/checks/snapshot-hash/wait` и
 producer-side timestamps, доказанные границы run/worker intervals, tokens/tool
 counts через HostClient-контракт, явное reason-наблюдение повторных checks и
 timestamps в qa-result, блоки `tools`/`dedup` при появлении производителей.
