@@ -10,6 +10,7 @@ import { parseSimpleYaml } from './aif-artifact-sync.mjs';
 import { parseToolConfig } from './tool-config.mjs';
 import { resolveAiFactoryVersion } from './ai-factory-version-resolver.mjs';
 import { resolvePlanContext, resolvePlanTarget } from './common-plan-resolver.mjs';
+import { buildCompositionBaseline, compositionStore } from './instruction-composition.mjs';
 import { parseStrictJson } from './json-strict.mjs';
 import {
   SDD_POLICY_PATH, selectSddProfile, sddError, validateSddPolicy
@@ -256,6 +257,23 @@ async function buildSnapshot(options, explicitCompile) {
       ? !planContext.requirements.acceptance_criteria.length
       : !nonGoals.length || !acceptanceExamples.length)) blocked.push('missing_behavior_acceptance_context');
     if (!blocked.length) {
+      // Prepared instruction-composition baseline (contract #252): the hook
+      // pins the immutable baseline index digest; null is the honest
+      // unavailable degradation (no ledger / extension / storage). Caller-
+      // provided composition hashes stay ignored — only the producer decides.
+      const composition = await buildCompositionBaseline(root);
+      let compositionDigest = composition.digest;
+      if (explicitCompile && compositionDigest !== null) {
+        // Compile persists the per-runtime manifests plus the baseline index
+        // as immutable content-addressed records; inspect never rewrites the
+        // pinned baseline. A storage failure degrades the hook to null
+        // instead of failing the compile.
+        try {
+          const compositions = await compositionStore(root, changeId);
+          for (const manifest of composition.manifests) await compositions.writeManifest(manifest.payload);
+          if (await compositions.writeIndex(composition.index) !== compositionDigest) compositionDigest = null;
+        } catch { compositionDigest = null; }
+      }
       const fields = {
         intent, target_outcome: targetOutcome, acceptance_criteria: planContext.requirements.acceptance_criteria,
         acceptance_examples: acceptanceExamples, non_goals: nonGoals,
@@ -274,7 +292,7 @@ async function buildSnapshot(options, explicitCompile) {
         context_manifest: sources.map(({ path: file, sha256, kind }) => ({ path: file, sha256, fidelity: files.get(file).fidelity ?? (methodology === 'openspec' && kind === 'canonical' && /(?:proposal|design)\.md$/.test(file) ? 'selected_sections' : 'full') })),
         required_capabilities: ['canonical_source_read', 'project_policy_checks'],
         plan_context: { methodology: planContext.methodology, adapter_version: planContext.adapter_version, source_revision: planContext.source_revision },
-        instruction_composition_digest: null,
+        instruction_composition_digest: compositionDigest,
         budget: { strategy: 'measured', source_bytes: totalBytes, brief_bytes: null, token_estimate: null }
       };
       brief = { ...payload, digest: hash(json(payload)) };

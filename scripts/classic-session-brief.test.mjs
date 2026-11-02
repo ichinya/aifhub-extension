@@ -24,7 +24,7 @@ const put = (root, file, text) => writeFile(path.join(root, file), text);
 const text = (root, file) => readFile(path.join(root, file), 'utf8');
 after(async () => { for (const root of roots) await rm(root, { recursive: true, force: true }); });
 
-it('classic full context and twin-root briefs are reproducible, with mandatory null composition inside digest', async () => {
+it('classic full context and twin-root briefs are reproducible, composition hook degrades to null without prompt inventory', async () => {
   const root = await fixture(), twin = await fixture();
   const context = await resolvePlanContext(opts(root));
   assert.deepEqual(context.errors, []);
@@ -37,10 +37,63 @@ it('classic full context and twin-root briefs are reproducible, with mandatory n
   assert.equal((await compileSessionBrief(opts(twin))).digest, first.digest);
   const status = await inspectSessionBrief({ ...opts(root), includeBrief: true });
   assert.equal(status.status, 'valid');
+  // The hook stays in the payload; this fixture has no installed prompt
+  // inventory, so null is the honest unavailable degradation, and a
+  // caller-provided hash is still ignored.
+  assert.equal(Object.hasOwn(status.brief, 'instruction_composition_digest'), true);
   assert.equal(status.brief.instruction_composition_digest, null);
   assert.equal(status.brief.plan_context.methodology, 'aifactory');
   assert.equal(first.sources.some(source => source.path.startsWith('openspec/')), false);
   assert.equal(status.brief.context_manifest.find(d => d.path.endsWith('status.yaml')).fidelity, 'projection');
+});
+
+it('instruction composition baseline pins a stable digest and persists immutable CAS records', async () => {
+  const root = await fixture();
+  await put(root, '.ai-factory.json', JSON.stringify({ agents: [{ id: 'claude' }] }));
+  const skillPath = '.claude/skills/aif-implement/SKILL.md';
+  const markers = ['<!-- aif-ext:aifhub-extension:aif-implement:prepend:start -->', '<!-- aif-ext:aifhub-extension:aif-implement:prepend:end -->'];
+  await mkdir(path.dirname(path.join(root, '.ai-factory/extensions/aifhub-extension/injections/core/aif-implement-head.md')), { recursive: true });
+  await put(root, '.ai-factory/extensions/aifhub-extension/extension.json', JSON.stringify({
+    skills: ['skills/aif-implement'],
+    injections: [{ target: 'aif-implement', position: 'prepend', file: './injections/core/aif-implement-head.md' }],
+    agentFiles: [{ runtime: 'claude', source: './agent-files/claude/aifhub-implement-worker.md', target: 'aifhub-implement-worker.md' }],
+  }));
+  await put(root, '.ai-factory/extensions/aifhub-extension/injections/core/aif-implement-head.md', 'managed body\n');
+  await mkdir(path.dirname(path.join(root, skillPath)), { recursive: true });
+  await put(root, skillPath, `# skill\n${markers[0]}\nmanaged body\n${markers[1]}\n`);
+  await mkdir(path.join(root, '.claude/agents'), { recursive: true });
+  await put(root, '.claude/agents/aifhub-implement-worker.md', 'worker contract\n');
+  const first = await compileSessionBrief(opts(root));
+  assert.equal(first.ok, true, JSON.stringify(first));
+  const status = await inspectSessionBrief({ ...opts(root), includeBrief: true });
+  assert.equal(status.status, 'valid');
+  const digest = status.brief.instruction_composition_digest;
+  assert.match(digest, /^[a-f0-9]{64}$/);
+  const index = JSON.parse(await text(root, `.ai-factory/state/${id}/compositions/indexes/${digest}.json`));
+  assert.equal(index.schema, 'aifhub.instruction_composition_index.v1');
+  assert.equal(index.compositions[0].runtime_id, '.claude');
+  // Recompiling identical inputs reproduces the same baseline digest.
+  const second = await compileSessionBrief(opts(root));
+  assert.equal(second.digest, first.digest);
+  const again = await inspectSessionBrief({ ...opts(root), includeBrief: true });
+  assert.equal(again.brief.instruction_composition_digest, digest);
+  // Instruction drift after compile makes the stored brief stale (digest wave),
+  // and inspect does not silently swap the pinned baseline for a fresh one.
+  await put(root, skillPath, `# skill changed\n${markers[0]}\nmanaged body\n${markers[1]}\n`);
+  const drifted = await inspectSessionBrief(opts(root));
+  assert.equal(drifted.status, 'stale');
+  assert.ok(drifted.stale_reasons.includes('brief_revision_mismatch'));
+  assert.equal(await compileSessionBrief(opts(root)).then(result => result.ok), true);
+});
+
+it('a corrupted installed ledger degrades the composition hook without failing the compile', async () => {
+  const root = await fixture();
+  await put(root, '.ai-factory.json', '{ not json');
+  const compiled = await compileSessionBrief(opts(root));
+  assert.equal(compiled.ok, true, JSON.stringify(compiled));
+  const status = await inspectSessionBrief({ ...opts(root), includeBrief: true });
+  assert.equal(status.status, 'valid');
+  assert.equal(status.brief.instruction_composition_digest, null);
 });
 
 it('classic status progress is excluded from revision, companion drift is stale', async () => {
