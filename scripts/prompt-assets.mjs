@@ -26,14 +26,16 @@ async function ensure(root, relative) {
     await safe(root, part, true);
   }
 }
-function ledgerRuntimeDirs(installation) {
+function ledgerRuntimeDirs(installation, runtimes = [...new Set([
+  '.agents', '.codex', '.claude', ...(installation?.agents ?? []).map(agent => `.${agent.id}`),
+])]) {
   const runtimeDir = (runtime, kind, fallback) => {
     const agent = installation?.agents?.find(entry => entry?.id === runtime.slice(1));
     const dir = String(agent?.[kind] ?? fallback).replaceAll('\\', '/');
     if (path.isAbsolute(dir) || dir.includes(':') || dir.split('/').some(part => !part || part === '..' || part === '.')) throw new Error('invalid-installed-layout');
     return dir;
   };
-  return Object.fromEntries(['.agents', '.codex', '.claude'].map(runtime => [runtime, {
+  return Object.fromEntries(runtimes.map(runtime => [runtime, {
     skillsDir: runtimeDir(runtime, 'skillsDir', `${runtime}/skills`),
     agentsDir: runtimeDir(runtime, 'agentsDir', `${runtime}/agents`)
   }]));
@@ -44,7 +46,16 @@ async function readInstallation(root) {
 }
 
 export async function inventoryPromptAssets(root) {
-  const files = [];
+  const files = new Map();
+  let totalBytes = 0;
+  function addFile(relative, bytes) {
+    // Runtime layouts can share prompt paths (e.g. Codex uses .agents/skills).
+    // Preserve and budget each path once, retaining exclusive backup writes.
+    if (files.has(relative)) return;
+    files.set(relative, { path: relative, sha256: hash(bytes), bytes: bytes.length });
+    totalBytes += bytes.length;
+    if (files.size > 4096 || totalBytes > 64 * 1024 * 1024) throw new Error('prompt-inventory-budget');
+  }
   async function walk(relative) {
     if (!await missing(() => safe(root, relative, true))) return;
     for (const entry of (await readdir(path.join(root, relative), { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name, 'en'))) {
@@ -52,22 +63,21 @@ export async function inventoryPromptAssets(root) {
       if (entry.isDirectory()) await walk(file);
       else {
         const bytes = await readFile(await safe(root, file));
-        files.push({ path: file, sha256: hash(bytes), bytes: bytes.length });
-        if (files.length > 4096 || files.reduce((n, f) => n + f.bytes, 0) > 64 * 1024 * 1024) throw new Error('prompt-inventory-budget');
+        addFile(file, bytes);
       }
     }
   }
   for (const directory of ['skills', 'injections', 'agent-files']) await walk(`${EXT}/${directory}`);
   for (const file of PROMPT_SUPPORT.filter(p => p.startsWith('docs/'))) {
     const filename = await missing(() => safe(root, `${EXT}/${file}`));
-    if (filename) { const bytes = await readFile(filename); files.push({ path: `${EXT}/${file}`, sha256: hash(bytes), bytes: bytes.length }); }
+    if (filename) addFile(`${EXT}/${file}`, await readFile(filename));
   }
   const manifestPath = await missing(() => safe(root, `${EXT}/extension.json`));
   const manifest = manifestPath ? JSON.parse(await readFile(manifestPath, 'utf8')) : {};
   // Custom runtime layouts from the installed ledger own the prompt locations:
   // ignoring them would let an update replace preserved user edits silently.
   const dirs = ledgerRuntimeDirs(await readInstallation(root));
-  for (const runtime of ['.agents', '.codex', '.claude']) {
+  for (const runtime of Object.keys(dirs)) {
     const skillsDir = dirs[runtime].skillsDir;
     const agentsDir = dirs[runtime].agentsDir;
     const skills = new Set([...(manifest.skills ?? []).map(s => path.posix.basename(s)), ...(manifest.injections ?? []).map(i => i.target)]);
@@ -81,10 +91,10 @@ export async function inventoryPromptAssets(root) {
       if (!/^[\w.-]+$/.test(agent.target)) throw new Error('unsafe-prompt-manifest');
       const file = `${agentsDir}/${agent.target}`;
       const filename = await missing(() => safe(root, file));
-      if (filename) { const bytes = await readFile(filename); files.push({ path: file, sha256: hash(bytes), bytes: bytes.length }); }
+      if (filename) addFile(file, await readFile(filename));
     }
   }
-  return files.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+  return [...files.values()].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
 }
 export async function preservePromptAssets(root) {
   const files = await inventoryPromptAssets(root);
@@ -130,8 +140,14 @@ export async function validateInstalledPromptAssets(root) {
   const refs = await validatePromptReferences(extension);
   for (const ref of refs) await safe(root, `${EXT}/${ref.target}`);
   let targets = 0;
-  const dirs = ledgerRuntimeDirs(await readInstallation(root));
-  for (const runtime of ['.agents', '.codex', '.claude']) {
+  const installation = await readInstallation(root);
+  // The updater refreshes configured agents only; dormant runtime directories
+  // can contain older user assets and must not invalidate that update.
+  const runtimes = Array.isArray(installation?.agents)
+    ? installation.agents.map(agent => `.${agent.id}`)
+    : ['.agents', '.codex', '.claude'];
+  const dirs = ledgerRuntimeDirs(installation, runtimes);
+  for (const runtime of runtimes) {
     const skillsDir = dirs[runtime].skillsDir;
     const agentsDir = dirs[runtime].agentsDir;
     for (const injection of manifest.injections ?? []) {

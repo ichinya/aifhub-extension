@@ -114,6 +114,25 @@ it('preservation honors custom runtime directories from the installed ledger', a
   await assert.rejects(inventoryPromptAssets(root), /invalid-installed-layout/);
 });
 
+it('preservation saves shared .agents skills once for unknown and modified baselines', async () => {
+  const root = await fixture();
+  await put(root, '.ai-factory.json', JSON.stringify({ agents: [{ id: 'codex', skillsDir: '.agents/skills' }] }));
+  const file = '.agents/skills/aif-implement/SKILL.md';
+  await put(root, file, 'original shared skill\r\n');
+  // Without a baseline, every inventoried file must be safely preservable.
+  const unknown = await preservePromptAssets(root);
+  assert.equal(unknown.manifest.files.filter(f => f.path === file).length, 1);
+  assert.equal(await readFile(path.join(root, path.dirname(unknown.manifestPath), 'preserve', file), 'utf8'), 'original shared skill\r\n');
+  const inventory = await inventoryPromptAssets(root);
+  assert.equal(new Set(inventory.map(f => f.path)).size, inventory.length);
+  await recordPromptBaseline(root);
+  assert.equal(await preservePromptAssets(root), null);
+  await put(root, file, 'user edit to shared skill\r\n');
+  const modified = await preservePromptAssets(root);
+  assert.deepEqual(modified.manifest.files.map(f => f.path), [file]);
+  assert.equal(await readFile(path.join(root, path.dirname(modified.manifestPath), 'preserve', file), 'utf8'), 'user edit to shared skill\r\n');
+});
+
 it('installed prompt validation honors custom runtime directories', async () => {
   const root = await fixture();
   await put(root, '.ai-factory.json', JSON.stringify({ agents: [{ id: 'codex', skillsDir: 'custom-codex/skills' }] }));
@@ -128,6 +147,25 @@ it('preservation fails before replacement when its destination is unsafe', async
   const before = await inventoryPromptAssets(root);
   await assert.rejects(preservePromptAssets(root));
   assert.deepEqual(await inventoryPromptAssets(root), before);
+});
+it('validation follows configured runtimes and leaves dormant Claude prompts untouched', async () => {
+  const root = await fixture();
+  await put(root, '.ai-factory.json', JSON.stringify({ agents: [
+    { id: 'codex', skillsDir: '.codex/skills' },
+    { id: 'copilot', skillsDir: '.github/skills' },
+  ] }));
+  const dormant = '.claude/skills/aif-plan/SKILL.md';
+  await put(root, dormant, 'old inactive Claude prompt\n');
+  const active = '.github/skills/aif-implement/SKILL.md';
+  const valid = await readFile(path.join(root, '.codex/skills/aif-implement/SKILL.md'), 'utf8');
+  await put(root, active, valid);
+  const preserved = await preservePromptAssets(root);
+  assert.equal(preserved.manifest.files.filter(f => f.path === active).length, 1);
+  assert.equal(await readFile(path.join(root, path.dirname(preserved.manifestPath), 'preserve', active), 'utf8'), valid);
+  await validateInstalledPromptAssets(root);
+  assert.equal(await readFile(path.join(root, dormant), 'utf8'), 'old inactive Claude prompt\n');
+  await put(root, active, valid.replace('Shared execution kernel', 'stale execution kernel'));
+  await assert.rejects(validateInstalledPromptAssets(root), /stale-installed-injection/);
 });
 it('installed reference and one-pair contracts reject missing references, duplicate/stale blocks', async () => {
   const root = await fixture(); await validateInstalledPromptAssets(root);
