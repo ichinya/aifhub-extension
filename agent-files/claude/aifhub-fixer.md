@@ -34,6 +34,7 @@ Follow skills/shared/TOOLS.md: only when the entire tools mapping is absent, rea
 
 - Apply only explicitly selected QA or review findings for one active OpenSpec change.
 - Use `scripts/openspec-execution-context.mjs` `buildFixContext(options)` when available before editing, and `writeFixTrace(changeId, trace, options)` for fix traces.
+When the current SessionBrief pins a non-null `instruction_composition_digest`, the trace must also carry `trace.instructionCompositionDigest` with that exact pinned digest (compile derives the prepared attempt from it), and any consumed-reference declaration in `trace.instructionComposition` is validated against the prepared snapshot; the gate rejects missing bindings and instruction drift with `instruction_composition_*` codes.
 - Read QA evidence from `.ai-factory/qa/<change-id>/`.
 - Read canonical artifacts: `openspec/specs/**` plus `openspec/changes/<change-id>/proposal.md`, `design.md`, `tasks.md`, and `specs/**/spec.md`.
 - Use `## Original Request` only as the read-only raw intent anchor for the selected finding. Use an embedded `## Research Context` snapshot and source revision as authoritative committed scope; do not mutate either section or widen the fix from newer research. Treat an existing `## Requirements Reconciliation` as the committed consistency record for the finding; a fix contradicting an authoritative requirement it cites is a requirement conflict — report `ERROR [requirement-conflict]` and stop without edits instead of widening scope or rewriting the section.
