@@ -240,15 +240,13 @@ export function buildByteOffsets(text) {
   let index = 0;
   while (index < text.length) {
     const code = text.charCodeAt(index);
-    let width = 1;
-    if (code >= ASTRAL_HIGH && code <= 0xDBFF && index + 1 < text.length
-      && text.charCodeAt(index + 1) >= ASTRAL_LOW && text.charCodeAt(index + 1) <= ASTRAL_MAX) {
-      width = 2;
-    } else if (code >= 0x800) width = 3;
-    else if (code >= 0x80) width = 2;
-    for (let unit = 0; unit < width; unit += 1) offsets[index + unit] = offset;
-    offset += code >= 0x10000 ? 4 : width;
-    index += width;
+    const isPair = code >= ASTRAL_HIGH && code <= 0xDBFF && index + 1 < text.length
+      && text.charCodeAt(index + 1) >= ASTRAL_LOW && text.charCodeAt(index + 1) <= ASTRAL_MAX;
+    const bytes = isPair ? 4 : code >= 0x800 ? 3 : code >= 0x80 ? 2 : 1;
+    offsets[index] = offset;
+    if (isPair) offsets[index + 1] = offset + 2;
+    offset += bytes;
+    index += isPair ? 2 : 1;
   }
   offsets[text.length] = offset;
   return offsets;
@@ -373,11 +371,13 @@ function scanInline(bare, base, excluded) {
       const rest = bare.slice(i);
       const inline = /\[([^\]]*)\]\(([^)]*)\)/.exec(rest);
       if (inline) {
+        push(i, i + 1); // the opening bracket is link syntax, not prose
         push(i + 1 + inline[1].length, i + inline[0].length); // ](target) excluded, label stays prose
         i += inline[0].length; continue;
       }
       const reference = /\[([^\]]+)\]\[([^\]]*)\]/.exec(rest);
       if (reference) {
+        push(i, i + 1);
         push(i + 1 + reference[1].length, i + reference[0].length);
         i += reference[0].length; continue;
       }
@@ -789,7 +789,6 @@ export function parseGlossaryEntries(text) {
 
 function parseGlossaryTerm(raw) {
   let term = raw.trim().replace(/^["'«]|["'»]$/g, '').trim();
-  if (/[.!?,;]/.test(term)) return null;
   const aliases = [];
   const parenthetical = /\(([^)]+)\)\s*$/.exec(term);
   if (parenthetical) {
@@ -799,6 +798,7 @@ function parseGlossaryTerm(raw) {
     }
     term = term.slice(0, parenthetical.index).trim();
   }
+  if (/[.!?,;]/.test(term)) return null;
   term = term.replace(/\*\*/g, '').trim();
   if (!term || !/[\p{L}]/u.test(term) || term.length > 80 || /^https?:/i.test(term)) return null;
   return { preferred: term, aliases: aliases.filter((alias) => alias.toLowerCase() !== term.toLowerCase()) };
@@ -827,7 +827,9 @@ async function readDocument(rootDir, relative, options = {}) {
   if (bytes.includes(0)) return fail('nul-byte', relative, { sha256 });
   let text;
   try {
-    text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    // ignoreBOM:true keeps a leading U+FEFF in the decoded text so that byte
+    // offsets stay anchored to the raw file bytes (the BOM is real content).
+    text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
   } catch {
     return fail('utf8-fatal', relative, { sha256 });
   }
@@ -848,6 +850,7 @@ function analyzeDocument(profile, glossaryEntries, relative, content, options) {
   const diagnostics = [];
   if (model.partial) diagnostics.push({ code: 'parser-uncovered-span', path: relative, detail: 'unsupported-markdown-construct' });
   if (language.diagnostic) diagnostics.push({ ...language.diagnostic, path: relative });
+  if (!profile.ok) diagnostics.push(...profile.diagnostics);
   if (profile.ok && language.resolved === null) {
     diagnostics.push({ code: 'rules-language-unresolved', path: relative, detail: 'language-dependent rules skipped' });
   }
