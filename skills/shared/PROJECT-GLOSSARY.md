@@ -48,6 +48,7 @@ When glossary terminology disagrees with a higher-authority source, follow that 
 
 - Do not add glossary contents to canonical OpenSpec artifacts unless the user explicitly authors the term as part of the requirement being changed.
 - Do not use the glossary in generated-rule inputs, source fingerprints, QA schemas or evidence, runtime traces, provider stores, status checks, doctor checks, verification gates, or done-readiness decisions.
+- Scoped exception (#228): the advisory docs readability report may record the glossary's project-relative path, state classification, and sha256 as invalidation metadata inside its own state-only report; this narrow metadata exception does not lift the copy prohibition of the glossary body, the lexical scope rules, or any other boundary above.
 - Do not recursively load files referenced by the glossary and do not import source, OpenSpec, provider output, or runtime state into it.
 
 ## Deferred Knowledge Formats
