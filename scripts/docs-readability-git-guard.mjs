@@ -21,10 +21,12 @@ export async function verifyReportIgnored(rootDir, relative, options = {}) {
     inside = (await git(rootDir, ['rev-parse', '--is-inside-work-tree'], run)).trim();
   } catch (error) {
     const stderr = String(error?.stderr ?? error?.message ?? '');
-    // Only git's own explicit verdict means "no tracking semantics to verify".
-    // Any other failure (dubious ownership, permissions, missing binary) fails
-    // closed: the guard cannot prove the destination is safe.
-    if (error?.code === 128 && /not a git repository/i.test(stderr)) {
+    // Only git's own explicit line-anchored verdict ("fatal: not a git
+    // repository …") means "no tracking semantics to verify". Substring
+    // matching would let an injected suffix ("… at D:/not a git repository")
+    // bypass the guard; any other failure (dubious ownership, permissions,
+    // missing binary) fails closed.
+    if (error?.code === 128 && /^fatal: not a git repository(?:$|\s|\()/im.test(stderr)) {
       return { ok: true, gitWorktree: false, ignored: true, tracked: false, reason: 'not-git' };
     }
     return { ok: false, code: 'git-verify-failed', detail: 'rev-parse' };

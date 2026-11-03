@@ -16,6 +16,7 @@ import {
   STALE_REPORT_STATE,
   buildByteOffsets,
   buildDocumentModel,
+  buildSections,
   loadProfile,
   parseConfigSubset,
   parseGlossaryEntries,
@@ -825,24 +826,30 @@ describe('review regressions: scanning coverage', () => {
 
   it('measures hard-wrapped sentences as one sentence (soft wrap is whitespace)', async () => {
     const root = await makeTemp('aif-rv-wrap-');
-    const tail = 'Длинное предложение без точки продолжается на следующей строке с большим количеством слов чтобы уверенно превысить порог описания в тридцать слов и стать находкой длины предложения при переносе строк внутри одного абзаца текста проекта.';
+    const lineA = 'Длинное предложение без точки продолжается на следующей строке с большим количеством слов чтобы уверенно превысить порог описания';
+    const lineB = 'в тридцать слов и стать единой находкой длины при переносе строк посреди предложения документа проекта целиком.';
     const doc = [
       '# Документ с переносами',
       '',
       '## Описание',
       '',
-      'Первое короткое предложение для контекста абзаца проекта.',
-      tail,
+      'Первое короткое предложение контекста абзаца.',
+      lineA,
+      lineB,
+      'Финальная короткая строка после точки завершает абзац теста.',
     ].join('\n');
-    const words = tail.match(/[\p{L}\p{N}]+/gu).length;
-    assert.ok(words > 30, `fixture sentence must exceed the threshold, got ${words}`);
+    const merged = `${lineA} ${lineB}`;
+    const words = merged.match(/[\p{L}\p{N}]+/gu).length;
+    assert.ok(words > 30, `wrapped sentence must exceed the threshold, got ${words}`);
+    const lineAWords = lineA.match(/[\p{L}\p{N}]+/gu).length;
+    assert.ok(lineAWords <= 30, 'the pre-fix fragment alone must not exceed the threshold');
     await seedProject(root, { files: { 'docs/guide.md': Buffer.from(doc, 'utf8') } });
     const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
     const report = run.json();
     const tailByte = Buffer.from(doc, 'utf8').indexOf(Buffer.from('Длинное предложение', 'utf8'));
     const finding = report.findings.find((item) => item.rule.id === 'docs-readability:sentence-length'
       && item.span.start === tailByte);
-    assert.ok(finding, 'the wrapped long sentence is one finding');
+    assert.ok(finding, 'the mid-paragraph wrapped sentence is one finding');
     assert.ok(finding.explanation.includes(`${words} words`));
   });
 
@@ -864,8 +871,11 @@ describe('review regressions: scanning coverage', () => {
     const urlStart = bytes.indexOf(Buffer.from('https://example.com', 'utf8'));
     const urlEnd = bytes.indexOf(Buffer.from(')', 'utf8'), urlStart) + 1;
     for (const finding of report.findings) {
-      const intersectsUrl = finding.span.start < urlEnd && finding.span.end > urlStart;
-      assert.ok(!intersectsUrl, 'no finding may touch the link target');
+      // Span-local rules must not produce findings that live inside the link
+      // target; sentence-length spans legitimately cover the whole sentence,
+      // so only containment inside the URL range is a defect here.
+      const insideUrl = finding.span.start >= urlStart && finding.span.end <= urlEnd;
+      assert.ok(!insideUrl, 'no finding may live inside the link target');
     }
     const utilize = bytes.indexOf(Buffer.from('utilize', 'utf8'));
     const cliche = report.findings.find((item) => item.rule.id === 'docs-readability:en-cliche'
@@ -1066,6 +1076,265 @@ describe('review regressions: binding identity', () => {
     const report = run.json();
     assert.equal(report.glossary.state, 'unreadable');
     assert.equal(report.glossary.sha256, null);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Review regressions (third round): each test names the defect it pins.
+// ---------------------------------------------------------------------------
+
+describe('round two: guard verdict and writer ownership', () => {
+  it('fails closed when the stderr merely contains the verdict substring', async () => {
+    const injected = async (command, args) => {
+      if (args.join(' ').includes('rev-parse')) {
+        const error = new Error('Command failed: git rev-parse --is-inside-work-tree');
+        error.code = 128;
+        error.stderr = 'fatal: detected dubious ownership in repository at D:/not a git repository';
+        throw error;
+      }
+      return { stdout: '' };
+    };
+    const verdict = await verifyReportIgnored('/fixture', '.ai-factory/state/w/readability/report.json', { execGit: injected });
+    assert.equal(verdict.ok, false, 'a substring match must not bypass the guard');
+    assert.equal(verdict.code, 'git-verify-failed');
+    const genuine = async (command, args) => {
+      if (args.join(' ').includes('rev-parse')) {
+        const error = new Error('Command failed: git rev-parse --is-inside-work-tree');
+        error.code = 128;
+        error.stderr = 'fatal: not a git repository (or any of the parent directories): .git\n';
+        throw error;
+      }
+      return { stdout: '' };
+    };
+    const notGit = await verifyReportIgnored('/fixture', '.ai-factory/state/w/readability/report.json', { execGit: genuine });
+    assert.equal(notGit.ok, true, 'the genuine verdict still means not-git');
+    assert.equal(notGit.reason, 'not-git');
+  });
+
+  it('keeps accepting a legacy report leaf written without language_options', async () => {
+    const root = await makeTemp('aif-r2-leaf-');
+    await seedProject(root, { files: { 'docs/guide.md': await fixtureBuffer('clean-ru.md') } });
+    const write = ['--change', 'work', '--file', 'docs/guide.md', '--write', '--json'];
+    assert.equal((await runCli(root, write)).exitCode, 0);
+    const leafPath = path.join(root, '.ai-factory', 'state', 'work', 'readability', 'report.json');
+    const current = parseStrictJson(await readFile(leafPath, 'utf8'));
+    const legacy = { ...current };
+    delete legacy.language_options;
+    await writeFile(leafPath, `${JSON.stringify(legacy, null, 2)}\n`);
+    const overwrite = await runCli(root, write);
+    assert.equal(overwrite.exitCode, 0, 'the fix-base form of the same change stays replaceable');
+    const rewritten = parseStrictJson(await readFile(leafPath, 'utf8'));
+    assert.deepEqual(rewritten.language_options, { override: null });
+  });
+
+  it('cross-checks the recorded profile state during revalidation', async () => {
+    const root = await makeTemp('aif-r2-state-');
+    await seedProject(root, { files: { 'docs/guide.md': await fixtureBuffer('ru-findings.md') } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--write', '--json']);
+    assert.equal(run.exitCode, 0);
+    const stored = parseStrictJson(await readFile(path.join(root, '.ai-factory', 'state', 'work', 'readability', 'report.json'), 'utf8'));
+    assert.equal(stored.profile.state, 'loaded');
+    const tampered = { ...stored, profile: { ...stored.profile, state: 'unavailable' } };
+    const verdict = await validateReportBinding(root, tampered);
+    assert.equal(verdict.stale, true);
+    assert.ok(verdict.mismatched.includes('profile'), 'a flipped profile state is named');
+  });
+
+  it('degrades a malformed phrase list to checker-unavailable instead of crashing', async () => {
+    const root = await makeTemp('aif-r2-phr-');
+    await seedProject(root, { files: { 'docs/guide.md': await fixtureBuffer('ru-findings.md') } });
+    const badProfile = JSON.stringify({
+      schema: 'aifhub.docs_readability_profile.v1', profile_id: 'x', profile_version: 1,
+      rules: [{ id: 'docs-readability:ru-cliche', version: 1, origin: 'project', type: 'phrase-list', language: 'ru', phrases: ['valid', 42] }],
+    });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json'], {
+      readProfile: async () => Buffer.from(badProfile, 'utf8'),
+    });
+    assert.equal(run.exitCode, 0, 'profile degradation stays exit 0, never a crash');
+    const report = run.json();
+    assert.equal(report.state, 'checker-unavailable');
+    assert.equal(report.profile.state, 'unavailable');
+  });
+});
+
+describe('round two: paragraph and section boundaries', () => {
+  it('keeps two unterminated paragraphs separate across a blank line', async () => {
+    const root = await makeTemp('aif-r2-par-');
+    const baseWords = ['абзац', 'без', 'точки', 'в', 'конце', 'строки', 'продолжается', 'мыслью', 'документа', 'на', 'всём', 'протяжении', 'каждого', 'предложения', 'текста', 'проекта'];
+    const firstParagraph = baseWords.join(' ');
+    const secondParagraph = [...baseWords, 'и', 'вторая', 'часть', 'тоже', 'без', 'пунктуации', 'в', 'самом', 'конце', 'всего', 'текста', 'документа', 'целиком', 'совсем'].join(' ');
+    const doc = [
+      '# Документ без пунктуации',
+      '',
+      '## Описание',
+      '',
+      firstParagraph,
+      '',
+      secondParagraph,
+    ].join('\n');
+    const words = (match) => match.match(/[\p{L}\p{N}]+/gu).length;
+    const first = words(firstParagraph);
+    const second = words(secondParagraph);
+    const merged = first + second;
+    assert.ok(first <= 30 && second <= 30 && merged > 30, `fixture: first=${first}, second=${second}, merged=${merged}`);
+    await seedProject(root, { files: { 'docs/guide.md': Buffer.from(doc, 'utf8') } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const report = run.json();
+    const long = report.findings.filter((item) => item.rule.id === 'docs-readability:sentence-length'
+      && item.explanation.includes(`${merged} words`));
+    assert.deepEqual(long, [], 'paragraphs must not merge across the blank line');
+    assert.deepEqual(report.findings.filter((item) => item.rule.id === 'docs-readability:sentence-length'), [],
+      'each paragraph alone stays within the threshold');
+  });
+
+  it('does not merge a heading with the following 30-word paragraph', async () => {
+    const root = await makeTemp('aif-r2-head-');
+    const bodyWords = ['ровно', 'тридцать', 'слов', 'идут', 'внутри', 'этого', 'абзаце', 'без', 'единой', 'терминальной',
+      'точки', 'чтобы', 'старый', 'алгоритм', 'склейки', 'заголовка', 'или', 'абзаца', 'сформировал', 'ложную',
+      'находку', 'длины', 'предложения', 'однако', 'новый', 'алгоритм', 'оставил', 'итоговый', 'результат', 'везде'];
+    const body = bodyWords.join(' ');
+    assert.equal(bodyWords.length, 30, 'fixture must be exactly 30 words');
+    const doc = ['# Doc', '', '## Описание', '', body].join('\n');
+    await seedProject(root, { files: { 'docs/guide.md': Buffer.from(doc, 'utf8') } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const report = run.json();
+    assert.equal(report.state, 'complete', 'the 30-word paragraph plus short heading stays under the detector threshold and description limit');
+    assert.deepEqual(report.findings.filter((item) => item.rule.id === 'docs-readability:sentence-length'), [],
+      'heading words must not merge with the following paragraph');
+  });
+
+  it('recognizes a BOM-prefixed H2 heading for classification', () => {
+    const text = '\uFEFF## Установка\n\nПервый абзац документа с обычным текстом для контекста классификации секций и проверки заголовка с байт-порядка маркером в начале файла проекта.';
+    const model = buildDocumentModel(text);
+    const sections = buildSections(model);
+    assert.equal(sections[0].sectionClass, 'procedure', 'the BOM-prefixed H2 is classified');
+  });
+
+  it('keeps a fenced block inside closed front matter from masking the body', async () => {
+    const root = await makeTemp('aif-r2-fm3-');
+    const doc = [
+      '---',
+      'title: fixture',
+      'blocks:',
+      '  ```yaml',
+      '  key: value',
+      '  ```',
+      '---',
+      '',
+      '## Usage',
+      '',
+      'The body keeps enough latin letters for confident language detection because detectors require solid evidence before committing to any language decision for the document here today.',
+      'Second sentence adds the remaining letter volume the deterministic share estimator needs for a confident verdict today.',
+    ].join('\n');
+    await seedProject(root, { files: { 'docs/guide.md': Buffer.from(doc, 'utf8') } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const report = run.json();
+    assert.equal(report.inputs[0].parsing, 'full', 'closed front matter must not trip fence state');
+    assert.ok(report.inputs[0].eligible_bytes > 0, 'body prose stays eligible');
+    assert.ok(!report.diagnostics.some((diagnostic) => diagnostic.code === 'parser-uncovered-span'));
+    assert.equal(report.state, 'complete');
+  });
+});
+
+describe('round two: inline constructs', () => {
+  it('keeps Wikipedia-style balanced link destinations fully excluded', async () => {
+    const root = await makeTemp('aif-r2-wiki-');
+    const doc = [
+      '# Wiki',
+      '',
+      '## Usage',
+      '',
+      'See [the article](https://en.wikipedia.org/wiki/Use_(section)) for background and keep the surrounding prose balanced so no false unbalanced pair finding can ever appear inside this sentence of the document today.',
+      'Second sentence adds enough letters for confident language detection by the deterministic share estimator used here today.',
+    ].join('\n');
+    const bytes = Buffer.from(doc, 'utf8');
+    await seedProject(root, { files: { 'docs/guide.md': bytes } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const report = run.json();
+    assert.ok(!ruleIds(report).includes('docs-readability:unbalanced-pair'), 'balanced parens in the destination leave no phantom close paren');
+    const urlStart = bytes.indexOf(Buffer.from('https://en.wikipedia.org', 'utf8'));
+    const urlEnd = bytes.indexOf(Buffer.from('))', 'utf8'), urlStart) + 2;
+    for (const finding of report.findings) {
+      const insideUrl = finding.span.start >= urlStart && finding.span.end <= urlEnd;
+      assert.ok(!insideUrl, 'no finding may live inside the balanced link target');
+    }
+    assert.equal(report.state, 'complete');
+  });
+
+  it('excludes multi-line inline code spans from prose rules', async () => {
+    const root = await makeTemp('aif-r2-code-');
+    const doc = [
+      '# Code spans',
+      '',
+      '## Usage',
+      '',
+      'Prose before the span `code begins on this line',
+      'utilize the continuation across the newline` and the sentence keeps going for the detection evidence purposes of the document.',
+      'Second paragraph adds enough letters for confident language detection by the deterministic share estimator used here today.',
+    ].join('\n');
+    await seedProject(root, { files: { 'docs/guide.md': Buffer.from(doc, 'utf8') } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const report = run.json();
+    assert.equal(report.state, 'complete');
+    assert.ok(!ruleIds(report).includes('docs-readability:en-cliche'), 'the cross-line span cliche stays out of findings');
+  });
+
+  it('treats an indented continuation inside a list item as prose', async () => {
+    const root = await makeTemp('aif-r2-list-');
+    const doc = [
+      '# Lists',
+      '',
+      '## Usage',
+      '',
+      '- item',
+      '',
+      '    utilize the four-space continuation inside the list item paragraph without any code semantics at all.',
+      '',
+      'Second paragraph adds enough letters for confident language detection by the deterministic share estimator used here today.',
+    ].join('\n');
+    await seedProject(root, { files: { 'docs/guide.md': Buffer.from(doc, 'utf8') } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const report = run.json();
+    assert.equal(report.state, 'complete');
+    const cliche = report.findings.find((item) => item.rule.id === 'docs-readability:en-cliche'
+      && item.explanation.includes('utilize'));
+    assert.ok(cliche, 'the four-space list continuation stays prose (found by rules)');
+  });
+
+  it('still treats a deep indented line after a list item as code', async () => {
+    const root = await makeTemp('aif-r2-list2-');
+    const doc = [
+      '# Lists deep',
+      '',
+      '## Usage',
+      '',
+      '- item',
+      '',
+      '      utilize the six-space line inside the list item that really is code semantics here.',
+      '',
+      'Second paragraph adds enough letters for confident language detection by the deterministic share estimator used here today and keeps the remaining volume above the threshold that the deterministic share estimator requires before committing to any language decision for the analyzed document.',
+    ].join('\n');
+    await seedProject(root, { files: { 'docs/guide.md': Buffer.from(doc, 'utf8') } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const report = run.json();
+    assert.equal(report.state, 'complete');
+    assert.ok(!ruleIds(report).includes('docs-readability:en-cliche'), 'the six-space line is code');
+  });
+
+  it('excludes an indented code line that directly follows a heading', async () => {
+    const root = await makeTemp('aif-r2-head2-');
+    const doc = [
+      '# Heading code',
+      '',
+      '## Установка',
+      '    в рамках данного процесса строка сразу после заголовка',
+      '',
+      'Второй абзац содержит достаточное количество букв кириллицы для уверенной детекции языка всего документа целиком.',
+    ].join('\n');
+    await seedProject(root, { files: { 'docs/guide.md': Buffer.from(doc, 'utf8') } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const report = run.json();
+    assert.ok(!ruleIds(report).includes('docs-readability:ru-cliche'), 'indented line right after a heading is code');
   });
 });
 

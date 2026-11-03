@@ -218,7 +218,10 @@ function validateProfileShape(parsed) {
     if (!Number.isInteger(rule.version) || rule.version < 1) problems.push(`rule version invalid: ${String(rule.id)}`);
     if (!['project', 'upstream'].includes(rule.origin)) problems.push(`rule origin invalid: ${String(rule.id)}`);
     if (rule.type === 'phrase-list') {
-      if (!Array.isArray(rule.phrases) || !rule.phrases.some((p) => typeof p === 'string' && p)) problems.push(`empty phrase list: ${String(rule.id)}`);
+      // Every entry must be a non-empty string: a single malformed phrase must
+      // degrade to checker-unavailable instead of crashing the rule engine.
+      if (!Array.isArray(rule.phrases) || rule.phrases.length === 0
+        || !rule.phrases.every((p) => typeof p === 'string' && p.length > 0)) problems.push(`phrase list invalid: ${String(rule.id)}`);
     } else if (rule.type === 'sentence-length') {
       for (const sectionClass of ['procedure', 'description', 'requirement', 'acceptance', 'general']) {
         const threshold = rule.thresholds?.[sectionClass];
@@ -299,8 +302,58 @@ function lineLevelExclusion(bare) {
     || /^\s{0,3}\[[^\]]+\]:\s*\S/.test(bare); // link-reference definition
 }
 
-function indentedCodeLine(bare) {
-  return /^ {4}\S/.test(bare) || /^\t+\S/.test(bare);
+function leadingIndent(bare) {
+  let indent = 0;
+  for (const ch of bare) {
+    if (ch === ' ') indent += 1;
+    else if (ch === '\t') indent += 4 - (indent % 4);
+    else break;
+  }
+  return indent;
+}
+
+function listMarkerIndent(bare) {
+  const match = /^ {0,3}(?:[-*+]|\d{1,9}[.)])(?:[ \t]+|$)/.exec(bare);
+  if (!match) return null;
+  // A bare marker line ("-") behaves like a marker plus one space of content.
+  return match[0].length === bare.length ? bare.length + 1 : match[0].length;
+}
+
+function lineKind(bare) {
+  const withoutBom = bare.replace(/^\uFEFF/, '');
+  if (/^ {0,3}#{1,6}(?:[ \t]+|$)/.test(withoutBom)) return 'heading';
+  if (/^ {0,3}>/.test(withoutBom)) return 'quote';
+  if (/^ {0,3}\|/.test(withoutBom)) return 'table';
+  return 'text';
+}
+
+// Cross-line CommonMark code spans: exact-length backtick runs pair within one
+// paragraph (blank lines and paragraph breaks end a span; blocked lines such
+// as fences interrupt it). Unclosed runs stay literal prose.
+function scanInlineCodeSpans(lines, fenceMask, lineBlocked, excluded, firstBodyLine) {
+  const breaks = paragraphBoundaries({ lines, fenceMask });
+  let pending = null;
+  for (let index = firstBodyLine; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (lineBlocked[index]) { pending = null; continue; }
+    if (breaks.has(line.start)) pending = null;
+    const bare = line.bare;
+    let i = 0;
+    while (i < bare.length) {
+      if (bare[i] === '`') {
+        let run = 0;
+        while (bare[i + run] === '`') run += 1;
+        if (pending === null) pending = { run, s: line.start + i };
+        else if (run === pending.run) {
+          excluded.push({ s: pending.s, e: line.start + i + run });
+          pending = null;
+        }
+        i += run;
+        continue;
+      }
+      i += 1;
+    }
+  }
 }
 
 export function buildDocumentModel(text) {
@@ -313,14 +366,13 @@ export function buildDocumentModel(text) {
     lines.push({ bare, start: cursor, bodyEnd: cursor + bare.length, end: cursor + raw.length });
     cursor += raw.length;
   }
-  const fenceMask = fenceLineMask(lines.map((line) => line.bare));
   const excluded = [];
-  const diagnostics = [];
   const uncovered = [];
   let partial = false;
-  const bodyStart = 0;
   // Front matter: a leading --- block is metadata, not prose. A leading BOM is
-  // real file content and must not hide the front-matter marker.
+  // real file content and must not hide the front-matter marker. Fence state
+  // is computed over the body only: a ``` line inside closed front matter must
+  // not mask the whole document body.
   let firstBodyLine = 0;
   if (lines[0]?.bare.replace(/^\uFEFF/, '').trimEnd() === '---') {
     for (let index = 1; index < lines.length; index += 1) {
@@ -338,6 +390,9 @@ export function buildDocumentModel(text) {
       firstBodyLine = lines.length;
     }
   }
+  const fenceMask = new Array(lines.length).fill(true);
+  const bodyMask = fenceLineMask(lines.slice(firstBodyLine).map((line) => line.bare));
+  for (let index = firstBodyLine; index < lines.length; index += 1) fenceMask[index] = bodyMask[index - firstBodyLine];
   // An unclosed terminal fence is a known-ambiguous construct: its content is
   // excluded, but the parser reports partial coverage with an uncovered span.
   let openFence = false;
@@ -353,32 +408,78 @@ export function buildDocumentModel(text) {
         && /^\s*$/.test(lines[index].bare.slice(fenceMatch[0].length))) openFence = false;
     }
   }
-  let prevBlank = true;
+  // Pass A: line classification and whole-line exclusions (fences, command
+  // lines, indented code with list-container awareness).
+  const lineBlocked = new Array(lines.length).fill(false);
+  let prevKind = 'blank'; // the document start behaves like a blank line
   let indentedCode = false;
+  let listContentIndent = null;
   for (let index = firstBodyLine; index < lines.length; index += 1) {
     const line = lines[index];
-    if (fenceMask[index] || lineLevelExclusion(line.bare)) {
+    if (fenceMask[index]) {
       excluded.push({ s: line.start, e: line.end });
-      prevBlank = false;
+      lineBlocked[index] = true;
+      prevKind = 'fence';
+      indentedCode = false;
       continue;
     }
-    // Indented code blocks (4 spaces or a tab, opened after a blank line or at
-    // the document start) are code, not prose. A block cannot interrupt a
-    // paragraph, so only blank-preceded indentation opens one; blank lines
-    // continue an open block (documented CommonMark subset).
-    if (indentedCodeLine(line.bare) && (indentedCode || prevBlank)) {
-      indentedCode = true;
+    if (lineLevelExclusion(line.bare)) {
       excluded.push({ s: line.start, e: line.end });
+      lineBlocked[index] = true;
+      prevKind = 'text';
       continue;
     }
     if (line.bare.trim() === '') {
-      prevBlank = true;
+      // Blank lines continue open indented blocks and list containers.
+      prevKind = 'blank';
       indentedCode = false;
-    } else {
-      prevBlank = false;
-      indentedCode = false;
+      continue;
     }
-    scanInline(line.bare, line.start, excluded);
+    const indent = leadingIndent(line.bare);
+    const markerIndent = indent <= 3 ? listMarkerIndent(line.bare) : null;
+    if (markerIndent !== null) {
+      listContentIndent = markerIndent;
+      prevKind = 'listitem';
+      continue; // marker line text stays prose; scanned in pass C
+    }
+    if (indent >= 4) {
+      // Indented code needs the container threshold: inside a list item the
+      // block starts only past the item content indent plus four spaces.
+      const threshold = listContentIndent !== null ? listContentIndent + 4 : 4;
+      const canOpen = prevKind === 'blank' || prevKind === 'code' || prevKind === 'heading' || prevKind === 'fence';
+      if ((indentedCode || canOpen) && indent >= threshold) {
+        indentedCode = true;
+        excluded.push({ s: line.start, e: line.end });
+        lineBlocked[index] = true;
+        prevKind = 'code';
+        continue;
+      }
+      // Lazy prose continuation (also inside an open list item below the
+      // code-block threshold): never treated as code.
+      prevKind = 'text';
+      indentedCode = false;
+      if (listContentIndent !== null && indent < listContentIndent) listContentIndent = null;
+      continue;
+    }
+    listContentIndent = null;
+    indentedCode = false;
+    prevKind = lineKind(line.bare);
+  }
+  // Pass B: cross-line inline code spans over the remaining eligible lines.
+  scanInlineCodeSpans(lines, fenceMask, lineBlocked, excluded, firstBodyLine);
+  // Pass C: links, autolinks, HTML tags and bare URLs, skipping characters
+  // already excluded (line-level and code-span spans).
+  excluded.sort((left, right) => left.s - right.s || left.e - right.e);
+  const passB = [];
+  for (const span of excluded) {
+    const last = passB[passB.length - 1];
+    if (last && span.s <= last.e) last.e = Math.max(last.e, span.e);
+    else passB.push({ ...span });
+  }
+  const isSkipped = makeExclusionPredicate(passB);
+  for (let index = firstBodyLine; index < lines.length; index += 1) {
+    if (lineBlocked[index]) continue;
+    scanInline(lines[index].bare, lines[index].start, excluded, isSkipped);
   }
   if (openFence !== false && openFenceIndex >= 0) {
     partial = true;
@@ -391,34 +492,32 @@ export function buildDocumentModel(text) {
     if (last && span.s <= last.e) last.e = Math.max(last.e, span.e);
     else merged.push({ ...span });
   }
-  for (const span of uncovered) diagnostics.push({ code: 'parser-uncovered-span', path: null, detail: `${span.detail} bytes=${span.s}-${span.e}` });
-  return { text: String(text), lines, fenceMask, excluded: merged, uncovered, partial, diagnostics };
+  return { text: String(text), lines, fenceMask, excluded: merged, uncovered, partial };
 }
 
-function scanInline(bare, base, excluded) {
+function makeExclusionPredicate(spans) {
+  return (index) => {
+    let low = 0;
+    let high = spans.length - 1;
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      const span = spans[mid];
+      if (index < span.s) high = mid - 1;
+      else if (index >= span.e) low = mid + 1;
+      else return true;
+    }
+    return false;
+  };
+}
+
+function scanInline(bare, base, excluded, isSkipped) {
   const push = (s, e) => excluded.push({ s: base + s, e: base + e });
   let i = 0;
   while (i < bare.length) {
     const ch = bare[i];
-    if (ch === '`') {
-      let run = 0;
-      while (bare[i + run] === '`') run += 1;
-      let j = i + run;
-      let closer = -1;
-      let closerLength = 0;
-      while (j < bare.length) {
-        if (bare[j] === '`') {
-          let run2 = 0;
-          while (bare[j + run2] === '`') run2 += 1;
-          // CommonMark: the closing backtick string must have the exact same
-          // length as the opener; a longer run does not close a shorter one.
-          if (run2 === run) { closer = j; closerLength = run2; break; }
-          j += run2;
-        } else j += 1;
-      }
-      if (closer >= 0) { push(i, closer + closerLength); i = closer + closerLength; } else i += run;
-      continue;
-    }
+    // Characters already consumed by line-level rules or cross-line code
+    // spans are syntax, not prose: links must not be parsed inside them.
+    if (isSkipped && isSkipped(base + i)) { i += 1; continue; }
     if (ch === '<') {
       const rest = bare.slice(i);
       const autolink = /^<https?:\/\/[^>\s]*>/i.exec(rest);
@@ -430,8 +529,10 @@ function scanInline(bare, base, excluded) {
     if (ch === '[') {
       const rest = bare.slice(i);
       // Anchored at the scan position: a link construct must start exactly at
-      // this '['; unanchored matching would exclude unrelated prose.
-      const inline = /^\[([^\]]*)\]\(([^)]*)\)/.exec(rest);
+      // this '['; unanchored matching would exclude unrelated prose. The
+      // destination accepts one level of balanced parentheses (Wikipedia-style
+      // /wiki/Page_(Section) URLs).
+      const inline = /^\[([^\]]*)\]\(((?:[^()]|\([^()]*\))*)\)/.exec(rest);
       if (inline) {
         push(i, i + 1); // the opening bracket is link syntax, not prose
         push(i + 1 + inline[1].length, i + inline[0].length); // ](target) excluded, label stays prose
@@ -487,7 +588,7 @@ export function buildSections(model) {
   let current = null;
   for (let index = 0; index < model.lines.length; index += 1) {
     const line = model.lines[index];
-    if (!model.fenceMask[index] && /^##(?!#)[ \t]+/.test(line.bare)) {
+    if (!model.fenceMask[index] && /^(\uFEFF)?##(?!#)[ \t]+/.test(line.bare)) {
       if (current) sections.push(current);
       const heading = line.bare.replace(/^##[ \t]+/, '').trim();
       current = { heading, start: line.start, bodyStart: line.end, end: line.end, sectionClass: classifyHeading(heading) };
@@ -586,7 +687,7 @@ function paragraphBoundaries(model) {
   for (let index = 0; index < model.lines.length; index += 1) {
     const bare = model.lines[index].bare;
     if (bare.trim() === ''
-      || (!model.fenceMask[index] && /^#{1,6}[ \t]/.test(bare))
+      || (!model.fenceMask[index] && /^(\uFEFF)?#{1,6}[ \t]/.test(bare))
       || /^\s{0,3}(?:[-*+]|\d+[.)])[ \t]/.test(bare)
       || /^\s{0,3}\|/.test(bare)
       || /^\s{0,3}>/.test(bare)
@@ -614,12 +715,18 @@ function collectSentences(model) {
   for (let index = 0; index < text.length; index += 1) {
     const ch = text[index];
     if (ch === '\n' || ch === '\r') {
-      // A newline only closes a sentence when the next line starts a new
-      // paragraph construct; soft-wrapped lines inside one paragraph count as
-      // whitespace so hard-wrapped long sentences are measured in full.
+      // A newline run closes a sentence when ANY position it crosses starts a
+      // new paragraph construct — including the blank line itself inside a
+      // multi-newline run. Only single soft wraps inside one paragraph count
+      // as whitespace, so hard-wrapped long sentences are measured in full
+      // while two unterminated paragraphs never merge.
       let next = index;
       while (next < text.length && (text[next] === '\n' || text[next] === '\r')) next += 1;
-      if ((breaks.has(next) || next >= text.length) && sentenceStart !== null) {
+      let boundary = next >= text.length;
+      for (let p = index + 1; p <= next && !boundary; p += 1) {
+        if (breaks.has(p)) boundary = true;
+      }
+      if (boundary && sentenceStart !== null) {
         closeSentence(model, sentences, sentenceStart, index);
         sentenceStart = null;
       }
@@ -904,6 +1011,8 @@ function parseGlossaryTerm(raw) {
 // Analysis of one document
 // ---------------------------------------------------------------------------
 
+const KNOWN_READ_CODES = Object.freeze(['unsafe_path', 'path_unreadable', 'unsafe_file', 'file_limit', 'file_changed']);
+
 async function readDocument(rootDir, relative, options = {}) {
   const fail = (code, detail, extra = {}) => ({ ok: false, code, detail, ...extra });
   let target;
@@ -911,14 +1020,15 @@ async function readDocument(rootDir, relative, options = {}) {
     target = await safeProviderPath(rootDir, relative);
     if (!target.exists) return fail('file-missing', relative);
   } catch (error) {
-    return fail(String(error?.message ?? 'unsafe_path'), relative);
+    const code = String(error?.message ?? 'unsafe_path');
+    return fail(KNOWN_READ_CODES.includes(code) ? code : 'file-unreadable', relative);
   }
   // Size gate before the bounded read so the spec-named code is exact.
   let info;
   try {
     info = await lstat(target.path);
   } catch (error) {
-    return fail(String(error?.message ?? 'unsafe_file'), relative);
+    return fail('file-unreadable', relative);
   }
   if (!info.isFile()) return fail('unsafe_file', relative);
   if (info.size > DOCUMENT_LIMIT) return fail('file_limit', relative);
@@ -926,7 +1036,8 @@ async function readDocument(rootDir, relative, options = {}) {
   try {
     bytes = await readProviderFile(rootDir, relative, DOCUMENT_LIMIT);
   } catch (error) {
-    return fail(String(error?.message ?? 'unsafe_file'), relative);
+    const code = String(error?.message ?? 'unsafe_file');
+    return fail(KNOWN_READ_CODES.includes(code) ? code : 'file-unreadable', relative);
   }
   if (bytes === null) return fail('file-missing', relative);
   const sha256 = digest(bytes);
@@ -1037,7 +1148,7 @@ async function currentProfilePart(options) {
 }
 
 const MALFORMED_CODES = Object.freeze(['file-missing', 'file_limit', 'file_changed', 'unsafe_file',
-  'unsafe_path', 'path_unreadable', 'nul-byte', 'utf8-fatal']);
+  'unsafe_path', 'path_unreadable', 'file-unreadable', 'nul-byte', 'utf8-fatal']);
 
 // Read-time revalidation of a persisted report. Any divergence between the
 // recorded composite binding and the current worktree/inputs/profile/engine/
@@ -1088,7 +1199,8 @@ export async function validateReportBinding(rootDir, report, options = {}) {
   const recordedProfile = report.profile ?? {};
   if ((recordedProfile.id ?? null) !== (profilePart.part.id ?? null)
     || (recordedProfile.version ?? null) !== (profilePart.part.version ?? null)
-    || (recordedProfile.sha256 ?? null) !== (profilePart.part.sha256 ?? null)) mismatched.push('profile');
+    || (recordedProfile.sha256 ?? null) !== (profilePart.part.sha256 ?? null)
+    || (recordedProfile.state ?? null) !== (profilePart.ok ? 'loaded' : 'unavailable')) mismatched.push('profile');
   const recordedEngine = report.engine ?? {};
   if ((recordedEngine.module ?? null) !== ENGINE_MODULE
     || (recordedEngine.sha256 ?? null) !== engineSha
@@ -1141,7 +1253,10 @@ export async function writeReadabilityReport(rootDir, report, config, options = 
   const leafConflict = () => ({ ok: false, code: 'report-leaf-conflict', detail: relative });
   // Leaf ownership: only a previous, fully schema-valid report of the same
   // change may be replaced — a matching schema+change_id pair alone is not
-  // ownership (review: two-field objects must not pass).
+  // ownership (review: two-field objects must not pass). A report written by
+  // an older extension form without language_options ("fix-base" shape) is
+  // accepted through an explicit legacy fill so extension updates can still
+  // overwrite their own earlier outputs.
   const assertLeafWritable = async () => {
     let leafInfo = null;
     try { leafInfo = await lstat(leaf); } catch { leafInfo = null; }
@@ -1154,7 +1269,11 @@ export async function writeReadabilityReport(rootDir, report, config, options = 
       return leafConflict();
     }
     const schema = parseStrictJson(await readFile(new URL('../schemas/docs-readability.schema.json', import.meta.url), 'utf8'));
-    if (validateJsonAgainstSchema(priorReport, schema).length > 0) return leafConflict();
+    let priorValid = validateJsonAgainstSchema(priorReport, schema).length === 0;
+    if (!priorValid && !('language_options' in priorReport)) {
+      priorValid = validateJsonAgainstSchema({ ...priorReport, language_options: { override: null } }, schema).length === 0;
+    }
+    if (!priorValid) return leafConflict();
     return null;
   };
   const firstRejection = await assertLeafWritable();
@@ -1176,6 +1295,15 @@ export async function writeReadabilityReport(rootDir, report, config, options = 
   const payload = `${JSON.stringify(report, null, 2)}\n`;
   const temporary = path.join(liveDirectory, `${parts[parts.length - 1]}.${randomUUID()}.tmp`);
   await writeFile(temporary, payload, { encoding: 'utf8', mode: 0o600 });
+  // Third ownership check after the temp write, immediately before the atomic
+  // rename: the leaf must not have been replaced by foreign content during the
+  // write. rename itself is atomic, so the residual race is the microseconds
+  // between this check and the rename (documented in design.md).
+  const thirdRejection = await assertLeafWritable();
+  if (thirdRejection) {
+    await unlink(temporary).catch((error) => { if (error?.code !== 'ENOENT') throw error; });
+    return thirdRejection;
+  }
   try {
     await rename(temporary, leaf);
   } finally {
