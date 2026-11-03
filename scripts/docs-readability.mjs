@@ -50,8 +50,10 @@ export const usage = 'ai-factory aifhub-docs-readability --change <id> [--enable
 // ---------------------------------------------------------------------------
 
 export function parseReadabilityArgs(argv) {
-  const invalid = (error) => ({ ok: false, changeId: null, files: [], language: null, json: false, write: false, enabled: null, error });
+  // The accumulator carries the flags seen before an error, so invalid-usage
+  // envelopes honor an earlier --json instead of downgrading to human text.
   const result = { ok: true, changeId: null, files: [], language: null, json: false, write: false, enabled: null, error: null };
+  const invalid = (error) => ({ ...result, ok: false, error });
   const seen = new Set();
   const args = Array.from(argv ?? []);
   for (let index = 0; index < args.length; index += 1) {
@@ -579,7 +581,7 @@ function scanInline(bare, base, excluded, isSkipped) {
     }
     if (ch === 'h' || ch === 'H' || ch === 'w' || ch === 'W') {
       const rest = bare.slice(i);
-      const urlMatch = /^(?:https?:\/\/|www\.)[^\s]+/i.exec(rest);
+      const urlMatch = /^(?:https?:\/\/|www\.)[^\s`]+/i.exec(rest);
       if (urlMatch) {
         let urlText = urlMatch[0];
         while (/[.,;:!?'"]$/.test(urlText)) urlText = urlText.slice(0, -1);
@@ -909,13 +911,18 @@ export function runRules(profile, model, document, glossaryEntries, sections, op
   if (pairRule && !model.partial) {
     for (const section of sections) {
       if (truncated) break;
-      const counts = new Map(pairRule.pairs.map(([open, close]) => [`${open}${close}`, { open: 0, close: 0 }]));
+      const counts = new Map(pairRule.pairs.map(([open, close]) => [`${open}${close}`, { open: 0, close: 0, depth: 0, crossed: false }]));
       for (const run of eligibleRuns(model, section.start, section.end)) {
         for (const ch of model.text.slice(run.s, run.e)) {
           for (const [open, close] of pairRule.pairs) {
             const tally = counts.get(`${open}${close}`);
-            if (ch === open) tally.open += 1;
-            else if (ch === close) tally.close += 1;
+            if (ch === open) { tally.open += 1; tally.depth += 1; } else if (ch === close) {
+              tally.close += 1;
+              tally.depth -= 1;
+              // A closer before its opener escapes total-count balance; a
+              // negative running depth flags the reversed order explicitly.
+              if (tally.depth < 0) { tally.crossed = true; tally.depth = 0; }
+            }
           }
         }
       }
@@ -924,9 +931,13 @@ export function runRules(profile, model, document, glossaryEntries, sections, op
       const span = { s: sectionRuns[0].s, e: sectionRuns[sectionRuns.length - 1].e };
       for (const [open, close] of pairRule.pairs) {
         const tally = counts.get(`${open}${close}`);
-        if (tally.open !== tally.close) {
+        const unbalanced = tally.open !== tally.close;
+        if (unbalanced || tally.crossed) {
+          const reason = unbalanced
+            ? `${tally.open} open, ${tally.close} close`
+            : `reversed order: a ${close} appears before its ${open}`;
           add(makeFinding(model, document, span.s, span.e, pairRule,
-            `Unbalanced pair ${open}${close} in ${section.heading ? `section «${bounded(section.heading, 40)}»` : 'document'}: ${tally.open} open, ${tally.close} close.`,
+            `Unbalanced pair ${open}${close} in ${section.heading ? `section «${bounded(section.heading, 40)}»` : 'document'}: ${reason}.`,
             `Check the ${open}${close} pair balance.`, false));
         }
       }
@@ -1494,7 +1505,7 @@ export async function runDocsReadabilityCommand(argv = process.argv.slice(2), op
     for (const diagnostic of diagnostics) {
       if (diagnostic.code === 'wrong-language') degraded.add('wrong-language');
       else if (diagnostic.code === 'ambiguous-language') degraded.add('ambiguous-language');
-      else if (diagnostic.code === 'parser-uncovered-span') degraded.add('partial-coverage');
+      else if (diagnostic.code === 'parser-uncovered-span' || diagnostic.code === 'findings-truncated') degraded.add('partial-coverage');
       else if (MALFORMED_CODES.includes(diagnostic.code)) degraded.add('malformed-input');
     }
     if (!profile.ok) degraded.add('checker-unavailable');

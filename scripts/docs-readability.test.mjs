@@ -947,9 +947,9 @@ describe('review regressions: scanning coverage', () => {
     }
   });
 
-  it('caps per-document findings instead of exploding memory', async () => {
+  it('caps per-document findings and degrades the outcome to partial-coverage', async () => {
     const root = await makeTemp('aif-rv-cap-');
-    const doc = `# Cap\n\n## Description\n\n${'“'.repeat(3000)}\n`;
+    const doc = `# Cap\n\n## Description\n\n${'“'.repeat(3000)}\n\n${EN_VOLUME}\n`;
     await seedProject(root, { files: { 'docs/guide.md': Buffer.from(doc, 'utf8') } });
     const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
     assert.equal(run.exitCode, 0, 'the bounded pipeline survives pathological documents');
@@ -957,6 +957,7 @@ describe('review regressions: scanning coverage', () => {
     assert.ok(report.findings.length <= 2000, `findings capped, got ${report.findings.length}`);
     assert.ok(report.diagnostics.some((diagnostic) => diagnostic.code === 'findings-truncated'
       && diagnostic.path === 'docs/guide.md'));
+    assert.equal(report.state, 'partial-coverage', 'truncated diagnostics must not stay complete');
   });
 });
 
@@ -1222,6 +1223,43 @@ describe('round three: paragraph boundaries', () => {
     assert.equal(sections[0].heading, 'Установка');
     assert.ok(!sections[0].heading.includes('\uFEFF'));
     assert.ok(!sections[0].heading.startsWith('##'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Devin PR-review triage (round four): each test names the defect it pins.
+// ---------------------------------------------------------------------------
+
+describe('devin pr triage: bounded inline handling', () => {
+  it('stops url tokens at a code-span delimiter so the span still pairs', async () => {
+    const root = await makeTemp('aif-d1-urltick-');
+    const doc = ['# Url tick', '', '## Usage', '', 'Keep the `utilize https://x.com/a` fragment inside its code span and rely on the remaining prose to carry the language detection evidence of this document today.', EN_VOLUME].join('\n');
+    await seedProject(root, { files: { 'docs/guide.md': Buffer.from(doc, 'utf8') } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const report = run.json();
+    assert.equal(report.state, 'complete');
+    assert.ok(!ruleIds(report).includes('docs-readability:en-cliche'), 'the code span around the url stays excluded');
+  });
+
+  it('flags reversed punctuation order that total counts would miss', async () => {
+    const root = await makeTemp('aif-d2-rev-');
+    const doc = ['# Reversed', '', '## Usage', '', 'The crossed example )( and the swapped ][ stay visible to the pair rule even though their totals match each other here today.', EN_VOLUME].join('\n');
+    await seedProject(root, { files: { 'docs/guide.md': Buffer.from(doc, 'utf8') } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const report = run.json();
+    const pairFindings = report.findings.filter((item) => item.rule.id === 'docs-readability:unbalanced-pair');
+    assert.ok(pairFindings.length >= 2, 'both reversed pairs are detected');
+    assert.ok(pairFindings.some((item) => item.explanation.includes('reversed order: a ) appears before its (')));
+    assert.ok(pairFindings.some((item) => item.explanation.includes('reversed order: a ] appears before its [')));
+  });
+
+  it('preserves --json for invalid-usage envelopes', () => {
+    const parsed = parseReadabilityArgs(['--json', '--nope']);
+    assert.equal(parsed.ok, false);
+    assert.equal(parsed.json, true, 'the seen --json flag survives the usage error');
+    const later = parseReadabilityArgs(['--nope', '--json']);
+    assert.equal(later.ok, false);
+    assert.equal(later.json, false, 'flags after the error are not honored');
   });
 });
 
