@@ -27,7 +27,7 @@ ai-factory aifhub-docs-readability --change <id> [--enabled true|false] --file <
 
 - One pinned offline profile `scripts/docs-readability.profile.json` (`profile_id`, `profile_version`, per-rule `id`/`version`/`origin`): sentence length with per-section thresholds, closed RU/EN cliche lists (exact matching, findings marked `heuristic: true`), unbalanced `()`/`[]`/`«»` pairs, unsupported quotation marks, and terminology suggestions only from recognized glossary entries. Thresholds and lists are recorded in the change design; they are not a language standard.
 - Markdown parsing is position-preserving over raw bytes: fenced code, inline code, link targets, autolinks, HTML tags, front matter, and command/log lines are excluded from eligible prose and never rewritten. Unsupported parsing degrades the outcome to `partial-coverage` with uncovered spans in `diagnostics`.
-- Suggestions are conservative: only mechanically derivable facts (unbalanced pairs, glossary preferred forms). No rule proposes a rewrite of modal prose (MUST/SHOULD/MAY), negations, values, or references.
+- Suggestions are conservative: only mechanically derivable facts (unbalanced pairs, unsupported quotation marks, glossary preferred forms). No rule proposes a rewrite of modal prose (MUST/SHOULD/MAY), negations, values, or references.
 
 ## Language
 

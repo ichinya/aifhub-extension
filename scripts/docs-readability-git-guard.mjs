@@ -20,7 +20,11 @@ export async function verifyReportIgnored(rootDir, relative, options = {}) {
   try {
     inside = (await git(rootDir, ['rev-parse', '--is-inside-work-tree'], run)).trim();
   } catch (error) {
-    if (error?.code === 128 || /not a git repository/i.test(String(error?.stderr ?? ''))) {
+    const stderr = String(error?.stderr ?? error?.message ?? '');
+    // Only git's own explicit verdict means "no tracking semantics to verify".
+    // Any other failure (dubious ownership, permissions, missing binary) fails
+    // closed: the guard cannot prove the destination is safe.
+    if (error?.code === 128 && /not a git repository/i.test(stderr)) {
       return { ok: true, gitWorktree: false, ignored: true, tracked: false, reason: 'not-git' };
     }
     return { ok: false, code: 'git-verify-failed', detail: 'rev-parse' };

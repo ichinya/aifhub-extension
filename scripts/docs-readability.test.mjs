@@ -27,7 +27,7 @@ import {
 import { verifyReportIgnored } from './docs-readability-git-guard.mjs';
 import { prepareQaManifest } from './qa-manifest.mjs';
 import { qaStore } from './qa-manifest-store.mjs';
-import { observeQaSnapshot } from './qa-manifest-inputs.mjs';
+import { observeQaSnapshot, allDeclaredRoots } from './qa-manifest-inputs.mjs';
 import { buildOpenSpecDoneReadiness } from './openspec-done-readiness.mjs';
 import { parseStrictJson } from './json-strict.mjs';
 import { validateJsonAgainstSchema } from './json-schema-subset.mjs';
@@ -131,6 +131,12 @@ describe('readability config subset parsing', () => {
   it('keeps malformed boolean values as non-boolean diagnostics input', () => {
     const parsed = parseConfigSubset('aifhub:\n  readability:\n    enabled: "yes"\n');
     assert.equal(parsed.aifhub.readability.enabled, 'yes');
+  });
+
+  it('keeps quoted boolean-looking values as strings', () => {
+    const parsed = parseConfigSubset('aifhub:\n  readability:\n    enabled: "true"\n');
+    assert.equal(parsed.aifhub.readability.enabled, 'true');
+    assert.equal(typeof parsed.aifhub.readability.enabled, 'string');
   });
 });
 
@@ -423,7 +429,7 @@ describe('AC6: distinct outcomes', () => {
     assert.equal(readStates['docs/big.md'], 'malformed');
     assert.equal(readStates['docs/nul-bytes.md'], 'malformed');
     assert.equal(readStates['docs/bin-data.md'], 'malformed');
-    assert.ok(report.diagnostics.some((diagnostic) => ['unsafe_file', 'file_limit'].includes(diagnostic.code) && diagnostic.path === 'docs/big.md'));
+    assert.ok(report.diagnostics.some((diagnostic) => diagnostic.code === 'file_limit' && diagnostic.path === 'docs/big.md'));
     assert.ok(report.diagnostics.some((diagnostic) => diagnostic.code === 'nul-byte'));
     assert.ok(report.diagnostics.some((diagnostic) => diagnostic.code === 'utf8-fatal'));
     assert.ok(report.findings.length > 0, 'healthy inputs are still analyzed');
@@ -541,6 +547,7 @@ describe('AC7: QA isolation and writer guards', () => {
       files: Object.keys(snapshot.files).sort(),
       ignored_names: snapshot.ignored_names,
       changed_paths: snapshot.changed_paths,
+      digest: snapshot.digest,
     };
   }
 
@@ -758,10 +765,16 @@ describe('profile loading', () => {
     const corrupt = await loadProfile({ readProfile: async () => Buffer.from('not json', 'utf8') });
     assert.equal(corrupt.ok, false);
     assert.equal(corrupt.diagnostics[0].code, 'profile-unavailable');
+    // Incomplete sentence thresholds are a profile-shape failure: the command
+    // must degrade to checker-unavailable instead of crashing on the rule.
     const invalid = await loadProfile({
       readProfile: async () => Buffer.from(JSON.stringify({ schema: 'aifhub.docs_readability_profile.v1', profile_id: 'x', profile_version: 1, rules: [{ id: 'docs-readability:sentence-length', version: 1, origin: 'project', type: 'sentence-length', thresholds: {} }] }), 'utf8'),
     });
-    assert.equal(invalid.ok, true);
+    assert.equal(invalid.ok, false);
+    const missingPairs = await loadProfile({
+      readProfile: async () => Buffer.from(JSON.stringify({ schema: 'aifhub.docs_readability_profile.v1', profile_id: 'x', profile_version: 1, rules: [{ id: 'docs-readability:unbalanced-pair', version: 1, origin: 'project', type: 'unbalanced-pair' }] }), 'utf8'),
+    });
+    assert.equal(missingPairs.ok, false);
     const badShape = await loadProfile({
       readProfile: async () => Buffer.from(JSON.stringify({ schema: 'wrong', profile_id: 'x' }), 'utf8'),
     });
@@ -779,3 +792,280 @@ describe('readReadabilityConfig', () => {
     assert.deepEqual(config.diagnostics, []);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Review regressions (second round): each test names the defect it pins.
+// ---------------------------------------------------------------------------
+
+describe('review regressions: scanning coverage', () => {
+  it('scans the preamble before the first active H2 (no dead prose)', async () => {
+    const root = await makeTemp('aif-rv-pre-');
+    const doc = [
+      '# Титульный документ проекта',
+      '',
+      'В рамках данного документа преамбула содержит канцелярит до первого заголовка второго уровня проекта.',
+      '',
+      '## Описание',
+      '',
+      'Система собирает события и записывает их в журнал наблюдений за поведением основных компонентов платформы.',
+      'Каждый журнал содержит время, источник события и код итогового результата проверки состояния окружения.',
+      'Отчёт формируется по запросу оператора без изменения исходных файлов документации проекта полностью.',
+    ].join('\n');
+    await seedProject(root, { files: { 'docs/guide.md': Buffer.from(doc, 'utf8') } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    assert.equal(run.exitCode, 0);
+    const report = run.json();
+    assert.equal(report.state, 'complete');
+    const h2 = Buffer.from(doc, 'utf8').indexOf(Buffer.from('## Описание', 'utf8'));
+    const preambleCliche = report.findings.find((finding) => finding.rule.id === 'docs-readability:ru-cliche'
+      && Buffer.from(doc, 'utf8').slice(finding.span.start, finding.span.end).toString('utf8').toLowerCase() === 'в рамках');
+    assert.ok(preambleCliche, 'preamble cliche is found');
+    assert.ok(preambleCliche.span.end <= h2, 'preamble finding stays before the first H2');
+  });
+
+  it('measures hard-wrapped sentences as one sentence (soft wrap is whitespace)', async () => {
+    const root = await makeTemp('aif-rv-wrap-');
+    const tail = 'Длинное предложение без точки продолжается на следующей строке с большим количеством слов чтобы уверенно превысить порог описания в тридцать слов и стать находкой длины предложения при переносе строк внутри одного абзаца текста проекта.';
+    const doc = [
+      '# Документ с переносами',
+      '',
+      '## Описание',
+      '',
+      'Первое короткое предложение для контекста абзаца проекта.',
+      tail,
+    ].join('\n');
+    const words = tail.match(/[\p{L}\p{N}]+/gu).length;
+    assert.ok(words > 30, `fixture sentence must exceed the threshold, got ${words}`);
+    await seedProject(root, { files: { 'docs/guide.md': Buffer.from(doc, 'utf8') } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const report = run.json();
+    const tailByte = Buffer.from(doc, 'utf8').indexOf(Buffer.from('Длинное предложение', 'utf8'));
+    const finding = report.findings.find((item) => item.rule.id === 'docs-readability:sentence-length'
+      && item.span.start === tailByte);
+    assert.ok(finding, 'the wrapped long sentence is one finding');
+    assert.ok(finding.explanation.includes(`${words} words`));
+  });
+
+  it('anchors link matching at the scan position', async () => {
+    const root = await makeTemp('aif-rv-link-');
+    const doc = [
+      '# Doc',
+      '',
+      '## Usage',
+      '',
+      'The nonsensical bracket prefix [x] utilize the labeled link [label](https://example.com/very/long/path) and the analyzer must keep prose findings while excluding the target URL completely from every rule evaluation today.',
+      'Second sentence adds enough letters for confident language detection by the deterministic share estimator used here today.',
+    ].join('\n');
+    const bytes = Buffer.from(doc, 'utf8');
+    await seedProject(root, { files: { 'docs/guide.md': bytes } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const report = run.json();
+    assert.equal(report.state, 'complete');
+    const urlStart = bytes.indexOf(Buffer.from('https://example.com', 'utf8'));
+    const urlEnd = bytes.indexOf(Buffer.from(')', 'utf8'), urlStart) + 1;
+    for (const finding of report.findings) {
+      const intersectsUrl = finding.span.start < urlEnd && finding.span.end > urlStart;
+      assert.ok(!intersectsUrl, 'no finding may touch the link target');
+    }
+    const utilize = bytes.indexOf(Buffer.from('utilize', 'utf8'));
+    const cliche = report.findings.find((item) => item.rule.id === 'docs-readability:en-cliche'
+      && bytes.slice(item.span.start, item.span.end).toString('utf8') === 'utilize');
+    assert.ok(cliche, 'the prose utilize occurrence is found');
+    assert.equal(cliche.span.start, utilize);
+  });
+
+  it('excludes indented code blocks from eligible prose', async () => {
+    const root = await makeTemp('aif-rv-ind-');
+    const doc = [
+      '# Документ с отступами',
+      '',
+      '## Описание',
+      '',
+      'Сначала идёт обычный абзац проекта с достаточным количеством букв кириллицы для уверенной детекции языка документа.',
+      '',
+      '    в рамках данного процесса строка кода с отступом четыре пробела',
+      '',
+      'Ещё один абзац после кода тоже содержит достаточное количество букв кириллицы для детекции и не содержит штампов.',
+    ].join('\n');
+    await seedProject(root, { files: { 'docs/guide.md': Buffer.from(doc, 'utf8') } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const report = run.json();
+    assert.equal(report.state, 'complete');
+    assert.ok(!ruleIds(report).includes('docs-readability:ru-cliche'), 'indented code cliche stays out of findings');
+  });
+
+  it('excludes BOM-prefixed front matter and reports unterminated front matter as partial', async () => {
+    const body = '## Usage\n\nThe document keeps enough latin letters for confident language detection because detectors require solid evidence before committing to any language decision here today.\n';
+    const closedRoot = await makeTemp('aif-rv-fm1-');
+    const closedDoc = '\uFEFF---\ntitle: utilize\n---\n\n' + body;
+    await seedProject(closedRoot, { files: { 'docs/guide.md': Buffer.from(closedDoc, 'utf8') } });
+    const closedRun = await runCli(closedRoot, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const closed = closedRun.json();
+    assert.equal(closed.inputs[0].parsing, 'full');
+    assert.ok(!ruleIds(closed).includes('docs-readability:en-cliche'), 'front matter is not prose');
+
+    const openRoot = await makeTemp('aif-rv-fm2-');
+    const openDoc = '\uFEFF---\ntitle: utilize\n';
+    await seedProject(openRoot, { files: { 'docs/guide.md': Buffer.from(openDoc, 'utf8') } });
+    const openRun = await runCli(openRoot, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const open = openRun.json();
+    assert.equal(open.inputs[0].parsing, 'partial');
+    const uncovered = open.diagnostics.find((diagnostic) => diagnostic.code === 'parser-uncovered-span');
+    assert.ok(uncovered, 'unterminated front matter produces an uncovered-span diagnostic');
+    assert.ok(/bytes=0-\d+/.test(uncovered.detail), `diagnostic carries the byte range: ${uncovered.detail}`);
+  });
+
+  it('reports uncovered byte ranges for an unclosed fence', async () => {
+    const root = await makeTemp('aif-rv-fence-');
+    await seedProject(root, { files: { 'docs/guide.md': await fixtureBuffer('unclosed-fence.md') } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const report = run.json();
+    const uncovered = report.diagnostics.find((diagnostic) => diagnostic.code === 'parser-uncovered-span'
+      && diagnostic.path === 'docs/guide.md');
+    assert.ok(uncovered, 'unclosed fence diagnostic present');
+    assert.ok(/bytes=\d+-\d+/.test(uncovered.detail), `byte range present: ${uncovered.detail}`);
+  });
+
+  it('gives quote-mismatch a mechanically derivable suggestion', async () => {
+    const root = await makeTemp('aif-rv-quote-');
+    await seedProject(root, { files: { 'docs/guide.md': await fixtureBuffer('en-findings.md') } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const quotes = run.json().findings.filter((finding) => finding.rule.id === 'docs-readability:quote-mismatch');
+    assert.equal(quotes.length, 2);
+    for (const finding of quotes) {
+      assert.ok(typeof finding.suggestion === 'string' && finding.suggestion.length > 0);
+    }
+  });
+
+  it('caps per-document findings instead of exploding memory', async () => {
+    const root = await makeTemp('aif-rv-cap-');
+    const doc = `# Cap\n\n## Description\n\n${'“'.repeat(3000)}\n`;
+    await seedProject(root, { files: { 'docs/guide.md': Buffer.from(doc, 'utf8') } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    assert.equal(run.exitCode, 0, 'the bounded pipeline survives pathological documents');
+    const report = run.json();
+    assert.ok(report.findings.length <= 2000, `findings capped, got ${report.findings.length}`);
+    assert.ok(report.diagnostics.some((diagnostic) => diagnostic.code === 'findings-truncated'
+      && diagnostic.path === 'docs/guide.md'));
+  });
+});
+
+describe('review regressions: writer and guard hardening', () => {
+  it('refuses to replace a same-change leaf that is not a fully valid report', async () => {
+    const root = await makeTemp('aif-rv-leaf-');
+    await seedProject(root, { files: { 'docs/guide.md': await fixtureBuffer('clean-ru.md') } });
+    const leafDir = path.join(root, '.ai-factory', 'state', 'work', 'readability');
+    await mkdir(leafDir, { recursive: true });
+    const plausible = {
+      schema: READABILITY_SCHEMA, change_id: 'work', extra_unknown: true,
+    };
+    await writeFile(path.join(leafDir, 'report.json'), `${JSON.stringify(plausible)}\n`);
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--write']);
+    assert.equal(run.exitCode, 1);
+    assert.ok(run.stdout.includes('report-leaf-conflict'));
+  });
+
+  it('fails the git guard closed on dubious ownership', async () => {
+    const dubious = async (command, args) => {
+      if (args.join(' ').includes('rev-parse')) {
+        const error = new Error('fatal: detected dubious ownership in repository');
+        error.code = 128;
+        error.stderr = 'fatal: detected dubious ownership in repository';
+        throw error;
+      }
+      return { stdout: '' };
+    };
+    const verdict = await verifyReportIgnored('/fixture', '.ai-factory/state/w/readability/report.json', { execGit: dubious });
+    assert.equal(verdict.ok, false);
+    assert.equal(verdict.code, 'git-verify-failed');
+  });
+});
+
+describe('review regressions: binding identity', () => {
+  it('persists the language override and survives revalidation with malformed inputs', async () => {
+    const root = await makeTemp('aif-rv-lang-');
+    await seedProject(root, {
+      files: {
+        'docs/broken.md': Buffer.from([0xD0, 0xB1, 0x00]),
+        'docs/clean.md': await fixtureBuffer('clean-ru.md'),
+      },
+    });
+    const run = await runCli(root, ['--change', 'work', '--language', 'en', '--file', 'docs/broken.md', '--file', 'docs/clean.md', '--write', '--json']);
+    assert.equal(run.exitCode, 0);
+    const report = run.json();
+    assert.deepEqual(report.language_options, { override: 'en' });
+    assert.equal(report.state, 'malformed-input');
+    const verdict = await validateReportBinding(root, report);
+    assert.equal(verdict.ok, true);
+    assert.equal(verdict.stale, false, 'the binding component is recoverable from the persisted override');
+  });
+
+  it('names tampered profile, engine, glossary and language fields', async () => {
+    const root = await makeTemp('aif-rv-tamper-');
+    const glossary = await fixtureBuffer('glossary-context.md');
+    await seedProject(root, { glossary, files: { 'docs/guide.md': await fixtureBuffer('ru-findings.md') } });
+    const run = await runCli(root, ['--change', 'work', '--language', 'ru', '--file', 'docs/guide.md', '--write', '--json']);
+    assert.equal(run.exitCode, 0);
+    const stored = parseStrictJson(await readFile(path.join(root, '.ai-factory', 'state', 'work', 'readability', 'report.json'), 'utf8'));
+
+    const profileTampered = { ...stored, profile: { ...stored.profile, id: 'other-profile' } };
+    const profileVerdict = await validateReportBinding(root, profileTampered);
+    assert.ok(profileVerdict.mismatched.includes('profile'));
+
+    const engineTampered = { ...stored, engine: { ...stored.engine, sha256: 'a'.repeat(64) } };
+    const engineVerdict = await validateReportBinding(root, engineTampered);
+    assert.ok(engineVerdict.mismatched.includes('engine'));
+
+    const glossaryTampered = { ...stored, glossary: { ...stored.glossary, sha256: 'b'.repeat(64) } };
+    const glossaryVerdict = await validateReportBinding(root, glossaryTampered);
+    assert.ok(glossaryVerdict.mismatched.includes('glossary'));
+
+    const languageTampered = { ...stored, language_options: { override: 'en' } };
+    const languageVerdict = await validateReportBinding(root, languageTampered);
+    // The override has no external source to compare against; tampering is
+    // localized by the binding digest that mixes the persisted value in.
+    assert.ok(languageVerdict.mismatched.includes('binding'));
+  });
+
+  it('keeps the injected-provider snapshot identical across a report write', async () => {
+    const root = await makeTemp('aif-rv-inj-');
+    await seedProject(root, { files: { 'docs/guide.md': await fixtureBuffer('ru-findings.md') } });
+    const toolchain = [{ name: 'fake-node', sha256: digest('runtime') }];
+    const checks = [{ id: 'check-verify', gate: 'verify', profile: 'declared.v1', dependencies_complete: true,
+      inputs: ['docs'], command: { argv: ['fake'], cwd: '.' }, toolchain, env_inputs: [], requires_observed: false }];
+    const model = { files: { 'docs/guide.md': Buffer.from('same bytes') }, ignored_names: [],
+      modules: { helper: digest('helper') }, worktree_identity: digest(root), actual_diff: digest('same') };
+    const options = { rootDir: root, changeId: 'work', scope: ['docs'], checks, environment: {},
+      providers: { requirements: async () => ({ gates: ['verify'], independent_roles: [], evidence: [] }), toolchain: async () => toolchain },
+      SnapshotProvider: async ({ payload }) => {
+        const files = { ...model.files };
+        for (const scope of allDeclaredRoots(payload)) {
+          if (!Object.keys(files).some((p) => p === scope || p.startsWith(`${scope}/`))) files[scope] = null;
+        }
+        return { ...model, complete: true, files };
+      } };
+    assert.equal((await prepareQaManifest(options)).ok, true);
+    const store = await qaStore(options);
+    const { payload } = await store.manifest();
+    const before = await observeQaSnapshot(store, payload, options);
+    assert.equal((await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--write', '--json'])).exitCode, 0);
+    const after = await observeQaSnapshot(store, payload, options);
+    assert.equal(after.digest, before.digest, 'injected-provider snapshot digest is unchanged');
+    assert.deepEqual(after.ignored_names, before.ignored_names);
+    assert.deepEqual(after.changed_paths, before.changed_paths);
+    assert.ok(!Object.keys(after.files).some((p) => p.includes('readability')));
+  });
+
+  it('classifies an unreadable glossary without exposing content', async () => {
+    const root = await makeTemp('aif-rv-glos-');
+    await seedProject(root, {
+      glossary: Buffer.from([0xD0, 0xB1, 0x00]),
+      files: { 'docs/guide.md': await fixtureBuffer('clean-ru.md') },
+    });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const report = run.json();
+    assert.equal(report.glossary.state, 'unreadable');
+    assert.equal(report.glossary.sha256, null);
+  });
+});
+

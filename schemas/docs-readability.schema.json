@@ -142,8 +142,7 @@
             "missing",
             "empty",
             "unreadable",
-            "unsafe",
-            "disabled"
+            "unsafe"
           ]
         },
         "sha256": {
@@ -158,6 +157,22 @@
         "path",
         "state",
         "sha256"
+      ]
+    },
+    "language_options": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "override": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "override"
       ]
     },
     "findings": {
@@ -402,6 +417,7 @@
     "profile",
     "inputs",
     "glossary",
+    "language_options",
     "findings",
     "counts_only",
     "diagnostics",

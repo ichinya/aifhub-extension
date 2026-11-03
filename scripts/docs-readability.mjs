@@ -36,6 +36,7 @@ export const QA_ROOT = '.ai-factory/qa';
 const DEFAULT_CONTEXT_PATH = 'CONTEXT.md';
 const DEFAULT_DEADLINE_MS = 30000;
 const MAX_FINDINGS = 5000;
+const MAX_FINDINGS_PER_DOCUMENT = 2000;
 const MAX_DIAGNOSTICS = 200;
 // Deterministic degradation aggregation: the first state on this scale wins.
 const SEVERITY = Object.freeze([
@@ -164,8 +165,11 @@ export function parseConfigSubset(raw) {
       stack.push({ indent, value: parent[key] });
       continue;
     }
-    const unquoted = rawValue.replace(/^['"]|['"]$/g, '');
-    if (/^(true|false)$/i.test(unquoted)) parent[key] = unquoted.toLowerCase() === 'true';
+    const unquoted = /^(['"]).*\1$/.test(rawValue) ? rawValue.slice(1, -1) : rawValue.replace(/^['"]|['"]$/g, '');
+    // Quoted values are strings by construction: `enabled: "true"` must stay a
+    // non-boolean diagnostic instead of silently flipping the opt-in.
+    if (/^(['"]).*\1$/.test(rawValue)) parent[key] = unquoted;
+    else if (/^(true|false)$/i.test(unquoted)) parent[key] = unquoted.toLowerCase() === 'true';
     else if (/^-?\d+(?:\.\d+)?$/.test(unquoted)) parent[key] = Number(unquoted);
     else parent[key] = unquoted;
   }
@@ -216,8 +220,26 @@ function validateProfileShape(parsed) {
     if (rule.type === 'phrase-list') {
       if (!Array.isArray(rule.phrases) || !rule.phrases.some((p) => typeof p === 'string' && p)) problems.push(`empty phrase list: ${String(rule.id)}`);
     } else if (rule.type === 'sentence-length') {
-      if (!rule.thresholds || typeof rule.thresholds !== 'object') problems.push(`sentence thresholds missing: ${String(rule.id)}`);
-    } else if (!['unbalanced-pair', 'quote-mismatch', 'glossary-term'].includes(rule.type)) {
+      for (const sectionClass of ['procedure', 'description', 'requirement', 'acceptance', 'general']) {
+        const threshold = rule.thresholds?.[sectionClass];
+        if (!threshold || typeof threshold !== 'object'
+          || !Number.isInteger(threshold.ru) || !Number.isInteger(threshold.en)) {
+          problems.push(`sentence thresholds incomplete for ${sectionClass}: ${String(rule.id)}`);
+        }
+      }
+    } else if (rule.type === 'unbalanced-pair') {
+      if (!Array.isArray(rule.pairs) || rule.pairs.length === 0
+        || !rule.pairs.every((pair) => Array.isArray(pair) && pair.length === 2
+          && typeof pair[0] === 'string' && pair[0].length === 1
+          && typeof pair[1] === 'string' && pair[1].length === 1)) {
+        problems.push(`pairs invalid: ${String(rule.id)}`);
+      }
+    } else if (rule.type === 'quote-mismatch') {
+      if (!Array.isArray(rule.disallowed) || rule.disallowed.length === 0
+        || !rule.disallowed.every((mark) => typeof mark === 'string' && [...mark].length === 1)) {
+        problems.push(`disallowed quotes invalid: ${String(rule.id)}`);
+      }
+    } else if (rule.type !== 'glossary-term') {
       problems.push(`unknown rule type: ${String(rule.type)}`);
     }
   }
@@ -277,6 +299,10 @@ function lineLevelExclusion(bare) {
     || /^\s{0,3}\[[^\]]+\]:\s*\S/.test(bare); // link-reference definition
 }
 
+function indentedCodeLine(bare) {
+  return /^ {4}\S/.test(bare) || /^\t+\S/.test(bare);
+}
+
 export function buildDocumentModel(text) {
   const rawLines = String(text).match(/[^\r\n]*(?:\r\n|\r|\n|$)/g) ?? [''];
   if (rawLines.length > 1 && rawLines[rawLines.length - 1] === '') rawLines.pop();
@@ -290,10 +316,13 @@ export function buildDocumentModel(text) {
   const fenceMask = fenceLineMask(lines.map((line) => line.bare));
   const excluded = [];
   const diagnostics = [];
+  const uncovered = [];
   let partial = false;
-  // Front matter: a leading --- block is metadata, not prose.
+  const bodyStart = 0;
+  // Front matter: a leading --- block is metadata, not prose. A leading BOM is
+  // real file content and must not hide the front-matter marker.
   let firstBodyLine = 0;
-  if (lines[0]?.bare.trimEnd() === '---') {
+  if (lines[0]?.bare.replace(/^\uFEFF/, '').trimEnd() === '---') {
     for (let index = 1; index < lines.length; index += 1) {
       if (lines[index].bare.trimEnd() === '---') {
         for (let front = 0; front <= index; front += 1) excluded.push({ s: lines[front].start, e: lines[front].end });
@@ -301,31 +330,59 @@ export function buildDocumentModel(text) {
         break;
       }
     }
-    if (firstBodyLine === 0) partial = true; // unterminated front matter: unknown metadata span
+    if (firstBodyLine === 0) {
+      // Unterminated front matter: the whole leading block is unknown metadata.
+      partial = true;
+      uncovered.push({ s: lines[0].start, e: lines[lines.length - 1].end, detail: 'unclosed-front-matter' });
+      for (let front = 0; front < lines.length; front += 1) excluded.push({ s: lines[front].start, e: lines[front].end });
+      firstBodyLine = lines.length;
+    }
   }
   // An unclosed terminal fence is a known-ambiguous construct: its content is
   // excluded, but the parser reports partial coverage with an uncovered span.
   let openFence = false;
-  for (const bare of lines.map((line) => line.bare)) {
-    const fenceMatch = bare.match(/^ {0,3}(`{3,}|~{3,})/);
+  let openFenceIndex = -1;
+  for (let index = firstBodyLine; index < lines.length; index += 1) {
+    const fenceMatch = lines[index].bare.match(/^ {0,3}(`{3,}|~{3,})/);
     if (fenceMatch) {
       const token = fenceMatch[1];
-      if (openFence === false) openFence = { char: token[0], length: token.length };
-      else if (token[0] === openFence.char && token.length >= openFence.length
-        && /^\s*$/.test(bare.slice(fenceMatch[0].length))) openFence = false;
+      if (openFence === false) {
+        openFence = { char: token[0], length: token.length };
+        openFenceIndex = index;
+      } else if (token[0] === openFence.char && token.length >= openFence.length
+        && /^\s*$/.test(lines[index].bare.slice(fenceMatch[0].length))) openFence = false;
     }
   }
-  if (openFence !== false) {
-    partial = true;
-    diagnostics.push({ code: 'parser-uncovered-span', path: null, detail: 'unclosed-fence' });
-  }
+  let prevBlank = true;
+  let indentedCode = false;
   for (let index = firstBodyLine; index < lines.length; index += 1) {
     const line = lines[index];
     if (fenceMask[index] || lineLevelExclusion(line.bare)) {
       excluded.push({ s: line.start, e: line.end });
+      prevBlank = false;
       continue;
     }
+    // Indented code blocks (4 spaces or a tab, opened after a blank line or at
+    // the document start) are code, not prose. A block cannot interrupt a
+    // paragraph, so only blank-preceded indentation opens one; blank lines
+    // continue an open block (documented CommonMark subset).
+    if (indentedCodeLine(line.bare) && (indentedCode || prevBlank)) {
+      indentedCode = true;
+      excluded.push({ s: line.start, e: line.end });
+      continue;
+    }
+    if (line.bare.trim() === '') {
+      prevBlank = true;
+      indentedCode = false;
+    } else {
+      prevBlank = false;
+      indentedCode = false;
+    }
     scanInline(line.bare, line.start, excluded);
+  }
+  if (openFence !== false && openFenceIndex >= 0) {
+    partial = true;
+    uncovered.push({ s: lines[openFenceIndex].start, e: lines[lines.length - 1].end, detail: 'unclosed-fence' });
   }
   excluded.sort((left, right) => left.s - right.s || left.e - right.e);
   const merged = [];
@@ -334,7 +391,8 @@ export function buildDocumentModel(text) {
     if (last && span.s <= last.e) last.e = Math.max(last.e, span.e);
     else merged.push({ ...span });
   }
-  return { text: String(text), lines, fenceMask, excluded: merged, partial, diagnostics };
+  for (const span of uncovered) diagnostics.push({ code: 'parser-uncovered-span', path: null, detail: `${span.detail} bytes=${span.s}-${span.e}` });
+  return { text: String(text), lines, fenceMask, excluded: merged, uncovered, partial, diagnostics };
 }
 
 function scanInline(bare, base, excluded) {
@@ -352,7 +410,9 @@ function scanInline(bare, base, excluded) {
         if (bare[j] === '`') {
           let run2 = 0;
           while (bare[j + run2] === '`') run2 += 1;
-          if (run2 >= run) { closer = j; closerLength = run2; break; }
+          // CommonMark: the closing backtick string must have the exact same
+          // length as the opener; a longer run does not close a shorter one.
+          if (run2 === run) { closer = j; closerLength = run2; break; }
           j += run2;
         } else j += 1;
       }
@@ -369,13 +429,15 @@ function scanInline(bare, base, excluded) {
     }
     if (ch === '[') {
       const rest = bare.slice(i);
-      const inline = /\[([^\]]*)\]\(([^)]*)\)/.exec(rest);
+      // Anchored at the scan position: a link construct must start exactly at
+      // this '['; unanchored matching would exclude unrelated prose.
+      const inline = /^\[([^\]]*)\]\(([^)]*)\)/.exec(rest);
       if (inline) {
         push(i, i + 1); // the opening bracket is link syntax, not prose
         push(i + 1 + inline[1].length, i + inline[0].length); // ](target) excluded, label stays prose
         i += inline[0].length; continue;
       }
-      const reference = /\[([^\]]+)\]\[([^\]]*)\]/.exec(rest);
+      const reference = /^\[([^\]]+)\]\[([^\]]*)\]/.exec(rest);
       if (reference) {
         push(i, i + 1);
         push(i + 1 + reference[1].length, i + reference[0].length);
@@ -436,6 +498,12 @@ export function buildSections(model) {
   if (current) sections.push(current);
   if (sections.length === 0) {
     return [{ heading: null, start: 0, bodyStart: 0, end: model.text.length, sectionClass: 'general' }];
+  }
+  // The prose before the first active H2 belongs to a synthetic general
+  // section so every rule covers all eligible text (review: preamble scan).
+  const first = sections[0];
+  if (first.start > 0) {
+    sections.unshift({ heading: null, start: 0, bodyStart: 0, end: first.start, sectionClass: 'general' });
   }
   return sections;
 }
@@ -542,32 +610,39 @@ function collectSentences(model) {
   const breaks = paragraphBoundaries(model);
   const sentences = [];
   let sentenceStart = null;
-  for (let index = 0; index < model.text.length; index += 1) {
-    if (breaks.has(index) && sentenceStart !== null) {
-      closeSentence(model, sentences, sentenceStart, index);
-      sentenceStart = null;
-    }
-    const ch = model.text[index];
+  const text = model.text;
+  for (let index = 0; index < text.length; index += 1) {
+    const ch = text[index];
     if (ch === '\n' || ch === '\r') {
-      if (sentenceStart !== null) {
+      // A newline only closes a sentence when the next line starts a new
+      // paragraph construct; soft-wrapped lines inside one paragraph count as
+      // whitespace so hard-wrapped long sentences are measured in full.
+      let next = index;
+      while (next < text.length && (text[next] === '\n' || text[next] === '\r')) next += 1;
+      if ((breaks.has(next) || next >= text.length) && sentenceStart !== null) {
         closeSentence(model, sentences, sentenceStart, index);
         sentenceStart = null;
       }
+      index = next - 1;
       continue;
+    }
+    if (breaks.has(index) && sentenceStart !== null) {
+      closeSentence(model, sentences, sentenceStart, index);
+      sentenceStart = null;
     }
     if (!isEligible(model, index)) continue;
     if (sentenceStart === null) sentenceStart = index;
     if (ch === '.' || ch === '!' || ch === '?' || ch === '…') {
       let next = index + 1;
-      while (next < model.text.length && /[)}\]"'»”]/.test(model.text[next])) next += 1;
-      if (next >= model.text.length || /\s/.test(model.text[next])) {
+      while (next < text.length && /[)}\]"'»”]/.test(text[next])) next += 1;
+      if (next >= text.length || /\s/.test(text[next])) {
         closeSentence(model, sentences, sentenceStart, next);
         sentenceStart = null;
         index = next - 1;
       }
     }
   }
-  if (sentenceStart !== null) closeSentence(model, sentences, sentenceStart, model.text.length);
+  if (sentenceStart !== null) closeSentence(model, sentences, sentenceStart, text.length);
   return sentences;
 }
 
@@ -625,36 +700,51 @@ function makeFinding(model, document, sIndex, eIndex, rule, explanation, suggest
   };
 }
 
-export function runRules(profile, model, document, glossaryEntries, sections) {
+export function runRules(profile, model, document, glossaryEntries, sections, options = {}) {
   const findings = [];
   const countsOnly = [];
+  let truncated = false;
+  const cap = options.maxFindings ?? MAX_FINDINGS_PER_DOCUMENT;
+  const add = (finding) => {
+    if (findings.length >= cap) {
+      truncated = true;
+      return false;
+    }
+    findings.push(finding);
+    return true;
+  };
   const sentenceRule = profile.profile.rules.get('docs-readability:sentence-length');
   if (sentenceRule && document.resolved !== null) {
     for (const sentence of collectSentences(model)) {
+      if (findings.length >= cap) { truncated = true; break; }
       const section = sections.find((item) => sentence.s >= item.start && sentence.s < item.end) ?? sections[0];
       const words = countWords(model, sentence);
       const threshold = sentenceRule.thresholds?.[section.sectionClass]?.[document.resolved];
       if (Number.isInteger(threshold) && words > threshold) {
-        findings.push(makeFinding(model, document, sentence.s, sentence.e, sentenceRule,
+        add(makeFinding(model, document, sentence.s, sentence.e, sentenceRule,
           `Sentence has ${words} words; threshold for ${section.sectionClass} (${document.resolved}) is ${threshold}.`,
           null, false));
       }
     }
   }
   for (const ruleId of ['docs-readability:ru-cliche', 'docs-readability:en-cliche']) {
+    if (truncated) break;
     const rule = profile.profile.rules.get(ruleId);
     if (!rule || document.language !== rule.language) continue;
     for (const section of sections) {
+      if (truncated) break;
       for (const run of eligibleRuns(model, section.start, section.end)) {
+        if (truncated) break;
         const chunk = model.text.slice(run.s, run.e);
         for (const phrase of rule.phrases) {
           const pattern = phraseRegex(phrase);
           let match;
           while ((match = pattern.exec(chunk)) !== null) {
-            findings.push(makeFinding(model, document, run.s + match.index, run.s + match.index + match[0].length, rule,
-              `Cliche phrase «${bounded(match[0], 40)}» from the pinned ${rule.language} list.`, null, true));
+            if (!add(makeFinding(model, document, run.s + match.index, run.s + match.index + match[0].length, rule,
+              `Cliche phrase «${bounded(match[0], 40)}» from the pinned ${rule.language} list.`, null, true))) break;
             if (match.index === pattern.lastIndex) pattern.lastIndex += 1;
           }
+          if (truncated) break;
         }
       }
     }
@@ -662,6 +752,7 @@ export function runRules(profile, model, document, glossaryEntries, sections) {
   const pairRule = profile.profile.rules.get('docs-readability:unbalanced-pair');
   if (pairRule && !model.partial) {
     for (const section of sections) {
+      if (truncated) break;
       const counts = new Map(pairRule.pairs.map(([open, close]) => [`${open}${close}`, { open: 0, close: 0 }]));
       for (const run of eligibleRuns(model, section.start, section.end)) {
         for (const ch of model.text.slice(run.s, run.e)) {
@@ -678,7 +769,7 @@ export function runRules(profile, model, document, glossaryEntries, sections) {
       for (const [open, close] of pairRule.pairs) {
         const tally = counts.get(`${open}${close}`);
         if (tally.open !== tally.close) {
-          findings.push(makeFinding(model, document, span.s, span.e, pairRule,
+          add(makeFinding(model, document, span.s, span.e, pairRule,
             `Unbalanced pair ${open}${close} in ${section.heading ? `section «${bounded(section.heading, 40)}»` : 'document'}: ${tally.open} open, ${tally.close} close.`,
             `Check the ${open}${close} pair balance.`, false));
         }
@@ -689,12 +780,14 @@ export function runRules(profile, model, document, glossaryEntries, sections) {
   if (quoteRule) {
     const disallowed = new Set(quoteRule.disallowed);
     for (const section of sections) {
+      if (truncated) break;
       for (const run of eligibleRuns(model, section.start, section.end)) {
+        if (truncated) break;
         for (let index = run.s; index < run.e; index += 1) {
           if (disallowed.has(model.text[index])) {
-            findings.push(makeFinding(model, document, index, index + 1, quoteRule,
+            if (!add(makeFinding(model, document, index, index + 1, quoteRule,
               `Unsupported quotation mark U+${model.text.codePointAt(index).toString(16).toUpperCase().padStart(4, '0')} in prose; use «» or ".`,
-              null, false));
+              'Replace the unsupported quotation mark with «» or ".', false))) break;
           }
         }
       }
@@ -703,24 +796,27 @@ export function runRules(profile, model, document, glossaryEntries, sections) {
   const glossaryRule = profile.profile.rules.get('docs-readability:glossary-term');
   if (glossaryRule && Array.isArray(glossaryEntries) && glossaryEntries.length > 0) {
     for (const section of sections) {
+      if (truncated) break;
       for (const run of eligibleRuns(model, section.start, section.end)) {
+        if (truncated) break;
         const chunk = model.text.slice(run.s, run.e);
         for (const entry of glossaryEntries) {
           for (const alias of entry.aliases) {
             const pattern = phraseRegex(alias);
             let match;
             while ((match = pattern.exec(chunk)) !== null) {
-              findings.push(makeFinding(model, document, run.s + match.index, run.s + match.index + match[0].length, glossaryRule,
+              if (!add(makeFinding(model, document, run.s + match.index, run.s + match.index + match[0].length, glossaryRule,
                 `Term «${bounded(match[0], 40)}» differs from the glossary preferred form «${bounded(entry.preferred, 40)}».`,
-                entry.preferred, true));
+                entry.preferred, true))) break;
               if (match.index === pattern.lastIndex) pattern.lastIndex += 1;
             }
+            if (truncated) break;
           }
         }
       }
     }
   }
-  return { findings, countsOnly };
+  return { findings, countsOnly, truncated };
 }
 
 // ---------------------------------------------------------------------------
@@ -810,12 +906,22 @@ function parseGlossaryTerm(raw) {
 
 async function readDocument(rootDir, relative, options = {}) {
   const fail = (code, detail, extra = {}) => ({ ok: false, code, detail, ...extra });
+  let target;
   try {
-    const target = await safeProviderPath(rootDir, relative);
+    target = await safeProviderPath(rootDir, relative);
     if (!target.exists) return fail('file-missing', relative);
   } catch (error) {
     return fail(String(error?.message ?? 'unsafe_path'), relative);
   }
+  // Size gate before the bounded read so the spec-named code is exact.
+  let info;
+  try {
+    info = await lstat(target.path);
+  } catch (error) {
+    return fail(String(error?.message ?? 'unsafe_file'), relative);
+  }
+  if (!info.isFile()) return fail('unsafe_file', relative);
+  if (info.size > DOCUMENT_LIMIT) return fail('file_limit', relative);
   let bytes;
   try {
     bytes = await readProviderFile(rootDir, relative, DOCUMENT_LIMIT);
@@ -846,9 +952,18 @@ function analyzeDocument(profile, glossaryEntries, relative, content, options) {
   for (const run of eligibleRuns(model, 0, model.text.length)) eligibleBytes += model.byteOffsets[run.e] - model.byteOffsets[run.s];
   const ruleOutcome = profile.ok
     ? runRules(profile, model, document, glossaryEntries, sections)
-    : { findings: [], countsOnly: [] };
+    : { findings: [], countsOnly: [], truncated: false };
   const diagnostics = [];
-  if (model.partial) diagnostics.push({ code: 'parser-uncovered-span', path: relative, detail: 'unsupported-markdown-construct' });
+  if (model.partial) {
+    // Uncovered spans are reported with byte ranges from the raw file bytes.
+    const ranges = model.uncovered.length > 0
+      ? model.uncovered.map((span) => `bytes=${model.byteOffsets[span.s]}-${model.byteOffsets[span.e]}`).join(', ')
+      : 'bytes=unspecified';
+    diagnostics.push({ code: 'parser-uncovered-span', path: relative, detail: ranges });
+  }
+  if (ruleOutcome.truncated) {
+    diagnostics.push({ code: 'findings-truncated', path: relative, detail: `limit=${MAX_FINDINGS_PER_DOCUMENT}` });
+  }
   if (language.diagnostic) diagnostics.push({ ...language.diagnostic, path: relative });
   if (!profile.ok) diagnostics.push(...profile.diagnostics);
   if (profile.ok && language.resolved === null) {
@@ -863,6 +978,7 @@ function analyzeDocument(profile, glossaryEntries, relative, content, options) {
     eligibleBytes,
     findings: ruleOutcome.findings,
     countsOnly: ruleOutcome.countsOnly,
+    truncated: ruleOutcome.truncated,
     diagnostics,
   };
 }
@@ -925,7 +1041,9 @@ const MALFORMED_CODES = Object.freeze(['file-missing', 'file_limit', 'file_chang
 
 // Read-time revalidation of a persisted report. Any divergence between the
 // recorded composite binding and the current worktree/inputs/profile/engine/
-// glossary state yields the `stale-report` outcome with mismatched fields.
+// glossary/language state yields the `stale-report` outcome with named fields.
+// Recorded profile/engine/glossary/language_options metadata is cross-checked
+// against the current components, so tampering with a single field is named.
 export async function validateReportBinding(rootDir, report, options = {}) {
   if (!report || typeof report !== 'object' || report.schema !== READABILITY_SCHEMA
     || typeof report.change_id !== 'string' || typeof report.binding !== 'string') {
@@ -960,10 +1078,28 @@ export async function validateReportBinding(rootDir, report, options = {}) {
     inputDigests[input.path] = currentSha;
     if (currentSha !== (input.sha256 ?? null)) mismatched.push(`inputs:${input.path}`);
   }
-  const overrideEntry = inputs.find((input) => input.language_source === 'override');
-  const languageOptions = { override: overrideEntry ? overrideEntry.language : null };
+  // The language override is persisted in the report: it cannot be recovered
+  // from inputs alone (malformed/skipped inputs never carry language_source).
+  const languageOptions = {
+    override: typeof report.language_options?.override === 'string' ? report.language_options.override : null,
+  };
   const engine = { module: ENGINE_MODULE, sha256: engineSha, parser_version: PARSER_VERSION };
   const glossaryPart = { path: glossary.path ?? null, state: glossary.state, sha256: glossary.sha256 ?? null };
+  const recordedProfile = report.profile ?? {};
+  if ((recordedProfile.id ?? null) !== (profilePart.part.id ?? null)
+    || (recordedProfile.version ?? null) !== (profilePart.part.version ?? null)
+    || (recordedProfile.sha256 ?? null) !== (profilePart.part.sha256 ?? null)) mismatched.push('profile');
+  const recordedEngine = report.engine ?? {};
+  if ((recordedEngine.module ?? null) !== ENGINE_MODULE
+    || (recordedEngine.sha256 ?? null) !== engineSha
+    || (recordedEngine.parser_version ?? null) !== PARSER_VERSION) mismatched.push('engine');
+  const recordedGlossary = report.glossary ?? {};
+  if ((recordedGlossary.path ?? null) !== (glossaryPart.path ?? null)
+    || (recordedGlossary.state ?? null) !== glossaryPart.state
+    || (recordedGlossary.sha256 ?? null) !== (glossaryPart.sha256 ?? null)) mismatched.push('glossary');
+  // language_options has no independent current value to cross-check (the CLI
+  // override lives only in the report); tampering with it is caught by the
+  // binding digest, which mixes the persisted override in.
   const currentBinding = digest(canonical(bindingCanonicalObject({
     worktreeIdentity,
     changeId: normalized.changeId,
@@ -1002,24 +1138,43 @@ export async function writeReadabilityReport(rootDir, report, config, options = 
     if (!info.isDirectory()) return { ok: false, code: 'file-shadow', detail: parts.slice(0, index).join('/') };
   }
   const leaf = path.join(root, ...parts);
-  let leafInfo = null;
-  try { leafInfo = await lstat(leaf); } catch { leafInfo = null; }
-  if (leafInfo !== null) {
-    if (!leafInfo.isFile()) return { ok: false, code: 'report-leaf-conflict', detail: relative };
+  const leafConflict = () => ({ ok: false, code: 'report-leaf-conflict', detail: relative });
+  // Leaf ownership: only a previous, fully schema-valid report of the same
+  // change may be replaced — a matching schema+change_id pair alone is not
+  // ownership (review: two-field objects must not pass).
+  const assertLeafWritable = async () => {
+    let leafInfo = null;
+    try { leafInfo = await lstat(leaf); } catch { leafInfo = null; }
+    if (leafInfo === null) return null;
+    if (!leafInfo.isFile()) return leafConflict();
     const previous = await readProviderFile(root, relative, 4 * 1024 * 1024);
     let priorReport = null;
     try { priorReport = parseStrictJson(previous.toString('utf8')); } catch { priorReport = null; }
     if (!priorReport || priorReport.schema !== READABILITY_SCHEMA || priorReport.change_id !== report.change_id) {
-      return { ok: false, code: 'report-leaf-conflict', detail: relative };
+      return leafConflict();
     }
-  }
+    const schema = parseStrictJson(await readFile(new URL('../schemas/docs-readability.schema.json', import.meta.url), 'utf8'));
+    if (validateJsonAgainstSchema(priorReport, schema).length > 0) return leafConflict();
+    return null;
+  };
+  const firstRejection = await assertLeafWritable();
+  if (firstRejection) return firstRejection;
   const gitGuard = options.verifyReportIgnored ?? verifyReportIgnored;
   const verdict = await gitGuard(root, relative, options);
   if (!verdict.ok) return { ok: false, code: verdict.code, detail: verdict.detail ?? null };
   const directory = path.join(root, ...parts.slice(0, -1));
   await mkdir(directory, { recursive: true });
+  // TOCTOU re-check after materialization: the live directory must resolve to
+  // the same real path (no symlink/junction swap) and the leaf ownership must
+  // still hold right before the atomic rename.
+  const liveDirectory = await realpath(directory);
+  if (path.resolve(liveDirectory).toLowerCase() !== path.resolve(directory).toLowerCase()) {
+    return { ok: false, code: 'file-shadow', detail: parts.slice(0, -1).join('/') };
+  }
+  const secondRejection = await assertLeafWritable();
+  if (secondRejection) return secondRejection;
   const payload = `${JSON.stringify(report, null, 2)}\n`;
-  const temporary = path.join(root, ...parts.slice(0, -1), `${parts[parts.length - 1]}.${randomUUID()}.tmp`);
+  const temporary = path.join(liveDirectory, `${parts[parts.length - 1]}.${randomUUID()}.tmp`);
   await writeFile(temporary, payload, { encoding: 'utf8', mode: 0o600 });
   try {
     await rename(temporary, leaf);
@@ -1146,8 +1301,13 @@ export async function runDocsReadabilityCommand(argv = process.argv.slice(2), op
         path: analysis.path, sha256: analysis.sha256, language: analysis.language, language_source: analysis.languageSource,
         parsing: analysis.parsing, eligible_bytes: analysis.eligibleBytes, read_state: 'ok',
       });
-      findings.push(...analysis.findings);
-      countsOnly.push(...analysis.countsOnly);
+      // Bounded accumulation without spread: a pathological document can emit
+      // tens of thousands of findings and must not grow the array unbounded.
+      for (const finding of analysis.findings) {
+        if (findings.length >= MAX_FINDINGS) break;
+        findings.push(finding);
+      }
+      for (const entry of analysis.countsOnly) countsOnly.push(entry);
       diagnostics.push(...analysis.diagnostics);
     }
     if (!timedOut && expired()) timedOut = true;
@@ -1166,9 +1326,8 @@ export async function runDocsReadabilityCommand(argv = process.argv.slice(2), op
     for (const candidate of SEVERITY) {
       if (degraded.has(candidate)) { state = candidate; break; }
     }
-    if (findings.length > MAX_FINDINGS) {
+    if (findings.length >= MAX_FINDINGS) {
       diagnostics.push({ code: 'findings-truncated', path: null, detail: `limit=${MAX_FINDINGS}` });
-      findings.length = MAX_FINDINGS;
     }
     if (diagnostics.length > MAX_DIAGNOSTICS) diagnostics.length = MAX_DIAGNOSTICS;
     findings.sort((left, right) => (left.file < right.file ? -1 : left.file > right.file ? 1 : 0)
@@ -1177,7 +1336,17 @@ export async function runDocsReadabilityCommand(argv = process.argv.slice(2), op
 
     const worktreeIdentity = await computeWorktreeIdentity(rootDir, options);
     const engineSha = await engineModuleSha256(options);
-    const profilePart = (await currentProfilePart(options)).part;
+    // Binding metadata comes from the exact profile snapshot the findings were
+    // computed with — a second load here would let a profile change between
+    // reads desynchronize findings from the recorded binding.
+    const profilePart = profile.ok
+      ? {
+        sha256: profile.sha256,
+        id: profile.profile.id,
+        version: profile.profile.version,
+        rules: Object.fromEntries([...profile.profile.rules.entries()].map(([id, rule]) => [id, rule.version])),
+      }
+      : { sha256: profile.sha256 ?? null, id: null, version: null, rules: {} };
     const binding = digest(canonical(bindingCanonicalObject({
       worktreeIdentity,
       changeId,
@@ -1202,6 +1371,7 @@ export async function runDocsReadabilityCommand(argv = process.argv.slice(2), op
       },
       inputs,
       glossary: { path: glossary.path ?? null, state: glossary.state, sha256: glossary.sha256 ?? null },
+      language_options: { override: parsed.language },
       findings,
       counts_only: countsOnly,
       diagnostics,
