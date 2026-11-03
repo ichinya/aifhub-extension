@@ -160,6 +160,13 @@ const WRAPPER_COMMANDS = [
     module: './commands/aifhub-context-dedup.mjs',
     script: 'context-dedup.mjs',
     args: ['status', '--json']
+  },
+  {
+    name: 'aifhub-docs-readability',
+    description: 'Run opt-in non-blocking readability diagnostics for documents bound to an OpenSpec change without changing evidence or authorizing progression.',
+    module: './commands/aifhub-docs-readability.mjs',
+    script: 'docs-readability.mjs',
+    args: ['--change', 'add-oauth', '--enabled', 'true', '--file', 'docs/usage.md', '--json']
   }
 ];
 

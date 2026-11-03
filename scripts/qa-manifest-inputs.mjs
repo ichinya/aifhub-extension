@@ -91,7 +91,11 @@ export async function observeQaSnapshot(store, payload, options = {}) {
   // (files, directory_names, ignored_names, changed_paths) excludes them
   // regardless of the snapshot provider in front of the store (review F7).
   const compositionsNamespace = p => within(p, `.ai-factory/state/${payload.target.id}/compositions`);
-  const names = Object.keys(observed.files).filter(p => !compositionsNamespace(p));
+  // Closed runtime namespace (#228): advisory readability reports are written
+  // under state between enroll and binding checks, so the same projection rule
+  // applies to the readability namespace; the writer refuses custom state roots.
+  const readabilityNamespace = p => within(p, `.ai-factory/state/${payload.target.id}/readability`);
+  const names = Object.keys(observed.files).filter(p => !compositionsNamespace(p) && !readabilityNamespace(p));
   requireValue(names.length <= QA_LIMITS.files, 'qa-files-limit', true);
   const collision = new Map();
   const directoryCase = new Map();
@@ -104,7 +108,7 @@ export async function observeQaSnapshot(store, payload, options = {}) {
       directoryCase.set(prefix.toLowerCase(), prefix);
     }
   }
-  const directories = new Set((observed.directory_names ?? []).filter(p => !compositionsNamespace(p)));
+  const directories = new Set((observed.directory_names ?? []).filter(p => !compositionsNamespace(p) && !readabilityNamespace(p)));
   requireValue(directories.size <= QA_LIMITS.files && [...directories].every(p => Object.hasOwn(observed.files, p)
     && observed.files[p] === null), 'directory-catalog-invalid', true);
   let bytes = 0;
@@ -124,7 +128,7 @@ export async function observeQaSnapshot(store, payload, options = {}) {
     files[relative] = data === null ? { kind: directories.has(relative) ? 'directory' : 'missing' } : { kind: 'file', sha256: digest(data),
       projection: material ? null : metadataProjection(relative, data) };
   }
-  const ignored = sorted((observed.ignored_names ?? []).filter(p => !compositionsNamespace(p)));
+  const ignored = sorted((observed.ignored_names ?? []).filter(p => !compositionsNamespace(p) && !readabilityNamespace(p)));
   requireValue(ignored.length <= QA_LIMITS.files, 'qa-files-limit', true);
   for (const p of ignored) {
     sourcePath(p);
@@ -135,7 +139,7 @@ export async function observeQaSnapshot(store, payload, options = {}) {
   requireValue(new Set([...names, ...ignored]).size <= QA_LIMITS.files, 'qa-files-limit', true);
   requireValue(observed.modules && Object.keys(observed.modules).length > 0
     && Object.values(observed.modules).every(hash => SHA.test(hash)), 'module-identity-unproven', true);
-  const changedPaths = sorted((observed.changed_paths ?? []).filter(p => !compositionsNamespace(p)));
+  const changedPaths = sorted((observed.changed_paths ?? []).filter(p => !compositionsNamespace(p) && !readabilityNamespace(p)));
   requireValue(changedPaths.length <= QA_LIMITS.files, 'qa-files-limit', true);
   for (const p of changedPaths) {
     sourcePath(p);
@@ -195,7 +199,8 @@ async function filesystemSnapshot(store, payload, options) {
       ...(payload.target.flow === 'classic' ? ['gates'] : ['rules.md']), 'review.md', 'security.md', 'coverage.json', 'done-readiness.json', '.gitignore', 'raw', 'openspec-validation.json', 'openspec-status.json']
       .some(name => withinCi(p, `${store.qa}/${name}`));
   const excluded = p => within(p, '.git') || qaInternal(p)
-    || within(p, `.ai-factory/state/${payload.target.id}/compositions`);
+    || within(p, `.ai-factory/state/${payload.target.id}/compositions`)
+    || within(p, `.ai-factory/state/${payload.target.id}/readability`);
   const visible = (await git(['ls-files', '--cached', '--others', '--exclude-standard', '-z'])).split('\0').filter(Boolean);
   // Closed namespaces are excluded before the catalog limits: a flood of
   // gitignored paths under compositions/ must not fail the snapshot when the
