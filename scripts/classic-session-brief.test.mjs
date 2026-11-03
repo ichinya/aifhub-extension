@@ -4,6 +4,7 @@ import { cp, mkdtemp, mkdir, readFile, writeFile, rm, realpath, readdir } from '
 import path from 'node:path';
 import os from 'node:os';
 import { compileSessionBrief, inspectSessionBrief, assertSessionBriefBinding } from './session-brief.mjs';
+import { buildCompositionBaseline, prepareCompositionAttempt } from './instruction-composition.mjs';
 import { resolvePlanContext, resolvePlanTarget } from './common-plan-resolver.mjs';
 import { buildImplementationContext, buildFixContext, writeFixTrace, writeExecutionTrace } from './openspec-execution-context.mjs';
 import { checkPlanCompliance } from './plan-compliance.mjs';
@@ -24,7 +25,7 @@ const put = (root, file, text) => writeFile(path.join(root, file), text);
 const text = (root, file) => readFile(path.join(root, file), 'utf8');
 after(async () => { for (const root of roots) await rm(root, { recursive: true, force: true }); });
 
-it('classic full context and twin-root briefs are reproducible, with mandatory null composition inside digest', async () => {
+it('classic full context and twin-root briefs are reproducible, composition hook degrades to null without prompt inventory', async () => {
   const root = await fixture(), twin = await fixture();
   const context = await resolvePlanContext(opts(root));
   assert.deepEqual(context.errors, []);
@@ -37,10 +38,191 @@ it('classic full context and twin-root briefs are reproducible, with mandatory n
   assert.equal((await compileSessionBrief(opts(twin))).digest, first.digest);
   const status = await inspectSessionBrief({ ...opts(root), includeBrief: true });
   assert.equal(status.status, 'valid');
+  // The hook stays in the payload; this fixture has no installed prompt
+  // inventory, so null is the honest unavailable degradation, and a
+  // caller-provided hash is still ignored.
+  assert.equal(Object.hasOwn(status.brief, 'instruction_composition_digest'), true);
   assert.equal(status.brief.instruction_composition_digest, null);
   assert.equal(status.brief.plan_context.methodology, 'aifactory');
   assert.equal(first.sources.some(source => source.path.startsWith('openspec/')), false);
   assert.equal(status.brief.context_manifest.find(d => d.path.endsWith('status.yaml')).fidelity, 'projection');
+});
+
+it('instruction composition baseline pins a stable digest and persists immutable CAS records', async () => {
+  const root = await fixture();
+  await put(root, '.ai-factory.json', JSON.stringify({ agents: [{ id: 'claude' }] }));
+  const skillPath = '.claude/skills/aif-implement/SKILL.md';
+  const markers = ['<!-- aif-ext:aifhub-extension:aif-implement:prepend:start -->', '<!-- aif-ext:aifhub-extension:aif-implement:prepend:end -->'];
+  await mkdir(path.dirname(path.join(root, '.ai-factory/extensions/aifhub-extension/injections/core/aif-implement-head.md')), { recursive: true });
+  await put(root, '.ai-factory/extensions/aifhub-extension/extension.json', JSON.stringify({
+    skills: ['skills/aif-implement'],
+    injections: [{ target: 'aif-implement', position: 'prepend', file: './injections/core/aif-implement-head.md' }],
+    agentFiles: [{ runtime: 'claude', source: './agent-files/claude/aifhub-implement-worker.md', target: 'aifhub-implement-worker.md' }],
+  }));
+  await put(root, '.ai-factory/extensions/aifhub-extension/injections/core/aif-implement-head.md', 'managed body\n');
+  await mkdir(path.dirname(path.join(root, skillPath)), { recursive: true });
+  await put(root, skillPath, `# skill\n${markers[0]}\nmanaged body\n${markers[1]}\n`);
+  await mkdir(path.join(root, '.claude/agents'), { recursive: true });
+  await put(root, '.claude/agents/aifhub-implement-worker.md', 'worker contract\n');
+  const first = await compileSessionBrief(opts(root));
+  assert.equal(first.ok, true, JSON.stringify(first));
+  const status = await inspectSessionBrief({ ...opts(root), includeBrief: true });
+  assert.equal(status.status, 'valid');
+  const digest = status.brief.instruction_composition_digest;
+  assert.match(digest, /^[a-f0-9]{64}$/);
+  const index = JSON.parse(await text(root, `.ai-factory/state/${id}/compositions/indexes/${digest}.json`));
+  assert.equal(index.schema, 'aifhub.instruction_composition_index.v1');
+  assert.equal(index.compositions[0].runtime_id, '.claude');
+  // Recompiling identical inputs reproduces the same baseline digest.
+  const second = await compileSessionBrief(opts(root));
+  assert.equal(second.digest, first.digest);
+  const again = await inspectSessionBrief({ ...opts(root), includeBrief: true });
+  assert.equal(again.brief.instruction_composition_digest, digest);
+  // Instruction drift after compile makes the stored brief stale (digest wave),
+  // and inspect does not silently swap the pinned baseline for a fresh one.
+  await put(root, skillPath, `# skill changed\n${markers[0]}\nmanaged body\n${markers[1]}\n`);
+  const drifted = await inspectSessionBrief(opts(root));
+  assert.equal(drifted.status, 'stale');
+  assert.ok(drifted.stale_reasons.includes('brief_revision_mismatch'));
+  assert.equal(await compileSessionBrief(opts(root)).then(result => result.ok), true);
+});
+
+it('a corrupted installed ledger degrades the composition hook without failing the compile', async () => {
+  const root = await fixture();
+  await put(root, '.ai-factory.json', '{ not json');
+  const compiled = await compileSessionBrief(opts(root));
+  assert.equal(compiled.ok, true, JSON.stringify(compiled));
+  const status = await inspectSessionBrief({ ...opts(root), includeBrief: true });
+  assert.equal(status.status, 'valid');
+  assert.equal(status.brief.instruction_composition_digest, null);
+});
+
+it('the write-gate enforces the composition binding and renders its own trace section', async () => {
+  const root = await fixture();
+  await put(root, '.ai-factory.json', JSON.stringify({ agents: [{ id: 'claude' }] }));
+  const markers = ['<!-- aif-ext:aifhub-extension:aif-implement:prepend:start -->', '<!-- aif-ext:aifhub-extension:aif-implement:prepend:end -->'];
+  const skillPath = '.claude/skills/aif-implement/SKILL.md';
+  await mkdir(path.dirname(path.join(root, '.ai-factory/extensions/aifhub-extension/injections/core/aif-implement-head.md')), { recursive: true });
+  await put(root, '.ai-factory/extensions/aifhub-extension/extension.json', JSON.stringify({
+    skills: ['skills/aif-implement'],
+    injections: [{ target: 'aif-implement', position: 'prepend', file: './injections/core/aif-implement-head.md' }],
+  }));
+  await put(root, '.ai-factory/extensions/aifhub-extension/injections/core/aif-implement-head.md', 'managed body\n');
+  // Validatable reference surface (decision 16 routes): absent members are
+  // required gaps since review round three, so the fixture installs them like
+  // a real published extension does.
+  for (const reference of [
+    'injections/references/aif-implement/openspec-native.md',
+    'injections/references/aif-implement/classic-sdd.md',
+    'skills/aif-done/references/openspec-finalization.md',
+    'skills/aif-done/references/classic-finalization.md',
+    'skills/aif-done/references/finalization-contract.md',
+    'injections/references/aif-implement/worker-claude.md',
+    'skills/shared/references/question-tool/examples.md',
+  ]) {
+    await mkdir(path.dirname(path.join(root, `.ai-factory/extensions/aifhub-extension/${reference}`)), { recursive: true });
+    await put(root, `.ai-factory/extensions/aifhub-extension/${reference}`, `reference: ${reference}\n`);
+  }
+  await mkdir(path.dirname(path.join(root, skillPath)), { recursive: true });
+  await mkdir(path.join(root, '.claude/agents'), { recursive: true });
+  await put(root, skillPath, `# skill\n${markers[0]}\nmanaged body\n${markers[1]}\n`);
+  const compiled = await compileSessionBrief(opts(root));
+  assert.equal(compiled.ok, true, JSON.stringify(compiled));
+  const status = await inspectSessionBrief({ ...opts(root), includeBrief: true });
+  const hook = status.brief.instruction_composition_digest;
+  assert.match(hook, /^[a-f0-9]{64}$/);
+  const options = opts(root);
+  // Context acquisition stays green while the surface matches the baseline.
+  const context = await buildImplementationContext({ ...options, detectOpenSpec: () => { throw new Error('classic must not detect'); } });
+  assert.equal(context.ok, true, JSON.stringify(context.errors));
+  assert.equal(context.instructionComposition.status, 'verified');
+  // A pinned hook requires the trace to echo the pinned baseline digest.
+  await assert.rejects(
+    writeExecutionTrace(id, { sessionBriefDigest: compiled.digest, changedFiles: [] }, { ...options, runId: 'composition-unbound' }),
+    /instruction_composition_binding_missing/,
+  );
+  const bound = await writeExecutionTrace(id, { sessionBriefDigest: compiled.digest, instructionCompositionDigest: hook, changedFiles: [] }, { ...options, runId: 'composition-bound' });
+  const markdown = await readFile(bound.path, 'utf8');
+  assert.match(markdown, /## Instruction composition\n\nDigest: /);
+  assert.match(markdown, new RegExp(`Digest: ${hook}`));
+  // Both H2 sections coexist; binding parsing still finds the brief digest
+  // first and does not confuse the composition Digest line with it.
+  const receipt = await checkPlanCompliance({ ...options, runId: 'composition-bound', changedFiles: [] });
+  assert.equal(receipt.ok, true, JSON.stringify(receipt.receipt?.blocked_reasons ?? receipt));
+  assert.ok(!receipt.receipt.blocked_reasons.includes('trace_session_brief_stale'));
+  assert.ok(!receipt.receipt.blocked_reasons.includes('trace_session_brief_unbound'));
+  assert.equal(receipt.receipt.instruction_composition_digest, hook);
+  // Review round three: the trace carries the digest binding but no
+  // structured consumption, so the honest status is unverified — digest
+  // equality alone never claims validated declarations (user decision 1).
+  assert.equal(receipt.receipt.instruction_composition_status, 'unverified');
+  assert.deepEqual(receipt.receipt.composition_drift, []);
+  // Advisory policy: a bound trace without a composition section (hand-written
+  // or legacy helper) is recorded as drift but never blocks compliance.
+  await mkdir(path.dirname(path.join(root, `.ai-factory/state/${id}/implementation/legacy.md`)), { recursive: true });
+  await put(root, `.ai-factory/state/${id}/implementation/legacy.md`, [
+    `# Implementation Trace: ${id}`, '', '## Summary', '', 'legacy helper trace', '',
+    '## SessionBrief binding', '', `Digest: ${compiled.digest}`, '', '## Changed files', '', '- none', '',
+    '## Next step', '', `/aif-verify ${id}`, '',
+  ].join('\n'));
+  const legacyReceipt = await checkPlanCompliance({ ...options, runId: 'legacy', changedFiles: [] });
+  assert.equal(legacyReceipt.ok, true, JSON.stringify(legacyReceipt.receipt?.blocked_reasons ?? legacyReceipt));
+  assert.deepEqual(legacyReceipt.receipt.composition_drift, ['trace_instruction_composition_missing']);
+  assert.equal(legacyReceipt.receipt.instruction_composition_status, 'unverified');
+  // Not blocked: the composition observation stays advisory on this surface.
+  assert.notEqual(legacyReceipt.receipt.outcome, 'blocked');
+  // Observed instruction drift after compile fails the write-gate with the
+  // distinct drift code.
+  await put(root, skillPath, `# skill changed\n${markers[0]}\nmanaged body\n${markers[1]}\n`);
+  const driftedContext = await buildImplementationContext({ ...options, detectOpenSpec: () => { throw new Error('classic must not detect'); } });
+  assert.equal(driftedContext.ok, false);
+  assert.ok(driftedContext.errors.some(error => error.code === 'instruction-composition-stale'));
+  await assert.rejects(
+    writeExecutionTrace(id, { sessionBriefDigest: compiled.digest, instructionCompositionDigest: hook, changedFiles: [] }, { ...options, runId: 'composition-drift' }),
+    /instruction_composition_stale/,
+  );
+  // An incomplete consumption declaration fails closed as well. Recompile
+  // first: the drifted brief above must be replaced before tracing again.
+  const recompiled = await compileSessionBrief(options);
+  assert.equal(recompiled.ok, true, JSON.stringify(recompiled));
+  const freshHook = (await inspectSessionBrief({ ...options, includeBrief: true })).brief.instruction_composition_digest;
+  assert.notEqual(freshHook, hook);
+  // An unverified consumption (no declaration) degrades the rendered status
+  // instead of claiming verified (review R2).
+  const unverified = await writeExecutionTrace(id, {
+    sessionBriefDigest: recompiled.digest, instructionCompositionDigest: freshHook,
+    instructionComposition: { runtimeId: '.claude' },
+    changedFiles: [],
+  }, { ...options, runId: 'composition-unverified' });
+  assert.equal(unverified.instructionComposition.status, 'unverified');
+  assert.match(await readFile(unverified.path, 'utf8'), /Status: unverified/);
+  const unverifiedReceipt = await checkPlanCompliance({ ...options, runId: 'composition-unverified', changedFiles: [] });
+  assert.equal(unverifiedReceipt.ok, true, JSON.stringify(unverifiedReceipt.receipt?.blocked_reasons ?? unverifiedReceipt));
+  assert.equal(unverifiedReceipt.receipt.instruction_composition_status, 'unverified');
+  const baseline = await buildCompositionBaseline(root);
+  await prepareCompositionAttempt(root, id, 'attempt-1', baseline);
+  await assert.rejects(
+    writeExecutionTrace(id, {
+      sessionBriefDigest: recompiled.digest, instructionCompositionDigest: freshHook,
+      instructionComposition: { attemptId: 'attempt-1', runtimeId: '.claude', declaration: { references: [] } },
+      changedFiles: [],
+    }, { ...options, runId: 'composition-consumption' }),
+    /instruction_composition_consumption_incomplete/,
+  );
+  // Echoing a foreign digest fails the mismatch code, and a producer that
+  // degraded after compile fails the unavailable code (review F13/F6 family).
+  await assert.rejects(
+    writeExecutionTrace(id, { sessionBriefDigest: recompiled.digest, instructionCompositionDigest: 'e'.repeat(64), changedFiles: [] }, { ...options, runId: 'composition-mismatch' }),
+    /instruction_composition_mismatch/,
+  );
+  await rm(path.join(root, '.ai-factory.json'));
+  await assert.rejects(
+    writeExecutionTrace(id, { sessionBriefDigest: recompiled.digest, instructionCompositionDigest: freshHook, changedFiles: [] }, { ...options, runId: 'composition-unavailable' }),
+    /instruction_composition_unavailable/,
+  );
+  const degradedContext = await buildImplementationContext({ ...options, detectOpenSpec: () => { throw new Error('classic must not detect'); } });
+  assert.equal(degradedContext.ok, false);
+  assert.ok(degradedContext.errors.some(error => error.code === 'instruction-composition-stale'));
 });
 
 it('classic status progress is excluded from revision, companion drift is stale', async () => {

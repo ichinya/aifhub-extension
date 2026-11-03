@@ -153,6 +153,7 @@ For both configured OpenSpec and complete classic plans after marker-first class
 Write fix traces only to runtime state:
 
 - Prefer `writeFixTrace(changeId, trace, options)` from `scripts/openspec-execution-context.mjs` for fix traces.
+When the current SessionBrief pins a non-null `instruction_composition_digest`, the trace must also carry `trace.instructionCompositionDigest` with that exact pinned digest (compile derives the prepared attempt from it), and any consumed-reference declaration in `trace.instructionComposition` is validated against the prepared snapshot; the gate rejects missing bindings and instruction drift with `instruction_composition_*` codes.
 - `.ai-factory/state/<change-id>/`
 - `.ai-factory/state/<change-id>/fixes/`
 

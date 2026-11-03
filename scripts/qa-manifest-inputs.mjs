@@ -86,7 +86,12 @@ export async function observeQaSnapshot(store, payload, options = {}) {
   requireValue(observed && observed.complete === true && typeof observed.worktree_identity === 'string'
     && observed.worktree_identity.length > 0, 'snapshot-incomplete', true);
   requireValue(observed.files && typeof observed.files === 'object', 'snapshot-incomplete', true);
-  const names = Object.keys(observed.files);
+  // Closed runtime namespace (#252): per-attempt composition records are
+  // written on the write-gate between QA waves, so every snapshot projection
+  // (files, directory_names, ignored_names, changed_paths) excludes them
+  // regardless of the snapshot provider in front of the store (review F7).
+  const compositionsNamespace = p => within(p, `.ai-factory/state/${payload.target.id}/compositions`);
+  const names = Object.keys(observed.files).filter(p => !compositionsNamespace(p));
   requireValue(names.length <= QA_LIMITS.files, 'qa-files-limit', true);
   const collision = new Map();
   const directoryCase = new Map();
@@ -99,7 +104,7 @@ export async function observeQaSnapshot(store, payload, options = {}) {
       directoryCase.set(prefix.toLowerCase(), prefix);
     }
   }
-  const directories = new Set(observed.directory_names ?? []);
+  const directories = new Set((observed.directory_names ?? []).filter(p => !compositionsNamespace(p)));
   requireValue(directories.size <= QA_LIMITS.files && [...directories].every(p => Object.hasOwn(observed.files, p)
     && observed.files[p] === null), 'directory-catalog-invalid', true);
   let bytes = 0;
@@ -119,7 +124,7 @@ export async function observeQaSnapshot(store, payload, options = {}) {
     files[relative] = data === null ? { kind: directories.has(relative) ? 'directory' : 'missing' } : { kind: 'file', sha256: digest(data),
       projection: material ? null : metadataProjection(relative, data) };
   }
-  const ignored = sorted(observed.ignored_names ?? []);
+  const ignored = sorted((observed.ignored_names ?? []).filter(p => !compositionsNamespace(p)));
   requireValue(ignored.length <= QA_LIMITS.files, 'qa-files-limit', true);
   for (const p of ignored) {
     sourcePath(p);
@@ -130,7 +135,7 @@ export async function observeQaSnapshot(store, payload, options = {}) {
   requireValue(new Set([...names, ...ignored]).size <= QA_LIMITS.files, 'qa-files-limit', true);
   requireValue(observed.modules && Object.keys(observed.modules).length > 0
     && Object.values(observed.modules).every(hash => SHA.test(hash)), 'module-identity-unproven', true);
-  const changedPaths = sorted(observed.changed_paths ?? []);
+  const changedPaths = sorted((observed.changed_paths ?? []).filter(p => !compositionsNamespace(p)));
   requireValue(changedPaths.length <= QA_LIMITS.files, 'qa-files-limit', true);
   for (const p of changedPaths) {
     sourcePath(p);
@@ -182,13 +187,6 @@ async function filesystemSnapshot(store, payload, options) {
       maxBuffer: QA_LIMITS.blob, timeout: 30000 });
     return String(value.stdout ?? value);
   }
-  const visible = (await git(['ls-files', '--cached', '--others', '--exclude-standard', '-z'])).split('\0').filter(Boolean);
-  const ignored = (await git(['ls-files', '--others', '--ignored', '--exclude-standard', '-z'])).split('\0').filter(Boolean);
-  const stage = await git(['ls-files', '--stage', '-z']);
-  requireValue(!/(?:^|\0)160000 /.test(stage), 'submodule-identity-unproven', true);
-  const actualDiff = await git(['diff', '--no-ext-diff', '--no-textconv', '--binary', 'HEAD', '--']);
-  const changedPaths = sorted([...(await git(['diff', '--no-ext-diff', '--no-textconv', '--name-only', '-z', 'HEAD', '--'])).split('\0'),
-    ...(await git(['ls-files', '--others', '--exclude-standard', '-z'])).split('\0')].filter(Boolean));
   const roots = allDeclaredRoots(payload);
   const qaInternal = p => within(p, `${store.qa}/waves`) || within(p, `${store.qa}/results`)
     || within(p, `${store.qa}/bodies`) || within(p, `${store.qa}/artifacts`)
@@ -196,13 +194,28 @@ async function filesystemSnapshot(store, payload, options) {
     || ['manifest.json', 'enrollment.json', 'publication.json', 'qa.lock', 'verify.md',
       ...(payload.target.flow === 'classic' ? ['gates'] : ['rules.md']), 'review.md', 'security.md', 'coverage.json', 'done-readiness.json', '.gitignore', 'raw', 'openspec-validation.json', 'openspec-status.json']
       .some(name => withinCi(p, `${store.qa}/${name}`));
-  const excluded = p => within(p, '.git') || qaInternal(p);
+  const excluded = p => within(p, '.git') || qaInternal(p)
+    || within(p, `.ai-factory/state/${payload.target.id}/compositions`);
+  const visible = (await git(['ls-files', '--cached', '--others', '--exclude-standard', '-z'])).split('\0').filter(Boolean);
+  // Closed namespaces are excluded before the catalog limits: a flood of
+  // gitignored paths under compositions/ must not fail the snapshot when the
+  // projected inventory is clean (review R7).
+  const ignored = (await git(['ls-files', '--others', '--ignored', '--exclude-standard', '-z'])).split('\0').filter(Boolean).filter(p => !excluded(p));
+  const stage = await git(['ls-files', '--stage', '-z']);
+  requireValue(!/(?:^|\0)160000 /.test(stage), 'submodule-identity-unproven', true);
+  const actualDiff = await git(['diff', '--no-ext-diff', '--no-textconv', '--binary', 'HEAD', '--']);
+  const changedPaths = sorted([...(await git(['diff', '--no-ext-diff', '--no-textconv', '--name-only', '-z', 'HEAD', '--'])).split('\0'),
+    ...(await git(['ls-files', '--others', '--exclude-standard', '-z'])).split('\0')].filter(Boolean));
   requireValue(!roots.some(excluded), 'self-referential-input', true);
   const names = new Set(visible.filter(p => !excluded(p)));
   const directories = new Set();
   // Inventory declared ignored roots, plus the two closed metadata namespaces.
   const scanRoots = sorted([...roots, `.ai-factory/state/${payload.target.id}/delivery`, `.ai-factory/state/${payload.target.id}/status.json`]);
   async function walk(relative, tombstone = true) {
+    // A declared root may be an ancestor of the closed compositions namespace
+    // (e.g. a scope covering all of .ai-factory/state): the closed namespace
+    // never enters the snapshot even below a declared root (review F7).
+    if (excluded(relative)) return;
     sourcePath(relative);
     const filename = await store.safeTarget(relative);
     let info;

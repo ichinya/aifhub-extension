@@ -26,7 +26,7 @@ async function ensure(root, relative) {
     await safe(root, part, true);
   }
 }
-function ledgerRuntimeDirs(installation, runtimes = [...new Set([
+export function ledgerRuntimeDirs(installation, runtimes = [...new Set([
   '.agents', '.codex', '.claude', ...(installation?.agents ?? []).map(agent => `.${agent.id}`),
 ])]) {
   const runtimeDir = (runtime, kind, fallback) => {
@@ -40,9 +40,21 @@ function ledgerRuntimeDirs(installation, runtimes = [...new Set([
     agentsDir: runtimeDir(runtime, 'agentsDir', `${runtime}/agents`)
   }]));
 }
-async function readInstallation(root) {
+export async function readInstallation(root) {
   try { return JSON.parse(await readFile(path.join(root, '.ai-factory.json'), 'utf8')); }
   catch (error) { if (error.code !== 'ENOENT') throw error; return null; }
+}
+export function injectionMarkerPair(target, position) {
+  const prefix = `<!-- aif-ext:aifhub-extension:${target}:${position}:`;
+  return [`${prefix}start -->`, `${prefix}end -->`];
+}
+// Raw extraction only: the update guard keeps its .trim() equality at its own
+// call site; composition hashing consumes the untrimmed block bytes.
+export function publishedInjectionBlock(text, target, position) {
+  if (!/^[\w-]+$/.test(target) || !['prepend', 'append'].includes(position)) throw new Error('unsafe-injection-manifest');
+  const [start, end] = injectionMarkerPair(target, position);
+  if (text.split(start).length !== 2 || text.split(end).length !== 2 || text.indexOf(start) >= text.indexOf(end)) throw new Error('invalid-installed-marker-pair');
+  return text.slice(text.indexOf(start) + start.length, text.indexOf(end));
 }
 
 export async function inventoryPromptAssets(root) {
@@ -154,11 +166,10 @@ export async function validateInstalledPromptAssets(root) {
       if (!/^[\w-]+$/.test(injection.target) || !['prepend', 'append'].includes(injection.position)) throw new Error('unsafe-injection-manifest');
       const filename = await missing(() => safe(root, `${skillsDir}/${injection.target}/SKILL.md`));
       if (!filename) continue;
-      const text = await readFile(filename, 'utf8'), prefix = `<!-- aif-ext:aifhub-extension:${injection.target}:${injection.position}:`;
-      const start = prefix + 'start -->', end = prefix + 'end -->';
-      if (text.split(start).length !== 2 || text.split(end).length !== 2 || text.indexOf(start) >= text.indexOf(end)) throw new Error('invalid-installed-marker-pair');
+      const text = await readFile(filename, 'utf8');
+      const block = publishedInjectionBlock(text, injection.target, injection.position);
       const source = (await readFile(await safe(root, `${EXT}/${injection.file.replace(/^\.\//, '')}`), 'utf8')).trim();
-      if (text.slice(text.indexOf(start) + start.length, text.indexOf(end)).trim() !== source) throw new Error('stale-installed-injection');
+      if (block.trim() !== source) throw new Error('stale-installed-injection');
       targets++;
     }
     const published = [

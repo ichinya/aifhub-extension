@@ -13,7 +13,12 @@ export const DELIVERY_LIMITS = Object.freeze({ body: 16 * 1024 * 1024, stdin: 10
 // Shared adapter utilities must not import execution-state: its CLI awaits dispatch.
 export const bindingFor = ({ run, result, task_id }, target) => ({ change_id: run.change_id, run_id: run.run_id, task_id,
   run_version_at_prepare: run.version, result_submitted_version: result.submitted_version, result_digest: result.digest,
-  source_digest: run.source.namespace_digest, context_digest: result.context_digest, worktree_digest: result.worktree_digest, target_digest: digest(target) });
+  source_digest: run.source.namespace_digest, context_digest: result.context_digest, worktree_digest: result.worktree_digest, target_digest: digest(target),
+  // Frozen-result binding only (review R3): the composition digest is bound at
+  // result time and is never back-filled from the mutable run level, which
+  // accept may have advanced past the frozen snapshot. Historical results
+  // bind without the field.
+  ...(result.instruction_composition_digest !== undefined ? { instruction_composition_digest: result.instruction_composition_digest } : {}) });
 export function validCapabilities(c, r, s) {
   const i = c?.idempotency;
   return c?.idempotent_create === true && c.read_by_request_id === true && c.fetch_response === true
@@ -33,6 +38,9 @@ const phases = ['reserved', 'prepared', 'in_flight', 'pending', 'observed_comple
 const equal = (a, b) => canonical(a) === canonical(b);
 const count = n => requireValue(Number.isSafeInteger(n) && n >= 0, 'invalid-delivery-state', true);
 const hash = s => requireValue(typeof s === 'string' && /^[a-f0-9]{64}$/.test(s), 'invalid-delivery-state', true);
+// Present composition binding is hash-or-null: null is the legal unavailable
+// degradation, matching execution-record semantics (review R1).
+const hashOrNull = s => requireValue(s === null || (typeof s === 'string' && /^[a-f0-9]{64}$/.test(s)), 'invalid-delivery-state', true);
 const date = s => requireValue(typeof s === 'string' && Number.isFinite(Date.parse(s)), 'invalid-delivery-state', true);
 const opaque = s => requireValue(typeof s === 'string' && s.length > 0 && s.length <= 500 && !/[\x00-\x1f]/.test(s), 'invalid-delivery-state', true);
 export function requestUuid(s) {
@@ -102,11 +110,15 @@ export function validateDeliveryRequest(r) {
   } else {
     fields(r.identity, ['request_uuid', 'body_sha256', 'target_kind']);
     requireValue(r.identity.request_uuid === r.request_uuid && r.identity.body_sha256 === r.body.sha256 && r.identity.target_kind === r.target.kind, 'invalid-delivery-state', true);
-    fields(r.binding, ['change_id', 'run_id', 'task_id', 'run_version_at_prepare', 'result_submitted_version', 'result_digest', 'source_digest', 'context_digest', 'worktree_digest', 'target_digest']);
+    fields(r.binding, ['change_id', 'run_id', 'task_id', 'run_version_at_prepare', 'result_submitted_version', 'result_digest', 'source_digest', 'context_digest', 'worktree_digest', 'target_digest'], ['instruction_composition_digest']);
     for (const k of ['change_id', 'run_id', 'task_id']) requireValue(r.binding[k] === r.slot[k], 'invalid-delivery-state', true);
     count(r.binding.run_version_at_prepare); count(r.binding.result_submitted_version);
     requireValue(r.binding.run_version_at_prepare > r.binding.result_submitted_version && r.binding.result_submitted_version > 0, 'invalid-delivery-state', true);
     for (const k of ['result_digest', 'source_digest', 'context_digest', 'worktree_digest', 'target_digest']) hash(r.binding[k]);
+    // Present composition digest is hash-or-null: null is the legal
+    // unavailable degradation, matching the execution-record semantics
+    // (review R1).
+    if (r.binding.instruction_composition_digest !== undefined) hashOrNull(r.binding.instruction_composition_digest);
     requireValue(r.binding.target_digest === digest(r.target), 'invalid-delivery-state', true);
     fields(r.verdict, ['gate', 'gate_result_sha256']); hash(r.verdict.gate_result_sha256);
     requireValue(['verify', 'rules', 'review', 'security'].includes(r.verdict.gate), 'invalid-delivery-state', true);

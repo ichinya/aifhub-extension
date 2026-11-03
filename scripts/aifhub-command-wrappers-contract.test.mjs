@@ -208,6 +208,24 @@ async function copyInstalledCommandLayout(userProjectDir) {
     path.join(REPO_ROOT, 'scripts', 'prompt-reference-graph.mjs'),
     path.join(extensionDir, 'scripts', 'prompt-reference-graph.mjs')
   );
+  // post-update-init rebases composition baselines; the import closure must
+  // resolve inside the fake installed extension.
+  await copyFile(
+    path.join(REPO_ROOT, 'scripts', 'instruction-composition.mjs'),
+    path.join(extensionDir, 'scripts', 'instruction-composition.mjs')
+  );
+  await copyFile(
+    path.join(REPO_ROOT, 'scripts', 'workflow-state-store.mjs'),
+    path.join(extensionDir, 'scripts', 'workflow-state-store.mjs')
+  );
+  await copyFile(
+    path.join(REPO_ROOT, 'scripts', 'qa-manifest-store.mjs'),
+    path.join(extensionDir, 'scripts', 'qa-manifest-store.mjs')
+  );
+  await copyFile(
+    path.join(REPO_ROOT, 'scripts', 'aif-gate-result.mjs'),
+    path.join(extensionDir, 'scripts', 'aif-gate-result.mjs')
+  );
 
   for (const command of WRAPPER_COMMANDS) {
     await copyFile(

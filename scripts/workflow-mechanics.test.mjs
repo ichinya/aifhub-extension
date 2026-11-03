@@ -170,6 +170,31 @@ describe('persistent no-progress guard', () => {
     await put('src/main.js', 'fourth experiment\n'); await fails(begin(), 'attempt-budget-exhausted');
     assert.equal((await begin({ environment_revision: 'independently-updated-fixture-runtime-2' })).outcome, 'pending');
   });
+  it('keeps the no-progress budget across an instruction composition update', async () => {
+    // Composition digest is stored next to context_digest but never enters the
+    // budget identity: an instruction update between attempts must not reset it.
+    await call('start', { ...startInput, role: 'fix', instruction_composition_digest: 'a'.repeat(64), instruction_composition_status: 'verified' });
+    await put(trace, 'Observed assertion failure\n');
+    const attempt = await begin({ instruction_composition_digest: 'a'.repeat(64), instruction_composition_status: 'verified' });
+    await end(attempt);
+    await fails(begin({ instruction_composition_digest: 'b'.repeat(64), instruction_composition_status: 'stale' }), 'no-progress');
+    const inspected = await call('inspect', { change_id: change, run_id: runInput.run_id });
+    assert.equal(inspected.instruction_composition_digest, 'a'.repeat(64));
+    assert.equal(inspected.instruction_composition_status, 'verified');
+  });
+  it('binds the composition digest per checkpoint and per result without backfill', async () => {
+    await call('start', { ...startInput, role: 'fix', instruction_composition_digest: 'a'.repeat(64), instruction_composition_status: 'verified' });
+    await put(trace, 'checkpoint evidence\n');
+    await call('checkpoint', { ...worker(), progress: { completed_steps: ['step'], next_step: 'next' }, instruction_composition_digest: 'b'.repeat(64), instruction_composition_status: 'verified' });
+    await call('result', { ...worker(2), result: { result_id: 'bound-result', status: 'blocked', changed_files: [], checks: [], evidence: [] }, instruction_composition_digest: 'c'.repeat(64), instruction_composition_status: 'verified' });
+    const store = await storeFor(root);
+    const stored = await store.load(`.ai-factory/state/${change}/execution/runs/${runInput.run_id}.json`);
+    // The checkpoint keeps its own observed binding even after the result
+    // advanced the run-level field: no backfill, per-record recovery.
+    assert.equal(stored.checkpoint.instruction_composition_digest, 'b'.repeat(64));
+    assert.equal(stored.result.instruction_composition_digest, 'c'.repeat(64));
+    assert.equal(stored.instruction_composition_digest, 'c'.repeat(64));
+  });
   it('prevents a terminal worker response from stranding its pending check', async () => {
     await call('start', { ...startInput, role: 'fix' });
     await begin();

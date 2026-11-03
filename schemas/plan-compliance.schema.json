@@ -24,6 +24,28 @@
       ],
       "pattern": "^[a-f0-9]{64}$"
     },
+    "instruction_composition_digest": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "instruction_composition_status": {
+      "enum": [
+        "unavailable",
+        "incomplete",
+        "unverified",
+        "stale",
+        "verified"
+      ]
+    },
+    "composition_drift": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "trace_run_id": {
       "type": [
         "string",

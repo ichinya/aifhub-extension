@@ -78,9 +78,14 @@ async function findTrace(root, changeId, runId) {
   const changedFiles = parseTraceList(content, 'Changed files');
   const binding = parseTraceSection(content, 'SessionBrief binding');
   const sessionBriefDigest = binding?.match(/^Digest: ([a-f0-9]{64})$/m)?.[1] ?? null;
+  const composition = parseTraceSection(content, 'Instruction composition');
+  const instructionCompositionDigest = composition?.match(/^Digest: ([a-f0-9]{64})$/m)?.[1] ?? null;
+  // Whitelist the emitted status enum: the receipt field is schema-enum bound,
+  // so an arbitrary word in a hand-written trace must not flow through.
+  const instructionCompositionStatus = composition?.match(/^Status: (unavailable|incomplete|unverified|stale|verified)$/m)?.[1] ?? null;
   const run = selected.name.replace(/\.md$/, '');
   const acceptanceImpact = traceAcceptanceImpact(content);
-  return { runId: run, changedFiles, sessionBriefDigest, acceptanceImpact };
+  return { runId: run, changedFiles, sessionBriefDigest, instructionCompositionDigest, instructionCompositionStatus, acceptanceImpact };
 }
 
 async function listTraceFiles(root, directory) {
@@ -177,8 +182,27 @@ function buildReceipt(snapshot) {
   else if (!snapshot.trace.sessionBriefDigest) blockedReasons.push('trace_session_brief_unbound');
   if (snapshot.trace && snapshot.trace.sessionBriefDigest && snapshot.trace.sessionBriefDigest !== sessionBriefDigest) blockedReasons.push('trace_session_brief_stale');
 
+  // Composition drift is advisory here by policy: fail-closed stays on the
+  // SessionBrief binding channel only (contract decision 11). The receipt
+  // records the independent observation instead of blocking.
+  const compositionDigest = brief?.instruction_composition_digest ?? null;
+  const compositionDrift = [];
+  let compositionStatus = 'unavailable';
+  if (compositionDigest !== null) {
+    if (!snapshot.trace?.instructionCompositionDigest) {
+      compositionStatus = 'unverified';
+      compositionDrift.push('trace_instruction_composition_missing');
+    } else if (snapshot.trace.instructionCompositionDigest !== compositionDigest) {
+      compositionStatus = 'stale';
+      compositionDrift.push('trace_instruction_composition_stale');
+    } else compositionStatus = snapshot.trace.instructionCompositionStatus ?? 'verified';
+  } else if (snapshot.trace?.instructionCompositionDigest) {
+    compositionStatus = 'unverified';
+    compositionDrift.push('brief_instruction_composition_unavailable');
+  }
+
   if (blockedReasons.length > 0) {
-    return emptyReceipt(snapshot.changeId, { planRevision, sessionBriefDigest, traceRunId, completedTasks, skippedTasks, blockedReasons, outcome: 'blocked' });
+    return emptyReceipt(snapshot.changeId, { planRevision, sessionBriefDigest, traceRunId, completedTasks, skippedTasks, blockedReasons, outcome: 'blocked', compositionDigest, compositionStatus, compositionDrift });
   }
 
   const allowed = collectSurfacePatterns(brief.change_surface?.allowed ?? []);
@@ -209,7 +233,10 @@ function buildReceipt(snapshot) {
     newConstraints: [],
     acceptanceImpact: snapshot.trace?.acceptanceImpact ?? [],
     outcome,
-    replanRequired: outcome === 'replan_required'
+    replanRequired: outcome === 'replan_required',
+    compositionDigest,
+    compositionStatus,
+    compositionDrift
   });
 }
 
@@ -219,6 +246,9 @@ function emptyReceipt(changeId, values) {
     change_id: changeId,
     plan_revision: values.planRevision ?? null,
     session_brief_digest: values.sessionBriefDigest ?? null,
+    instruction_composition_digest: values.compositionDigest ?? null,
+    instruction_composition_status: values.compositionStatus ?? 'unavailable',
+    composition_drift: values.compositionDrift ?? [],
     trace_run_id: values.traceRunId ?? null,
     completed_tasks: values.completedTasks ?? [],
     skipped_tasks: values.skippedTasks ?? [],

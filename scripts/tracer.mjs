@@ -85,7 +85,7 @@ async function buildTracerSnapshot(options, phase) {
   const context = await resolvePlanContext({ ...options, rootDir: root, changeId, methodology: resolution.methodology });
   errors.push(...context.errors);
   const sources = context.documents.map(({ path, sha256 }) => ({ path, sha256 }));
-  const status = await inspectSessionBrief({ ...options, rootDir: root, changeId });
+  const status = await inspectSessionBrief({ ...options, rootDir: root, changeId, includeBrief: true });
   if (status.status === 'stale') errors.push({ code: 'session_brief_not_current' });
   const previous = await readJsonIfExists(root, paths.brief);
   const bindingChanged = previous && (previous.methodology !== context.methodology
@@ -123,6 +123,9 @@ async function buildTracerSnapshot(options, phase) {
     methodology: context.methodology,
     source_revision: context.source_revision,
     session_brief_digest: status.digest ?? null,
+    // Advisory projection only: tracer binding staleness keeps ignoring the
+    // composition digest (fail-closed stays on the SessionBrief channel).
+    instruction_composition_digest: status.brief?.instruction_composition_digest ?? null,
     created_at: now,
     updated_at: now
   } : null;

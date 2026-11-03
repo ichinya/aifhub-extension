@@ -455,3 +455,11 @@ If `.ai-factory/config.yaml` is missing or incomplete:
 - [ADR 0002: Optional Project Glossary](adr/0002-optional-project-context-glossary.md)
 - [Project Review Policy](review-policy.md)
 - [ADR 0003: Durable Project Review Policy](adr/0003-durable-project-review-policy.md)
+
+## Instruction composition слои и границы честности
+
+Instruction composition (`scripts/instruction-composition.mjs`, #252) фиксирует состав исполненных инструкций отдельными слоями с ролями: `runtime_skill_entrypoint`/`runtime_agent_entrypoint` (полные опубликованные entrypoints из union `extension.skills` и injection targets — authoritative byte identity), `runtime_injection_prepend`/`runtime_injection_append` (точный блок между marker-pairs опубликованного файла) и `extension_injection_source` (side-source из `injections/core/`, не подменяет published block hash), слои project skill-context в порядке чтения (`individual`/`_legacy_fallback` → `build` → `global`; порядок эмитируется в `skill_context_order`) и references (`selected_references` — декларативное замыкание `PROMPT_REFERENCES`; остальные reference-файлы — `reference_candidate` inventory без declared condition).
+
+Composition-записи не являются context providers, QA evidence или verification gates: compile-time baseline наблюдение живёт в SessionBrief hook-е, per-attempt prepared/consumed записи — под `.ai-factory/state/<change-id>/compositions/` (закрытый namespace для QA snapshot projected), shared SessionBrief они не перезаписывают. Порядок injections — наблюдаемый document-order по byte offset опубликованного файла, не порядок JSON-массива в `extension.json`.
+
+Граница честности: статус `verified` доказывает только детерминированные байты компонентов и валидированные обязательные декларации references (path в prepared-наборе, правильный namespace, hash сырых байтов). Он не доказывает, какие инструкции модель фактически прочитала — офлайн это ненаблюдаемо (прецедент `agent_consumption: not_observed_offline`). Декларации по candidate inventory дают честный `unverified`; расхождение против закреплённого prepared/consumed binding — `stale`.

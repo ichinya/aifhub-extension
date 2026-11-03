@@ -34,3 +34,11 @@ Source manifest содержит девять позиций брифа; `aif-do
 `tokens: null`, `api_read_bytes: null`, `agent_consumption: not_observed_offline`: physical bytes не измеряют tokenizer, повторные API reads или фактическое потребление агентом. Внешний исторический audit не считается воспроизведённым baseline.
 
 Baseline/after implementation receipts и отчёт сохраняются в gitignored `.ai-factory/state/session-brief-entrypoints/`. Offline consumer smoke проверяет fresh install, base refresh → reapply, one-copy, repeated reapply, outside-marker bytes, missing references и независимое сохранение prompt edits. Live downloads и production validation этими проверками не заявляются.
+
+## Instruction composition inventory и ребазирование
+
+Единственный producer/reader composition-манифестов — `scripts/instruction-composition.mjs` (схема `aifhub.instruction_composition.v1`, baseline index — `aifhub.instruction_composition_index.v1`). Compile SessionBrief собирает per-runtime манифесты published surface (skill/agent entrypoints, marker-pair injection blocks с raw byte identity, слои skill-context, selected references по декларативному замыканию `PROMPT_REFERENCES`, reference candidate inventory) и persist-ит их как иммутабельные CAS-записи под `.ai-factory/state/<change-id>/compositions/` (`indexes/<indexDigest>.json`, `manifests/<compositionDigest>.json`, per-attempt `prepared`/`consumed`). Digest канонизируется через `canonical()` из `workflow-state-store`; компонентные sha256 — от сырых байтов файла (CRLF/BOM как есть); runtime identity входит в payload, поэтому разные runtimes дают разные digests при общих байтах, а сравнения — только same-runtime.
+
+После update расширения `post-update-init` пересобирает baseline для каждого change-каталога с существующим namespace `compositions/` и дописывает новый `indexes/<indexDigest>.json` (старые index-файлы не перезаписываются; bindings против старого index читаются как `stale` до recompile). Ребазирование advisory: его сбой не превращает update в упавший.
+
+До включения модуля в `HELPER_MODULES` (release-транзакт) producer-файл находится вне preservation-контуров update: входящий пакет доставляет файл заново, локальная правка до релиза теряется молча — это осознанный принятый разрыв, фиксируемый в CHANGELOG при release.
