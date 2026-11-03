@@ -1080,6 +1080,152 @@ describe('review regressions: binding identity', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Review regressions (fourth round): each test names the defect it pins.
+// ---------------------------------------------------------------------------
+
+const EN_VOLUME = 'Second paragraph adds enough letters for confident language detection by the deterministic share estimator used here today and keeps the remaining volume comfortably above the required detector threshold of the analyzed document.';
+
+describe('round three: inline syntax priority', () => {
+  it('lets an orphan opener stay literal without blocking later pairs', async () => {
+    const root = await makeTemp('aif-r3-orphan-');
+    const doc = ['# Orphans', '', '## Usage', '', 'text ` orphan ``utilize`` end and the analyzer must still treat the double-backtick span as code for every rule evaluation of this document today.', EN_VOLUME].join('\n');
+    await seedProject(root, { files: { 'docs/guide.md': Buffer.from(doc, 'utf8') } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const report = run.json();
+    assert.equal(report.state, 'complete');
+    assert.ok(!ruleIds(report).includes('docs-readability:en-cliche'), 'the closed double-backtick span stays code');
+  });
+
+  it('never pairs a backtick inside a recognized link destination', async () => {
+    const root = await makeTemp('aif-r3-dest-');
+    const doc = ['# Dest', '', '## Usage', '', 'See [label](https://example.com/`) and then utilize the regular prose wording so the rules can evaluate this sentence of the documentation project today.', EN_VOLUME].join('\n');
+    const bytes = Buffer.from(doc, 'utf8');
+    await seedProject(root, { files: { 'docs/guide.md': bytes } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const report = run.json();
+    assert.equal(report.state, 'complete');
+    const utilize = bytes.indexOf(Buffer.from('utilize', 'utf8'));
+    const cliche = report.findings.find((item) => item.rule.id === 'docs-readability:en-cliche'
+      && bytes.slice(item.span.start, item.span.end).toString('utf8') === 'utilize');
+    assert.ok(cliche, 'prose utilize after the link is found');
+    assert.equal(cliche.span.start, utilize);
+    const urlStart = bytes.indexOf(Buffer.from('https://example.com', 'utf8'));
+    const urlEnd = bytes.indexOf(Buffer.from(')', 'utf8'), urlStart) + 1;
+    for (const finding of report.findings) {
+      const insideUrl = finding.span.start >= urlStart && finding.span.end <= urlEnd;
+      assert.ok(!insideUrl, 'no finding may live inside the destination');
+    }
+  });
+
+  it('trims bare-url trailing parens only while unbalanced', async () => {
+    const root = await makeTemp('aif-r3-url-');
+    const doc = [
+      '# Библиотека',
+      '',
+      '## Описание',
+      '',
+      'Смотрите материал https://en.wikipedia.org/wiki/Markdown_(язык) и проверяйте утверждения по первоисточникам проекта перед использованием в документации.',
+      'Каждый журнал проверок содержит время события, источник факта и код итогового результата проверки состояния окружения проекта.',
+    ].join('\n');
+    await seedProject(root, { files: { 'docs/guide.md': Buffer.from(doc, 'utf8') } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const report = run.json();
+    assert.equal(report.state, 'complete');
+    assert.ok(!ruleIds(report).includes('docs-readability:unbalanced-pair'), 'balanced url parens leave no orphan close paren');
+  });
+
+  it('accepts two-level balanced parentheses in link destinations', async () => {
+    const root = await makeTemp('aif-r3-deep-');
+    const doc = ['# Deep', '', '## Usage', '', 'See [label](https://example.com/a((b))) and keep the surrounding prose balanced so no phantom unbalanced pair finding can appear inside this sentence of the documentation project today.', EN_VOLUME].join('\n');
+    const bytes = Buffer.from(doc, 'utf8');
+    await seedProject(root, { files: { 'docs/guide.md': bytes } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const report = run.json();
+    assert.ok(!ruleIds(report).includes('docs-readability:unbalanced-pair'), 'two-level balanced destination leaves no phantom');
+    assert.equal(report.state, 'complete');
+  });
+});
+
+describe('round three: list containers and markers', () => {
+  it('expands tab markers to their visual content column', async () => {
+    const root = await makeTemp('aif-r3-tab-');
+    const doc = ['# Tabs', '', '## Usage', '', '-\titem', '', '      utilize the six-space line under a tab-marker item that stays prose semantics for the rules engine here.', '', EN_VOLUME].join('\n');
+    await seedProject(root, { files: { 'docs/guide.md': Buffer.from(doc, 'utf8') } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const report = run.json();
+    assert.equal(report.state, 'complete');
+    const cliche = report.findings.find((item) => item.rule.id === 'docs-readability:en-cliche'
+      && item.explanation.includes('utilize'));
+    assert.ok(cliche, 'six spaces under a tab marker (content column 4) stay prose');
+  });
+
+  it('keeps the list container open across two-space continuations', async () => {
+    const root = await makeTemp('aif-r3-cont-');
+    const doc = ['# Cont', '', '## Usage', '', '- item', '  continuation of the same item text', '', '    utilize the four-space line after the continuation that stays prose inside the item container.', '', EN_VOLUME].join('\n');
+    await seedProject(root, { files: { 'docs/guide.md': Buffer.from(doc, 'utf8') } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const report = run.json();
+    assert.equal(report.state, 'complete');
+    const cliche = report.findings.find((item) => item.rule.id === 'docs-readability:en-cliche'
+      && item.explanation.includes('utilize'));
+    assert.ok(cliche, 'the four-space line after a continuation stays prose (container kept)');
+  });
+
+  it('recognizes a nested marker instead of hiding its prose as code', async () => {
+    const root = await makeTemp('aif-r3-nest-');
+    const doc = ['# Nested', '', '## Usage', '', '- item', '    - sub with utilize wording that must stay visible prose for the rules engine evaluation.', '', EN_VOLUME].join('\n');
+    await seedProject(root, { files: { 'docs/guide.md': Buffer.from(doc, 'utf8') } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const report = run.json();
+    assert.equal(report.state, 'complete');
+    const cliche = report.findings.find((item) => item.rule.id === 'docs-readability:en-cliche'
+      && item.explanation.includes('utilize'));
+    assert.ok(cliche, 'nested marker prose stays visible to the rules');
+  });
+});
+
+describe('round three: paragraph boundaries', () => {
+  it('does not merge a heading into a body paragraph without a blank line', async () => {
+    const root = await makeTemp('aif-r3-head-');
+    const bodyWords = ['ровно', 'тридцать', 'слов', 'идут', 'внутри', 'этого', 'абзаце', 'без', 'единой', 'терминальной',
+      'точки', 'чтобы', 'старый', 'алгоритм', 'склейки', 'заголовка', 'или', 'абзаца', 'сформировал', 'ложную',
+      'находку', 'длины', 'предложения', 'однако', 'новый', 'алгоритм', 'оставил', 'итоговый', 'результат', 'везде'];
+    const body = bodyWords.join(' ');
+    const doc = ['# Doc', '## Описание', body].join('\n');
+    await seedProject(root, { files: { 'docs/guide.md': Buffer.from(doc, 'utf8') } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const report = run.json();
+    assert.equal(report.state, 'complete');
+    assert.deepEqual(report.findings.filter((item) => item.rule.id === 'docs-readability:sentence-length'), [],
+      'heading plus body without a blank line stays separate');
+  });
+
+  it('treats a link-reference definition as its own paragraph break', async () => {
+    const root = await makeTemp('aif-r3-linkdef-');
+    const baseWords = ['абзац', 'без', 'точки', 'в', 'конце', 'строки', 'продолжается', 'мыслью', 'документа', 'на', 'всём', 'протяжении', 'каждого', 'предложения', 'текста', 'проекта'];
+    const firstParagraph = baseWords.join(' ');
+    const secondParagraph = [...baseWords, 'и', 'вторая', 'часть', 'тоже', 'без', 'пунктуации', 'в', 'самом', 'конце', 'всего', 'текста', 'документа', 'целиком', 'совсем'].join(' ');
+    const doc = ['# Def', '', '## Описание', '', firstParagraph, '[x]: /u', secondParagraph].join('\n');
+    await seedProject(root, { files: { 'docs/guide.md': Buffer.from(doc, 'utf8') } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const report = run.json();
+    const merged = firstParagraph.split(' ').length + secondParagraph.split(' ').length;
+    const long = report.findings.filter((item) => item.rule.id === 'docs-readability:sentence-length'
+      && item.explanation.includes(`${merged} words`));
+    assert.deepEqual(long, [], 'link definition breaks the paragraph flow');
+  });
+
+  it('stores clean heading names without BOM or hash marks', () => {
+    const text = '\uFEFF## Установка\n\nПервый абзац документа с обычным текстом для контекста классификации секций.';
+    const model = buildDocumentModel(text);
+    const sections = buildSections(model);
+    assert.equal(sections[0].heading, 'Установка');
+    assert.ok(!sections[0].heading.includes('\uFEFF'));
+    assert.ok(!sections[0].heading.startsWith('##'));
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Review regressions (third round): each test names the defect it pins.
 // ---------------------------------------------------------------------------
 

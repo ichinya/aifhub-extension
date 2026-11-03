@@ -313,10 +313,24 @@ function leadingIndent(bare) {
 }
 
 function listMarkerIndent(bare) {
-  const match = /^ {0,3}(?:[-*+]|\d{1,9}[.)])(?:[ \t]+|$)/.exec(bare);
+  // The leading-indent gate lives in the caller; here any indent is accepted
+  // so nested markers (inside an open container) are recognized.
+  const match = /^ *(?:[-*+]|\d{1,9}[.)])(?:[ \t]+|$)/.exec(bare);
   if (!match) return null;
+  // Content indent is the expanded visual column (tabs count up to the next
+  // multiple of four), not the raw character count of the prefix.
+  const contentIndent = expandedWidth(match[0]);
   // A bare marker line ("-") behaves like a marker plus one space of content.
-  return match[0].length === bare.length ? bare.length + 1 : match[0].length;
+  return match[0].length === bare.length ? contentIndent + 1 : contentIndent;
+}
+
+function expandedWidth(prefix) {
+  let width = 0;
+  for (const ch of prefix) {
+    if (ch === ' ') width += 1;
+    else if (ch === '\t') width += 4 - (width % 4);
+  }
+  return width;
 }
 
 function lineKind(bare) {
@@ -329,24 +343,33 @@ function lineKind(bare) {
 
 // Cross-line CommonMark code spans: exact-length backtick runs pair within one
 // paragraph (blank lines and paragraph breaks end a span; blocked lines such
-// as fences interrupt it). Unclosed runs stay literal prose.
-function scanInlineCodeSpans(lines, fenceMask, lineBlocked, excluded, firstBodyLine) {
+// as fences interrupt it). Runs pair with the most recent unpaired opener of
+// the same length — an orphan opener stays literal prose and never blocks
+// later pairs. Characters already excluded (link destinations, bare URLs) are
+// syntax, not span content, and never open or close a span.
+function scanInlineCodeSpans(lines, fenceMask, lineBlocked, excluded, firstBodyLine, isSkipped) {
   const breaks = paragraphBoundaries({ lines, fenceMask });
-  let pending = null;
+  const openers = [];
   for (let index = firstBodyLine; index < lines.length; index += 1) {
     const line = lines[index];
-    if (lineBlocked[index]) { pending = null; continue; }
-    if (breaks.has(line.start)) pending = null;
+    if (lineBlocked[index]) { openers.length = 0; continue; }
+    if (breaks.has(line.start)) openers.length = 0;
     const bare = line.bare;
     let i = 0;
     while (i < bare.length) {
-      if (bare[i] === '`') {
+      if (bare[i] === '`' && !(isSkipped && isSkipped(line.start + i))) {
         let run = 0;
         while (bare[i + run] === '`') run += 1;
-        if (pending === null) pending = { run, s: line.start + i };
-        else if (run === pending.run) {
-          excluded.push({ s: pending.s, e: line.start + i + run });
-          pending = null;
+        const position = line.start + i;
+        let openerIndex = -1;
+        for (let cursor = openers.length - 1; cursor >= 0; cursor -= 1) {
+          if (openers[cursor].run === run) { openerIndex = cursor; break; }
+        }
+        if (openerIndex >= 0) {
+          excluded.push({ s: openers[openerIndex].s, e: position + run });
+          openers.length = openerIndex;
+        } else {
+          openers.push({ run, s: position });
         }
         i += run;
         continue;
@@ -436,7 +459,11 @@ export function buildDocumentModel(text) {
       continue;
     }
     const indent = leadingIndent(line.bare);
-    const markerIndent = indent <= 3 ? listMarkerIndent(line.bare) : null;
+    // A list marker is recognized up to three columns of its own (or within
+    // the open container's content column), so nested markers are not
+    // swallowed as indented code. Tabs count as their expanded columns.
+    const markerGate = listContentIndent !== null ? listContentIndent + 3 : 3;
+    const markerIndent = indent <= markerGate ? listMarkerIndent(line.bare) : null;
     if (markerIndent !== null) {
       listContentIndent = markerIndent;
       prevKind = 'listitem';
@@ -455,32 +482,35 @@ export function buildDocumentModel(text) {
         continue;
       }
       // Lazy prose continuation (also inside an open list item below the
-      // code-block threshold): never treated as code.
+      // code-block threshold): never treated as code. Continuations at or
+      // past the container content column keep the container open.
       prevKind = 'text';
       indentedCode = false;
       if (listContentIndent !== null && indent < listContentIndent) listContentIndent = null;
       continue;
     }
-    listContentIndent = null;
+    if (listContentIndent !== null && indent < listContentIndent) listContentIndent = null;
     indentedCode = false;
     prevKind = lineKind(line.bare);
   }
-  // Pass B: cross-line inline code spans over the remaining eligible lines.
-  scanInlineCodeSpans(lines, fenceMask, lineBlocked, excluded, firstBodyLine);
-  // Pass C: links, autolinks, HTML tags and bare URLs, skipping characters
-  // already excluded (line-level and code-span spans).
-  excluded.sort((left, right) => left.s - right.s || left.e - right.e);
-  const passB = [];
-  for (const span of excluded) {
-    const last = passB[passB.length - 1];
-    if (last && span.s <= last.e) last.e = Math.max(last.e, span.e);
-    else passB.push({ ...span });
-  }
-  const isSkipped = makeExclusionPredicate(passB);
+  // Pass B: links, autolinks, HTML tags and bare URLs run first so that
+  // backtick characters inside recognized link destinations are syntax and
+  // never pair as code spans.
   for (let index = firstBodyLine; index < lines.length; index += 1) {
     if (lineBlocked[index]) continue;
-    scanInline(lines[index].bare, lines[index].start, excluded, isSkipped);
+    scanInline(lines[index].bare, lines[index].start, excluded, null);
   }
+  excluded.sort((left, right) => left.s - right.s || left.e - right.e);
+  const passLinks = [];
+  for (const span of excluded) {
+    const last = passLinks[passLinks.length - 1];
+    if (last && span.s <= last.e) last.e = Math.max(last.e, span.e);
+    else passLinks.push({ ...span });
+  }
+  const isSkipped = makeExclusionPredicate(passLinks);
+  // Pass C: cross-line inline code spans over the remaining eligible lines,
+  // skipping characters already claimed by link/URL syntax.
+  scanInlineCodeSpans(lines, fenceMask, lineBlocked, excluded, firstBodyLine, isSkipped);
   if (openFence !== false && openFenceIndex >= 0) {
     partial = true;
     uncovered.push({ s: lines[openFenceIndex].start, e: lines[lines.length - 1].end, detail: 'unclosed-fence' });
@@ -530,9 +560,10 @@ function scanInline(bare, base, excluded, isSkipped) {
       const rest = bare.slice(i);
       // Anchored at the scan position: a link construct must start exactly at
       // this '['; unanchored matching would exclude unrelated prose. The
-      // destination accepts one level of balanced parentheses (Wikipedia-style
-      // /wiki/Page_(Section) URLs).
-      const inline = /^\[([^\]]*)\]\(((?:[^()]|\([^()]*\))*)\)/.exec(rest);
+      // destination accepts up to two levels of balanced parentheses
+      // (Wikipedia-style /wiki/Page_(Section) and nested cases); deeper
+      // nesting falls back to the balanced bare-URL trim below.
+      const inline = /^\[([^\]]*)\]\(((?:[^()]|\((?:[^()]|\([^()]*\))*\))*)\)/.exec(rest);
       if (inline) {
         push(i, i + 1); // the opening bracket is link syntax, not prose
         push(i + 1 + inline[1].length, i + inline[0].length); // ](target) excluded, label stays prose
@@ -552,7 +583,16 @@ function scanInline(bare, base, excluded, isSkipped) {
       if (urlMatch) {
         let urlText = urlMatch[0];
         while (/[.,;:!?'"]$/.test(urlText)) urlText = urlText.slice(0, -1);
-        if (urlText.endsWith(')') && !urlText.slice(0, -1).includes(')')) urlText = urlText.slice(0, -1);
+        // Strip trailing close parens only while the URL itself is
+        // paren-unbalanced: a balanced tail like /Markdown_(язык) keeps its
+        // closing paren, so no orphan ')' leaks into the pair balance.
+        let openCount = (urlText.match(/\(/g) ?? []).length;
+        let closeCount = (urlText.match(/\)/g) ?? []).length;
+        while (urlText.endsWith(')') && closeCount > openCount) {
+          urlText = urlText.slice(0, -1);
+          closeCount -= 1;
+        }
+        while (/[.,;:!?'"]$/.test(urlText)) urlText = urlText.slice(0, -1);
         push(i, i + urlText.length);
         i += urlText.length; continue;
       }
@@ -590,21 +630,21 @@ export function buildSections(model) {
     const line = model.lines[index];
     if (!model.fenceMask[index] && /^(\uFEFF)?##(?!#)[ \t]+/.test(line.bare)) {
       if (current) sections.push(current);
-      const heading = line.bare.replace(/^##[ \t]+/, '').trim();
-      current = { heading, start: line.start, bodyStart: line.end, end: line.end, sectionClass: classifyHeading(heading) };
+      const heading = line.bare.replace(/^(\uFEFF)?##[ \t]+/, '').trim();
+      current = { heading, start: line.start, end: line.end, sectionClass: classifyHeading(heading) };
     } else if (current) {
       current.end = line.end;
     }
   }
   if (current) sections.push(current);
   if (sections.length === 0) {
-    return [{ heading: null, start: 0, bodyStart: 0, end: model.text.length, sectionClass: 'general' }];
+    return [{ heading: null, start: 0, end: model.text.length, sectionClass: 'general' }];
   }
   // The prose before the first active H2 belongs to a synthetic general
   // section so every rule covers all eligible text (review: preamble scan).
   const first = sections[0];
   if (first.start > 0) {
-    sections.unshift({ heading: null, start: 0, bodyStart: 0, end: first.start, sectionClass: 'general' });
+    sections.unshift({ heading: null, start: 0, end: first.start, sectionClass: 'general' });
   }
   return sections;
 }
@@ -684,16 +724,25 @@ export function resolveDocumentLanguage(model, override) {
 
 function paragraphBoundaries(model) {
   const breaks = new Set();
+  let prevWasHeading = false;
   for (let index = 0; index < model.lines.length; index += 1) {
-    const bare = model.lines[index].bare;
+    const line = model.lines[index];
+    const bare = line.bare;
+    const isHeading = !model.fenceMask[index] && /^(\uFEFF)?#{1,6}[ \t]/.test(bare);
     if (bare.trim() === ''
-      || (!model.fenceMask[index] && /^(\uFEFF)?#{1,6}[ \t]/.test(bare))
-      || /^\s{0,3}(?:[-*+]|\d+[.)])[ \t]/.test(bare)
+      || isHeading
+      // A heading ends its block: the line after one starts a new paragraph
+      // even without a blank line between them.
+      || prevWasHeading
+      || /^\s{0,3}(?:[-*+]|\d+[.)])(?:[ \t]+|$)/.test(bare)
       || /^\s{0,3}\|/.test(bare)
       || /^\s{0,3}>/.test(bare)
+      // Link-reference definitions are syntax, not part of a paragraph.
+      || /^\s{0,3}\[[^\]]+\]:\s*\S/.test(bare)
       || model.fenceMask[index]) {
-      breaks.add(model.lines[index].start);
+      breaks.add(line.start);
     }
+    prevWasHeading = isHeading;
   }
   return breaks;
 }
@@ -1263,6 +1312,7 @@ export async function writeReadabilityReport(rootDir, report, config, options = 
     if (leafInfo === null) return null;
     if (!leafInfo.isFile()) return leafConflict();
     const previous = await readProviderFile(root, relative, 4 * 1024 * 1024);
+    if (previous === null) return leafConflict();
     let priorReport = null;
     try { priorReport = parseStrictJson(previous.toString('utf8')); } catch { priorReport = null; }
     if (!priorReport || priorReport.schema !== READABILITY_SCHEMA || priorReport.change_id !== report.change_id) {
@@ -1295,16 +1345,15 @@ export async function writeReadabilityReport(rootDir, report, config, options = 
   const payload = `${JSON.stringify(report, null, 2)}\n`;
   const temporary = path.join(liveDirectory, `${parts[parts.length - 1]}.${randomUUID()}.tmp`);
   await writeFile(temporary, payload, { encoding: 'utf8', mode: 0o600 });
-  // Third ownership check after the temp write, immediately before the atomic
-  // rename: the leaf must not have been replaced by foreign content during the
-  // write. rename itself is atomic, so the residual race is the microseconds
-  // between this check and the rename (documented in design.md).
-  const thirdRejection = await assertLeafWritable();
-  if (thirdRejection) {
-    await unlink(temporary).catch((error) => { if (error?.code !== 'ENOENT') throw error; });
-    return thirdRejection;
-  }
   try {
+    // Third ownership check after the temp write, immediately before the
+    // atomic rename: the leaf must not have been replaced by foreign content
+    // during the write. Inside the finally-guarded block so a failed bounded
+    // read cannot leak the temporary file. rename itself is atomic; the
+    // residual race is the microseconds between this check and the rename
+    // (documented in design.md).
+    const thirdRejection = await assertLeafWritable();
+    if (thirdRejection) return thirdRejection;
     await rename(temporary, leaf);
   } finally {
     await unlink(temporary).catch((error) => { if (error?.code !== 'ENOENT') throw error; });
