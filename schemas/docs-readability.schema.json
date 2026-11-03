@@ -1,0 +1,413 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Docs readability report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "aifhub.docs_readability.v1"
+    },
+    "change_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "generated_at": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "diagnostic_only": {
+      "const": true
+    },
+    "authorizes": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200
+        },
+        "version": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "state": {
+          "enum": [
+            "loaded",
+            "unavailable"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "sha256",
+        "state"
+      ]
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "language": {
+            "enum": [
+              "ru",
+              "en",
+              "unknown"
+            ]
+          },
+          "language_source": {
+            "enum": [
+              "detected",
+              "override"
+            ]
+          },
+          "parsing": {
+            "enum": [
+              "full",
+              "partial"
+            ]
+          },
+          "eligible_bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "read_state": {
+            "enum": [
+              "ok",
+              "malformed",
+              "skipped"
+            ]
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "language",
+          "language_source",
+          "parsing",
+          "eligible_bytes",
+          "read_state"
+        ]
+      }
+    },
+    "glossary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 500
+        },
+        "state": {
+          "enum": [
+            "present",
+            "missing",
+            "empty",
+            "unreadable",
+            "unsafe",
+            "disabled"
+          ]
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "path",
+        "state",
+        "sha256"
+      ]
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "source_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "span": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "start": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "end": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "line": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "column": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "start",
+              "end",
+              "line",
+              "column"
+            ]
+          },
+          "rule": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "origin": {
+                "enum": [
+                  "project",
+                  "upstream"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "version",
+              "origin"
+            ]
+          },
+          "explanation": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "suggestion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200
+          },
+          "heuristic": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "file",
+          "source_sha256",
+          "span",
+          "rule",
+          "explanation",
+          "suggestion",
+          "heuristic"
+        ]
+      }
+    },
+    "counts_only": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "rule": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "origin": {
+                "enum": [
+                  "project",
+                  "upstream"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "version",
+              "origin"
+            ]
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "explanation": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "file",
+          "rule",
+          "count",
+          "explanation"
+        ]
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "path": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "code",
+          "path",
+          "detail"
+        ]
+      }
+    },
+    "state": {
+      "enum": [
+        "complete",
+        "partial-coverage",
+        "checker-unavailable",
+        "empty-input",
+        "wrong-language",
+        "ambiguous-language",
+        "malformed-input",
+        "timeout"
+      ]
+    },
+    "worktree_identity": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "binding": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "module": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "parser_version": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "module",
+        "sha256",
+        "parser_version"
+      ]
+    }
+  },
+  "required": [
+    "schema",
+    "change_id",
+    "generated_at",
+    "diagnostic_only",
+    "authorizes",
+    "profile",
+    "inputs",
+    "glossary",
+    "findings",
+    "counts_only",
+    "diagnostics",
+    "state",
+    "worktree_identity",
+    "binding",
+    "engine"
+  ]
+}
