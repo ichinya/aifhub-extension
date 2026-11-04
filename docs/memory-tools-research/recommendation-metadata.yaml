@@ -556,6 +556,63 @@ task_signals:
     avoid_by_default:
       - codex-mem
 tools:
+  memlab:
+    display_name: memlab
+    repository: "https://github.com/sattva2020/memlab"
+    tested_version: "e902a59 (re-pin от 37963997; дельта = upstream PR #3 reranker graceful degradation, retrieval/corpus не затронуты)"
+    decision: manual_mcp_experiment
+    recommendation_action: suggest_only_for_explicit_decision_retrieval_on_covered_corpus
+    integration_role: decision_retrieval_provider
+    install_policy: explicit_user_opt_in_only
+    stable_cli: true
+    mcp_status: manual_only_outside_harness
+    read_scope: sanitized_project_copy
+    purge_path: "удалить run-каталог пилота и MEMLAB_HOME-кэш (веса+индекс)"
+    user_warning_mandatory: "ЗАПУСК ИНДЕКСАЦИИ MEMLAB ИСПОЛЬЗУЕТ NVIDIA GPU. Требования: CUDA-совместимая NVIDIA-карта с compute capability >= 7.5 (Turing+), VRAM >= 4 GB (fp16: Qwen3-Embedding-0.6B ~1.4 GB + e5-small ~0.15 GB + батч-активации; проверено на RTX 4060 Ti 16 GB), драйвер NVIDIA с поддержкой CUDA 12.6 (runtime torch 2.14.1+cu126). Проверенные накладные: embed 2382 чанков ~81 s одноразово (GPU), далее ~0.05 s/запрос. CPU-fallback технически работает, но непрактичен: >30 минут на ~1000 чанков. ПРЕДУПРЕДИ ПОЛЬЗОВАТЕЛЯ ДО ЛЮБОГО ЗАПУСКА ИНДЕКСАЦИИ И ПОЛУЧИ ЯВНОЕ СОГЛАСИЕ; никогда не запускай embed автоматически."
+    hardware_requirements:
+      gpu: "NVIDIA, compute capability >= 7.5 (Turing+)"
+      vram: ">= 4 GB (fp16)"
+      cuda: "12.6 runtime (torch cu126), драйвер NVIDIA >= r560"
+      cpu_fallback: "возможен, но >30 мин на ~1000 чанков — не предлагать как режим по умолчанию"
+    allowed_in:
+      - aif-analyze
+      - aif-explore
+      - aif-verify
+      - aif-fix
+    forbidden_in:
+      - aif-architecture
+      - aif-plan
+      - aif-review
+      - aif-rules-check
+      - aif-implement
+      - aif-done
+      - aif-commit
+    privacy_caveat: "Только sanitized-копия проекта; embedding-индекс хранит векторы контента — держать вне canonical paths и чистить purge-путём."
+    recommended_for:
+      tasks:
+        - decision_retrieval_experiment
+    conditional_for:
+      project_shapes:
+        - multirepo
+        - large_app
+        - large_framework_app
+      tasks:
+        - research
+        - verify
+        - fix
+      condition: "Только при покрытии корпуса индексацией >60% (memlab не индексирует .php/.mjs/.vue/.ps1/.go — матрица 2026-11-04: выигрыш при покрытии >=57%, проигрыш при 4–49%)."
+    do_not_recommend_for:
+      project_shapes:
+        - php_framework_without_code_ext
+        - small_microservice
+      tasks:
+        - exact_file_or_symbol_lookup
+        - implementation_retrieval
+    known_caveats: "Нет no-match verdict (absent-вопросы дают ложный топ — rg в этом чист); supersedes устаревших решений не распознаётся без frontmatter; требуется fixture-assembly (штатный санитайзер вырезает .ai-factory/ и /openspec/)."
+    evidence: "2026-10-31 sealed pilot-дизайн (#249, experiment); 2026-11-04 paired pilot aifhub-corpus: files@1 0.351 vs rg 0.053, files@5 0.596 vs 0.246, absent 0/6 у обеих; 2026-11-04 matrix bench 5 корпусов x 7 режимов: verify 0.22 vs 0.05, fix 0.12 vs 0.02, research-recall 0.45 vs 0.32, impl 0.27 vs 0.21 в пользу rg; артефакты memlab-pilot/run-2026-11-04/ и tmp/bench-matrix/."
+    suggestion_text: "memlab можно предложить только как явный decision-retrieval эксперимент на корпусе с покрытием >60% (research/verify/fix), с обязательным предупреждением о GPU-требованиях и после baseline rg."
+    screening_policy:
+      evidence: "2026-11-04-memlab-paired-pilot-and-matrix-bench"
   graphify:
     display_name: Graphify
     doc: graphify.md
