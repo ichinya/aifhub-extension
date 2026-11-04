@@ -1,5 +1,6 @@
 import { after, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -381,6 +382,78 @@ describe('Evaluation export', () => {
     const result = await exportEvaluation({ rootDir: root, changeId: change, evidenceClass: 'synthetic_fixture', runnerMetricsPath: 'metrics/bad.json' });
     assert.equal(result.outcome, 'failed');
     assert.equal(result.errors[0].code, 'invalid_runner_metrics');
+  });
+});
+
+describe('Public runtime identifier validation', () => {
+  // The six public runtime fields are projected verbatim into the record while
+  // privacy.contains_paths stays false (issue #273): a path-like value in any
+  // of them must fail the export before any snapshot, salt or projection.
+  const fields = ['run_id', 'model.provider', 'model.id', 'model.version', 'harness.id', 'harness.version'];
+  const pathLike = [
+    '/etc/passwd', 'src/auth/login.ts', 'C:\\Users\\me\\project', 'dir\\file.txt',
+    'C:evil', '\\\\server\\share', '../secrets', '.hidden'
+  ];
+  const metricsWith = (field, value) => {
+    const metrics = {
+      schema: 'aifhub.runner_metrics.v1', run_id: 'run-1',
+      model: { provider: 'anthropic', id: 'claude-sonnet', version: 'exact' },
+      harness: { id: 'ai-factory', version: '2.18.1' }
+    };
+    const [block, key] = field.split('.');
+    if (key === undefined) metrics[field] = value;
+    else metrics[block][key] = value;
+    return metrics;
+  };
+  const probe = async (root, change, field, value) => {
+    await put(root, 'metrics/adversarial.json', JSON.stringify(metricsWith(field, value)));
+    return exportEvaluation({
+      rootDir: root, changeId: change, evidenceClass: 'synthetic_fixture',
+      runnerMetricsPath: 'metrics/adversarial.json', now: '2026-09-13T00:00:00.000Z'
+    });
+  };
+
+  it('rejects path-like values in every public runtime field before any projection', async () => {
+    // One fresh fixture for the whole loop: every probe must reject, so no
+    // fingerprint salt may ever be bootstrapped for this project.
+    const { root, change } = await compiledFixture();
+    for (const field of fields) {
+      for (const value of pathLike) {
+        const result = await probe(root, change, field, value);
+        assert.equal(result.outcome, 'failed', `${field} must reject ${JSON.stringify(value)}`);
+        assert.deepEqual(result.errors, [{ code: 'invalid_runner_metrics' }]);
+        assert.equal('evaluation' in result, false);
+        assert.equal('written' in result, false);
+        // The canary string never reaches the serialized envelope.
+        assert.equal(JSON.stringify(result).includes(JSON.stringify(value)), false,
+          `${field} envelope must not carry ${JSON.stringify(value)}`);
+        // Rejection precedes salt bootstrap: no exchange state was created.
+        assert.equal(existsSync(path.join(root, '.ai-factory/state/exchange/fingerprint-salt.json')), false);
+      }
+    }
+  });
+
+  it('rejects semver build metadata and over-length public identifiers, then accepts the normalized value', async () => {
+    const { root, change } = await compiledFixture();
+    const rejected = [
+      ['harness.version', '2.18.1+build'],
+      ['run_id', 'r'.repeat(81)],
+      ['model.id', 'm'.repeat(81)]
+    ];
+    for (const [field, value] of rejected) {
+      const result = await probe(root, change, field, value);
+      assert.equal(result.outcome, 'failed', `${field} must reject ${JSON.stringify(value)}`);
+      assert.deepEqual(result.errors, [{ code: 'invalid_runner_metrics' }]);
+      assert.equal('evaluation' in result, false);
+      assert.equal('written' in result, false);
+      assert.equal(JSON.stringify(result).includes(JSON.stringify(value)), false,
+        `${field} envelope must not carry ${JSON.stringify(value)}`);
+    }
+    // Sanity control: flipping the single adversarial field back to its
+    // benign form restores a normal export on the same fixture.
+    const good = await probe(root, change, 'run_id', 'run-1');
+    assert.equal(good.outcome, 'exported', JSON.stringify(good.errors));
+    assert.equal(good.evaluation.runtime.run_id, 'run-1');
   });
 });
 
