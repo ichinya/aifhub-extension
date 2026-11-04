@@ -34,6 +34,11 @@ aifhub:
     protectedPatterns: []
     sqz:
       command: sqz
+  # Optional advisory readability diagnostics (issue #228); default is false
+  # and it must never be enabled automatically. The CLI override is
+  # `--enabled true|false` on `ai-factory aifhub-docs-readability`.
+  # readability:
+  #   enabled: false
 # OpenSpec-native mode writes its own aifhub settings profile only when
 # aifhub.tools.openspec is true.
 

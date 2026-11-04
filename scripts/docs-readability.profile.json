@@ -1,0 +1,94 @@
+{
+  "schema": "aifhub.docs_readability_profile.v1",
+  "profile_id": "aifhub-docs-readability-default",
+  "profile_version": 1,
+  "description": "Pinned offline readability profile (RU/EN). Thresholds and phrase lists are recorded in openspec/changes/228-docs-readability/design.md; they are not a language standard.",
+  "rules": [
+    {
+      "id": "docs-readability:sentence-length",
+      "version": 1,
+      "origin": "project",
+      "type": "sentence-length",
+      "thresholds": {
+        "procedure": { "ru": 25, "en": 30 },
+        "description": { "ru": 30, "en": 35 },
+        "requirement": { "ru": 35, "en": 35 },
+        "acceptance": { "ru": 35, "en": 35 },
+        "general": { "ru": 30, "en": 35 }
+      }
+    },
+    {
+      "id": "docs-readability:ru-cliche",
+      "version": 1,
+      "origin": "project",
+      "type": "phrase-list",
+      "language": "ru",
+      "heuristic": true,
+      "phrases": [
+        "в целях",
+        "в рамках",
+        "в качестве",
+        "данный",
+        "настоящий",
+        "осуществлять",
+        "производить действие",
+        "имеет место",
+        "следует отметить",
+        "необходимо отметить",
+        "в связи с этим",
+        "таким образом",
+        "является",
+        "представляет собой",
+        "в случае если",
+        "по факту",
+        "на сегодняшний день"
+      ]
+    },
+    {
+      "id": "docs-readability:en-cliche",
+      "version": 1,
+      "origin": "project",
+      "type": "phrase-list",
+      "language": "en",
+      "heuristic": true,
+      "phrases": [
+        "utilize",
+        "in order to",
+        "leverage",
+        "it should be noted that",
+        "it is important to note that",
+        "a number of",
+        "at this point in time",
+        "in the event that",
+        "due to the fact that",
+        "prior to",
+        "subsequent to"
+      ]
+    },
+    {
+      "id": "docs-readability:unbalanced-pair",
+      "version": 1,
+      "origin": "project",
+      "type": "unbalanced-pair",
+      "pairs": [
+        ["(", ")"],
+        ["[", "]"],
+        ["«", "»"]
+      ]
+    },
+    {
+      "id": "docs-readability:quote-mismatch",
+      "version": 1,
+      "origin": "project",
+      "type": "quote-mismatch",
+      "disallowed": ["“", "”", "„"]
+    },
+    {
+      "id": "docs-readability:glossary-term",
+      "version": 1,
+      "origin": "project",
+      "type": "glossary-term",
+      "heuristic": true
+    }
+  ]
+}

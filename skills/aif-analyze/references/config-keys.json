@@ -52,6 +52,12 @@
       "purpose": "Reserved boolean opt-in for Lekalo semantic model artifacts; keep false until a compatible provider exists."
     },
     {
+      "key": "aifhub.readability.enabled",
+      "required": false,
+      "since": "1.8.1",
+      "purpose": "Boolean opt-in for advisory docs readability diagnostics (aifhub-docs-readability); default false, CLI --enabled overrides."
+    },
+    {
       "key": "paths.plans",
       "required": true,
       "since": "1.0.0",

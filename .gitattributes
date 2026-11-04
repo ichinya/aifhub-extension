@@ -7,3 +7,4 @@
 *.ico binary
 *.pdf binary
 *.zip binary
+test/fixtures/docs-readability/crlf-bom.md -text

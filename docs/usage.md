@@ -1409,6 +1409,16 @@ Exit 0 means the requested final-result inventory and current supporting coverag
 
 Provenance observations show the fresh-context tier (execution_profile ai-fresh-context with a matching saved diff hash), same-session (same_session_fallback), unrecorded, or unknown. An existing prepared receipt does not bind a final gate result to a role and a current target; without a supported binding independence stays unknown even when the outcome says reviewed. Labels, self-review, and same-session never promote to independent. Explicitly required review/security therefore currently report UNKNOWN independence until such a binding exists. Gate coverage does not replace /aif-verify, /aif-done, or required audits. This is a diagnostic with no writes, locks, creates, providers, or stage routing.
 
+### Opt-in readability diagnostics
+
+```text
+ai-factory aifhub-docs-readability --change <id> [--enabled true|false] --file <path> [--file <path> ...] [--language ru|en] [--json] [--write]
+```
+
+The helper computes non-blocking readability diagnostics for explicitly selected documents (pinned offline RU/EN profile: sentence length per section class, closed cliche lists, unbalanced `()`/`[]`/`«»` pairs, unsupported quotation marks, glossary terminology). It is opt-in: `--enabled true|false` overrides the `aifhub.readability.enabled` config key (default `false`); without opt-in the command refuses with exit 2 and touches nothing. Preview is the default; `--write` persists the `aifhub.docs_readability.v1` report under `.ai-factory/state/<id>/readability/report.json` through guarded state-only writes (a custom `paths.state` is refused because the QA projection covers only the default state root).
+
+Findings are source-bound (UTF-8 byte spans plus derived line/column and raw-byte sha256); documents are never edited. State is a closed enum and every degradation (`partial-coverage`, `checker-unavailable`, `wrong-language`, `ambiguous-language`, `malformed-input`, `timeout`) is distinguishable from a zero-findings `complete`. Exit 0 means an advisory result was formed, exit 2 is an invalid invocation, exit 1 is an operational failure; no exit code participates in verify/done/archive chains. The diagnostics are advisory only: no `aif-gate-result`, no QA writes, no entry into done-readiness, provider policy, or runner metrics, and document text is treated as data (no process/network calls on the analysis path). Read-time consumers revalidate the composite binding digest (worktree identity, selection, source/profile/glossary/engine digests) and get `stale-report` on any drift. See [Docs Readability Policy](readability-policy.md).
+
 ## See Also
 
 - [Persistent Workflow Mechanics](workflow-mechanics.md) — classic/OpenSpec execution, `batch-start` → checkpoint/seal → per-item acceptance → close, exact inspection and owner interruption/stop confirmation. Use `ai-factory aifhub-execution <action> --json` with JSON on stdin; authoritative verification remains `/aif-verify`.

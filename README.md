@@ -417,6 +417,7 @@ Switching to AI Factory-only mode updates the legacy path profile and preserves 
 | [Memory Tool Recommendations](docs/memory-tool-recommendations.md) | Local metadata-driven optional memory/context tool recommendations and installed wrapper commands |
 | [Context Loading Policy](docs/context-loading-policy.md) | Consumer context, AI Factory 2.19 upstream warmup, Optional Project Glossary, optional provider context, GitHub-aware roadmap evidence, command ownership, upstream utility boundaries, and legacy boundaries |
 | [Project Review Policy](docs/review-policy.md) | Configurable root-default `REVIEW.md`, scaffold ownership, safe review consumption, precedence, and session-state boundary |
+| [Docs Readability Policy](docs/readability-policy.md) | Opt-in non-blocking readability diagnostics: pinned RU/EN profile, source-bound report, closed-enum outcomes, composite invalidation, writer guards, and advisory isolation |
 | [OpenSpec Compatibility](docs/openspec-compatibility.md) | Optional CLI adapter policy, exact-tagged OpenSpec `1.15.0` reviewed baseline from `1.3.1`, pinned AI Factory `2.19.0` release, AI Factory 2.18 classic/ultra planning, research, verification, archive and ownership matrix, reviewed no-ops, and capability flags |
 | [OpenSpec Artifact Validation](docs/openspec-validation.md) | Read-only AIFHub contract validator for OpenSpec-native artifacts |
 | [OpenSpec Coverage Matrix](docs/spec-coverage.md) | Requirement-to-code coverage artifact and verify/done policy |
