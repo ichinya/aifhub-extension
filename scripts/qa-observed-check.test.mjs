@@ -569,15 +569,31 @@ describe('review custody contracts (round 2)', () => {
   });
   it('a declared-absent environment variable stays absent (no parent-env leak into the run)', async () => {
     const f = await observedFixture();
-    f.checks[0].env_inputs = ['CI'];
-    const withoutCI = { ...process.env };
-    delete withoutCI.CI;
-    f.options.environment = withoutCI;
-    await f.prepare();
-    const ingested = await f.ingest(await f.issue(await f.compose()));
-    // With the parent-env merge bug this exact flow failed observation-stale-gates
-    // before the launch: the fingerprinted CI-absent state was masked by process.env.
-    assert.equal(ingested.ok, true, JSON.stringify(ingested));
+    // A unique sentinel guarantees the absence is real on any host: deleting a
+    // common variable (CI) degenerates on CI-less machines. The key was absent
+    // before the test, so the finally-restore returns the exact prior state.
+    const sentinel = 'QA_OBSERVED_CHECK_ABSENT_SENTINEL';
+    process.env[sentinel] = 'parent-only-value';
+    try {
+      f.checks[0].env_inputs = [sentinel];
+      f.options.environment = { ...process.env };
+      delete f.options.environment[sentinel];
+      await f.prepare();
+      const baseExec = f.options.execFile;
+      let spawnedEnv = null;
+      f.options.execFile = (file, argv, opts, cb) => {
+        if (file !== 'git') spawnedEnv = opts.env;
+        return baseExec(file, argv, opts, cb);
+      };
+      const ingested = await f.ingest(await f.issue(await f.compose()));
+      // With the parent-env merge bug this exact flow failed observation-stale-gates
+      // before the launch: the fingerprinted sentinel-absent state was masked by
+      // process.env — and the spawn must observe the same absent variable.
+      assert.equal(ingested.ok, true, JSON.stringify(ingested));
+      assert.ok(spawnedEnv !== null && !(sentinel in spawnedEnv), 'declared-absent sentinel leaked into the spawned env');
+    } finally {
+      delete process.env[sentinel];
+    }
   });
   it('a fresh envelope with a manifest digest from another wave is stale before intent or launch', async () => {
     const f = await observedFixture();
@@ -691,22 +707,73 @@ describe('review custody contracts (round 2)', () => {
     assert.equal(spawnedCI, 'declared');
     assert.equal((await f.publish({ HostObservationRegistry: f.registry })).accepted, true);
   });
-  it('an in-place provider roles mutation cannot pass the pre/post owner comparison', async () => {
+  it('an in-place provider role content mutation cannot pass the pre/post owner comparison', async () => {
     const f = await observedFixture({ gates: ['verify', 'review'] });
     const roles = [{ check_id: 'check-verify', role: 'verify' }, { check_id: 'check-review', role: 'review' }];
     f.options.providers.requirements = async () => ({ gates: ['verify', 'review'], independent_roles: roles, evidence: [] });
     await f.prepare({ independentRoles: roles });
     const original = f.options.execFile;
     f.options.execFile = (file, argv, opts, cb) => {
-      if (file !== 'git') roles.reverse(); // in-place mutation while the run is in flight
+      if (file !== 'git') roles[0].role = 'forged'; // content mutation while the run is in flight
       return original(file, argv, opts, cb);
     };
     const result = await f.ingest(await f.issue(await f.compose()));
-    // Both subset checks still pass after the reorder; only the copied pre/post
-    // owner snapshots catch the drift.
+    // The canonical snapshot normalizes order, not content: the forged role
+    // differs canonically from the pre snapshot and from the frozen manifest.
     assert.equal(result.ok, false);
     assert.equal(result.code, 'observation-custody-race');
     assert.equal((await f.records()).length, 0);
+  });
+  it('adding a role mid-flight blocks the custody window', async () => {
+    const f = await observedFixture({ gates: ['verify', 'review'] });
+    const roles = [{ check_id: 'check-verify', role: 'verify' }, { check_id: 'check-review', role: 'review' }];
+    f.options.providers.requirements = async () => ({ gates: ['verify', 'review'], independent_roles: roles, evidence: [] });
+    await f.prepare({ independentRoles: roles });
+    const original = f.options.execFile;
+    f.options.execFile = (file, argv, opts, cb) => {
+      if (file !== 'git') roles.push({ check_id: 'check-review', role: 'review-shadow' }); // membership grows mid-flight
+      return original(file, argv, opts, cb);
+    };
+    const result = await f.ingest(await f.issue(await f.compose()));
+    // The post-site re-check is one requireValue over snapshot equality &&
+    // coverage: membership growth falsifies both, so the code is deterministic.
+    assert.equal(result.ok, false);
+    assert.equal(result.code, 'observation-custody-race');
+    assert.equal((await f.records()).length, 0);
+  });
+  it('removing a role mid-flight blocks the custody window', async () => {
+    const f = await observedFixture({ gates: ['verify', 'review'] });
+    const roles = [{ check_id: 'check-verify', role: 'verify' }, { check_id: 'check-review', role: 'review' }];
+    f.options.providers.requirements = async () => ({ gates: ['verify', 'review'], independent_roles: roles, evidence: [] });
+    await f.prepare({ independentRoles: roles });
+    const original = f.options.execFile;
+    f.options.execFile = (file, argv, opts, cb) => {
+      if (file !== 'git') roles.pop(); // membership shrinks mid-flight
+      return original(file, argv, opts, cb);
+    };
+    const result = await f.ingest(await f.issue(await f.compose()));
+    // A shrunken multiset is canonically distinct from the pre snapshot even
+    // though the subset check would still pass — the snapshot catches it.
+    assert.equal(result.ok, false);
+    assert.equal(result.code, 'observation-custody-race');
+    assert.equal((await f.records()).length, 0);
+  });
+  it('a pure mid-flight reordering of the same roles is canonical and must not fail closed', async () => {
+    const f = await observedFixture({ gates: ['verify', 'review'] });
+    const roles = [{ check_id: 'check-verify', role: 'verify' }, { check_id: 'check-review', role: 'review' }];
+    f.options.providers.requirements = async () => ({ gates: ['verify', 'review'], independent_roles: roles, evidence: [] });
+    await f.prepare({ independentRoles: roles });
+    const original = f.options.execFile;
+    f.options.execFile = (file, argv, opts, cb) => {
+      if (file !== 'git') roles.reverse(); // pure reordering while the run is in flight
+      return original(file, argv, opts, cb);
+    };
+    const ingested = await f.ingest(await f.issue(await f.compose()));
+    // Canonical owner snapshot: reordering a canonically equal multiset is not
+    // a custody incident (content and membership drift stay blocked — see the
+    // mutation/membership tests around here).
+    assert.equal(ingested.ok, true, JSON.stringify(ingested));
+    assert.equal((await f.records()).length, 1);
   });
   it('a transport without a stop mechanism refuses typed instead of hanging the lock', async () => {
     const f = await observedFixture({ mode: 'hang' });
@@ -809,6 +876,66 @@ describe('review custody contracts (round 2)', () => {
     assert.equal(result.code, 'observation-stale-gates');
     assert.equal((await f.records()).length, 0);
   });
+  for (const [broken, label] of [
+    [{ gates: {}, independent_roles: [], evidence: [] }, 'non-array gates object'],
+    [{ gates: 'verify', independent_roles: [], evidence: [] }, 'string gates'],
+  ]) {
+    it(`a broken owner-requirements shape (${label}) is typed stale-gates before the launch`, async () => {
+      const f = await observedFixture();
+      // prepare itself must see the healthy provider (qa-manifest.mjs:68 calls
+      // providers.requirements); the broken shape is installed after prepare.
+      await f.prepare();
+      f.options.providers.requirements = async () => broken;
+      const result = await f.ingest(await f.issue(await f.compose()));
+      // Typed guard: a non-array non-nullish field is a stale owner answer, not
+      // an untyped storage error (or a silent char-coercion of a string).
+      assert.equal(result.ok, false);
+      assert.equal(result.code, 'observation-stale-gates');
+      assert.equal(f.host.state.counters.verifier_launches, 0);
+      assert.equal((await f.records()).length, 0);
+      assert.equal(await f.registry.lookup('run-1'), null);
+    });
+  }
+  for (const [broken, label] of [
+    [{ gates: ['verify'], independent_roles: {}, evidence: [] }, 'non-array independent_roles object'],
+    [{ gates: ['verify'], independent_roles: [], evidence: {} }, 'non-array evidence object'],
+    [{ gates: 'verify', independent_roles: [], evidence: [] }, 'string gates'],
+  ]) {
+    it(`a broken owner-requirements shape mid-flight (${label}) is typed stale-gates after the launch`, async () => {
+      const f = await observedFixture();
+      await f.prepare();
+      let calls = 0;
+      f.options.providers.requirements = async () => {
+        calls += 1;
+        return calls === 1 ? { gates: ['verify'], independent_roles: [], evidence: [] } : broken;
+      };
+      const result = await f.ingest(await f.issue(await f.compose()));
+      // The post-site re-check runs the guarded view first: the broken shape is
+      // a stale owner answer, not a custody race between the two snapshots.
+      assert.equal(result.ok, false);
+      assert.equal(result.code, 'observation-stale-gates');
+      assert.equal(f.host.state.counters.verifier_launches, 1);
+      const intent = JSON.parse(await readFile(path.join(f.rootDir, recordPath(f)))).record;
+      assert.equal(intent.state, 'pending'); // the intent stays resumable on disk
+      assert.equal(await f.registry.lookup('run-1'), null); // lookup hides pending intents
+    });
+  }
+  it('nullish and empty-array owner requirements stay legitimate answers', async () => {
+    for (const owner of [
+      { gates: null, independent_roles: null, evidence: null },
+      { gates: [], independent_roles: [], evidence: [] },
+      {},
+    ]) {
+      const f = await observedFixture();
+      await f.prepare();
+      f.options.providers.requirements = async () => owner;
+      const ingested = await f.ingest(await f.issue(await f.compose()));
+      // The shape guard only rejects non-array non-nullish forms; absent and
+      // empty answers are the documented legitimate shapes (no false blocks).
+      assert.equal(ingested.ok, true, `${JSON.stringify(owner)} -> ${JSON.stringify(ingested)}`);
+      assert.equal((await f.records()).length, 1);
+    }
+  });
   it('requirements drift between the pre- and post-run reads blocks the custody window', async () => {
     const f = await observedFixture({ execFailpoint: async () => {
       f.options.providers.requirements = async () => ({ gates: ['verify'], independent_roles: [], evidence: ['drift'] });
@@ -854,6 +981,23 @@ describe('review custody contracts (round 2)', () => {
     const replay = await f.ingest(await f.issue(await f.compose()));
     assert.equal(replay.ok, false);
     assert.equal(replay.code, 'observation-incomplete');
+  });
+  it('unparseable stored result bytes fail the exact replay without relaunching the verifier', async () => {
+    const f = await observedFixture();
+    await f.prepare();
+    const ingested = await f.ingest(await f.issue(await f.compose()));
+    assert.equal(ingested.ok, true);
+    const launches = f.host.state.counters.verifier_launches;
+    const resultFile = path.join(f.rootDir, f.qa, 'results', `${ingested.result_id}.json`);
+    await writeFile(resultFile, '{"corrupted":');
+    const before = await readFile(resultFile);
+    const replay = await f.ingest(await f.issue(await f.compose()));
+    // The stored result is unreadable, so the run can no longer be confirmed:
+    // typed observation-incomplete, and the exact replay never relaunches.
+    assert.equal(replay.ok, false);
+    assert.equal(replay.code, 'observation-incomplete');
+    assert.equal(f.host.state.counters.verifier_launches, launches);
+    assert.deepEqual(await readFile(resultFile), before); // corrupted bytes preserved
   });
   it('the fake host refuses re-issuing a run under a different payload', async () => {
     const f = await observedFixture();
