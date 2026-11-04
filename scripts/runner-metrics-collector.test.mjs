@@ -561,8 +561,11 @@ test('parity: public runtime fields — schema and gate agree on every probe (is
   ];
   // Rejected by both sides: every path-like class, over-length, control
   // characters, empty string, reserved devices before a dot (CON.x/com1.x),
-  // trailing dot and semver build metadata.
-  const rejected = [...pathLike, 'x'.repeat(81), 'bad\u0001id', '', 'CON.x', 'com1.x', 'trailing.', '2.18.1+build'];
+  // trailing dot and semver build metadata. Trailing LF/CR probes pin the
+  // `$` anchor to ECMA-262 end-of-input semantics (no match before a final
+  // line terminator, unlike PCRE/Python): the newline sits outside the
+  // character class, so both the schema pattern and the gate reject.
+  const rejected = [...pathLike, 'x'.repeat(81), 'bad\u0001id', '', 'CON.x', 'com1.x', 'trailing.', '2.18.1+build', 'run-1\n', 'run-1\r'];
   // Accepted by both sides: plain version, identifier length boundary, inner
   // dots, device-lookahead edges with an accepting continuation (conX/com10),
   // null and fully omitted members.
