@@ -912,16 +912,29 @@ export function runRules(profile, model, document, glossaryEntries, sections, op
     for (const section of sections) {
       if (truncated) break;
       const counts = new Map(pairRule.pairs.map(([open, close]) => [`${open}${close}`, { open: 0, close: 0, depth: 0, crossed: false }]));
+      // Crossed nesting across different pair kinds (e.g. `([)]`) escapes both
+      // total-count balance and per-pair running depth; the outstanding-opener
+      // stack flags a closer that has no matching current opener.
+      const outstanding = [];
+      const crossedWith = new Map();
       for (const run of eligibleRuns(model, section.start, section.end)) {
         for (const ch of model.text.slice(run.s, run.e)) {
           for (const [open, close] of pairRule.pairs) {
             const tally = counts.get(`${open}${close}`);
-            if (ch === open) { tally.open += 1; tally.depth += 1; } else if (ch === close) {
+            if (ch === open) {
+              tally.open += 1;
+              tally.depth += 1;
+              outstanding.push(open);
+            } else if (ch === close) {
               tally.close += 1;
               tally.depth -= 1;
               // A closer before its opener escapes total-count balance; a
               // negative running depth flags the reversed order explicitly.
               if (tally.depth < 0) { tally.crossed = true; tally.depth = 0; }
+              const top = outstanding[outstanding.length - 1];
+              if (top === undefined) continue;
+              if (top === open) outstanding.pop();
+              else crossedWith.set(`${open}${close}`, top);
             }
           }
         }
@@ -930,12 +943,16 @@ export function runRules(profile, model, document, glossaryEntries, sections, op
       if (sectionRuns.length === 0) continue;
       const span = { s: sectionRuns[0].s, e: sectionRuns[sectionRuns.length - 1].e };
       for (const [open, close] of pairRule.pairs) {
-        const tally = counts.get(`${open}${close}`);
+        const key = `${open}${close}`;
+        const tally = counts.get(key);
         const unbalanced = tally.open !== tally.close;
-        if (unbalanced || tally.crossed) {
+        const blockedBy = crossedWith.get(key);
+        if (unbalanced || tally.crossed || blockedBy !== undefined) {
           const reason = unbalanced
             ? `${tally.open} open, ${tally.close} close`
-            : `reversed order: a ${close} appears before its ${open}`;
+            : tally.crossed
+              ? `reversed order: a ${close} appears before its ${open}`
+              : `crossed order: a ${close} appears while a ${blockedBy} is still open`;
           add(makeFinding(model, document, span.s, span.e, pairRule,
             `Unbalanced pair ${open}${close} in ${section.heading ? `section «${bounded(section.heading, 40)}»` : 'document'}: ${reason}.`,
             `Check the ${open}${close} pair balance.`, false));
@@ -1501,6 +1518,13 @@ export async function runDocsReadabilityCommand(argv = process.argv.slice(2), op
     if (!timedOut && expired()) timedOut = true;
     if (timedOut) diagnostics.push({ code: 'deadline-exceeded', path: null, detail: `deadlineMs=${deadlineMs}` });
 
+    if (findings.length >= MAX_FINDINGS) {
+      // The global diagnostic must precede the degradation mapping below, so
+      // global truncation (documents each under their own cap, together over
+      // the global limit) degrades the outcome exactly like per-document
+      // truncation does.
+      diagnostics.push({ code: 'findings-truncated', path: null, detail: `limit=${MAX_FINDINGS}` });
+    }
     const degraded = new Set();
     for (const diagnostic of diagnostics) {
       if (diagnostic.code === 'wrong-language') degraded.add('wrong-language');
@@ -1513,9 +1537,6 @@ export async function runDocsReadabilityCommand(argv = process.argv.slice(2), op
     let state = 'complete';
     for (const candidate of SEVERITY) {
       if (degraded.has(candidate)) { state = candidate; break; }
-    }
-    if (findings.length >= MAX_FINDINGS) {
-      diagnostics.push({ code: 'findings-truncated', path: null, detail: `limit=${MAX_FINDINGS}` });
     }
     if (diagnostics.length > MAX_DIAGNOSTICS) diagnostics.length = MAX_DIAGNOSTICS;
     findings.sort((left, right) => (left.file < right.file ? -1 : left.file > right.file ? 1 : 0)

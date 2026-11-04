@@ -1261,6 +1261,37 @@ describe('devin pr triage: bounded inline handling', () => {
     assert.equal(later.ok, false);
     assert.equal(later.json, false, 'flags after the error are not honored');
   });
+
+  it('flags crossed nesting across pair kinds that per-pair totals would miss', async () => {
+    const root = await makeTemp('aif-d5-crossed-');
+    const doc = ['# Crossed', '', '## Usage', '', 'The interleave ([)] sits inside this sentence and the pair rule must flag the crossed order even though both totals match each other here today.', EN_VOLUME].join('\n');
+    await seedProject(root, { files: { 'docs/guide.md': Buffer.from(doc, 'utf8') } });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/guide.md', '--json']);
+    const report = run.json();
+    const pairFindings = report.findings.filter((item) => item.rule.id === 'docs-readability:unbalanced-pair');
+    assert.ok(pairFindings.length >= 1, 'the crossed nesting is detected');
+    assert.ok(pairFindings.some((item) => item.explanation.includes('crossed order: a ) appears while a [ is still open')));
+  });
+
+  it('degrades the outcome to partial-coverage when only the global finding cap hits', async () => {
+    const root = await makeTemp('aif-d6-globalcap-');
+    // Three documents stay under the per-document cap (2000) but together
+    // cross the global cap (5000): no per-document truncation diagnostic may
+    // exist, yet the outcome must not stay complete.
+    const docs = ['docs/one.md', 'docs/two.md', 'docs/three.md'].map((name, index) => {
+      const filler = '“'.repeat(1750 + index);
+      return [name, Buffer.from(`# Cap ${index}\n\n## Description\n\n${filler}\n\n${EN_VOLUME}\n`, 'utf8')];
+    });
+    await seedProject(root, { files: Object.fromEntries(docs) });
+    const run = await runCli(root, ['--change', 'work', '--file', 'docs/one.md', '--file', 'docs/two.md', '--file', 'docs/three.md', '--json']);
+    assert.equal(run.exitCode, 0, 'the bounded pipeline survives the global cap');
+    const report = run.json();
+    assert.ok(!report.diagnostics.some((diagnostic) => diagnostic.code === 'findings-truncated' && diagnostic.path !== null),
+      'no per-document truncation diagnostic exists');
+    assert.ok(report.diagnostics.some((diagnostic) => diagnostic.code === 'findings-truncated' && diagnostic.path === null),
+      'the global truncation diagnostic is present');
+    assert.equal(report.state, 'partial-coverage', 'global truncation must not stay complete');
+  });
 });
 
 // ---------------------------------------------------------------------------
