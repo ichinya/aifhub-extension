@@ -312,12 +312,27 @@ async function recordObservedResult(store, options, envelope, check, plan) {
   return recorded;
 }
 
-const requirementsView = value => ({ gates: sorted(value?.gates ?? []),
-  // Roles are deep-copied per snapshot: a provider mutating its cached array
-  // in place mid-run must not turn the pre/post owner comparison into a
-  // self-comparison (review R3-2).
-  independent_roles: (value?.independent_roles ?? []).map(role => ({ ...role })),
-  evidence: sorted(value?.evidence ?? []) });
+const requirementsView = value => {
+  // Typed shape guard (#274 L-a): every owner-requirements field must be an
+  // array or nullish. Anything else would either crash `sorted` with an
+  // untyped TypeError (`qa-custody-unavailable`) or — for a string — silently
+  // coerce into its characters; the provider answer is stale, not unavailable.
+  for (const field of ['gates', 'independent_roles', 'evidence']) {
+    const current = value?.[field];
+    requireValue(current === null || current === undefined || Array.isArray(current), 'observation-stale-gates', true);
+  }
+  return { gates: sorted(value?.gates ?? []),
+    // Roles are deep-copied per snapshot and canonically sorted: a provider
+    // mutating its cached array in place mid-run must not turn the pre/post
+    // owner comparison into a self-comparison (review R3-2), and a pure
+    // reordering of the same roles is canonical — the comparison stays a
+    // multiset check (no dedup), ordered by code-unit strings over
+    // canonical(role) (never localeCompare: ICU collation can return 0 for
+    // canonically distinct strings and revive the reorder flake).
+    independent_roles: (value?.independent_roles ?? []).map(role => structuredClone(role))
+      .sort((a, b) => { const x = canonical(a); const y = canonical(b); return x < y ? -1 : x > y ? 1 : 0; }),
+    evidence: sorted(value?.evidence ?? []) };
+};
 // Publish-owner semantics (qa-manifest.mjs:121-124): the manifest stores the
 // union of previous + owner + explicit additions, so the live owner must be a
 // subset of the frozen sets — never byte-equal to them.
