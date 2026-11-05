@@ -1633,3 +1633,24 @@ test('stage-2 qa timing aggregates: checks_ms sums only host-observed complete r
   assert.equal(forged.metrics.phases.checks_ms, null, 'agent-authored checks timing is not a verifier measurement');
   assert.equal(forged.metrics.unknowns.includes('checks_ms'), true);
 });
+
+test('stage-2 incomplete snapshot_hash timing reads as unmeasured per-record, not zero (#270 review)', async (t) => {
+  const f = await fixture(t);
+  const options = qaOptions(f);
+  assert.equal((await prepareQaManifest(options)).ok, true);
+  const first = await recordQaResult({ ...options, gate: 'verify', resultId: 'qa-1', markdown: gateBody('verify').toString('utf8') });
+  assert.equal(first.ok, true, JSON.stringify(first));
+  // Downgrade the frozen measurement to the incomplete-interval shape a
+  // failed binding persists (complete: false): the collector read validation
+  // accepts the shape, timingComplete rejects the record's contribution —
+  // per-record null behind the marker, publication does not fail.
+  const store = await (await import('./workflow-state-store.mjs')).storeFor(f.root);
+  const name = '.ai-factory/qa/' + f.id + '/results/qa-1.json';
+  const envelope = JSON.parse((await store.textFile(name)).toString());
+  envelope.record.metadata.timings.snapshot_hash = { ...envelope.record.metadata.timings.snapshot_hash, complete: false };
+  await store.write(name, Buffer.from(canonical({ checksum: digest(envelope.record), record: envelope.record }) + '\n'));
+  const result = await f.collect(['--include-qa']);
+  assert.equal(result.outcome, 'collected');
+  assert.equal(result.metrics.phases.snapshot_hash_ms, null, 'an incomplete interval is not a completed measurement');
+  assert.equal(result.metrics.unknowns.includes('snapshot_hash_ms'), true);
+});

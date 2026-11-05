@@ -574,6 +574,31 @@ describe('QA stage-2 metadata (#270)', () => {
     assert.equal(stored.record.metadata.timings.checks, undefined);
   });
 
+  it('a binding that fails after measured operations keeps an incomplete snapshot_hash timing', async () => {
+    const f = await fixture();
+    assert.equal((await f.prepare()).ok, true);
+    // checkFingerprints rejects an unproven dependency mid-binding: the
+    // snapshot and the fingerprint operation still ran and were measured
+    // (telemetry emits in finally, failures included), so the record must
+    // carry the interval as complete:false instead of reading as unmeasured
+    // (#270 Devin review round 3).
+    const failed = await f.record('verify', { providers: {
+      dependencies: async () => ({ profile: 'declared.v1', dependencies_complete: false }) } });
+    assert.equal(failed.ok, true, JSON.stringify(failed));
+    const store = await qaStore(f.options);
+    const stored = await store.json(`${f.qa}/results/verify-1.json`);
+    assert.equal(stored.record.binding_code, 'dependency-unproven');
+    const timing = stored.record.metadata.timings.snapshot_hash;
+    assert.equal(timing.complete, false, 'the interval closed on failure, not by a completed binding');
+    assert.equal(timing.operations, 2); // one snapshot + one fingerprints operation, failure included
+    assert.ok(Number.isSafeInteger(timing.elapsed_ms) && timing.elapsed_ms >= 0);
+    assert.ok(Number.isFinite(Date.parse(timing.started_at)) && Number.isFinite(Date.parse(timing.ended_at)));
+    // Same-id replay stays immutable: the incomplete interval is part of the
+    // frozen first write, a later binding outcome cannot reuse this id.
+    assert.equal((await f.record('verify', { providers: {
+      dependencies: async () => ({ profile: 'declared.v1', dependencies_complete: true }) } })).code, 'immutable-conflict');
+  });
+
   it('same-id replay without options is idempotent and keeps the frozen recorded_at', async () => {
     const f = await fixture();
     await f.prepare();

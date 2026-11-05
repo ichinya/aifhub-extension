@@ -106,6 +106,10 @@ export async function recordBoundEvidence(options = {}) {
       let commandDigest = digest(check.command);
       let snapshotHashTiming = null;
       const snapshotStartWall = new Date().toISOString();
+      const snapshotTimingFromTelemetry = (complete) => ({ started_at: snapshotStartWall,
+        ended_at: new Date().toISOString(),
+        elapsed_ms: telemetryEvents.reduce((sum, event) => sum + event.elapsed_ms, 0),
+        operations: telemetryEvents.length, complete });
       try {
         const observed = await observeQaSnapshot(store, manifest.payload, options);
         fingerprints = await checkFingerprints(manifest.payload, observed, options);
@@ -116,10 +120,17 @@ export async function recordBoundEvidence(options = {}) {
         observedModules = observed.modules;
         // Elapsed is the sum of the measured operations — never an enclosing
         // wall timer on top of them (double-counting is forbidden, contract R2).
-        snapshotHashTiming = { started_at: snapshotStartWall, ended_at: new Date().toISOString(),
-          elapsed_ms: telemetryEvents.reduce((sum, event) => sum + event.elapsed_ms, 0),
-          operations: telemetryEvents.length, complete: true };
-      } catch (error) { bindingCode = qaFailure(error).code; }
+        snapshotHashTiming = snapshotTimingFromTelemetry(true);
+      } catch (error) {
+        bindingCode = qaFailure(error).code;
+        // A binding that fails after at least one measured operation still
+        // measured real work (#270 review): the timing persists with
+        // `complete: false` — «интервал незавершён, итог неизвестен» (docs
+        // completeness semantics) — instead of silently reading as "no
+        // source". The collector sums complete timings only, so the record
+        // contributes per-record null and keeps the coverage marker.
+        if (telemetryEvents.length > 0) snapshotHashTiming = snapshotTimingFromTelemetry(false);
+      }
       // First-write frozen metadata: caller members are explicit and validated;
       // on replay the saved metadata wins and conflicting explicit members are
       // a typed rejection (never a silent overwrite, never a fresh measurement).
