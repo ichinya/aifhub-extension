@@ -112,7 +112,12 @@ is mandatory and uses the aifhub#29 vocabulary: `synthetic_fixture`,
   aggregate request counters, checks counts with closed-enum reason codes,
   derived record-span durations, the `unknowns` list and the `coverage` marker
   are projected under fixed names (`requests_*`, `checks_*`, `*_span_ms`,
-  `pending_observed_ms`, `transport_ms`, `recovery_ms`). Everything else stays
+  `pending_observed_ms`, `transport_ms`, `recovery_ms`). Stage 2 (#270) adds
+  `tokens_reasoning` (closing the existing five-of-six-dimensions gap),
+  `tool_calls`, `model_requests`, the stub members `tools_*`/`dedup_*` and the
+  measured phase durations `setup_ms`/`checks_ms`/`snapshot_hash_ms`/
+  `run_elapsed_ms`. `wait_ms` is deliberately not projected (no stage-2
+  producer). Everything else stays
   `null`; nothing is estimated, and no new names are added to the schema's
   `metrics.required` list (the `transport` precedent).
 - `outcomes` — session-brief status, plan-compliance outcome and drift counts,
@@ -155,8 +160,21 @@ Optional input file passed via `--runner-metrics`. Strict allow-list:
 (`setup_ms`/`checks_ms`/`snapshot_hash_ms`/`wait_ms`/`run_elapsed_ms`/
 `run_record_span_ms`/`workers_span_sum_ms`/`pending_observed_ms`/`transport_ms`/
 `recovery_ms`), `provenance` (`requests_scanned`/`journals_scanned`/
-`runs_scanned`/`qa_results_scanned`/`members_skipped`/`registry_digest`/
-`collector`), `unknowns` (bounded closed enum) and `coverage` (closed enum).
+`runs_scanned`/`qa_results_scanned`/`members_skipped`/`ledger_attempts_scanned`/
+`registry_digest`/`collector`), `unknowns` (bounded closed enum) and `coverage`
+(closed enum). Stage 2 (#270) adds top-level `tool_calls`/`model_requests`
+(intOrNull) and the closed optional+nullable stub blocks `tools`
+(`observed_calls`/`failed_calls`/`elapsed_ms`) and `dedup` (`lookups`/`hits`/
+`misses`/`input_bytes`/`output_bytes`) — contracts for future producers of
+actual tool executions and context reuse; merging these semantics with
+host-reported counters is forbidden, zero-init is forbidden, and in stage 2 the
+collector publishes them with `null` members behind `unknowns` markers
+`tools`/`dedup`. The reason dictionary gains the five causal rerun codes
+(`rerun-inputs-changed`, `rerun-command-changed`, `rerun-environment-changed`,
+`rerun-policy-changed`, `rerun-explicit`) — the same frozen list is duplicated
+in `qa-manifest-record.mjs` (no reverse import) and pinned by a parity test;
+the `coverage` enum gains `delivery_registry+timings` and
+`delivery_registry+qa+timings`.
 Counters are non-negative safe integers or `null`; all objects are closed
 (`additionalProperties: false`). Unknown fields or invalid values reject the
 export with `invalid_runner_metrics`; the file must live inside the project
@@ -181,10 +199,12 @@ input; fix the producer, normalize the identifiers and re-export.
 field is validated but never projected into the public record, and the
 collector's own output is identifier-safe by construction.
 
-The aggregate fields (issue #230, stage 1) are produced by the read-only
-collector documented in `docs/runner-metrics.md`. Two fields deliberately never
-reach the public evaluation record: `checks.dependencies` and
-`provenance.registry_digest` stay in the project-internal metrics file, and
+The aggregate fields (issue #230, stage 1; measured phases, usage and ledger
+input — stage 2 #270) are produced by the read-only
+collector documented in `docs/runner-metrics.md`. Three fields deliberately never
+reach the public evaluation record: `checks.dependencies`,
+`provenance.registry_digest` and `provenance.ledger_attempts_scanned` stay in
+the project-internal metrics file, and
 `phases.run_record_span_ms`/`workers_span_sum_ms`/`pending_observed_ms` are
 record-span observations, not measured compute durations.
 

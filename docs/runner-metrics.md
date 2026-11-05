@@ -1,6 +1,6 @@
 [Back to Documentation](README.md)
 
-# Runner metrics collector (#230, этап 1)
+# Runner metrics collector (#230, этапы 1–2)
 
 Read-only CLI-агрегатор `scripts/runner-metrics-collector.mjs`: собирает per-request
 delivery snapshots (`aifhub.runner_metrics.v1.transport`), execution run-записи и
@@ -106,6 +106,20 @@ metadata-namespace (`<id>/delivery`, `<id>/status.json` любого change), п
 - `phases.transport_ms` и `phases.recovery_ms` — раздельные **не-аддитивные**
   счётчики: recovery включает transport-вызовы, суммирующего поля и «breakdown»
   нет.
+- Этап 2 (#270): измеряемые фазы и usage имеют producers, а скаляры
+  `phases.setup_ms`, `phases.run_elapsed_ms`, `phases.checks_ms`,
+  `phases.snapshot_hash_ms` публикуются как **Σ по покрытым записям** —
+  только когда каждая релевантная запись выборки несёт измерение
+  (частичное покрытие → `null` + маркер, см. ниже). Top-level `tokens`,
+  `tool_calls`, `model_requests` агрегируются из HostClient usage по правилам
+  accounting scope (см. «Usage-агрегация»).
+- Заготовки `tools`/`dedup` публикуются закрытыми блоками с `null`-членами
+  (`tools: {observed_calls, failed_calls, elapsed_ms}`,
+  `dedup: {lookups, hits, misses, input_bytes, output_bytes}`) и маркерами
+  `tools`/`dedup` в `unknowns`: producers у блоков нет, zero-init запрещён.
+  Равенство `tools.observed_calls` с host-reported счётчиками заранее не
+  предполагается; `dedup` — не response identity (`duplicate_responses`
+  остаётся единственным счётчиком повторных ответов).
 
 ## Две дедупликации
 
@@ -148,15 +162,21 @@ race-класс (`scan_inconsistent`); `invalid-*`/`delivery-*` (отказ ва
 
 ## Честность unknown и zero
 
-`0` — измеренный ноль в рамках declared `coverage`; `null` + запись в
-`unknowns[]` — «нет источника». Подмена одного другим запрещена. В v1
-`unknowns` (closed enum) всегда содержит `tokens`, `cost`, `tool_calls`,
-`model_requests`, `unlogged_requests`, `coordinator_accounting`, `billing`,
-`setup_ms`, `checks_ms`, `snapshot_hash_ms`, `wait_ms`, `run_elapsed`;
-`checks` добавляется только когда checks-блок недоступен.
+`0` — измеренный ноль при полном per-record покрытии declared `coverage`;
+`null` + запись в `unknowns[]` — «нет источника» или неполное покрытие.
+Подмена одного другим запрещена. С этапа 2 (#270) маркер снимается **per-record**:
+только когда каждая релевантная запись выбранного скоупа несёт измерение.
+`unknowns` (closed enum) всегда содержит `wait_ms`, `tools`, `dedup`, `cost`,
+`unlogged_requests`, `coordinator_accounting`, `billing`; `checks` добавляется
+только когда checks-блок недоступен. Маркеры `setup_ms`, `checks_ms`,
+`snapshot_hash_ms`, `run_elapsed`, `tokens`, `tool_calls`, `model_requests`
+снимаются при полном покрытии и возвращаются при любом разрыве покрытия.
 
 - Delivery registry ≠ все model requests: `coverage` — closed enum
-  `delivery_registry | delivery_registry+qa`. `create_calls` не переносится в
+  `delivery_registry | delivery_registry+qa | delivery_registry+timings |
+  delivery_registry+qa+timings`; варианты `+timings` добавляют «в выборке
+  наблюдена timing-поверхность (≥1 запись с timings)» — per-record полнота
+  по-прежнему живёт в `unknowns`. `create_calls` не переносится в
   model request counts; transport-счётчики — durable local intent до host-вызова,
   не доказательство remote commit; capabilities/inspect-вызовы в counters не
   входят, поэтому transport — не полный service-call accounting.
@@ -164,17 +184,75 @@ race-класс (`scan_inconsistent`); `invalid-*`/`delivery-*` (отказ ва
   `verified_recoveries ⊂ recovery_attempts` суммируются по UUID независимо;
   `total` из subsets не вычисляется. Из transport не заполняются legacy top-level
   поля `retries`, `latency_ms`, `verified_success`, `cost`, `human_review_ms`.
-- Tokens/cost/tool counts публикуются как `null` только при достоверном
-  источнике; в v1 источника нет — маркер в `unknowns`.
+- Tokens/tool counts/model requests — «что хост сообщил» (usage, этап 2):
+  отсутствует usage хотя бы у одного UUID → агрегат `null` + маркеры;
+  измеренный ноль при полном покрытии публикуется как `0`. `cost`/`billing`/
+  `unlogged_requests`/`coordinator_accounting` остаются unknown — источников нет.
+- Различение «нет источника / незавершённый интервал / измеренный ноль»
+  per-record: поле отсутствует в старой записи → измерения нет (`null` и
+  вклад в разрыв покрытия); тайминг с `complete: false` → интервал незавершён,
+  итог неизвестен; завершённый интервал 0 ms → измеренный ноль.
 - `provenance.registry_digest` — digest канонического образа отсортированного
   union `[{request_uuid, record_digest|null}]` (нечитаемые члены дают `null`).
   Никаких заявлений об экономии: сравнение baseline/candidate — поверхность
   benchmarks, не collector.
 
-## Производные durations: record-span, не compute
+## Usage-агрегация (этап 2)
 
-Измеряемые `setup_ms`, `checks_ms`, `snapshot_hash_ms`, `wait_ms`,
-`run_elapsed_ms` публикуются как `null` с маркерами в `unknowns` до этапа 2.
+HostClient usage персистится в delivery-записи парой sibling-членов
+`usage` + `usage_scope` (см. [host-delivery](host-delivery.md)). Коллектор:
+
+- **overwrite per accounting key** — один UUID даёт один resolved-образ
+  (snapshot-дедуп этапа 1), ретраи и повторные fetch одного UUID не суммируются;
+- **scope** берётся из персистентного `usage_scope`, не вычисляется.
+  `scope: 'request'` — прямые суммы по UUID. `scope: 'response'` — агрегация по
+  distinct response-ключу `(namespace_digest, target.kind,
+  message_id|completion_id)`: копии одного response считаются один раз и
+  обязаны совпадать (расхождение → затронутые агрегаты `null` + маркеры,
+  публикация не падает); записи с usage, но без host id (финал
+  pending/uncertain) не атрибутируются — покрытие недоказуемо;
+- **per-dimension полнота**: размерность (`tokens.input`…`tokens.reasoning`,
+  `tool_calls`, `model_requests`) суммируется только когда все UUID выборки
+  несут usage и значение этой размерности non-null; иначе агрегат размерности
+  `null` и соответствующий маркер остаётся. Частичные размеры не «суммируются
+  с пропусками»; `total` не синтезируется;
+- `members_skipped > 0` → usage-агрегаты консервативно `null` + маркеры
+  (полнота выборки недоказуема); пустой реестр → `null` + маркеры;
+- `usage` без host-вызова не стирается и не обнуляется: стирание сфабриковало
+  бы «хост перестал сообщать» — остаётся последнее наблюдение.
+
+## Производные durations: record-span и измеряемые фазы
+
+С этапа 2 (#270) измеряемые фазы имеют producer-границы и публикуются как Σ по
+полностью покрытому скоупу:
+
+- `phases.setup_ms` — «подготовка admission до publication» по run-записям
+  (`timings.setup`): сегмент `preflight` — fresh preflight до блокировки,
+  сегмент `admission` — от входа в `execute()` до готовности валидированных
+  worktree-образов перед `publish`. Ожидание execution-locks и сама durable
+  publication в интервал не входят; replay/prepared-recovery-путь таймингов не
+  пишет вовсе.
+- `phases.run_elapsed_ms` — measured-elapsed по штампам mutating-команд
+  (`timings.stamps`): `last.at − first.at` per run, Σ по покрытым runs. Это
+  elapsed-конверт, **включающий простои между командами**; никогда не
+  подаётся как compute-сумма. Меньше двух штампов → `null`; перевёрнутая пара
+  (last < first, wall-clock между процессами) → per-record `null` + маркер,
+  без `failed`. Имя `run_wall_ms` запрещено.
+- `phases.checks_ms` — интервал фактического verifier-процесса
+  (`metadata.timings.checks` qa-результатов, только host-observed): старт
+  перед `spawn`, конец на общем settlement-пути (включая timeout/cancelled —
+  «интервал закрыт замером»); pre/post-наблюдения fingerprints, запись
+  receipt/registry и запись qa-record в интервал не входят. Crash после
+  registry-complete восстанавливает тайминг из registry без повторного запуска
+  verifier (`agent-authored`/`imported` записи не измеряются вовсе).
+- `phases.snapshot_hash_ms` — сумма операций `observeQaSnapshot` +
+  `checkFingerprints` записи (`metadata.timings.snapshot_hash`): telemetry
+  живёт вне custody-материала, digest и equality наблюдений не меняются;
+  повторные вызовы — реальные затраты, агрегат = сумма всех вызовов записи.
+- `phases.wait_ms` — **производителя нет** (решение владельца 1B): helper не
+  ждёт, dwell живёт в `pending_observed_ms`. Поле остаётся `null` + маркер;
+  при появлении реального источника поле заполняется будущим синхронным diff.
+
 Разрешены только производные с именами, которые нельзя прочитать как измеренные
 durations:
 
@@ -207,14 +285,31 @@ Checks-блок — **change-scoped**: qa-результаты v1 не несу�
 - `checks.repeated` — число qa-результатов с `supersedes ≠ null`
   (corrective-цепочки).
 - `checks.reasons` — только коды закрытого allow-list: recovery action types
-  delivery-членов, ledger `outcome`, run `recovery.reason`, плюс `unknown`.
-  Ledger `outcome` входит в словарь кодов, но **не сэмплируется** в v1:
-  `fix-attempts.json` не входит в declared inputs (см. design change), поэтому
-  fix-attempt исходы появляются в `reasons` только после включения ledger в
-  источники (follow-up #270). `binding_code` — открытое множество: код вне
-  allow-list публикуется как
-  `unknown`; `binding_code = null` не даёт выборки. Явное наблюдение причины
-  повторной проверки в момент решения — этап 2.
+  delivery-членов, ledger `outcome`, run `recovery.reason`, causal-коды
+  rerun (`rerun-inputs-changed`, `rerun-command-changed`,
+  `rerun-environment-changed`, `rerun-policy-changed`, `rerun-explicit`), плюс
+  `unknown`. **Reasons — счётчики по источникам**: один факт может описываться
+  двумя кодами из разных источников (например `interrupted`-attempt в ledger и
+  `run.recovery.reason`) — дедупа между источниками нет. С этапа 2 (#270)
+  ledger сэмплируется: `fix-attempts.json` — declared input (точечное чтение
+  `.ai-factory/state/<change>/execution/fix-attempts.json`, envelope checksum →
+  `validateLedger`, digest до/после против гонок: расхождение →
+  `scan_inconsistent`; невалидный ledger → `ledger_invalid` + `member_skipped`
+  + degraded без обнуления прочитанных QA counts; absent (legacy) → note
+  `ledger_absent`, сэмплирования нет; I/O отказ → `ledger_unreadable` +
+  degraded; валидный пустой ledger → измеренный пустой набор;
+  `aifhub.fix-attempts.v1` сэмплируется как v2). Каждый attempt — один outcome
+  сэмпл по текущему снапшоту; `--run` фильтрует по `attempt.run_id`;
+  `hypothesis`/`check`/`environment`/`inputs`/paths никогда не покидают
+  project-internal. Явный `metadata.rerun_reason` qa-записи предпочтителен
+  косвенному `binding_code` (одна запись даёт не более одного сэмпла);
+  `binding_code` — код ошибки повторного snapshot/binding и causal-reason'ом
+  не переиспользуется; код вне allow-list публикуется как `unknown`;
+  `binding_code = null` не даёт выборки. Auto-supersede без явной причины —
+  `rerun_reason` не пишется (коллектор покрывает `unknown`).
+  **Честная оговорка**: отдельные scan-окна (delivery → runs → ledger → QA) не
+  доказывают совместный атомарный snapshot ledger/run/delivery; joint bounded
+  envelope — опция дизайна, в этапе 2 не реализуется.
 - `checks.dependencies` — `[{check_id, manifest_digest, wave_id,
   input_fingerprint}]`, ids и digests без путей; больше 64 уникальных checks →
   deterministic truncate до 64 + note `dependencies_truncated`.
@@ -228,11 +323,12 @@ Checks-блок — **change-scoped**: qa-результаты v1 не несу�
 
 `service_calls`/`host_reads`/`host_releases` не входят в `runner_metrics` — это
 граница coordination-dispatch; их агрегирует отдельный follow-up (#266) поверх
-измерителя #230. Этап 2 — follow-up issue
-[#270](https://github.com/ichinya/aifhub-extension/issues/270):
-инструментирование `setup/checks/snapshot-hash/wait` и
-producer-side timestamps, доказанные границы run/worker intervals, tokens/tool
-counts через HostClient-контракт, явное reason-наблюдение повторных checks и
-timestamps в qa-result, блоки `tools`/`dedup` при появлении производителей.
-Issue #230 после этапа 1 не считается полностью выполненным — полнота
-заявляется только относительно этапа 1.
+измерителя #230. Этап 2 (#270) доставлен: producer-side timestamps и
+инструментирование `setup/checks/snapshot-hash` (`wait` — намеренно без
+producer), `run_elapsed_ms` по штампам run-записей, tokens/tool counts через
+HostClient usage-reporting, явное reason-наблюдение повторных checks
+(`metadata.rerun_reason`, first-write frozen) и timestamps в qa-result, ledger
+как declared input, контрактные заготовки `tools`/`dedup` без producers
+(будущие producers — отдельные issues при появлении реальных источников).
+Classic plan-dir QA collection остаётся deferred. Compute-сумма фаз (сумма
+locked-секций) отдельным полем не вводится; `run_wall_ms` запрещён.
