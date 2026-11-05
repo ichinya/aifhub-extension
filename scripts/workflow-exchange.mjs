@@ -139,17 +139,22 @@ const CREDENTIAL_RE = /-----BEGIN [A-Z ]*PRIVATE KEY-----|\b(?:sk-[A-Za-z0-9_-]{
 // samples without provable evidence — nothing outside this list is publishable.
 // The collector imports these constants so the validator stays the single
 // source of truth; the JSON schema carries the same enum (parity-tested).
+// Stage 2 (#270) adds the causal rerun vocabulary that qa-manifest-record
+// duplicates as its frozen producer-side list (no reverse dependency).
 export const RUNNER_METRICS_REASON_CODES = Object.freeze([
   'provide-capabilities', 'read-request', 'wait-request', 'fetch-response',
   'resend-same-request', 'reconcile-host-state', 'resolve-identity-conflict',
   'pending', 'passed', 'failed', 'blocked', 'interrupted',
-  'cancelled', 'timed_out', 'abandoned', 'unknown'
+  'cancelled', 'timed_out', 'abandoned', 'unknown',
+  'rerun-inputs-changed', 'rerun-command-changed', 'rerun-environment-changed',
+  'rerun-policy-changed', 'rerun-explicit'
 ]);
-export const RUNNER_METRICS_COVERAGES = Object.freeze(['delivery_registry', 'delivery_registry+qa']);
+export const RUNNER_METRICS_COVERAGES = Object.freeze(['delivery_registry', 'delivery_registry+qa',
+  'delivery_registry+timings', 'delivery_registry+qa+timings']);
 export const RUNNER_METRICS_UNKNOWNS = Object.freeze([
   'tokens', 'cost', 'tool_calls', 'model_requests', 'unlogged_requests',
   'setup_ms', 'checks_ms', 'snapshot_hash_ms', 'wait_ms', 'run_elapsed',
-  'coordinator_accounting', 'billing', 'checks'
+  'coordinator_accounting', 'billing', 'checks', 'tools', 'dedup'
 ]);
 const MAX_METRIC_REASONS = 32;
 const MAX_METRIC_DEPENDENCIES = 64;
@@ -229,7 +234,7 @@ export function validateRunnerMetrics(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw exchangeError('invalid_runner_metrics');
   if (input.schema !== RUNNER_METRICS_SCHEMA) throw exchangeError('invalid_runner_metrics');
   const allowed = ['schema', 'run_id', 'tokens', 'cost', 'latency_ms', 'model', 'harness', 'retries', 'changed_loc', 'unrelated_changes', 'human_review_ms', 'verified_success', 'transport',
-    'attribution', 'requests', 'checks', 'phases', 'provenance', 'unknowns', 'coverage'];
+    'attribution', 'requests', 'checks', 'phases', 'provenance', 'unknowns', 'coverage', 'tool_calls', 'model_requests', 'tools', 'dedup'];
   if (Object.keys(input).some((key) => !allowed.includes(key))) throw exchangeError('invalid_runner_metrics');
   const safeIdentifier = (value) => { try { identifier(value); return true; } catch { return false; } };
   const label = (value) => value === null || value === undefined || (typeof value === 'string' && value.length <= MAX_LABEL && !/[\x00-\x1f]/.test(value));
@@ -261,8 +266,22 @@ export function validateRunnerMetrics(input) {
       || typeof cost.currency !== 'string' || !/^[A-Z]{3}$/.test(cost.currency)) throw exchangeError('invalid_runner_metrics');
   }
   if (!intOrNull(input.latency_ms)) throw exchangeError('invalid_runner_metrics');
-  for (const key of ['retries', 'changed_loc', 'unrelated_changes', 'human_review_ms']) {
+  for (const key of ['retries', 'changed_loc', 'unrelated_changes', 'human_review_ms', 'tool_calls', 'model_requests']) {
     if (!intOrNull(input[key])) throw exchangeError('invalid_runner_metrics');
+  }
+  // Stage-2 stub blocks (#270, owner decision 3 / shape 2B): closed optional+
+  // nullable contracts for future measurements of actual tool executions
+  // (tools) and context reuse (dedup). Producers come later; merging these
+  // semantics with host-reported counters is forbidden.
+  for (const [key, members] of [
+    ['tools', ['observed_calls', 'failed_calls', 'elapsed_ms']],
+    ['dedup', ['lookups', 'hits', 'misses', 'input_bytes', 'output_bytes']]
+  ]) {
+    const value = input[key];
+    if (value === undefined || value === null) continue;
+    if (typeof value !== 'object' || Array.isArray(value)
+      || Object.keys(value).some((k) => !members.includes(k))
+      || Object.values(value).some((v) => !intOrNull(v))) throw exchangeError('invalid_runner_metrics');
   }
   if (input.verified_success !== undefined && input.verified_success !== null && typeof input.verified_success !== 'boolean') throw exchangeError('invalid_runner_metrics');
   for (const side of ['model', 'harness']) {
@@ -333,9 +352,10 @@ export function validateRunnerMetrics(input) {
       && Object.keys(collector).every((key) => ['id', 'version'].includes(key))
       && Object.values(collector).every(label));
     if (typeof provenance !== 'object' || Array.isArray(provenance)
-      || Object.keys(provenance).some((key) => !['requests_scanned', 'journals_scanned', 'runs_scanned', 'qa_results_scanned', 'members_skipped', 'registry_digest', 'collector'].includes(key))
+      || Object.keys(provenance).some((key) => !['requests_scanned', 'journals_scanned', 'runs_scanned', 'qa_results_scanned', 'members_skipped', 'ledger_attempts_scanned', 'registry_digest', 'collector'].includes(key))
       || !intOrNull(provenance.requests_scanned) || !intOrNull(provenance.journals_scanned) || !intOrNull(provenance.runs_scanned)
       || !intOrNull(provenance.qa_results_scanned) || !intOrNull(provenance.members_skipped)
+      || !intOrNull(provenance.ledger_attempts_scanned)
       || !digestOrNull(provenance.registry_digest) || !collectorValid) throw exchangeError('invalid_runner_metrics');
   }
   if (input.unknowns !== undefined) {
@@ -623,6 +643,17 @@ function buildEvaluationRecord(snapshot, version, now, options) {
     tokens_total: runner?.tokens?.total ?? null,
     tokens_cache_read: runner?.tokens?.cache_read ?? null,
     tokens_cache_write: runner?.tokens?.cache_write ?? null,
+    tokens_reasoning: runner?.tokens?.reasoning ?? null,
+    tool_calls: runner?.tool_calls ?? null,
+    model_requests: runner?.model_requests ?? null,
+    tools_observed_calls: runner?.tools?.observed_calls ?? null,
+    tools_failed_calls: runner?.tools?.failed_calls ?? null,
+    tools_elapsed_ms: runner?.tools?.elapsed_ms ?? null,
+    dedup_lookups: runner?.dedup?.lookups ?? null,
+    dedup_hits: runner?.dedup?.hits ?? null,
+    dedup_misses: runner?.dedup?.misses ?? null,
+    dedup_input_bytes: runner?.dedup?.input_bytes ?? null,
+    dedup_output_bytes: runner?.dedup?.output_bytes ?? null,
     cost: runner?.cost ?? null,
     latency_ms: runner?.latency_ms ?? null,
     retries: runner?.retries ?? null,
@@ -651,6 +682,12 @@ function buildEvaluationRecord(snapshot, version, now, options) {
     pending_observed_ms: runner?.phases?.pending_observed_ms ?? null,
     transport_ms: runner?.phases?.transport_ms ?? null,
     recovery_ms: runner?.phases?.recovery_ms ?? null,
+    // Measured phase durations (#270): wait_ms has no producer in stage 2 and
+    // is deliberately absent from the projection until a real source arrives.
+    setup_ms: runner?.phases?.setup_ms ?? null,
+    checks_ms: runner?.phases?.checks_ms ?? null,
+    snapshot_hash_ms: runner?.phases?.snapshot_hash_ms ?? null,
+    run_elapsed_ms: runner?.phases?.run_elapsed_ms ?? null,
     unknowns: runner?.unknowns ?? null,
     coverage: runner?.coverage ?? null
   };

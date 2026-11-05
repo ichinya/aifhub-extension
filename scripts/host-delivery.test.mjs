@@ -7,6 +7,7 @@ import { createGateResult, renderGateResultBlock } from './aif-gate-result.mjs';
 import { digest } from './workflow-state-store.mjs';
 import { deliveryPaths, deliveryStore, validateDeliveryRequest, DELIVERY_LIMITS } from './host-delivery-store.mjs';
 import { deliveryTransportInput } from './host-delivery.mjs';
+import { validateRunnerMetrics } from './workflow-exchange.mjs';
 import { prepareQaManifest, recordQaResult, publishQaManifest } from './qa-manifest.mjs';
 import { qaStore } from './qa-manifest-store.mjs';
 import { allDeclaredRoots } from './qa-manifest-inputs.mjs';
@@ -290,6 +291,7 @@ test('reserve replay materializes the registry when the journal survived without
     assert.deepEqual(r.runner_metrics.tokens, fullUsage().tokens);
     assert.equal(r.runner_metrics.tool_calls, 3);
     assert.equal(r.runner_metrics.model_requests, 2);
+    assert.equal(validateRunnerMetrics(r.runner_metrics).schema, 'aifhub.runner_metrics.v1', 'snapshot satisfies the metrics contract');
     // Replay persistence: the pair survives reload without any host call.
     const reloaded = await f.s.loadRequest(f.id, uuid);
     assert.deepEqual(reloaded.usage, fullUsage());
@@ -362,5 +364,6 @@ test('reserve replay materializes the registry when the journal survived without
     assert.equal(record.usage.tool_calls, 0);
     assert.equal(record.usage.model_requests, 0);
     assert.equal(r.runner_metrics.tool_calls, 0);
+    assert.equal(validateRunnerMetrics(r.runner_metrics).tool_calls, 0);
   });
 }
