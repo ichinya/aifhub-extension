@@ -32,6 +32,12 @@ node scripts/runner-metrics-collector.mjs --change <id> [--run <run_id>] [--incl
   только через safe provider writer (atomic tmp+rename, идемпотентная перезапись
   без timestamps: повторный прогон на неизменных данных не меняет байты файла).
 
+Вывод collector'а остаётся совместим с identifier-валидацией публичных
+runtime-полей в `exchange evaluation` (#273): эмиттируемый `run_id`
+наследует identifier-гарантию upstream-артефактов, блоков `model`/`harness`
+в выводе нет, `provenance.collector.id` фиксирован (`aifhub-extension`) —
+ужесточение гейта и схемы не влияет на collector и его self-check.
+
 ## Граница невмешательства
 
 Collector не меняет execution/QA/delivery state: только read-примитивы

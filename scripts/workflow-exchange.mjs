@@ -231,10 +231,13 @@ export function validateRunnerMetrics(input) {
   const allowed = ['schema', 'run_id', 'tokens', 'cost', 'latency_ms', 'model', 'harness', 'retries', 'changed_loc', 'unrelated_changes', 'human_review_ms', 'verified_success', 'transport',
     'attribution', 'requests', 'checks', 'phases', 'provenance', 'unknowns', 'coverage'];
   if (Object.keys(input).some((key) => !allowed.includes(key))) throw exchangeError('invalid_runner_metrics');
-  const label = (value) => value === null || value === undefined || (typeof value === 'string' && value.length <= MAX_LABEL && !/[\x00-\x1f]/.test(value));
-  if (!label(input.run_id)) throw exchangeError('invalid_runner_metrics');
-  const intOrNull = (value) => value === null || value === undefined || (Number.isSafeInteger(value) && value >= 0);
   const safeIdentifier = (value) => { try { identifier(value); return true; } catch { return false; } };
+  const label = (value) => value === null || value === undefined || (typeof value === 'string' && value.length <= MAX_LABEL && !/[\x00-\x1f]/.test(value));
+  // Run id and model/harness identities are projected verbatim into the public
+  // runtime record while privacy.contains_paths stays false: a path-like value
+  // must never reach it (issue #273).
+  if (!(input.run_id === null || input.run_id === undefined || safeIdentifier(input.run_id))) throw exchangeError('invalid_runner_metrics');
+  const intOrNull = (value) => value === null || value === undefined || (Number.isSafeInteger(value) && value >= 0);
   const digestOrNull = (value) => value === null || value === undefined || (typeof value === 'string' && HASH.test(value));
   if (input.transport !== undefined && input.transport !== null) {
     const keys = ['create_calls', 'read_calls', 'fetch_calls', 'retry_creates', 'recovery_attempts', 'verified_recoveries',
@@ -266,9 +269,11 @@ export function validateRunnerMetrics(input) {
     const value = input[side];
     if (value === undefined || value === null) continue;
     const allowedFields = side === 'model' ? ['provider', 'id', 'version'] : ['id', 'version'];
+    // These members land in the public runtime record verbatim, so they are
+    // identifiers, not free-form labels (same predicate as attribution below).
     if (typeof value !== 'object' || Array.isArray(value)
       || Object.keys(value).some((key) => !allowedFields.includes(key))
-      || Object.values(value).some((field) => !label(field))) throw exchangeError('invalid_runner_metrics');
+      || Object.values(value).some((field) => !(field === null || field === undefined || safeIdentifier(field)))) throw exchangeError('invalid_runner_metrics');
   }
   if (input.attribution !== undefined && input.attribution !== null) {
     const attribution = input.attribution;

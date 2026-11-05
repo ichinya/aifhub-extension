@@ -694,19 +694,60 @@
             "string",
             "null"
           ],
-          "pattern": "^[^\\u0000-\\u001f]*$"
+          "pattern": "^(?!(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][0-9]|[Ll][Pp][Tt][0-9])(?:[.]|$))(?!.*[.]$)[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$"
         },
         "model": {
           "type": [
             "object",
             "null"
-          ]
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "provider": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^(?!(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][0-9]|[Ll][Pp][Tt][0-9])(?:[.]|$))(?!.*[.]$)[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$"
+            },
+            "id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^(?!(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][0-9]|[Ll][Pp][Tt][0-9])(?:[.]|$))(?!.*[.]$)[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$"
+            },
+            "version": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^(?!(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][0-9]|[Ll][Pp][Tt][0-9])(?:[.]|$))(?!.*[.]$)[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$"
+            }
+          }
         },
         "harness": {
           "type": [
             "object",
             "null"
-          ]
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^(?!(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][0-9]|[Ll][Pp][Tt][0-9])(?:[.]|$))(?!.*[.]$)[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$"
+            },
+            "version": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^(?!(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][0-9]|[Ll][Pp][Tt][0-9])(?:[.]|$))(?!.*[.]$)[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$"
+            }
+          }
         },
         "coordinator": {
           "type": [

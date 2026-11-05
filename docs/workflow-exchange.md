@@ -121,12 +121,23 @@ is mandatory and uses the aifhub#29 vocabulary: `synthetic_fixture`,
 - `runtime` — run id, model, and harness identity from the runner metrics
   file, plus execution attribution (`coordinator`/`worker`/`role`/`run_kind`/
   `runs`/`tasks`) at the same sensitivity level as `run_id` when the file
-  carries an `attribution` block.
+  carries an `attribution` block. Run id and model/harness identities are
+  identifier-validated (the same grammar as `coordinator`/`worker`), so a
+  path-like value can never reach the public record; the export schema
+  enforces the same member constraints on its own (`runtime.run_id`,
+  `runtime.model.*`, `runtime.harness.*`).
 - `privacy` — explicit `false` flags for paths, prompts, source content,
   transcripts, and change ID. `exchange_notes` in this record carry codes
   only — note details may contain project-relative paths and stay internal to
   the bundle. The serialized record is additionally scanned for recognizable
   credential patterns before export.
+
+Compatibility note (issue #273): the schema ID is unchanged, but the
+`runtime.run_id`/`runtime.model`/`runtime.harness` member constraints were
+tightened to the identifier grammar. Records exported under the previous
+contract with path-like values in `runtime.*` fail revalidation against
+`aifhub.evaluation_export.v1` without a diagnostic explanation; there is no
+migrator — normalize the identifiers and re-export.
 
 ### `aifhub.runner_metrics.v1`
 
@@ -150,6 +161,25 @@ Counters are non-negative safe integers or `null`; all objects are closed
 (`additionalProperties: false`). Unknown fields or invalid values reject the
 export with `invalid_runner_metrics`; the file must live inside the project
 root.
+
+The six public runtime fields — `run_id`, `model.provider`, `model.id`,
+`model.version`, `harness.id`, `harness.version` — are identifier-validated
+(the same grammar as the `attribution` identifiers: alphanumeric start,
+`[a-zA-Z0-9._-]` only, at most 80 characters, no trailing dot, no reserved
+device names before a dot). Validation happens before the export snapshot,
+the fingerprint salt and any projection, so an invalid value produces the
+existing `invalid_runner_metrics` failure outcome and never reaches the
+public record. This is a deliberate fail-closed break (issue #273): values
+containing `/`, `\`, `:` or `+` (semver build metadata), a leading dot, a
+reserved device name (`CON.x`), or longer than 80 characters are now
+rejected by both the runtime gate and the schema, which carries the same
+pattern. The most realistic affected class is namespaced identifiers with
+`/` (an org/model id such as `provider/prefixed-model`). There is no
+migrator and none is needed — the metrics are observational, not material
+input; fix the producer, normalize the identifiers and re-export.
+`provenance.collector.*` deliberately keeps the looser label contract: the
+field is validated but never projected into the public record, and the
+collector's own output is identifier-safe by construction.
 
 The aggregate fields (issue #230, stage 1) are produced by the read-only
 collector documented in `docs/runner-metrics.md`. Two fields deliberately never
