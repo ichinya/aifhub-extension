@@ -921,6 +921,61 @@ describe('review custody contracts (round 2)', () => {
     assert.equal(existsSync(path.join(f.rootDir, receiptPath(f))), false);
     assert.equal(f.host.state.counters.verifier_launches, launchCount + 1); // pending resume is a fresh cycle
   });
+  it('an observed run lands exactly on the refs boundary over a full prior record', async () => {
+    // Boundary math, pinned to the adapter's own formula (existingRefsOf): a
+    // prior record with 252 frozen artifacts plus its evidence body and receipt
+    // holds E = 254 stored refs; the fresh run adds nothing materialized (the
+    // report lives in the control namespace) and reserves two refs of its own,
+    // so E + A + 2 === 256 === QA_LIMITS.refs still passes. This also proves the
+    // adapter precheck and the recorder budget agree on the same boundary.
+    const f = await observedFixture();
+    await f.prepare();
+    await recordBulkPrior(f);
+    const refs = await existingRefsOf(f);
+    assert.equal(refs.size, 254);
+    const ingested = await f.ingest(await f.issue(await f.compose()));
+    assert.equal(ingested.ok, true, JSON.stringify(ingested));
+    assert.equal(refs.size + 0 + 2, QA_LIMITS.refs);
+    assert.equal((await f.records()).length, 2);
+    assert.equal(existsSync(path.join(f.rootDir, receiptPath(f))), true);
+  });
+  it('one artifact beyond the refs boundary refuses and resumes after freeing refs', async () => {
+    // Same prior record (E = 254) plus one attested artifact outside the
+    // control namespace: E + A + 2 === 257 refuses typed before any custody
+    // write, and a budget resume of the same pending intent only succeeds once
+    // the overflow cause is actually removed — here by dropping the prior
+    // result file, a test-only simulation of freed refs (no supported user
+    // procedure frees refs today). The resume is a fresh cycle, not a replay:
+    // the verifier relaunches before the budget is re-checked.
+    const f = await observedFixture();
+    const extraRel = `${f.qa}/attest/extra.txt`;
+    f.model.files[extraRel] = bytes('boundary-extra');
+    await mkdir(path.join(f.rootDir, f.qa, 'attest'), { recursive: true });
+    await writeFile(path.join(f.rootDir, extraRel), 'boundary-extra'); // attested bytes exist before prepare
+    await f.prepare();
+    await recordBulkPrior(f);
+    const refs = await existingRefsOf(f);
+    assert.equal(refs.size, 254);
+    const envelope = await f.issue(await f.compose());
+    const declared = { ...envelope, artifacts: { ...envelope.artifacts, [extraRel]: digest('boundary-extra') } };
+    const result = await f.ingest(declared);
+    assert.equal(result.ok, false);
+    assert.equal(result.code, 'qa-refs-limit');
+    assert.equal(refs.size + 1 + 2, QA_LIMITS.refs + 1);
+    assert.equal((await pendingIntent(f)).state, 'pending');
+    assert.equal(await f.registry.lookup('run-1'), null);
+    assert.equal(existsSync(path.join(f.rootDir, receiptPath(f))), false);
+    assert.equal(existsSync(path.join(f.rootDir, f.qa, 'results', `observed-${digest('run-1').slice(0, 16)}.json`)), false);
+    assert.equal(existsSync(path.join(f.rootDir, lockPath(f))), false);
+    // Free exactly the overflow amount: the prior record leaves the refs set.
+    const launches = f.host.state.counters.verifier_launches; // includes the refused attempt's own relaunch
+    await rm(path.join(f.rootDir, f.qa, 'results', 'bulk-1.json'));
+    const resumed = await f.ingest(declared);
+    assert.equal(resumed.ok, true, JSON.stringify(resumed));
+    assert.equal(resumed.replayed, false); // pending resume runs the verifier again
+    assert.equal(f.host.state.counters.verifier_launches, launches + 1);
+    assert.equal((await f.records()).length, 1); // bulk prior removed, the observed record installed
+  });
   it('record-only resume refuses a run attested against a replaced manifest wave', async () => {
     const f = await observedFixture();
     await f.prepare();
