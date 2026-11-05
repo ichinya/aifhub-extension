@@ -12,6 +12,7 @@ import { promisify } from 'node:util';
 
 import { canonical, digest } from './workflow-state-store.mjs';
 import {
+  QA_ROOT,
   READABILITY_SCHEMA,
   STALE_REPORT_STATE,
   buildByteOffsets,
@@ -605,6 +606,110 @@ describe('AC7: QA isolation and writer guards', () => {
     const leafRun = await runCli(leafRoot, ['--change', 'work', '--file', 'docs/guide.md', '--write']);
     assert.equal(leafRun.exitCode, 1);
     assert.ok(leafRun.stdout.includes('report-leaf-conflict'));
+  });
+
+  it('fail-closed refuses an output equal to a selected input, the glossary, or the configured QA root', async () => {
+    const inputRoot = await makeTemp('aif-read-coll-in-');
+    await seedProject(inputRoot, {
+      files: { '.ai-factory/state/work/readability/report.json': '# self-referential input\n' },
+    });
+    const inputRun = await runCli(inputRoot, ['--change', 'work', '--file', '.ai-factory/state/work/readability/report.json', '--write']);
+    assert.equal(inputRun.exitCode, 1);
+    assert.ok(inputRun.stdout.includes('report-source-collision'));
+
+    const glossaryRoot = await makeTemp('aif-read-coll-gl-');
+    await seedProject(glossaryRoot, {
+      files: {
+        'docs/guide.md': await fixtureBuffer('clean-ru.md'),
+        '.ai-factory/state/work/readability/report.json': 'Термин — определение\n',
+      },
+      config: 'aifhub:\n  readability:\n    enabled: true\npaths:\n  context: .ai-factory/state/work/readability/report.json\n',
+    });
+    const glossaryRun = await runCli(glossaryRoot, ['--change', 'work', '--file', 'docs/guide.md', '--write']);
+    assert.equal(glossaryRun.exitCode, 1);
+    assert.ok(glossaryRun.stdout.includes('report-source-collision'));
+
+    const qaRoot = await makeTemp('aif-read-coll-qa-');
+    await seedProject(qaRoot, {
+      files: { 'docs/guide.md': await fixtureBuffer('clean-ru.md') },
+      config: 'aifhub:\n  readability:\n    enabled: true\npaths:\n  qa: .ai-factory/state/work/readability/report.json\n',
+    });
+    const qaRun = await runCli(qaRoot, ['--change', 'work', '--file', 'docs/guide.md', '--write']);
+    assert.equal(qaRun.exitCode, 1);
+    assert.ok(qaRun.stdout.includes('qa-namespace-conflict'));
+
+    const qaAliasFileRoot = await makeTemp('aif-read-coll-qaaf-');
+    await seedProject(qaAliasFileRoot, {
+      files: { 'docs/guide.md': await fixtureBuffer('clean-ru.md') },
+      config: 'aifhub:\n  readability:\n    enabled: true\npaths:\n  qa: ./.ai-factory/state/work/readability/report.json\n',
+    });
+    const qaAliasFileRun = await runCli(qaAliasFileRoot, ['--change', 'work', '--file', 'docs/guide.md', '--write']);
+    assert.equal(qaAliasFileRun.exitCode, 1);
+    assert.ok(qaAliasFileRun.stdout.includes('qa-namespace-conflict'));
+
+    const qaAliasDirRoot = await makeTemp('aif-read-coll-qaad-');
+    await seedProject(qaAliasDirRoot, {
+      files: { 'docs/guide.md': await fixtureBuffer('clean-ru.md') },
+      config: 'aifhub:\n  readability:\n    enabled: true\npaths:\n  qa: ./.ai-factory/state/work/readability\n',
+    });
+    const qaAliasDirRun = await runCli(qaAliasDirRoot, ['--change', 'work', '--file', 'docs/guide.md', '--write']);
+    assert.equal(qaAliasDirRun.exitCode, 1);
+    assert.ok(qaAliasDirRun.stdout.includes('qa-namespace-conflict'));
+
+    const qaUnsafeRoot = await makeTemp('aif-read-coll-qau-');
+    await seedProject(qaUnsafeRoot, {
+      files: { 'docs/guide.md': await fixtureBuffer('clean-ru.md') },
+      config: 'aifhub:\n  readability:\n    enabled: true\npaths:\n  qa: ../outside/qa\n',
+    });
+    const qaUnsafeRun = await runCli(qaUnsafeRoot, ['--change', 'work', '--file', 'docs/guide.md', '--write']);
+    assert.equal(qaUnsafeRun.exitCode, 1);
+    assert.ok(qaUnsafeRun.stdout.includes('qa-root-unsafe'));
+  });
+
+  it('treats present-but-unsafe configured qa/state roots as fail-closed, never as silent defaults', async () => {
+    // A lossy normalization must not turn `paths.qa: /` or a drive-relative
+    // value into the safe default: the raw value stays distinguishable from
+    // an absent key and the writer refuses.
+    const slashRoot = await makeTemp('aif-read-uns-slash-');
+    await seedProject(slashRoot, {
+      files: { 'docs/guide.md': await fixtureBuffer('clean-ru.md') },
+      config: 'aifhub:\n  readability:\n    enabled: true\npaths:\n  qa: /\n',
+    });
+    const slashConfig = await readReadabilityConfig(slashRoot);
+    assert.equal(slashConfig.qaRootRaw, '/', 'raw qa value survives lossy normalization');
+    assert.equal(slashConfig.qaRoot, QA_ROOT, 'normalized form keeps the default until the writer decides');
+    const slashRun = await runCli(slashRoot, ['--change', 'work', '--file', 'docs/guide.md', '--write']);
+    assert.equal(slashRun.exitCode, 1);
+    assert.ok(slashRun.stdout.includes('qa-root-unsafe'));
+
+    const driveSlashRoot = await makeTemp('aif-read-uns-drive-');
+    await seedProject(driveSlashRoot, {
+      files: { 'docs/guide.md': await fixtureBuffer('clean-ru.md') },
+      config: 'aifhub:\n  readability:\n    enabled: true\npaths:\n  qa: D:/\n',
+    });
+    const driveSlashRun = await runCli(driveSlashRoot, ['--change', 'work', '--file', 'docs/guide.md', '--write']);
+    assert.equal(driveSlashRun.exitCode, 1);
+    assert.ok(driveSlashRun.stdout.includes('qa-root-unsafe'));
+
+    const driveRelativeRoot = await makeTemp('aif-read-uns-drel-');
+    await seedProject(driveRelativeRoot, {
+      files: { 'docs/guide.md': await fixtureBuffer('clean-ru.md') },
+      config: 'aifhub:\n  readability:\n    enabled: true\npaths:\n  qa: D:.ai-factory/state/work/readability\n',
+    });
+    const driveRelativeRun = await runCli(driveRelativeRoot, ['--change', 'work', '--file', 'docs/guide.md', '--write']);
+    assert.equal(driveRelativeRun.exitCode, 1);
+    assert.ok(driveRelativeRun.stdout.includes('qa-root-unsafe'));
+
+    const stateSlashRoot = await makeTemp('aif-read-uns-state-');
+    await seedProject(stateSlashRoot, {
+      files: { 'docs/guide.md': await fixtureBuffer('clean-ru.md') },
+      config: 'aifhub:\n  readability:\n    enabled: true\npaths:\n  state: /\n',
+    });
+    const stateConfig = await readReadabilityConfig(stateSlashRoot);
+    assert.equal(stateConfig.stateRootRaw, '/', 'raw state value survives lossy normalization');
+    const stateRun = await runCli(stateSlashRoot, ['--change', 'work', '--file', 'docs/guide.md', '--write']);
+    assert.equal(stateRun.exitCode, 1);
+    assert.ok(stateRun.stdout.includes('state-root-mismatch'));
   });
 
   it('git guard fails closed on not-ignored and tracked destinations', async () => {
