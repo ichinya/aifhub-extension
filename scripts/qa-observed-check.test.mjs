@@ -79,6 +79,32 @@ async function observedFixture({ mode = 'pass', requiresObserved = true, ignored
 const realReport = (f, run = f.runId) => path.join(f.rootDir, f.qa, 'artifacts/observations/reports', `${run}.json`);
 const recordPath = (f, run = f.runId) => `${f.qa}/artifacts/observations/${run}.json`;
 const receiptPath = (f, run = f.runId) => `${f.qa}/artifacts/observations/receipts/${run}.json`;
+const lockPath = f => `${f.qa}/artifacts/observations/observations.lock`;
+// The adapter's boundary formula (qa-observed-check.mjs): the set of unique
+// stored refs of all prior results — evidence body, frozen artifacts, receipt —
+// plus this run's materialized artifacts and the two reserved refs of the new
+// record must stay within QA_LIMITS.refs. Recomputing it here pins the boundary
+// numbers to the same source of truth the adapter uses.
+const existingRefsOf = async f => new Set((await f.records()).flatMap(record => [record.evidence.path,
+  ...Object.values(record.artifacts).map(ref => ref.path),
+  ...(record.execution.receipt ? [record.execution.receipt.path] : [])]));
+// Prior bulk record for the observed check: `count` recorder-frozen artifacts
+// (values are written by the recorder itself), a pre-created receipt file and
+// the gate evidence body make every stored path a unique existing ref.
+async function recordBulkPrior(f, { resultId = 'bulk-1', count = 252 } = {}) {
+  const artifacts = {};
+  for (let i = 0; i < count; i++) artifacts[`${f.qa}/${resultId}/a-${i}.txt`] = `bulk-${resultId}-${i}`;
+  const receiptRel = `${f.qa}/${resultId}/receipt.json`;
+  await mkdir(path.join(f.rootDir, f.qa, resultId), { recursive: true });
+  await writeFile(path.join(f.rootDir, receiptRel), `${resultId} receipt bytes`);
+  const recorded = await recordQaResult({ ...f.options, gate: 'verify', resultId,
+    markdown: gateBody(), artifacts, receiptPath: receiptRel, execution: { kind: 'imported', exit_code: 0 } });
+  assert.equal(recorded.ok, true, JSON.stringify(recorded));
+  return recorded;
+}
+async function pendingIntent(f) {
+  return JSON.parse(await readFile(path.join(f.rootDir, recordPath(f)))).record;
+}
 
 async function recordedResult(f, resultId) {
   const record = (await f.records()).find(r => r.id === resultId);
@@ -784,6 +810,13 @@ describe('review custody contracts (round 2)', () => {
     assert.equal(result.ok, false);
     assert.equal(result.code, 'observation-stop-unsupported');
     assert.equal(await f.registry.lookup('run-1'), null);
+    // Fail-closed custody: the lock is released through the store's finally
+    // block, nothing accepted was written, and the pending intent stays
+    // resumable on disk for an exact replay of the same payload.
+    assert.equal(existsSync(path.join(f.rootDir, lockPath(f))), false);
+    assert.equal(existsSync(path.join(f.rootDir, receiptPath(f))), false);
+    assert.equal((await f.records()).length, 0);
+    assert.equal((await pendingIntent(f)).state, 'pending');
   });
   it('a failing stop is normalized and a killed transport gets a bounded grace window', async () => {
     const f = await observedFixture({ mode: 'hang' });
@@ -793,11 +826,63 @@ describe('review custody contracts (round 2)', () => {
       execFile: () => ({ kill() { throw new Error('no'); } }) });
     assert.equal(failing.ok, false);
     assert.equal(failing.code, 'observation-exec-failed');
+    assert.equal(existsSync(path.join(f.rootDir, lockPath(f))), false);
+    assert.equal(existsSync(path.join(f.rootDir, receiptPath(f))), false);
+    assert.equal((await f.records()).length, 0);
+    assert.equal((await pendingIntent(f)).state, 'pending');
     const grace = await f.ingest(await f.issue(await f.compose()), {
       execFile: () => ({ kill() { /* stop ok, but no callback ever fires */ } }) });
     assert.equal(grace.ok, false);
     assert.equal(grace.code, 'observation-exec-failed');
     assert.equal(await f.registry.lookup('run-1'), null);
+    assert.equal(existsSync(path.join(f.rootDir, lockPath(f))), false);
+    assert.equal(existsSync(path.join(f.rootDir, receiptPath(f))), false);
+    assert.equal((await f.records()).length, 0);
+    assert.equal((await pendingIntent(f)).state, 'pending');
+  });
+  it('every fail-closed stop releases the observations lock and keeps the intent resumable', async () => {
+    // One fixture, three sequential fail-closed ingests over the same pending
+    // intent: each attempt re-captures the cooperative lock and releases it
+    // again through the store's finally block, so a stale lock can only remain
+    // after a process death — never after a live, in-process fail-closed stop.
+    const f = await observedFixture({ mode: 'hang' });
+    f.options.timeoutMs = 200;
+    await f.prepare();
+    const cases = [
+      // Deadline fires, kill succeeds, the callback never answers: the grace
+      // window (another timeoutMs) expires before the typed rejection.
+      { execFile: () => ({ kill() { /* stop ok, no callback ever */ } }), code: 'observation-exec-failed' },
+      // No stop mechanism at all: typed refusal right at the deadline.
+      { execFile: () => ({ /* no kill, no callback ever */ }), code: 'observation-stop-unsupported' },
+      // A throwing kill is normalized instead of leaking the transport error.
+      { execFile: () => ({ kill() { throw new Error('no'); } }), code: 'observation-exec-failed' },
+    ];
+    for (const expected of cases) {
+      const result = await f.ingest(await f.issue(await f.compose()), { execFile: expected.execFile });
+      assert.equal(result.ok, false, expected.code);
+      assert.equal(result.code, expected.code);
+      assert.equal(existsSync(path.join(f.rootDir, lockPath(f))), false);
+      assert.equal((await f.records()).length, 0);
+      // The pending intent survives every fail-closed attempt: it was written
+      // before the launch and is only replaced by a complete record.
+      assert.equal((await pendingIntent(f)).state, 'pending');
+    }
+    assert.equal(await f.registry.lookup('run-1'), null);
+    assert.equal(f.host.state.counters.verifier_launches, 0); // overridden transports never spawn
+  });
+  it('an orphan observations.lock refuses state-locked without touching the file', async () => {
+    const f = await observedFixture();
+    await f.prepare();
+    await mkdir(path.join(f.rootDir, f.qa, 'artifacts/observations'), { recursive: true });
+    const orphan = bytes('test-owned orphan');
+    await writeFile(path.join(f.rootDir, lockPath(f)), orphan);
+    const result = await f.ingest(await f.issue(await f.compose()));
+    assert.equal(result.ok, false);
+    assert.equal(result.code, 'state-locked'); // EEXIST on the wx capture fails closed
+    assert.deepEqual(await readFile(path.join(f.rootDir, lockPath(f))), orphan);
+    assert.equal(f.host.state.counters.verifier_launches, 0);
+    // The lock is captured before any custody write: no intent record exists.
+    assert.equal(existsSync(path.join(f.rootDir, recordPath(f))), false);
   });
   it('a reference budget overflow refuses before any custody write', async () => {
     const f = await observedFixture();
@@ -817,6 +902,79 @@ describe('review custody contracts (round 2)', () => {
     assert.equal(result.code, 'qa-refs-limit');
     assert.equal(await f.registry.lookup('run-1'), null);
     assert.equal(existsSync(path.join(f.rootDir, receiptPath(f))), false);
+    // The pending intent was written before the budget check: after the refusal
+    // it stays on disk, bound to exactly this payload, hidden from lookup, and
+    // the lock is already released.
+    const intent = await pendingIntent(f);
+    assert.equal(intent.state, 'pending');
+    assert.equal(intent.payload_digest, digest(declared));
+    assert.equal(existsSync(path.join(f.rootDir, lockPath(f))), false);
+    // The same payload refuses again and cannot be shrunk under the same
+    // run_id (that would change payload_digest into observation-conflict):
+    // the intent stays byte-identical and resumable for exactly this catalog.
+    const intentBefore = await readFile(path.join(f.rootDir, recordPath(f)));
+    const launchCount = f.host.state.counters.verifier_launches;
+    const retry = await f.ingest(declared);
+    assert.equal(retry.ok, false);
+    assert.equal(retry.code, 'qa-refs-limit');
+    assert.deepEqual(await readFile(path.join(f.rootDir, recordPath(f))), intentBefore);
+    assert.equal(existsSync(path.join(f.rootDir, receiptPath(f))), false);
+    assert.equal(f.host.state.counters.verifier_launches, launchCount + 1); // pending resume is a fresh cycle
+  });
+  it('an observed run lands exactly on the refs boundary over a full prior record', async () => {
+    // Boundary math, pinned to the adapter's own formula (existingRefsOf): a
+    // prior record with 252 frozen artifacts plus its evidence body and receipt
+    // holds E = 254 stored refs; the fresh run adds nothing materialized (the
+    // report lives in the control namespace) and reserves two refs of its own,
+    // so E + A + 2 === 256 === QA_LIMITS.refs still passes. This also proves the
+    // adapter precheck and the recorder budget agree on the same boundary.
+    const f = await observedFixture();
+    await f.prepare();
+    await recordBulkPrior(f);
+    const refs = await existingRefsOf(f);
+    assert.equal(refs.size, 254);
+    const ingested = await f.ingest(await f.issue(await f.compose()));
+    assert.equal(ingested.ok, true, JSON.stringify(ingested));
+    assert.equal(refs.size + 0 + 2, QA_LIMITS.refs);
+    assert.equal((await f.records()).length, 2);
+    assert.equal(existsSync(path.join(f.rootDir, receiptPath(f))), true);
+  });
+  it('one artifact beyond the refs boundary refuses and resumes after freeing refs', async () => {
+    // Same prior record (E = 254) plus one attested artifact outside the
+    // control namespace: E + A + 2 === 257 refuses typed before any custody
+    // write, and a budget resume of the same pending intent only succeeds once
+    // the overflow cause is actually removed — here by dropping the prior
+    // result file, a test-only simulation of freed refs (no supported user
+    // procedure frees refs today). The resume is a fresh cycle, not a replay:
+    // the verifier relaunches before the budget is re-checked.
+    const f = await observedFixture();
+    const extraRel = `${f.qa}/attest/extra.txt`;
+    f.model.files[extraRel] = bytes('boundary-extra');
+    await mkdir(path.join(f.rootDir, f.qa, 'attest'), { recursive: true });
+    await writeFile(path.join(f.rootDir, extraRel), 'boundary-extra'); // attested bytes exist before prepare
+    await f.prepare();
+    await recordBulkPrior(f);
+    const refs = await existingRefsOf(f);
+    assert.equal(refs.size, 254);
+    const envelope = await f.issue(await f.compose());
+    const declared = { ...envelope, artifacts: { ...envelope.artifacts, [extraRel]: digest('boundary-extra') } };
+    const result = await f.ingest(declared);
+    assert.equal(result.ok, false);
+    assert.equal(result.code, 'qa-refs-limit');
+    assert.equal(refs.size + 1 + 2, QA_LIMITS.refs + 1);
+    assert.equal((await pendingIntent(f)).state, 'pending');
+    assert.equal(await f.registry.lookup('run-1'), null);
+    assert.equal(existsSync(path.join(f.rootDir, receiptPath(f))), false);
+    assert.equal(existsSync(path.join(f.rootDir, f.qa, 'results', `observed-${digest('run-1').slice(0, 16)}.json`)), false);
+    assert.equal(existsSync(path.join(f.rootDir, lockPath(f))), false);
+    // Free exactly the overflow amount: the prior record leaves the refs set.
+    const launches = f.host.state.counters.verifier_launches; // includes the refused attempt's own relaunch
+    await rm(path.join(f.rootDir, f.qa, 'results', 'bulk-1.json'));
+    const resumed = await f.ingest(declared);
+    assert.equal(resumed.ok, true, JSON.stringify(resumed));
+    assert.equal(resumed.replayed, false); // pending resume runs the verifier again
+    assert.equal(f.host.state.counters.verifier_launches, launches + 1);
+    assert.equal((await f.records()).length, 1); // bulk prior removed, the observed record installed
   });
   it('record-only resume refuses a run attested against a replaced manifest wave', async () => {
     const f = await observedFixture();
@@ -831,6 +989,54 @@ describe('review custody contracts (round 2)', () => {
     assert.equal(resumed.ok, false);
     assert.equal(resumed.code, 'observation-stale-gates');
     assert.equal(existsSync(resultFile), false);
+  });
+  it('record-only resume hands the refs budget to the recorder and keeps the registry intact', async () => {
+    // The record-only branch runs no adapter-level refs precheck: the budget is
+    // enforced by the recorder, before any of its writes, so a refusal there
+    // leaves the complete registry record untouched and the run resumable.
+    // Filler math: refs(run-1) = body + receipt = 2 (report stays in the control
+    // namespace); the filler holds 253 artifacts + body + receipt = 255; the
+    // rejected re-record would add run-1's two refs on top: 257 > QA_LIMITS.refs.
+    // Dropping result files is a test-only simulation of freed refs — there is
+    // no supported user procedure for it, and none is documented as one.
+    const f = await observedFixture();
+    await f.prepare();
+    const envelope = await f.issue(await f.compose());
+    const ingested = await f.ingest(envelope);
+    assert.equal(ingested.ok, true);
+    const resultFile = path.join(f.rootDir, f.qa, 'results', `${ingested.result_id}.json`);
+    const resultBefore = await readFile(resultFile);
+    const receiptBefore = await readFile(path.join(f.rootDir, receiptPath(f)));
+    await rm(resultFile); // crash window: registry-complete exists, the record does not
+    await recordBulkPrior(f, { resultId: 'bulk-2', count: QA_LIMITS.refs - 3 }); // 255 own refs
+    assert.equal((await existingRefsOf(f)).size, QA_LIMITS.refs - 1);
+    const registryBefore = await readFile(path.join(f.rootDir, recordPath(f)));
+    const fillerBefore = await readFile(path.join(f.rootDir, f.qa, 'results', 'bulk-2.json'));
+    const launches = f.host.state.counters.verifier_launches;
+    const blocked = await f.ingest(envelope); // exact replay of the original envelope
+    assert.equal(blocked.ok, false);
+    assert.equal(blocked.code, 'qa-refs-limit');
+    assert.deepEqual(await readFile(path.join(f.rootDir, recordPath(f))), registryBefore);
+    assert.equal(JSON.parse(registryBefore.toString()).record.state, 'complete');
+    assert.notEqual(await f.registry.lookup('run-1'), null);
+    assert.equal(existsSync(resultFile), false);
+    assert.equal(existsSync(path.join(f.rootDir, lockPath(f))), false);
+    assert.deepEqual(await readFile(path.join(f.rootDir, receiptPath(f))), receiptBefore);
+    assert.deepEqual(await readFile(path.join(f.rootDir, f.qa, 'results', 'bulk-2.json')), fillerBefore);
+    assert.equal(f.host.state.counters.verifier_launches, launches); // record-only never relaunches
+    // Freeing the filler refs makes the same envelope complete through the
+    // record-only branch: idempotent re-recording of canonically equal content.
+    await rm(path.join(f.rootDir, f.qa, 'results', 'bulk-2.json'));
+    const resumed = await f.ingest(envelope);
+    assert.equal(resumed.ok, true, JSON.stringify(resumed));
+    assert.equal(resumed.replayed, true);
+    assert.equal(resumed.recorded, true);
+    assert.equal(existsSync(resultFile), true);
+    assert.deepEqual(await readFile(resultFile), resultBefore); // no auto-supersede divergence
+    const finalReplay = await f.ingest(envelope);
+    assert.equal(finalReplay.ok, true);
+    assert.equal(finalReplay.replayed, true);
+    assert.equal(finalReplay.recorded, false); // complete + stored: exact replay is a no-op
   });
   it('a slow verifier completes under the bounded default deadline', async () => {
     const f = await observedFixture({ mode: 'slow', omitTimeout: true });
