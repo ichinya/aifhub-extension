@@ -106,6 +106,12 @@ export async function readReadabilityConfig(rootDir, options = {}) {
     stateRoot: STATE_ROOT,
     qaRoot: QA_ROOT,
     contextPath: DEFAULT_CONTEXT_PATH,
+    // Raw `paths.*` values preserved before lossy normalization: the writer
+    // must distinguish an absent key (safe default) from a present-but-
+    // unsafe value (fail-closed), so `paths.qa: /` never silently becomes
+    // the default QA root.
+    stateRootRaw: undefined,
+    qaRootRaw: undefined,
   };
   let bytes = null;
   try {
@@ -132,9 +138,13 @@ export async function readReadabilityConfig(rootDir, options = {}) {
       diagnostics.push({ code: 'config-malformed', path: '.ai-factory/config.yaml', detail: 'aifhub.readability.enabled is not a boolean' });
     }
   }
-  const stateRoot = normalizeConfigPath(parsed?.paths?.state);
+  const rawState = parsed?.paths?.state;
+  if (rawState !== undefined) config.stateRootRaw = rawState;
+  const stateRoot = normalizeConfigPath(rawState);
   if (stateRoot !== null) config.stateRoot = stateRoot;
-  const qaRoot = normalizeConfigPath(parsed?.paths?.qa);
+  const rawQa = parsed?.paths?.qa;
+  if (rawQa !== undefined) config.qaRootRaw = rawQa;
+  const qaRoot = normalizeConfigPath(rawQa);
   if (qaRoot !== null) config.qaRoot = qaRoot;
   const contextPath = normalizeConfigPath(parsed?.paths?.context);
   if (contextPath !== null) config.contextPath = contextPath;
@@ -145,6 +155,19 @@ function normalizeConfigPath(value) {
   if (typeof value !== 'string' || !value) return null;
   const normalized = value.replaceAll('\\', '/').replace(/^['"]|['"]$/g, '').replace(/\/+$/, '');
   return normalized || null;
+}
+
+// Canonical project-relative form for guard comparisons: resolves `./` and
+// interior dot segments so equivalent spellings cannot bypass namespace
+// guards. Returns null for absolute, drive-relative, or escaping values —
+// guards fail closed instead of silently substituting a default.
+function canonicalizeConfigRoot(value) {
+  const normalized = normalizeConfigPath(value);
+  if (!normalized) return null;
+  if (/^[A-Za-z]:/.test(normalized) || normalized.startsWith('/')) return null;
+  const canonical = path.posix.normalize(normalized);
+  if (!canonical || canonical === '.' || canonical === '..' || canonical.startsWith('../')) return null;
+  return canonical;
 }
 
 // Nested-key subset parser: indentation stack, comments stripped, boolean and
@@ -1314,10 +1337,25 @@ function withinCi(prefix, value) {
 export async function writeReadabilityReport(rootDir, report, config, options = {}) {
   const normalized = normalizeChangeId(report.change_id);
   if (!normalized.ok) return { ok: false, code: 'invalid-change-id' };
-  const stateRoot = normalizeConfigPath(config.stateRoot);
+  const rawState = config.stateRootRaw;
+  const stateRoot = normalizeConfigPath(rawState === undefined ? config.stateRoot : rawState);
+  if (stateRoot === null) return { ok: false, code: 'state-root-mismatch', detail: String(rawState) };
   if (stateRoot !== STATE_ROOT) return { ok: false, code: 'state-root-mismatch', detail: stateRoot };
   const relative = `${STATE_ROOT}/${normalized.changeId}/readability/report.json`;
-  if (withinCi(`${config.qaRoot ?? QA_ROOT}/`, relative)) return { ok: false, code: 'qa-namespace-conflict', detail: relative };
+  const rawQa = config.qaRootRaw;
+  const qaRoot = canonicalizeConfigRoot(rawQa === undefined ? QA_ROOT : rawQa);
+  if (qaRoot === null) return { ok: false, code: 'qa-root-unsafe', detail: String(rawQa ?? QA_ROOT) };
+  if (withinCi(`${qaRoot}/`, relative) || relative.toLowerCase() === qaRoot.toLowerCase()) {
+    return { ok: false, code: 'qa-namespace-conflict', detail: relative };
+  }
+  // Read-only sources: the report destination must never equal a selected
+  // input document or the glossary — the writer would overwrite exactly the
+  // material the report claims to describe without changes.
+  const outputLower = relative.toLowerCase();
+  const sourceCollision = [...(report.inputs ?? []).map((entry) => entry?.path), report.glossary?.path]
+    .find((candidate) => typeof candidate === 'string' && candidate.length > 0
+      && normalizeConfigPath(candidate)?.toLowerCase() === outputLower);
+  if (sourceCollision) return { ok: false, code: 'report-source-collision', detail: sourceCollision };
   const root = await realpath(options.rootDir ?? rootDir);
   const parts = relative.split('/');
   for (let index = 1; index < parts.length; index += 1) {
