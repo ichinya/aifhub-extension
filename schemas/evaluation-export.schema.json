@@ -537,7 +537,12 @@
                   "cancelled",
                   "timed_out",
                   "abandoned",
-                  "unknown"
+                  "unknown",
+                  "rerun-inputs-changed",
+                  "rerun-command-changed",
+                  "rerun-environment-changed",
+                  "rerun-policy-changed",
+                  "rerun-explicit"
                 ]
               },
               "count": {

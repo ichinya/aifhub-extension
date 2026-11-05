@@ -14,6 +14,7 @@ import { canonical, digest } from './workflow-state-store.mjs';
 import { deliveryPaths, deliveryStore } from './host-delivery-store.mjs';
 import { history } from './execution-transactions.mjs';
 import { classifyMemberError, collectRunnerMetrics, projectChecks, runCollectorCommand } from './runner-metrics-collector.mjs';
+import { RUNNER_METRICS_COVERAGES, RUNNER_METRICS_KEYS, RUNNER_METRICS_PHASE_KEYS, RUNNER_METRICS_REASON_CODES, RUNNER_METRICS_UNKNOWNS, validateRunnerMetrics } from './workflow-exchange.mjs';
 import { validateJsonAgainstSchema } from './json-schema-subset.mjs';
 import { exportEvaluation } from './workflow-exchange.mjs';
 import { qaStore } from './qa-manifest-store.mjs';
@@ -1072,4 +1073,440 @@ test('invalid argv fails closed with exit 2 and no output file', async (t) => {
   assert.equal(exit, 2);
   const state = await inventory(f.root, '.ai-factory/state');
   assert.equal(Object.keys(state).some((name) => name.includes('runner-metrics')), false);
+});
+
+// ---- Stage-2 matrix (#270, contract §3) -----------------------------------
+
+// Timing-surface mutation helper for runReader injection: the fixture's real
+// admitted record provides the valid base, the override changes only timings.
+const loadRealRun = async (f, filename) => {
+  const store = await (await import('./workflow-state-store.mjs')).storeFor(f.root);
+  return JSON.parse((await store.textFile(filename)).toString()).record;
+};
+function withTimings(run, { setup, stamps } = {}) {
+  const copy = structuredClone(run);
+  copy.timings = { ...(setup ? { setup } : {}), ...(stamps ? { stamps } : {}) };
+  return copy;
+}
+// Union of delivery request UUIDs currently registered for the fixture change.
+const unionUuids = async (f) => {
+  const folder = '.ai-factory/state/' + f.id + '/execution/requests';
+  const entries = await readdir(path.join(f.root, folder));
+  return entries.filter((name) => name.endsWith('.json')).map((name) => name.slice(0, -5));
+};
+
+test('stage-2 measured phases: sum over fully measured non-legacy scope, partial coverage stays null (#270)', async (t) => {
+  const f = await fixture(t);
+  // Baseline: the fixture's own measured run publishes its real sums.
+  const base = await f.collect();
+  assert.equal(Number.isSafeInteger(base.metrics.phases.setup_ms) && base.metrics.phases.setup_ms >= 0, true, JSON.stringify(base.metrics.phases));
+  assert.equal(base.metrics.unknowns.includes('setup_ms'), false);
+  // Partial coverage: a second non-legacy run whose record carries no timings
+  // (simulated pre-stage-2 rewrite) forces null over the whole scope.
+  await f.call('start', f.start({ run_id: 'run-2', task_id: '1.2', scope: ['src/b.js'] }));
+  const stripStore = await (await import('./workflow-state-store.mjs')).storeFor(f.root);
+  const stripName = '.ai-factory/state/' + f.id + '/execution/runs/run-2.json';
+  const stripRecord = JSON.parse((await stripStore.textFile(stripName)).toString()).record;
+  delete stripRecord.timings;
+  await stripStore.save(stripName, stripRecord);
+  const partial = await f.collect();
+  assert.equal(partial.metrics.phases.setup_ms, null);
+  assert.equal(partial.metrics.phases.run_elapsed_ms, null);
+  assert.equal(partial.metrics.unknowns.includes('setup_ms'), true);
+  assert.equal(partial.metrics.unknowns.includes('run_elapsed'), true);
+});
+
+test('stage-2 phase semantics: measured zero vs inverted stamps (#270)', async (t) => {
+  const f = await fixture(t);
+  const iso = '2026-11-05T00:00:00.000Z';
+  const zeroSegments = { preflight: { started_at: iso, ended_at: iso, elapsed_ms: 0 }, admission: { started_at: iso, ended_at: iso, elapsed_ms: 0 } };
+  const zeroReader = async (id, filename) => {
+    const record = await loadRealRun(f, filename);
+    if (id !== 'run-1') return record;
+    return withTimings(record, {
+      setup: { started_at: iso, ended_at: iso, elapsed_ms: 0, complete: true, segments: zeroSegments },
+      stamps: [{ action: 'start', at: iso }, { action: 'result', at: iso }] });
+  };
+  const zero = await f.collect([], { runReader: zeroReader });
+  assert.equal(zero.outcome, 'collected');
+  assert.equal(zero.metrics.phases.setup_ms, 0, 'a completed 0 ms interval is a measured zero');
+  assert.equal(zero.metrics.phases.run_elapsed_ms, 0);
+  assert.equal(zero.metrics.unknowns.includes('setup_ms'), false);
+  assert.equal(zero.metrics.unknowns.includes('run_elapsed'), false);
+  // Inverted stamp pair (last before first across processes): per-record null,
+  // honest collected outcome — never a failed publication.
+  const invertedReader = async (id, filename) => {
+    const record = await loadRealRun(f, filename);
+    if (id !== 'run-1') return record;
+    // Keep the record's real measured setup; only the stamp pair is inverted.
+    return withTimings(record, { setup: record.timings.setup, stamps: [{ action: 'start', at: '2026-11-05T00:02:00.000Z' }, { action: 'result', at: '2026-11-05T00:01:00.000Z' }] });
+  };
+  const inverted = await f.collect([], { runReader: invertedReader });
+  assert.equal(inverted.outcome, 'collected');
+  assert.equal(inverted.metrics.phases.run_elapsed_ms, null);
+  assert.equal(inverted.metrics.unknowns.includes('run_elapsed'), true);
+  assert.equal(inverted.metrics.unknowns.includes('setup_ms'), false);
+});
+
+test('stage-2 usage: full/partial/zero dimensions and retry keeps a single resolved image (#270)', async (t) => {
+  const full = createFakeHost({ usage: { scope: 'request', kind: 'full' } });
+  const f = await fixture(t, { host: full });
+  assert.equal((await f.send()).delivery_verified, true);
+  const r = await f.collect();
+  assert.deepEqual(r.metrics.tokens, { input: 10, output: 5, total: 15, cache_read: 2, cache_write: 1, reasoning: 3 });
+  assert.equal(r.metrics.tool_calls, 3);
+  assert.equal(r.metrics.model_requests, 2);
+  assert.equal(r.metrics.unknowns.includes('tokens'), false);
+  assert.equal(r.metrics.unknowns.includes('tool_calls'), false);
+  assert.equal(r.metrics.unknowns.includes('model_requests'), false);
+  // Partial dimensions: measured dims publish, missing dims stay null with the
+  // tokens marker kept; tool_calls/model_requests have no coverage at all.
+  const partialHost = createFakeHost({ usage: { scope: 'request', kind: 'partial' } });
+  const g = await fixture(t, { host: partialHost });
+  assert.equal((await g.send()).delivery_verified, true);
+  const gp = await g.collect();
+  assert.deepEqual(gp.metrics.tokens, { input: 10, output: null, total: null, cache_read: null, cache_write: null, reasoning: null });
+  assert.equal(gp.metrics.unknowns.includes('tokens'), true);
+  assert.equal(gp.metrics.tool_calls, null);
+  assert.equal(gp.metrics.unknowns.includes('tool_calls'), true);
+  assert.equal(gp.metrics.unknowns.includes('model_requests'), true);
+  // Measured zeros are zeros, never unknowns.
+  const zeroHost = createFakeHost({ usage: { scope: 'request', kind: 'full', tool_calls: 0, model_requests: 0 } });
+  const z = await fixture(t, { host: zeroHost });
+  assert.equal((await z.send()).delivery_verified, true);
+  const rz = await z.collect();
+  assert.equal(rz.metrics.tool_calls, 0);
+  assert.equal(rz.metrics.model_requests, 0);
+  assert.equal(rz.metrics.unknowns.includes('tool_calls'), false);
+  assert.equal(rz.metrics.unknowns.includes('model_requests'), false);
+  // Recovery after verification keeps a single resolved image per UUID:
+  // repeated fetches never double usage.
+  const before = (await z.collect()).metrics.model_requests;
+  await z.recover();
+  assert.equal((await z.collect()).metrics.model_requests, before);
+});
+
+test('stage-2 usage scope request: two UUIDs count twice; response scope counts the shared response once (#270)', async (t) => {
+  const requestScoped = createFakeHost({ usage: { scope: 'request', kind: 'full', model_requests: 2 } });
+  const f = await fixture(t, { host: requestScoped });
+  await f.send();
+  await addRequest(f);
+  const perRequest = await f.collect();
+  assert.equal(perRequest.metrics.model_requests, 4, 'request scope sums per UUID');
+  assert.equal(perRequest.metrics.tokens.input, 20);
+  // The same topology on a response-scoped host: shared-completion dedupes the
+  // host id, model_requests counts the distinct response once.
+  const responseScoped = createFakeHost({ mode: 'shared-completion', usage: { scope: 'response', kind: 'full', model_requests: 2 } });
+  const g = await fixture(t, { host: responseScoped });
+  await g.send();
+  await addRequest(g);
+  const perResponse = await g.collect();
+  assert.equal(perResponse.metrics.model_requests, 2, 'response scope counts the shared response once');
+  assert.equal(perResponse.metrics.tokens.input, 10);
+  assert.equal(perResponse.metrics.requests.duplicate_responses, 1);
+});
+
+test('stage-2 usage without a host id is not response-attributed (#270)', async (t) => {
+  const host = createFakeHost({ mode: 'pending', usage: { scope: 'response', kind: 'full' } });
+  const f = await fixture(t, { host });
+  const r = await f.send(); // stays pending: usage captured without any host id
+  assert.equal(r.query_state, 'pending');
+  const result = await f.collect();
+  assert.equal(result.metrics.tokens, null);
+  assert.equal(result.metrics.unknowns.includes('tokens'), true);
+  assert.equal(result.metrics.unknowns.includes('model_requests'), true);
+});
+
+test('stage-2 conflicting response usage degrades the affected aggregates without failing (#270)', async (t) => {
+  const host = createFakeHost({ mode: 'shared-completion', usage: { scope: 'response', kind: 'full' } });
+  const f = await fixture(t, { host });
+  await f.send();
+  await addRequest(f);
+  const first = await f.collect();
+  assert.equal(first.metrics.tool_calls, 3, 'two agreeing copies of one response count once');
+  assert.equal(first.metrics.model_requests, 2);
+  // One member's persisted usage is rewritten to contradict its response twin:
+  // the collector reads the persisted records, finds the contradiction and
+  // nulls the affected sums with an honest collected outcome.
+  const uuids = await unionUuids(f);
+  const primary = (await f.record()).request_uuid;
+  for (const uuid of uuids) {
+    if (uuid === primary) continue;
+    const record = await f.s.loadRequest(f.id, uuid);
+    record.usage = { ...structuredClone(record.usage), tool_calls: 99 };
+    await f.s.saveRequest(record);
+  }
+  const result = await f.collect();
+  assert.equal(result.outcome, 'collected');
+  assert.equal(result.metrics.tool_calls, null, 'contradiction nulls the affected dimension');
+  assert.equal(result.metrics.unknowns.includes('tool_calls'), true);
+  assert.equal(result.metrics.model_requests, null);
+});
+
+test('stage-2 members_skipped keeps usage aggregates conservative (#270)', async (t) => {
+  const host = createFakeHost({ usage: { scope: 'request', kind: 'full' } });
+  const f = await fixture(t, { host });
+  await f.send();
+  // A corrupted journal makes the member unreadable while the registry entry
+  // stays listed: the member is skipped and usage coverage becomes unprovable.
+  await f.put(f.paths.folder + '/delivery-journals/' + f.uuid + '.json', '{broken');
+  const result = await f.collect();
+  assert.ok(result.notes.some((note) => note.code === 'member_skipped'), JSON.stringify(result.notes));
+  assert.equal(result.metrics.tokens, null);
+  assert.equal(result.metrics.unknowns.includes('tokens'), true);
+});
+
+// ---- Stage-2 ledger, telemetry and parity gates (#270) --------------------
+
+// A valid v1 fix-attempts ledger entry (validateLedger accepts both schemas).
+function v1Attempt({ runId, outcome = 'failed', hypothesis = 'Boundary hypothesis', check = 'focused-check' } = {}) {
+  const identity = { task_id: '1.2', finding_id: 'QA-1', context: digest('ctx'), check,
+    environment: digest('env'), inputs: {} };
+  const worktree = digest('worktree');
+  const { check: budgetCheck, ...budgetIdentity } = identity;
+  void budgetCheck;
+  return { attempt_id: 'attempt-v1-1', run_id: runId, worker: 'worker', fingerprint: digest({ ...identity, worktree }),
+    budget: digest(budgetIdentity), identity, hypothesis, worktree_digest: worktree, outcome };
+}
+
+async function writeLedger(f, ledger, { version = 2 } = {}) {
+  const store = await (await import('./workflow-state-store.mjs')).storeFor(f.root);
+  const envelope = { checksum: digest(ledger), record: ledger };
+  if (version === 1) delete envelope.record.aliases, ledger.aliases = undefined;
+  await store.write('.ai-factory/state/' + f.id + '/execution/fix-attempts.json',
+    Buffer.from(JSON.stringify(envelope, null, 2) + '\n'));
+}
+
+// A fix-role run with one finished attempt, so the change has a populated
+// ledger with a real produced outcome.
+async function populateLedger(f, outcome = 'failed') {
+  await f.call('start', f.start({ run_id: 'fix-1', role: 'fix', task_id: '1.2', scope: ['src/b.js'] }));
+  const begin = await f.call('attempt-begin', f.actor(1, { run_id: 'fix-1',
+    finding_id: 'QA-1', hypothesis: 'Boundary hypothesis text', check: 'focused-check',
+    environment_revision: 'fixture-1', input_paths: [] }));
+  const evidence = '.ai-factory/state/' + f.id + '/implementation/fix.md';
+  await f.put(evidence, 'Observed fix exit.');
+  await f.call('attempt-finish', f.actor(1, { run_id: 'fix-1', attempt_id: begin.attempt_id, outcome, evidence: [evidence] }));
+  return begin.attempt_id;
+}
+
+test('stage-2 ledger: outcomes sample into checks.reasons and never leak ledger details (#270)', async (t) => {
+  const f = await fixture(t);
+  await populateLedger(f, 'failed');
+  const options = qaOptions(f);
+  assert.equal((await prepareQaManifest(options)).ok, true);
+  const recorded = await recordQaResult({ ...options, gate: 'verify', resultId: 'qa-1', markdown: gateBody('verify').toString('utf8') });
+  assert.equal(recorded.ok, true, JSON.stringify(recorded));
+  const result = await f.collect(['--include-qa']);
+  assert.equal(result.outcome, 'collected');
+  assert.equal(result.metrics.provenance.ledger_attempts_scanned, 1);
+  assert.ok(result.metrics.checks.reasons.some((entry) => entry.code === 'failed' && entry.count === 1),
+    JSON.stringify(result.metrics.checks.reasons));
+  // Ledger internals stay project-internal.
+  const metricsSerialized = JSON.stringify(result.metrics);
+  assert.equal(metricsSerialized.includes('Boundary hypothesis text'), false);
+  assert.equal(metricsSerialized.includes('attempt-v1'), false);
+  // ledger_attempts_scanned is a legitimate internal provenance member of the
+  // project metrics file; only the public export must omit it.
+  // The public export keeps the outcome count but not the provenance member.
+  const exported = await exportEvaluation({ rootDir: f.root, changeId: f.id, evidenceClass: 'maintainer_controlled',
+    runnerMetrics: result.metrics, now: '2026-11-01T00:00:00.000Z' });
+  assert.equal(exported.outcome === 'exported' || exported.outcome === 'degraded', true, JSON.stringify(exported.errors));
+  const serialized = JSON.stringify(exported.evaluation);
+  assert.ok(exported.evaluation.metrics.checks_reasons.some((entry) => entry.code === 'failed'));
+  assert.equal(serialized.includes('ledger_attempts_scanned'), false);
+  assert.equal(serialized.includes('Boundary hypothesis text'), false);
+  assert.equal(serialized.includes('focused-check'), false);
+});
+
+test('stage-2 ledger: --run filter samples only the requested run attempts (#270)', async (t) => {
+  const f = await fixture(t);
+  await populateLedger(f, 'failed');
+  // A second attempt on the same fix run (fresh fingerprint, budget intact).
+  const second = await f.call('attempt-begin', f.actor(1, { run_id: 'fix-1',
+    finding_id: 'QA-2', hypothesis: 'Second hypothesis', check: 'other-check',
+    environment_revision: 'fixture-2', input_paths: [] }));
+  const evidence = '.ai-factory/state/' + f.id + '/implementation/fix2.md';
+  await f.put(evidence, 'Observed second fix exit.');
+  await f.call('attempt-finish', f.actor(1, { run_id: 'fix-1', attempt_id: second.attempt_id, outcome: 'blocked', evidence: [evidence] }));
+  // A legacy v1 attempt attributed to the implement run joins the unfiltered sample.
+  const store = await (await import('./workflow-state-store.mjs')).storeFor(f.root);
+  const ledgerName = '.ai-factory/state/' + f.id + '/execution/fix-attempts.json';
+  const ledger = JSON.parse((await store.textFile(ledgerName)).toString()).record;
+  ledger.attempts.push({ ...v1Attempt({ runId: 'run-1', outcome: 'passed' }), attempt_id: 'attempt-v1-2' });
+  await store.write(ledgerName, Buffer.from(JSON.stringify({ checksum: digest(ledger), record: ledger }, null, 2) + '\n'));
+  const options = qaOptions(f);
+  assert.equal((await prepareQaManifest(options)).ok, true);
+  await recordQaResult({ ...options, gate: 'verify', resultId: 'qa-1', markdown: gateBody('verify').toString('utf8') });
+  const filtered = await f.collect(['--include-qa', '--run', 'fix-1']);
+  const reasons = Object.fromEntries(filtered.metrics.checks.reasons.map((entry) => [entry.code, entry.count]));
+  assert.equal(reasons.failed, 1);
+  assert.equal(reasons.blocked, 1);
+  assert.equal(reasons.passed, undefined, 'attempts of other runs stay outside the --run filter');
+  assert.equal(filtered.metrics.provenance.ledger_attempts_scanned, 2);
+  const unfiltered = await f.collect(['--include-qa']);
+  const all = Object.fromEntries(unfiltered.metrics.checks.reasons.map((entry) => [entry.code, entry.count]));
+  assert.equal(all.failed, 1);
+  assert.equal(all.blocked, 1);
+  assert.equal(all.passed, 1);
+  assert.equal(unfiltered.metrics.provenance.ledger_attempts_scanned, 3);
+});
+
+test('stage-2 ledger states: absent, empty, invalid, changed and interrupted reads (#270)', async (t) => {
+  // Legacy absent ledger: nothing was ever executed for this change.
+  const bare = await deliveryProject(t); t.after(bare.cleanup);
+  const absent = await collectRunnerMetrics({ rootDir: bare.root, argv: ['--change', bare.id] });
+  assert.equal(absent.outcome, 'collected');
+  assert.ok(absent.notes.some((note) => note.code === 'ledger_absent'));
+  assert.equal(absent.metrics.provenance.ledger_attempts_scanned, null);
+  // A valid empty ledger is a measured empty set, not an absence.
+  const f = await fixture(t);
+  const empty = await f.collect();
+  assert.ok(!empty.notes.some((note) => note.code.startsWith('ledger_')));
+  assert.equal(empty.metrics.provenance.ledger_attempts_scanned, 0);
+  // A ledger whose bytes fail validation degrades with its own note; the
+  // successfully read QA counts stay intact.
+  await populateLedger(f, 'passed');
+  const options = qaOptions(f);
+  assert.equal((await prepareQaManifest(options)).ok, true);
+  await recordQaResult({ ...options, gate: 'verify', resultId: 'qa-1', markdown: gateBody('verify').toString('utf8') });
+  const store = await (await import('./workflow-state-store.mjs')).storeFor(f.root);
+  await store.write('.ai-factory/state/' + f.id + '/execution/fix-attempts.json', Buffer.from('{broken'));
+  const invalid = await f.collect(['--include-qa']);
+  assert.equal(invalid.outcome, 'degraded');
+  assert.ok(invalid.notes.some((note) => note.code === 'ledger_invalid'));
+  assert.equal(invalid.metrics.provenance.ledger_attempts_scanned, null);
+  assert.equal(invalid.metrics.checks.results, 1, 'read QA counts are not zeroed by ledger failure');
+  // Changed between the two digest reads: scan inconsistent.
+  const bytes = Buffer.from(JSON.stringify({ checksum: digest({ schema: 'aifhub.fix-attempts.v2', attempts: [], aliases: [] }),
+    record: { schema: 'aifhub.fix-attempts.v2', attempts: [], aliases: [] } }, null, 2) + '\n');
+  let reads = 0;
+  const changingReader = async () => { reads += 1; return reads === 1 ? bytes : Buffer.from(bytes.toString().replace('[]', '[{"x":1}]')); };
+  const changed = await f.collect([], { ledgerReader: changingReader });
+  assert.equal(changed.outcome, 'degraded');
+  assert.ok(changed.notes.some((note) => note.code === 'scan_inconsistent'));
+  assert.equal(changed.metrics.provenance.ledger_attempts_scanned, null);
+  // Read failure between the reads: honest unreadable degradation.
+  const failingReader = async () => { if (++reads > 1) throw new Error('injected-io'); return bytes; };
+  const interrupted = await f.collect([], { ledgerReader: failingReader });
+  assert.equal(interrupted.outcome, 'degraded');
+  assert.ok(interrupted.notes.some((note) => note.code === 'ledger_unreadable'));
+  assert.equal(interrupted.metrics.checks, null); // include-qa off in this call
+});
+
+test('stage-2 ledger: valid legacy v1 ledger samples like v2 (#270)', async (t) => {
+  const f = await fixture(t);
+  const v1 = { schema: 'aifhub.fix-attempts.v1', attempts: [v1Attempt({ runId: 'run-1' })] };
+  await writeLedger(f, v1);
+  const result = await f.collect();
+  assert.equal(result.outcome, 'collected');
+  assert.equal(result.metrics.provenance.ledger_attempts_scanned, 1);
+});
+
+test('stage-2 telemetry: snapshot measurements never enter custody material (#270)', async (t) => {
+  const f = await fixture(t);
+  const options = qaOptions(f);
+  assert.equal((await prepareQaManifest(options)).ok, true);
+  const store = await qaStore(options);
+  const manifest = await store.manifest();
+  const events = [];
+  const first = await observeQaSnapshot(store, manifest.payload, { ...options, telemetry: (event) => events.push(event) });
+  const second = await observeQaSnapshot(store, manifest.payload, { ...options, telemetry: () => {} });
+  assert.equal(first.digest, second.digest, 'equality of custody observations survives telemetry');
+  assert.equal(digest(first), digest(second));
+  assert.equal(events.length, 1);
+  assert.equal(events[0].operation, 'qa-snapshot');
+  assert.equal(Number.isSafeInteger(events[0].elapsed_ms) && events[0].elapsed_ms >= 0, true);
+  const fingerprintEvents = [];
+  await checkFingerprints(manifest.payload, first, { ...options, telemetry: (event) => fingerprintEvents.push(event) });
+  assert.equal(fingerprintEvents.length, 1);
+  assert.equal(fingerprintEvents[0].operation, 'qa-fingerprints');
+});
+
+test('stage-2 non-interference: a populated ledger leaves the workspace byte-identical (#270)', async (t) => {
+  const f = await fixture(t);
+  await populateLedger(f, 'failed');
+  const walk = async (dir, acc = {}) => {
+    for (const entry of await readdir(path.join(f.root, dir), { withFileTypes: true })) {
+      const name = dir ? dir + '/' + entry.name : entry.name;
+      if (entry.isDirectory()) await walk(name, acc);
+      else acc[name] = (await readFile(path.join(f.root, name))).toString('base64');
+    }
+    return acc;
+  };
+  const observable = (acc) => { delete acc['.ai-factory/state/' + f.id + '/runner-metrics.json']; return acc; };
+  const before = observable(await walk('.ai-factory'));
+  const result = await f.collect(['--include-qa']);
+  assert.equal(result.outcome, 'collected');
+  const after = observable(await walk('.ai-factory'));
+  assert.deepEqual(after, before, 'the collector never mutates state, including the ledger');
+});
+
+test('stage-2 parity gates (R17): structural deep-equals across dictionaries, schemas and projection (#270)', async (t) => {
+  const runnerSchema = JSON.parse(await readFile(new URL('../schemas/runner-metrics.schema.json', import.meta.url), 'utf8'));
+  const evalSchema = JSON.parse(await readFile(new URL('../schemas/evaluation-export.schema.json', import.meta.url), 'utf8'));
+  // unknowns enum === RUNNER_METRICS_UNKNOWNS
+  assert.deepEqual(runnerSchema.properties.unknowns.items.enum, [...RUNNER_METRICS_UNKNOWNS]);
+  assert.deepEqual(evalSchema.properties.metrics.properties.unknowns.items.enum, [...RUNNER_METRICS_UNKNOWNS]);
+  // reason codes === schema enum (21 with the causal rerun codes)
+  assert.deepEqual(runnerSchema.properties.checks.properties.reasons.items.properties.code.enum, [...RUNNER_METRICS_REASON_CODES]);
+  // coverage values === RUNNER_METRICS_COVERAGES (+null in the eval schema)
+  assert.deepEqual(runnerSchema.properties.coverage.enum, [...RUNNER_METRICS_COVERAGES]);
+  assert.deepEqual(evalSchema.properties.metrics.properties.coverage.enum.filter((value) => value !== null), [...RUNNER_METRICS_COVERAGES]);
+  // top-level schema properties === validator allow-list; phases keys === validator phase list
+  assert.deepEqual(Object.keys(runnerSchema.properties).sort(), [...RUNNER_METRICS_KEYS].sort());
+  assert.deepEqual(Object.keys(runnerSchema.properties.phases.properties).sort(), [...RUNNER_METRICS_PHASE_KEYS].sort());
+  // eval-schema metrics properties include exactly the projected names
+  const exported = await exportEvaluation({ rootDir: (await fixture(t)).root, changeId: (await fixture(t)).id,
+    evidenceClass: 'synthetic_fixture', runnerMetrics: { schema: 'aifhub.runner_metrics.v1', tool_calls: 3, model_requests: 2,
+      tokens: { reasoning: 3 }, tools: { observed_calls: null, failed_calls: null, elapsed_ms: null },
+      dedup: { lookups: null, hits: null, misses: null, input_bytes: null, output_bytes: null },
+      phases: { setup_ms: 5, checks_ms: 6, snapshot_hash_ms: 7, run_elapsed_ms: 8 } }, now: '2026-11-01T00:00:00.000Z' });
+  const metrics = exported.evaluation.metrics;
+  assert.equal(metrics.tool_calls, 3);
+  assert.equal(metrics.model_requests, 2);
+  assert.equal(metrics.tokens_reasoning, 3);
+  assert.equal(metrics.tools_observed_calls, null);
+  assert.equal(metrics.dedup_lookups, null);
+  assert.equal(metrics.setup_ms, 5);
+  assert.equal(metrics.checks_ms, 6);
+  assert.equal(metrics.snapshot_hash_ms, 7);
+  assert.equal(metrics.run_elapsed_ms, 8);
+  assert.equal('wait_ms' in metrics, false, 'wait_ms has no stage-2 source and is not projected');
+  assert.deepEqual(validateJsonAgainstSchema(exported.evaluation, evalSchema), []);
+});
+
+test('stage-2 parity gates (R17): negative probes agree on both sides for every new constraint (#270)', async (t) => {
+  const runnerSchema = JSON.parse(await readFile(new URL('../schemas/runner-metrics.schema.json', import.meta.url), 'utf8'));
+  const base = { schema: 'aifhub.runner_metrics.v1', transport: { create_calls: 1, transport_ms: null } };
+  const stub = { schema: 'aifhub.runner_metrics.v1', tool_calls: null, model_requests: null,
+    tools: { observed_calls: null, failed_calls: null, elapsed_ms: null },
+    dedup: { lookups: null, hits: null, misses: null, input_bytes: null, output_bytes: null } };
+  // Positive: the stage-2 stub snapshot passes schema and runtime validator.
+  assert.deepEqual(validateJsonAgainstSchema(stub, runnerSchema), []);
+  validateRunnerMetrics(stub);
+  assert.deepEqual(validateJsonAgainstSchema(base, runnerSchema), []);
+  validateRunnerMetrics(base);
+  const probes = [
+    { ...stub, tools: { ...stub.tools, observed_calls: 'x' } },
+    { ...stub, tools: { ...stub.tools, bogus: 1 } },
+    { ...stub, dedup: { ...stub.dedup, bogus: 1 } },
+    { ...stub, tool_calls: 'x' },
+    { ...stub, model_requests: -1 },
+    { ...stub, tools: { ...stub.tools, elapsed_ms: -5 } },
+    { ...stub, provenance: { ledger_attempts_scanned: 'many' } },
+    { ...base, checks: { results: 1, reasons: [{ code: 'rerun-made-up', count: 1 }] } },
+    { ...stub, tokens: { input: 1, output: 1, total: 1, cache_read: 1, cache_write: 1, reasoning: -2 } }
+  ];
+  for (const probe of probes) {
+    assert.ok(validateJsonAgainstSchema(probe, runnerSchema).length > 0, 'schema must reject ' + JSON.stringify(probe));
+    assert.throws(() => validateRunnerMetrics(probe), (error) => error.exchangeCode === 'invalid_runner_metrics',
+      'validator must reject ' + JSON.stringify(probe));
+  }
+  // Reason-code vocabulary parity: the producer-side duplicated list stays a
+  // strict subset of the exporter dictionary (producer home test pins equality
+  // per code; here we pin size and membership from the exporter side).
+  assert.equal(RUNNER_METRICS_REASON_CODES.length, 21);
+  for (const code of ['rerun-inputs-changed', 'rerun-command-changed', 'rerun-environment-changed',
+    'rerun-policy-changed', 'rerun-explicit']) assert.ok(RUNNER_METRICS_REASON_CODES.includes(code));
 });

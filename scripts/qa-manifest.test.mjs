@@ -6,6 +6,8 @@ import path from 'node:path';
 import { createGateResult, renderGateResultBlock } from './aif-gate-result.mjs';
 import { digest, canonical } from './workflow-state-store.mjs';
 import { prepareQaManifest, recordQaResult, publishQaManifest, evaluateQaBinding, parseQaManifestArgs, runQaManifestCommand } from './qa-manifest.mjs';
+import { QA_RERUN_REASON_CODES } from './qa-manifest-record.mjs';
+import { RUNNER_METRICS_REASON_CODES } from './workflow-exchange.mjs';
 import { observeQaSnapshot, allDeclaredRoots, metadataProjection } from './qa-manifest-inputs.mjs';
 import { qaStore, QA_LIMITS } from './qa-manifest-store.mjs';
 import { writeGateEvidence } from './write-gate-evidence.mjs';
@@ -622,5 +624,24 @@ describe('QA stage-2 metadata (#270)', () => {
     assert.deepEqual(parseQaManifestArgs(['record', '--change', 'c', '--rerun-reason', 'rerun-inputs-changed']),
       { action: 'record', changeId: 'c', rerunReason: 'rerun-inputs-changed', json: false });
     assert.equal(parseQaManifestArgs(['record', '--change', 'c', '--rerun-reason', 'made-up']), null);
+  });
+});
+
+describe('QA stage-2 rerun vocabulary (#270)', () => {
+  it('stays a strict subset of the exporter reason dictionary and both schema enums', async () => {
+  // qa-manifest-record must not import workflow-exchange; the frozen duplicated
+  // list is pinned equal from both sides plus the two JSON schema enums.
+  const source = await readFile(new URL('./qa-manifest-record.mjs', import.meta.url), 'utf8');
+  assert.equal(source.includes("from './workflow-exchange"), false, 'no reverse dependency');
+  assert.ok(QA_RERUN_REASON_CODES.length >= 1);
+  for (const code of QA_RERUN_REASON_CODES) assert.ok(RUNNER_METRICS_REASON_CODES.includes(code), code);
+  const runnerSchema = JSON.parse((await readFile(new URL('../schemas/runner-metrics.schema.json', import.meta.url), 'utf8')).toString());
+  const evalSchema = JSON.parse((await readFile(new URL('../schemas/evaluation-export.schema.json', import.meta.url), 'utf8')).toString());
+  const runnerEnum = runnerSchema.properties.checks.properties.reasons.items.properties.code.enum;
+  const evalEnum = evalSchema.properties.metrics.properties.checks_reasons.items.properties.code.enum;
+  for (const code of QA_RERUN_REASON_CODES) {
+    assert.ok(runnerEnum.includes(code), 'runner schema enum misses ' + code);
+    assert.ok(evalEnum.includes(code), 'eval schema enum misses ' + code);
+  }
   });
 });

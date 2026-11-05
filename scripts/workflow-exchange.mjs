@@ -230,11 +230,16 @@ export function validateDesignContext(input) {
   return errors;
 }
 
+// Exported for the structural parity gates (#270, R17): the JSON schema's
+// top-level properties must equal this allow-list exactly.
+export const RUNNER_METRICS_KEYS = Object.freeze(['schema', 'run_id', 'tokens', 'cost', 'latency_ms', 'model', 'harness', 'retries', 'changed_loc', 'unrelated_changes', 'human_review_ms', 'verified_success', 'transport',
+  'attribution', 'requests', 'checks', 'phases', 'provenance', 'unknowns', 'coverage', 'tool_calls', 'model_requests', 'tools', 'dedup']);
+export const RUNNER_METRICS_PHASE_KEYS = Object.freeze(['setup_ms', 'checks_ms', 'snapshot_hash_ms', 'wait_ms', 'run_elapsed_ms', 'run_record_span_ms',
+  'workers_span_sum_ms', 'pending_observed_ms', 'transport_ms', 'recovery_ms']);
 export function validateRunnerMetrics(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw exchangeError('invalid_runner_metrics');
   if (input.schema !== RUNNER_METRICS_SCHEMA) throw exchangeError('invalid_runner_metrics');
-  const allowed = ['schema', 'run_id', 'tokens', 'cost', 'latency_ms', 'model', 'harness', 'retries', 'changed_loc', 'unrelated_changes', 'human_review_ms', 'verified_success', 'transport',
-    'attribution', 'requests', 'checks', 'phases', 'provenance', 'unknowns', 'coverage', 'tool_calls', 'model_requests', 'tools', 'dedup'];
+  const allowed = RUNNER_METRICS_KEYS;
   if (Object.keys(input).some((key) => !allowed.includes(key))) throw exchangeError('invalid_runner_metrics');
   const safeIdentifier = (value) => { try { identifier(value); return true; } catch { return false; } };
   const label = (value) => value === null || value === undefined || (typeof value === 'string' && value.length <= MAX_LABEL && !/[\x00-\x1f]/.test(value));
@@ -339,8 +344,7 @@ export function validateRunnerMetrics(input) {
   }
   if (input.phases !== undefined && input.phases !== null) {
     const phases = input.phases;
-    const keys = ['setup_ms', 'checks_ms', 'snapshot_hash_ms', 'wait_ms', 'run_elapsed_ms', 'run_record_span_ms',
-      'workers_span_sum_ms', 'pending_observed_ms', 'transport_ms', 'recovery_ms'];
+    const keys = RUNNER_METRICS_PHASE_KEYS;
     if (typeof phases !== 'object' || Array.isArray(phases)
       || Object.keys(phases).some((key) => !keys.includes(key))
       || Object.values(phases).some((value) => !intOrNull(value))) throw exchangeError('invalid_runner_metrics');
