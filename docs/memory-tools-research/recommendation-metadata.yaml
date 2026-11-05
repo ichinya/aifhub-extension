@@ -1436,7 +1436,7 @@ tools:
     doc: repowise.md
     results_doc: repowise-benchmark-results.md
     repository: "https://github.com/repowise-dev/repowise"
-    tested_version: "repowise 0.25.0"
+    tested_version: "repowise 0.55.0 (retrieval bench-matrix 2026-11-05); 0.25.0 (paired A/B smoke 2026-06-29, spike 2026-06-28)"
     decision: manual_cli_only
     recommendation_action: suggest_manual_cli_for_repo_intelligence_when_enabled_or_explicit
     integration_role: repo_intelligence_provider
@@ -1459,16 +1459,19 @@ tools:
       - aif-done
       - aif-commit
     privacy_caveat: "Local constrained init creates .repowise/ under the explicit project path until purged. repowise init globally registers an MCP server and PostToolUse hook in ~/.claude/settings.json and a central ~/.repowise/platform.json registry; this is accepted MCP-provider behavior and AIFHub must not run init from command ownership. The wiki tier (without --index-only) issues LLM API calls billed to the user; provider keys live in user-owned .repowise/.env (gitignored)."
+    evidence: "2026-06-28 spike + 2026-06-29 paired A/B smoke (glm-5-turbo, 0.25.0 --index-only): -24.8% total tokens / -45.9% cost vs rg на 3/3 парах, но +139% duration. 2026-11-05 retrieval bench-matrix (0.55.0 manual CLI --no-prose --embedder ollama; 5 корпусов, 245 normal + 25 absent questions, rg vs memlab vs repowise, pooled files@1/files@5/MRR@5): files@1 22.0% vs memlab 13.5% / rg 11.0%, MRR@5 0.259 vs 0.199 / 0.184, files@5 31.8% vs 32.7% у обеих. Сильнейший корпус framework_app php+node (f40d504fd4bc): @1 57% / @5 63% / MRR 0.593 — breadth покрытия по всем текстовым файлам там, где code-only индекс memlab слеп. Слабые места: in_coverage MRR хуже memlab на 3/5 корпусов (0.000/0.035/0.053 vs 0.149/0.271/0.132); на node-корпусах с покрытым graph-индексом memlab ведёт (0.239/0.469 vs 0.185/0.253); d74219642bed — worst of three по всем метрикам (wiki-словарь загрязнён agent-tooling деревом); absent 5/5 ложных top-5 на каждом корпусе (нет abstention); ~35-38s на запрос manual CLI. Артефакты: tmp/bench-matrix/results-repowise.json, tmp/bench-matrix/aggregate-repowise.md, docs/memory-tools-research/repowise-benchmark-results.md. Контекст вне evidence: пользователь сам активно использует repowise в daily-работе — это аргумент доступности при явном запросе, не метрика."
+    known_caveats: "Нет abstention: absent-вопросы дают уверенный непустой top-5 (5/5 false hits на каждом корпусе, 2026-11-05; rg в этом чист). Recall глубже top-1 не лучше rg/memlab (files@5 31.8% vs 32.7% у обеих); in_coverage-ранжирование хуже memlab на 3/5 корпусов. Wiki-словарь может загрязняться большими agent-tooling деревьями (.ai-factory) — на d74219642bed repowise последний из трёх по всем метрикам. Цена: ~35-38s на запрос на CLI-процесс (2.6h на 270 запросов, без batch/MCP в manual-CLI constraint)."
     conditional_for:
       project_shapes:
         - large_framework_app
         - large_legacy
         - multirepo
+        - framework_app
       tasks:
         - architecture_or_impact_discovery
         - multirepo_surface_mapping
       quality_gate: "Do not treat low token output as success by itself. Require non-empty useful repowise search/health/get_overview results; header-only or empty context is avoid_no_useful_context."
-      condition: "Только после baseline rg и только когда tools.repowise.screening_policy содержит exact match по skill + project labels. Не выбирать по language-only, skill-only или broad project shape. Index-only tier (zero LLM) is the default; wiki tier requires repowise doctor to confirm provider configuration."
+      condition: "Только после baseline rg и только когда tools.repowise.screening_policy содержит exact match по skill + project labels. Не выбирать по language-only, skill-only или broad project shape. Retrieval bench 2026-11-05: лучший answerer для language-poor/doc-heavy и mixed-language корпусов и для first-rank precision (commit-subject вопросы); на node-корпусах, где graph-индекс memlab покрывает код, memlab ведёт (MRR 0.239/0.469 vs 0.185/0.253), а files@5 у repowise не лучше rg — держать conditional, не default. Index-only/--no-prose tier (zero LLM) is the default; wiki tier requires repowise doctor to confirm provider configuration. Цена: ~35-38s на запрос manual CLI."
     screening_policy:
       evidence: repowise-paired-ab-glm5turbo-2026-06-29-smoke
       report: docs/memory-tools-research/repowise-benchmark-results.md
@@ -1527,7 +1530,8 @@ tools:
           best_rows:
             - "project-6bfa82605c24 (php/large): -27.3% total tokens, -41.0% cost, -44.4% turns vs rg"
             - "project-ac1ab2d4c116 (go/large): -32.6% total tokens, -39.9% cost, -34.1% turns vs rg"
-          recommendation_gate: "Smoke signal only (3 paired runs, glm-5-turbo). repowise saves tokens via fewer turns from structured-data queries, at cost of wall-clock init overhead. Apply only on large/framework projects for architecture discovery; rg remains baseline."
+            - "f40d504fd4bc (framework_app, php+node, 2026-11-05): files@1 57%, files@5 63%, MRR@5 0.593 vs rg 0.252 / memlab 0.049"
+          recommendation_gate: "Smoke signal (3 paired runs, glm-5-turbo) + retrieval bench-matrix 2026-11-05 (0.55.0 manual CLI, 5 корпусов, 245 normal + 25 absent queries). repowise saves tokens via fewer turns and leads top-1/MRR (files@1 22.0%, MRR 0.259 vs memlab 0.199 / rg 0.184) but ties-or-loses files@5 (31.8% vs 32.7% у обеих) and loses in_coverage ranking to memlab on 3/5 corpora; где graph-индекс memlab покрывает код (node-корпуса, multirepo), memlab ведёт. Apply only on large/framework/mixed-language projects for architecture discovery after rg baseline; rg remains baseline. Cost: ~35-38s per query per CLI process."
       known_avoid_cases:
         - id: framework_service_container_dead_code_false_positives
           match:
@@ -1535,6 +1539,12 @@ tools:
             language: [php]
           tasks: [exact_file_or_symbol_lookup]
           reason: "repowise dead-code analysis flags container-discovered services (Laravel DI) as unreachable (in_degree=0, 70% confidence). High false-positive rate on framework apps with service containers. Dead-code output unreliable without framework-aware tuning."
+        - id: wiki_vocabulary_polluted_by_agent_tooling_tree
+          match:
+            project_shape: [large_service]
+            language: [node]
+          tasks: [architecture_or_impact_discovery]
+          reason: "Retrieval bench 2026-11-05 (corpus d74219642bed, large_service node): repowise last of three on every metric (files@5 13% vs rg 29% / memlab 21%) — wiki vocabulary polluted by a large .ai-factory agent-tooling tree that crowded top-5 with agent scripts on many queries (raw orders). Single-corpus evidence: do not generalize to node services without a clean wiki vocabulary check."
     do_not_recommend_for:
       project_shapes:
         - small_microservice
@@ -1549,7 +1559,7 @@ tools:
         mode: manual_purged_cli_execution
         tiers:
           default:
-            init: "repowise init <project> --index-only --no-claude-md --no-agents --no-codex --no-distill-hook --yes"
+            init: "repowise init <project> --index-only --no-claude-md --no-agents --no-codex --no-distill-hook --yes (verified on 0.25.0; 0.55.0 removed --index-only — use --no-prose --embedder ollama --no-hook --no-editor-setup --no-save-key --no-workspace, see benchmark results; plain --embedder auto-detect falls back to mock and corrupts ranking)"
             enables: [get_overview, get_context, get_health, get_risk, get_dead_code, search_symbol]
             cost: zero_llm_zero_api
           wiki:

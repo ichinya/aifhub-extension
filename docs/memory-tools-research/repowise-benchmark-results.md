@@ -2,7 +2,58 @@
 
 Репозиторий: [repowise-dev/repowise](https://github.com/repowise-dev/repowise)
 
-Проверенная версия: `repowise 0.25.0`.
+Проверенные версии: `repowise 0.55.0` (retrieval bench-matrix 2026-11-05), `repowise 0.25.0` (paired A/B smoke 2026-06-29, spike 2026-06-28).
+
+## Retrieval bench-matrix 2026-11-05 (rg vs memlab vs repowise)
+
+Прямое retrieval-сравнение трёх систем на 5 анонимизированных корпусах (corpus id — path-hash; реальные проекты не называются): 245 normal-вопросов (7 режимов: research/plan/context/impl/fix/review/verify) + 25 absent-вопросов (5 на корпус). Метрики — pooled files@1 / files@5 / MRR@5 по всем normal-вопросам корпуса (subset full), плюс in_coverage (только вопросы, чьи gold-файлы memlab способен индексировать) и absent (любой непустой ответ — false hit; идеал 0). Релевантные наборы и алгоритм подсчёта — те же, что в предыдущих прогонах (scripts/metrics.py); расчёт для repowise выполнен `scripts/repowise_metrics.js` (node) построчно по тому же алгоритму и кросс-валидирован на пересекающихся строках results.json (rg impl/fix на 1790117eb78d: 0.25/0.50/0.3542 и 0/0/0; memlab research на cf1982e46954: 0/0.5714/0.1905 — точное совпадение).
+
+Repowise 0.55.0 работал как manual CLI per corpus: `repowise init --no-prose --embedder ollama --no-claude-md --no-agents --no-codex --no-distill-hook --no-hook --no-editor-setup --no-save-key --no-workspace -y .` (structural wiki без LLM; `--no-prose` — эквивалент исчезнувшего в 0.55.0 `--index-only`), затем per query `repowise search --limit 30 --format json --no-workspace "<question>"` (QUERY передаётся последним; PATH positional опущен — см. отклонения). Извлечение файлов: первые 5 результатов, чей `path` указывает на реальный файл корпуса (module/onboarding-страницы при извлечении пропускаются) — consumer, запрашивающий top-5 файлов, фильтрует так же (`meta.extraction_rule` в results-repowise.json).
+
+### Корпуса и агрегаты (subset full, n = normal-вопросы)
+
+| corpus (tags) | rg @1/@5/MRR | memlab @1/@5/MRR | repowise @1/@5/MRR | repowise in_cov MRR | absent false-hits (rg/memlab/rp) | repowise init / search-mean |
+|---|---|---|---|---:|---|---|
+| cf1982e46954 (large_framework_app, php, active) n=51 | 6% / 37% / 0.182 | 0% / 39% / 0.125 | **8%** / 22% / 0.136 | 0.000 | 0/5, 5/5, 5/5 | 119.9s / 46.9s |
+| f40d504fd4bc (framework_app, php+node, semi-stale) n=51 | 16% / 45% / 0.252 | 2% / 14% / 0.049 | **57% / 63% / 0.593** | 0.000 | 0/5, 5/5, 5/5 | 59.2s / 38.5s |
+| 3cdc1e3d1293 (large_app, node, active) n=47 | 6% / 21% / 0.113 | **19% / 32% / 0.239** | 13% / 28% / 0.185 | 0.035 | 0/5, 5/5, 5/5 | 297.3s / 35.2s |
+| 1790117eb78d (multirepo, mixed) n=48 | 13% / 29% / 0.184 | **40% / 58% / 0.469** | 21% / 33% / 0.253 | 0.239 | 0/5, 5/5, 5/5 | 46.9s / 38.8s |
+| d74219642bed (large_service, node, active) n=48 | **15% / 29% / 0.183** | 8% / 21% / 0.126 | 10% / 13% / 0.115 | 0.053 | 0/5, 5/5, 5/5 | 153.5s / 35.1s |
+| **Mean over 245 queries** | **11.0% / 32.7% / 0.184** | **13.5% / 32.7% / 0.199** | **22.0% / 31.8% / 0.259** | — | — | — |
+
+(rg 0/5 в absent — структурный факт: rg_baseline.py пропускает absent-вопросы, это не способность; memlab и repowise всегда возвращают непустой top-5 = нет abstention, идеал 0.)
+
+**Итог:** repowise выигрывает top-1 и MRR на 245 normal-вопросах (files@1 22.0% vs 13.5% memlab / 11.0% rg; MRR@5 0.259 vs 0.199/0.184), но немного проигрывает files@5 recall (31.8% vs 32.7% у обеих).
+
+### Сильные стороны
+
+1. **Breadth over languages.** На f40d504fd4bc (96% PHP, memlab индексирует только 15 файлов) repowise доминирует по всем метрикам: @1 57% vs 16/2, @5 63% vs 45/14, MRR 0.593 vs 0.252/0.049. Structural wiki индексирует все текстовые файлы независимо от расширения — именно там, где code-only pipeline memlab слеп.
+2. **Top-1 precision на commit-subject вопросах.** Quoted commit subjects совпадают со словарём wiki-страниц, давая first-rank попадания, которые rg/memlab пропускают (impl mode f40d504fd4bc: @1 54.5%, @5 81.8%).
+
+### Слабые стороны
+
+1. **Глубина recall.** На cf1982e46954 @5 падает до 22% vs 37/39 — repowise ранжирует собственные module/onboarding-страницы и периферийные file-страницы выше gold-файлов.
+2. **in_coverage: ранжирование хуже покрытия.** На gold-файлах, которые memlab способен индексировать, repowise хуже всех на 3 из 5 корпусов (MRR 0.000 / 0.035 / 0.053 vs memlab 0.149 / 0.271 / 0.132) — победы приходят от breadth покрытия, а не от качества ранжирования. Где graph-pipeline memlab применим (node-корпус 3cdc1e3d1293, multirepo 1790117eb78d), memlab уверенно ведёт (0.239/0.469 vs 0.185/0.253).
+3. **Корпус d74219642bed — последний из трёх по всем метрикам** (@5 13% vs 29/21): словарь wiki загрязнён большим .ai-factory agent-tooling деревом, которое вытеснило .ai-factory скрипты в top-5 на многих вопросах (видно в raw orders).
+4. **Нет abstention** — 5/5 absent-вопросов получили уверенный top-5 (как у memlab; идеал 0; rg-колонка не сравнима как способность).
+5. **Практическая цена:** ~35-38s на запрос на CLI-процесс (2.6h на 270 запросов; batch/MCP-режима в рамках manual-CLI constraint нет) против секунд у rg — само по себе ограничивает интерактивное использование.
+
+**Net:** repowise — лучший default answerer на language-poor / doc-heavy корпусах и для first-rank precision; memlab выигрывает там, где его индекс покрывает код; rg остаётся дешёвым recall floor.
+
+### Отклонения
+
+1. **CLI drift:** фактический CLI — repowise 0.55.0; `--index-only` из спайка (0.25.0) больше не существует. Фактическая init-команда на каждый корпус (зафиксирована в results-repowise.json meta): `repowise init --no-prose --embedder ollama --no-claude-md --no-agents --no-codex --no-distill-hook --no-hook --no-editor-setup --no-save-key --no-workspace -y .` — `--no-prose` это 0.55.0-эквивалент index-only (вся wiki из структуры, без модели, без spend). `--embedder ollama` задан явно: auto-detect падает в `embedder: mock`, который инжектит бессмысленные векторы в fused ranking (проверено: `.repowise/config.yaml` содержал `embedder: mock` после plain init; порядок/оценки изменились после ollama reindex). 0.55.0 также добавил `--editor-setup` (machine-wide мутация), поэтому добавлены `--no-hook --no-editor-setup --no-save-key` + REPOWISE_SKIP_EDITOR_SETUP=1/REPOWISE_NO_SAVE_KEY=1 — сохранён no-global-mutations constraint спайка.
+2. **Извлечение файлов:** `search --format json` возвращает wiki-страницы со сниппетами, а не голый список файлов. Использован proxy (зафиксирован в meta.extraction_rule): top-5 результатов, чей `path` резолвится в реальный файл корпуса, в порядке возврата; не-файловые страницы пропускаются при извлечении. `--limit 30` сырых результатов гарантирует >=5 файловых записей; первые 10 сырых записей на вопрос сохранены (raw_top) для аудита.
+3. **Порядок аргументов:** click биндит positionals по порядку, поэтому `search --... --no-workspace . "<question>"` молча биндит `.` к QUERY, а вопрос к PATH и печатает `No indexed repos to search` (exit 0). Фикс — QUERY последним и без PATH (defaults to cwd). Это два полностью холостых прогона до изоляции; финальные данные — 0 ошибок и 0 пустых order'ов на всех 270 вопросах.
+4. **Latency:** каждый CLI search ~34-38s (cProfile: работа внутри C-driven coroutine frames, CPU-bound, read-only; per-process cold start; batch/MCP-режим запрещён manual-CLI constraint). 270 вопросов ~2.6h. Mean корпуса-1 46.9s завышен окном антивируса (Kaspersky avp): q34-q36 заняли 205-251s. Машина shared — параллельные agent-сессии пользователя; сам retrieval детерминирован.
+5. **Post-init canary probe:** первый search после init занимает ~35s (one-time warmup, зафиксирован как index_wait_seconds; 1 probe на каждом корпусе).
+6. **Absent-вопросы** прогонялись для repowise (как memlab); rg их пропускает — rg-колонка 0/5 не сравнима как способность.
+7. **Прерванные прогоны:** один chained background run был убит прерванным tool call'ом посреди corpus-2; частичный .repowise corpus-2 вычищен, corpus-2 (и все последующие корпуса) перезапущены чисто во второй цепочке. Corpus-1 — из собственного чистого полного прогона после двух abort'ов (их артефакты вычищены; причина — bug порядка аргументов из п.3). Purge верифицирован post-run: .repowise/.mcp.json не осталось ни в одном из 5 корпусов (двухступенчатый `delete -p . --force` со stdin `1\n`, затем rm -rf остатков).
+8. **Метрики:** scripts/repowise_metrics.js (node), алгоритм повторяет scripts/metrics.py построчно; кросс-валидация против results.json — см. методологию.
+
+Raw per-system files: `tmp/bench-matrix/results/{rg,memlab,repowise}/<project_id>.json`; per-mode rows: `tmp/bench-matrix/results.json` / `results-repowise.json` (70 строк, schema results.json, system="repowise"); полная таблица: `tmp/bench-matrix/aggregate-repowise.md`.
+
+---
 
 ## ai-tester paired A/B 2026-06-29 (claude/glm-5-turbo)
 
