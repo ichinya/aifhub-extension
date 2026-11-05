@@ -88,22 +88,28 @@ test('aggregates a verified sample: attribution, spans, transport sums, provenan
   const m = result.metrics;
   assert.equal(m.schema, 'aifhub.runner_metrics.v1');
   assert.equal(m.run_id, 'run-1');
-  assert.equal(m.coverage, 'delivery_registry');
+  assert.equal(m.coverage, 'delivery_registry+timings');
   assert.deepEqual(m.attribution, { coordinator: 'parent', worker: 'worker', role: 'implement', run_kind: 'single', runs: 1, tasks: 1 });
   assert.deepEqual(m.requests, { total: 1, verified: 1, retried: 0, recovered: 0, incomplete: 0, duplicate_responses: 0, by_kind: { message: 0, completion: 1 } });
   assert.equal(m.transport.create_calls, 1);
   assert.equal(m.transport.read_calls, before.transport.read_calls);
   assert.equal(m.transport.incomplete_intervals, 0);
   assert.equal(m.checks, null);
-  assert.equal(m.phases.setup_ms, null);
-  assert.equal(m.phases.run_elapsed_ms, null);
+  // Stage-2 (#270): the sampled run record carries a measured setup timing,
+  // so the aggregate is the sum over the fully measured scope.
+  assert.equal(Number.isSafeInteger(m.phases.setup_ms) && m.phases.setup_ms >= 0, true, JSON.stringify(m.phases));
+  assert.equal(m.unknowns.includes('setup_ms'), false);
+  // Two mutating commands (start + result) close the measured envelope over
+  // their stamps; the aggregate is the per-run envelope summed over scope.
+  assert.equal(Number.isSafeInteger(m.phases.run_elapsed_ms) && m.phases.run_elapsed_ms >= 0, true, JSON.stringify(m.phases));
+  assert.equal(m.unknowns.includes('run_elapsed'), false);
   assert.equal(typeof m.phases.run_record_span_ms, 'number');
   assert.ok(m.phases.run_record_span_ms >= 0);
   assert.equal(m.phases.workers_span_sum_ms, m.phases.run_record_span_ms);
   assert.equal(m.phases.pending_observed_ms, 0);
   assert.equal(m.unknowns.includes('tokens'), true);
   assert.equal(m.unknowns.includes('checks'), true);
-  assert.equal(m.unknowns.includes('setup_ms'), true);
+  assert.equal(m.unknowns.includes('setup_ms'), false);
   assert.match(m.provenance.registry_digest, HEX);
   assert.deepEqual([m.provenance.requests_scanned, m.provenance.journals_scanned, m.provenance.runs_scanned], [1, 1, 1]);
   assert.equal(m.provenance.members_skipped, 0);
@@ -371,7 +377,7 @@ test('include-qa counts corrective supersession chains and closed reason codes',
   assert.deepEqual(checks.reasons, [{ code: 'unknown', count: 1 }]);
   assert.equal(checks.dependencies.length, 1);
   assert.deepEqual(Object.keys(checks.dependencies[0]).sort(), ['check_id', 'input_fingerprint', 'manifest_digest', 'wave_id']);
-  assert.equal(result.metrics.coverage, 'delivery_registry+qa');
+  assert.equal(result.metrics.coverage, 'delivery_registry+qa+timings');
   assert.equal(result.metrics.unknowns.includes('checks'), false);
   assert.equal(result.metrics.provenance.qa_results_scanned, 3);
 });
@@ -420,7 +426,7 @@ test('unreadable qa store degrades the checks block instead of guessing', async 
   assert.equal(result.metrics.provenance.qa_results_scanned, null);
   // Coverage declares the successfully read scope: the unreadable QA half
   // is not claimed even though --include-qa was requested.
-  assert.equal(result.metrics.coverage, "delivery_registry");
+  assert.equal(result.metrics.coverage, "delivery_registry+timings");
   // Without the opt-in the checks block is null by design, not by failure.
   const off = await f.collect();
   assert.equal(off.outcome, 'collected');
@@ -474,7 +480,7 @@ test('parity: collector output passes schema, runtime validator, projection and 
   assert.equal(record.metrics.checks_repeated, 1);
   assert.deepEqual(record.metrics.checks_reasons, []);
   assert.equal(record.metrics.run_record_span_ms, metrics.phases.run_record_span_ms);
-  assert.equal(record.metrics.coverage, 'delivery_registry+qa');
+  assert.equal(record.metrics.coverage, 'delivery_registry+qa+timings');
   assert.deepEqual(record.metrics.unknowns, metrics.unknowns);
   assert.equal(record.runtime.coordinator, 'parent');
   assert.equal(record.runtime.run_kind, 'single');

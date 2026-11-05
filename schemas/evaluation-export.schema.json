@@ -622,7 +622,9 @@
           "enum": [
             "delivery_registry",
             "delivery_registry+qa",
-            null
+            null,
+            "delivery_registry+timings",
+            "delivery_registry+qa+timings"
           ]
         },
         "setup_ms": {
