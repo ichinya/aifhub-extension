@@ -27,6 +27,29 @@ export function validCapabilities(c, r, s) {
     && (c.release_after_verify === undefined || typeof c.release_after_verify === 'boolean')
     && (i.retention_until === 'durable' || Date.parse(i.retention_until) > Date.parse(s.now()));
 }
+// Stage-2 usage reporting (#270): a stable declaration of support, never
+// counters — capabilities_digest covers the whole object and feeds identity/
+// recovery preconditions, so anything volatile would break them. A malformed
+// declaration is simply "not declared".
+export function usageReportingDeclaration(caps) {
+  const d = caps?.usage_reporting;
+  if (d === undefined || d === null) return null;
+  if (typeof d !== 'object' || Array.isArray(d)) return null;
+  const keys = Object.keys(d);
+  if (keys.length !== 4 || !['tokens', 'tool_calls', 'model_requests'].every(k => keys.includes(k) && typeof d[k] === 'boolean')
+    || !['request', 'response'].includes(d.scope)) return null;
+  return d;
+}
+const usageCount = v => v === null || (Number.isSafeInteger(v) && v >= 0);
+// Closed usage object ("what the host reported", not "what the model did"):
+// every member is present, partial support is expressed with null members.
+export function validateUsageObject(u) {
+  fields(u, ['tokens', 'tool_calls', 'model_requests']);
+  if (typeof u.tokens !== 'object' || u.tokens === null || Array.isArray(u.tokens)) requireValue(false, 'invalid-delivery-state', true);
+  fields(u.tokens, ['input', 'output', 'total', 'cache_read', 'cache_write', 'reasoning']);
+  requireValue(Object.values(u.tokens).every(usageCount) && usageCount(u.tool_calls) && usageCount(u.model_requests), 'invalid-delivery-state', true);
+  return u;
+}
 export async function bounded(fn, options) {
   const ms = options.hostTimeoutMs ?? 5000;
   requireValue(Number.isSafeInteger(ms) && ms >= 1 && ms <= 300000, 'invalid-host-timeout');
@@ -76,8 +99,16 @@ export function frozenRequest(r) {
 }
 export function validateDeliveryRequest(r) {
   fields(r, ['schema', 'request_uuid', 'revision', 'phase', 'slot', 'target', 'identity', 'binding', 'body', 'verdict', 'frozen_evidence',
-    'frozen_digest', 'host', 'attempt_count', 'recovery', 'history', 'transport', 'interval', 'created_at', 'updated_at'], ['release']);
+    'frozen_digest', 'host', 'attempt_count', 'recovery', 'history', 'transport', 'interval', 'created_at', 'updated_at'], ['release', 'usage', 'usage_scope']);
   requireValue(r.schema === DELIVERY_REQUEST_SCHEMA && phases.includes(r.phase), 'invalid-delivery-state', true);
+  // Usage reporting (#270): the sibling pair is written together and absent
+  // together; TRANSPORT_KEYS and the zero-initialized transport never carry it
+  // (no fabricated zeros). An answer without usage never erases a persisted one.
+  if (r.usage !== undefined || r.usage_scope !== undefined) {
+    requireValue(r.usage !== undefined && r.usage_scope !== undefined, 'invalid-delivery-state', true);
+    validateUsageObject(r.usage);
+    requireValue(['request', 'response'].includes(r.usage_scope), 'invalid-delivery-state', true);
+  }
   requestUuid(r.request_uuid); count(r.revision); requireValue(r.revision > 0, 'invalid-delivery-state', true);
   fields(r.slot, ['change_id', 'run_id', 'task_id']); executionId(r.slot.change_id); identifier(r.slot.run_id); identifier(r.slot.task_id);
   fields(r.target, ['kind', 'locator']); requireValue(['message', 'completion'].includes(r.target.kind), 'invalid-delivery-state', true); opaque(r.target.locator);

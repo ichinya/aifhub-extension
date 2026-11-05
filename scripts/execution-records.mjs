@@ -85,6 +85,41 @@ export function resultRecord(value, run, task) {
   requireValue(canonical(Object.keys(value.evidence_digests).sort())===canonical(payload.evidence) && value.payload_digest===digest(payload), 'invalid-state');
   const {digest: checksum,...rest}=value; requireValue(checksum===digest(rest),'invalid-state');
 }
+// Stage-2 measured timings (#270): optional closed block on a run record. Setup
+// is "admission preparation before publication" (fresh preflight + under-lock
+// admission segments); stamps are added only by commands that really rewrite
+// the run record. The block is optional, so every pre-stage-2 record stays
+// valid unchanged.
+const TIMING_STAMP_LIMIT = 256;
+export function timingsBlock(value) {
+  fields(value, [], ['setup', 'stamps']);
+  if (value.setup !== undefined) {
+    const setup = value.setup;
+    fields(setup, ['started_at', 'ended_at', 'elapsed_ms', 'complete', 'segments']);
+    for (const time of [setup.started_at, setup.ended_at]) requireValue(typeof time === 'string' && Number.isFinite(Date.parse(time)), 'invalid-state');
+    requireValue(Number.isSafeInteger(setup.elapsed_ms) && setup.elapsed_ms >= 0 && typeof setup.complete === 'boolean', 'invalid-state');
+    fields(setup.segments, ['preflight', 'admission']);
+    for (const key of ['preflight', 'admission']) {
+      const segment = setup.segments[key];
+      fields(segment, ['started_at', 'ended_at', 'elapsed_ms']);
+      for (const time of [segment.started_at, segment.ended_at]) requireValue(typeof time === 'string' && Number.isFinite(Date.parse(time)), 'invalid-state');
+      requireValue(Number.isSafeInteger(segment.elapsed_ms) && segment.elapsed_ms >= 0, 'invalid-state');
+    }
+    // The measured total is the sum of the two segments — never an independent
+    // wall interval that would double-count (contract R2 discipline).
+    requireValue(setup.elapsed_ms === setup.segments.preflight.elapsed_ms + setup.segments.admission.elapsed_ms, 'invalid-state');
+  }
+  if (value.stamps !== undefined) {
+    requireValue(Array.isArray(value.stamps) && value.stamps.length <= TIMING_STAMP_LIMIT, 'invalid-state');
+    for (const stamp of value.stamps) {
+      fields(stamp, ['action', 'at']);
+      requireValue(typeof stamp.action === 'string' && stamp.action.length >= 1 && stamp.action.length <= 80
+        && !/[\x00-\x1f]/.test(stamp.action), 'invalid-state');
+      requireValue(typeof stamp.at === 'string' && Number.isFinite(Date.parse(stamp.at)), 'invalid-state');
+    }
+  }
+  return value;
+}
 function receipt(value) {
   fields(value,['action','input_digest','submitted_version','output']);
   enumeration(value.action,['result','accept','batch-seal','batch-result','batch-accept','batch-close','interrupt','stop-confirm','upgrade']);
@@ -178,7 +213,8 @@ function batchReceipts(run) {
 export function validateRun(run, {predecessors=[]}={}) {
   const legacy=run?.schema==='aifhub.execution.v1';
   requireValue(legacy || run?.schema===RUN_SCHEMA,'unsupported-run-schema');
-  fields(run,['schema','change_id','run_id','task_id','owner','worker','role','scope','context_paths','version','status','context','initial_worktree','checkpoint',...(!legacy?['kind','lifecycle','execution_state','source','receipts','created_at','updated_at']:[])], ['result','accepted_by',...(!legacy?['manifest','preflight','items','seal','closure','recovery','confirmation','legacy','instruction_composition_digest','instruction_composition_status']:[])]);
+  fields(run,['schema','change_id','run_id','task_id','owner','worker','role','scope','context_paths','version','status','context','initial_worktree','checkpoint',...(!legacy?['kind','lifecycle','execution_state','source','receipts','created_at','updated_at']:[])], ['result','accepted_by',...(!legacy?['manifest','preflight','items','seal','closure','recovery','confirmation','legacy','instruction_composition_digest','instruction_composition_status','timings']:[])]);
+  if(!legacy && run.timings!==undefined)timingsBlock(run.timings);
   executionId(run.change_id); identifier(run.run_id); if(run.task_id!==null || legacy) identifier(run.task_id);
   identifier(run.owner); identifier(run.worker); enumeration(run.role,['implement','fix']);
   requireValue(stringList(run.scope).length>0,'invalid-state'); run.scope.forEach(portablePath); assertAuxiliaryPaths(run.context_paths);

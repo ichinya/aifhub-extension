@@ -264,3 +264,103 @@ test('reserve replay materializes the registry when the journal survived without
   const replayed = await f.call('delivery-reserve', { change_id: f.id, run_id: 'run-1', task_id: '1.1', request_uuid: uuid, target: { kind: 'completion', locator: 'worker-1' } });
   assert.equal(replayed.ok, true);
 });
+
+
+// Host usage reporting (#270)
+{
+  const fullUsage = () => ({ tokens: { input: 10, output: 5, total: 15, cache_read: 2, cache_write: 1, reasoning: 3 }, tool_calls: 3, model_requests: 2 });
+  test('without a declaration, responses carry no usage and the record has none', async t => {
+    const f = await fixture(t, { mode: 'normal' }); await f.prepare();
+    const r = await f.send(); assert.equal(r.delivery_verified, true);
+    const record = await f.record();
+    assert.equal(record.usage, undefined);
+    assert.equal(record.usage_scope, undefined);
+    assert.deepEqual(r.runner_metrics.tokens, null);
+    assert.equal(r.runner_metrics.tool_calls, null);
+    assert.equal(r.runner_metrics.model_requests, null);
+    assert.doesNotMatch(JSON.stringify(r.runner_metrics), /"usage/);
+  });
+  test('declared full usage persists the sibling pair and extends the local metrics view', async t => {
+    const host = createFakeHost({ usage: { scope: 'request', kind: 'full' } });
+    const f = await fixture(t, { host }); await f.prepare();
+    const r = await f.send(); assert.equal(r.delivery_verified, true);
+    const record = await f.record();
+    assert.deepEqual(record.usage, fullUsage());
+    assert.equal(record.usage_scope, 'request');
+    assert.deepEqual(r.runner_metrics.tokens, fullUsage().tokens);
+    assert.equal(r.runner_metrics.tool_calls, 3);
+    assert.equal(r.runner_metrics.model_requests, 2);
+    // Replay persistence: the pair survives reload without any host call.
+    const reloaded = await f.s.loadRequest(f.id, uuid);
+    assert.deepEqual(reloaded.usage, fullUsage());
+    assert.equal(reloaded.usage_scope, 'request');
+  });
+  test('partial and null-dim usage persist null members without fabricated zeros', async t => {
+    for (const kind of ['partial', 'null-dims']) {
+      const host = createFakeHost({ usage: { scope: 'response', kind } });
+      const f = await fixture(t, { host }); await f.prepare();
+      const r = await f.send(); assert.equal(r.delivery_verified, true);
+      const record = await f.record();
+      assert.equal(record.usage_scope, 'response');
+      assert.equal(Object.hasOwn(record.usage, 'tokens'), true);
+      if (kind === 'partial') {
+        assert.equal(record.usage.tokens.input, 10);
+        assert.equal(record.usage.tokens.output, null);
+        assert.equal(record.usage.tool_calls, null);
+      } else {
+        assert.deepEqual(record.usage.tokens, { input: null, output: null, total: null, cache_read: null, cache_write: null, reasoning: null });
+        assert.equal(record.usage.tool_calls, null);
+        assert.equal(record.usage.model_requests, null);
+      }
+    }
+  });
+  test('a malformed usage declaration behaves like no declaration', async t => {
+    const host = createFakeHost({ usage: { scope: 'request', kind: 'full' } });
+    const realCaps = host.capabilities.bind(host);
+    host.capabilities = async () => ({ ...await realCaps(), usage_reporting: { tokens: 'yes', tool_calls: true, model_requests: true, scope: 'request' } });
+    const f = await fixture(t, { host }); await f.prepare();
+    const r = await f.send(); assert.equal(r.delivery_verified, true);
+    const record = await f.record();
+    assert.equal(record.usage, undefined);
+    assert.equal(record.usage_scope, undefined);
+  });
+  test('an answer without usage never erases the persisted observation', async t => {
+    const host = createFakeHost({ usage: { scope: 'request', kind: 'full', stopAfterResponses: 1 } });
+    const f = await fixture(t, { host }); await f.prepare();
+    assert.equal((await f.send()).delivery_verified, true);
+    const afterSend = await f.record();
+    assert.deepEqual(afterSend.usage, fullUsage());
+    const r = await f.recover(); // all later answers carry no usage
+    assert.equal(r.delivery_verified, true);
+    const record = await f.record();
+    assert.deepEqual(record.usage, fullUsage(), 'the last observation survives');
+    assert.equal(record.usage_scope, 'request');
+  });
+  test('usage without a host id persists while the request stays pending', async t => {
+    const host = createFakeHost({ mode: 'pending', usage: { scope: 'request', kind: 'full' } });
+    const f = await fixture(t, { host }); await f.prepare();
+    const r = await f.send();
+    assert.equal(r.state, 'uncertain'); assert.equal(r.query_state, 'pending');
+    const record = await f.record();
+    assert.deepEqual(record.usage, fullUsage());
+    assert.equal(record.usage_scope, 'request');
+    assert.equal(record.host.message_id, null);
+    assert.equal(record.host.completion_id, null);
+  });
+  test('newer usage overwrites the persisted observation (fetch after read)', async t => {
+    const host = createFakeHost({ usage: { scope: 'request', kind: 'conflict', model_requests: 2 } });
+    const f = await fixture(t, { host }); await f.prepare();
+    assert.equal((await f.send()).delivery_verified, true);
+    const record = await f.record();
+    assert.equal(record.usage.model_requests, 9, 'the fetch answer is the last observation');
+  });
+  test('measured zeros persist as zeros, never as absence', async t => {
+    const host = createFakeHost({ usage: { scope: 'request', kind: 'full', tool_calls: 0, model_requests: 0 } });
+    const f = await fixture(t, { host }); await f.prepare();
+    const r = await f.send(); assert.equal(r.delivery_verified, true);
+    const record = await f.record();
+    assert.equal(record.usage.tool_calls, 0);
+    assert.equal(record.usage.model_requests, 0);
+    assert.equal(r.runner_metrics.tool_calls, 0);
+  });
+}

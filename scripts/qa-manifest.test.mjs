@@ -553,3 +553,74 @@ describe('QA review hardening: case aliases, module identity, policy roots, verd
     assert.equal(drifted.code, 'owner-requirements-drift');
   });
 });
+
+describe('QA stage-2 metadata (#270)', () => {
+  it('fresh records freeze recorded_at and measured snapshot_hash timing', async () => {
+    const f = await fixture();
+    assert.equal((await f.prepare()).ok, true);
+    assert.equal((await f.record('verify', { rerunReason: 'rerun-explicit' })).ok, true);
+    const store = await qaStore(f.options);
+    const stored = await store.json(`${f.qa}/results/verify-1.json`);
+    const metadata = stored.record.metadata;
+    assert.equal(metadata.rerun_reason, 'rerun-explicit');
+    assert.ok(Number.isFinite(Date.parse(metadata.recorded_at)));
+    const timing = metadata.timings.snapshot_hash;
+    assert.equal(timing.complete, true);
+    assert.ok(Number.isSafeInteger(timing.elapsed_ms) && timing.elapsed_ms >= 0);
+    assert.equal(timing.operations, 2); // one snapshot + one fingerprints operation
+    assert.equal(metadata.execution_run_id, undefined);
+    assert.equal(stored.record.metadata.timings.checks, undefined);
+  });
+
+  it('same-id replay without options is idempotent and keeps the frozen recorded_at', async () => {
+    const f = await fixture();
+    await f.prepare();
+    await f.record('verify');
+    const store = await qaStore(f.options);
+    const before = await store.json(`${f.qa}/results/verify-1.json`);
+    assert.equal((await f.record('verify')).ok, true, 'replay without options must succeed');
+    const after = await store.json(`${f.qa}/results/verify-1.json`);
+    assert.deepEqual(after, before, 'replayed record is byte-identical');
+    assert.equal(after.record.metadata.recorded_at, before.record.metadata.recorded_at);
+  });
+
+  it('replay with a conflicting rerun reason or checks timing is a typed metadata-conflict', async () => {
+    const f = await fixture();
+    await f.prepare();
+    await f.record('verify', { rerunReason: 'rerun-explicit', checksTiming: { started_at: '2026-11-05T00:00:00Z', ended_at: '2026-11-05T00:00:01Z', elapsed_ms: 1000, complete: true } });
+    assert.equal((await f.record('verify', { rerunReason: 'rerun-policy-changed' })).code, 'metadata-conflict');
+    assert.equal((await f.record('verify', { rerunReason: 'rerun-explicit', checksTiming: { started_at: '2026-11-05T00:00:00Z', ended_at: '2026-11-05T00:00:02Z', elapsed_ms: 2000, complete: true } })).code, 'metadata-conflict');
+    assert.equal((await f.record('verify', { rerunReason: 'rerun-explicit', checksTiming: { started_at: '2026-11-05T00:00:00Z', ended_at: '2026-11-05T00:00:01Z', elapsed_ms: 1000, complete: true } })).ok, true);
+    const store = await qaStore(f.options);
+    const stored = await store.json(`${f.qa}/results/verify-1.json`);
+    assert.equal(stored.record.metadata.timings.checks.elapsed_ms, 1000);
+  });
+
+  it('legacy records without metadata stay replayable and refuse explicit metadata members', async () => {
+    const f = await fixture();
+    await f.prepare();
+    await f.record('verify');
+    const store = await qaStore(f.options);
+    const envelope = await store.json(`${f.qa}/results/verify-1.json`);
+    const legacy = envelope.record; delete legacy.metadata;
+    await store.write(`${f.qa}/results/verify-1.json`, `${canonical({ checksum: digest(legacy), record: legacy })}\n`);
+    assert.equal((await f.record('verify')).ok, true, 'replay without options stays byte-identical');
+    assert.equal((await f.record('verify', { rerunReason: 'rerun-explicit' })).code, 'metadata-conflict');
+  });
+
+  it('invalid rerun reasons and timing shapes are rejected before any state changes', async () => {
+    const f = await fixture();
+    await f.prepare();
+    assert.equal((await f.record('verify', { rerunReason: 'made-up-reason' })).code, 'rerun-reason-invalid');
+    assert.equal((await f.record('verify', { checksTiming: { started_at: 'x', ended_at: 'y', elapsed_ms: -1, complete: true } })).code, 'timing-invalid');
+    const store = await qaStore(f.options);
+    const records = await store.results();
+    assert.equal(records.length, 0, 'nothing was recorded');
+  });
+
+  it('CLI parser validates --rerun-reason against the closed vocabulary', async () => {
+    assert.deepEqual(parseQaManifestArgs(['record', '--change', 'c', '--rerun-reason', 'rerun-inputs-changed']),
+      { action: 'record', changeId: 'c', rerunReason: 'rerun-inputs-changed', json: false });
+    assert.equal(parseQaManifestArgs(['record', '--change', 'c', '--rerun-reason', 'made-up']), null);
+  });
+});

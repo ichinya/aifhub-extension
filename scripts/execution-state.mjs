@@ -45,6 +45,18 @@ const contracts={
   'attempt-finish':[[...mutation,'attempt_id','outcome','evidence'],[]],
 };
 const now=()=>new Date().toISOString();
+// Elapsed segments are measured on the monotonic process clock; wall ISO stamps
+// stay correlation-only. Rounded to whole milliseconds so the persisted value
+// stays a nonnegative safe integer.
+const perfNow=()=>performance.now();
+const measuredMs=(start)=>Math.max(0,Math.round(perfNow()-start));
+// Stage-2 stamp (#270): only commands that really rewrite the run record add a
+// stamp; failed transitions never persist one because they never save the run.
+function stamp(run,action) {
+  const timings=run.timings??(run.timings={});
+  const stamps=timings.stamps??(timings.stamps=[]);
+  stamps.push({action,at:now()});
+}
 const same=(a,b)=>canonical(a)===canonical(b);
 const sourceRecord=s=>({...s.namespace,namespace_digest:s.namespace_digest});
 const refs=(store,paths)=>store.references(assertAuxiliaryPaths(paths));
@@ -135,8 +147,11 @@ export async function executionCommand(action,input,options={}) {
   const starting=['start','batch-start'].includes(action), readOnly=['inspect','resume','attempt-check'].includes(action);
   // Prepared admission is historical intent; worker resume still checks freshness.
   const prepared=starting?await readTransaction(store,folder,transactionId(action,input)):null;
-  let preflight;
+  let preflight, preflightTiming=null;
   if(starting && prepared?.state!=='prepared') {
+    // Setup segment 1 (#270): fresh preflight before any lock. A prepared
+    // replay skips this branch entirely and never writes timings.
+    const startedAt=now(), start=perfNow();
     identifier(input.owner); identifier(input.worker);
     const extra=assertAuxiliaryPaths(stringList(input.context_paths??[])).slice().sort();
     const source=await resolveExecutionSource(store,change,input.role,extra);
@@ -149,8 +164,10 @@ export async function executionCommand(action,input,options={}) {
       requireValue(stringList(input.preflight_paths).length>0,'missing-preflight'); preflightRefs=await refs(store,input.preflight_paths);
     } else { identifier(input.task_id); selectExecutionTask(source,input.task_id,input.role,extra); scope=await validateExecutionScope(store,input.scope,source); }
     preflight={source,scope,extra,refs:preflightRefs};
+    preflightTiming={started_at:startedAt,ended_at:now(),elapsed_ms:measuredMs(start)};
   }
   async function execute() {
+    const admissionStart=now(), admissionStartPerf=starting?perfNow():null;
     const pending=await pendingTransactions(store), txId=transactionId(action,input);
     if(action!=='inspect' && pending.length) {
       requireValue(!readOnly && pending.length===1 && pending[0].folder===folder && pending[0].tx.id===txId && pending[0].tx.action===action && pending[0].tx.input_digest===digest(input),'pending-transaction',true);
@@ -197,6 +214,14 @@ export async function executionCommand(action,input,options={}) {
       if(run.kind==='batch')Object.assign(run,{manifest:structuredClone(input.manifest),preflight:preflight.refs,items:Object.fromEntries(input.manifest.map(i=>[i.task_id,{}]))});
       if(input.instruction_composition_digest!==undefined)run.instruction_composition_digest=input.instruction_composition_digest;
       if(input.instruction_composition_status!==undefined)run.instruction_composition_status=input.instruction_composition_status;
+      // Setup segment 2 (#270): under-lock admission from the entry of this
+      // function up to the validated worktree image, right before publish.
+      // Lock waiting and the durable publication itself stay outside.
+      const admission={started_at:admissionStart,ended_at:now(),elapsed_ms:measuredMs(admissionStartPerf)};
+      run.timings={setup:{started_at:preflightTiming.started_at,ended_at:admission.ended_at,
+        elapsed_ms:preflightTiming.elapsed_ms+admission.elapsed_ms,complete:true,
+        segments:{preflight:preflightTiming,admission}},stamps:[]};
+      stamp(run,action);
       validateRun(run); const writes=[];
       if(!h.source)writes.push([`${folder}/source.json`,{schema:SOURCE_SCHEMA,source:run.source}]);
       if(!h.ledger)writes.push([`${folder}/fix-attempts.json`,{schema:LEDGER_SCHEMA,attempts:[],aliases:[]}]);
@@ -233,7 +258,7 @@ export async function executionCommand(action,input,options={}) {
       run.checkpoint={worktree:snapshot,progress:progressRecord(input.progress),
         ...(input.instruction_composition_digest!==undefined?{instruction_composition_digest:input.instruction_composition_digest}:{}),
         ...(input.instruction_composition_status!==undefined?{instruction_composition_status:input.instruction_composition_status}:{})};
-      advance(run); await saveRun(store,filename,run); return view(run);
+      stamp(run,'checkpoint'); advance(run); await saveRun(store,filename,run); return view(run);
     }
     if(action.startsWith('attempt-')) {
       requireValue(run.kind==='single' && run.role==='fix' && run.status==='started' && run.lifecycle==='active','fix-run-required');
@@ -275,7 +300,7 @@ export async function executionCommand(action,input,options={}) {
         run.lifecycle='closed'; run.execution_state='stopped'; extra={...extra,accepted,unfinished};
       }
     }
-    advance(run); const output=receipt(run,action,input,key,extra); await saveRun(store,filename,run); return {...view(run),...output};
+    stamp(run,key); advance(run); const output=receipt(run,action,input,key,extra); await saveRun(store,filename,run); return {...view(run),...output};
   }
   if(readOnly)return execute();
   await options.beforeLock?.();
@@ -361,7 +386,7 @@ async function interrupt(store,folder,filename,h,original,input,options) {
     pending_attempts:pending.map(a=>a.attempt_id),drift:await drift(store,original),interrupted_at:now(),
     ...(input.instruction_composition_digest!==undefined?{instruction_composition_digest:input.instruction_composition_digest}:{}),
     ...(input.instruction_composition_status!==undefined?{instruction_composition_status:input.instruction_composition_status}:{})};
-  run.lifecycle='interrupted'; run.execution_state=input.execution_state; advance(run);
+  run.lifecycle='interrupted'; run.execution_state=input.execution_state; stamp(run,'interrupt'); advance(run);
   const output=receipt(run,'interrupt',input,'interrupt',{recovery_id:input.recovery_id}); await validateHistoricalRun(store,run,original); validateLedger(ledger);
   const writes=[]; if(!h.source)writes.push([`${folder}/source.json`,{schema:SOURCE_SCHEMA,source:run.source}]);
   writes.push([`${folder}/fix-attempts.json`,ledger],[filename,run]);
@@ -373,7 +398,7 @@ async function stopConfirm(store,filename,run,input) {
   actor(run,input,true);
   requireValue(run.lifecycle==='interrupted' && run.recovery.recovery_id===input.recovery_id && run.execution_state!=='stopped','invalid-stop-confirmation',true);
   const evidence=await refs(store,input.evidence); requireValue(Object.keys(evidence).length>0,'missing-stop-evidence');
-  run.confirmation={confirmation_id:input.confirmation_id,recovery_id:input.recovery_id,evidence}; run.execution_state='stopped'; advance(run);
+  run.confirmation={confirmation_id:input.confirmation_id,recovery_id:input.recovery_id,evidence}; run.execution_state='stopped'; stamp(run,'stop-confirm'); advance(run);
   const output=receipt(run,'stop-confirm',input,'stop-confirm',{recovery_id:input.recovery_id,confirmation_id:input.confirmation_id});
   await saveRun(store,filename,run); return output;
 }

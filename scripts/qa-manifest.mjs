@@ -10,7 +10,7 @@ import { validateChecks, observeQaSnapshot, checkFingerprints } from './qa-manif
 import { evaluateQaBinding } from './qa-bound-evidence.mjs';
 import { writeGateEvidence } from './write-gate-evidence.mjs';
 import { readOpenSpecPolicy } from './openspec-policy.mjs';
-import { isQaEnrolled } from './qa-manifest-record.mjs';
+import { isQaEnrolled, QA_RERUN_REASON_CODES } from './qa-manifest-record.mjs';
 import { REQUIRED_GATES_BY_STAGE } from './handoff-gate-summary.mjs';
 
 export { evaluateQaBinding, readBoundGateEvidence } from './qa-bound-evidence.mjs';
@@ -172,7 +172,7 @@ export function parseQaManifestArgs(argv = []) {
   const names = { '--change': 'changeId', '--plan': 'plan', '--flow': 'flow', '--namespace': 'namespace', '--qa-dir': 'qaDir',
     '--config': 'configFile', '--wave': 'waveId', '--gate': 'gate', '--check': 'checkId', '--result': 'resultId',
     '--from': 'from', '--receipt': 'receiptPath', '--execution': 'executionFile', '--supersedes': 'supersedes',
-    '--expected-publication': 'expectedPublication' };
+    '--expected-publication': 'expectedPublication', '--rerun-reason': 'rerunReason' };
   const seen = new Set();
   for (let i = 1; i < argv.length; i++) {
     const flag = argv[i];
@@ -182,6 +182,9 @@ export function parseQaManifestArgs(argv = []) {
     else if (names[flag] && typeof argv[i + 1] === 'string' && !argv[i + 1].startsWith('--')) parsed[names[flag]] = argv[++i];
     else return null;
   }
+  // Parser-side causal-vocabulary validation (#270): an out-of-dictionary
+  // reason is rejected before any execution touches QA state.
+  if (parsed.rerunReason !== undefined && !QA_RERUN_REASON_CODES.includes(parsed.rerunReason)) return null;
   if (!parsed.changeId && !parsed.plan) return null;
   if (parsed.expectedPublication === 'none') parsed.expectedPublication = null;
   return parsed;

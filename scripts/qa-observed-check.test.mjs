@@ -520,8 +520,20 @@ describe('crash and concurrency windows', () => {
     assert.equal(resumed.replayed, true);
     assert.equal(resumed.recorded, true);
     assert.equal(resumed.result_id, first.result_id);
-    assert.equal(f.host.state.counters.verifier_launches, 1);
-    assert.deepEqual(await readFile(path.join(f.rootDir, f.qa, 'results', `${first.result_id}.json`)), before);
+    assert.equal(f.host.state.counters.verifier_launches, 1); // record-only never relaunches
+    // Stage-2 (#270): the re-record is byte-identical outside metadata. The
+    // checks timing is restored from the registry record (no new measurement);
+    // recorded_at and the snapshot-hash timing are honestly re-stamped because
+    // the crashed record was never persisted.
+    const after = JSON.parse((await readFile(path.join(f.rootDir, f.qa, 'results', `${first.result_id}.json`))).toString());
+    const original = JSON.parse(before.toString());
+    const withoutMetadata = record => { const copy = { ...record }; delete copy.metadata; return copy; };
+    assert.deepEqual(withoutMetadata(after.record), withoutMetadata(original.record));
+    const registry = JSON.parse((await readFile(path.join(f.rootDir, recordPath(f)))).toString());
+    assert.deepEqual(after.record.metadata.timings.checks, registry.record.checks_timing);
+    assert.equal(after.record.metadata.timings.checks.complete, true);
+    assert.equal(after.record.metadata.timings.snapshot_hash.complete, true);
+    assert.equal(Number.isFinite(Date.parse(after.record.metadata.recorded_at)), true);
   });
   it('parallel ingestions of the same run serialize through the registry lock', async () => {
     const f = await observedFixture({ mode: 'hang' });
@@ -1032,7 +1044,14 @@ describe('review custody contracts (round 2)', () => {
     assert.equal(resumed.replayed, true);
     assert.equal(resumed.recorded, true);
     assert.equal(existsSync(resultFile), true);
-    assert.deepEqual(await readFile(resultFile), resultBefore); // no auto-supersede divergence
+    // No auto-supersede divergence: identical outside metadata, checks timing
+    // restored from the registry without a new verifier launch (#270).
+    const rewritten = JSON.parse((await readFile(resultFile)).toString());
+    const prior = JSON.parse(resultBefore.toString());
+    const withoutMetadata = record => { const copy = { ...record }; delete copy.metadata; return copy; };
+    assert.deepEqual(withoutMetadata(rewritten.record), withoutMetadata(prior.record));
+    const registryRecord = JSON.parse((await readFile(path.join(f.rootDir, recordPath(f)))).toString());
+    assert.deepEqual(rewritten.record.metadata.timings.checks, registryRecord.record.checks_timing);
     const finalReplay = await f.ingest(envelope);
     assert.equal(finalReplay.ok, true);
     assert.equal(finalReplay.replayed, true);
@@ -1313,5 +1332,54 @@ describe('AC6: inert without hook configuration and stable extension surfaces', 
     const binding = await f.inspect({ HostObservationRegistry: f.registry });
     assert.deepEqual(binding.authorizes, []);
     assert.equal(binding.state, 'valid');
+  });
+});
+
+
+describe('observed checks timing (#270)', () => {
+  const registryTiming = async f => JSON.parse((await readFile(path.join(f.rootDir, recordPath(f)), 'utf8'))).record.checks_timing;
+  const shapeOk = timing => {
+    assert.ok(Number.isFinite(Date.parse(timing.started_at)));
+    assert.ok(Number.isFinite(Date.parse(timing.ended_at)));
+    assert.equal(Number.isSafeInteger(timing.elapsed_ms) && timing.elapsed_ms >= 0, true);
+    assert.equal(timing.complete, true, 'settled outcomes close the measurement');
+  };
+  for (const [mode, outcome] of [['pass', 'completed'], ['fail', 'failed'], ['hang', 'timeout'], ['noreport', 'missing-report']]) {
+    it(`${mode} (${outcome}) persists a complete checks timing in the registry and metadata`, async () => {
+      const f = await observedFixture({ mode });
+      await f.prepare();
+      const ingested = await f.ingest(await f.issue(await f.compose()));
+      assert.equal(ingested.ok, true, JSON.stringify(ingested));
+      const timing = await registryTiming(f);
+      shapeOk(timing);
+      const record = await recordedResult(f, ingested.result_id);
+      assert.deepEqual(record.metadata.timings.checks, timing, 'metadata carries the same measured interval');
+      assert.equal(record.metadata.timings.snapshot_hash.complete, true);
+    });
+  }
+  it('an externally cancelled run closes its measurement with complete:true', async () => {
+    const f = await observedFixture({ mode: 'cancel' });
+    await f.prepare();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 250);
+    try {
+      const ingested = await f.ingest(await f.issue(await f.compose()), { signal: controller.signal });
+      assert.equal(ingested.ok, true, JSON.stringify(ingested));
+      assert.equal(ingested.outcome, 'cancelled');
+      shapeOk(await registryTiming(f));
+    } finally { clearTimeout(timer); controller.abort(); }
+  });
+  it('a rejected verifier launch leaves no measurement anywhere', async () => {
+    const f = await observedFixture({ execThrow: true });
+    await f.prepare();
+    const ingested = await f.ingest(await f.issue(await f.compose()));
+    assert.equal(ingested.ok, false);
+    assert.equal(ingested.code, 'observation-exec-failed');
+    // The pending intent exists (written before the launch) but carries no
+    // measurement; no complete registry record and no qa record exist.
+    const pending = JSON.parse(await readFile(path.join(f.rootDir, recordPath(f)), 'utf8')).record;
+    assert.equal(pending.state, 'pending');
+    assert.equal(pending.checks_timing, undefined);
+    assert.equal((await f.records()).length, 0, 'no qa record, no metadata');
   });
 });

@@ -4,7 +4,8 @@ import { deliveryAdmission } from './execution-state.mjs';
 import { strictQaGate } from './qa-manifest-store.mjs';
 import { DELIVERY_REQUEST_SCHEMA, DELIVERY_RECORD_SCHEMA, RECOVERY_ACTION_TYPES, DELIVERY_LIMITS, TRANSPORT_KEYS,
   deliveryPaths, deliveryStore, requestUuid, validateDeliveryRequest, validateDeliveryRecord, validateRecoveryAction,
-  frozenRequest, strictBody, readBody, validateFrozenBody, projection, bindingFor, validCapabilities, bounded } from './host-delivery-store.mjs';
+  frozenRequest, strictBody, readBody, validateFrozenBody, projection, bindingFor, validCapabilities, bounded,
+  usageReportingDeclaration, validateUsageObject } from './host-delivery-store.mjs';
 export { DELIVERY_REQUEST_SCHEMA, DELIVERY_RECORD_SCHEMA, RECOVERY_ACTION_TYPES, validateDeliveryRequest,
   validateDeliveryRecord, validateRecoveryAction };
 // Records one bounded send/recover action may still append after the host
@@ -60,12 +61,18 @@ async function suppliedBody(s, input) {
   return null;
 }
 function localView(r, admission, extra = {}) {
+  // Stage-2 usage view (#270): the snapshot extends honestly from the sibling
+  // usage member — absent usage stays null, never a fabricated zero.
+  const usage = r.usage;
   return { ok: !['blocked', 'uncertain'].includes(r.phase), request_uuid: r.request_uuid, request_revision: r.revision, state: r.phase,
     query_state: projection(r).query_state, body_sha256: r.identity?.body_sha256 ?? null,
     delivery_verified: false, reservation_retained: admission.reservation_retained, retry_create_allowed: false,
     recovery_action: r.recovery, host_state: r.host.request_state, authorizes: [], historical: admission.historical,
     persisted: admission.mutating !== false,
-    runner_metrics: { schema: 'aifhub.runner_metrics.v1', run_id: r.slot.run_id, transport: structuredClone(r.transport) }, ...extra };
+    runner_metrics: { schema: 'aifhub.runner_metrics.v1', run_id: r.slot.run_id, transport: structuredClone(r.transport),
+      tokens: usage ? structuredClone(usage.tokens) : null,
+      tool_calls: usage?.tool_calls ?? null,
+      model_requests: usage?.model_requests ?? null }, ...extra };
 }
 async function assertIdentity(s, r, input, a) {
   requireValue(input.run_id === r.slot.run_id && (input.task_id === undefined || input.task_id === r.slot.task_id)
@@ -192,9 +199,22 @@ async function resolveRequest(input, options, mode) {
     if (writable) {
       r.host.namespace_digest = scope; r.host.continuity_token = continuity; r.host.capabilities_digest = digest(caps); await s.saveRequest(r);
     }
+    // Usage capture (#270): only a declared, well-formed usage object is
+    // persisted, overwrite-with-newer only. A response without usage never
+    // erases the persisted observation (erasing would fabricate "the host
+    // stopped reporting"). The create answer is discarded by the helper, so it
+    // is never a capture source.
+    const usageDeclaration = usageReportingDeclaration(caps);
+    function captureUsage(response) {
+      if (!usageDeclaration || !writable || response?.usage === undefined || response.usage === null) return;
+      try { validateUsageObject(response.usage); } catch { return; } // malformed: no capture, no erase
+      r.usage = structuredClone(response.usage);
+      r.usage_scope = usageDeclaration.scope;
+    }
     const query = { request_uuid: r.request_uuid, namespace_digest: scope };
     async function read() {
       const found = await operate('read', s, r, () => client.readRequest(query), options, writable);
+      captureUsage(found);
       await s.hit('after-host-read'); return found;
     }
     let found;
@@ -249,6 +269,7 @@ async function resolveRequest(input, options, mode) {
     let response;
     try { response = await operate('fetch', s, r, () => client.fetchResponse(query), options, writable); }
     catch { return uncertain('delivery-response-unavailable', 'fetch-response'); }
+    captureUsage(response);
     await s.hit('after-response-fetch');
     if (!Buffer.isBuffer(response?.body)) return uncertain('delivery-response-unavailable', 'fetch-response');
     try {
