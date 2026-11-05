@@ -990,6 +990,54 @@ describe('review custody contracts (round 2)', () => {
     assert.equal(resumed.code, 'observation-stale-gates');
     assert.equal(existsSync(resultFile), false);
   });
+  it('record-only resume hands the refs budget to the recorder and keeps the registry intact', async () => {
+    // The record-only branch runs no adapter-level refs precheck: the budget is
+    // enforced by the recorder, before any of its writes, so a refusal there
+    // leaves the complete registry record untouched and the run resumable.
+    // Filler math: refs(run-1) = body + receipt = 2 (report stays in the control
+    // namespace); the filler holds 253 artifacts + body + receipt = 255; the
+    // rejected re-record would add run-1's two refs on top: 257 > QA_LIMITS.refs.
+    // Dropping result files is a test-only simulation of freed refs — there is
+    // no supported user procedure for it, and none is documented as one.
+    const f = await observedFixture();
+    await f.prepare();
+    const envelope = await f.issue(await f.compose());
+    const ingested = await f.ingest(envelope);
+    assert.equal(ingested.ok, true);
+    const resultFile = path.join(f.rootDir, f.qa, 'results', `${ingested.result_id}.json`);
+    const resultBefore = await readFile(resultFile);
+    const receiptBefore = await readFile(path.join(f.rootDir, receiptPath(f)));
+    await rm(resultFile); // crash window: registry-complete exists, the record does not
+    await recordBulkPrior(f, { resultId: 'bulk-2', count: QA_LIMITS.refs - 3 }); // 255 own refs
+    assert.equal((await existingRefsOf(f)).size, QA_LIMITS.refs - 1);
+    const registryBefore = await readFile(path.join(f.rootDir, recordPath(f)));
+    const fillerBefore = await readFile(path.join(f.rootDir, f.qa, 'results', 'bulk-2.json'));
+    const launches = f.host.state.counters.verifier_launches;
+    const blocked = await f.ingest(envelope); // exact replay of the original envelope
+    assert.equal(blocked.ok, false);
+    assert.equal(blocked.code, 'qa-refs-limit');
+    assert.deepEqual(await readFile(path.join(f.rootDir, recordPath(f))), registryBefore);
+    assert.equal(JSON.parse(registryBefore.toString()).record.state, 'complete');
+    assert.notEqual(await f.registry.lookup('run-1'), null);
+    assert.equal(existsSync(resultFile), false);
+    assert.equal(existsSync(path.join(f.rootDir, lockPath(f))), false);
+    assert.deepEqual(await readFile(path.join(f.rootDir, receiptPath(f))), receiptBefore);
+    assert.deepEqual(await readFile(path.join(f.rootDir, f.qa, 'results', 'bulk-2.json')), fillerBefore);
+    assert.equal(f.host.state.counters.verifier_launches, launches); // record-only never relaunches
+    // Freeing the filler refs makes the same envelope complete through the
+    // record-only branch: idempotent re-recording of canonically equal content.
+    await rm(path.join(f.rootDir, f.qa, 'results', 'bulk-2.json'));
+    const resumed = await f.ingest(envelope);
+    assert.equal(resumed.ok, true, JSON.stringify(resumed));
+    assert.equal(resumed.replayed, true);
+    assert.equal(resumed.recorded, true);
+    assert.equal(existsSync(resultFile), true);
+    assert.deepEqual(await readFile(resultFile), resultBefore); // no auto-supersede divergence
+    const finalReplay = await f.ingest(envelope);
+    assert.equal(finalReplay.ok, true);
+    assert.equal(finalReplay.replayed, true);
+    assert.equal(finalReplay.recorded, false); // complete + stored: exact replay is a no-op
+  });
   it('a slow verifier completes under the bounded default deadline', async () => {
     const f = await observedFixture({ mode: 'slow', omitTimeout: true });
     await f.prepare();
