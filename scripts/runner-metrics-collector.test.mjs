@@ -538,6 +538,84 @@ test('parity: old minimal snapshot stays valid, unknown keys rejected by both ga
   }
 });
 
+test('parity: public runtime fields — schema and gate agree on every probe (issue #273)', async (t) => {
+  const f = await fixture(t);
+  const runnerSchema = JSON.parse(await readFile(new URL('../schemas/runner-metrics.schema.json', import.meta.url), 'utf8'));
+  const fields = ['run_id', 'model.provider', 'model.id', 'model.version', 'harness.id', 'harness.version'];
+  const OMIT = Symbol('omit');
+  const withField = (field, value) => {
+    const metrics = { schema: 'aifhub.runner_metrics.v1', run_id: 'run-1' };
+    const [block, key] = field.split('.');
+    if (value === OMIT) {
+      if (key === undefined) delete metrics[field];
+      else metrics[block] = {};
+      return metrics;
+    }
+    if (key === undefined) metrics[field] = value;
+    else metrics[block] = { [key]: value };
+    return metrics;
+  };
+  const pathLike = [
+    '/etc/passwd', 'src/auth/login.ts', 'C:\\Users\\me\\project', 'dir\\file.txt',
+    'C:evil', '\\\\server\\share', '../secrets', '.hidden'
+  ];
+  // Rejected by both sides: every path-like class, over-length, control
+  // characters, empty string, reserved devices before a dot (CON.x/com1.x),
+  // trailing dot and semver build metadata. Trailing LF/CR probes pin the
+  // `$` anchor to ECMA-262 end-of-input semantics (no match before a final
+  // line terminator, unlike PCRE/Python): the newline sits outside the
+  // character class, so both the schema pattern and the gate reject.
+  const rejected = [...pathLike, 'x'.repeat(81), 'bad\u0001id', '', 'CON.x', 'com1.x', 'trailing.', '2.18.1+build', 'run-1\n', 'run-1\r'];
+  // Accepted by both sides: plain version, identifier length boundary, inner
+  // dots, device-lookahead edges with an accepting continuation (conX/com10),
+  // null and fully omitted members.
+  const accepted = ['2.18.1', 'a'.repeat(80), 'a..b', 'conX', 'com10', null, OMIT];
+  for (const field of fields) {
+    for (const value of rejected) {
+      const probe = withField(field, value);
+      assert.ok(validateJsonAgainstSchema(probe, runnerSchema).length > 0,
+        `schema must reject ${field}=${JSON.stringify(value)}`);
+      const outcome = await exportEvaluation({ rootDir: f.root, changeId: f.id, evidenceClass: 'synthetic_fixture', runnerMetrics: probe, now: '2026-11-01T00:00:00.000Z' });
+      assert.equal(outcome.outcome, 'failed', `validator must reject ${field}=${JSON.stringify(value)}`);
+      assert.equal(outcome.errors[0].code, 'invalid_runner_metrics');
+    }
+    for (const value of accepted) {
+      const probe = withField(field, value);
+      assert.deepEqual(validateJsonAgainstSchema(probe, runnerSchema), [],
+        `schema must accept ${field}=${value === OMIT ? '<omitted>' : JSON.stringify(value)}`);
+      const outcome = await exportEvaluation({ rootDir: f.root, changeId: f.id, evidenceClass: 'synthetic_fixture', runnerMetrics: probe, now: '2026-11-01T00:00:00.000Z' });
+      assert.notEqual(outcome.outcome, 'failed',
+        `validator must accept ${field}=${value === OMIT ? '<omitted>' : JSON.stringify(value)}`);
+    }
+  }
+});
+
+test('provenance.collector deliberately keeps the label contract and stays out of the public record', async (t) => {
+  const f = await fixture(t);
+  const runnerSchema = JSON.parse(await readFile(new URL('../schemas/runner-metrics.schema.json', import.meta.url), 'utf8'));
+  // 200 characters outside the identifier grammar (carries a slash, forbidden
+  // by the identifier pattern) but inside the label contract: no control
+  // characters, length <= 200. The narrowing of this field was rejected
+  // because it never reaches the public record.
+  const label200 = `${'a'.repeat(99)}/${'b'.repeat(100)}`;
+  const label201 = `${label200}c`;
+  const metrics = (collector) => ({ schema: 'aifhub.runner_metrics.v1', run_id: 'run-1', provenance: { collector } });
+  assert.deepEqual(validateJsonAgainstSchema(metrics({ id: label200, version: '1.0.0' }), runnerSchema), []);
+  const exported = await exportEvaluation({
+    rootDir: f.root, changeId: f.id, evidenceClass: 'synthetic_fixture',
+    runnerMetrics: metrics({ id: label200, version: '1.0.0' }), now: '2026-11-01T00:00:00.000Z'
+  });
+  assert.notEqual(exported.outcome, 'failed');
+  // The collector identity is validated but never projected: the public
+  // record carries no trace of it.
+  assert.equal(JSON.stringify(exported.evaluation).includes(label200), false);
+  const over = metrics({ id: label201, version: '1.0.0' });
+  assert.ok(validateJsonAgainstSchema(over, runnerSchema).length > 0);
+  const rejected = await exportEvaluation({ rootDir: f.root, changeId: f.id, evidenceClass: 'synthetic_fixture', runnerMetrics: over, now: '2026-11-01T00:00:00.000Z' });
+  assert.equal(rejected.outcome, 'failed');
+  assert.equal(rejected.errors[0].code, 'invalid_runner_metrics');
+});
+
 test('non-interference: byte identity, no lock files, static dependency graph', async (t) => {
   const f = await fixture(t);
   assert.equal((await f.send()).delivery_verified, true);
