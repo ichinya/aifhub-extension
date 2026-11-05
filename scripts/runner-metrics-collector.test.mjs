@@ -1488,24 +1488,34 @@ test('stage-2 parity gates (R17): structural deep-equals across dictionaries, sc
   // top-level schema properties === validator allow-list; phases keys === validator phase list
   assert.deepEqual(Object.keys(runnerSchema.properties).sort(), [...RUNNER_METRICS_KEYS].sort());
   assert.deepEqual(Object.keys(runnerSchema.properties.phases.properties).sort(), [...RUNNER_METRICS_PHASE_KEYS].sort());
-  // eval-schema metrics properties include exactly the projected names
-  const exported = await exportEvaluation({ rootDir: (await fixture(t)).root, changeId: (await fixture(t)).id,
-    evidenceClass: 'synthetic_fixture', runnerMetrics: { schema: 'aifhub.runner_metrics.v1', tool_calls: 3, model_requests: 2,
-      tokens: { reasoning: 3 }, tools: { observed_calls: null, failed_calls: null, elapsed_ms: null },
-      dedup: { lookups: null, hits: null, misses: null, input_bytes: null, output_bytes: null },
-      phases: { setup_ms: 5, checks_ms: 6, snapshot_hash_ms: 7, run_elapsed_ms: 8 } }, now: '2026-11-01T00:00:00.000Z' });
+  // eval-schema metrics properties === the projection key set, exactly
+  // (deep-equal on both directions: a dropped or extra projected name breaks
+  // the gate — review round 2, all new fields are optional so a silent
+  // projection omission would otherwise go unnoticed).
+  const fixtureA = await fixture(t);
+  const exported = await exportEvaluation({ rootDir: fixtureA.root, changeId: fixtureA.id,
+    evidenceClass: 'synthetic_fixture', runnerMetrics: { schema: 'aifhub.runner_metrics.v1',
+      tokens: { input: 21, output: 22, total: 23, cache_read: 24, cache_write: 25, reasoning: 26 },
+      tool_calls: 3, model_requests: 2,
+      tools: { observed_calls: 31, failed_calls: 32, elapsed_ms: 33 },
+      dedup: { lookups: 41, hits: 42, misses: 43, input_bytes: 44, output_bytes: 45 },
+      phases: { setup_ms: 5, checks_ms: 6, snapshot_hash_ms: 7, run_elapsed_ms: 8,
+        run_record_span_ms: 9, workers_span_sum_ms: 10, pending_observed_ms: 11, transport_ms: 12, recovery_ms: 13 } },
+    now: '2026-11-01T00:00:00.000Z' });
   const metrics = exported.evaluation.metrics;
-  assert.equal(metrics.tool_calls, 3);
-  assert.equal(metrics.model_requests, 2);
-  assert.equal(metrics.tokens_reasoning, 3);
-  assert.equal(metrics.tools_observed_calls, null);
-  assert.equal(metrics.dedup_lookups, null);
-  assert.equal(metrics.setup_ms, 5);
-  assert.equal(metrics.checks_ms, 6);
-  assert.equal(metrics.snapshot_hash_ms, 7);
-  assert.equal(metrics.run_elapsed_ms, 8);
-  assert.equal('wait_ms' in metrics, false, 'wait_ms has no stage-2 source and is not projected');
+  assert.deepEqual(Object.keys(metrics).sort(), Object.keys(evalSchema.properties.metrics.properties).sort(),
+    'projection keys === eval schema properties keys');
   assert.deepEqual(validateJsonAgainstSchema(exported.evaluation, evalSchema), []);
+  // Every projected stage-2 numeric member carries its distinct non-null value.
+  const expectedValues = { tokens_input: 21, tokens_output: 22, tokens_total: 23, tokens_cache_read: 24,
+    tokens_cache_write: 25, tokens_reasoning: 26, tool_calls: 3, model_requests: 2,
+    tools_observed_calls: 31, tools_failed_calls: 32, tools_elapsed_ms: 33,
+    dedup_lookups: 41, dedup_hits: 42, dedup_misses: 43, dedup_input_bytes: 44, dedup_output_bytes: 45,
+    setup_ms: 5, checks_ms: 6, snapshot_hash_ms: 7, run_elapsed_ms: 8 };
+  for (const [key, value] of Object.entries(expectedValues)) {
+    assert.equal(metrics[key], value, 'projected ' + key + ' must carry its distinct value');
+  }
+  assert.equal('wait_ms' in metrics, false, 'wait_ms has no stage-2 source and is not projected');
 });
 
 test('stage-2 parity gates (R17): negative probes agree on both sides for every new constraint (#270)', async (t) => {
@@ -1581,18 +1591,19 @@ test('stage-2 qa metadata: forged rerun_reason outside the causal vocabulary fai
     'no reason sample leaks from a forged record');
 });
 
-test('stage-2 qa timing aggregates: checks_ms sums only complete measured records; snapshot_hash sums the store (#270 review)', async (t) => {
+test('stage-2 qa timing aggregates: checks_ms sums only host-observed complete records; snapshot_hash sums the store (#270 review 2)', async (t) => {
   const f = await fixture(t);
   const options = qaOptions(f);
   assert.equal((await prepareQaManifest(options)).ok, true);
   const timing = { started_at: '2026-11-05T00:00:00.000Z', ended_at: '2026-11-05T00:00:02.000Z', elapsed_ms: 2000, complete: true };
-  const first = await recordQaResult({ ...options, gate: 'verify', resultId: 'qa-1', markdown: gateBody('verify').toString('utf8'), checksTiming: timing });
+  // The checks timing belongs to a host-observed verifier run: the producer
+  // path accepts it only with that execution kind (the observed adapter is
+  // the real producer; this fixture exercises the same accepted surface).
+  const first = await recordQaResult({ ...options, gate: 'verify', resultId: 'qa-1', markdown: gateBody('verify').toString('utf8'),
+    execution: { kind: 'host-observed', exit_code: 0 }, checksTiming: timing });
   assert.equal(first.ok, true, JSON.stringify(first));
-  // A second agent-authored record without a checks timing (the producer
-  // never measured a verifier process for it) but with its own measured
-  // snapshot-hash timing.
   const only = await f.collect(['--include-qa']);
-  assert.equal(only.metrics.phases.checks_ms, 2000, 'sum over the records carrying a complete checks measurement');
+  assert.equal(only.metrics.phases.checks_ms, 2000, 'sum over the records carrying a complete host-observed checks measurement');
   assert.equal(only.metrics.unknowns.includes('checks_ms'), false);
   const snapshotOnly = only.metrics.phases.snapshot_hash_ms;
   assert.equal(Number.isSafeInteger(snapshotOnly) && snapshotOnly >= 0, true, JSON.stringify(only.metrics.phases));
@@ -1608,4 +1619,17 @@ test('stage-2 qa timing aggregates: checks_ms sums only complete measured record
   const snapshot = result.metrics.phases.snapshot_hash_ms;
   assert.equal(Number.isSafeInteger(snapshot) && snapshot >= 0, true, JSON.stringify(result.metrics.phases));
   assert.equal(result.metrics.unknowns.includes('snapshot_hash_ms'), false, 'both records carry measured snapshot timings');
+  // Collector-side gate: a forged checks timing attached to an agent-authored
+  // record is not attributable to any verifier — it contributes nothing and
+  // the marker stays, publication does not fail.
+  const store = await (await import('./workflow-state-store.mjs')).storeFor(f.root);
+  const name = '.ai-factory/qa/' + f.id + '/results/qa-2.json';
+  const envelope = JSON.parse((await store.textFile(name)).toString());
+  envelope.record.metadata.timings = { ...(envelope.record.metadata.timings ?? {}),
+    checks: { started_at: '2026-11-05T00:00:00.000Z', ended_at: '2026-11-05T00:00:09.000Z', elapsed_ms: 9000, complete: true } };
+  await store.write(name, Buffer.from(canonical({ checksum: digest(envelope.record), record: envelope.record }) + '\n'));
+  const forged = await f.collect(['--include-qa']);
+  assert.equal(forged.outcome, 'collected');
+  assert.equal(forged.metrics.phases.checks_ms, null, 'agent-authored checks timing is not a verifier measurement');
+  assert.equal(forged.metrics.unknowns.includes('checks_ms'), true);
 });

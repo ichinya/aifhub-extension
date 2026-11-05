@@ -31,7 +31,7 @@ function checksTimingValue(value) {
 // Explicit caller-supplied metadata members only. The snapshot-hash timing is
 // process telemetry recomputed on every binding — it is never caller-supplied,
 // so replay idempotency compares it against nothing (first-write frozen).
-function callerMetadata(options) {
+function callerMetadata(options, executionKind) {
   const metadata = {};
   if (options.rerunReason !== undefined) {
     requireValue(QA_RERUN_REASON_CODES.includes(options.rerunReason), 'rerun-reason-invalid', true);
@@ -39,6 +39,12 @@ function callerMetadata(options) {
   }
   if (options.executionRunId !== undefined) metadata.execution_run_id = identifier(options.executionRunId);
   if (options.checksTiming !== undefined) {
+    // The checks interval measures the verifier process of a host-observed
+    // run (contract SHALL): an agent-authored/imported record has no verifier
+    // it could have measured, so a caller-supplied timing without that
+    // execution kind is a fabricated measurement, rejected before any state
+    // changes (review round 2).
+    requireValue(executionKind === 'host-observed', 'checks-timing-unproven', true);
     metadata.timings = { checks: structuredClone(checksTimingValue(options.checksTiming)) };
   }
   return metadata;
@@ -117,7 +123,18 @@ export async function recordBoundEvidence(options = {}) {
       // First-write frozen metadata: caller members are explicit and validated;
       // on replay the saved metadata wins and conflicting explicit members are
       // a typed rejection (never a silent overwrite, never a fresh measurement).
-      const callerMeta = callerMetadata(options);
+      // The execution kind is resolved before the metadata merge: the checks
+      // timing gate depends on it (host-observed only).
+      const execution = { kind: 'agent-authored', ...(options.execution ?? {}) };
+      requireValue(['agent-authored', 'imported', 'host-observed'].includes(execution.kind), 'execution-kind-invalid', true);
+      if (options.receiptPath) {
+        portablePath(options.receiptPath);
+        const data = await store.bytes(options.receiptPath);
+        requireValue(data !== null, 'receipt-missing', true);
+        execution.receipt = { path: `${store.qa}/artifacts/${id}/receipt.json`, sha256: digest(data),
+          original_path: options.receiptPath };
+      }
+      const callerMeta = callerMetadata(options, execution.kind);
       let metadata;
       if (existing && existing.metadata !== undefined) {
         metadata = structuredClone(existing.metadata);
@@ -173,15 +190,6 @@ export async function recordBoundEvidence(options = {}) {
         const data = Buffer.isBuffer(value) ? value : Buffer.from(String(value));
         const frozen = `${store.qa}/artifacts/${id}/${relative.slice(store.qa.length + 1)}`;
         artifacts[relative] = { path: frozen, sha256: digest(data) };
-      }
-      const execution = { kind: 'agent-authored', ...(options.execution ?? {}) };
-      requireValue(['agent-authored', 'imported', 'host-observed'].includes(execution.kind), 'execution-kind-invalid', true);
-      if (options.receiptPath) {
-        portablePath(options.receiptPath);
-        const data = await store.bytes(options.receiptPath);
-        requireValue(data !== null, 'receipt-missing', true);
-        execution.receipt = { path: `${store.qa}/artifacts/${id}/receipt.json`, sha256: digest(data),
-          original_path: options.receiptPath };
       }
       const record = { schema: 'aifhub.qa-result.v1', id, check_id: check.id, gate: check.gate,
         manifest_digest: manifest.manifest_digest, wave_id: manifest.payload.wave_id,

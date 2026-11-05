@@ -260,19 +260,25 @@ async function resolveRequest(input, options, mode) {
     if (found.state === 'conflict' || !same(found.identity, r.identity) || !same(found.target, r.target)
       || found.namespace_digest !== scope || found.continuity_token !== continuity || !same(found.binding, r.binding))
       return uncertain('delivery-identity-conflict', 'resolve-identity-conflict', { conflict: true });
-    // The response is proven to belong to this request: now (and only now) its
-    // usage may be captured. Pending answers keep usage-without-host-id
-    // support — ownership was proven above even though no host id exists yet.
-    captureUsage(found);
     const idKey = r.target.kind === 'message' ? 'message_id' : 'completion_id', otherKey = r.target.kind === 'message' ? 'completion_id' : 'message_id';
     if (found.state === 'pending') {
       if (r.phase === 'verified') return uncertain('delivery-host-state-regressed', 'reconcile-host-state');
+      // A pending answer owns no host id yet: after the ownership checks above
+      // there is no id/mapping left to contradict, so its usage may persist
+      // (usage-without-host-id support).
+      captureUsage(found);
       if (writable) r.host.request_state = 'pending';
       return uncertain('delivery-pending', 'wait-request', { pending: true });
     }
     if (found.state !== 'completed' || typeof found[idKey] !== 'string' || !found[idKey] || found[otherKey] !== null
       || (r.host[idKey] !== null && found[idKey] !== r.host[idKey]))
       return uncertain('delivery-identity-conflict', 'resolve-identity-conflict', { conflict: true });
+    // Completed answers carry the response id: usage may persist only after
+    // the id/mapping consistency has been proven too — a remapped id is a
+    // mapping conflict whose usage must never be attributed to the old
+    // response key (review round 2: the uncertain save would otherwise keep
+    // the captured usage under the previous id).
+    captureUsage(found);
     if (writable) {
       r.host.request_state = 'completed'; r.host[idKey] = found[idKey];
       if (r.phase !== 'verified') r.phase = 'observed_completed'; await s.saveRequest(r);

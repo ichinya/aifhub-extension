@@ -377,6 +377,26 @@ test('usage of a foreign (identity-conflicting) response never persists into the
   assert.equal(record.usage_scope, undefined);
 });
 
+test('usage of a completed answer with a remapped host id never persists (#270 review 2)', async t => {
+  const host = createFakeHost({ usage: { scope: 'request', kind: 'full' } });
+  const f = await fixture(t, { host }); await f.prepare();
+  assert.equal((await f.send()).delivery_verified, true);
+  const before = await f.record();
+  assert.equal(before.usage.tool_calls, 3);
+  // Host remaps the completion id and reports different usage: the read answer
+  // passes ownership but fails the id/mapping consistency against the verified
+  // record — a mapping conflict whose usage must stay unattributed.
+  host.state.requests.get(uuid).completion_id = 'remapped-completion';
+  host.usageSpec = { scope: 'request', kind: 'full', tool_calls: 99, model_requests: 2 };
+  const r = await f.recover();
+  assert.equal(r.state, 'blocked');
+  assert.equal(r.code, 'delivery-identity-conflict');
+  const record = await f.record();
+  assert.deepEqual(record.usage, before.usage, 'the persisted usage stays the last consistent observation');
+  assert.equal(record.usage_scope, 'request');
+  assert.equal(record.usage.tool_calls, 3, 'the remapped answer usage=99 was not captured');
+});
+
 test('a negative usage_reporting declaration is authoritative: unsolicited usage is not captured (#270 review)', async t => {
   for (const declaration of [
     { tokens: false, tool_calls: false, model_requests: false, scope: 'request' },

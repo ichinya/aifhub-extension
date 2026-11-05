@@ -589,13 +589,23 @@ describe('QA stage-2 metadata (#270)', () => {
   it('replay with a conflicting rerun reason or checks timing is a typed metadata-conflict', async () => {
     const f = await fixture();
     await f.prepare();
-    await f.record('verify', { rerunReason: 'rerun-explicit', checksTiming: { started_at: '2026-11-05T00:00:00Z', ended_at: '2026-11-05T00:00:01Z', elapsed_ms: 1000, complete: true } });
-    assert.equal((await f.record('verify', { rerunReason: 'rerun-policy-changed' })).code, 'metadata-conflict');
-    assert.equal((await f.record('verify', { rerunReason: 'rerun-explicit', checksTiming: { started_at: '2026-11-05T00:00:00Z', ended_at: '2026-11-05T00:00:02Z', elapsed_ms: 2000, complete: true } })).code, 'metadata-conflict');
-    assert.equal((await f.record('verify', { rerunReason: 'rerun-explicit', checksTiming: { started_at: '2026-11-05T00:00:00Z', ended_at: '2026-11-05T00:00:01Z', elapsed_ms: 1000, complete: true } })).ok, true);
+    // The checks timing belongs to a host-observed verifier run only.
+    await f.record('verify', { rerunReason: 'rerun-explicit', execution: { kind: 'host-observed', exit_code: 0 },
+      checksTiming: { started_at: '2026-11-05T00:00:00Z', ended_at: '2026-11-05T00:00:01Z', elapsed_ms: 1000, complete: true } });
+    assert.equal((await f.record('verify', { rerunReason: 'rerun-policy-changed', execution: { kind: 'host-observed', exit_code: 0 } })).code, 'metadata-conflict');
+    assert.equal((await f.record('verify', { rerunReason: 'rerun-explicit', execution: { kind: 'host-observed', exit_code: 0 },
+      checksTiming: { started_at: '2026-11-05T00:00:00Z', ended_at: '2026-11-05T00:00:02Z', elapsed_ms: 2000, complete: true } })).code, 'metadata-conflict');
+    assert.equal((await f.record('verify', { rerunReason: 'rerun-explicit', execution: { kind: 'host-observed', exit_code: 0 },
+      checksTiming: { started_at: '2026-11-05T00:00:00Z', ended_at: '2026-11-05T00:00:01Z', elapsed_ms: 1000, complete: true } })).ok, true);
     const store = await qaStore(f.options);
     const stored = await store.json(`${f.qa}/results/verify-1.json`);
     assert.equal(stored.record.metadata.timings.checks.elapsed_ms, 1000);
+    // A caller-supplied checks timing without a host-observed run is a
+    // fabricated measurement, rejected before any state changes (#270 review 2).
+    assert.equal((await f.record('verify', { resultId: 'verify-2', checksTiming: { started_at: '2026-11-05T00:00:00Z', ended_at: '2026-11-05T00:00:01Z', elapsed_ms: 1000, complete: true } })).code, 'checks-timing-unproven');
+    assert.equal((await f.record('verify', { resultId: 'verify-2', execution: { kind: 'imported', exit_code: 0 }, checksTiming: { started_at: '2026-11-05T00:00:00Z', ended_at: '2026-11-05T00:00:01Z', elapsed_ms: 1000, complete: true } })).code, 'checks-timing-unproven');
+    const records = await store.results();
+    assert.equal(records.length, 1, 'rejected fabrications persisted nothing');
   });
 
   it('legacy records without metadata stay replayable and refuse explicit metadata members', async () => {
@@ -614,7 +624,8 @@ describe('QA stage-2 metadata (#270)', () => {
     const f = await fixture();
     await f.prepare();
     assert.equal((await f.record('verify', { rerunReason: 'made-up-reason' })).code, 'rerun-reason-invalid');
-    assert.equal((await f.record('verify', { checksTiming: { started_at: 'x', ended_at: 'y', elapsed_ms: -1, complete: true } })).code, 'timing-invalid');
+    assert.equal((await f.record('verify', { execution: { kind: 'host-observed', exit_code: 0 },
+      checksTiming: { started_at: 'x', ended_at: 'y', elapsed_ms: -1, complete: true } })).code, 'timing-invalid');
     const store = await qaStore(f.options);
     const records = await store.results();
     assert.equal(records.length, 0, 'nothing was recorded');

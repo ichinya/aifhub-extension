@@ -552,7 +552,14 @@ const runElapsedOf = (run) => {
   if (!Number.isFinite(first) || !Number.isFinite(last)) return null;
   return last - first;
 };
-const qaChecksMsOf = (record) => timingComplete(record.metadata?.timings?.checks) ? record.metadata.timings.checks.elapsed_ms : null;
+// The checks interval measures the verifier process of a host-observed run
+// (contract SHALL): a timing attached to an agent-authored/imported record is
+// not attributable to any verifier and contributes nothing to the sum — the
+// coverage stays broken behind its marker (review round 2). The snapshot-hash
+// timing, by contrast, measures the record's own binding work, which every
+// bound record genuinely performs.
+const qaChecksMsOf = (record) => record.execution?.kind === 'host-observed'
+  && timingComplete(record.metadata?.timings?.checks) ? record.metadata.timings.checks.elapsed_ms : null;
 const qaSnapshotMsOf = (record) => timingComplete(record.metadata?.timings?.snapshot_hash) ? record.metadata.timings.snapshot_hash.elapsed_ms : null;
 
 // Usage aggregation (#270, R9): overwrite per accounting key is already
