@@ -902,6 +902,24 @@ describe('review custody contracts (round 2)', () => {
     assert.equal(result.code, 'qa-refs-limit');
     assert.equal(await f.registry.lookup('run-1'), null);
     assert.equal(existsSync(path.join(f.rootDir, receiptPath(f))), false);
+    // The pending intent was written before the budget check: after the refusal
+    // it stays on disk, bound to exactly this payload, hidden from lookup, and
+    // the lock is already released.
+    const intent = await pendingIntent(f);
+    assert.equal(intent.state, 'pending');
+    assert.equal(intent.payload_digest, digest(declared));
+    assert.equal(existsSync(path.join(f.rootDir, lockPath(f))), false);
+    // The same payload refuses again and cannot be shrunk under the same
+    // run_id (that would change payload_digest into observation-conflict):
+    // the intent stays byte-identical and resumable for exactly this catalog.
+    const intentBefore = await readFile(path.join(f.rootDir, recordPath(f)));
+    const launchCount = f.host.state.counters.verifier_launches;
+    const retry = await f.ingest(declared);
+    assert.equal(retry.ok, false);
+    assert.equal(retry.code, 'qa-refs-limit');
+    assert.deepEqual(await readFile(path.join(f.rootDir, recordPath(f))), intentBefore);
+    assert.equal(existsSync(path.join(f.rootDir, receiptPath(f))), false);
+    assert.equal(f.host.state.counters.verifier_launches, launchCount + 1); // pending resume is a fresh cycle
   });
   it('record-only resume refuses a run attested against a replaced manifest wave', async () => {
     const f = await observedFixture();
