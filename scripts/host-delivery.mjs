@@ -199,14 +199,22 @@ async function resolveRequest(input, options, mode) {
     if (writable) {
       r.host.namespace_digest = scope; r.host.continuity_token = continuity; r.host.capabilities_digest = digest(caps); await s.saveRequest(r);
     }
-    // Usage capture (#270): only a declared, well-formed usage object is
-    // persisted, overwrite-with-newer only. A response without usage never
-    // erases the persisted observation (erasing would fabricate "the host
-    // stopped reporting"). The create answer is discarded by the helper, so it
-    // is never a capture source.
+    // Usage capture (#270): only a well-formed usage object from a host that
+    // affirms full reporting support is persisted, overwrite-with-newer only.
+    // A negative or partial declaration is authoritative — unsolicited usage
+    // from such a host is never a capture basis. A response without usage
+    // never erases the persisted observation (erasing would fabricate "the
+    // host stopped reporting"). The create answer is discarded by the helper,
+    // so it is never a capture source. Ownership comes first: usage is
+    // captured only after the response's identity/target/namespace/continuity/
+    // binding have been proven to belong to this request (review: a foreign
+    // response's usage must never persist into this slot), and a fetched body
+    // only after its digest/gate verification passed.
     const usageDeclaration = usageReportingDeclaration(caps);
+    const usageCaptureAllowed = Boolean(usageDeclaration?.tokens === true
+      && usageDeclaration.tool_calls === true && usageDeclaration.model_requests === true);
     function captureUsage(response) {
-      if (!usageDeclaration || !writable || response?.usage === undefined || response.usage === null) return;
+      if (!usageCaptureAllowed || !writable || response?.usage === undefined || response.usage === null) return;
       try { validateUsageObject(response.usage); } catch { return; } // malformed: no capture, no erase
       r.usage = structuredClone(response.usage);
       r.usage_scope = usageDeclaration.scope;
@@ -214,7 +222,6 @@ async function resolveRequest(input, options, mode) {
     const query = { request_uuid: r.request_uuid, namespace_digest: scope };
     async function read() {
       const found = await operate('read', s, r, () => client.readRequest(query), options, writable);
-      captureUsage(found);
       await s.hit('after-host-read'); return found;
     }
     let found;
@@ -253,6 +260,10 @@ async function resolveRequest(input, options, mode) {
     if (found.state === 'conflict' || !same(found.identity, r.identity) || !same(found.target, r.target)
       || found.namespace_digest !== scope || found.continuity_token !== continuity || !same(found.binding, r.binding))
       return uncertain('delivery-identity-conflict', 'resolve-identity-conflict', { conflict: true });
+    // The response is proven to belong to this request: now (and only now) its
+    // usage may be captured. Pending answers keep usage-without-host-id
+    // support — ownership was proven above even though no host id exists yet.
+    captureUsage(found);
     const idKey = r.target.kind === 'message' ? 'message_id' : 'completion_id', otherKey = r.target.kind === 'message' ? 'completion_id' : 'message_id';
     if (found.state === 'pending') {
       if (r.phase === 'verified') return uncertain('delivery-host-state-regressed', 'reconcile-host-state');
@@ -269,13 +280,15 @@ async function resolveRequest(input, options, mode) {
     let response;
     try { response = await operate('fetch', s, r, () => client.fetchResponse(query), options, writable); }
     catch { return uncertain('delivery-response-unavailable', 'fetch-response'); }
-    captureUsage(response);
     await s.hit('after-response-fetch');
     if (!Buffer.isBuffer(response?.body)) return uncertain('delivery-response-unavailable', 'fetch-response');
     try {
       requireValue(digest(response.body) === r.body.sha256, 'delivery-body-mismatch', true);
       requireValue(digest(strictQaGate(strictBody(response.body), r.verdict.gate)) === r.verdict.gate_result_sha256, 'delivery-gate-mismatch', true);
     } catch { return uncertain('delivery-body-mismatch', 'resolve-identity-conflict', { conflict: true }); }
+    // The fetched bytes are proven to be this request's verified body: only
+    // now may the fetch answer's usage overwrite the persisted observation.
+    captureUsage(response);
     if (writable) {
       await s.hit('before-verified-write');
       if (r.phase !== 'verified' && mode === 'recover') r.transport.verified_recoveries++;

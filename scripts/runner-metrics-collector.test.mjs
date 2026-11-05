@@ -375,7 +375,10 @@ test('include-qa counts corrective supersession chains and closed reason codes',
   const checks = result.metrics.checks;
   assert.equal(checks.results, 3);
   assert.equal(checks.repeated, 2);
-  assert.deepEqual(checks.reasons, [{ code: 'unknown', count: 1 }]);
+  // qa-3's open binding_code collapses to unknown AND the reason-less
+  // corrective rerun qa-2 is itself an unknown-cause sample (#270: the
+  // collector covers auto-supersede without a recorded reason).
+  assert.deepEqual(checks.reasons, [{ code: 'unknown', count: 2 }]);
   assert.equal(checks.dependencies.length, 1);
   assert.deepEqual(Object.keys(checks.dependencies[0]).sort(), ['check_id', 'input_fingerprint', 'manifest_digest', 'wave_id']);
   assert.equal(result.metrics.coverage, 'delivery_registry+qa+timings');
@@ -479,7 +482,8 @@ test('parity: collector output passes schema, runtime validator, projection and 
   assert.deepEqual(validateJsonAgainstSchema(record, evalSchema), []);
   assert.equal(record.metrics.requests_total, 1);
   assert.equal(record.metrics.checks_repeated, 1);
-  assert.deepEqual(record.metrics.checks_reasons, []);
+  // The corrective qa-2 carries no recorded reason: an unknown-cause sample.
+  assert.deepEqual(record.metrics.checks_reasons, [{ code: 'unknown', count: 1 }]);
   assert.equal(record.metrics.run_record_span_ms, metrics.phases.run_record_span_ms);
   assert.equal(record.metrics.coverage, 'delivery_registry+qa+timings');
   assert.deepEqual(record.metrics.unknowns, metrics.unknowns);
@@ -1377,18 +1381,46 @@ test('stage-2 ledger states: absent, empty, invalid, changed and interrupted rea
   assert.ok(invalid.notes.some((note) => note.code === 'ledger_invalid'));
   assert.equal(invalid.metrics.provenance.ledger_attempts_scanned, null);
   assert.equal(invalid.metrics.checks.results, 1, 'read QA counts are not zeroed by ledger failure');
-  // Changed between the two digest reads: scan inconsistent.
+  // The full moving-target matrix over a sequenced reader: each scenario gets
+  // a fresh counter, and the interrupted case asserts exactly two calls so the
+  // window "between the reads" is genuinely covered (review: a reused counter
+  // failed the FIRST read instead).
   const bytes = Buffer.from(JSON.stringify({ checksum: digest({ schema: 'aifhub.fix-attempts.v2', attempts: [], aliases: [] }),
     record: { schema: 'aifhub.fix-attempts.v2', attempts: [], aliases: [] } }, null, 2) + '\n');
+  const mutated = Buffer.from(bytes.toString().replace('[]', '[{"x":1}]'));
   let reads = 0;
-  const changingReader = async () => { reads += 1; return reads === 1 ? bytes : Buffer.from(bytes.toString().replace('[]', '[{"x":1}]')); };
-  const changed = await f.collect([], { ledgerReader: changingReader });
+  let sequence = [];
+  const sequencedReader = async () => {
+    const step = sequence[Math.min(reads, sequence.length - 1)];
+    reads += 1;
+    if (step === 'THROW') throw new Error('injected-io');
+    return step;
+  };
+  // present -> changed between reads: scan inconsistent.
+  reads = 0; sequence = [bytes, mutated];
+  const changed = await f.collect([], { ledgerReader: sequencedReader });
   assert.equal(changed.outcome, 'degraded');
   assert.ok(changed.notes.some((note) => note.code === 'scan_inconsistent'));
   assert.equal(changed.metrics.provenance.ledger_attempts_scanned, null);
-  // Read failure between the reads: honest unreadable degradation.
-  const failingReader = async () => { if (++reads > 1) throw new Error('injected-io'); return bytes; };
-  const interrupted = await f.collect([], { ledgerReader: failingReader });
+  // absent -> present between reads: a created ledger is a moving target,
+  // never an honest absence.
+  reads = 0; sequence = [null, bytes];
+  const appeared = await f.collect([], { ledgerReader: sequencedReader });
+  assert.equal(appeared.outcome, 'degraded');
+  assert.ok(appeared.notes.some((note) => note.code === 'scan_inconsistent'));
+  assert.equal(appeared.notes.some((note) => note.code === 'ledger_absent'), false);
+  assert.equal(appeared.metrics.provenance.ledger_attempts_scanned, null);
+  // present -> absent between reads: deletion is equally a moving target.
+  reads = 0; sequence = [bytes, null];
+  const vanished = await f.collect([], { ledgerReader: sequencedReader });
+  assert.equal(vanished.outcome, 'degraded');
+  assert.ok(vanished.notes.some((note) => note.code === 'scan_inconsistent'));
+  assert.equal(vanished.metrics.provenance.ledger_attempts_scanned, null);
+  // Read failure exactly between the reads (first read succeeded): honest
+  // unreadable degradation after exactly two calls.
+  reads = 0; sequence = [bytes, 'THROW'];
+  const interrupted = await f.collect([], { ledgerReader: sequencedReader });
+  assert.equal(reads, 2, 'absence/consistency requires exactly two reads');
   assert.equal(interrupted.outcome, 'degraded');
   assert.ok(interrupted.notes.some((note) => note.code === 'ledger_unreadable'));
   assert.equal(interrupted.metrics.checks, null); // include-qa off in this call
@@ -1509,4 +1541,71 @@ test('stage-2 parity gates (R17): negative probes agree on both sides for every 
   assert.equal(RUNNER_METRICS_REASON_CODES.length, 21);
   for (const code of ['rerun-inputs-changed', 'rerun-command-changed', 'rerun-environment-changed',
     'rerun-policy-changed', 'rerun-explicit']) assert.ok(RUNNER_METRICS_REASON_CODES.includes(code));
+});
+
+test('stage-2 skipped run records keep timing sums null behind markers (#270 review)', async (t) => {
+  const f = await fixture(t);
+  // One measured run next to one damaged record: the readable neighbor must
+  // never publish a sum over an unprovable scope — same conservatism as
+  // aggregateUsage under members_skipped.
+  await f.put('.ai-factory/state/' + f.id + '/execution/runs/broken.json', '{broken');
+  const result = await f.collect();
+  assert.equal(result.outcome, 'degraded');
+  assert.ok(result.notes.some((note) => note.code === 'member_skipped'));
+  assert.equal(result.metrics.phases.setup_ms, null);
+  assert.equal(result.metrics.phases.run_elapsed_ms, null);
+  assert.equal(result.metrics.unknowns.includes('setup_ms'), true);
+  assert.equal(result.metrics.unknowns.includes('run_elapsed'), true);
+  // Span fields are derived record-span observations (stage-1 semantics):
+  // they remain honest over the readable subset and are not phase sums.
+});
+
+test('stage-2 qa metadata: forged rerun_reason outside the causal vocabulary fails all-or-nothing (#270 review)', async (t) => {
+  const f = await fixture(t);
+  const options = qaOptions(f);
+  assert.equal((await prepareQaManifest(options)).ok, true);
+  const recorded = await recordQaResult({ ...options, gate: 'verify', resultId: 'qa-1', markdown: gateBody('verify').toString('utf8') });
+  assert.equal(recorded.ok, true, JSON.stringify(recorded));
+  // Forge an outcome code into rerun_reason inside the checksummed envelope:
+  // the producer vocabulary has five causal codes, 'passed' is not one.
+  const store = await (await import('./workflow-state-store.mjs')).storeFor(f.root);
+  const name = '.ai-factory/qa/' + f.id + '/results/qa-1.json';
+  const envelope = JSON.parse((await store.textFile(name)).toString());
+  envelope.record.metadata.rerun_reason = 'passed';
+  await store.write(name, Buffer.from(canonical({ checksum: digest(envelope.record), record: envelope.record }) + '\n'));
+  const result = await f.collect(['--include-qa']);
+  assert.equal(result.outcome, 'degraded');
+  assert.ok(result.notes.some((note) => note.code === 'qa_results_unreadable'));
+  assert.equal(result.metrics.checks, null, 'malformed metadata degrades the whole QA block');
+  assert.equal(JSON.stringify(result.metrics.checks_reasons ?? result.metrics.checks?.reasons), undefined,
+    'no reason sample leaks from a forged record');
+});
+
+test('stage-2 qa timing aggregates: checks_ms sums only complete measured records; snapshot_hash sums the store (#270 review)', async (t) => {
+  const f = await fixture(t);
+  const options = qaOptions(f);
+  assert.equal((await prepareQaManifest(options)).ok, true);
+  const timing = { started_at: '2026-11-05T00:00:00.000Z', ended_at: '2026-11-05T00:00:02.000Z', elapsed_ms: 2000, complete: true };
+  const first = await recordQaResult({ ...options, gate: 'verify', resultId: 'qa-1', markdown: gateBody('verify').toString('utf8'), checksTiming: timing });
+  assert.equal(first.ok, true, JSON.stringify(first));
+  // A second agent-authored record without a checks timing (the producer
+  // never measured a verifier process for it) but with its own measured
+  // snapshot-hash timing.
+  const only = await f.collect(['--include-qa']);
+  assert.equal(only.metrics.phases.checks_ms, 2000, 'sum over the records carrying a complete checks measurement');
+  assert.equal(only.metrics.unknowns.includes('checks_ms'), false);
+  const snapshotOnly = only.metrics.phases.snapshot_hash_ms;
+  assert.equal(Number.isSafeInteger(snapshotOnly) && snapshotOnly >= 0, true, JSON.stringify(only.metrics.phases));
+  assert.equal(only.metrics.unknowns.includes('snapshot_hash_ms'), false);
+  // A second agent-authored record never measured a verifier process: the
+  // checks coverage breaks and the sum goes null behind its marker, while the
+  // snapshot-hash coverage stays complete over both records.
+  const second = await recordQaResult({ ...options, gate: 'verify', resultId: 'qa-2', markdown: gateBody('verify').toString('utf8') });
+  assert.equal(second.ok, true, JSON.stringify(second));
+  const result = await f.collect(['--include-qa']);
+  assert.equal(result.metrics.phases.checks_ms, null);
+  assert.equal(result.metrics.unknowns.includes('checks_ms'), true, 'partial checks coverage keeps the marker');
+  const snapshot = result.metrics.phases.snapshot_hash_ms;
+  assert.equal(Number.isSafeInteger(snapshot) && snapshot >= 0, true, JSON.stringify(result.metrics.phases));
+  assert.equal(result.metrics.unknowns.includes('snapshot_hash_ms'), false, 'both records carry measured snapshot timings');
 });

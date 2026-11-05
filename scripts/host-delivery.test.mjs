@@ -367,3 +367,30 @@ test('reserve replay materializes the registry when the journal survived without
     assert.equal(validateRunnerMetrics(r.runner_metrics).tool_calls, 0);
   });
 }
+test('usage of a foreign (identity-conflicting) response never persists into the slot (#270 review)', async t => {
+  const host = createFakeHost({ mode: 'conflicting-payload', usage: { scope: 'request', kind: 'full' } });
+  const f = await fixture(t, { host }); await f.prepare();
+  const r = await f.send();
+  assert.equal(r.state, 'blocked'); assert.equal(r.delivery_verified, false);
+  const record = await f.record();
+  assert.equal(record.usage, undefined, 'usage is captured only after ownership checks pass');
+  assert.equal(record.usage_scope, undefined);
+});
+
+test('a negative usage_reporting declaration is authoritative: unsolicited usage is not captured (#270 review)', async t => {
+  for (const declaration of [
+    { tokens: false, tool_calls: false, model_requests: false, scope: 'request' },
+    { tokens: true, tool_calls: false, model_requests: false, scope: 'request' },
+  ]) {
+    const host = createFakeHost({ usage: { scope: 'request', kind: 'full' } });
+    const realCaps = host.capabilities.bind(host);
+    host.capabilities = async () => ({ ...await realCaps(), usage_reporting: declaration });
+    const f = await fixture(t, { host }); await f.prepare();
+    const r = await f.send(); assert.equal(r.delivery_verified, true);
+    const record = await f.record();
+    assert.equal(record.usage, undefined, 'capture requires a full-support declaration');
+    assert.equal(record.usage_scope, undefined);
+    assert.equal(r.runner_metrics.tokens, null);
+    assert.equal(r.runner_metrics.tool_calls, null);
+  }
+});

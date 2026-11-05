@@ -620,6 +620,20 @@ describe('QA stage-2 metadata (#270)', () => {
     assert.equal(records.length, 0, 'nothing was recorded');
   });
 
+  it('auto-superseded corrective record replays idempotently with its frozen chain reference (#270 review)', async () => {
+    const f = await fixture();
+    await f.prepare();
+    assert.equal((await f.record('verify')).ok, true); // qa-1: the open tip
+    const corrective = await f.record('verify', { resultId: 'verify-2' });
+    assert.equal(corrective.ok, true, JSON.stringify(corrective));
+    const store = await qaStore(f.options);
+    const before = await store.json(`${f.qa}/results/verify-2.json`);
+    assert.equal(before.record.supersedes, 'verify-1', 'the corrective record auto-chained onto the tip');
+    assert.equal((await f.record('verify', { resultId: 'verify-2' })).ok, true, 'replay succeeds');
+    const after = await store.json(`${f.qa}/results/verify-2.json`);
+    assert.deepEqual(after, before, 'same-id replay reuses the frozen supersedes and stays byte-identical');
+  });
+
   it('CLI parser validates --rerun-reason against the closed vocabulary', async () => {
     assert.deepEqual(parseQaManifestArgs(['record', '--change', 'c', '--rerun-reason', 'rerun-inputs-changed']),
       { action: 'record', changeId: 'c', rerunReason: 'rerun-inputs-changed', json: false });

@@ -17,6 +17,7 @@ import { RUN_SCHEMA, decode, validateLedger } from './execution-records.mjs';
 import { validateHistoricalRun } from './execution-transactions.mjs';
 import { QA_LIMITS, qaStore } from './qa-manifest-store.mjs';
 import { allDeclaredRoots } from './qa-manifest-inputs.mjs';
+import { QA_RERUN_REASON_CODES } from './qa-manifest-record.mjs';
 import { parseStrictJson } from './json-strict.mjs';
 import { readProviderFile, writeProviderFile } from './provider-files.mjs';
 import { RUNNER_METRICS_COVERAGES, RUNNER_METRICS_REASON_CODES, RUNNER_METRICS_UNKNOWNS, validateRunnerMetrics } from './workflow-exchange.mjs';
@@ -501,7 +502,17 @@ async function scanLedger(store, changeId, runId, notes, ledgerReader) {
   const read = ledgerReader ?? (() => store.bytes(relative));
   let bytes;
   try { bytes = await read(); } catch { note(notes, 'ledger_unreadable'); return { status: 'unreadable', attempts: null }; }
-  if (bytes === null) { note(notes, 'ledger_absent'); return { status: 'absent', attempts: null }; }
+  if (bytes === null) {
+    // Absence is confirmed with a second read: a ledger created between the
+    // two reads is a moving target (scan_inconsistent), never an honest
+    // absence — the SHALL scenario "created/deleted/changed between reads"
+    // covers all three directions.
+    let confirm;
+    try { confirm = await read(); } catch { note(notes, 'ledger_unreadable'); return { status: 'unreadable', attempts: null }; }
+    if (confirm !== null) { note(notes, 'scan_inconsistent'); return { status: 'race', attempts: null }; }
+    note(notes, 'ledger_absent');
+    return { status: 'absent', attempts: null };
+  }
   const before = digest(bytes);
   let ledger;
   try { ledger = validateLedger(decode(bytes.toString('utf8'))); } catch { note(notes, 'ledger_invalid'); note(notes, 'member_skipped'); return { status: 'invalid', attempts: null }; }
@@ -611,7 +622,7 @@ function aggregateUsage(validMembers, membersSkipped) {
   result.tokens = measuredDims.length > 0 ? tokens : null;
   result.tool_calls = flat(['tool_calls']);
   result.model_requests = flat(['model_requests']);
-  if (result.tokens === null || USAGE_TOKEN_DIMENSIONS.some((d) => tokens[d] === null)) markers.add('tokens'); else markers.delete('tokens');
+  if (USAGE_TOKEN_DIMENSIONS.some((d) => tokens[d] === null)) markers.add('tokens'); else markers.delete('tokens');
   if (result.tool_calls === null) markers.add('tool_calls'); else markers.delete('tool_calls');
   if (result.model_requests === null) markers.add('model_requests'); else markers.delete('model_requests');
   return { result, markers };
@@ -647,7 +658,10 @@ const intMs = (value) => Number.isSafeInteger(value) && value >= 0;
 function validateQaMetadata(metadata) {
   fields(metadata, ['recorded_at'], ['rerun_reason', 'execution_run_id', 'timings']);
   requireValue(isoTime(metadata.recorded_at), 'invalid-qa-result');
-  if (metadata.rerun_reason !== undefined) requireValue(RUNNER_METRICS_REASON_CODES.includes(metadata.rerun_reason), 'invalid-qa-result');
+  // The producer writes only the five causal rerun codes; a forged record
+  // carrying an outcome code (e.g. 'passed') in rerun_reason is malformed
+  // metadata, not a causal sample (review: validate by the producer subset).
+  if (metadata.rerun_reason !== undefined) requireValue(QA_RERUN_REASON_CODES.includes(metadata.rerun_reason), 'invalid-qa-result');
   if (metadata.execution_run_id !== undefined) identifier(metadata.execution_run_id);
   if (metadata.timings !== undefined) {
     const timings = metadata.timings;
@@ -696,6 +710,10 @@ export function projectChecks(qaRecords, { deliveryMembers = [], runs = [], ledg
       bump(record.metadata.rerun_reason);
     } else if (typeof record.binding_code === 'string' && record.binding_code.length > 0) {
       bump(RUNNER_METRICS_REASON_CODES.includes(record.binding_code) ? record.binding_code : 'unknown');
+    } else if (record.supersedes !== null && record.supersedes !== undefined) {
+      // A corrective rerun without any recorded reason is an unknown-cause
+      // sample: the collector covers it with `unknown` exactly as documented.
+      bump('unknown');
     }
     if (!dependencies.has(dependency.check_id)) dependencies.set(dependency.check_id, dependency);
   }
@@ -833,17 +851,23 @@ export async function collectRunnerMetrics(options = {}) {
       && Date.parse(run.updated_at) >= Date.parse(run.created_at));
     // Stage-2 measured phases (#270): setup and run_elapsed sum over the
     // sampled non-legacy run records; checks and snapshot_hash sum over the
-    // sampled qa records. Partial coverage stays null behind its marker.
+    // sampled qa records. Partial coverage stays null behind its marker. A
+    // skipped run record makes the sampled scope unprovable — one measured
+    // run next to one damaged record must never publish a sum, exactly like
+    // aggregateUsage stays conservative under members_skipped.
+    const timingScopeProvable = runScan.skipped === 0;
     const measuredRuns = runScan.runs.filter((run) => !isLegacyRun(run));
     const runElapsedValues = measuredRuns.map((run) => runElapsedOf(run));
     // An inverted stamp pair (last before first across processes) is per-record
     // null — it must never reach the intOrNull contract as a negative number.
     const phases = {
-      setup_ms: measuredPhaseSum(measuredRuns.map((run) => setupMsOf(run))),
+      setup_ms: timingScopeProvable ? measuredPhaseSum(measuredRuns.map((run) => setupMsOf(run))) : null,
       checks_ms: null,
       snapshot_hash_ms: null,
       wait_ms: null,
-      run_elapsed_ms: measuredPhaseSum(runElapsedValues.map((value) => (value !== null && value >= 0 ? value : null))),
+      run_elapsed_ms: timingScopeProvable
+        ? measuredPhaseSum(runElapsedValues.map((value) => (value !== null && value >= 0 ? value : null)))
+        : null,
       run_record_span_ms: spanRuns.length
         ? Math.max(...spanRuns.map((run) => Date.parse(run.updated_at))) - Math.min(...spanRuns.map((run) => Date.parse(run.created_at)))
         : null,

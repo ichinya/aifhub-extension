@@ -110,3 +110,60 @@ test('the 256-stamp cap fails closed on the next rewrite',async()=>{
   run.timings.stamps=Array.from({length:256},(_,i)=>({action:`s${i}`,at}));
   validateRun(run); // 256 stamps stay representable
 });
+
+const batchTrace = id => `.ai-factory/state/work/implementation/${id}.md`;
+const batchManifest = () => [
+  { task_id: '1.1', files: ['src/a.js'], expected_change: 'Implement item 1', check: 'focused-check', dependencies: [] },
+  { task_id: '1.2', files: ['src/b.js'], expected_change: 'Implement item 2', check: 'focused-check', dependencies: [] },
+];
+const batchResult = i => ({ result_id: `result-${i}`, status: 'completed', changed_files: [`src/${String.fromCharCode(96 + i)}.js`],
+  checks: [{ name: 'focused-check', exit_code: 0 }], evidence: [batchTrace(i)] });
+
+test('batch transitions stamp literal command names; batch-result keys never enter stamp.action (review wedge fix)', async () => {
+  const p = await project();
+  await p.put(batchTrace('preflight'), 'Observed independent files; no cross-item dependency.');
+  await p.call('batch-start', { change_id: p.id, run_id: 'run-1', owner: 'parent', worker: 'worker', role: 'implement', manifest: batchManifest(), preflight_paths: [batchTrace('preflight')] });
+  // Edits land before the checkpoint: batch-seal requires the sealed worktree
+  // to equal the saved checkpoint (same order as the batches fixture).
+  await p.put('src/a.js', 'fixed 1'); await p.put('src/b.js', 'fixed 2');
+  await p.put(batchTrace(1), 'Observed item 1.'); await p.put(batchTrace(2), 'Observed item 2.');
+  await p.call('checkpoint', p.actor(1, { progress: { completed_steps: [], next_step: 'Seal' } }));
+  const evidence = { '1.1': [batchTrace(1)], '1.2': [batchTrace(2)] };
+  const seal = await p.call('batch-seal', p.actor(2, { evidence }));
+  let version = seal.version;
+  const stamps = [];
+  const readStamps = async () => (await persisted(p, 'runs/run-1.json')).timings.stamps.map(s => s.action);
+  for (const i of [1, 2]) {
+    await p.call('batch-result', p.actor(version, { task_id: `1.${i}`, seal_digest: seal.seal_digest, result: batchResult(i) }));
+    version = (await persisted(p, 'runs/run-1.json')).version;
+  }
+  for (const i of [1, 2]) {
+    await p.call('batch-accept', p.actor(version, { actor: 'parent', task_id: `1.${i}`, seal_digest: seal.seal_digest, result_digest: (await persisted(p, 'runs/run-1.json')).items[`1.${i}`].result.digest }));
+    version = (await persisted(p, 'runs/run-1.json')).version;
+  }
+  await p.call('batch-close', p.actor(version, { actor: 'parent', seal_digest: seal.seal_digest }));
+  stamps.push(...await readStamps());
+  assert.deepEqual(stamps, ['batch-start', 'checkpoint', 'batch-seal', 'batch-result', 'batch-result', 'batch-accept', 'batch-accept', 'batch-close'],
+    'stamps carry the literal command name; the task-suffixed receipt key never overflows stamp.action');
+  const run = await persisted(p, 'runs/run-1.json');
+  for (const stamp of run.timings.stamps) assert.ok(stamp.action.length <= 80);
+});
+
+test('the 256-stamp cap wedges honestly through a real saveRun rewrite (review coverage gap)', async () => {
+  const p = await project();
+  await p.call('start', p.start());
+  let version = 1;
+  const input = () => p.actor(version, { progress: { completed_steps: [], next_step: `step ${version}` } });
+  // start contributes one stamp; 255 more checkpoints reach the cap exactly.
+  for (let i = 0; i < 255; i += 1) {
+    const view = await p.call('checkpoint', input());
+    version = view.version;
+  }
+  let run = await persisted(p, 'runs/run-1.json');
+  assert.equal(run.timings.stamps.length, 256, 'the cap is reached, not exceeded, by legal transitions');
+  await assert.rejects(p.call('checkpoint', input()), error => error.code === 'invalid-state',
+    'the 257th stamp fails the rewrite: an honest fail-closed wedge of this run');
+  const after = await persisted(p, 'runs/run-1.json');
+  assert.equal(after.timings.stamps.length, 256, 'the rejected transition persisted nothing');
+  assert.equal(after.version, version, 'the failed transition left no version advance');
+});

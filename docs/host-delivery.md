@@ -38,7 +38,15 @@ model_requests: bool, scope: "request"|"response"}`. Это декларация
 **не счётчики**: `capabilities_digest = digest(caps)` входит в identity/recovery
 preconditions, поэтому volatile значения в capabilities запрещены. Malformed
 декларация ведёт себя как «не объявлено» — usage не читается, поведение как
-раньше.
+раньше. Отрицательные члены декларации авторитетны: основание для capture —
+только декларация, подтверждающая **все три** поверхности; декларация,
+отрицающая какую-либо поверхность (или все), не является основанием для
+capture, и unsolicited usage такого хоста никогда не персистится (иначе хост,
+заявивший «я не сообщаю tool_calls», молча продиктовал бы accounting).
+Ownership тоже обязателен: usage захватывается только после проверки
+принадлежности ответа запросу (identity/target/namespace/continuity/binding),
+а ответ fetch — только после успешной digest/gate-верификации body; usage
+чужого ответа в слот не попадает никогда.
 
 Ответы `readRequest`/`fetchResponse` MAY нести sibling `usage` рядом с `body`/
 state: closed `{tokens: {input, output, total, cache_read, cache_write,

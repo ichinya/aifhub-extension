@@ -25,12 +25,9 @@ function checksTimingValue(value) {
     && typeof value.complete === 'boolean', 'timing-invalid', true);
   return value;
 }
-function snapshotTimingValue(value) {
-  fields(value, ['started_at', 'ended_at', 'elapsed_ms', 'operations', 'complete']);
-  requireValue(isoDate(value.started_at) && isoDate(value.ended_at) && intMs(value.elapsed_ms)
-    && intMs(value.operations) && typeof value.complete === 'boolean', 'timing-invalid', true);
-  return value;
-}
+// The snapshot-hash timing is assembled internally from the telemetry list
+// (never caller-supplied); its closed shape is re-validated by the collector
+// on read, so no producer-side constructor is needed here.
 // Explicit caller-supplied metadata members only. The snapshot-hash timing is
 // process telemetry recomputed on every binding — it is never caller-supplied,
 // so replay idempotency compares it against nothing (first-write frozen).
@@ -154,7 +151,14 @@ export async function recordBoundEvidence(options = {}) {
       const tips = other.filter(r => !other.some(child => child.supersedes === r.id));
       // Corrective chaining: a second bound record for the same check supersedes
       // the single open tip instead of being rejected (corrective runs are the norm).
-      if (supersedes === null && !records.some(r => r.id === id) && tips.length === 1) supersedes = tips[0].id;
+      // Same-id replay (#270 review): without an explicit option a corrective
+      // record reuses its frozen chain reference — the auto-chained supersedes
+      // is part of the first write, so the replay stays canonically stable and
+      // idempotent instead of colliding on supersedes=null.
+      if (supersedes === null) {
+        if (existing) supersedes = existing.supersedes ?? null;
+        else if (tips.length === 1) supersedes = tips[0].id;
+      }
       requireValue(records.some(r => r.id === id) || tips.length === 0
         || (tips.length === 1 && tips[0].id === supersedes), 'supersedes-required', true);
       const artifacts = {};

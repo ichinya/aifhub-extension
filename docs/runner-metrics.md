@@ -110,7 +110,10 @@ metadata-namespace (`<id>/delivery`, `<id>/status.json` любого change), п
   `phases.setup_ms`, `phases.run_elapsed_ms`, `phases.checks_ms`,
   `phases.snapshot_hash_ms` публикуются как **Σ по покрытым записям** —
   только когда каждая релевантная запись выборки несёт измерение
-  (частичное покрытие → `null` + маркер, см. ниже). Top-level `tokens`,
+  (частичное покрытие → `null` + маркер, см. ниже). Нечитаемая
+  (skipped) run-запись делает скоуп недоказуемым: `setup_ms`/`run_elapsed_ms`
+  остаются `null` + маркеры даже рядом с измеренными соседями — та же
+  консервативность, что у usage при `members_skipped > 0`. Top-level `tokens`,
   `tool_calls`, `model_requests` агрегируются из HostClient usage по правилам
   accounting scope (см. «Usage-агрегация»).
 - Заготовки `tools`/`dedup` публикуются закрытыми блоками с `null`-членами

@@ -300,7 +300,12 @@ export async function executionCommand(action,input,options={}) {
         run.lifecycle='closed'; run.execution_state='stopped'; extra={...extra,accepted,unfinished};
       }
     }
-    stamp(run,key); advance(run); const output=receipt(run,action,input,key,extra); await saveRun(store,filename,run); return {...view(run),...output};
+    // The stamp records the literal command name (no task suffix): receipt
+    // keys may append `:<task_id>` with an 80-character identifier, which
+    // would overflow the stamp.action bound and wedge the transition
+    // (review: batch-result:<80-char-id> reached 93 characters). The measured
+    // envelope needs first/last stamps, not per-task disambiguation.
+    stamp(run,action); advance(run); const output=receipt(run,action,input,key,extra); await saveRun(store,filename,run); return {...view(run),...output};
   }
   if(readOnly)return execute();
   await options.beforeLock?.();
