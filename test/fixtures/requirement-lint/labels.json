@@ -1,6 +1,6 @@
 {
   "schema": "aifhub.requirement_lint_corpus.v1",
-  "notes": "Curated labels for the requirement-lint corpus. Dev files informed the detector markers; held-out files were labeled by the same discipline and are asserted by the same test. Expected values are exact by_type counts over the whole presented file. Sanitized historical material is evidence, not an oracle: labels record what the advisory lint should surface, not ground truth about requirement quality.",
+  "notes": "Curated labels for the requirement-lint corpus. Dev files informed the detector markers; held-out files were labeled by the same discipline and are asserted by the same test. Expected values are exact by_type counts over the whole presented file, and expected_findings pins the exact 1-based line per finding so a same-type finding on the wrong line fails the corpus test. Sanitized historical material is evidence, not an oracle: labels record what the advisory lint should surface, not ground truth about requirement quality.",
   "thresholds": {
     "negative_false_findings": 0,
     "label_match": "exact"
@@ -8,127 +8,70 @@
   "groups": {
     "dev": {
       "dev-en-vague-outcome.md": {
-        "expected_by_type": {
-          "undefined_observable_outcome": 2,
-          "missing_error_case": 0,
-          "owner_decision_assumed": 0,
-          "suspected_requirement_revision_conflict": 0
-        }
+        "expected_by_type": { "undefined_observable_outcome": 2, "missing_error_case": 0, "owner_decision_assumed": 0, "suspected_requirement_revision_conflict": 0 },
+        "expected_findings": [["undefined_observable_outcome", 3], ["undefined_observable_outcome", 4]]
       },
       "dev-en-observable-outcome.md": {
-        "expected_by_type": {
-          "undefined_observable_outcome": 0,
-          "missing_error_case": 0,
-          "owner_decision_assumed": 0,
-          "suspected_requirement_revision_conflict": 0
-        }
+        "expected_by_type": { "undefined_observable_outcome": 0, "missing_error_case": 0, "owner_decision_assumed": 0, "suspected_requirement_revision_conflict": 0 }
       },
       "dev-ru-vague-outcome.md": {
-        "expected_by_type": {
-          "undefined_observable_outcome": 2,
-          "missing_error_case": 0,
-          "owner_decision_assumed": 0,
-          "suspected_requirement_revision_conflict": 0
-        }
+        "expected_by_type": { "undefined_observable_outcome": 2, "missing_error_case": 0, "owner_decision_assumed": 0, "suspected_requirement_revision_conflict": 0 },
+        "expected_findings": [["undefined_observable_outcome", 3], ["undefined_observable_outcome", 4]]
       },
       "dev-ru-observable-outcome.md": {
-        "expected_by_type": {
-          "undefined_observable_outcome": 0,
-          "missing_error_case": 0,
-          "owner_decision_assumed": 0,
-          "suspected_requirement_revision_conflict": 0
-        }
+        "expected_by_type": { "undefined_observable_outcome": 0, "missing_error_case": 0, "owner_decision_assumed": 0, "suspected_requirement_revision_conflict": 0 }
       },
       "dev-en-missing-error-case.md": {
-        "expected_by_type": {
-          "undefined_observable_outcome": 0,
-          "missing_error_case": 2,
-          "owner_decision_assumed": 0,
-          "suspected_requirement_revision_conflict": 0
-        }
+        "expected_by_type": { "undefined_observable_outcome": 0, "missing_error_case": 2, "owner_decision_assumed": 0, "suspected_requirement_revision_conflict": 0 },
+        "expected_findings": [["missing_error_case", 3], ["missing_error_case", 4]]
+      },
+      "dev-ru-missing-error-case.md": {
+        "expected_by_type": { "undefined_observable_outcome": 0, "missing_error_case": 1, "owner_decision_assumed": 0, "suspected_requirement_revision_conflict": 0 },
+        "expected_findings": [["missing_error_case", 3]]
       },
       "dev-en-error-aware.md": {
-        "expected_by_type": {
-          "undefined_observable_outcome": 0,
-          "missing_error_case": 0,
-          "owner_decision_assumed": 0,
-          "suspected_requirement_revision_conflict": 0
-        }
+        "expected_by_type": { "undefined_observable_outcome": 0, "missing_error_case": 0, "owner_decision_assumed": 0, "suspected_requirement_revision_conflict": 0 }
       },
       "dev-ru-owner-assumption.md": {
-        "expected_by_type": {
-          "undefined_observable_outcome": 0,
-          "missing_error_case": 0,
-          "owner_decision_assumed": 2,
-          "suspected_requirement_revision_conflict": 0
-        }
+        "expected_by_type": { "undefined_observable_outcome": 0, "missing_error_case": 0, "owner_decision_assumed": 2, "suspected_requirement_revision_conflict": 0 },
+        "expected_findings": [["owner_decision_assumed", 3], ["owner_decision_assumed", 4]]
       },
       "dev-ru-owner-attributed.md": {
-        "expected_by_type": {
-          "undefined_observable_outcome": 0,
-          "missing_error_case": 0,
-          "owner_decision_assumed": 0,
-          "suspected_requirement_revision_conflict": 0
-        }
+        "expected_by_type": { "undefined_observable_outcome": 0, "missing_error_case": 0, "owner_decision_assumed": 0, "suspected_requirement_revision_conflict": 0 },
+        "notes": "Line 3 carries the strong assumption marker suppressed by explicit owner attribution, so the negative proves suppression rather than absence of the trigger."
       },
       "dev-en-revision-conflict.md": {
-        "expected_by_type": {
-          "undefined_observable_outcome": 0,
-          "missing_error_case": 0,
-          "owner_decision_assumed": 0,
-          "suspected_requirement_revision_conflict": 1
-        }
+        "expected_by_type": { "undefined_observable_outcome": 0, "missing_error_case": 0, "owner_decision_assumed": 0, "suspected_requirement_revision_conflict": 1 },
+        "expected_findings": [["suspected_requirement_revision_conflict", 3]]
+      },
+      "dev-ru-revision-conflict.md": {
+        "expected_by_type": { "undefined_observable_outcome": 0, "missing_error_case": 0, "owner_decision_assumed": 0, "suspected_requirement_revision_conflict": 1 },
+        "expected_findings": [["suspected_requirement_revision_conflict", 3]]
       },
       "dev-en-revision-resolved.md": {
-        "expected_by_type": {
-          "undefined_observable_outcome": 0,
-          "missing_error_case": 0,
-          "owner_decision_assumed": 0,
-          "suspected_requirement_revision_conflict": 0
-        }
+        "expected_by_type": { "undefined_observable_outcome": 0, "missing_error_case": 0, "owner_decision_assumed": 0, "suspected_requirement_revision_conflict": 0 }
       },
       "dev-mixed-ru-en.md": {
-        "expected_by_type": {
-          "undefined_observable_outcome": 1,
-          "missing_error_case": 0,
-          "owner_decision_assumed": 1,
-          "suspected_requirement_revision_conflict": 0
-        }
+        "expected_by_type": { "undefined_observable_outcome": 1, "missing_error_case": 0, "owner_decision_assumed": 1, "suspected_requirement_revision_conflict": 0 },
+        "expected_findings": [["undefined_observable_outcome", 3], ["owner_decision_assumed", 4]]
       },
       "dev-hostile-injection.md": {
-        "expected_by_type": {
-          "undefined_observable_outcome": 2,
-          "missing_error_case": 0,
-          "owner_decision_assumed": 1,
-          "suspected_requirement_revision_conflict": 0
-        },
+        "expected_by_type": { "undefined_observable_outcome": 2, "missing_error_case": 0, "owner_decision_assumed": 1, "suspected_requirement_revision_conflict": 0 },
+        "expected_findings": [["undefined_observable_outcome", 3], ["undefined_observable_outcome", 5], ["owner_decision_assumed", 5]],
         "assert": "refs-confined-to-input"
       }
     },
     "heldout": {
       "heldout-en-findings.md": {
-        "expected_by_type": {
-          "undefined_observable_outcome": 1,
-          "missing_error_case": 1,
-          "owner_decision_assumed": 1,
-          "suspected_requirement_revision_conflict": 1
-        }
+        "expected_by_type": { "undefined_observable_outcome": 1, "missing_error_case": 1, "owner_decision_assumed": 1, "suspected_requirement_revision_conflict": 1 },
+        "expected_findings": [["undefined_observable_outcome", 3], ["missing_error_case", 4], ["owner_decision_assumed", 5], ["suspected_requirement_revision_conflict", 6]]
       },
       "heldout-ru-clean.md": {
-        "expected_by_type": {
-          "undefined_observable_outcome": 0,
-          "missing_error_case": 0,
-          "owner_decision_assumed": 0,
-          "suspected_requirement_revision_conflict": 0
-        }
+        "expected_by_type": { "undefined_observable_outcome": 0, "missing_error_case": 0, "owner_decision_assumed": 0, "suspected_requirement_revision_conflict": 0 }
       },
       "heldout-sanitized-archive-excerpt.md": {
-        "expected_by_type": {
-          "undefined_observable_outcome": 0,
-          "missing_error_case": 0,
-          "owner_decision_assumed": 1,
-          "suspected_requirement_revision_conflict": 0
-        }
+        "expected_by_type": { "undefined_observable_outcome": 0, "missing_error_case": 0, "owner_decision_assumed": 1, "suspected_requirement_revision_conflict": 0 },
+        "expected_findings": [["owner_decision_assumed", 5]]
       }
     }
   }
