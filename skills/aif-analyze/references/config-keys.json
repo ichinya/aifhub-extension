@@ -58,6 +58,12 @@
       "purpose": "Boolean opt-in for advisory docs readability diagnostics (aifhub-docs-readability); default false, CLI --enabled overrides."
     },
     {
+      "key": "aifhub.requirementLint.enabled",
+      "required": false,
+      "since": "1.8.1",
+      "purpose": "Boolean opt-in for advisory requirement ambiguity lint (aifhub-requirement-lint); default false, CLI --enabled overrides."
+    },
+    {
       "key": "paths.plans",
       "required": true,
       "since": "1.0.0",

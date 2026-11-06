@@ -1,0 +1,53 @@
+{
+  "schema": "aifhub.requirement_lint_profile.v1",
+  "profile_id": "aifhub-requirement-lint-default",
+  "profile_version": 1,
+  "description": "Pinned offline requirement-lint profile (RU/EN). Detector markers and corpus thresholds are recorded in openspec/changes/281-requirements-semantic-lint/design.md; they are advisory line-based heuristics (suppression markers do not model negation or role), not a requirement-quality standard. The lint never inserts numeric SLAs, never answers its own clarifying question, and never emits a ready or verified verdict.",
+  "exclusion_policy": {
+    "id": "requirement-lint-exclusion-default",
+    "version": 1,
+    "notes": "First implementation scans only requirement text presented through --file inputs. Secret exclusion and egress checks before any model call belong to the separate opt-in live-provider step and are not active in this profile."
+  },
+  "rules": [
+    {
+      "id": "requirement-lint:undefined_observable_outcome",
+      "version": 1,
+      "origin": "project",
+      "type": "undefined_observable_outcome",
+      "heuristic": true,
+      "notes": "Flags an obligation statement with no observable completion criterion. The proposed question asks for an observable signal; it never proposes a numeric SLA."
+    },
+    {
+      "id": "requirement-lint:missing_error_case",
+      "version": 1,
+      "origin": "project",
+      "type": "missing_error_case",
+      "heuristic": true,
+      "notes": "Flags a success-path action obligation with no error or failure handling mention. The proposed question asks whether an error policy applies; it never invents one."
+    },
+    {
+      "id": "requirement-lint:owner_decision_assumed",
+      "version": 1,
+      "origin": "project",
+      "type": "owner_decision_assumed",
+      "heuristic": true,
+      "notes": "Flags a strong assumption marker (obviously, we assume, будем считать) without explicit owner attribution. The proposed question returns the decision to the owner; it never answers it."
+    },
+    {
+      "id": "requirement-lint:suspected_requirement_revision_conflict",
+      "version": 1,
+      "origin": "project",
+      "type": "suspected_requirement_revision_conflict",
+      "heuristic": true,
+      "notes": "Intra-requirement only: flags two revision markers inside one presented requirement with no declared precedence or owner approval. Refs bind exactly the two revision markers of both sides within one document (the deterministic anchors of this line-based heuristic); cross-source plan-level conflicts stay with the upstream reconciliation gate."
+    }
+  ],
+  "prohibitions": [
+    "insert_numeric_sla",
+    "answer_in_place_of_question",
+    "ready_or_verified_verdict",
+    "auto_send_questions",
+    "canonical_or_spec_edits",
+    "hidden_or_invented_source_ids"
+  ]
+}

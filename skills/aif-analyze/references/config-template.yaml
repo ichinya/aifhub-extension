@@ -39,6 +39,11 @@ aifhub:
   # `--enabled true|false` on `ai-factory aifhub-docs-readability`.
   # readability:
   #   enabled: false
+  # Optional advisory requirement ambiguity lint (issue #281); default is
+  # false and it must never be enabled automatically. The CLI override is
+  # `--enabled true|false` on `ai-factory aifhub-requirement-lint`.
+  # requirementLint:
+  #   enabled: false
 # OpenSpec-native mode writes its own aifhub settings profile only when
 # aifhub.tools.openspec is true.
 
