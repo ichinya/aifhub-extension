@@ -1327,6 +1327,23 @@ export async function runClaimEvidenceCheckCommand(argv = process.argv.slice(2),
     // mid-scan swap yields stale, not a silent current.
     const watch = {
       changed: async () => {
+        // The presented pairs file is binding input just like the sources
+        // (R2-1): for file transport the probe re-reads it bounded and
+        // compares content digests, so a mid-run change, deletion, or
+        // unreadable/oversized envelope drifts exactly like a source swap.
+        // A stdin envelope has no disk state to re-read; its recorded digest
+        // stays provenance only.
+        if (transportRecord.mode === 'file' && typeof transportRecord.envelope_path === 'string') {
+          let currentEnvelopeBytes = null;
+          try {
+            currentEnvelopeBytes = await readProviderFile(rootDir, transportRecord.envelope_path, MAX_ENVELOPE_BYTES);
+          } catch {
+            currentEnvelopeBytes = null;
+          }
+          if (currentEnvelopeBytes === null || digest(currentEnvelopeBytes) !== transportRecord.envelope_sha256) {
+            return true;
+          }
+        }
         const freshInputs = [];
         for (const relative of readInputs) {
           const read = await readRequirementDocument(rootDir, relative, options);

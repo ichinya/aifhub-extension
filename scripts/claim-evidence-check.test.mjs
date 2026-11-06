@@ -663,6 +663,71 @@ describe('claim-evidence semantic stage (typed DI)', () => {
     assert.ok(observation.diagnostics.some((entry) => entry.code === 'assessment-stale'));
     assert.equal(observation.structural.pairs[0].quote_check, 'exact_found');
   });
+
+  it('catches a mid-run swap of the presented pairs file through the freshness probe', async () => {
+    const root = await makeTemp('aif-ce-envstale-');
+    await seedSmokeProject(root);
+    const outputs = [];
+    const exit = await runClaimEvidenceCheckCommand(['--change', 'work', '--pairs', 'pairs.json', '--json'], {
+      rootDir: root, output: (value) => outputs.push(value),
+      assessor: async () => {
+        // Swap the quote inside the presented envelope while the semantic
+        // stage is running: the file-transport probe must catch it (R2-1).
+        const envelope = parseStrictJson(await readFile(path.join(root, 'pairs.json'), 'utf8'));
+        envelope.claims[0].quote = `${envelope.claims[0].quote} tweaked`;
+        await writeFile(path.join(root, 'pairs.json'), JSON.stringify(envelope), 'utf8');
+        return { findings: [] };
+      },
+    });
+    assert.equal(exit, 0);
+    const observation = observationOf(outputs);
+    assert.equal(observation.transport.mode, 'file');
+    assert.equal(observation.semantic.freshness, 'stale', 'a mid-run envelope swap must mark the outcome stale');
+    assert.ok(observation.diagnostics.some((entry) => entry.code === 'assessment-stale'));
+    assert.equal(observation.structural.pairs[0].quote_check, 'exact_found', 'structural section survives the drift');
+    // Probe and revalidation must agree — no current/stale contradiction.
+    const verdict = await validateObservationBinding(root, observation);
+    assert.equal(verdict.stale, true);
+    assert.ok(verdict.mismatched.includes('envelope'), verdict.mismatched.join(','));
+  });
+
+  it('catches a mid-run deletion of the presented pairs file through the freshness probe', async () => {
+    const root = await makeTemp('aif-ce-envgone-');
+    await seedSmokeProject(root);
+    const outputs = [];
+    const exit = await runClaimEvidenceCheckCommand(['--change', 'work', '--pairs', 'pairs.json', '--json'], {
+      rootDir: root, output: (value) => outputs.push(value),
+      assessor: async () => {
+        await rm(path.join(root, 'pairs.json'));
+        return { findings: [] };
+      },
+    });
+    assert.equal(exit, 0);
+    const observation = observationOf(outputs);
+    assert.equal(observation.semantic.freshness, 'stale', 'a vanished envelope is drift, not a silent current');
+    assert.ok(observation.diagnostics.some((entry) => entry.code === 'assessment-stale'));
+    assert.equal(observation.structural.pairs[0].quote_check, 'exact_found');
+  });
+
+  it('does not drift a stdin run when an unrelated pairs file disappears mid-run', async () => {
+    const root = await makeTemp('aif-ce-stdinstr-');
+    await seedSmokeProject(root);
+    const outputs = [];
+    const exit = await runClaimEvidenceCheckCommand(['--change', 'work', '--stdin', '--json'], {
+      rootDir: root, readStdin: async () => Buffer.from(JSON.stringify(pairsEnvelope()), 'utf8'),
+      output: (value) => outputs.push(value),
+      assessor: async () => {
+        // The on-disk pairs file is not the presented input for stdin
+        // transport: deleting it must not mark the run stale.
+        await rm(path.join(root, 'pairs.json'));
+        return { findings: [] };
+      },
+    });
+    assert.equal(exit, 0);
+    const observation = observationOf(outputs);
+    assert.equal(observation.transport.mode, 'stdin');
+    assert.equal(observation.semantic.freshness, 'current', 'stdin envelope has no disk state to re-read');
+  });
 });
 
 // ---------------------------------------------------------------------------
