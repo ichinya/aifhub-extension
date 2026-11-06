@@ -112,7 +112,7 @@ ai-factory aifhub-requirement-lint --change <change-id> --enabled true --file <r
 ```
 
 - Scan only requirement sources the user or the refinement context explicitly presented. Every finding cites an exact source ref and carries a proposed clarifying question: present that question to the user instead of answering it; never insert a numeric SLA, never rewrite the requirement text, never send questions automatically, and never edit canonical artifacts from the lint output.
-- A `none` result means nothing was found in the presented scope only; it is never a readiness, verification, or approval signal. When the lint is disabled, unavailable, or reports a failed, stale, or partial-coverage run, state `advisory scan was not performed` with the bounded reason and continue with unchanged refinement behavior; this neither blocks nor unblocks a required gate.
+- A `none` result means nothing was found in the presented scope only; it is never a readiness, verification, or approval signal. When the lint is disabled or unavailable, or reports a failed, stale, abstained (`abstained: true` — the assessor declined, which is not a zero-findings result), or partial-coverage run, state `advisory scan was not performed` with the bounded reason and continue with unchanged refinement behavior; this neither blocks nor unblocks a required gate.
 - Skip findings whose exact source refs were already surfaced by `## Requirements Reconciliation` or an upstream reconciliation gate instead of presenting them twice. When a reconciliation gate already stopped the workflow, a skipped or not-performed scan is not a no-problems signal.
 
 Preservation rules:
