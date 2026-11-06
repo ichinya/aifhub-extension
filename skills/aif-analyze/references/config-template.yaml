@@ -44,6 +44,11 @@ aifhub:
   # `--enabled true|false` on `ai-factory aifhub-requirement-lint`.
   # requirementLint:
   #   enabled: false
+  # Optional advisory claim evidence check (issue #282); default is
+  # false and it must never be enabled automatically. The CLI override is
+  # `--enabled true|false` on `ai-factory aifhub-claim-evidence-check`.
+  # claimEvidence:
+  #   enabled: false
 # OpenSpec-native mode writes its own aifhub settings profile only when
 # aifhub.tools.openspec is true.
 

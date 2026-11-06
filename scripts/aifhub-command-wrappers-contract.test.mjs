@@ -174,6 +174,13 @@ const WRAPPER_COMMANDS = [
     module: './commands/aifhub-requirement-lint.mjs',
     script: 'requirement-lint.mjs',
     args: ['--change', 'add-oauth', '--enabled', 'true', '--file', 'openspec/changes/add-oauth/proposal.md', '--json']
+  },
+  {
+    name: 'aifhub-claim-evidence-check',
+    description: 'Run opt-in advisory claim evidence diagnostics for presented claim-source pairs without changing evidence or authorizing progression.',
+    module: './commands/aifhub-claim-evidence-check.mjs',
+    script: 'claim-evidence-check.mjs',
+    args: ['--change', 'add-oauth', '--enabled', 'true', '--pairs', 'docs/research-claims.json', '--json']
   }
 ];
 

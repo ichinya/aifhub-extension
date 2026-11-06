@@ -133,6 +133,11 @@
       "name": "aifhub-requirement-lint",
       "description": "Run opt-in advisory requirement ambiguity diagnostics for presented requirement sources without changing evidence or authorizing progression.",
       "module": "./commands/aifhub-requirement-lint.mjs"
+    },
+    {
+      "name": "aifhub-claim-evidence-check",
+      "description": "Run opt-in advisory claim evidence diagnostics for presented claim-source pairs without changing evidence or authorizing progression.",
+      "module": "./commands/aifhub-claim-evidence-check.mjs"
     }
   ],
   "skills": [
