@@ -36,15 +36,16 @@ OpenSpec CLI features вызываются через AIFHub wrappers и `script
 10. [Project Review Policy](review-policy.md) - configurable root-default `REVIEW.md`, scaffold ownership, review-only consumers, precedence, path safety и policy/session-state boundary.
 11. [Docs Readability Policy](readability-policy.md) - opt-in non-blocking readability diagnostics, pinned RU/EN profile, source-bound report schema, closed-enum outcomes, composite invalidation, state-only writer guards и advisory-изоляция от verification/finalization.
 12. [Requirement Lint Policy](requirement-lint-policy.md) - opt-in advisory линтер неоднозначных требований для plan/improve: четыре closed finding types, точные source refs, уточняющие вопросы без ответов, честные run/coverage исходы, state-only writer guards и отказ кастомных state-корней.
-13. [OpenSpec Compatibility](openspec-compatibility.md) - optional CLI adapter support, exact-tagged OpenSpec 1.15.0 reviewed baseline from 1.3.1, tracked Git/npm custody and CLI matrix, pinned AI Factory 2.19.0 release plus selectable 2.18.1/2.19.0 published-executable smoke targets, requirements reconciliation gates, browser-replay write scope, cumulative 2.18 classic/ultra plan and research contracts, upstream coherence ownership, revision-bound receipt, archive guard, ownership/no-op ledger, artifact sync points, rules gate, Node requirements, validation policy flags и degraded mode.
-14. [OpenSpec Artifact Validation](openspec-validation.md) - AIFHub contract validator поверх OpenSpec CLI validation.
-15. [OpenSpec Coverage Matrix](spec-coverage.md) - requirement-to-task-to-code coverage evidence и verify/done policy.
-16. [Legacy Plan Migration](legacy-plan-migration.md) - если существующие `.ai-factory/plans` artifacts нужно перенести в OpenSpec-native changes.
-17. [Active Change Resolver](active-change-resolver.md) - active change selection, runtime paths, current pointer behavior и ambiguity diagnostics.
-18. [Handoff Validation Profile](handoff-validation-profile.md) - read-only orchestration summary contract.
-19. [ADR 0001](adr/0001-openspec-native-artifact-protocol.md) - v1 artifact ownership decision.
-20. [ADR 0002: Optional Project Glossary](adr/0002-optional-project-context-glossary.md) - protocol-neutral glossary ownership, lexical authority and deferred OKF decision.
-21. [ADR 0003: Durable Project Review Policy](adr/0003-durable-project-review-policy.md) - review-policy namespace, ownership, authority and session-state separation.
+13. [Claim Evidence Policy](claim-evidence-policy.md) - opt-in advisory claim↔source проверка предъявленных пар на research/review: детерминированная структурная стадия по raw bytes, DI-семантика с честным not_run, custody «hooks preview / explicit `--write` persists», compound roll-up и QA-изоляция namespace.
+14. [OpenSpec Compatibility](openspec-compatibility.md) - optional CLI adapter support, exact-tagged OpenSpec 1.15.0 reviewed baseline from 1.3.1, tracked Git/npm custody and CLI matrix, pinned AI Factory 2.19.0 release plus selectable 2.18.1/2.19.0 published-executable smoke targets, requirements reconciliation gates, browser-replay write scope, cumulative 2.18 classic/ultra plan and research contracts, upstream coherence ownership, revision-bound receipt, archive guard, ownership/no-op ledger, artifact sync points, rules gate, Node requirements, validation policy flags и degraded mode.
+15. [OpenSpec Artifact Validation](openspec-validation.md) - AIFHub contract validator поверх OpenSpec CLI validation.
+16. [OpenSpec Coverage Matrix](spec-coverage.md) - requirement-to-task-to-code coverage evidence и verify/done policy.
+17. [Legacy Plan Migration](legacy-plan-migration.md) - если существующие `.ai-factory/plans` artifacts нужно перенести в OpenSpec-native changes.
+18. [Active Change Resolver](active-change-resolver.md) - active change selection, runtime paths, current pointer behavior и ambiguity diagnostics.
+19. [Handoff Validation Profile](handoff-validation-profile.md) - read-only orchestration summary contract.
+20. [ADR 0001](adr/0001-openspec-native-artifact-protocol.md) - v1 artifact ownership decision.
+21. [ADR 0002: Optional Project Glossary](adr/0002-optional-project-context-glossary.md) - protocol-neutral glossary ownership, lexical authority and deferred OKF decision.
+22. [ADR 0003: Durable Project Review Policy](adr/0003-durable-project-review-policy.md) - review-policy namespace, ownership, authority and session-state separation.
 
 Остальные runtime-specific guides являются supporting references:
 
@@ -86,6 +87,7 @@ OpenSpec CLI features вызываются через AIFHub wrappers и `script
 | [Project Review Policy](review-policy.md) | Configurable `reviews.policy_file`, root `REVIEW.md` default, scaffold lifecycle, safe read-only review consumption и policy/session-state boundary |
 | [Docs Readability Policy](readability-policy.md) | Opt-in non-blocking readability diagnostics: pinned RU/EN profile, source-bound report schema, closed-enum outcomes, composite invalidation, state-only writer guards и advisory-изоляция |
 | [Requirement Lint Policy](requirement-lint-policy.md) | Opt-in advisory линтер неоднозначных требований для plan/improve: четыре closed finding types, точные source refs, вопросы без ответов, честные run/coverage исходы и state-only writer guards |
+| [Claim Evidence Policy](claim-evidence-policy.md) | Opt-in advisory claim↔source проверка на research/review: structural исходы по raw bytes, DI-семантика с честным not_run, custody «hooks preview / explicit `--write` persists», compound roll-up и QA-изоляция |
 | [OpenSpec Compatibility](openspec-compatibility.md) | CLI adapter policy, exact-tagged OpenSpec 1.15.0 reviewed baseline from 1.3.1, tracked Git/npm custody and CLI matrix, AI Factory 2.19.0 pinned release and selectable 2.18.1/2.19.0 executable smoke targets, requirements reconciliation and browser-replay boundaries, cumulative 2.18 plan/research/archive adapters, upstream coherence ownership, exact consumer ownership/no-ops, validation policy flags, sync points, rules gate, version support и degraded mode |
 | [OpenSpec Artifact Validation](openspec-validation.md) | Read-only AIFHub contract validator для canonical artifacts, runtime evidence, QA и generated rules |
 | [OpenSpec Coverage Matrix](spec-coverage.md) | Requirement-to-task-to-code coverage evidence, policy, staleness и integration points |

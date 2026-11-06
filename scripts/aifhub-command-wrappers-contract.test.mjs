@@ -646,7 +646,8 @@ describe('AIFHub wrapper guidance contract', () => {
         'ai-factory aifhub-migrate-legacy-plans <change-id> --dry-run',
         'ai-factory aifhub-migrate-legacy-plans --all --dry-run',
         'ai-factory aifhub-done-finalizer --change <change-id> --json',
-        'ai-factory aifhub-requirement-lint --change <id> [--enabled true|false]'
+        'ai-factory aifhub-requirement-lint --change <id> [--enabled true|false]',
+        'ai-factory aifhub-claim-evidence-check --change <id> [--enabled true|false]'
       ]],
       ['docs/openspec-validation.md', [
         'ai-factory aifhub-write-gate-evidence --change add-oauth-login --gate rules',
