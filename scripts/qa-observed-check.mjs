@@ -212,6 +212,17 @@ function runVerifier(envelope, store, transport) {
   // runs far exceed short fixture defaults (Devin PR review).
   const timeoutMs = Number.isInteger(transport.timeoutMs) && transport.timeoutMs > 0 ? transport.timeoutMs : 600000;
   const spawn = transport.execFile ?? execFile;
+  // Stage-2 checks measurement (#270): the interval of the verifier process
+  // itself, opened right before spawn and closed at the common settlement
+  // path. Pre/post fingerprint observations and receipt/record writes stay
+  // outside. `complete` means "the interval is closed by a measurement" — a
+  // timeout or cancellation still carries a finished measurement; the
+  // unresolved work itself is recorded by the outcome. Reject paths (launch
+  // failure, unsupported stop) never produce a measurement.
+  const startedAt = new Date().toISOString();
+  const startPerf = performance.now();
+  const checksTiming = () => ({ started_at: startedAt, ended_at: new Date().toISOString(),
+    elapsed_ms: Math.max(0, Math.round(performance.now() - startPerf)), complete: true });
   return new Promise((resolve, reject) => {
     let timedOut = false;
     let settled = false;
@@ -228,11 +239,11 @@ function runVerifier(envelope, store, transport) {
           maxBuffer: QA_LIMITS.blob,
           ...(transport.signal ? { signal: transport.signal } : {}),
         }, error => {
-          if (timedOut) return settle(() => resolve({ outcome: 'timeout', exit_code: null, stop: 'timeout' }));
-          if (error?.code === 'ABORT_ERR') return settle(() => resolve({ outcome: 'cancelled', exit_code: null, stop: 'cancelled' }));
-          if (typeof error?.code === 'number') return settle(() => resolve({ outcome: 'failed', exit_code: error.code, stop: 'exit' }));
+          if (timedOut) return settle(() => resolve({ outcome: 'timeout', exit_code: null, stop: 'timeout', checks_timing: checksTiming() }));
+          if (error?.code === 'ABORT_ERR') return settle(() => resolve({ outcome: 'cancelled', exit_code: null, stop: 'cancelled', checks_timing: checksTiming() }));
+          if (typeof error?.code === 'number') return settle(() => resolve({ outcome: 'failed', exit_code: error.code, stop: 'exit', checks_timing: checksTiming() }));
           if (error) return settle(() => reject(new WorkflowError('observation-exec-failed', true)));
-          settle(() => resolve({ outcome: 'completed', exit_code: 0, stop: null }));
+          settle(() => resolve({ outcome: 'completed', exit_code: 0, stop: null, checks_timing: checksTiming() }));
         });
       } catch { return null; }
     })();
@@ -306,6 +317,10 @@ async function recordObservedResult(store, options, envelope, check, plan) {
     providers: options.providers, readBudget: options.readBudget,
     gate: check.gate, checkId: check.id, resultId: plan.resultId, markdown: plan.markdown,
     receiptPath: plan.receiptPath, artifacts: plan.artifacts,
+    // Producer-internal timing (#270): the measurement the adapter itself made
+    // of the verifier interval (registry value on replay). It is not a
+    // caller-supplied recorder surface and never enters the whitelist.
+    ...(plan.checksTiming ? { checksTiming: plan.checksTiming } : {}),
     execution: { kind: 'host-observed', exit_code: envelope.exit_code, outcome: envelope.outcome },
   });
   requireValue(recorded.ok, recorded.code ?? 'observation-incomplete', true);
@@ -462,9 +477,10 @@ export async function ingestObservedRun(versionedResult, options = {}) {
       let observed = await runVerifier(envelope, store, transport);
       if (observed.outcome === 'completed') {
         // Availability refinement: a clean exit without a report at the declared
-        // path is a distinct missing-report outcome, never a silent PASS.
+        // path is a distinct missing-report outcome, never a silent PASS. The
+        // measured verifier interval survives the refinement (#270).
         if (await store.bytes(envelope.report_path) === null)
-          observed = { outcome: 'missing-report', exit_code: 0, stop: null };
+          observed = { ...observed, outcome: 'missing-report', exit_code: 0, stop: null };
       }
       requireValue(observed.outcome === envelope.outcome && observed.exit_code === envelope.exit_code,
         'observation-declared-mismatch', true);
@@ -507,8 +523,12 @@ export async function ingestObservedRun(versionedResult, options = {}) {
         run_id: envelope.run_id, check_id: envelope.check_id, change_id: envelope.change_id,
         result_id: resultId, payload: envelope, payload_digest: digest(envelope),
         worktree_identity: receipt.worktree_identity, exit_code: receipt.exit_code,
-        outcome: receipt.outcome, receipt_path: paths.receipt, receipt_sha256: digest(bytes) });
-      return { kind: 'fresh', check, block, receiptSha256: digest(bytes),
+        outcome: receipt.outcome, receipt_path: paths.receipt, receipt_sha256: digest(bytes),
+        // Measured verifier interval (#270): persisted before the bound record
+        // so a crash in between is recovered by the record-only replay without
+        // relaunching the verifier or taking a second measurement.
+        ...(observed.checks_timing ? { checks_timing: observed.checks_timing } : {}) });
+      return { kind: 'fresh', check, block, receiptSha256: digest(bytes), checksTiming: observed.checks_timing,
         artifacts, execFile: observeOptions.execFile, environment };
     });
     if (plan.kind === 'replay') {
@@ -542,13 +562,17 @@ export async function ingestObservedRun(versionedResult, options = {}) {
       const artifacts = await collectRecorderArtifacts(store, envelope);
       await recordObservedResult(store, options, envelope, check,
         { resultId, receiptPath: paths.receipt, markdown: block.markdown, artifacts,
+          // Record-only recovery (#270): the timing comes from the registry
+          // record — no verifier relaunch, no second measurement.
+          checksTiming: plan.existing.checks_timing,
           execFile: observeOptions.execFile, environment });
       return { ok: true, replayed: true, recorded: true, accepted: false, state: 'valid',
         ...registryView(plan.existing), authorizes: [] };
     }
     await recordObservedResult(store, options, envelope, plan.check,
       { resultId, receiptPath: paths.receipt, markdown: plan.block.markdown,
-        artifacts: plan.artifacts, execFile: plan.execFile, environment: plan.environment });
+        artifacts: plan.artifacts, checksTiming: plan.checksTiming,
+        execFile: plan.execFile, environment: plan.environment });
     return { ok: true, replayed: false, recorded: true, accepted: false, state: 'valid',
       result_id: resultId, check_id: plan.check.id, gate: plan.check.gate, run_id: envelope.run_id,
       receipt_path: paths.receipt, receipt_sha256: plan.receiptSha256, outcome: envelope.outcome,

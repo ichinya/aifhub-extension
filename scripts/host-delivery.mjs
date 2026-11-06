@@ -4,7 +4,8 @@ import { deliveryAdmission } from './execution-state.mjs';
 import { strictQaGate } from './qa-manifest-store.mjs';
 import { DELIVERY_REQUEST_SCHEMA, DELIVERY_RECORD_SCHEMA, RECOVERY_ACTION_TYPES, DELIVERY_LIMITS, TRANSPORT_KEYS,
   deliveryPaths, deliveryStore, requestUuid, validateDeliveryRequest, validateDeliveryRecord, validateRecoveryAction,
-  frozenRequest, strictBody, readBody, validateFrozenBody, projection, bindingFor, validCapabilities, bounded } from './host-delivery-store.mjs';
+  frozenRequest, strictBody, readBody, validateFrozenBody, projection, bindingFor, validCapabilities, bounded,
+  usageReportingDeclaration, validateUsageObject } from './host-delivery-store.mjs';
 export { DELIVERY_REQUEST_SCHEMA, DELIVERY_RECORD_SCHEMA, RECOVERY_ACTION_TYPES, validateDeliveryRequest,
   validateDeliveryRecord, validateRecoveryAction };
 // Records one bounded send/recover action may still append after the host
@@ -60,12 +61,18 @@ async function suppliedBody(s, input) {
   return null;
 }
 function localView(r, admission, extra = {}) {
+  // Stage-2 usage view (#270): the snapshot extends honestly from the sibling
+  // usage member — absent usage stays null, never a fabricated zero.
+  const usage = r.usage;
   return { ok: !['blocked', 'uncertain'].includes(r.phase), request_uuid: r.request_uuid, request_revision: r.revision, state: r.phase,
     query_state: projection(r).query_state, body_sha256: r.identity?.body_sha256 ?? null,
     delivery_verified: false, reservation_retained: admission.reservation_retained, retry_create_allowed: false,
     recovery_action: r.recovery, host_state: r.host.request_state, authorizes: [], historical: admission.historical,
     persisted: admission.mutating !== false,
-    runner_metrics: { schema: 'aifhub.runner_metrics.v1', run_id: r.slot.run_id, transport: structuredClone(r.transport) }, ...extra };
+    runner_metrics: { schema: 'aifhub.runner_metrics.v1', run_id: r.slot.run_id, transport: structuredClone(r.transport),
+      tokens: usage ? structuredClone(usage.tokens) : null,
+      tool_calls: usage?.tool_calls ?? null,
+      model_requests: usage?.model_requests ?? null }, ...extra };
 }
 async function assertIdentity(s, r, input, a) {
   requireValue(input.run_id === r.slot.run_id && (input.task_id === undefined || input.task_id === r.slot.task_id)
@@ -192,6 +199,26 @@ async function resolveRequest(input, options, mode) {
     if (writable) {
       r.host.namespace_digest = scope; r.host.continuity_token = continuity; r.host.capabilities_digest = digest(caps); await s.saveRequest(r);
     }
+    // Usage capture (#270): only a well-formed usage object from a host that
+    // affirms full reporting support is persisted, overwrite-with-newer only.
+    // A negative or partial declaration is authoritative — unsolicited usage
+    // from such a host is never a capture basis. A response without usage
+    // never erases the persisted observation (erasing would fabricate "the
+    // host stopped reporting"). The create answer is discarded by the helper,
+    // so it is never a capture source. Ownership comes first: usage is
+    // captured only after the response's identity/target/namespace/continuity/
+    // binding have been proven to belong to this request (review: a foreign
+    // response's usage must never persist into this slot), and a fetched body
+    // only after its digest/gate verification passed.
+    const usageDeclaration = usageReportingDeclaration(caps);
+    const usageCaptureAllowed = Boolean(usageDeclaration?.tokens === true
+      && usageDeclaration.tool_calls === true && usageDeclaration.model_requests === true);
+    function captureUsage(response) {
+      if (!usageCaptureAllowed || !writable || response?.usage === undefined || response.usage === null) return;
+      try { validateUsageObject(response.usage); } catch { return; } // malformed: no capture, no erase
+      r.usage = structuredClone(response.usage);
+      r.usage_scope = usageDeclaration.scope;
+    }
     const query = { request_uuid: r.request_uuid, namespace_digest: scope };
     async function read() {
       const found = await operate('read', s, r, () => client.readRequest(query), options, writable);
@@ -236,12 +263,22 @@ async function resolveRequest(input, options, mode) {
     const idKey = r.target.kind === 'message' ? 'message_id' : 'completion_id', otherKey = r.target.kind === 'message' ? 'completion_id' : 'message_id';
     if (found.state === 'pending') {
       if (r.phase === 'verified') return uncertain('delivery-host-state-regressed', 'reconcile-host-state');
+      // A pending answer owns no host id yet: after the ownership checks above
+      // there is no id/mapping left to contradict, so its usage may persist
+      // (usage-without-host-id support).
+      captureUsage(found);
       if (writable) r.host.request_state = 'pending';
       return uncertain('delivery-pending', 'wait-request', { pending: true });
     }
     if (found.state !== 'completed' || typeof found[idKey] !== 'string' || !found[idKey] || found[otherKey] !== null
       || (r.host[idKey] !== null && found[idKey] !== r.host[idKey]))
       return uncertain('delivery-identity-conflict', 'resolve-identity-conflict', { conflict: true });
+    // Completed answers carry the response id: usage may persist only after
+    // the id/mapping consistency has been proven too — a remapped id is a
+    // mapping conflict whose usage must never be attributed to the old
+    // response key (review round 2: the uncertain save would otherwise keep
+    // the captured usage under the previous id).
+    captureUsage(found);
     if (writable) {
       r.host.request_state = 'completed'; r.host[idKey] = found[idKey];
       if (r.phase !== 'verified') r.phase = 'observed_completed'; await s.saveRequest(r);
@@ -255,6 +292,9 @@ async function resolveRequest(input, options, mode) {
       requireValue(digest(response.body) === r.body.sha256, 'delivery-body-mismatch', true);
       requireValue(digest(strictQaGate(strictBody(response.body), r.verdict.gate)) === r.verdict.gate_result_sha256, 'delivery-gate-mismatch', true);
     } catch { return uncertain('delivery-body-mismatch', 'resolve-identity-conflict', { conflict: true }); }
+    // The fetched bytes are proven to be this request's verified body: only
+    // now may the fetch answer's usage overwrite the persisted observation.
+    captureUsage(response);
     if (writable) {
       await s.hit('before-verified-write');
       if (r.phase !== 'verified' && mode === 'recover') r.transport.verified_recoveries++;

@@ -8,6 +8,15 @@ import { digest, canonical, portablePath, identifier, requireValue, storeFor } f
 import { QA_LIMITS, sorted, within, withinCi, jsonValue } from './qa-manifest-store.mjs';
 
 const exec = promisify(execFile);
+// Stage-2 telemetry (#270): caller-supplied accumulator for measured operation
+// durations. Telemetry never enters the returned snapshot/fingerprint material —
+// digests and custody equality stay content-only (contract R2).
+async function timed(operation, options, fn) {
+  if (typeof options?.telemetry !== 'function') return fn();
+  const start = performance.now();
+  try { return await fn(); }
+  finally { try { options.telemetry({ operation, elapsed_ms: Math.max(0, Math.round(performance.now() - start)) }); } catch { /* telemetry is observability only */ } }
+}
 const SHA = /^[a-f0-9]{64}$/;
 const MODULES = ['qa-manifest.mjs', 'qa-manifest-store.mjs', 'qa-manifest-inputs.mjs',
   'qa-bound-evidence.mjs', 'qa-manifest-record.mjs', 'workflow-state-store.mjs',
@@ -79,6 +88,10 @@ export function allDeclaredRoots(payload) {
 }
 
 export async function observeQaSnapshot(store, payload, options = {}) {
+  return timed('qa-snapshot', options, async () => observeQaSnapshotInner(store, payload, options));
+}
+
+async function observeQaSnapshotInner(store, payload, options = {}) {
   const provider = options.SnapshotProvider ?? options.snapshotProvider;
   const observed = provider
     ? await (typeof provider === 'function' ? provider : provider.observe.bind(provider))({ rootDir: store.root, payload })
@@ -153,6 +166,10 @@ export async function observeQaSnapshot(store, payload, options = {}) {
 }
 
 export async function checkFingerprints(payload, snapshot, options = {}) {
+  return timed('qa-fingerprints', options, async () => checkFingerprintsInner(payload, snapshot, options));
+}
+
+async function checkFingerprintsInner(payload, snapshot, options = {}) {
   const fingerprints = {};
   for (const frozen of payload.checks) {
     const check = options.providers?.checkDefinition ? await options.providers.checkDefinition(frozen) : frozen;

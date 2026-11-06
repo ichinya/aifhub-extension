@@ -30,6 +30,48 @@ Registry и journal используют checksummed envelope. Delivery record �
 
 Read возвращает `state:not_found|pending|completed|conflict`. Для существующего request обязательны исходные `identity`, `binding`, `target`, namespace/continuity и nullable `message_id`/`completion_id`. Completed содержит ID соответствующего target. `fetchResponse` возвращает `{body:Buffer}` либо unavailable. Not-found содержит namespace/continuity и `deduplication_retained`.
 
+## Usage-reporting (этап 2)
+
+HostClient MAY декларировать поддержку usage-reporting в `capabilities()`
+опциональным closed-членом `usage_reporting: {tokens: bool, tool_calls: bool,
+model_requests: bool, scope: "request"|"response"}`. Это декларация поддержки,
+**не счётчики**: `capabilities_digest = digest(caps)` входит в identity/recovery
+preconditions, поэтому volatile значения в capabilities запрещены. Malformed
+декларация ведёт себя как «не объявлено» — usage не читается, поведение как
+раньше. Отрицательные члены декларации авторитетны: основание для capture —
+только декларация, подтверждающая **все три** поверхности; декларация,
+отрицающая какую-либо поверхность (или все), не является основанием для
+capture, и unsolicited usage такого хоста никогда не персистится (иначе хост,
+заявивший «я не сообщаю tool_calls», молча продиктовал бы accounting).
+Ownership тоже обязателен: usage захватывается только после проверки
+принадлежности ответа запросу (identity/target/namespace/continuity/binding),
+а ответ fetch — только после успешной digest/gate-верификации body; usage
+чужого ответа в слот не попадает никогда.
+
+Ответы `readRequest`/`fetchResponse` MAY нести sibling `usage` рядом с `body`/
+state: closed `{tokens: {input, output, total, cache_read, cache_write,
+reasoning}, tool_calls, model_requests}` — все члены присутствуют, каждый
+nonnegative safe integer | `null`; частичная поддержка → `null`-члены. Ответы
+create helper отбрасывает — capture с него невозможен.
+
+Персистенция: sibling-пара `usage` + `usage_scope` delivery-записи (пишутся
+вместе, отсутствуют вместе; `usage_scope` фиксирует scope декларации на момент
+capture, поскольку сама декларация живёт только в транзиентном `capabilities()`).
+`TRANSPORT_KEYS` и zero-init transport на usage не распространяются — никаких
+ложных нулей. Ответ без usage **не стирает** ранее персистенный usage:
+стирание сфабриковало бы «хост перестал сообщать» — остаётся последнее
+наблюдение; overwrite — только более новым корректным usage. Отказ fetch после
+read с usage оставляет usage персистенным (финал pending/uncertain с usage без
+host id — легальное состояние).
+
+Честность: usage — «что хост сообщил», не «что модель сделала»;
+`verified_success` не становится model/billing claim. Отсутствие usage → `null`
++ маркеры `tokens`/`tool_calls`/`model_requests` в runner-metrics per-record.
+Snapshot `runner_metrics` в ответах helper'а расширяется синхронно
+(`tokens`/`tool_calls`/`model_requests` из persisted usage). Агрегацию выполняет
+read-only collector ([runner metrics](runner-metrics.md)) по правилам
+accounting scope.
+
 | Наблюдение | Recovery |
 |---|---|
 | Timeout + not_found | `reconcile-host-state`, delivery не подтверждена |
@@ -49,6 +91,6 @@ Read возвращает `state:not_found|pending|completed|conflict`. Для �
 
 Timeout, EPIPE и stdout overflow требуют host reconciliation. Journal сохраняет intent до mutation и позволяет repair после прерывания helper. Порядок locks — project → source; ограничение одного host вызова по умолчанию 5 секунд, максимум 300 секунд. Polling под lock отсутствует. История ограничена 256 revisions, registry — 200 requests на change; переполнение блокирует продолжение без молчаливого pruning. Power-loss durability отдельно не квалифицирована.
 
-Ответ содержит snapshot `aifhub.runner_metrics.v1.transport`: create/read/fetch calls, retry_creates, recovery_attempts, verified_recoveries, uncertain_returns, identity_conflicts, transport_ms, recovery_ms, wait_ms, incomplete_intervals. Это per-request snapshot; повторная публикация не складывает его повторно. `wait_ms` равен нулю: helper сам не ждёт pending requests. Незавершённый interval учитывается без выдуманной duration; local attempts не означают remote committed count (durable local intent, не remote commit). `verified_success`, model/billing данные автоматически не устанавливаются. Несколько UUID агрегирует read-only collector `scripts/runner-metrics-collector.mjs` ([runner metrics](runner-metrics.md)) с дедупликацией по UUID/revision и по host ID.
+Ответ содержит snapshot `aifhub.runner_metrics.v1.transport`: create/read/fetch calls, retry_creates, recovery_attempts, verified_recoveries, uncertain_returns, identity_conflicts, transport_ms, recovery_ms, wait_ms, incomplete_intervals. Это per-request snapshot; повторная публикация не складывает его повторно. `wait_ms` равен нулю: helper сам не ждёт pending requests (этап 2 не меняет эту семантику; `phases.wait_ms` в агрегате остаётся `null` + маркер). Незавершённый interval учитывается без выдуманной duration; local attempts не означают remote committed count (durable local intent, не remote commit). `verified_success`, model/billing данные автоматически не устанавливаются. Несколько UUID агрегирует read-only collector `scripts/runner-metrics-collector.mjs` ([runner metrics](runner-metrics.md)) с дедупликацией по UUID/revision и по host ID.
 
 Offline coverage: fake-host моделирует request index, commits, durable tombstones, response store и epoch отдельно. Проверяются четыре recovery paths, no-duplicate, capability admission, failpoints, byte identity, forged-delivery/QA receipts, freshness и historical lifecycle. Native Git и Windows `.cmd` contracts требуют окружение с доступными child processes. Live-host совместимость и измеренная экономия — NOTRUN. Grouped settlement/ACK release реализованы отдельным [lifecycle helper](host-lifecycle.md) (#231); ack остаётся verified custody фактом, optional request.release не меняет run reservation.

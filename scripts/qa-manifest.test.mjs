@@ -6,6 +6,8 @@ import path from 'node:path';
 import { createGateResult, renderGateResultBlock } from './aif-gate-result.mjs';
 import { digest, canonical } from './workflow-state-store.mjs';
 import { prepareQaManifest, recordQaResult, publishQaManifest, evaluateQaBinding, parseQaManifestArgs, runQaManifestCommand } from './qa-manifest.mjs';
+import { QA_RERUN_REASON_CODES } from './qa-manifest-record.mjs';
+import { RUNNER_METRICS_REASON_CODES } from './workflow-exchange.mjs';
 import { observeQaSnapshot, allDeclaredRoots, metadataProjection } from './qa-manifest-inputs.mjs';
 import { qaStore, QA_LIMITS } from './qa-manifest-store.mjs';
 import { writeGateEvidence } from './write-gate-evidence.mjs';
@@ -551,5 +553,145 @@ describe('QA review hardening: case aliases, module identity, policy roots, verd
       independent_roles: [], evidence: [] }) } });
     assert.equal(drifted.ok, false, JSON.stringify(drifted));
     assert.equal(drifted.code, 'owner-requirements-drift');
+  });
+});
+
+describe('QA stage-2 metadata (#270)', () => {
+  it('fresh records freeze recorded_at and measured snapshot_hash timing', async () => {
+    const f = await fixture();
+    assert.equal((await f.prepare()).ok, true);
+    assert.equal((await f.record('verify', { rerunReason: 'rerun-explicit' })).ok, true);
+    const store = await qaStore(f.options);
+    const stored = await store.json(`${f.qa}/results/verify-1.json`);
+    const metadata = stored.record.metadata;
+    assert.equal(metadata.rerun_reason, 'rerun-explicit');
+    assert.ok(Number.isFinite(Date.parse(metadata.recorded_at)));
+    const timing = metadata.timings.snapshot_hash;
+    assert.equal(timing.complete, true);
+    assert.ok(Number.isSafeInteger(timing.elapsed_ms) && timing.elapsed_ms >= 0);
+    assert.equal(timing.operations, 2); // one snapshot + one fingerprints operation
+    assert.equal(metadata.execution_run_id, undefined);
+    assert.equal(stored.record.metadata.timings.checks, undefined);
+  });
+
+  it('a binding that fails after measured operations keeps an incomplete snapshot_hash timing', async () => {
+    const f = await fixture();
+    assert.equal((await f.prepare()).ok, true);
+    // checkFingerprints rejects an unproven dependency mid-binding: the
+    // snapshot and the fingerprint operation still ran and were measured
+    // (telemetry emits in finally, failures included), so the record must
+    // carry the interval as complete:false instead of reading as unmeasured
+    // (#270 Devin review round 3).
+    const failed = await f.record('verify', { providers: {
+      dependencies: async () => ({ profile: 'declared.v1', dependencies_complete: false }) } });
+    assert.equal(failed.ok, true, JSON.stringify(failed));
+    const store = await qaStore(f.options);
+    const stored = await store.json(`${f.qa}/results/verify-1.json`);
+    assert.equal(stored.record.binding_code, 'dependency-unproven');
+    const timing = stored.record.metadata.timings.snapshot_hash;
+    assert.equal(timing.complete, false, 'the interval closed on failure, not by a completed binding');
+    assert.equal(timing.operations, 2); // one snapshot + one fingerprints operation, failure included
+    assert.ok(Number.isSafeInteger(timing.elapsed_ms) && timing.elapsed_ms >= 0);
+    assert.ok(Number.isFinite(Date.parse(timing.started_at)) && Number.isFinite(Date.parse(timing.ended_at)));
+    // Same-id replay stays immutable: the incomplete interval is part of the
+    // frozen first write, a later binding outcome cannot reuse this id.
+    assert.equal((await f.record('verify', { providers: {
+      dependencies: async () => ({ profile: 'declared.v1', dependencies_complete: true }) } })).code, 'immutable-conflict');
+  });
+
+  it('same-id replay without options is idempotent and keeps the frozen recorded_at', async () => {
+    const f = await fixture();
+    await f.prepare();
+    await f.record('verify');
+    const store = await qaStore(f.options);
+    const before = await store.json(`${f.qa}/results/verify-1.json`);
+    assert.equal((await f.record('verify')).ok, true, 'replay without options must succeed');
+    const after = await store.json(`${f.qa}/results/verify-1.json`);
+    assert.deepEqual(after, before, 'replayed record is byte-identical');
+    assert.equal(after.record.metadata.recorded_at, before.record.metadata.recorded_at);
+  });
+
+  it('replay with a conflicting rerun reason or checks timing is a typed metadata-conflict', async () => {
+    const f = await fixture();
+    await f.prepare();
+    // The checks timing belongs to a host-observed verifier run only.
+    await f.record('verify', { rerunReason: 'rerun-explicit', execution: { kind: 'host-observed', exit_code: 0 },
+      checksTiming: { started_at: '2026-11-05T00:00:00Z', ended_at: '2026-11-05T00:00:01Z', elapsed_ms: 1000, complete: true } });
+    assert.equal((await f.record('verify', { rerunReason: 'rerun-policy-changed', execution: { kind: 'host-observed', exit_code: 0 } })).code, 'metadata-conflict');
+    assert.equal((await f.record('verify', { rerunReason: 'rerun-explicit', execution: { kind: 'host-observed', exit_code: 0 },
+      checksTiming: { started_at: '2026-11-05T00:00:00Z', ended_at: '2026-11-05T00:00:02Z', elapsed_ms: 2000, complete: true } })).code, 'metadata-conflict');
+    assert.equal((await f.record('verify', { rerunReason: 'rerun-explicit', execution: { kind: 'host-observed', exit_code: 0 },
+      checksTiming: { started_at: '2026-11-05T00:00:00Z', ended_at: '2026-11-05T00:00:01Z', elapsed_ms: 1000, complete: true } })).ok, true);
+    const store = await qaStore(f.options);
+    const stored = await store.json(`${f.qa}/results/verify-1.json`);
+    assert.equal(stored.record.metadata.timings.checks.elapsed_ms, 1000);
+    // A caller-supplied checks timing without a host-observed run is a
+    // fabricated measurement, rejected before any state changes (#270 review 2).
+    assert.equal((await f.record('verify', { resultId: 'verify-2', checksTiming: { started_at: '2026-11-05T00:00:00Z', ended_at: '2026-11-05T00:00:01Z', elapsed_ms: 1000, complete: true } })).code, 'checks-timing-unproven');
+    assert.equal((await f.record('verify', { resultId: 'verify-2', execution: { kind: 'imported', exit_code: 0 }, checksTiming: { started_at: '2026-11-05T00:00:00Z', ended_at: '2026-11-05T00:00:01Z', elapsed_ms: 1000, complete: true } })).code, 'checks-timing-unproven');
+    const records = await store.results();
+    assert.equal(records.length, 1, 'rejected fabrications persisted nothing');
+  });
+
+  it('legacy records without metadata stay replayable and refuse explicit metadata members', async () => {
+    const f = await fixture();
+    await f.prepare();
+    await f.record('verify');
+    const store = await qaStore(f.options);
+    const envelope = await store.json(`${f.qa}/results/verify-1.json`);
+    const legacy = envelope.record; delete legacy.metadata;
+    await store.write(`${f.qa}/results/verify-1.json`, `${canonical({ checksum: digest(legacy), record: legacy })}\n`);
+    assert.equal((await f.record('verify')).ok, true, 'replay without options stays byte-identical');
+    assert.equal((await f.record('verify', { rerunReason: 'rerun-explicit' })).code, 'metadata-conflict');
+  });
+
+  it('invalid rerun reasons and timing shapes are rejected before any state changes', async () => {
+    const f = await fixture();
+    await f.prepare();
+    assert.equal((await f.record('verify', { rerunReason: 'made-up-reason' })).code, 'rerun-reason-invalid');
+    assert.equal((await f.record('verify', { execution: { kind: 'host-observed', exit_code: 0 },
+      checksTiming: { started_at: 'x', ended_at: 'y', elapsed_ms: -1, complete: true } })).code, 'timing-invalid');
+    const store = await qaStore(f.options);
+    const records = await store.results();
+    assert.equal(records.length, 0, 'nothing was recorded');
+  });
+
+  it('auto-superseded corrective record replays idempotently with its frozen chain reference (#270 review)', async () => {
+    const f = await fixture();
+    await f.prepare();
+    assert.equal((await f.record('verify')).ok, true); // qa-1: the open tip
+    const corrective = await f.record('verify', { resultId: 'verify-2' });
+    assert.equal(corrective.ok, true, JSON.stringify(corrective));
+    const store = await qaStore(f.options);
+    const before = await store.json(`${f.qa}/results/verify-2.json`);
+    assert.equal(before.record.supersedes, 'verify-1', 'the corrective record auto-chained onto the tip');
+    assert.equal((await f.record('verify', { resultId: 'verify-2' })).ok, true, 'replay succeeds');
+    const after = await store.json(`${f.qa}/results/verify-2.json`);
+    assert.deepEqual(after, before, 'same-id replay reuses the frozen supersedes and stays byte-identical');
+  });
+
+  it('CLI parser validates --rerun-reason against the closed vocabulary', async () => {
+    assert.deepEqual(parseQaManifestArgs(['record', '--change', 'c', '--rerun-reason', 'rerun-inputs-changed']),
+      { action: 'record', changeId: 'c', rerunReason: 'rerun-inputs-changed', json: false });
+    assert.equal(parseQaManifestArgs(['record', '--change', 'c', '--rerun-reason', 'made-up']), null);
+  });
+});
+
+describe('QA stage-2 rerun vocabulary (#270)', () => {
+  it('stays a strict subset of the exporter reason dictionary and both schema enums', async () => {
+  // qa-manifest-record must not import workflow-exchange; the frozen duplicated
+  // list is pinned equal from both sides plus the two JSON schema enums.
+  const source = await readFile(new URL('./qa-manifest-record.mjs', import.meta.url), 'utf8');
+  assert.equal(source.includes("from './workflow-exchange"), false, 'no reverse dependency');
+  assert.ok(QA_RERUN_REASON_CODES.length >= 1);
+  for (const code of QA_RERUN_REASON_CODES) assert.ok(RUNNER_METRICS_REASON_CODES.includes(code), code);
+  const runnerSchema = JSON.parse((await readFile(new URL('../schemas/runner-metrics.schema.json', import.meta.url), 'utf8')).toString());
+  const evalSchema = JSON.parse((await readFile(new URL('../schemas/evaluation-export.schema.json', import.meta.url), 'utf8')).toString());
+  const runnerEnum = runnerSchema.properties.checks.properties.reasons.items.properties.code.enum;
+  const evalEnum = evalSchema.properties.metrics.properties.checks_reasons.items.properties.code.enum;
+  for (const code of QA_RERUN_REASON_CODES) {
+    assert.ok(runnerEnum.includes(code), 'runner schema enum misses ' + code);
+    assert.ok(evalEnum.includes(code), 'eval schema enum misses ' + code);
+  }
   });
 });

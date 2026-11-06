@@ -10,13 +10,14 @@ import { lstat, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
-import { canonical, digest, identifier, portablePath, storeFor, requireValue, WorkflowError } from './workflow-state-store.mjs';
+import { canonical, digest, fields, identifier, portablePath, storeFor, requireValue, WorkflowError } from './workflow-state-store.mjs';
 import { executionId } from './execution-task-source.mjs';
 import { DELIVERY_LIMITS, TRANSPORT_KEYS, deliveryPaths, deliveryStore, requestUuid } from './host-delivery-store.mjs';
-import { RUN_SCHEMA, decode } from './execution-records.mjs';
+import { RUN_SCHEMA, decode, validateLedger } from './execution-records.mjs';
 import { validateHistoricalRun } from './execution-transactions.mjs';
 import { QA_LIMITS, qaStore } from './qa-manifest-store.mjs';
 import { allDeclaredRoots } from './qa-manifest-inputs.mjs';
+import { QA_RERUN_REASON_CODES } from './qa-manifest-record.mjs';
 import { parseStrictJson } from './json-strict.mjs';
 import { readProviderFile, writeProviderFile } from './provider-files.mjs';
 import { RUNNER_METRICS_COVERAGES, RUNNER_METRICS_REASON_CODES, RUNNER_METRICS_UNKNOWNS, validateRunnerMetrics } from './workflow-exchange.mjs';
@@ -32,10 +33,15 @@ const DEFAULT_OUTPUT = `${STATE_ROOT}/<change>/runner-metrics.json`;
 const MAX_ENTRIES = 1000;
 const MAX_CONFIG_BYTES = 256 * 1024;
 // Everything a runner metrics file cannot observe in v1, regardless of flags:
-// phase instrumentation, tokens/cost/tool accounting and model-request totals
-// all lack a producer until the stage-2 follow-up. `checks` is added only when
-// the checks block itself is unavailable (opt-out or unreadable QA store).
-const BASE_UNKNOWNS = Object.freeze(RUNNER_METRICS_UNKNOWNS.filter((value) => value !== 'checks'));
+// cost/tool accounting, unlogged requests, coordinator accounting and billing
+// still lack any producer. `checks` is added only when the checks block itself
+// is unavailable (opt-out or unreadable QA store). Stage-2 (#270) producers
+// cover the measurable phases, tokens/tool_calls/model_requests and the
+// tools/dedup stubs, so those markers are removed per-record by the coverage
+// rules below — never wholesale.
+const BASE_UNKNOWNS = Object.freeze(RUNNER_METRICS_UNKNOWNS.filter((value) =>
+  !['checks', 'setup_ms', 'checks_ms', 'snapshot_hash_ms', 'run_elapsed', 'tokens', 'tool_calls', 'model_requests'].includes(value)));
+const USAGE_TOKEN_DIMENSIONS = Object.freeze(['input', 'output', 'total', 'cache_read', 'cache_write', 'reasoning']);
 // Read errors that mean the scan observed a moving target (a concurrent writer)
 // versus a member whose persisted content fails validation: the former is a
 // scan-level inconsistency, the latter a per-member skip. Both degrade the
@@ -485,6 +491,150 @@ async function scanRuns(store, changeId, runId, notes, runReader) {
   return { runs, scanned: second.length, skipped, race };
 }
 
+// The fix-attempts ledger is a declared input (#270, R12): a single targeted
+// read of the change's ledger file — never a recursive inventory walk. The
+// digest-before/after pattern mirrors scanRuns; an observed change degrades
+// the scan instead of mixing ledger snapshots. Ledger failures are not
+// delivery/run members: they carry their own notes and never zero out
+// successfully read QA counts.
+async function scanLedger(store, changeId, runId, notes, ledgerReader) {
+  const relative = `${STATE_ROOT}/${changeId}/execution/fix-attempts.json`;
+  const read = ledgerReader ?? (() => store.bytes(relative));
+  let bytes;
+  try { bytes = await read(); } catch { note(notes, 'ledger_unreadable'); return { status: 'unreadable', attempts: null }; }
+  if (bytes === null) {
+    // Absence is confirmed with a second read: a ledger created between the
+    // two reads is a moving target (scan_inconsistent), never an honest
+    // absence — the SHALL scenario "created/deleted/changed between reads"
+    // covers all three directions.
+    let confirm;
+    try { confirm = await read(); } catch { note(notes, 'ledger_unreadable'); return { status: 'unreadable', attempts: null }; }
+    if (confirm !== null) { note(notes, 'scan_inconsistent'); return { status: 'race', attempts: null }; }
+    note(notes, 'ledger_absent');
+    return { status: 'absent', attempts: null };
+  }
+  const before = digest(bytes);
+  let ledger;
+  try { ledger = validateLedger(decode(bytes.toString('utf8'))); } catch { note(notes, 'ledger_invalid'); note(notes, 'member_skipped'); return { status: 'invalid', attempts: null }; }
+  let after;
+  try { after = await read(); } catch { note(notes, 'ledger_unreadable'); return { status: 'unreadable', attempts: null }; }
+  if (after === null || digest(after) !== before) { note(notes, 'scan_inconsistent'); return { status: 'race', attempts: null }; }
+  const attempts = runId === undefined ? ledger.attempts : ledger.attempts.filter((attempt) => attempt.run_id === runId);
+  return { status: 'ok', attempts };
+}
+
+// Stage-2 measured phases (#270): per-record producers with per-record
+// coverage. `values` are per-record measurements or null (absent timing,
+// incomplete interval, inverted stamps); a scalar is published as a sum only
+// when every relevant record carries a measured value and the set is
+// non-empty — partial coverage stays null behind its marker (R7).
+function measuredPhaseSum(values) {
+  if (values.length === 0) return null;
+  let total = 0;
+  for (const value of values) {
+    if (value === null || !Number.isSafeInteger(value) || value < 0) return null;
+    total += value;
+  }
+  return Number.isSafeInteger(total) ? total : null;
+}
+
+const timingComplete = (timing) => Boolean(timing) && timing.complete === true
+  && Number.isSafeInteger(timing.elapsed_ms) && timing.elapsed_ms >= 0;
+const setupMsOf = (run) => timingComplete(run.timings?.setup) ? run.timings.setup.elapsed_ms : null;
+// run_elapsed_ms is a measured envelope over run-record stamps: last − first
+// across mutating commands. It includes idle time between commands and is
+// never a compute sum; a single stamp or an inverted clock pair yields null.
+const runElapsedOf = (run) => {
+  const stamps = run.timings?.stamps;
+  if (!Array.isArray(stamps) || stamps.length < 2) return null;
+  const first = Date.parse(stamps[0].at);
+  const last = Date.parse(stamps[stamps.length - 1].at);
+  if (!Number.isFinite(first) || !Number.isFinite(last)) return null;
+  return last - first;
+};
+// The checks interval measures the verifier process of a host-observed run
+// (contract SHALL): a timing attached to an agent-authored/imported record is
+// not attributable to any verifier and contributes nothing to the sum — the
+// coverage stays broken behind its marker (review round 2). The snapshot-hash
+// timing, by contrast, measures the record's own binding work, which every
+// bound record genuinely performs.
+const qaChecksMsOf = (record) => record.execution?.kind === 'host-observed'
+  && timingComplete(record.metadata?.timings?.checks) ? record.metadata.timings.checks.elapsed_ms : null;
+const qaSnapshotMsOf = (record) => timingComplete(record.metadata?.timings?.snapshot_hash) ? record.metadata.timings.snapshot_hash.elapsed_ms : null;
+
+// Usage aggregation (#270, R9): overwrite per accounting key is already
+// guaranteed by the single resolved image per UUID. Scope comes from the
+// persisted `usage_scope` sibling, never from a digest guess. Every sampled
+// record must carry usage; each dimension is summed only under full coverage.
+function aggregateUsage(validMembers, membersSkipped) {
+  const markers = new Set(['tokens', 'tool_calls', 'model_requests']);
+  const result = { tokens: null, tool_calls: null, model_requests: null };
+  if (membersSkipped > 0) return { result, markers }; // unprovable completeness: stay conservative
+  if (validMembers.length === 0) return { result, markers };
+  const sampled = validMembers.map((member) => member.record);
+  const withUsage = sampled.filter((record) => record.usage && record.usage_scope);
+  if (withUsage.length !== sampled.length) return { result, markers };
+  const scopes = new Set(withUsage.map((record) => record.usage_scope));
+  if (scopes.size !== 1) return { result, markers };
+  const scope = [...scopes][0];
+  const dimValue = (usage, path) => {
+    let value = usage;
+    for (const key of path) { value = value?.[key]; }
+    return value === undefined ? null : value;
+  };
+  const dims = [...USAGE_TOKEN_DIMENSIONS.map((d) => ['tokens', d]), ['tool_calls'], ['model_requests']];
+  let sources = withUsage.map((record) => ({ usage: record.usage }));
+  if (scope === 'response') {
+    // Response-scoped accounting: records without a host id are not
+    // attributable (coverage is unprovable), copies of one response are
+    // counted once and must agree — a contradiction nulls the affected sums.
+    const responses = new Map();
+    for (const record of withUsage) {
+      const id = record.target.kind === 'message' ? record.host.message_id : record.host.completion_id;
+      if (typeof id !== 'string' || id.length === 0) return { result, markers };
+      const key = `${record.host.namespace_digest ?? ''}|${record.target.kind}|${id}`;
+      const existing = responses.get(key);
+      if (existing && canonical(existing) !== canonical(record.usage)) return { result, markers };
+      responses.set(key, record.usage);
+    }
+    sources = [...responses.values()].map((usage) => ({ usage }));
+  }
+  const tokens = {};
+  let tokensCovered = true;
+  for (const dimension of USAGE_TOKEN_DIMENSIONS) {
+    const path = ['tokens', dimension];
+    let sum = 0;
+    let covered = true;
+    for (const { usage } of sources) {
+      const value = dimValue(usage, path);
+      if (value === null || !Number.isSafeInteger(value) || value < 0) { covered = false; break; }
+      sum += value;
+    }
+    tokens[dimension] = covered && Number.isSafeInteger(sum) ? sum : null;
+    if (!covered) tokensCovered = false;
+  }
+  const flat = (path) => {
+    let sum = 0;
+    let covered = true;
+    for (const { usage } of sources) {
+      const value = dimValue(usage, path);
+      if (value === null || !Number.isSafeInteger(value) || value < 0) { covered = false; break; }
+      sum += value;
+    }
+    return covered && Number.isSafeInteger(sum) ? sum : null;
+  };
+  // A tokens block is published only when at least one dimension carries a
+  // measured sum; fully unknown dimensions stay null behind the marker.
+  const measuredDims = USAGE_TOKEN_DIMENSIONS.filter((d) => tokens[d] !== null);
+  result.tokens = measuredDims.length > 0 ? tokens : null;
+  result.tool_calls = flat(['tool_calls']);
+  result.model_requests = flat(['model_requests']);
+  if (USAGE_TOKEN_DIMENSIONS.some((d) => tokens[d] === null)) markers.add('tokens'); else markers.delete('tokens');
+  if (result.tool_calls === null) markers.add('tool_calls'); else markers.delete('tool_calls');
+  if (result.model_requests === null) markers.add('model_requests'); else markers.delete('model_requests');
+  return { result, markers };
+}
+
 function pendingObservedMs(validMembers) {
   // Dwell of the `pending` phase across recorded delivery history. This is a
   // host-wait observation from timestamps the producer already wrote — not
@@ -508,6 +658,31 @@ function pendingObservedMs(validMembers) {
 // consumes. The QA store already guarantees checksum integrity; anything that
 // fails here fails the whole opt-in block (all-or-nothing), because a partial
 // per-member recovery would duplicate store invariants.
+const isoTime = (value) => typeof value === 'string' && Number.isFinite(Date.parse(value));
+const intMs = (value) => Number.isSafeInteger(value) && value >= 0;
+// Closed-shape validation of the optional stage-2 metadata (#270). Malformed
+// metadata throws: the QA block is all-or-nothing, exactly like stage 1.
+function validateQaMetadata(metadata) {
+  fields(metadata, ['recorded_at'], ['rerun_reason', 'execution_run_id', 'timings']);
+  requireValue(isoTime(metadata.recorded_at), 'invalid-qa-result');
+  // The producer writes only the five causal rerun codes; a forged record
+  // carrying an outcome code (e.g. 'passed') in rerun_reason is malformed
+  // metadata, not a causal sample (review: validate by the producer subset).
+  if (metadata.rerun_reason !== undefined) requireValue(QA_RERUN_REASON_CODES.includes(metadata.rerun_reason), 'invalid-qa-result');
+  if (metadata.execution_run_id !== undefined) identifier(metadata.execution_run_id);
+  if (metadata.timings !== undefined) {
+    const timings = metadata.timings;
+    fields(timings, [], ['checks', 'snapshot_hash']);
+    for (const [key, withOperations] of [['checks', false], ['snapshot_hash', true]]) {
+      const timing = timings[key];
+      if (timing === undefined) continue;
+      fields(timing, ['started_at', 'ended_at', 'elapsed_ms', 'complete', ...(withOperations ? ['operations'] : [])]);
+      requireValue(isoTime(timing.started_at) && isoTime(timing.ended_at) && intMs(timing.elapsed_ms)
+        && typeof timing.complete === 'boolean'
+        && (!withOperations || intMs(timing.operations)), 'invalid-qa-result');
+    }
+  }
+}
 function qaDependency(record) {
   requireValue(record && typeof record === 'object' && !Array.isArray(record), 'invalid-qa-result');
   requireValue(record.schema === QA_RESULT_SCHEMA, 'invalid-qa-result');
@@ -517,6 +692,7 @@ function qaDependency(record) {
   requireValue(record.supersedes === null || record.supersedes === undefined || typeof record.supersedes === 'string', 'invalid-qa-result');
   requireValue(record.binding_code === null || record.binding_code === undefined
     || (typeof record.binding_code === 'string' && record.binding_code.length > 0), 'invalid-qa-result');
+  if (record.metadata !== undefined) validateQaMetadata(record.metadata);
   const fingerprint = record.input_fingerprints?.[record.check_id];
   requireValue(typeof fingerprint === 'string' && HEX64.test(fingerprint), 'invalid-qa-result');
   return { check_id: record.check_id, manifest_digest: record.manifest_digest, wave_id: record.wave_id, input_fingerprint: fingerprint };
@@ -526,7 +702,7 @@ function qaDependency(record) {
 // qa-results, reason counts restricted to the closed allow-list (open binding
 // codes collapse into `unknown`, absent evidence contributes nothing), and the
 // bounded dependency list (ids and digests only, never paths).
-export function projectChecks(qaRecords, { deliveryMembers = [], runs = [] } = {}, notes = new Set()) {
+export function projectChecks(qaRecords, { deliveryMembers = [], runs = [], ledgerAttempts = [] } = {}, notes = new Set()) {
   const reasons = new Map();
   const bump = (code) => reasons.set(code, (reasons.get(code) ?? 0) + 1);
   let repeated = 0;
@@ -534,13 +710,26 @@ export function projectChecks(qaRecords, { deliveryMembers = [], runs = [] } = {
   for (const record of qaRecords) {
     const dependency = qaDependency(record);
     if (record.supersedes !== null && record.supersedes !== undefined) repeated += 1;
-    if (typeof record.binding_code === 'string' && record.binding_code.length > 0) {
+    // One reason sample per record. An explicit causal rerun_reason outranks
+    // the indirect binding_code; ledger outcomes are a separate source below
+    // — "reasons are counters by source", never deduplicated across sources.
+    if (typeof record.metadata?.rerun_reason === 'string') {
+      bump(record.metadata.rerun_reason);
+    } else if (typeof record.binding_code === 'string' && record.binding_code.length > 0) {
       bump(RUNNER_METRICS_REASON_CODES.includes(record.binding_code) ? record.binding_code : 'unknown');
+    } else if (record.supersedes !== null && record.supersedes !== undefined) {
+      // A corrective rerun without any recorded reason is an unknown-cause
+      // sample: the collector covers it with `unknown` exactly as documented.
+      bump('unknown');
     }
     if (!dependencies.has(dependency.check_id)) dependencies.set(dependency.check_id, dependency);
   }
   for (const member of deliveryMembers) if (member.record.recovery) bump(member.record.recovery.type);
   for (const run of runs) if (run.recovery) bump(run.recovery.reason);
+  // Ledger outcomes (#270): each attempt contributes exactly one outcome
+  // sample over the current snapshot. Hypothesis/check/environment/inputs and
+  // paths never leave the project-internal ledger file.
+  for (const attempt of ledgerAttempts) bump(attempt.outcome);
   let entries = [...dependencies.values()].sort((a, b) => (a.check_id < b.check_id ? -1 : a.check_id > b.check_id ? 1 : 0));
   if (entries.length > QA_LIMITS.checks) {
     entries = entries.slice(0, QA_LIMITS.checks);
@@ -583,11 +772,15 @@ export async function collectRunnerMetrics(options = {}) {
     const delivery = await deliveryStore({ rootDir: root });
     const scan = await scanMembers(delivery, store, changeId, runId, notes, options.memberReader);
     const runScan = await scanRuns(store, changeId, runId, notes, options.runReader);
+    const ledgerScan = await scanLedger(store, changeId, runId, notes, options.ledgerReader);
     if (runId !== undefined && scan.members.size === 0 && runScan.runs.length === 0) note(notes, 'run_filter_empty');
     const validMembers = [...scan.members.values()].filter((member) => member.ok);
     const membersSkipped = scan.members.size - validMembers.length + runScan.skipped + scan.unreadableNames;
     if (membersSkipped > 0) note(notes, 'member_skipped');
-    const degraded = membersSkipped > 0 || scan.race || runScan.race;
+    // Ledger failures degrade through their own notes; they never enter
+    // provenance.members_skipped and never zero out read QA counts.
+    const ledgerDegraded = ['invalid', 'unreadable', 'race'].includes(ledgerScan.status);
+    const degraded = membersSkipped > 0 || scan.race || runScan.race || ledgerDegraded;
 
     // Snapshot dedup is implicit: each UUID contributes its single resolved
     // image exactly once; revisions are never summed and per-counter maxima
@@ -598,6 +791,11 @@ export async function collectRunnerMetrics(options = {}) {
       for (const key of TRANSPORT_KEYS) transport[key] += member.record.transport[key];
     }
     transport.incomplete_intervals += validMembers.filter((member) => member.record.interval !== null).length;
+
+    // Stage-2 usage accounting (#270): what the host reported, aggregated only
+    // under provable coverage (R9). `cost`/`billing`/`unlogged_requests`/
+    // `coordinator_accounting` keep their markers — no source exists.
+    const usage = aggregateUsage(validMembers, membersSkipped);
 
     // Response dedup: one host id observed by several UUIDs is one host-side
     // response serving repeated local operations. It never reduces the
@@ -658,12 +856,25 @@ export async function collectRunnerMetrics(options = {}) {
     // span would be negative and therefore unusable.
     const spanRuns = runScan.runs.filter((run) => !isLegacyRun(run)
       && Date.parse(run.updated_at) >= Date.parse(run.created_at));
+    // Stage-2 measured phases (#270): setup and run_elapsed sum over the
+    // sampled non-legacy run records; checks and snapshot_hash sum over the
+    // sampled qa records. Partial coverage stays null behind its marker. A
+    // skipped run record makes the sampled scope unprovable — one measured
+    // run next to one damaged record must never publish a sum, exactly like
+    // aggregateUsage stays conservative under members_skipped.
+    const timingScopeProvable = runScan.skipped === 0;
+    const measuredRuns = runScan.runs.filter((run) => !isLegacyRun(run));
+    const runElapsedValues = measuredRuns.map((run) => runElapsedOf(run));
+    // An inverted stamp pair (last before first across processes) is per-record
+    // null — it must never reach the intOrNull contract as a negative number.
     const phases = {
-      setup_ms: null,
+      setup_ms: timingScopeProvable ? measuredPhaseSum(measuredRuns.map((run) => setupMsOf(run))) : null,
       checks_ms: null,
       snapshot_hash_ms: null,
       wait_ms: null,
-      run_elapsed_ms: null,
+      run_elapsed_ms: timingScopeProvable
+        ? measuredPhaseSum(runElapsedValues.map((value) => (value !== null && value >= 0 ? value : null)))
+        : null,
       run_record_span_ms: spanRuns.length
         ? Math.max(...spanRuns.map((run) => Date.parse(run.updated_at))) - Math.min(...spanRuns.map((run) => Date.parse(run.created_at)))
         : null,
@@ -677,49 +888,76 @@ export async function collectRunnerMetrics(options = {}) {
 
     let checks = null;
     let qaScanned = null;
+    let qaRecords = [];
     if (parsed.includeQa) {
       const qaRoot = await resolveQaRoot(root);
       try {
         const qStore = await qaStore({ rootDir: root, changeId, qaDir: `${qaRoot}/${changeId}` });
-        const records = await qStore.results();
-        qaScanned = records.length;
-        checks = projectChecks(records, { deliveryMembers: validMembers, runs: runScan.runs }, notes);
+        qaRecords = await qStore.results();
+        qaScanned = qaRecords.length;
+        checks = projectChecks(qaRecords, { deliveryMembers: validMembers, runs: runScan.runs,
+          ledgerAttempts: ledgerScan.attempts ?? [] }, notes);
       } catch {
         checks = null;
         qaScanned = null;
+        qaRecords = [];
         note(notes, 'qa_results_unreadable');
       }
     }
+    phases.checks_ms = measuredPhaseSum(qaRecords.map((record) => qaChecksMsOf(record)));
+    phases.snapshot_hash_ms = measuredPhaseSum(qaRecords.map((record) => qaSnapshotMsOf(record)));
 
+    // Per-record unknown/zero honesty (#270): a marker leaves only when every
+    // relevant record in the selected scope carries the measurement. An empty
+    // relevant set has nothing to observe and keeps the marker.
     const unknowns = new Set(BASE_UNKNOWNS);
     if (checks === null) unknowns.add('checks');
+    if (phases.setup_ms === null) unknowns.add('setup_ms');
+    if (phases.run_elapsed_ms === null) unknowns.add('run_elapsed');
+    if (phases.checks_ms === null) unknowns.add('checks_ms');
+    if (phases.snapshot_hash_ms === null) unknowns.add('snapshot_hash_ms');
+    for (const marker of usage.markers) unknowns.add(marker);
 
     const registryImage = [...scan.members.keys()].sort().map((uuid) => {
       const member = scan.members.get(uuid);
       return { request_uuid: uuid, record_digest: member.ok ? member.recordDigest : null };
     });
+    // Stage-2 stub blocks (#270, owner decision 3 / shape 2B): published with
+    // null members until real producers exist — zero-init is forbidden.
+    const toolsStub = { observed_calls: null, failed_calls: null, elapsed_ms: null };
+    const dedupStub = { lookups: null, hits: null, misses: null, input_bytes: null, output_bytes: null };
+    const timingSurface = measuredRuns.some((run) => run.timings !== undefined)
+      || qaRecords.some((record) => record.metadata?.timings !== undefined);
     const metrics = {
       schema: RUNNER_METRICS_SCHEMA,
       run_id: runIds.size === 1 ? [...runIds][0] : null,
-      tokens: null,
+      tokens: usage.result.tokens,
+      tool_calls: usage.result.tool_calls,
+      model_requests: usage.result.model_requests,
       transport,
       attribution,
       requests,
       checks,
       phases,
+      tools: toolsStub,
+      dedup: dedupStub,
       provenance: {
         requests_scanned: scan.requestScanned,
         journals_scanned: scan.journalScanned,
         runs_scanned: runScan.scanned,
         qa_results_scanned: qaScanned,
         members_skipped: membersSkipped,
+        ledger_attempts_scanned: ledgerScan.status === 'ok' ? ledgerScan.attempts.length : null,
         registry_digest: digest(canonical(registryImage)),
         collector: { id: COLLECTOR_ID, version: await collectorVersion(root) }
       },
       unknowns: [...unknowns].sort(),
-      // Coverage declares the successfully read scope: an unreadable (or
-      // opted-out) checks block means the QA half was not actually observed.
-      coverage: checks !== null ? RUNNER_METRICS_COVERAGES[1] : RUNNER_METRICS_COVERAGES[0]
+      // Coverage declares the successfully read scope; the +timings variants
+      // add "a timing surface was observed in the sample" (per-record
+      // completeness stays in unknowns).
+      coverage: checks !== null
+        ? (timingSurface ? RUNNER_METRICS_COVERAGES[3] : RUNNER_METRICS_COVERAGES[1])
+        : (timingSurface ? RUNNER_METRICS_COVERAGES[2] : RUNNER_METRICS_COVERAGES[0])
     };
     // Final self-check before the single write: the aggregate must satisfy the
     // same runtime contract the export gate applies (per-record safe integers

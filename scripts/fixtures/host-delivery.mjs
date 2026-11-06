@@ -1,15 +1,42 @@
 // Offline HostClient model: request index, commits, responses and tombstones are separate.
 import { canonical, digest } from '../workflow-state-store.mjs';
 
-export function createFakeHost({ state, mode = 'normal', capabilities = {}, failpoint } = {}) {
+// Stage-2 usage reporting fixture (#270): `usage` activates a `usage_reporting`
+// capability declaration and attaches well-formed usage objects to read/fetch
+// responses. Modes: 'full' (every dimension), 'partial' (only tokens.input),
+// 'null-dims' (all null members — declared but unsupported dimensions),
+// 'conflict' (fetch usage contradicts read usage). `stopAfterResponses`
+// models "the host stopped reporting" (erase-mode: later answers carry no
+// usage). `model_requests` is its own declared number — never derived from the
+// fixture's own create counter.
+export function createFakeHost({ state, mode = 'normal', capabilities = {}, failpoint, usage } = {}) {
   state ??= { requests: new Map(), tombstones: new Map(), responses: new Map(), messages: [], completions: [], epoch: 'epoch-1',
-    counters: { create_calls: 0, read_calls: 0, fetch_calls: 0 }, trace: [] };
-  const host = { state, mode, capabilitiesOverride: capabilities,
+    counters: { create_calls: 0, read_calls: 0, fetch_calls: 0 }, trace: [], usage_responses: 0 };
+  const host = { state, mode, capabilitiesOverride: capabilities, usageSpec: usage ?? null,
     async capabilities() {
-      return { idempotent_create: true, read_by_request_id: true, fetch_response: true,
+      const base = { idempotent_create: true, read_by_request_id: true, fetch_response: true,
         target_kinds: ['message', 'completion'], transport: { utf8_stdin: true, utf8_file: true },
         idempotency: { scope_digest: digest('fake-host-namespace'), continuity_token: state.epoch,
           retention_until: 'durable', conflicting_payload: 'reject' }, ...host.capabilitiesOverride };
+      if (host.usageSpec) base.usage_reporting = { tokens: true, tool_calls: true, model_requests: true,
+        scope: host.usageSpec.scope ?? 'request' };
+      return base;
+    },
+    usageFor(answerKind) {
+      if (!host.usageSpec) return undefined;
+      if (host.usageSpec.stopAfterResponses !== undefined && state.usage_responses >= host.usageSpec.stopAfterResponses) return undefined;
+      state.usage_responses += 1;
+      const kind = host.usageSpec.kind ?? 'full';
+      if (kind === 'null-dims') return { tokens: { input: null, output: null, total: null, cache_read: null, cache_write: null, reasoning: null },
+        tool_calls: null, model_requests: null };
+      const tokens = kind === 'partial'
+        ? { input: 10, output: null, total: null, cache_read: null, cache_write: null, reasoning: null }
+        : { input: 10, output: 5, total: 15, cache_read: 2, cache_write: 1, reasoning: 3 };
+      if (kind === 'partial') return { tokens, tool_calls: null, model_requests: null };
+      const toolCalls = host.usageSpec.tool_calls ?? 3;
+      const modelRequests = answerKind === 'fetch' && kind === 'conflict' ? (host.usageSpec.model_requests ?? 2) + 7
+        : (host.usageSpec.model_requests ?? 2);
+      return { tokens, tool_calls: toolCalls, model_requests: modelRequests };
     },
     async createRequest(input) {
       const uuid = input.request_uuid;
@@ -50,6 +77,8 @@ export function createFakeHost({ state, mode = 'normal', capabilities = {}, fail
       if (host.mode === 'wrong-target') found.target.kind = 'message';
       if (host.mode === 'wrong-namespace') found.namespace_digest = digest('other-namespace');
       if (host.mode === 'wrong-mapping') found.completion_id = 'other-completion';
+      const usage = host.usageFor('read');
+      if (usage) found.usage = usage;
       return found;
     },
     async fetchResponse({ request_uuid }) {
@@ -58,7 +87,10 @@ export function createFakeHost({ state, mode = 'normal', capabilities = {}, fail
       if (host.mode === 'temporary-body') { host.mode = 'normal'; return null; }
       const body = state.responses.get(request_uuid);
       if (!body) return null;
-      return { body: host.mode === 'changed-body' ? Buffer.concat([body, Buffer.from('\nnormalized')]) : Buffer.from(body) };
+      const answer = { body: host.mode === 'changed-body' ? Buffer.concat([body, Buffer.from('\nnormalized')]) : Buffer.from(body) };
+      const usage = host.usageFor('fetch');
+      if (usage) answer.usage = usage;
+      return answer;
     },
     async releaseRequest({ request_uuid }) {
       state.trace.push(['release', request_uuid]); state.counters.release_calls = (state.counters.release_calls ?? 0) + 1;
