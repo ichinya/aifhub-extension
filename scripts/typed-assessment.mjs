@@ -24,12 +24,40 @@ export const ASSESSMENT_CONSUMER_IDS = Object.freeze([
 // identity, and cost are provenance, never key inputs (design: binding R7).
 const BANNED_BINDING_KEYS = Object.freeze(['timestamp', 'generated_at', 'run_id', 'cost', 'elapsed_ms']);
 
-export function assessmentCanonical(value) {
-  if (Array.isArray(value)) return `[${value.map(assessmentCanonical).join(',')}]`;
-  if (value && typeof value === 'object') {
-    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${assessmentCanonical(value[key])}`).join(',')}}`;
+// Canonical serialization with strict JSON-compatibility: binding inputs must
+// round-trip losslessly. `NaN`→`null`, dropped `undefined` array slots, and
+// cyclic structures would collapse distinct values into one digest, so every
+// unsupported value is rejected instead of silently normalized.
+export function assessmentCanonical(value, seen = new WeakSet(), path = '$') {
+  if (typeof value === 'string' || value === null || typeof value === 'boolean') return JSON.stringify(value);
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new TypeError(`binding input must be JSON-compatible: non-finite number at ${path}`);
+    return JSON.stringify(value);
   }
-  return JSON.stringify(value);
+  if (typeof value === 'bigint' || typeof value === 'function' || typeof value === 'symbol' || value === undefined) {
+    throw new TypeError(`binding input must be JSON-compatible: unsupported value at ${path}`);
+  }
+  if (Array.isArray(value)) {
+    if (seen.has(value)) throw new TypeError(`binding input must be acyclic: cycle at ${path}`);
+    seen.add(value);
+    const rendered = value.map((item, index) => assessmentCanonical(item, seen, `${path}[${index}]`));
+    seen.delete(value);
+    return `[${rendered.join(',')}]`;
+  }
+  if (value && typeof value === 'object') {
+    if (seen.has(value)) throw new TypeError(`binding input must be acyclic: cycle at ${path}`);
+    seen.add(value);
+    const rendered = Object.keys(value).sort()
+      .map((key) => {
+        if (BANNED_BINDING_KEYS.includes(key)) {
+          throw new TypeError(`binding input must not contain volatile key ${key} at ${path}.${key}`);
+        }
+        return `${JSON.stringify(key)}:${assessmentCanonical(value[key], seen, `${path}.${key}`)}`;
+      });
+    seen.delete(value);
+    return `{${rendered.join(',')}}`;
+  }
+  throw new TypeError(`binding input must be JSON-compatible at ${path}`);
 }
 
 export function assessmentDigest(value) {
@@ -38,38 +66,33 @@ export function assessmentDigest(value) {
     .digest('hex');
 }
 
-function assertNoBannedKeys(value, path = '$') {
-  if (Array.isArray(value)) {
-    value.forEach((item, index) => assertNoBannedKeys(item, `${path}[${index}]`));
-    return;
-  }
-  if (value && typeof value === 'object') {
-    for (const [key, item] of Object.entries(value)) {
-      if (BANNED_BINDING_KEYS.includes(key)) {
-        throw new TypeError(`binding input must not contain volatile key ${key} at ${path}.${key}`);
-      }
-      assertNoBannedKeys(item, `${path}.${key}`);
-    }
-  }
-}
-
 // Deterministic composite binding for a typed-assessment cache/observation.
 // Callers assemble the full revision set (input digests, rubric/profile,
 // adapter, contract, language, exclusion policy, target identity); this module
 // only guarantees canonical serialization, a stable digest, and that volatile
-// fields never enter the key.
+// fields never enter the key. One cycle-safe walk performs both the banned-key
+// rejection and the JSON-compatibility check.
 export function buildAssessmentBinding(parts) {
-  assertNoBannedKeys(parts);
-  return assessmentDigest(assessmentCanonical(parts));
+  return createHash('sha256').update(assessmentCanonical(parts)).digest('hex');
 }
 
-export function normalizeAssessmentLimits(limits = {}) {
-  const normalized = {
-    deadlineMs: Number.isFinite(limits.deadlineMs) && limits.deadlineMs > 0 ? Math.floor(limits.deadlineMs) : 30000,
-    maxFindings: Number.isFinite(limits.maxFindings) && limits.maxFindings >= 0 ? Math.floor(limits.maxFindings) : 500,
-    maxDiagnostics: Number.isFinite(limits.maxDiagnostics) && limits.maxDiagnostics >= 0 ? Math.floor(limits.maxDiagnostics) : 200,
+export function normalizeAssessmentLimits(limits) {
+  const source = limits && typeof limits === 'object' && !Array.isArray(limits) ? limits : {};
+  // Clamps are applied after rounding so a fractional 0.4 deadline cannot
+  // floor to 0 (immediate-expiry) and a zero diagnostics budget still leaves
+  // room for the truncation marker itself.
+  const bounded = (value, fallback, minimum, maximum) => {
+    if (!Number.isFinite(value)) return fallback;
+    const rounded = Math.floor(value);
+    if (rounded < minimum) return minimum;
+    if (rounded > maximum) return maximum;
+    return rounded;
   };
-  return normalized;
+  return {
+    deadlineMs: bounded(source.deadlineMs, 30000, 1, 24 * 60 * 60 * 1000),
+    maxFindings: bounded(source.maxFindings, 500, 0, 1_000_000),
+    maxDiagnostics: bounded(source.maxDiagnostics, 200, 1, 10_000),
+  };
 }
 
 function diagnostic(code, path = null, detail = null) {
@@ -82,13 +105,23 @@ function emptyCoverage() {
 
 function normalizeCoverage(coverage) {
   const base = coverage && typeof coverage === 'object' && !Array.isArray(coverage) ? coverage : {};
-  const state = ASSESSMENT_COVERAGE_STATES.includes(base.state) ? base.state : 'none';
+  let state = ASSESSMENT_COVERAGE_STATES.includes(base.state) ? base.state : 'none';
   const boundedCount = (value) => (Number.isInteger(value) && value >= 0 ? value : 0);
-  const missing = Array.isArray(base.missing_sources) ? base.missing_sources.slice(0, 100) : [];
+  const declared = boundedCount(base.declared_sources);
+  const scanned = boundedCount(base.scanned_sources);
+  // Items must be well-formed {path, reason} pairs; anything else is dropped
+  // so a malformed entry cannot masquerade as coverage evidence.
+  const missing = (Array.isArray(base.missing_sources) ? base.missing_sources : [])
+    .filter((item) => item && typeof item === 'object' && !Array.isArray(item)
+      && typeof item.path === 'string' && item.path.length > 0)
+    .slice(0, 100);
+  // Consistency: an incomplete scan can never be `full`, whatever the caller
+  // claimed — missing entries or a scanned<declared gap degrade to partial.
+  if ((missing.length > 0 || scanned < declared) && state === 'full') state = 'partial';
   return {
     state,
-    declared_sources: boundedCount(base.declared_sources),
-    scanned_sources: boundedCount(base.scanned_sources),
+    declared_sources: declared,
+    scanned_sources: scanned,
     missing_sources: missing,
   };
 }
@@ -142,11 +175,36 @@ export async function runTypedAssessment(spec) {
   const finish = async (outcome) => {
     const result = { ...outcome };
     if (typeof watch?.changed === 'function') {
+      // The freshness probe shares the assessment's deadline budget: a hung
+      // probe must not hold the whole call open past the bound. A probe that
+      // exceeds the budget (or rejects) degrades to stale — the conservative
+      // honest direction.
+      const remaining = Math.max(1, bounds.deadlineMs - Math.round((typeof now === 'function' ? now() : Date.now()) - startedAt));
       let drifted = false;
-      try { drifted = (await watch.changed()) === true; } catch { drifted = true; }
-      if (drifted) {
+      let probeTimedOut = false;
+      try {
+        let probeTimer;
+        const probeDeadline = new Promise((resolve) => {
+          probeTimer = setTimeout(() => resolve({ probeTimedOut: true }), remaining);
+        });
+        try {
+          const probeResult = await Promise.race([
+            Promise.resolve(watch.changed()).then((value) => ({ drifted: value === true })),
+            probeDeadline,
+          ]);
+          if (probeResult && probeResult.probeTimedOut === true) probeTimedOut = true;
+          else if (probeResult) drifted = probeResult.drifted === true;
+        } finally {
+          if (typeof probeTimer.unref === 'function') probeTimer.unref();
+        }
+      } catch {
+        drifted = true;
+      }
+      if (drifted || probeTimedOut) {
         result.freshness = 'stale';
-        result.diagnostics = [...result.diagnostics, diagnostic('assessment-stale', null, 'inputs or rubric changed during the scan')];
+        result.diagnostics = [...result.diagnostics, diagnostic('assessment-stale', null, probeTimedOut
+          ? 'freshness probe exceeded the deadline budget'
+          : 'inputs or rubric changed during the scan')];
       }
     }
     if (result.diagnostics.length > bounds.maxDiagnostics) {
@@ -170,13 +228,20 @@ export async function runTypedAssessment(spec) {
   }
 
   let raw;
+  let raceTimer = null;
   try {
     const context = { expired, deadlineMs: bounds.deadlineMs };
     const deadline = new Promise((resolve) => {
-      const timer = setTimeout(() => resolve({ timedOut: true }), bounds.deadlineMs);
-      if (typeof timer.unref === 'function') timer.unref();
+      // Referenced while the race is pending: a never-settling assessor must
+      // still drive the deadline outcome instead of letting the process exit
+      // silently. Released right after the race settles.
+      raceTimer = setTimeout(() => resolve({ timedOut: true }), bounds.deadlineMs);
     });
-    raw = await Promise.race([Promise.resolve(assessor(input, context)), deadline]);
+    try {
+      raw = await Promise.race([Promise.resolve(assessor(input, context)), deadline]);
+    } finally {
+      if (raceTimer && typeof raceTimer.unref === 'function') raceTimer.unref();
+    }
   } catch (error) {
     return finish({
       ok: false, run_status: 'failed', freshness: 'current', abstained: false, findings: [],
@@ -185,6 +250,16 @@ export async function runTypedAssessment(spec) {
     });
   }
   if (raw && raw.timedOut === true) {
+    return finish({
+      ok: false, run_status: 'failed', freshness: 'current', abstained: false, findings: [],
+      diagnostics: [diagnostic('deadline-exceeded', null, `deadlineMs=${bounds.deadlineMs}`)],
+      coverage: normalizeCoverage(coverage), elapsed_ms: 0,
+    });
+  }
+  // A synchronous or same-tick assessor can return after the deadline already
+  // elapsed (the loop was blocked so the timer callback could not run first).
+  // Its output is discarded: an over-deadline result is never presented.
+  if (expired()) {
     return finish({
       ok: false, run_status: 'failed', freshness: 'current', abstained: false, findings: [],
       diagnostics: [diagnostic('deadline-exceeded', null, `deadlineMs=${bounds.deadlineMs}`)],

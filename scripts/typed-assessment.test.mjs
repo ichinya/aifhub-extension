@@ -181,7 +181,10 @@ describe('typed-assessment honest outcomes', () => {
 
   it('normalizes malformed coverage and limits instead of trusting them', async () => {
     assert.deepEqual(normalizeAssessmentLimits({ deadlineMs: -5, maxFindings: 1.7, maxDiagnostics: 'x' }),
-      { deadlineMs: 30000, maxFindings: 1, maxDiagnostics: 200 });
+      { deadlineMs: 1, maxFindings: 1, maxDiagnostics: 200 });
+    assert.deepEqual(normalizeAssessmentLimits(null), { deadlineMs: 30000, maxFindings: 500, maxDiagnostics: 200 });
+    assert.deepEqual(normalizeAssessmentLimits('x'), { deadlineMs: 30000, maxFindings: 500, maxDiagnostics: 200 });
+    assert.deepEqual(normalizeAssessmentLimits({ maxDiagnostics: 0 }).maxDiagnostics, 1, 'zero budget still leaves the marker slot');
     const outcome = await runTypedAssessment({
       assessor: async () => ({ findings: [], diagnostics: [] }),
       coverage: { state: 'bogus', declared_sources: 'x', missing_sources: 'x' },
@@ -189,6 +192,16 @@ describe('typed-assessment honest outcomes', () => {
     assert.equal(outcome.coverage.state, 'none');
     assert.equal(outcome.coverage.declared_sources, 0);
     assert.deepEqual(outcome.coverage.missing_sources, []);
+    const inconsistent = await runTypedAssessment({
+      assessor: async () => ({ findings: [], diagnostics: [] }),
+      coverage: { state: 'full', declared_sources: 2, scanned_sources: 1, missing_sources: [{ path: 'a.md', reason: 'file-missing' }] },
+    });
+    assert.equal(inconsistent.coverage.state, 'partial', 'an incomplete scan can never stay full');
+    const junkEntries = await runTypedAssessment({
+      assessor: async () => ({ findings: [], diagnostics: [] }),
+      coverage: { state: 'partial', missing_sources: ['junk', null, { path: 'ok.md', reason: 'file-missing' }, 7] },
+    });
+    assert.deepEqual(junkEntries.coverage.missing_sources, [{ path: 'ok.md', reason: 'file-missing' }]);
   });
 
   it('rejects outcome shapes that would mask a negative result', async () => {
@@ -202,6 +215,58 @@ describe('typed-assessment honest outcomes', () => {
     });
     assert.equal(outcome.run_status, 'failed');
     assert.deepEqual(outcome.findings, []);
+  });
+
+  it('discards a same-tick assessor result produced after the deadline elapsed', async () => {
+    // A synchronous assessor blocks the loop, so the deadline timer cannot
+    // fire while it runs; the post-race expired() check must discard its
+    // output instead of presenting a complete outcome. The clock jumps past
+    // the deadline on its second read (after the assessor returned), which is
+    // exactly what a blocked loop produces with a real clock.
+    let reads = 0;
+    const outcome = await runTypedAssessment({
+      now: () => {
+        reads += 1;
+        return reads === 1 ? 0 : 5000;
+      },
+      assessor: async () => ({ findings: [{ late: true }], diagnostics: [] }),
+      coverage: { state: 'full' },
+      limits: { deadlineMs: 1000 },
+    });
+    assert.equal(outcome.run_status, 'failed');
+    assert.deepEqual(outcome.findings, []);
+    assert.ok(outcome.diagnostics.some((entry) => entry.code === 'deadline-exceeded'));
+  });
+
+  it('degrades to stale when the freshness probe hangs past the deadline budget', async () => {
+    const outcome = await runTypedAssessment({
+      assessor: async () => ({ findings: [{ n: 1 }], diagnostics: [] }),
+      coverage: { state: 'full' },
+      watch: { changed: () => new Promise(() => {}) },
+      limits: { deadlineMs: 60 },
+    });
+    assert.equal(outcome.freshness, 'stale');
+    assert.ok(outcome.diagnostics.some((entry) => entry.code === 'assessment-stale'
+      && String(entry.detail).includes('probe')));
+  });
+
+  it('rejects binding inputs that would silently collapse into one digest', () => {
+    for (const [name, parts] of Object.entries({
+      nan: { x: Number.NaN },
+      infinity: { x: Number.POSITIVE_INFINITY },
+      undefined_value: { x: undefined },
+      array_hole: { list: [undefined] },
+      function_value: { fn: () => {} },
+      cycle: null,
+    })) {
+      if (parts === null) {
+        const cyclic = { self: null };
+        cyclic.self = cyclic;
+        assert.throws(() => buildAssessmentBinding(cyclic), /acyclic/, name);
+        continue;
+      }
+      assert.throws(() => buildAssessmentBinding(parts), /JSON-compatible/, name);
+    }
   });
 });
 
