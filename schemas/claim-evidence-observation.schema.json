@@ -185,6 +185,13 @@
                   "changed",
                   "not_declared"
                 ]
+              },
+              "known_source_revision": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^sha256:[a-f0-9]{64}$"
               }
             },
             "required": [
@@ -197,7 +204,8 @@
               "quote_sha256",
               "quote_check",
               "quote_span",
-              "known_revision"
+              "known_revision",
+              "known_source_revision"
             ]
           }
         },
@@ -513,11 +521,19 @@
             "null"
           ],
           "maxLength": 500
+        },
+        "envelope_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
         }
       },
       "required": [
         "mode",
-        "envelope_path"
+        "envelope_path",
+        "envelope_sha256"
       ]
     },
     "diagnostics": {

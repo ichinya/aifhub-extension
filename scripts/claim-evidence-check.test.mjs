@@ -423,6 +423,47 @@ describe('claim-evidence structural stage', () => {
     assert.equal(observation.semantic.coverage.declared_sources, 4);
   });
 
+  it('counts a carrier that is itself the only source as one scanned input', async () => {
+    const root = await makeTemp('aif-ce-selfcarrier-');
+    await seedSmokeProject(root);
+    const outputs = [];
+    const envelope = pairsEnvelope({ claims: [
+      { claim_id: 's1', source_ref: { path: 'docs/research.md' }, relation: 'paraphrase' },
+    ] });
+    const exit = await runClaimEvidenceCheckCommand(['--change', 'work', '--stdin', '--json'], {
+      rootDir: root, readStdin: async () => Buffer.from(JSON.stringify(envelope), 'utf8'), output: (value) => outputs.push(value),
+    });
+    assert.equal(exit, 0);
+    const observation = observationOf(outputs);
+    assert.equal(observation.semantic.coverage.state, 'full', 'a honestly handled self-carrier pair is not a silent none');
+    assert.deepEqual([observation.semantic.coverage.declared_sources, observation.semantic.coverage.scanned_sources], [1, 1]);
+    assert.equal(observation.structural.pairs[0].quote_check, 'not_applicable');
+    assert.deepEqual(observation.structural.missing_sources, []);
+  });
+
+  it('binds the presented quote bytes and declared revision into the composite binding', async () => {
+    const root = await makeTemp('aif-ce-bindq-');
+    await seedSmokeProject(root);
+    const run = async (envelope) => {
+      const outputs = [];
+      await runClaimEvidenceCheckCommand(['--change', 'work', '--stdin', '--json'], {
+        rootDir: root, readStdin: async () => Buffer.from(JSON.stringify(envelope), 'utf8'), output: (value) => outputs.push(value),
+      });
+      return observationOf(outputs);
+    };
+    const base = await run(pairsEnvelope());
+    const otherQuote = await run(pairsEnvelope({ claims: [
+      { claim_id: 'c1', claim_ref: 'research line 3', source_ref: { path: 'docs/spec.md' }, relation: 'literal_quote', quote: 'The session MUST expire after 30 minutes of inactivity.' },
+    ] }));
+    const declaredRevision = await run(pairsEnvelope({ claims: [
+      { claim_id: 'c1', claim_ref: 'research line 3', source_ref: { path: 'docs/spec.md' }, relation: 'literal_quote', quote: QUOTE_OK, known_source_revision: `sha256:${'a'.repeat(64)}` },
+    ] }));
+    assert.notEqual(base.binding, otherQuote.binding, 'a different presented quote must change the binding');
+    assert.notEqual(base.binding, declaredRevision.binding, 'a different declared revision must change the binding');
+    // The recorded pair carries the declared revision verbatim.
+    assert.equal(declaredRevision.structural.pairs[0].known_source_revision, `sha256:${'a'.repeat(64)}`);
+  });
+
   it('records the declared source revision as a separate dimension from freshness', async () => {
     const root = await makeTemp('aif-ce-rev-');
     await seedSmokeProject(root);
@@ -555,6 +596,54 @@ describe('claim-evidence semantic stage (typed DI)', () => {
     });
     observation = observationOf(foreignVerdict);
     assert.equal(observation.semantic.run_status, 'failed', 'an assessment for a claim outside the envelope degrades the stage');
+
+    // Contradictory verdicts for the same claim never survive the sort: the
+    // duplicated claim id degrades the stage instead of letting a last-wins
+    // map pick one side (and possibly flip a compound parent to supported).
+    const duplicated = [];
+    await runClaimEvidenceCheckCommand(['--change', 'work', '--pairs', 'pairs.json', '--json'], {
+      rootDir: root, output: (value) => duplicated.push(value),
+      assessor: async () => ({ findings: [
+        { claim_id: 'c1', verdict: 'supports', rationale: 'x' },
+        { claim_id: 'c1', verdict: 'contradicts', rationale: 'y' },
+      ] }),
+    });
+    observation = observationOf(duplicated);
+    assert.equal(observation.semantic.run_status, 'failed', 'duplicate claim_id findings degrade the stage');
+    assert.equal(observation.semantic.outcome_reason, 'semantic-assessment-invalid');
+    assert.deepEqual(observation.semantic.assessments, []);
+    assert.deepEqual(observation.compound.parents, []);
+
+    // Provider-supplied diagnostics are untrusted: entries outside the
+    // closed {code, path, detail} shape are dropped at the semantic
+    // boundary, the stage degrades honestly, and the observation still
+    // renders — schema parity never fails after the structural scan ran.
+    const malformedDiagnostics = [];
+    const malformedExit = await runClaimEvidenceCheckCommand(['--change', 'work', '--pairs', 'pairs.json', '--json'], {
+      rootDir: root, output: (value) => malformedDiagnostics.push(value),
+      assessor: async () => ({ findings: [], diagnostics: [{ unexpected: 'shape' }, 'a string', 5, { code: 7, path: null, detail: null }] }),
+    });
+    assert.equal(malformedExit, 0, 'invalid provider diagnostics must not become a schema-parity failure');
+    observation = observationOf(malformedDiagnostics);
+    assert.equal(observation.semantic.run_status, 'failed');
+    assert.equal(observation.semantic.outcome_reason, 'semantic-diagnostic-invalid');
+    assert.equal(observation.structural.pairs[0].quote_check, 'exact_found', 'structural section survives invalid provider diagnostics');
+    assert.equal(observation.diagnostics.filter((entry) => entry.code === 'semantic-diagnostic-invalid').length, 4, 'one marker per dropped entry');
+    assert.ok(observation.diagnostics.every((entry) => ['code', 'path', 'detail'].every((key) => key in entry)), 'every emitted diagnostic keeps the closed shape');
+
+    // Valid helper diagnostics pass through exactly once — even when the
+    // same run also drops an invalid finding (the merge must not duplicate
+    // the helper entries).
+    const onceThrough = [];
+    await runClaimEvidenceCheckCommand(['--change', 'work', '--pairs', 'pairs.json', '--json'], {
+      rootDir: root, output: (value) => onceThrough.push(value),
+      assessor: async () => ({
+        findings: [{ claim_id: 'ghost', verdict: 'supports', rationale: 'x' }],
+        diagnostics: [{ code: 'provider-note', path: null, detail: null }],
+      }),
+    });
+    observation = observationOf(onceThrough);
+    assert.equal(observation.diagnostics.filter((entry) => entry.code === 'provider-note').length, 1, 'helper diagnostics merge exactly once');
   });
 
   it('marks the observation stale when an input changes during the semantic stage', async () => {
@@ -907,6 +996,24 @@ describe('claim-evidence binding revalidation', () => {
     const tamperedVerdict = await validateObservationBinding(tampered.root, tampered.observation);
     assert.equal(tamperedVerdict.stale, true);
     assert.ok(tamperedVerdict.mismatched.includes('binding'));
+
+    // The presented pairs envelope is binding input for file transport:
+    // editing the quote (or any envelope content) invalidates the record.
+    const envelopeEdit = await writtenObservation('aif-ce-envelope2-', async (root) => {
+      const envelope = parseStrictJson(await readFile(path.join(root, 'pairs.json'), 'utf8'));
+      envelope.claims[0].quote = `${envelope.claims[0].quote} tweaked`;
+      await writeFile(path.join(root, 'pairs.json'), JSON.stringify(envelope), 'utf8');
+    });
+    const envelopeVerdict = await validateObservationBinding(envelopeEdit.root, envelopeEdit.observation);
+    assert.equal(envelopeVerdict.stale, true);
+    assert.ok(envelopeVerdict.mismatched.includes('envelope'), envelopeVerdict.mismatched.join(','));
+
+    const envelopeDeleted = await writtenObservation('aif-ce-envelope3-', async (root) => {
+      await rm(path.join(root, 'pairs.json'));
+    });
+    const deletedVerdict = await validateObservationBinding(envelopeDeleted.root, envelopeDeleted.observation);
+    assert.equal(deletedVerdict.stale, true);
+    assert.ok(deletedVerdict.mismatched.includes('envelope'), 'a vanished envelope cannot prove freshness');
   });
 
   it('rejects damaged, semantically impossible, or foreign claim records', async () => {
@@ -932,6 +1039,30 @@ describe('claim-evidence binding revalidation', () => {
     abstainFull.semantic.assessments = [];
     abstainFull.semantic.coverage = { ...abstainFull.semantic.coverage, state: 'full' };
     assert.equal((await validateObservationBinding(root, abstainFull)).ok, false, 'abstained stage cannot claim scanned coverage');
+
+    // A truncation marker is a coverage fact: full coverage next to it is a
+    // contradiction no schema check can express (review F4 invariant).
+    const truncatedFull = structuredClone(observation);
+    truncatedFull.diagnostics = [...truncatedFull.diagnostics, { code: 'findings-truncated', path: null, detail: 'limit=50' }];
+    assert.equal((await validateObservationBinding(root, truncatedFull)).ok, false, 'findings-truncated + full coverage');
+
+    // Exactly one assessment per presented claim: duplicated ids would flip
+    // the compound roll-up through a last-wins map (review F1).
+    const duplicatedAssessments = structuredClone(observation);
+    duplicatedAssessments.semantic.assessments = [
+      { claim_id: 'c1', verdict: 'supports', rationale: 'x' },
+      { claim_id: 'c1', verdict: 'contradicts', rationale: 'y' },
+    ];
+    assert.equal((await validateObservationBinding(root, duplicatedAssessments)).ok, false, 'duplicate claim assessments');
+
+    // The engine never emits a language override; a schema-valid tampered
+    // override must fail revalidation, not pass as fresh (review F6).
+    const languageOverride = structuredClone(observation);
+    languageOverride.language_options.override = 'ru';
+    assert.equal((await validateObservationBinding(root, languageOverride)).ok, false, 'tampered language override');
+    const languageSource = structuredClone(observation);
+    languageSource.language_source = 'override';
+    assert.equal((await validateObservationBinding(root, languageSource)).ok, false, 'tampered language source');
   });
 
   it('rejects a hidden compound parent in a compound observation', async () => {

@@ -435,6 +435,7 @@ export function checkStructuralPair(pair, sourceBytes, sourceSha256, sourceOk, r
     quote_check: 'not_applicable',
     quote_span: null,
     known_revision: 'not_declared',
+    known_source_revision: pair.known_source_revision ?? null,
   };
   if (!sourceOk) {
     const outcome = sourceOutcomeForRead(read);
@@ -518,6 +519,8 @@ function claimRefRecords(envelope) {
     source_path: claim.source_ref.path,
     source_span: claim.source_ref.span ?? null,
     relation: claim.relation,
+    quote_sha256: claim.quote !== undefined ? digest(Buffer.from(claim.quote, 'utf8')) : null,
+    known_source_revision: claim.known_source_revision ?? null,
   })).sort((left, right) => (left.claim_id < right.claim_id ? -1 : left.claim_id > right.claim_id ? 1 : 0));
 }
 
@@ -586,46 +589,75 @@ export function computeCompoundParents(envelope, semantic) {
   return { parents };
 }
 
+// The observation schema admits exactly {code, path, detail} diagnostics:
+// provider-supplied diagnostics are untrusted, so anything outside the
+// closed shape is dropped here rather than failing schema parity after the
+// whole scan already ran (the structural section must always survive).
+function isValidObservationDiagnostic(entry) {
+  return entry && typeof entry === 'object' && !Array.isArray(entry)
+    && Object.keys(entry).length === 3
+    && typeof entry.code === 'string' && entry.code.length >= 1 && entry.code.length <= 200
+    && (entry.path === null || (typeof entry.path === 'string' && entry.path.length >= 1 && entry.path.length <= 500))
+    && (entry.detail === null || (typeof entry.detail === 'string' && entry.detail.length <= 500));
+}
+
 // Closed-shape normalization of helper findings into semantic assessments.
-// A finding outside the closed verdict shape — or naming a claim outside the
-// presented envelope (when the caller provides the presented id set) — is
-// never coerced into a verdict: it is dropped with a diagnostic, and the
-// stage degrades to an explicit `failed` outcome — a partial supports set
-// would be dishonest.
+// A finding outside the closed verdict shape — naming a claim outside the
+// presented envelope (when the caller provides the presented id set) — or
+// carrying a verdict for a claim that another finding already assessed is
+// never coerced into a result: it is dropped with a diagnostic, and the
+// stage degrades to an explicit `failed` outcome — a partial or
+// contradictory supports set would be dishonest. Helper diagnostics are
+// validated at the same boundary and returned exactly once, so callers can
+// merge them without duplicating entries in the observation.
 export function normalizeSemanticOutcome(outcome, knownClaimIds = null) {
-  const outcomeReason = outcome.run_status === 'complete'
-    ? (outcome.abstained ? 'assessor-abstain' : null)
-    : String(outcome.diagnostics.find((entry) => entry.code !== 'assessment-stale')?.code ?? outcome.diagnostics[0]?.code ?? 'unspecified').slice(0, 200);
+  const rawDiagnostics = Array.isArray(outcome.diagnostics) ? outcome.diagnostics : [];
+  const diagnostics = [];
+  let diagnosticsInvalid = false;
+  for (const entry of rawDiagnostics) {
+    if (isValidObservationDiagnostic(entry)) {
+      diagnostics.push(entry);
+      continue;
+    }
+    diagnosticsInvalid = true;
+    diagnostics.push({ code: 'semantic-diagnostic-invalid', path: null, detail: 'dropped a helper diagnostic outside the closed shape' });
+  }
   const rawAssessments = outcome.run_status === 'complete' && !outcome.abstained ? outcome.findings : [];
   const assessments = [];
-  const diagnostics = [];
+  const seenClaimIds = new Set();
+  let assessmentsInvalid = false;
   for (const finding of rawAssessments) {
     if (!finding || typeof finding !== 'object' || Array.isArray(finding)
       || !validateClaimId(finding.claim_id) || !SEMANTIC_VERDICTS.includes(finding.verdict)
       || typeof finding.rationale !== 'string' || finding.rationale.length < 1 || finding.rationale.length > 500
-      || (knownClaimIds !== null && !knownClaimIds.has(finding.claim_id))) {
+      || (knownClaimIds !== null && !knownClaimIds.has(finding.claim_id))
+      || seenClaimIds.has(finding.claim_id)) {
+      assessmentsInvalid = true;
       diagnostics.push({ code: 'semantic-assessment-invalid', path: null, detail: 'dropped a finding outside the closed verdict shape' });
       continue;
     }
+    seenClaimIds.add(finding.claim_id);
     assessments.push({ claim_id: finding.claim_id, verdict: finding.verdict, rationale: finding.rationale });
   }
-  if (diagnostics.length > 0) {
+  if (assessmentsInvalid || diagnosticsInvalid) {
     return {
       run_status: 'failed',
       freshness: outcome.freshness,
       abstained: false,
-      outcome_reason: 'semantic-assessment-invalid',
+      outcome_reason: assessmentsInvalid ? 'semantic-assessment-invalid' : 'semantic-diagnostic-invalid',
       assessments: [],
-      diagnostics: [...outcome.diagnostics, ...diagnostics],
+      diagnostics,
     };
   }
   return {
     run_status: outcome.run_status,
     freshness: outcome.freshness,
     abstained: outcome.abstained,
-    outcome_reason: outcomeReason,
+    outcome_reason: outcome.run_status === 'complete'
+      ? (outcome.abstained ? 'assessor-abstain' : null)
+      : String(diagnostics.find((entry) => entry.code !== 'assessment-stale')?.code ?? diagnostics[0]?.code ?? 'unspecified').slice(0, 200),
     assessments: sortAssessments(assessments).slice(0, MAX_CLAIM_PAIRS),
-    diagnostics: [],
+    diagnostics,
   };
 }
 
@@ -729,8 +761,27 @@ export async function validateObservationBinding(rootDir, observation, options =
   if (semantic.abstained === true && semantic.coverage?.state !== 'none') {
     return { ok: false, code: 'observation-invalid' };
   }
+  // A findings-truncated marker is a coverage fact: the stage that truncated
+  // can never be presented with full coverage (mirror of the helper's
+  // normalizeCoverage downgrade).
+  if ((observation.diagnostics ?? []).some((entry) => entry?.code === 'findings-truncated')
+    && semantic.coverage?.state === 'full') {
+    return { ok: false, code: 'observation-invalid' };
+  }
+  // The engine never emits a language override; a recorded override (or any
+  // non-detected source) is schema-valid tampering, not a state this engine
+  // can revalidate.
+  if (observation.language_source !== 'detected' || observation.language_options?.override !== null) {
+    return { ok: false, code: 'observation-invalid' };
+  }
+  // Exactly one assessment per presented claim: duplicated claim ids would
+  // let contradictory verdicts survive the sort and flip the compound
+  // roll-up through a last-wins map.
   for (const assessment of recordedAssessments) {
     if (!claimIds.has(assessment?.claim_id)) return { ok: false, code: 'observation-invalid' };
+  }
+  if (new Set(recordedAssessments.map((assessment) => assessment?.claim_id)).size !== recordedAssessments.length) {
+    return { ok: false, code: 'observation-invalid' };
   }
   // Compound consistency: parents must exist in the recorded pairs, parts
   // must be the recorded children, and `supported` requires every part to
@@ -808,6 +859,22 @@ export async function validateObservationBinding(rootDir, observation, options =
       mismatched.push(`inputs:${digestRecord.path}`);
     }
   }
+  // File-transport envelopes are re-read and compared by content: the
+  // presented pairs file is binding input just like the sources, so an
+  // edited quote or declared revision must invalidate the observation.
+  // A stdin envelope no longer exists on disk; its content digest stays
+  // recorded in the transport section as provenance only.
+  if (observation.transport?.mode === 'file' && typeof observation.transport?.envelope_path === 'string') {
+    let currentEnvelopeBytes = null;
+    try {
+      currentEnvelopeBytes = await readProviderFile(root, observation.transport.envelope_path, MAX_ENVELOPE_BYTES);
+    } catch {
+      currentEnvelopeBytes = null;
+    }
+    if (currentEnvelopeBytes === null || digest(currentEnvelopeBytes) !== observation.transport.envelope_sha256) {
+      mismatched.push('envelope');
+    }
+  }
   const recordedEngine = observation.engine ?? {};
   if ((recordedEngine.module ?? null) !== context.engine.module
     || (recordedEngine.sha256 ?? null) !== context.engine.sha256
@@ -859,6 +926,8 @@ function claimRefRecordsFromPairs(pairs) {
     source_path: pair.source_path,
     source_span: pair.source_span ?? null,
     relation: pair.relation,
+    quote_sha256: pair.quote_sha256 ?? null,
+    known_source_revision: pair.known_source_revision ?? null,
   })).sort((left, right) => (left.claim_id < right.claim_id ? -1 : left.claim_id > right.claim_id ? 1 : 0));
 }
 
@@ -1224,13 +1293,18 @@ export async function runClaimEvidenceCheckCommand(argv = process.argv.slice(2),
     const prose = resolveProseLanguage(documents, null);
     const resolvedLanguage = documents.length > 0 ? prose.language : 'unknown';
     const worktreeIdentity = await computeWorktreeIdentity(rootDir, options);
-    const scannedSources = inputs.filter((input) => input.kind === 'file').length - (inputs.find((input) => input.path === envelope.carrier.path)?.kind === 'file' ? 1 : 0);
+    // Coverage counts presented sources (not read records): a carrier that is
+    // itself the only presented source is one honest scanned input, not a
+    // silent zero.
+    const scannedSources = sourcePaths.filter((relative) => sourceBytesByPath.get(relative)?.ok === true).length;
     const semanticCoverage = {
       state: structuralPairs.length === 0 || scannedSources === 0 ? 'none' : (missingSources.length === 0 ? 'full' : 'partial'),
       declared_sources: structuralPairs.length,
       scanned_sources: structuralPairs.length - missingSources.length,
       missing_sources: missingSources,
     };
+    const envelopeSha256 = digest(envelopeBytes);
+    const transportRecord = { mode: transport.mode, envelope_path: transport.mode === 'file' ? transport.envelope_path : null, envelope_sha256: envelopeSha256 };
     const binding = buildAssessmentBinding(claimEvidenceBindingObject({
       worktreeIdentity,
       changeId,
@@ -1239,7 +1313,7 @@ export async function runClaimEvidenceCheckCommand(argv = process.argv.slice(2),
       inputDigests: context.inputDigests,
       checkedScope: envelope.checked_scope,
       truncation: { envelope_truncated: false, pairs_truncated: false, sources_truncated: missingSources.some((entry) => entry.reason === 'file_limit' || entry.reason === 'unsafe_file') },
-      transport: { mode: transport.mode, envelope_path: transport.mode === 'file' ? transport.envelope_path : null },
+      transport: transportRecord,
       rubric: context.rubric,
       engine: context.engine,
       helper: context.helper,
@@ -1267,7 +1341,7 @@ export async function runClaimEvidenceCheckCommand(argv = process.argv.slice(2),
           inputDigests: current.inputDigests,
           checkedScope: envelope.checked_scope,
           truncation: { envelope_truncated: false, pairs_truncated: false, sources_truncated: missingSources.some((entry) => entry.reason === 'file_limit' || entry.reason === 'unsafe_file') },
-          transport: { mode: transport.mode, envelope_path: transport.mode === 'file' ? transport.envelope_path : null },
+          transport: transportRecord,
           rubric: current.rubric,
           engine: current.engine,
           helper: current.helper,
@@ -1303,12 +1377,26 @@ export async function runClaimEvidenceCheckCommand(argv = process.argv.slice(2),
     });
     const semantic = normalizeSemanticOutcome(semanticOutcome, new Set(envelope.claims.map((claim) => claim.claim_id)));
     const compound = computeCompoundParents(envelope, semantic);
-    // An abstention keeps the helper's honest coverage contract at the
-    // observation level too: the stage presented nothing, so the section
-    // never claims scanned coverage even when every source was readable.
-    const presentedCoverage = semantic.abstained ? { ...semanticCoverage, state: 'none' } : semanticCoverage;
+    // Coverage degradations established by the helper (findings truncation,
+    // scanned/declared clamps) are authoritative for a stage that actually
+    // ran: the engine merges to the honest direction instead of re-asserting
+    // its own pre-scan estimate. A not_run/failed stage keeps the engine's
+    // estimate of the presented sources (the helper's empty coverage is a
+    // placeholder for "never scanned", not a degradation of what was read).
+    // An abstention keeps the helper's contract at the observation level
+    // too: the stage presented nothing, so the section never claims scanned
+    // coverage even when every source was readable.
+    const coverageRank = { none: 0, partial: 1, full: 2 };
+    const helperRan = semanticOutcome.run_status === 'complete';
+    const helperCoverageState = helperRan && coverageRank[semanticOutcome.coverage?.state] !== undefined
+      ? semanticOutcome.coverage.state
+      : semanticCoverage.state;
+    const mergedCoverageState = coverageRank[semanticCoverage.state] <= coverageRank[helperCoverageState] ? semanticCoverage.state : helperCoverageState;
+    const presentedCoverage = semantic.abstained ? { ...semanticCoverage, state: 'none' } : { ...semanticCoverage, state: mergedCoverageState };
 
-    const combinedDiagnostics = [...semantic.diagnostics, ...semanticOutcome.diagnostics, ...diagnostics];
+    // semantic.diagnostics already carries the helper diagnostics exactly
+    // once (validated at the semantic boundary) — never merge them again.
+    const combinedDiagnostics = [...semantic.diagnostics, ...diagnostics];
     if (combinedDiagnostics.length > MAX_DIAGNOSTICS) {
       combinedDiagnostics.length = Math.max(1, MAX_DIAGNOSTICS - 1);
       combinedDiagnostics.push({ code: 'diagnostics-truncated', path: null, detail: `limit=${MAX_DIAGNOSTICS}` });
@@ -1333,7 +1421,7 @@ export async function runClaimEvidenceCheckCommand(argv = process.argv.slice(2),
       },
       compound,
       inputs,
-      transport: { mode: transport.mode, envelope_path: transport.mode === 'file' ? transport.envelope_path : null },
+      transport: transportRecord,
       context,
       language: resolvedLanguage,
       languageSource: prose.source,

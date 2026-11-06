@@ -88,7 +88,7 @@ describe('durable project review policy', () => {
     const configKeys = JSON.parse(await readRepoFile('skills/aif-analyze/references/config-keys.json'));
 
     for (const expected of [
-      // reason: claim-evidence opt-in registration bumped aif-analyze 0.18.0 -> 0.19.0 (claimEvidence namespace documentation, #282)
+      // reason: claim-evidence opt-in registration bumped aif-analyze 0.17.0 -> 0.19.0 (claimEvidence namespace documentation, #282; the in-flight #281 tail's 0.18.0 bump was never committed, so main carries 0.17.0)
       'version: 0.19.0',
       '### Step 3.3: Project Review Policy',
       '`reviews.policy_file`',
