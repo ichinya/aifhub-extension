@@ -10,21 +10,21 @@
 // URLs, and invents no identifiers. The live model provider is a separate
 // opt-in step outside this first implementation (design R17).
 import { createHash, randomUUID } from 'node:crypto';
-import { lstat, mkdir, readFile, realpath } from 'node:fs/promises';
+import { lstat, mkdir, open, readFile, realpath, rename, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { digest, portablePath } from './workflow-state-store.mjs';
 import { parseStrictJson } from './json-strict.mjs';
 import { validateJsonAgainstSchema } from './json-schema-subset.mjs';
-import { readProviderFile, writeProviderFile } from './provider-files.mjs';
+import { readProviderFile } from './provider-files.mjs';
 import { normalizeChangeId } from './active-change-resolver.mjs';
 import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
+import { verifyObservationIgnored } from './requirement-lint-git-guard.mjs';
 import {
   buildAssessmentBinding,
   notRunAssessment,
   runTypedAssessment,
-  validateAssessmentObservation,
 } from './typed-assessment.mjs';
 
 export const REQUIREMENT_LINT_SCHEMA = 'aifhub.requirement_lint_observation.v1';
@@ -124,17 +124,44 @@ function validateFileForm(relative) {
 
 const LINT_CONFIG_PATH = Object.freeze(['aifhub', 'requirementLint']);
 const LINT_CONFIG_CLOSED_KEYS = Object.freeze(new Set(['enabled']));
+// Structural ancestors whose duplication or scalarization must be diagnosed:
+// a second `aifhub:`/`requirementLint:` block must not silently win, and a
+// flow-scalarized `paths:` must not hide `paths.state` from the writer guard.
+const LINT_STRUCTURAL_PATHS = Object.freeze([
+  ['aifhub'],
+  LINT_CONFIG_PATH,
+  ['paths'],
+]);
 
 function lintConfigDiagnostic(code, detail) {
   return { code: `requirement-lint:${code}`, path: '.ai-factory/config.yaml', detail: detail === undefined ? null : String(detail).slice(0, 200) };
 }
 
+// Strip a trailing comment only outside quotes: `enabled: "true # x"` must
+// stay a quoted string (quoted-boolean family), never become an unquoted
+// boolean opt-in.
+function stripLineComment(line) {
+  let inQuote = null;
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    if (inQuote) {
+      if (character === inQuote) inQuote = null;
+      continue;
+    }
+    if (character === '"' || character === "'") inQuote = character;
+    else if (character === '#' && index > 0 && /\s/.test(line[index - 1])) return line.slice(0, index);
+  }
+  return line;
+}
+
 export function parseRequirementLintConfigSubset(raw) {
   const diagnostics = [];
-  const root = {};
+  const root = Object.create(null);
   const stack = [{ indent: -1, value: root, path: [] }];
   const belowLint = (path) => path.length > LINT_CONFIG_PATH.length
     && LINT_CONFIG_PATH.every((part, index) => path[index] === part);
+  const structural = (path) => LINT_STRUCTURAL_PATHS.some((candidate) => candidate.length === path.length
+    && candidate.every((part, index) => path[index] === part));
   const scalar = (rawValue) => {
     if (/^(['"]).*\1$/.test(rawValue)) return { text: rawValue.slice(1, -1), quoted: true };
     const unquoted = rawValue.replace(/^['"]|['"]$/g, '');
@@ -143,7 +170,7 @@ export function parseRequirementLintConfigSubset(raw) {
     return { text: unquoted, quoted: false };
   };
   for (const rawLine of String(raw ?? '').replace(/^\uFEFF/, '').split(/\r?\n/)) {
-    const withoutComment = rawLine.replace(/\s+#.*$/, '');
+    const withoutComment = stripLineComment(rawLine);
     if (withoutComment.trim().length === 0) continue;
     const match = /^(\s*)([^:]+):(?:\s*(.*))?$/.exec(withoutComment);
     if (!match) continue;
@@ -154,24 +181,27 @@ export function parseRequirementLintConfigSubset(raw) {
     const parent = stack.at(-1);
     const ownPath = [...parent.path, key];
     const inside = belowLint(ownPath);
-    if (inside && key === '<<') {
+    const guarded = inside || structural(ownPath);
+    if (guarded && key === '<<') {
       diagnostics.push(lintConfigDiagnostic('merge-key', key));
       continue;
     }
-    if (inside && rawValue.startsWith('&')) {
+    if (guarded && rawValue.startsWith('&')) {
       diagnostics.push(lintConfigDiagnostic('anchor', key));
       continue;
     }
-    if (inside && rawValue.startsWith('*')) {
+    if (guarded && rawValue.startsWith('*')) {
       diagnostics.push(lintConfigDiagnostic('alias', key));
       continue;
     }
-    if (inside && /^[{[]/.test(rawValue)) {
+    if (guarded && /^[{[]/.test(rawValue)) {
       diagnostics.push(lintConfigDiagnostic('flow-mapping', key));
       continue;
     }
-    if (inside && Object.hasOwn(parent.value, key)) {
-      diagnostics.push(lintConfigDiagnostic('duplicate-key', key));
+    // Mappings are prototype-less: a `__proto__` key must not pollute the
+    // parse result, and readers use own-property lookups.
+    if (guarded && Object.hasOwn(parent.value, key)) {
+      diagnostics.push(lintConfigDiagnostic('duplicate-key', `${ownPath.join('.')}`));
       continue;
     }
     if (inside && !LINT_CONFIG_CLOSED_KEYS.has(key)) {
@@ -179,7 +209,7 @@ export function parseRequirementLintConfigSubset(raw) {
       continue;
     }
     if (rawValue.length === 0) {
-      parent.value[key] = {};
+      parent.value[key] = Object.create(null);
       stack.push({ indent, value: parent.value[key], path: ownPath });
       continue;
     }
@@ -215,7 +245,7 @@ export async function readRequirementLintConfig(rootDir, options = {}) {
   try {
     bytes = await readProviderFile(rootDir, '.ai-factory/config.yaml', 256 * 1024);
   } catch (error) {
-    diagnostics.push({ code: 'config-unreadable', path: '.ai-factory/config.yaml', detail: String(error?.message ?? error) });
+    diagnostics.push({ code: 'config-unreadable', path: '.ai-factory/config.yaml', detail: String(error?.message ?? error).slice(0, 500) });
     return config;
   }
   if (bytes === null) return config;
@@ -228,7 +258,21 @@ export async function readRequirementLintConfig(rootDir, options = {}) {
   }
   const parsed = parseRequirementLintConfigSubset(text);
   diagnostics.push(...parsed.diagnostics);
-  const enabled = parsed.value?.aifhub?.requirementLint?.enabled;
+  const hub = parsed.value?.aifhub;
+  const paths = parsed.value?.paths;
+  // A flow-scalarized structural section (`paths: {state: .state}`) must not
+  // hide `paths.state` from the writer guard: the lint degrades to not-run
+  // with a diagnostic instead of silently using the default root.
+  for (const [name, section] of [['aifhub', hub], ['paths', paths]]) {
+    if (section !== undefined && section !== null && (typeof section !== 'object' || Array.isArray(section))) {
+      diagnostics.push(lintConfigDiagnostic('scalarized-section', name));
+    }
+  }
+  const lintSection = hub && typeof hub === 'object' ? hub.requirementLint : undefined;
+  if (lintSection !== undefined && (lintSection === null || typeof lintSection !== 'object' || Array.isArray(lintSection))) {
+    diagnostics.push(lintConfigDiagnostic('scalarized-section', 'aifhub.requirementLint'));
+  }
+  const enabled = lintSection && typeof lintSection === 'object' ? lintSection.enabled : undefined;
   if (enabled !== undefined) {
     if (typeof enabled === 'boolean') config.enabled = enabled;
     else {
@@ -237,14 +281,16 @@ export async function readRequirementLintConfig(rootDir, options = {}) {
     }
   }
   if (parsed.diagnostics.length > 0) config.enabledMalformed = true;
-  const rawState = parsed.value?.paths?.state;
-  if (rawState !== undefined) config.stateRootRaw = rawState;
-  const stateRoot = normalizeConfigPath(rawState);
-  if (stateRoot !== null) config.stateRoot = stateRoot;
-  const rawQa = parsed.value?.paths?.qa;
-  if (rawQa !== undefined) config.qaRootRaw = rawQa;
-  const qaRoot = normalizeConfigPath(rawQa);
-  if (qaRoot !== null) config.qaRoot = qaRoot;
+  if (paths && typeof paths === 'object' && !Array.isArray(paths)) {
+    const rawState = paths.state;
+    if (rawState !== undefined) config.stateRootRaw = rawState;
+    const stateRoot = normalizeConfigPath(rawState);
+    if (stateRoot !== null) config.stateRoot = stateRoot;
+    const rawQa = paths.qa;
+    if (rawQa !== undefined) config.qaRootRaw = rawQa;
+    const qaRoot = normalizeConfigPath(rawQa);
+    if (qaRoot !== null) config.qaRoot = qaRoot;
+  }
   return config;
 }
 
@@ -272,10 +318,16 @@ export async function loadRequirementLintProfile(options = {}) {
       diagnostics: [{ code: 'profile-unavailable', path: PROFILE_MODULE, detail: 'profile-malformed' }],
     };
   }
+  // The pinned profile must cover the full closed finding-type set exactly
+  // once: an empty, duplicated, or partial rule set would let the assessor
+  // silently fall back to built-in rules while recording a "loaded" profile.
+  const rulesValid = Array.isArray(parsed.rules) && parsed.rules.length === FINDING_TYPES.length
+    && parsed.rules.every((rule) => typeof rule?.id === 'string' && Number.isInteger(rule?.version)
+      && ['project', 'upstream'].includes(rule?.origin) && FINDING_TYPES.includes(rule?.type))
+    && new Set(parsed.rules.map((rule) => rule.id)).size === parsed.rules.length
+    && new Set(parsed.rules.map((rule) => rule.type)).size === FINDING_TYPES.length;
   if (parsed?.schema !== REQUIREMENT_LINT_PROFILE_SCHEMA || typeof parsed.profile_id !== 'string'
-    || !Number.isInteger(parsed.profile_version) || !Array.isArray(parsed.rules)
-    || parsed.rules.some((rule) => typeof rule?.id !== 'string' || !Number.isInteger(rule?.version)
-      || !['project', 'upstream'].includes(rule?.origin) || !FINDING_TYPES.includes(rule?.type))) {
+    || !Number.isInteger(parsed.profile_version) || !rulesValid) {
     return {
       ok: false, sha256, profile: null, rules: new Map(), exclusionPolicy: null,
       diagnostics: [{ code: 'profile-unavailable', path: PROFILE_MODULE, detail: 'profile-invalid' }],
@@ -421,10 +473,6 @@ function byteOffsetOfLine(lineText, characterIndex) {
   return Buffer.byteLength(lineText.slice(0, characterIndex), 'utf8');
 }
 
-function catalogRef(sourceId) {
-  return { kind: 'catalog', source_id: sourceId };
-}
-
 export function buildFinding(type, rule, refs, language, quote) {
   const prose = PROSE[type][language] ?? PROSE[type].en;
   return {
@@ -460,15 +508,38 @@ export function createRulesAssessor(profileRules) {
     const documents = Array.isArray(input?.documents) ? input.documents : [];
     const language = input?.language === 'ru' ? 'ru' : 'en';
     const findings = [];
+    const diagnostics = [];
+    let truncated = false;
     for (const document of documents) {
       if (context.expired()) return { ok: false, code: 'deadline-exceeded' };
-      let inFence = false;
+      // Fences are tracked by character and run length: `````` inside a ``` fence
+      // stays excluded, and ~~~ fences close only on a matching run.
+      let fence = null;
       let perDocument = 0;
       for (const line of document.lines) {
         const trimmed = line.text.trim();
-        if (/^```/.test(trimmed)) { inFence = !inFence; continue; }
-        if (inFence || trimmed.length === 0) continue;
-        if (findings.length >= MAX_FINDINGS || perDocument >= MAX_FINDINGS_PER_DOCUMENT) break;
+        const fenceMatch = /^(`{3,}|~{3,})(.*)$/.exec(trimmed);
+        if (fenceMatch) {
+          const run = fenceMatch[1][0].repeat(fenceMatch[1].length);
+          if (fence === null) fence = { character: fenceMatch[1][0], length: fenceMatch[1].length };
+          else if (fenceMatch[1][0] === fence.character && fenceMatch[1].length >= fence.length
+            && fenceMatch[2].trim().length === 0) fence = null;
+          continue;
+        }
+        if (fence !== null || trimmed.length === 0) continue;
+        if (findings.length >= MAX_FINDINGS || perDocument >= MAX_FINDINGS_PER_DOCUMENT) {
+          // Honest truncation: an unprocessed tail is never presented as full
+          // coverage; the marker degrades the outcome instead.
+          truncated = true;
+          if (diagnostics.length < MAX_DIAGNOSTICS) {
+            diagnostics.push({
+              code: 'findings-truncated',
+              path: document.path,
+              detail: `per-document=${MAX_FINDINGS_PER_DOCUMENT}, global=${MAX_FINDINGS}`,
+            });
+          }
+          break;
+        }
         const hasMarker = REQUIREMENT_MARKER_RE.test(line.text);
         const quote = quoteOf(line.text);
         if (hasMarker && !EN_OBSERVABLE_RE.test(line.text) && !RU_OBSERVABLE_RE.test(line.text)) {
@@ -493,6 +564,9 @@ export function createRulesAssessor(profileRules) {
         }
         const markers = hasMarker ? collectMatches(line.text, [EN_REVISION_MARKER_RE, RU_REVISION_MARKER_RE]) : [];
         if (markers.length >= 2 && !RESOLUTION_RE.test(line.text)) {
+          // Refs bind the two revision markers of the same presented
+          // requirement — the deterministic anchor points of each side in this
+          // line-based heuristic (recorded in the profile notes and design).
           const refs = markers.slice(0, 2).map((marker) => {
             const start = line.start + byteOffsetOfLine(line.text, marker.index);
             return spanRef(document, start, start + Buffer.byteLength(marker.text, 'utf8'));
@@ -501,10 +575,9 @@ export function createRulesAssessor(profileRules) {
             refs, language, quote));
           perDocument += 1;
         }
-        if (perDocument >= MAX_FINDINGS_PER_DOCUMENT) break;
       }
     }
-    return { findings, diagnostics: [] };
+    return { findings, diagnostics, truncated };
   };
 }
 
@@ -542,28 +615,31 @@ export function bindingCanonicalObject({
   };
 }
 
+// Digest records derived from the exact bytes the assessor is about to see —
+// never from a second read: a source swapped between reads must not get
+// findings from A under a binding over B.
+export function inputDigestRecords(inputs) {
+  const records = inputs.map((input) => ({
+    path: input.path,
+    sha256: input.sha256 ?? null,
+    bytes: input.bytes ?? 0,
+    kind: input.kind,
+  }));
+  records.sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0));
+  return records;
+}
+
 export async function currentRequirementLintContext(rootDir, inputs, options = {}) {
   const profile = await loadRequirementLintProfile(options);
   const contractSha = await moduleSha256(new URL(`../${CONTRACT_MODULE}`, import.meta.url), options);
   const engineSha = await moduleSha256(new URL(`../${ENGINE_MODULE}`, import.meta.url), options);
   const helperSha = await moduleSha256(new URL(`../${HELPER_MODULE}`, import.meta.url), options);
-  const inputDigests = [];
-  for (const input of inputs) {
-    const read = await readRequirementDocument(rootDir, input.path, options);
-    inputDigests.push({
-      path: input.path,
-      sha256: read.ok ? read.sha256 : (read.sha256 ?? null),
-      bytes: read.bytes?.length ?? 0,
-      kind: read.kind,
-    });
-  }
-  inputDigests.sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0));
   const profilePart = profile.ok
     ? { sha256: profile.sha256, id: profile.profile.profile_id, version: profile.profile.profile_version, rules: Object.fromEntries([...profile.rules.entries()].map(([id, rule]) => [id, rule.version])) }
     : { sha256: profile.sha256 ?? null, id: null, version: null, rules: {} };
   return {
     profile,
-    inputDigests,
+    inputDigests: inputDigestRecords(inputs),
     profilePart,
     engine: { module: ENGINE_MODULE, sha256: engineSha, parser_version: PARSER_VERSION },
     helper: { module: HELPER_MODULE, sha256: helperSha },
@@ -598,9 +674,12 @@ export function assembleObservation({ changeId, generatedAt, outcome, inputs, co
   const scanned = inputs.filter((input) => input.kind === 'file').length;
   const missingSources = inputs.filter((input) => input.kind !== 'file')
     .map((input) => ({ path: input.path, reason: input.kind === 'missing' ? 'file-missing' : String(input.code ?? 'malformed') }));
-  const coverageState = scanned === 0 ? 'none' : (scanned === inputs.length ? 'full' : 'partial');
+  // Truncated scans never claim full coverage: an unprocessed tail is a
+  // partial outcome even when every file was readable.
+  const wasTruncated = diagnostics.some((entry) => entry.code === 'findings-truncated');
+  const coverageState = scanned === 0 ? 'none' : (scanned === inputs.length && !wasTruncated ? 'full' : 'partial');
   const coverage = outcome.run_status === 'complete' && outcome.abstained
-    ? { ...outcome.coverage }
+    ? { ...outcome.coverage, declared_sources: inputs.length, scanned_sources: scanned }
     : { state: coverageState, declared_sources: inputs.length, scanned_sources: scanned, missing_sources: missingSources };
   const outcomeReason = outcome.run_status === 'complete'
     ? (outcome.abstained ? 'assessor-abstain' : null)
@@ -650,6 +729,17 @@ export async function validateObservationBinding(rootDir, observation, options =
   }
   const normalized = normalizeChangeId(observation.change_id);
   if (!normalized.ok) return { ok: false, code: 'observation-invalid' };
+  // Full schema-form check before any binding comparison: damaged or stripped
+  // findings must fail the validation instead of silently passing as fresh.
+  let schema;
+  try {
+    schema = parseStrictJson(await readFile(new URL(`../${CONTRACT_MODULE}`, import.meta.url), 'utf8'));
+  } catch {
+    return { ok: false, code: 'root-unreadable' };
+  }
+  if (validateJsonAgainstSchema(observation, schema).length > 0) {
+    return { ok: false, code: 'observation-invalid' };
+  }
   let root;
   try {
     root = await realpath(options.rootDir ?? rootDir);
@@ -665,9 +755,44 @@ export async function validateObservationBinding(rootDir, observation, options =
   const mismatched = [];
   if (worktreeIdentity !== observation.worktree_identity) mismatched.push('worktree_identity');
   const recordedInputs = Array.isArray(observation.inputs) ? observation.inputs : [];
-  const { profile, inputDigests, profilePart, engine, helper, contract } = await currentRequirementLintContext(root, recordedInputs, options);
+  if (recordedInputs.length > MAX_INPUTS) return { ok: false, code: 'observation-invalid' };
+  // Semantic ref admissibility: every span ref must belong to a recorded
+  // input, stay inside its recorded byte length, and a conflict pair must sit
+  // inside one document (intra-requirement contract).
+  const inputsByPath = new Map(recordedInputs.map((input) => [input?.path, input]));
+  for (const finding of observation.findings ?? []) {
+    const refs = Array.isArray(finding.refs) ? finding.refs : [];
+    if (finding.finding_type === 'suspected_requirement_revision_conflict') {
+      if (refs.length !== 2) return { ok: false, code: 'observation-invalid' };
+      if (new Set(refs.map((ref) => ref?.path)).size !== 1) return { ok: false, code: 'observation-invalid' };
+    }
+    for (const ref of refs) {
+      if (ref?.kind !== 'span') continue;
+      const input = inputsByPath.get(ref.path);
+      if (!input || input.kind !== 'file') return { ok: false, code: 'observation-invalid' };
+      const { start, end } = ref.span ?? {};
+      if (!Number.isInteger(start) || !Number.isInteger(end)
+        || start < 0 || end < start || end > (input.bytes ?? 0)) {
+        return { ok: false, code: 'observation-invalid' };
+      }
+    }
+  }
+  // Digest records are rebuilt from CURRENT disk bytes (never from the
+  // recorded observation itself): an edited or renamed input must name its
+  // field and flip the recomputed binding.
+  const freshRecords = [];
+  for (const input of recordedInputs) {
+    const read = await readRequirementDocument(root, input.path, options);
+    freshRecords.push({
+      path: input.path,
+      sha256: read.ok ? read.sha256 : (read.sha256 ?? null),
+      bytes: read.bytes?.length ?? 0,
+      kind: read.kind,
+    });
+  }
+  const { profile, inputDigests, profilePart, engine, helper, contract } = await currentRequirementLintContext(root, freshRecords, options);
   for (const digestRecord of inputDigests) {
-    const recorded = recordedInputs.find((input) => input?.path === digestRecord.path);
+    const recorded = recordedInputs.find((candidate) => candidate?.path === digestRecord.path);
     if (!recorded || (recorded.sha256 ?? null) !== digestRecord.sha256 || (recorded.bytes ?? 0) !== digestRecord.bytes) {
       mismatched.push(`inputs:${digestRecord.path}`);
     }
@@ -745,6 +870,13 @@ export async function writeRequirementLintObservation(rootDir, observation, conf
   }
   const root = await realpath(options.rootDir ?? rootDir);
   const parts = relative.split('/');
+  // Read-only sources: the observation destination must never equal a selected
+  // input — the writer would overwrite exactly the material the scan claims to
+  // describe (readability `report-source-collision` precedent).
+  const outputLower = relative.toLowerCase();
+  const sourceCollision = (observation.inputs ?? []).find((input) => typeof input?.path === 'string'
+    && normalizeConfigPath(input.path)?.toLowerCase() === outputLower);
+  if (sourceCollision) return { ok: false, code: 'observation-source-collision', detail: sourceCollision.path };
   for (let index = 1; index < parts.length; index += 1) {
     const ancestor = path.join(root, ...parts.slice(0, index));
     let info;
@@ -755,7 +887,8 @@ export async function writeRequirementLintObservation(rootDir, observation, conf
   const leafConflict = () => ({ ok: false, code: 'observation-leaf-conflict', detail: relative });
   // Leaf ownership: only a previous, fully schema-valid observation of the
   // same change may be replaced — a matching schema+change_id pair alone is
-  // not ownership.
+  // not ownership, and an unreadable previous leaf (oversized, unsafe) cannot
+  // prove ownership at all, so it fails closed.
   const schemaBytes = await readFile(new URL(`../${CONTRACT_MODULE}`, import.meta.url), 'utf8');
   const schema = parseStrictJson(schemaBytes);
   const assertLeafWritable = async () => {
@@ -763,7 +896,12 @@ export async function writeRequirementLintObservation(rootDir, observation, conf
     try { leafInfo = await lstat(leaf); } catch { leafInfo = null; }
     if (leafInfo === null) return null;
     if (!leafInfo.isFile()) return leafConflict();
-    const previous = await readProviderFile(root, relative, 4 * 1024 * 1024);
+    let previous = null;
+    try {
+      previous = await readProviderFile(root, relative, 4 * 1024 * 1024);
+    } catch {
+      return leafConflict();
+    }
     if (previous === null) return leafConflict();
     let prior = null;
     try { prior = parseStrictJson(previous.toString('utf8')); } catch { prior = null; }
@@ -773,6 +911,14 @@ export async function writeRequirementLintObservation(rootDir, observation, conf
   };
   const firstRejection = await assertLeafWritable();
   if (firstRejection) return firstRejection;
+  // AC3 guard: the writer refuses a tracked or not-effectively-ignored output.
+  // The QA snapshot's `actual_diff` channel (git diff --binary HEAD) has no
+  // namespace filter, so a tracked observation would change required QA
+  // surfaces no matter how carefully the file/directory projections exclude
+  // the namespace.
+  const gitGuard = options.gitGuard ?? verifyObservationIgnored;
+  const verdict = await gitGuard(root, relative, options);
+  if (!verdict.ok) return { ok: false, code: verdict.code, detail: verdict.detail ?? null };
   // Gitignore lives inside the closed lint namespace: the namespace contents
   // stay local while the ignore rule itself is excluded from QA projections.
   if (!options.skipGitignore) {
@@ -783,19 +929,42 @@ export async function writeRequirementLintObservation(rootDir, observation, conf
     }
   }
   const directory = path.join(root, ...parts.slice(0, -1));
-  await mkdir(directory, { recursive: true });
+  try {
+    await mkdir(directory, { recursive: true });
+  } catch (error) {
+    return { ok: false, code: 'observation-write-failed', detail: String(error?.message ?? error).slice(0, 200) };
+  }
   // TOCTOU re-check after materialization: the live directory must resolve to
   // the same real path (no symlink/junction swap).
-  const liveDirectory = await realpath(directory);
+  let liveDirectory;
+  try {
+    liveDirectory = await realpath(directory);
+  } catch (error) {
+    return { ok: false, code: 'observation-write-failed', detail: String(error?.message ?? error).slice(0, 200) };
+  }
   if (path.resolve(liveDirectory).toLowerCase() !== path.resolve(directory).toLowerCase()) {
     return { ok: false, code: 'file-shadow', detail: parts.slice(0, -1).join('/') };
   }
   const secondRejection = await assertLeafWritable();
   if (secondRejection) return secondRejection;
+  // Atomic write owned by this module (readability writer model): the third
+  // ownership check runs after the temporary write and immediately before the
+  // rename, closing the check-then-rename window a foreign replacement could
+  // otherwise slip through.
+  const payload = `${JSON.stringify(observation, null, 2)}\n`;
+  const temporary = path.join(liveDirectory, `${parts[parts.length - 1]}.${randomUUID()}.tmp`);
   try {
-    await writeProviderFile(root, relative, observation);
+    const handle = await open(temporary, 'wx', 0o600);
+    try { await handle.writeFile(payload, 'utf8'); } finally { await handle.close(); }
   } catch (error) {
     return { ok: false, code: 'observation-write-failed', detail: String(error?.message ?? error).slice(0, 200) };
+  }
+  try {
+    const thirdRejection = await assertLeafWritable();
+    if (thirdRejection) return thirdRejection;
+    await rename(temporary, leaf);
+  } finally {
+    await unlink(temporary).catch((error) => { if (error?.code !== 'ENOENT') throw error; });
   }
   return { ok: true, path: relative };
 }
@@ -874,10 +1043,11 @@ export async function runRequirementLintCommand(argv = process.argv.slice(2), op
   // value: the opt-in must stay explicit and intact to run.
   const enabled = config.enabledMalformed ? false : (cliEnabled ?? config.enabled);
   const configCodes = (config.diagnostics ?? [])
-    .filter((diagnostic) => String(diagnostic.code).startsWith('requirement-lint:'))
+    .filter((diagnostic) => String(diagnostic.code).startsWith('requirement-lint:')
+      || diagnostic.code === 'config-unreadable' || diagnostic.code === 'config-malformed')
     .map((diagnostic) => diagnostic.code);
   if (enabled !== true) {
-    const codes = config.enabledMalformed
+    const codes = configCodes.length > 0
       ? ['requirement-lint-disabled', ...configCodes.slice(0, 11)]
       : ['requirement-lint-disabled'];
     emit(notRunEnvelope(codes), parsed.json);
@@ -885,6 +1055,13 @@ export async function runRequirementLintCommand(argv = process.argv.slice(2), op
   }
   if (typeof parsed.changeId !== 'string') {
     emit(notRunEnvelope(['missing-change']), parsed.json);
+    return 2;
+  }
+  // Schema-compatible change-id bounds are checked before any read or scan, so
+  // an oversized id is a typed invalid invocation (exit 2), not a late
+  // schema-parity failure after the whole assessment already ran.
+  if (parsed.changeId.length < 1 || parsed.changeId.length > 200 || !/^[A-Za-z0-9._-]+$/.test(parsed.changeId)) {
+    emit(notRunEnvelope(['invalid-change-id']), parsed.json);
     return 2;
   }
   const normalizedChange = normalizeChangeId(parsed.changeId);
@@ -916,10 +1093,11 @@ export async function runRequirementLintCommand(argv = process.argv.slice(2), op
       if (!read.ok) diagnostics.push({ code: read.code === 'file-missing' ? 'file-missing' : 'malformed-input', path: relative, detail: read.code });
     }
     const context = await currentRequirementLintContext(rootDir, inputs, options);
-    if (!context.profile.ok) diagnostics.push(...context.profile.diagnostics);
     const prose = resolveProseLanguage(inputs.filter((input) => input.ok), parsed.language);
     const resolvedLanguage = inputs.some((input) => input.ok) ? prose.language : 'unknown';
     const worktreeIdentity = await computeWorktreeIdentity(rootDir, options);
+    // Binding input digests come from the exact bytes read above; the watch
+    // re-reads only for drift detection.
     const binding = buildAssessmentBinding(bindingCanonicalObject({
       worktreeIdentity,
       changeId,
@@ -933,12 +1111,17 @@ export async function runRequirementLintCommand(argv = process.argv.slice(2), op
       exclusionPolicy: context.profile.ok ? context.profile.exclusionPolicy : { id: 'unknown', version: 0 },
     }));
 
-    // Post-scan freshness probe (AC2): requirement edits, rubric, or profile
-    // drift during the scan mark the outcome stale; it is then never presented
-    // as current (R7).
+    // Post-scan freshness probe (AC2): re-reads current disk state and
+    // compares the recomputed binding against the one built from the scanned
+    // bytes, so a mid-scan A→B swap yields stale, not a silent current.
     const watch = {
       changed: async () => {
-        const current = await currentRequirementLintContext(rootDir, inputs, options);
+        const freshInputs = [];
+        for (const relative of inputs.map((input) => input.path)) {
+          const read = await readRequirementDocument(rootDir, relative, options);
+          freshInputs.push({ path: relative, sha256: read.ok ? read.sha256 : (read.sha256 ?? null), bytes: read.bytes?.length ?? 0, kind: read.kind });
+        }
+        const current = await currentRequirementLintContext(rootDir, freshInputs, options);
         return buildAssessmentBinding(bindingCanonicalObject({
           worktreeIdentity: await computeWorktreeIdentity(rootDir, options),
           changeId,
@@ -953,21 +1136,72 @@ export async function runRequirementLintCommand(argv = process.argv.slice(2), op
         })) !== binding;
       },
     };
+    // A missing or damaged pinned profile never falls back to built-in rules:
+    // the scan honestly does not run instead of reporting findings under a
+    // profile it could not verify.
+    if (!context.profile.ok) {
+      diagnostics.push(...context.profile.diagnostics);
+      const outcome = notRunAssessment('profile-unavailable', []);
+      const observation = assembleObservation({
+        changeId,
+        generatedAt: new Date(startedAt).toISOString(),
+        outcome,
+        inputs,
+        context,
+        language: resolvedLanguage,
+        languageSource: prose.source,
+        worktreeIdentity,
+        binding,
+        diagnostics,
+      });
+      const schemaBytes = await readFile(new URL(`../${CONTRACT_MODULE}`, import.meta.url), 'utf8');
+      const schema = parseStrictJson(schemaBytes);
+      const schemaErrors = validateJsonAgainstSchema(observation, schema);
+      if (schemaErrors.length > 0) {
+        emit(failureEnvelope('operational-failure', ['schema-parity-failure', ...schemaErrors.slice(0, 5).map((error) => error.message)]), parsed.json);
+        return 1;
+      }
+      if (parsed.write) {
+        const written = await writeRequirementLintObservation(rootDir, observation, config, options);
+        if (!written.ok) {
+          emit({ ...failureEnvelope('observation-not-saved', [written.code]), change_id: changeId, detail: written.detail ?? null }, parsed.json);
+          return 1;
+        }
+      }
+      emit(observation, parsed.json);
+      return 0;
+    }
+    // Document order is normalized (sorted by path): the same input set must
+    // produce the same saved findings under one binding regardless of CLI
+    // order, because global caps make the sequence observable.
+    const documents = inputs.filter((input) => input.ok)
+      .slice()
+      .sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0))
+      .map((input) => ({ path: input.path, sha256: input.sha256, bytes: input.data, text: input.text, lines: input.lines }));
+    const scannedCoverage = {
+      state: documents.length === 0 ? 'none' : (documents.length === inputs.length ? 'full' : 'partial'),
+      declared_sources: inputs.length,
+      scanned_sources: documents.length,
+      missing_sources: inputs.filter((input) => input.kind !== 'file')
+        .map((input) => ({ path: input.path, reason: input.kind === 'missing' ? 'file-missing' : String(input.code ?? 'malformed') })),
+    };
     const assessor = options.assessor ?? createRulesAssessor(context.profile.rules);
     const outcome = await runTypedAssessment({
       assessor,
-      input: {
-        documents: inputs.filter((input) => input.ok)
-          .map((input) => ({ path: input.path, sha256: input.sha256, bytes: input.data, text: input.text, lines: input.lines })),
-        language: prose.language,
-      },
-      coverage: null,
+      input: { documents, language: prose.language },
+      coverage: scannedCoverage,
       limits: { deadlineMs: options.deadlineMs ?? DEFAULT_DEADLINE_MS, maxFindings: MAX_FINDINGS, maxDiagnostics: MAX_DIAGNOSTICS },
       watch,
       now,
     });
-    diagnostics.push(...outcome.diagnostics);
-    if (diagnostics.length > MAX_DIAGNOSTICS) diagnostics.length = MAX_DIAGNOSTICS;
+    // Outcome diagnostics land first so the stale/truncation markers are
+    // protected when the tail is trimmed, and an explicit marker survives a
+    // full diagnostics budget.
+    const combinedDiagnostics = [...outcome.diagnostics, ...diagnostics];
+    if (combinedDiagnostics.length > MAX_DIAGNOSTICS) {
+      combinedDiagnostics.length = Math.max(1, MAX_DIAGNOSTICS - 1);
+      combinedDiagnostics.push({ code: 'diagnostics-truncated', path: null, detail: `limit=${MAX_DIAGNOSTICS}` });
+    }
 
     const observation = assembleObservation({
       changeId,
@@ -979,7 +1213,7 @@ export async function runRequirementLintCommand(argv = process.argv.slice(2), op
       languageSource: prose.source,
       worktreeIdentity,
       binding,
-      diagnostics,
+      diagnostics: combinedDiagnostics,
     });
     const schemaBytes = await readFile(new URL(`../${CONTRACT_MODULE}`, import.meta.url), 'utf8');
     const schema = parseStrictJson(schemaBytes);

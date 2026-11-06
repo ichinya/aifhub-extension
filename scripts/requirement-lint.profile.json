@@ -2,7 +2,7 @@
   "schema": "aifhub.requirement_lint_profile.v1",
   "profile_id": "aifhub-requirement-lint-default",
   "profile_version": 1,
-  "description": "Pinned offline requirement-lint profile (RU/EN). Detector markers and corpus thresholds are recorded in openspec/changes/281-requirements-semantic-lint/design.md; they are advisory heuristics, not a requirement-quality standard. The lint never inserts numeric SLAs, never answers its own clarifying question, and never emits a ready or verified verdict.",
+  "description": "Pinned offline requirement-lint profile (RU/EN). Detector markers and corpus thresholds are recorded in openspec/changes/281-requirements-semantic-lint/design.md; they are advisory line-based heuristics (suppression markers do not model negation or role), not a requirement-quality standard. The lint never inserts numeric SLAs, never answers its own clarifying question, and never emits a ready or verified verdict.",
   "exclusion_policy": {
     "id": "requirement-lint-exclusion-default",
     "version": 1,
@@ -39,7 +39,7 @@
       "origin": "project",
       "type": "suspected_requirement_revision_conflict",
       "heuristic": true,
-      "notes": "Intra-requirement only: flags two revision markers inside one presented requirement with no declared precedence or owner approval. Refs are exactly the two conflicting span sides; cross-source plan-level conflicts stay with the upstream reconciliation gate."
+      "notes": "Intra-requirement only: flags two revision markers inside one presented requirement with no declared precedence or owner approval. Refs bind exactly the two revision markers of both sides within one document (the deterministic anchors of this line-based heuristic); cross-source plan-level conflicts stay with the upstream reconciliation gate."
     }
   ],
   "prohibitions": [
