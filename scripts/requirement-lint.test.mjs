@@ -6,6 +6,7 @@
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -680,6 +681,7 @@ describe('requirement-lint corpus evaluation (fixtures + labels)', () => {
     const labels = parseStrictJson(await readFile(path.join(CORPUS_DIR, 'labels.json'), 'utf8'));
     for (const [group, entries] of Object.entries(labels.groups)) {
       for (const [file, label] of Object.entries(entries)) {
+        if (typeof label !== 'object' || label === null) continue;
         const observation = await corpusRun(file);
         assert.equal(observation.run_status, 'complete', `${group}/${file}`);
         assert.equal(observation.coverage.state, 'full', `${group}/${file}`);
@@ -1102,5 +1104,219 @@ describe('review round: read-time validation strictness', () => {
       splitPair.findings[conflictIndex].refs[1].path = 'docs/other.md';
       assert.equal((await validateObservationBinding(root, splitPair)).ok, false, 'conflict pair must sit inside one document');
     }
+  });
+
+  it('rejects semantically tampered observations that stay schema-valid', async () => {
+    const root = await makeTemp('aif-rl-sem-');
+    await seedProject(root, { config: 'aifhub:\n  requirementLint:\n    enabled: true\n', files: { 'docs/req.md': EN_REQ } });
+    const outputs = [];
+    await runRequirementLintCommand(['--change', 'work', '--file', 'docs/req.md', '--write', '--json'], {
+      rootDir: root, output: (value) => outputs.push(value),
+    });
+    const observationPath = path.join(root, STATE_ROOT, 'work', LINT_NAMESPACE, 'observation.json');
+    const observation = parseStrictJson(await readFile(observationPath, 'utf8'));
+    assert.ok(observation.findings.length > 0, 'fixture needs findings');
+
+    // A flipped dedup key must fail revalidation, not pass as fresh.
+    const flippedKey = structuredClone(observation);
+    flippedKey.findings[0].dedup_key = digest({ different: true });
+    assert.equal((await validateObservationBinding(root, flippedKey)).ok, false, 'dedup_key');
+
+    // A corrupted summary contradicts the findings array.
+    const corruptedSummary = structuredClone(observation);
+    corruptedSummary.findings_summary.total += 1;
+    assert.equal((await validateObservationBinding(root, corruptedSummary)).ok, false, 'summary total');
+    const corruptedByType = structuredClone(observation);
+    corruptedByType.findings_summary.by_type[corruptedByType.findings[0].finding_type] += 1;
+    assert.equal((await validateObservationBinding(root, corruptedByType)).ok, false, 'summary by_type');
+
+    // A span ref claiming a foreign document digest is an internal
+    // contradiction of the record.
+    const foreignDigest = structuredClone(observation);
+    foreignDigest.findings[0].refs[0].document_sha256 = `sha256:${'9'.repeat(64)}`;
+    assert.equal((await validateObservationBinding(root, foreignDigest)).ok, false, 'document digest');
+
+    // Honest outcome invariants: schema-valid but semantically impossible
+    // records must be rejected.
+    const failedWithFindings = structuredClone(observation);
+    failedWithFindings.run_status = 'failed';
+    assert.equal((await validateObservationBinding(root, failedWithFindings)).ok, false, 'failed + findings');
+    const abstainedFull = structuredClone(observation);
+    abstainedFull.abstained = true;
+    abstainedFull.findings = [];
+    abstainedFull.coverage.state = 'full';
+    assert.equal((await validateObservationBinding(root, abstainedFull)).ok, false, 'abstained + full coverage');
+    const truncatedFull = structuredClone(observation);
+    truncatedFull.coverage.state = 'full';
+    truncatedFull.diagnostics = [{ code: 'findings-truncated', path: 'docs/req.md', detail: 'x' }];
+    assert.equal((await validateObservationBinding(root, truncatedFull)).ok, false, 'truncated + full coverage');
+  });
+});
+
+describe('review round 2: writer containment and namespace gitignore guard', () => {
+  async function seedGuardProject(root, { gitignore = true } = {}) {
+    await mkdir(path.join(root, 'docs'), { recursive: true });
+    await mkdir(path.join(root, '.ai-factory'), { recursive: true });
+    await mkdir(path.join(root, 'openspec', 'changes', 'work'), { recursive: true });
+    if (gitignore) await writeFile(path.join(root, '.gitignore'), '.ai-factory/\n');
+    await writeFile(path.join(root, 'docs', 'req.md'), EN_REQ);
+    await writeFile(path.join(root, '.ai-factory', 'config.yaml'), 'aifhub:\n  requirementLint:\n    enabled: true\n');
+    await writeFile(path.join(root, 'openspec', 'changes', 'work', 'proposal.md'), '# Proposal\n\n## Why\n\nGuard fixture.\n');
+    await writeFile(path.join(root, 'openspec', 'changes', 'work', 'tasks.md'), '- [ ] 1.1 Task\n');
+    const git = async (args) => execFileAsync('git', args, { cwd: root });
+    await git(['init', '--initial-branch=main']);
+    await git(['config', 'user.email', 'fixture@example.com']);
+    await git(['config', 'user.name', 'fixture']);
+    await git(['add', '.']);
+    await git(['commit', '-m', 'init']);
+    await ensureRuntimeGitignore(root, STATE_ROOT);
+  }
+
+  it('refuses to restore a tracked-then-deleted namespace gitignore', async () => {
+    const root = await makeTemp('aif-rl-gitrack-');
+    await seedGuardProject(root);
+    const argv = ['--change', 'work', '--file', 'docs/req.md', '--write', '--json'];
+    assert.equal(await runRequirementLintCommand(argv, { rootDir: root, output: () => {} }), 0);
+    const namespaceDir = path.join(root, STATE_ROOT, 'work', LINT_NAMESPACE);
+    // Track the namespace gitignore, then delete it from the worktree: the
+    // next write must refuse BEFORE ensureRuntimeGitignore recreates it —
+    // restoring tracked content would shift the unfiltered actual_diff.
+    await execFileAsync('git', ['add', '-f', '.ai-factory/state/work/requirement-lint/.gitignore'], { cwd: root });
+    await rm(path.join(namespaceDir, '.gitignore'));
+    const before = await treeFingerprint(root);
+    const outputs = [];
+    const exit = await runRequirementLintCommand(argv, { rootDir: root, output: (value) => outputs.push(value) });
+    assert.equal(exit, 1);
+    const envelope = JSON.parse(outputs.join(''));
+    assert.equal(envelope.state, 'observation-not-saved');
+    assert.ok(envelope.codes.includes('observation-path-tracked'), envelope.codes.join(','));
+    assert.match(String(envelope.detail), /\.gitignore$/);
+    assert.equal(await treeFingerprint(root), before, 'refused write must not restore the tracked gitignore');
+    assert.ok(!existsSync(path.join(namespaceDir, '.gitignore')), 'gitignore must stay absent after the refusal');
+  });
+
+  it('keeps the temp file contained and cleans up on a failed create', async () => {
+    const root = await makeTemp('aif-rl-tmp-');
+    await seedGuardProject(root);
+    const namespaceDir = path.join(root, STATE_ROOT, 'work', LINT_NAMESPACE);
+    const outputs = [];
+    const exit = await runRequirementLintCommand(['--change', 'work', '--file', 'docs/req.md', '--write', '--json'], {
+      rootDir: root,
+      openFile: async () => { throw new Error('open refused'); },
+      output: (value) => outputs.push(value),
+    });
+    assert.equal(exit, 1);
+    assert.ok(JSON.parse(outputs.join('')).codes.includes('observation-write-failed'));
+    const entries = await readdir(namespaceDir);
+    assert.deepEqual(entries.filter((name) => name.endsWith('.tmp')), [], 'failed create must not leave a partial temp file');
+  });
+
+  it('runs the controlled TOCTOU probe through the beforeRename seam', async () => {
+    const root = await makeTemp('aif-rl-toctou-');
+    await seedGuardProject(root);
+    const argv = ['--change', 'work', '--file', 'docs/req.md', '--write', '--json'];
+    assert.equal(await runRequirementLintCommand(argv, { rootDir: root, output: () => {} }), 0);
+    // The seam fires after the temp write and the third ownership check but
+    // before the rename: a foreign replacement must be refused, not renamed.
+    const outputs = [];
+    const exit = await runRequirementLintCommand(argv, {
+      rootDir: root,
+      beforeRename: async () => {
+        const observationPath = path.join(root, STATE_ROOT, 'work', LINT_NAMESPACE, 'observation.json');
+        await writeFile(observationPath, '{"schema":"aifhub.unrelated.v1"}\n');
+      },
+      output: (value) => outputs.push(value),
+    });
+    assert.equal(exit, 1);
+    assert.ok(outputs.join('').includes('observation-leaf-conflict'));
+    const namespaceDir = path.join(root, STATE_ROOT, 'work', LINT_NAMESPACE);
+    const entries = await readdir(namespaceDir);
+    assert.deepEqual(entries.filter((name) => name.endsWith('.tmp')), [], 'refusal must clean up the temp file');
+    const content = await readFile(path.join(namespaceDir, 'observation.json'), 'utf8');
+    assert.equal(JSON.parse(content).schema, 'aifhub.unrelated.v1', 'foreign leaf must survive a refused rename');
+  });
+});
+
+describe('review round 2: honesty and config edges', () => {
+  it('truncates at the exact overshoot when one line carries several findings', async () => {
+    const root = await makeTemp('aif-rl-capline-');
+    const vague = Array.from({ length: 199 }, (unused, n) => `- The system MUST validate item ${n} before processing.`);
+    // One line, three findings: observable gap + success action + assumption.
+    vague.push('- The system MUST sync the payload obviously without asking anyone.');
+    await seedProject(root, {
+      config: 'aifhub:\n  requirementLint:\n    enabled: true\n',
+      files: { 'docs/req.md': `# Requirements\n\n${vague.join('\n')}\n` },
+    });
+    const outputs = [];
+    const exit = await runRequirementLintCommand(['--change', 'work', '--file', 'docs/req.md', '--json'], {
+      rootDir: root, output: (value) => outputs.push(value),
+    });
+    assert.equal(exit, 0);
+    const observation = JSON.parse(outputs.join(''));
+    assert.equal(observation.findings_summary.total, 200, 'the cap must stop at the exact overshoot');
+    assert.equal(observation.coverage.state, 'partial');
+    assert.ok(observation.diagnostics.some((entry) => entry.code === 'findings-truncated'));
+  });
+
+  it('degrades to not_run for a JSON-null or scalar pinned profile', async () => {
+    const root = await makeTemp('aif-rl-profnull-');
+    await seedProject(root, { config: 'aifhub:\n  requirementLint:\n    enabled: true\n', files: { 'docs/req.md': EN_REQ } });
+    for (const payload of ['null', '5', '[]']) {
+      const outputs = [];
+      const exit = await runRequirementLintCommand(['--change', 'work', '--file', 'docs/req.md', '--json'], {
+        rootDir: root, assessor: MUST_NOT_RUN, readProfile: async () => Buffer.from(payload, 'utf8'), output: (value) => outputs.push(value),
+      });
+      assert.equal(exit, 0, payload);
+      const observation = JSON.parse(outputs.join(''));
+      assert.equal(observation.run_status, 'not_run', payload);
+      assert.ok(observation.diagnostics.some((entry) => entry.code === 'profile-unavailable'), payload);
+    }
+  });
+
+  it('keeps an unterminated quote from flipping the opt-in', async () => {
+    const root = await makeTemp('aif-rl-unterm-');
+    await seedProject(root, {
+      config: 'aifhub:\n  requirementLint:\n    enabled: "true\n',
+      files: { 'docs/req.md': EN_REQ },
+    });
+    const config = await readRequirementLintConfig(root);
+    assert.notEqual(config.enabled, true, 'an unterminated quote must never enable the lint');
+    assert.equal(config.enabledMalformed, true);
+    assert.ok(config.diagnostics.some((entry) => entry.code === 'requirement-lint:unterminated-quote'));
+    const outputs = [];
+    const exit = await runRequirementLintCommand(['--change', 'work', '--file', 'docs/req.md', '--json'], {
+      rootDir: root, assessor: MUST_NOT_RUN, output: (value) => outputs.push(value),
+    });
+    assert.equal(exit, 0);
+    assert.ok(JSON.parse(outputs.join('')).codes.includes('requirement-lint:unterminated-quote'));
+  });
+
+  it('disables the lint when a structural section scalarizes, even with enabled true', async () => {
+    const root = await makeTemp('aif-rl-scal5-');
+    await seedProject(root, {
+      config: 'aifhub:\n  requirementLint:\n    enabled: true\npaths: 5\n',
+      files: { 'docs/req.md': EN_REQ },
+    });
+    const outputs = [];
+    const exit = await runRequirementLintCommand(['--change', 'work', '--file', 'docs/req.md', '--json'], {
+      rootDir: root, assessor: MUST_NOT_RUN, output: (value) => outputs.push(value),
+    });
+    assert.equal(exit, 0);
+    const envelope = JSON.parse(outputs.join(''));
+    assert.equal(envelope.state, 'not_run');
+    assert.ok(envelope.codes.includes('requirement-lint:scalarized-section'), envelope.codes.join(','));
+  });
+
+  it('renders both refs of a conflicting pair in human output', async () => {
+    const root = await makeTemp('aif-rl-human-');
+    await seedProject(root, { config: 'aifhub:\n  requirementLint:\n    enabled: true\n', files: { 'docs/req.md': EN_REQ } });
+    const outputs = [];
+    await runRequirementLintCommand(['--change', 'work', '--file', 'docs/req.md'], {
+      rootDir: root, output: (value) => outputs.push(value),
+    });
+    const text = outputs.join('');
+    const conflict = text.split('\n').find((line) => line.includes('suspected_requirement_revision_conflict'));
+    assert.ok(conflict, 'conflict finding rendered');
+    assert.ok(conflict.includes(' <-> '), `both refs must render: ${conflict}`);
   });
 });

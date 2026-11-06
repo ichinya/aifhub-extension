@@ -220,22 +220,68 @@ describe('typed-assessment honest outcomes', () => {
   it('discards a same-tick assessor result produced after the deadline elapsed', async () => {
     // A synchronous assessor blocks the loop, so the deadline timer cannot
     // fire while it runs; the post-race expired() check must discard its
-    // output instead of presenting a complete outcome. The clock jumps past
-    // the deadline on its second read (after the assessor returned), which is
-    // exactly what a blocked loop produces with a real clock.
+    // output instead of presenting a complete outcome. The clock only jumps
+    // past the deadline AFTER the assessor started running (reads 1-2 are the
+    // start and the pre-check; the assessor itself advances the clock), which
+    // is exactly what a blocked loop produces with a real clock — and the
+    // assertion proves the assessor was actually invoked.
     let reads = 0;
+    const calls = [];
     const outcome = await runTypedAssessment({
       now: () => {
         reads += 1;
-        return reads === 1 ? 0 : 5000;
+        return calls.length === 0 ? 0 : 5000;
       },
-      assessor: async () => ({ findings: [{ late: true }], diagnostics: [] }),
+      assessor: async () => {
+        calls.push('run');
+        return { findings: [{ late: true }], diagnostics: [] };
+      },
       coverage: { state: 'full' },
       limits: { deadlineMs: 1000 },
     });
+    assert.equal(calls.length, 1, 'the assessor must have actually run');
     assert.equal(outcome.run_status, 'failed');
     assert.deepEqual(outcome.findings, []);
     assert.ok(outcome.diagnostics.some((entry) => entry.code === 'deadline-exceeded'));
+  });
+
+  it('marks a same-tick freshness probe stale when it finishes past the deadline budget', async () => {
+    // The probe settles successfully, but the loop was blocked while it ran
+    // (the clock advances inside the probe), so its verdict is produced after
+    // its budget elapsed and must not keep the outcome current.
+    let probeRan = false;
+    const outcome = await runTypedAssessment({
+      now: () => (probeRan ? 5000 : 0),
+      assessor: async () => ({ findings: [{ n: 1 }], diagnostics: [] }),
+      coverage: { state: 'full' },
+      watch: { changed: async () => { probeRan = true; return false; } },
+      limits: { deadlineMs: 1000 },
+    });
+    assert.equal(outcome.freshness, 'stale');
+    assert.ok(outcome.diagnostics.some((entry) => entry.code === 'assessment-stale'
+      && String(entry.detail).includes('probe')));
+  });
+
+  it('degrades coverage to partial when findings are truncated even with a full diagnostics budget', async () => {
+    const junkDiagnostics = Array.from({ length: 10 }, (_, index) => ({ code: `junk-${index}`, path: null, detail: null }));
+    const outcome = await runTypedAssessment({
+      assessor: async () => ({ findings: Array.from({ length: 8 }, () => ({ n: 1 })), diagnostics: junkDiagnostics }),
+      coverage: { state: 'full', declared_sources: 2, scanned_sources: 2, missing_sources: [] },
+      limits: { maxFindings: 5, maxDiagnostics: 10 },
+    });
+    assert.equal(outcome.findings.length, 5);
+    assert.equal(outcome.coverage.state, 'partial', 'truncation is a coverage fact, not a diagnostics fact');
+  });
+
+  it('rejects sparse arrays and non-plain objects in binding inputs', () => {
+    const sparse = new Array(2);
+    sparse[1] = 1;
+    assert.throws(() => buildAssessmentBinding({ sparse }), /sparse/);
+    assert.throws(() => buildAssessmentBinding({ at: new Date() }), /non-plain/);
+    assert.throws(() => buildAssessmentBinding({ map: new Map() }), /non-plain/);
+    // A null-prototype plain mapping stays acceptable.
+    const nullProto = Object.assign(Object.create(null), { a: 1 });
+    assert.match(buildAssessmentBinding({ nullProto }), /^[a-f0-9]{64}$/);
   });
 
   it('degrades to stale when the freshness probe hangs past the deadline budget', async () => {

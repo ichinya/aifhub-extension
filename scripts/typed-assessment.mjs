@@ -39,6 +39,11 @@ export function assessmentCanonical(value, seen = new WeakSet(), path = '$') {
   }
   if (Array.isArray(value)) {
     if (seen.has(value)) throw new TypeError(`binding input must be acyclic: cycle at ${path}`);
+    // Sparse arrays serialize as if the holes did not exist, collapsing
+    // distinct values into one digest — reject them outright.
+    if (Object.keys(value).length !== value.length) {
+      throw new TypeError(`binding input must be JSON-compatible: sparse array at ${path}`);
+    }
     seen.add(value);
     const rendered = value.map((item, index) => assessmentCanonical(item, seen, `${path}[${index}]`));
     seen.delete(value);
@@ -46,6 +51,12 @@ export function assessmentCanonical(value, seen = new WeakSet(), path = '$') {
   }
   if (value && typeof value === 'object') {
     if (seen.has(value)) throw new TypeError(`binding input must be acyclic: cycle at ${path}`);
+    // Non-plain objects (Date, Map, class instances) either serialize as {}
+    // or carry non-JSON state — reject anything but plain/null-prototype.
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) {
+      throw new TypeError(`binding input must be JSON-compatible: non-plain object at ${path}`);
+    }
     seen.add(value);
     const rendered = Object.keys(value).sort()
       .map((key) => {
@@ -108,12 +119,18 @@ function normalizeCoverage(coverage) {
   let state = ASSESSMENT_COVERAGE_STATES.includes(base.state) ? base.state : 'none';
   const boundedCount = (value) => (Number.isInteger(value) && value >= 0 ? value : 0);
   const declared = boundedCount(base.declared_sources);
-  const scanned = boundedCount(base.scanned_sources);
-  // Items must be well-formed {path, reason} pairs; anything else is dropped
-  // so a malformed entry cannot masquerade as coverage evidence.
+  // scanned > declared is a caller contradiction: clamp before any state
+  // decision instead of keeping an impossible "full" claim.
+  const scanned = Math.min(boundedCount(base.scanned_sources), declared);
+  // Items must be exactly {path, reason} string pairs: anything else — extra
+  // properties, missing/null reason, non-objects — is dropped so a malformed
+  // entry cannot masquerade as coverage evidence.
   const missing = (Array.isArray(base.missing_sources) ? base.missing_sources : [])
     .filter((item) => item && typeof item === 'object' && !Array.isArray(item)
-      && typeof item.path === 'string' && item.path.length > 0)
+      && Object.getPrototypeOf(item) === Object.prototype
+      && typeof item.path === 'string' && item.path.length > 0
+      && typeof item.reason === 'string' && item.reason.length > 0
+      && Object.keys(item).length === 2)
     .slice(0, 100);
   // Consistency: an incomplete scan can never be `full`, whatever the caller
   // claimed — missing entries or a scanned<declared gap degrade to partial.
@@ -179,7 +196,8 @@ export async function runTypedAssessment(spec) {
       // probe must not hold the whole call open past the bound. A probe that
       // exceeds the budget (or rejects) degrades to stale — the conservative
       // honest direction.
-      const remaining = Math.max(1, bounds.deadlineMs - Math.round((typeof now === 'function' ? now() : Date.now()) - startedAt));
+      const probeStartedAt = typeof now === 'function' ? now() : Date.now();
+      const remaining = Math.max(1, bounds.deadlineMs - Math.round(probeStartedAt - startedAt));
       let drifted = false;
       let probeTimedOut = false;
       try {
@@ -192,7 +210,12 @@ export async function runTypedAssessment(spec) {
             Promise.resolve(watch.changed()).then((value) => ({ drifted: value === true })),
             probeDeadline,
           ]);
+          // A same-tick probe can settle after its budget already elapsed (the
+          // loop was blocked, so the timer callback could not run first): its
+          // verdict is not trusted past the deadline.
+          const probeElapsed = (typeof now === 'function' ? now() : Date.now()) - probeStartedAt;
           if (probeResult && probeResult.probeTimedOut === true) probeTimedOut = true;
+          else if (probeElapsed > remaining) probeTimedOut = true;
           else if (probeResult) drifted = probeResult.drifted === true;
         } finally {
           if (typeof probeTimer.unref === 'function') probeTimer.unref();
@@ -297,11 +320,19 @@ export async function runTypedAssessment(spec) {
   }
   const diagnostics = Array.isArray(raw.diagnostics) ? [...raw.diagnostics] : [];
   let findings = raw.findings;
+  let findingsTruncated = false;
   if (findings.length > bounds.maxFindings) {
     diagnostics.push(diagnostic('findings-truncated', null, `limit=${bounds.maxFindings}`));
     findings = findings.slice(0, bounds.maxFindings);
+    findingsTruncated = true;
   }
   const normalizedCoverage = normalizeCoverage(coverage);
+  if (findingsTruncated && normalizedCoverage.state === 'full') {
+    // Truncation is a coverage fact, not a diagnostics fact: the unprocessed
+    // tail must degrade coverage even if the diagnostics budget later trims
+    // the findings-truncated marker.
+    normalizedCoverage.state = 'partial';
+  }
   return finish({
     ok: true, run_status: 'complete', freshness: 'current', abstained: false,
     findings, diagnostics, coverage: normalizedCoverage,

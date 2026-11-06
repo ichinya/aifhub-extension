@@ -1,6 +1,6 @@
 {
   "schema": "aifhub.requirement_lint_corpus.v1",
-  "notes": "Curated labels for the requirement-lint corpus. Dev files informed the detector markers; held-out files were labeled by the same discipline and are asserted by the same test. Expected values are exact by_type counts over the whole presented file, and expected_findings pins the exact 1-based line per finding so a same-type finding on the wrong line fails the corpus test. Sanitized historical material is evidence, not an oracle: labels record what the advisory lint should surface, not ground truth about requirement quality.",
+  "notes": "Curated regression subset for the requirement-lint corpus. Dev files informed the detector markers; heldout files were labeled by the same discipline after initial marker tuning and validated without further marker edits, but the held-out designation is DECLARED-ONLY: there is no recorded pre-registration provenance, so treat the entire corpus as a curated regression subset. Expected values are exact by_type counts over the whole presented file, and expected_findings pins the exact 1-based line per finding so a same-type finding on the wrong line fails the corpus test. Sanitized historical material is evidence, not an oracle: labels record what the advisory lint should surface, not ground truth about requirement quality.",
   "thresholds": {
     "negative_false_findings": 0,
     "label_match": "exact"
@@ -72,6 +72,22 @@
       "heldout-sanitized-archive-excerpt.md": {
         "expected_by_type": { "undefined_observable_outcome": 0, "missing_error_case": 0, "owner_decision_assumed": 1, "suspected_requirement_revision_conflict": 0 },
         "expected_findings": [["owner_decision_assumed", 5]]
+      }
+    },
+    "known_limitations": {
+      "notes": "Pins the CURRENT behavior of the documented heuristic limitations (design.md Review Round): false negatives and one false positive caused by line-based scanning and negation/role-blind suppression markers. These labels make the limitation observable; correcting the markers is expected to change these labels in the same commit.",
+      "limit-ru-negated-attribution.md": {
+        "expected_by_type": { "undefined_observable_outcome": 0, "missing_error_case": 0, "owner_decision_assumed": 0, "suspected_requirement_revision_conflict": 0 },
+        "limitation": "false-negative: the negated attribution (решение не согласовано) suppresses the owner finding"
+      },
+      "limit-en-error-log.md": {
+        "expected_by_type": { "undefined_observable_outcome": 0, "missing_error_case": 0, "owner_decision_assumed": 0, "suspected_requirement_revision_conflict": 0 },
+        "limitation": "false-negative: the error-token match is the object name (error log), suppressing missing_error_case; log also counts as observable"
+      },
+      "limit-en-must-not.md": {
+        "expected_by_type": { "undefined_observable_outcome": 0, "missing_error_case": 1, "owner_decision_assumed": 0, "suspected_requirement_revision_conflict": 0 },
+        "expected_findings": [["missing_error_case", 3]],
+        "limitation": "false-positive: a MUST NOT prohibition is scored as a success-path obligation missing error handling"
       }
     }
   }

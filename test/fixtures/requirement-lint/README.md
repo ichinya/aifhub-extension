@@ -10,10 +10,17 @@ asserts them exactly.
 
 - `dev/`-prefixed files informed the deterministic detector markers while they
   were written; `heldout/`-prefixed files were labeled with the same discipline
-  and are asserted by the same corpus test without further marker tuning.
+  and are asserted by the same corpus test without further marker tuning. The
+  held-out designation is declared-only: there is no recorded pre-registration
+  provenance, so treat the entire corpus as a curated regression subset.
 - Expected values are exact `by_type` counts, so a negative counterpart with a
   single false finding fails the corpus test (`thresholds.negative_false_
   findings: 0`).
+- `limit-*` files pin the CURRENT behavior of the documented heuristic
+  limitations (line-based scanning; negation/role-blind suppression markers):
+  two false negatives and one false positive, labeled under
+  `known_limitations` with a note that correcting the markers must update
+  those labels in the same commit.
 - Machine tokens (finding types, codes, schema names) stay English in every
   language; `proposed_question` prose follows the resolved language and keeps
   raw quotes untranslated.

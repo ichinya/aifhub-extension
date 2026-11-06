@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { digest, portablePath } from './workflow-state-store.mjs';
 import { parseStrictJson } from './json-strict.mjs';
 import { validateJsonAgainstSchema } from './json-schema-subset.mjs';
-import { readProviderFile } from './provider-files.mjs';
+import { readProviderFile, safeProviderPath } from './provider-files.mjs';
 import { normalizeChangeId } from './active-change-resolver.mjs';
 import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
 import { verifyObservationIgnored } from './requirement-lint-git-guard.mjs';
@@ -164,10 +164,13 @@ export function parseRequirementLintConfigSubset(raw) {
     && candidate.every((part, index) => path[index] === part));
   const scalar = (rawValue) => {
     if (/^(['"]).*\1$/.test(rawValue)) return { text: rawValue.slice(1, -1), quoted: true };
-    const unquoted = rawValue.replace(/^['"]|['"]$/g, '');
-    if (/^(true|false)$/i.test(unquoted)) return { bool: unquoted.toLowerCase() === 'true', text: unquoted, quoted: false };
-    if (/^-?\d+(?:\.\d+)?$/.test(unquoted)) return { number: Number(unquoted), text: unquoted, quoted: false };
-    return { text: unquoted, quoted: false };
+    // An unterminated quote must never be quote-stripped into a boolean: the
+    // paired-quote form is the only string form, everything else is a
+    // malformed scalar the guarded readers diagnose.
+    if (/^['"]/.test(rawValue)) return { unterminated: true, text: rawValue, quoted: false };
+    if (/^(true|false)$/i.test(rawValue)) return { bool: rawValue.toLowerCase() === 'true', text: rawValue, quoted: false };
+    if (/^-?\d+(?:\.\d+)?$/.test(rawValue)) return { number: Number(rawValue), text: rawValue, quoted: false };
+    return { text: rawValue, quoted: false };
   };
   for (const rawLine of String(raw ?? '').replace(/^\uFEFF/, '').split(/\r?\n/)) {
     const withoutComment = stripLineComment(rawLine);
@@ -214,6 +217,10 @@ export function parseRequirementLintConfigSubset(raw) {
       continue;
     }
     const parsed = scalar(rawValue);
+    if (guarded && parsed.unterminated) {
+      diagnostics.push(lintConfigDiagnostic('unterminated-quote', key));
+      continue;
+    }
     if (inside && key === 'enabled' && parsed.quoted && /^(true|false)$/i.test(parsed.text)) {
       diagnostics.push(lintConfigDiagnostic('quoted-boolean', rawValue));
       parent.value[key] = parsed.text;
@@ -263,9 +270,11 @@ export async function readRequirementLintConfig(rootDir, options = {}) {
   // A flow-scalarized structural section (`paths: {state: .state}`) must not
   // hide `paths.state` from the writer guard: the lint degrades to not-run
   // with a diagnostic instead of silently using the default root.
+  let structuralDamage = false;
   for (const [name, section] of [['aifhub', hub], ['paths', paths]]) {
     if (section !== undefined && section !== null && (typeof section !== 'object' || Array.isArray(section))) {
       diagnostics.push(lintConfigDiagnostic('scalarized-section', name));
+      structuralDamage = true;
     }
   }
   const lintSection = hub && typeof hub === 'object' ? hub.requirementLint : undefined;
@@ -280,7 +289,10 @@ export async function readRequirementLintConfig(rootDir, options = {}) {
       diagnostics.push(lintConfigDiagnostic('not-a-boolean', JSON.stringify(enabled)));
     }
   }
-  if (parsed.diagnostics.length > 0) config.enabledMalformed = true;
+  // Every lint-relevant anomaly disables the opt-in: parser diagnostics and
+  // structural damage alike — a scalarized `paths` must never leave the lint
+  // running against the silently-defaulted state root.
+  if (parsed.diagnostics.length > 0 || structuralDamage) config.enabledMalformed = true;
   if (paths && typeof paths === 'object' && !Array.isArray(paths)) {
     const rawState = paths.state;
     if (rawState !== undefined) config.stateRootRaw = rawState;
@@ -318,15 +330,19 @@ export async function loadRequirementLintProfile(options = {}) {
       diagnostics: [{ code: 'profile-unavailable', path: PROFILE_MODULE, detail: 'profile-malformed' }],
     };
   }
+  // Root-shape check first: `null` or scalar JSON must degrade to the honest
+  // profile-unavailable outcome, never reach property access that would turn
+  // a damaged profile into an operational crash (exit 1).
+  const shapeOk = parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed);
   // The pinned profile must cover the full closed finding-type set exactly
   // once: an empty, duplicated, or partial rule set would let the assessor
   // silently fall back to built-in rules while recording a "loaded" profile.
-  const rulesValid = Array.isArray(parsed.rules) && parsed.rules.length === FINDING_TYPES.length
+  const rulesValid = shapeOk && Array.isArray(parsed.rules) && parsed.rules.length === FINDING_TYPES.length
     && parsed.rules.every((rule) => typeof rule?.id === 'string' && Number.isInteger(rule?.version)
       && ['project', 'upstream'].includes(rule?.origin) && FINDING_TYPES.includes(rule?.type))
     && new Set(parsed.rules.map((rule) => rule.id)).size === parsed.rules.length
     && new Set(parsed.rules.map((rule) => rule.type)).size === FINDING_TYPES.length;
-  if (parsed?.schema !== REQUIREMENT_LINT_PROFILE_SCHEMA || typeof parsed.profile_id !== 'string'
+  if (!shapeOk || parsed?.schema !== REQUIREMENT_LINT_PROFILE_SCHEMA || typeof parsed.profile_id !== 'string'
     || !Number.isInteger(parsed.profile_version) || !rulesValid) {
     return {
       ok: false, sha256, profile: null, rules: new Map(), exclusionPolicy: null,
@@ -516,39 +532,45 @@ export function createRulesAssessor(profileRules) {
       // stays excluded, and ~~~ fences close only on a matching run.
       let fence = null;
       let perDocument = 0;
-      for (const line of document.lines) {
+      // Budget is enforced per finding, not per line: a single line can carry
+      // several findings, and the cap must stop at the exact overshoot with an
+      // honest truncation marker and degraded coverage.
+      const room = () => findings.length < MAX_FINDINGS && perDocument < MAX_FINDINGS_PER_DOCUMENT;
+      const outOfBudget = () => {
+        truncated = true;
+        if (diagnostics.length < MAX_DIAGNOSTICS) {
+          diagnostics.push({
+            code: 'findings-truncated',
+            path: document.path,
+            detail: `per-document=${MAX_FINDINGS_PER_DOCUMENT}, global=${MAX_FINDINGS}`,
+          });
+        }
+      };
+      documentLoop: for (const line of document.lines) {
         const trimmed = line.text.trim();
         const fenceMatch = /^(`{3,}|~{3,})(.*)$/.exec(trimmed);
         if (fenceMatch) {
-          const run = fenceMatch[1][0].repeat(fenceMatch[1].length);
           if (fence === null) fence = { character: fenceMatch[1][0], length: fenceMatch[1].length };
           else if (fenceMatch[1][0] === fence.character && fenceMatch[1].length >= fence.length
             && fenceMatch[2].trim().length === 0) fence = null;
           continue;
         }
         if (fence !== null || trimmed.length === 0) continue;
-        if (findings.length >= MAX_FINDINGS || perDocument >= MAX_FINDINGS_PER_DOCUMENT) {
-          // Honest truncation: an unprocessed tail is never presented as full
-          // coverage; the marker degrades the outcome instead.
-          truncated = true;
-          if (diagnostics.length < MAX_DIAGNOSTICS) {
-            diagnostics.push({
-              code: 'findings-truncated',
-              path: document.path,
-              detail: `per-document=${MAX_FINDINGS_PER_DOCUMENT}, global=${MAX_FINDINGS}`,
-            });
-          }
+        if (!room()) {
+          outOfBudget();
           break;
         }
         const hasMarker = REQUIREMENT_MARKER_RE.test(line.text);
         const quote = quoteOf(line.text);
         if (hasMarker && !EN_OBSERVABLE_RE.test(line.text) && !RU_OBSERVABLE_RE.test(line.text)) {
+          if (!room()) { outOfBudget(); break documentLoop; }
           findings.push(buildFinding('undefined_observable_outcome', ruleFor('undefined_observable_outcome'),
             [spanRef(document, line.start, line.end)], language, quote));
           perDocument += 1;
         }
         if (hasMarker && (EN_SUCCESS_ACTION_RE.test(line.text) || RU_SUCCESS_ACTION_RE.test(line.text))
           && !EN_ERROR_AWARE_RE.test(line.text) && !RU_ERROR_AWARE_RE.test(line.text)) {
+          if (!room()) { outOfBudget(); break documentLoop; }
           findings.push(buildFinding('missing_error_case', ruleFor('missing_error_case'),
             [spanRef(document, line.start, line.end)], language, quote));
           perDocument += 1;
@@ -558,6 +580,7 @@ export function createRulesAssessor(profileRules) {
         // silently regardless of sentence form.
         if ((EN_STRONG_ASSUMPTION_RE.test(line.text) || RU_STRONG_ASSUMPTION_RE.test(line.text))
           && !OWNER_ATTRIBUTION_RE.test(line.text)) {
+          if (!room()) { outOfBudget(); break documentLoop; }
           findings.push(buildFinding('owner_decision_assumed', ruleFor('owner_decision_assumed'),
             [spanRef(document, line.start, line.end)], language, quote));
           perDocument += 1;
@@ -567,6 +590,7 @@ export function createRulesAssessor(profileRules) {
           // Refs bind the two revision markers of the same presented
           // requirement — the deterministic anchor points of each side in this
           // line-based heuristic (recorded in the profile notes and design).
+          if (!room()) { outOfBudget(); break documentLoop; }
           const refs = markers.slice(0, 2).map((marker) => {
             const start = line.start + byteOffsetOfLine(line.text, marker.index);
             return spanRef(document, start, start + Buffer.byteLength(marker.text, 'utf8'));
@@ -675,8 +699,11 @@ export function assembleObservation({ changeId, generatedAt, outcome, inputs, co
   const missingSources = inputs.filter((input) => input.kind !== 'file')
     .map((input) => ({ path: input.path, reason: input.kind === 'missing' ? 'file-missing' : String(input.code ?? 'malformed') }));
   // Truncated scans never claim full coverage: an unprocessed tail is a
-  // partial outcome even when every file was readable.
-  const wasTruncated = diagnostics.some((entry) => entry.code === 'findings-truncated');
+  // partial outcome even when every file was readable — either the assessor
+  // or the helper reported the truncation (helper coverage degrades even if
+  // the diagnostics budget trimmed its marker).
+  const wasTruncated = diagnostics.some((entry) => entry.code === 'findings-truncated')
+    || (outcome.run_status === 'complete' && !outcome.abstained && outcome.coverage?.state === 'partial');
   const coverageState = scanned === 0 ? 'none' : (scanned === inputs.length && !wasTruncated ? 'full' : 'partial');
   const coverage = outcome.run_status === 'complete' && outcome.abstained
     ? { ...outcome.coverage, declared_sources: inputs.length, scanned_sources: scanned }
@@ -756,11 +783,26 @@ export async function validateObservationBinding(rootDir, observation, options =
   if (worktreeIdentity !== observation.worktree_identity) mismatched.push('worktree_identity');
   const recordedInputs = Array.isArray(observation.inputs) ? observation.inputs : [];
   if (recordedInputs.length > MAX_INPUTS) return { ok: false, code: 'observation-invalid' };
-  // Semantic ref admissibility: every span ref must belong to a recorded
-  // input, stay inside its recorded byte length, and a conflict pair must sit
-  // inside one document (intra-requirement contract).
+  // Semantic admissibility beyond the schema form: refs must belong to a
+  // recorded input, stay inside its recorded byte length, carry the recorded
+  // document digest, and dedup keys, summary, and outcome invariants must be
+  // internally consistent — schema-valid tampering must fail here, not pass
+  // as fresh.
   const inputsByPath = new Map(recordedInputs.map((input) => [input?.path, input]));
-  for (const finding of observation.findings ?? []) {
+  const summaryByType = Object.fromEntries(FINDING_TYPES.map((type) => [type, 0]));
+  const recordedFindings = Array.isArray(observation.findings) ? observation.findings : [];
+  // Honest outcome invariants: a failed/not_run scan and an abstention can
+  // never carry findings, and an abstention never claims scanned coverage.
+  if ((observation.run_status === 'failed' || observation.run_status === 'not_run' || observation.abstained === true)
+    && recordedFindings.length > 0) {
+    return { ok: false, code: 'observation-invalid' };
+  }
+  if (observation.abstained === true && observation.coverage?.state !== 'none') {
+    return { ok: false, code: 'observation-invalid' };
+  }
+  for (const finding of recordedFindings) {
+    if (!finding || typeof finding !== 'object') return { ok: false, code: 'observation-invalid' };
+    summaryByType[finding.finding_type] = (summaryByType[finding.finding_type] ?? 0) + 1;
     const refs = Array.isArray(finding.refs) ? finding.refs : [];
     if (finding.finding_type === 'suspected_requirement_revision_conflict') {
       if (refs.length !== 2) return { ok: false, code: 'observation-invalid' };
@@ -775,7 +817,36 @@ export async function validateObservationBinding(rootDir, observation, options =
         || start < 0 || end < start || end > (input.bytes ?? 0)) {
         return { ok: false, code: 'observation-invalid' };
       }
+      // The recorded document digest must match the recorded input digest —
+      // an internal contradiction of the record itself, independent of disk.
+      if (ref.document_sha256 !== `sha256:${input.sha256}`) {
+        return { ok: false, code: 'observation-invalid' };
+      }
     }
+    // Dedup keys are recomputed, not trusted: the stable key binds
+    // finding_type + exact refs.
+    if (finding.dedup_key !== digest({ finding_type: finding.finding_type, refs: finding.refs })) {
+      return { ok: false, code: 'observation-invalid' };
+    }
+  }
+  // Findings summary must agree with the findings array.
+  const recordedSummary = observation.findings_summary ?? {};
+  if ((recordedSummary.total ?? -1) !== recordedFindings.length
+    || FINDING_TYPES.some((type) => (recordedSummary.by_type?.[type] ?? -1) !== summaryByType[type])
+    || Object.keys(recordedSummary.by_type ?? {}).length !== FINDING_TYPES.length) {
+    return { ok: false, code: 'observation-invalid' };
+  }
+  // Coverage consistency mirrors the writer's assembly rules: an incomplete
+  // scan never claims full, an abstention never claims scanned sources.
+  const recordedCoverage = observation.coverage ?? {};
+  if (recordedCoverage.state === 'full'
+    && ((recordedCoverage.scanned_sources ?? 0) < (recordedCoverage.declared_sources ?? 0)
+      || (recordedCoverage.missing_sources ?? []).length > 0)) {
+    return { ok: false, code: 'observation-invalid' };
+  }
+  if ((observation.diagnostics ?? []).some((entry) => entry?.code === 'findings-truncated')
+    && recordedCoverage.state === 'full') {
+    return { ok: false, code: 'observation-invalid' };
   }
   // Digest records are rebuilt from CURRENT disk bytes (never from the
   // recorded observation itself): an edited or renamed input must name its
@@ -911,14 +982,18 @@ export async function writeRequirementLintObservation(rootDir, observation, conf
   };
   const firstRejection = await assertLeafWritable();
   if (firstRejection) return firstRejection;
-  // AC3 guard: the writer refuses a tracked or not-effectively-ignored output.
-  // The QA snapshot's `actual_diff` channel (git diff --binary HEAD) has no
-  // namespace filter, so a tracked observation would change required QA
-  // surfaces no matter how carefully the file/directory projections exclude
-  // the namespace.
+  // AC3 guard: the writer refuses a tracked or not-effectively-ignored output
+  // for EVERY path it may create — the observation and the namespace
+  // .gitignore. The QA snapshot's `actual_diff` channel (git diff --binary
+  // HEAD) has no namespace filter, so restoring a tracked-then-deleted
+  // namespace gitignore would shift required QA surfaces exactly like a
+  // tracked observation would.
   const gitGuard = options.gitGuard ?? verifyObservationIgnored;
-  const verdict = await gitGuard(root, relative, options);
-  if (!verdict.ok) return { ok: false, code: verdict.code, detail: verdict.detail ?? null };
+  const gitignoreRelative = `${paths.directory}/.gitignore`;
+  for (const guarded of [relative, gitignoreRelative]) {
+    const verdict = await gitGuard(root, guarded, options);
+    if (!verdict.ok) return { ok: false, code: verdict.code, detail: verdict.detail ?? null };
+  }
   // Gitignore lives inside the closed lint namespace: the namespace contents
   // stay local while the ignore rule itself is excluded from QA projections.
   if (!options.skipGitignore) {
@@ -950,23 +1025,39 @@ export async function writeRequirementLintObservation(rootDir, observation, conf
   // Atomic write owned by this module (readability writer model): the third
   // ownership check runs after the temporary write and immediately before the
   // rename, closing the check-then-rename window a foreign replacement could
-  // otherwise slip through.
+  // otherwise slip through. Destination and temporary are re-validated through
+  // safeProviderPath (containment, no symlinks, identity) right before the
+  // rename — the checks the shared helper performed and a bare path.join
+  // writer would lose.
   const payload = `${JSON.stringify(observation, null, 2)}\n`;
   const temporary = path.join(liveDirectory, `${parts[parts.length - 1]}.${randomUUID()}.tmp`);
+  const openFile = options.openFile ?? open;
+  let renamed = false;
   try {
-    const handle = await open(temporary, 'wx', 0o600);
+    await safeProviderPath(root, relative);
+    const handle = await openFile(temporary, 'wx', 0o600);
     try { await handle.writeFile(payload, 'utf8'); } finally { await handle.close(); }
-  } catch (error) {
-    return { ok: false, code: 'observation-write-failed', detail: String(error?.message ?? error).slice(0, 200) };
-  }
-  try {
+    // Controlled TOCTOU probe seam: the hook fires in the vulnerable window
+    // (after the temp write, before the final ownership check + rename), so
+    // a test can deterministically swap the leaf and prove the final checks
+    // catch it.
+    if (typeof options.beforeRename === 'function') await options.beforeRename();
     const thirdRejection = await assertLeafWritable();
     if (thirdRejection) return thirdRejection;
+    // Post-temp containment re-check (TOCTOU): the destination and the
+    // temporary must still resolve to safe, link-free paths inside the root.
+    await safeProviderPath(root, relative);
+    await safeProviderPath(root, path.posix.join(...parts.slice(0, -1), path.basename(temporary)));
     await rename(temporary, leaf);
+    renamed = true;
+    return { ok: true, path: relative };
+  } catch (error) {
+    return { ok: false, code: 'observation-write-failed', detail: String(error?.message ?? error).slice(0, 200) };
   } finally {
-    await unlink(temporary).catch((error) => { if (error?.code !== 'ENOENT') throw error; });
+    // A failed create/write must not leave a partial temporary behind; after a
+    // successful rename the temporary no longer exists (ENOENT is expected).
+    if (!renamed) await unlink(temporary).catch(() => {});
   }
-  return { ok: true, path: relative };
 }
 
 // ---------------------------------------------------------------------------
@@ -1008,8 +1099,10 @@ function renderHuman(value) {
     lines.push('No findings in the presented scope; this is not a readiness, verification, or approval signal.');
   }
   for (const finding of value.findings ?? []) {
-    const ref = finding.refs?.[0] ?? {};
-    const at = ref.kind === 'span' ? `${ref.path}:${ref.span?.start}-${ref.span?.end}` : ref.source_id;
+    const renderRef = (ref) => (ref.kind === 'span' ? `${ref.path}:${ref.span?.start}-${ref.span?.end}` : ref.source_id);
+    const at = finding.ref_relation === 'conflicting_revision_pair'
+      ? (finding.refs ?? []).map(renderRef).join(' <-> ')
+      : renderRef(finding.refs?.[0] ?? {});
     lines.push(`  ${finding.finding_type} @ ${at} — ${finding.rationale}`);
     lines.push(`    question: ${finding.proposed_question}`);
   }
