@@ -218,7 +218,11 @@ export async function runTypedAssessment(spec) {
           else if (probeElapsed > remaining) probeTimedOut = true;
           else if (probeResult) drifted = probeResult.drifted === true;
         } finally {
-          if (typeof probeTimer.unref === 'function') probeTimer.unref();
+          // Cancelled, not just unref'd: the probe already settled, so a
+          // pending timer would otherwise linger in a long-lived process
+          // until its (possibly long) budget expires.
+          if (probeTimer && typeof probeTimer.unref === 'function') probeTimer.unref();
+          if (probeTimer) clearTimeout(probeTimer);
         }
       } catch {
         drifted = true;
@@ -257,13 +261,16 @@ export async function runTypedAssessment(spec) {
     const deadline = new Promise((resolve) => {
       // Referenced while the race is pending: a never-settling assessor must
       // still drive the deadline outcome instead of letting the process exit
-      // silently. Released right after the race settles.
+      // silently. Cancelled right after the race settles — unref alone would
+      // leave the timer scheduled in a long-lived process until each deadline
+      // expires.
       raceTimer = setTimeout(() => resolve({ timedOut: true }), bounds.deadlineMs);
     });
     try {
       raw = await Promise.race([Promise.resolve(assessor(input, context)), deadline]);
     } finally {
       if (raceTimer && typeof raceTimer.unref === 'function') raceTimer.unref();
+      if (raceTimer) clearTimeout(raceTimer);
     }
   } catch (error) {
     return finish({

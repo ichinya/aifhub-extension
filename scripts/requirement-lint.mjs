@@ -252,7 +252,13 @@ export async function readRequirementLintConfig(rootDir, options = {}) {
   try {
     bytes = await readProviderFile(rootDir, '.ai-factory/config.yaml', 256 * 1024);
   } catch (error) {
+    // A config that exists but cannot be read must not stand in for the
+    // project's configured roots: with `--enabled true --write` the writer
+    // would otherwise save under the defaulted state root while a readable
+    // config would have refused it (`state-root-mismatch`). The lint stays
+    // off, like every other malformed-namespace path.
     diagnostics.push({ code: 'config-unreadable', path: '.ai-factory/config.yaml', detail: String(error?.message ?? error).slice(0, 500) });
+    config.enabledMalformed = true;
     return config;
   }
   if (bytes === null) return config;
@@ -261,6 +267,7 @@ export async function readRequirementLintConfig(rootDir, options = {}) {
     text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch {
     diagnostics.push({ code: 'config-malformed', path: '.ai-factory/config.yaml', detail: 'utf8-fatal' });
+    config.enabledMalformed = true;
     return config;
   }
   const parsed = parseRequirementLintConfigSubset(text);
@@ -280,6 +287,11 @@ export async function readRequirementLintConfig(rootDir, options = {}) {
   const lintSection = hub && typeof hub === 'object' ? hub.requirementLint : undefined;
   if (lintSection !== undefined && (lintSection === null || typeof lintSection !== 'object' || Array.isArray(lintSection))) {
     diagnostics.push(lintConfigDiagnostic('scalarized-section', 'aifhub.requirementLint'));
+    // A scalar nested section is lint-relevant damage that never reaches the
+    // parser's own diagnostics (the parent `aifhub` mapping is intact), so it
+    // must disable the opt-in here — the same never-run-on-damaged-config
+    // rule as the structural damage below.
+    config.enabledMalformed = true;
   }
   const enabled = lintSection && typeof lintSection === 'object' ? lintSection.enabled : undefined;
   if (enabled !== undefined) {
@@ -381,10 +393,14 @@ export async function readRequirementDocument(rootDir, relative, options = {}) {
   const lines = [];
   let start = 0;
   for (let index = 0; index <= bytes.length; index += 1) {
-    if (index === bytes.length || bytes[index] === 0x0A) {
-      let end = index;
-      if (end > start && bytes[end - 1] === 0x0D) end -= 1;
-      if (end > start) lines.push({ start, end, text: bytes.subarray(start, end).toString('utf8') });
+    // CR, LF, and CRLF each end a line: a CR-only document must not collapse
+    // separate requirements into one assessor line (markers on a later
+    // requirement would otherwise suppress findings for earlier ones while
+    // coverage still reports `full`). Offsets stay over the original buffer,
+    // so byte spans remain exact for every line-ending style.
+    if (index === bytes.length || bytes[index] === 0x0A || bytes[index] === 0x0D) {
+      if (index > start) lines.push({ start, end: index, text: bytes.subarray(start, index).toString('utf8') });
+      if (bytes[index] === 0x0D && bytes[index + 1] === 0x0A) index += 1; // CRLF pair
       start = index + 1;
     }
   }

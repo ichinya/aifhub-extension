@@ -172,6 +172,30 @@ describe('requirement-lint arguments and config parsing', () => {
     const absent = await readRequirementLintConfig(await makeTemp('aif-rl-cfg3-'));
     assert.equal(absent.enabled, null);
   });
+
+  it('marks unreadable config and scalar nested sections as malformed opt-in state', async () => {
+    // An oversized config cannot be read (readProviderFile refuses >256 KiB):
+    // the reader must mark the namespace malformed so `--enabled true` cannot
+    // run a scan (or a write) against silently-defaulted roots — a readable
+    // config with `paths.state: .custom-state` would have been refused by the
+    // writer (`state-root-mismatch`), so an unreadable one must not unlock it.
+    const unreadable = await makeTemp('aif-rl-cfg4-');
+    await seedProject(unreadable, {
+      config: `paths:\n  state: .custom-state\n${'x'.repeat(300 * 1024)}\n`,
+    });
+    const broken = await readRequirementLintConfig(unreadable);
+    assert.equal(broken.enabledMalformed, true);
+    assert.ok(broken.diagnostics.some((entry) => entry.code === 'config-unreadable'));
+    assert.equal(broken.stateRootRaw, undefined);
+    // A scalar nested `aifhub.requirementLint` never reaches the parser's own
+    // diagnostics (the parent mapping is intact), so the reader disables the
+    // opt-in itself.
+    const scalar = await makeTemp('aif-rl-cfg5-');
+    await seedProject(scalar, { config: 'aifhub:\n  requirementLint: 5\n' });
+    const damaged = await readRequirementLintConfig(scalar);
+    assert.equal(damaged.enabledMalformed, true);
+    assert.ok(damaged.diagnostics.some((entry) => entry.code === 'requirement-lint:scalarized-section'));
+  });
 });
 
 describe('requirement-lint document reading and language', () => {
@@ -190,6 +214,28 @@ describe('requirement-lint document reading and language', () => {
     await seedProject(crlf, { files: { 'docs/crlf.md': '- The system MUST retry.\r\n- The system MUST log.\r\n' } });
     const crlfRead = await readRequirementDocument(crlf, 'docs/crlf.md');
     assert.deepEqual(crlfRead.lines.map((entry) => entry.text), ['- The system MUST retry.', '- The system MUST log.']);
+  });
+
+  it('splits CR-only documents so per-line suppression cannot cross requirements', async () => {
+    // CR-only line endings: every requirement stays its own assessor line, so
+    // a later requirement's error wording cannot suppress the missing-error
+    // finding of an earlier one while coverage still reports `full`.
+    const root = await makeTemp('aif-rl-doc4-');
+    await seedProject(root, {
+      files: {
+        'docs/cr.md': '- The system MUST save the draft.\r- The system MUST report an error when saving fails.\r',
+      },
+    });
+    const read = await readRequirementDocument(root, 'docs/cr.md');
+    assert.equal(read.ok, true);
+    assert.deepEqual(read.lines.map((entry) => entry.text), [
+      '- The system MUST save the draft.',
+      '- The system MUST report an error when saving fails.',
+    ]);
+    const raw = await readFile(path.join(root, 'docs', 'cr.md'));
+    for (const line of read.lines) {
+      assert.equal(raw.subarray(line.start, line.end).toString('utf8'), line.text);
+    }
   });
 
   it('fails closed on missing files and fatal UTF-8', async () => {
@@ -1299,6 +1345,42 @@ describe('review round 2: honesty and config edges', () => {
     });
     const outputs = [];
     const exit = await runRequirementLintCommand(['--change', 'work', '--file', 'docs/req.md', '--json'], {
+      rootDir: root, assessor: MUST_NOT_RUN, output: (value) => outputs.push(value),
+    });
+    assert.equal(exit, 0);
+    const envelope = JSON.parse(outputs.join(''));
+    assert.equal(envelope.state, 'not_run');
+    assert.ok(envelope.codes.includes('requirement-lint:scalarized-section'), envelope.codes.join(','));
+  });
+
+  it('does not scan or write when the config itself is unreadable, even with enabled true', async () => {
+    // The CLI opt-in must not resurrect a config the reader could not verify:
+    // with unreadable config the configured roots are unknown, so neither a
+    // scan nor a write may proceed against silently-defaulted roots.
+    const root = await makeTemp('aif-rl-cfg6-');
+    await seedProject(root, {
+      config: `paths:\n  state: .custom-state\n${'x'.repeat(300 * 1024)}\n`,
+      files: { 'docs/req.md': EN_REQ },
+    });
+    const outputs = [];
+    const exit = await runRequirementLintCommand(['--change', 'work', '--enabled', 'true', '--write', '--file', 'docs/req.md', '--json'], {
+      rootDir: root, assessor: MUST_NOT_RUN, output: (value) => outputs.push(value),
+    });
+    assert.equal(exit, 0);
+    const envelope = JSON.parse(outputs.join(''));
+    assert.equal(envelope.state, 'not_run');
+    assert.ok(envelope.codes.includes('config-unreadable'), envelope.codes.join(','));
+    await assert.rejects(readdir(path.join(root, '.ai-factory', 'state', 'work')), { code: 'ENOENT' });
+  });
+
+  it('does not scan when the nested requirementLint section scalarizes, even with enabled true', async () => {
+    const root = await makeTemp('aif-rl-scal6-');
+    await seedProject(root, {
+      config: 'aifhub:\n  requirementLint: 5\n',
+      files: { 'docs/req.md': EN_REQ },
+    });
+    const outputs = [];
+    const exit = await runRequirementLintCommand(['--change', 'work', '--enabled', 'true', '--file', 'docs/req.md', '--json'], {
       rootDir: root, assessor: MUST_NOT_RUN, output: (value) => outputs.push(value),
     });
     assert.equal(exit, 0);
