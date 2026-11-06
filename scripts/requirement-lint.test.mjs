@@ -657,3 +657,62 @@ describe('AC3: requirement-lint QA namespace isolation', () => {
     assert.ok(!before.changed_paths.some((p) => p.includes(LINT_NAMESPACE)), 'namespace never enters changed_paths');
   });
 });
+
+describe('requirement-lint corpus evaluation (fixtures + labels)', () => {
+  const CORPUS_DIR = path.join(REPO_ROOT, 'test', 'fixtures', 'requirement-lint');
+
+  async function corpusRun(file) {
+    const content = await readFile(path.join(CORPUS_DIR, file));
+    const project = await makeTemp('aif-rl-corpus-');
+    await seedProject(project, {
+      config: 'aifhub:\n  requirementLint:\n    enabled: true\n',
+      files: { [`docs/${file}`]: content },
+    });
+    const outputs = [];
+    const exit = await runRequirementLintCommand(['--change', 'work', '--file', `docs/${file}`, '--json'], {
+      rootDir: project, output: (value) => outputs.push(value),
+    });
+    assert.equal(exit, 0, file);
+    return JSON.parse(outputs.join(''));
+  }
+
+  it('matches curated labels exactly on dev and held-out files', async () => {
+    const labels = parseStrictJson(await readFile(path.join(CORPUS_DIR, 'labels.json'), 'utf8'));
+    for (const [group, entries] of Object.entries(labels.groups)) {
+      for (const [file, label] of Object.entries(entries)) {
+        const observation = await corpusRun(file);
+        assert.equal(observation.run_status, 'complete', `${group}/${file}`);
+        assert.equal(observation.coverage.state, 'full', `${group}/${file}`);
+        assert.deepEqual(observation.findings_summary.by_type, label.expected_by_type, `${group}/${file}`);
+      }
+    }
+  });
+
+  it('keeps machine tokens stable across languages and raw quotes untranslated', async () => {
+    const ru = await corpusRun('dev-ru-owner-assumption.md');
+    for (const finding of ru.findings) {
+      assert.ok(FINDING_TYPES.includes(finding.finding_type));
+      assert.equal(finding.rule.origin, 'project');
+    }
+    assert.equal(ru.language, 'ru');
+    assert.ok(ru.findings.some((finding) => /лимит попыток|отчёт формируется/.test(finding.proposed_question)), 'raw RU quote must stay untranslated');
+    const mixed = await corpusRun('dev-mixed-ru-en.md');
+    assert.equal(mixed.language_source, 'detected');
+    for (const finding of mixed.findings) assert.ok(FINDING_TYPES.includes(finding.finding_type));
+  });
+
+  it('treats hostile prompt injection as inert data: refs stay confined to the presented input', async () => {
+    const observation = await corpusRun('dev-hostile-injection.md');
+    assert.equal(observation.run_status, 'complete');
+    for (const finding of observation.findings) {
+      for (const ref of finding.refs) {
+        assert.equal(ref.kind, 'span');
+        assert.equal(ref.path, 'docs/dev-hostile-injection.md', 'findings may only reference the presented input');
+      }
+    }
+    for (const diagnostic of observation.diagnostics) {
+      assert.ok(!String(diagnostic.detail ?? '').includes('attacker.invalid'), 'diagnostics must not echo hostile payload content');
+      assert.ok(!String(diagnostic.path ?? '').includes('attacker.invalid'));
+    }
+  });
+});
