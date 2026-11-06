@@ -15,6 +15,10 @@ import { promisify } from 'node:util';
 import { canonical, digest } from './workflow-state-store.mjs';
 import { parseStrictJson } from './json-strict.mjs';
 import { validateJsonAgainstSchema } from './json-schema-subset.mjs';
+import { prepareQaManifest } from './qa-manifest.mjs';
+import { qaStore } from './qa-manifest-store.mjs';
+import { observeQaSnapshot } from './qa-manifest-inputs.mjs';
+import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
 import {
   CONTRACT_MODULE,
   FINDING_TYPES,
@@ -584,5 +588,72 @@ describe('requirement-lint observation shape and schema parity', () => {
     assert.equal(Object.hasOwn(parts, 'timestamp'), false);
     assert.equal(requirementLintPaths('Work-1').directory, `${STATE_ROOT}/Work-1/${LINT_NAMESPACE}`);
     assert.throws(() => requirementLintPaths('../escape'));
+  });
+});
+
+describe('AC3: requirement-lint QA namespace isolation', () => {
+  async function seedGitProject(root) {
+    await mkdir(path.join(root, 'docs'), { recursive: true });
+    await mkdir(path.join(root, '.ai-factory'), { recursive: true });
+    await mkdir(path.join(root, 'openspec', 'changes', 'work'), { recursive: true });
+    await writeFile(path.join(root, '.gitignore'), '.ai-factory/\n');
+    await writeFile(path.join(root, 'docs', 'req.md'), EN_REQ);
+    await writeFile(path.join(root, '.ai-factory', 'config.yaml'), 'aifhub:\n  requirementLint:\n    enabled: true\n');
+    await writeFile(path.join(root, 'openspec', 'changes', 'work', 'proposal.md'), '# Proposal\n\n## Why\n\nQA isolation fixture.\n');
+    await writeFile(path.join(root, 'openspec', 'changes', 'work', 'tasks.md'), '- [ ] 1.1 Task\n');
+    const git = async (args) => execFileAsync('git', args, { cwd: root });
+    await git(['init', '--initial-branch=main']);
+    await git(['config', 'user.email', 'fixture@example.com']);
+    await git(['config', 'user.name', 'fixture']);
+    await git(['add', '.']);
+    await git(['commit', '-m', 'init']);
+    // The state-level runtime gitignore is a pre-existing surface: create it
+    // before enrollment so the first lint write cannot shift ignored_names.
+    await ensureRuntimeGitignore(root, STATE_ROOT);
+    const toolchain = [{ name: 'fixture-node', sha256: digest('node') }];
+    const check = {
+      id: 'check-verify', gate: 'verify', profile: 'declared.v1', dependencies_complete: true,
+      inputs: ['docs'], command: { argv: ['fake'], cwd: '.' }, toolchain, env_inputs: [], requires_observed: false,
+    };
+    const options = {
+      rootDir: root, changeId: 'work', scope: ['docs'], checks: [check], environment: {},
+      providers: {
+        requirements: async () => ({ gates: ['verify'], independent_roles: [], evidence: [] }),
+        toolchain: async () => toolchain,
+      },
+    };
+    assert.equal((await prepareQaManifest(options)).ok, true, 'qa enrollment needs a real git worktree');
+    return options;
+  }
+
+  async function observe(options) {
+    const store = await qaStore(options);
+    const { payload } = await store.manifest();
+    const snapshot = await observeQaSnapshot(store, payload);
+    return {
+      files: Object.keys(snapshot.files).sort(),
+      ignored_names: snapshot.ignored_names,
+      changed_paths: snapshot.changed_paths,
+      digest: snapshot.digest,
+    };
+  }
+
+  it('keeps the QA fingerprint identical across lint write, overwrite, and deletion', async () => {
+    const root = await makeTemp('aif-rl-qa3-');
+    const options = await seedGitProject(root);
+    const before = await observe(options);
+    const argv = ['--change', 'work', '--file', 'docs/req.md', '--write', '--json'];
+    assert.equal(await runRequirementLintCommand(argv, { rootDir: root, output: () => {} }), 0);
+    const afterWrite = await observe(options);
+    assert.deepEqual(afterWrite, before);
+    assert.equal(await runRequirementLintCommand(argv, { rootDir: root, output: () => {} }), 0, 'overwrite of the same-change observation is allowed');
+    const afterOverwrite = await observe(options);
+    assert.deepEqual(afterOverwrite, before);
+    await rm(path.join(root, STATE_ROOT, 'work', LINT_NAMESPACE, 'observation.json'));
+    const afterDelete = await observe(options);
+    assert.deepEqual(afterDelete, before);
+    assert.ok(!before.files.some((p) => p.includes(LINT_NAMESPACE)), 'namespace never enters the projected file catalog');
+    assert.ok(!before.ignored_names.some((p) => p.includes(LINT_NAMESPACE)), 'namespace never enters ignored_names');
+    assert.ok(!before.changed_paths.some((p) => p.includes(LINT_NAMESPACE)), 'namespace never enters changed_paths');
   });
 });
