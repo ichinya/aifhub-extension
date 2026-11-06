@@ -1,0 +1,18 @@
+{
+  "schema": "aifhub.claim_evidence_pairs.v1",
+  "carrier": {
+    "path": "research/research-ru.md"
+  },
+  "checked_scope": "held-out RU quote stays byte-exact",
+  "claims": [
+    {
+      "claim_id": "h1",
+      "claim_ref": "строка 3 исследования",
+      "source_ref": {
+        "path": "sources/spec-ru.md"
+      },
+      "relation": "literal_quote",
+      "quote": "Форма входа ОБЯЗАНА проверять адрес электронной почты перед отправкой."
+    }
+  ]
+}

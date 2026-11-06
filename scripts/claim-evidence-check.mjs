@@ -587,10 +587,12 @@ export function computeCompoundParents(envelope, semantic) {
 }
 
 // Closed-shape normalization of helper findings into semantic assessments.
-// A finding outside the closed verdict shape is never coerced into a
-// verdict: it is dropped with a diagnostic, and the stage degrades to an
-// explicit `failed` outcome — a partial supports set would be dishonest.
-export function normalizeSemanticOutcome(outcome) {
+// A finding outside the closed verdict shape — or naming a claim outside the
+// presented envelope (when the caller provides the presented id set) — is
+// never coerced into a verdict: it is dropped with a diagnostic, and the
+// stage degrades to an explicit `failed` outcome — a partial supports set
+// would be dishonest.
+export function normalizeSemanticOutcome(outcome, knownClaimIds = null) {
   const outcomeReason = outcome.run_status === 'complete'
     ? (outcome.abstained ? 'assessor-abstain' : null)
     : String(outcome.diagnostics.find((entry) => entry.code !== 'assessment-stale')?.code ?? outcome.diagnostics[0]?.code ?? 'unspecified').slice(0, 200);
@@ -600,7 +602,8 @@ export function normalizeSemanticOutcome(outcome) {
   for (const finding of rawAssessments) {
     if (!finding || typeof finding !== 'object' || Array.isArray(finding)
       || !validateClaimId(finding.claim_id) || !SEMANTIC_VERDICTS.includes(finding.verdict)
-      || typeof finding.rationale !== 'string' || finding.rationale.length < 1 || finding.rationale.length > 500) {
+      || typeof finding.rationale !== 'string' || finding.rationale.length < 1 || finding.rationale.length > 500
+      || (knownClaimIds !== null && !knownClaimIds.has(finding.claim_id))) {
       diagnostics.push({ code: 'semantic-assessment-invalid', path: null, detail: 'dropped a finding outside the closed verdict shape' });
       continue;
     }
@@ -719,6 +722,11 @@ export async function validateObservationBinding(rootDir, observation, options =
   // presented claim.
   if ((semantic.run_status === 'failed' || semantic.run_status === 'not_run' || semantic.abstained === true)
     && recordedAssessments.length > 0) {
+    return { ok: false, code: 'observation-invalid' };
+  }
+  // An abstention never claims scanned coverage (mirror of the helper
+  // invariant, enforced on the recorded observation itself).
+  if (semantic.abstained === true && semantic.coverage?.state !== 'none') {
     return { ok: false, code: 'observation-invalid' };
   }
   for (const assessment of recordedAssessments) {
@@ -1168,7 +1176,9 @@ export async function runClaimEvidenceCheckCommand(argv = process.argv.slice(2),
       emit(notRunEnvelope(['sources-limit-exceeded']), parsed.json);
       return 2;
     }
-    const readInputs = [envelope.carrier.path, ...sourcePaths];
+    // The carrier may itself be a presented source: read every unique
+    // presented path exactly once so identity digests never duplicate.
+    const readInputs = [...new Set([envelope.carrier.path, ...sourcePaths])];
     const inputs = [];
     for (const relative of readInputs) {
       const read = await readRequirementDocument(rootDir, relative, options);
@@ -1291,8 +1301,12 @@ export async function runClaimEvidenceCheckCommand(argv = process.argv.slice(2),
       watch,
       now,
     });
-    const semantic = normalizeSemanticOutcome(semanticOutcome);
+    const semantic = normalizeSemanticOutcome(semanticOutcome, new Set(envelope.claims.map((claim) => claim.claim_id)));
     const compound = computeCompoundParents(envelope, semantic);
+    // An abstention keeps the helper's honest coverage contract at the
+    // observation level too: the stage presented nothing, so the section
+    // never claims scanned coverage even when every source was readable.
+    const presentedCoverage = semantic.abstained ? { ...semanticCoverage, state: 'none' } : semanticCoverage;
 
     const combinedDiagnostics = [...semantic.diagnostics, ...semanticOutcome.diagnostics, ...diagnostics];
     if (combinedDiagnostics.length > MAX_DIAGNOSTICS) {
@@ -1314,7 +1328,7 @@ export async function runClaimEvidenceCheckCommand(argv = process.argv.slice(2),
         freshness: semantic.freshness,
         abstained: semantic.abstained,
         outcome_reason: semantic.outcome_reason,
-        coverage: semanticCoverage,
+        coverage: presentedCoverage,
         assessments: semantic.assessments,
       },
       compound,

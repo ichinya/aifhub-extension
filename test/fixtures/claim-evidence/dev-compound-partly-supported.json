@@ -1,0 +1,38 @@
+{
+  "schema": "aifhub.claim_evidence_pairs.v1",
+  "carrier": {
+    "path": "research/research-compound.md"
+  },
+  "checked_scope": "compound claim split into atomic parts",
+  "claims": [
+    {
+      "claim_id": "compound-1",
+      "claim_ref": "research line 3",
+      "source_ref": {
+        "path": "sources/spec-login.md"
+      },
+      "relation": "literal_quote",
+      "quote": "The session MUST expire after 30 minutes of inactivity."
+    },
+    {
+      "claim_id": "part-ok",
+      "parent_claim_id": "compound-1",
+      "claim_ref": "research line 3",
+      "source_ref": {
+        "path": "sources/spec-login.md"
+      },
+      "relation": "literal_quote",
+      "quote": "Failed logins MUST be rate limited to five attempts."
+    },
+    {
+      "claim_id": "part-bad",
+      "parent_claim_id": "compound-1",
+      "claim_ref": "research line 3",
+      "source_ref": {
+        "path": "sources/spec-login.md"
+      },
+      "relation": "literal_quote",
+      "quote": "The login form MUST validate the email using a certified hardware token."
+    }
+  ]
+}

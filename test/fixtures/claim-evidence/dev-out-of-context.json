@@ -1,0 +1,22 @@
+{
+  "schema": "aifhub.claim_evidence_pairs.v1",
+  "carrier": {
+    "path": "research/login-research.md"
+  },
+  "checked_scope": "literal match outside the presented span anchor",
+  "claims": [
+    {
+      "claim_id": "o1",
+      "claim_ref": "research line 3",
+      "source_ref": {
+        "path": "sources/spec-login.md",
+        "span": {
+          "start": 0,
+          "end": 10
+        }
+      },
+      "relation": "literal_quote",
+      "quote": "The login form MUST validate the email before submission."
+    }
+  ]
+}

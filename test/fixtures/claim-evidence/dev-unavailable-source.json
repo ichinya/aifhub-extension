@@ -1,0 +1,25 @@
+{
+  "schema": "aifhub.claim_evidence_pairs.v1",
+  "carrier": {
+    "path": "research/research-unavailable.md"
+  },
+  "checked_scope": "missing and unreadable sources are coverage outcomes",
+  "claims": [
+    {
+      "claim_id": "u1",
+      "claim_ref": "research line 3",
+      "source_ref": {
+        "path": "sources/absent-spec.md"
+      },
+      "relation": "paraphrase"
+    },
+    {
+      "claim_id": "u2",
+      "claim_ref": "research line 3",
+      "source_ref": {
+        "path": "sources/binary-spec.md"
+      },
+      "relation": "paraphrase"
+    }
+  ]
+}

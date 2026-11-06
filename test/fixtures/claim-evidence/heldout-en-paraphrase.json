@@ -1,0 +1,25 @@
+{
+  "schema": "aifhub.claim_evidence_pairs.v1",
+  "carrier": {
+    "path": "research/login-research.md"
+  },
+  "checked_scope": "paraphrase and inference skip the quote check explicitly",
+  "claims": [
+    {
+      "claim_id": "p1",
+      "claim_ref": "research line 3",
+      "source_ref": {
+        "path": "sources/spec-login.md"
+      },
+      "relation": "paraphrase"
+    },
+    {
+      "claim_id": "p2",
+      "claim_ref": "research line 3",
+      "source_ref": {
+        "path": "sources/spec-login.md"
+      },
+      "relation": "inference"
+    }
+  ]
+}
