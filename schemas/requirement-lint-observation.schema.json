@@ -424,6 +424,22 @@
         "override"
       ]
     },
+    "language_options": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "override": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "override"
+      ]
+    },
     "diagnostics": {
       "type": "array",
       "maxItems": 200,
@@ -510,6 +526,7 @@
     "contract",
     "language",
     "language_source",
+    "language_options",
     "diagnostics",
     "worktree_identity",
     "binding",
