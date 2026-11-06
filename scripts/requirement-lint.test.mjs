@@ -716,3 +716,56 @@ describe('requirement-lint corpus evaluation (fixtures + labels)', () => {
     }
   });
 });
+
+describe('requirement-lint config reader compatibility', () => {
+  it('keeps parseToolConfig behavior unchanged when the requirementLint namespace is present', async () => {
+    const { parseToolConfig } = await import('./tool-config.mjs');
+    const withLint = 'config_version: 1\naifhub:\n  tools:\n    openspec: true\n    hlv: false\n    lekalo: false\n  requirementLint:\n    enabled: false\n';
+    const withoutLint = 'config_version: 1\naifhub:\n  tools:\n    openspec: true\n    hlv: false\n    lekalo: false\n';
+    assert.deepEqual(parseToolConfig(withLint), parseToolConfig(withoutLint));
+    // Pre-existing hub-level failure modes are neither softened nor extended.
+    assert.throws(() => parseToolConfig('aifhub:\n  requirementLint:\n    enabled: true\naifhub:\n'), /duplicate_aifhub/);
+    assert.throws(() => parseToolConfig('aifhub:\n\trequirementLint:\n\t\tenabled: true\n'), /unsupported_aifhub|unsupported_tool_config/);
+  });
+
+  it('keeps provider policy parsing unchanged with the new namespace', async () => {
+    const { parseProviderConfig, normalizeProviderPolicies } = await import('./provider-policy.mjs');
+    const base = 'aifhub:\n  providers:\n    hlv:\n      enable: true\n      policy: optional\n';
+    const withLint = `${base}  requirementLint:\n    enabled: false\n`;
+    assert.deepEqual(normalizeProviderPolicies(parseProviderConfig(withLint)), normalizeProviderPolicies(parseProviderConfig(base)));
+  });
+
+  it('registers the optional managed key and keeps the required-keys diff clean', async () => {
+    const manifest = parseStrictJson(await readFile(path.join(REPO_ROOT, 'skills', 'aif-analyze', 'references', 'config-keys.json'), 'utf8'));
+    const entry = manifest.keys.find((item) => item.key === 'aifhub.requirementLint.enabled');
+    assert.ok(entry, 'config-keys must declare aifhub.requirementLint.enabled');
+    assert.equal(entry.required, false, 'the lint opt-in must stay optional');
+    assert.ok(!manifest.keys.some((item) => item.key.startsWith('aifhub.requirementLint.') && item.key !== 'aifhub.requirementLint.enabled'),
+      'policy keys must not be exposed');
+
+    const { buildAnalyzeConfigDiff } = await import('./aif-analyze-config-diff.mjs');
+    const { renderConfigForMode } = await import('./aif-artifact-sync.mjs');
+    const root = await makeTemp('aif-rl-diff-');
+    const rendered = renderConfigForMode('', 'openspec', { analyzeSkillVersion: '0.11.0' });
+    const lines = rendered.split('\n');
+    const hubIndex = lines.findIndex((line) => /^aifhub:$/.test(line));
+    assert.ok(hubIndex >= 0, 'fresh openspec config must contain the aifhub hub');
+    let insertAt = lines.findIndex((line, index) => index > hubIndex && /^\S/.test(line));
+    if (insertAt < 0) insertAt = lines.length;
+    lines.splice(insertAt, 0, '  requirementLint:', '    enabled: false');
+    await mkdir(path.join(root, '.ai-factory'), { recursive: true });
+    await writeFile(path.join(root, '.ai-factory', 'config.yaml'), lines.join('\n'), 'utf8');
+    const diff = await buildAnalyzeConfigDiff({ rootDir: root });
+    assert.equal(diff.ok, true, JSON.stringify(diff.errors ?? []));
+    assert.deepEqual(diff.errors ?? [], []);
+    assert.equal((diff.missing ?? []).length, 0, 'optional lint key must never appear as a missing required key');
+  });
+
+  it('documents the never-auto-enable clause in the analyze skill', async () => {
+    const skill = await readFile(path.join(REPO_ROOT, 'skills', 'aif-analyze', 'SKILL.md'), 'utf8');
+    assert.ok(skill.includes('Preserve existing `aifhub.requirementLint.enabled` values and never enable the requirement ambiguity lint automatically.'));
+    const template = await readFile(path.join(REPO_ROOT, 'skills', 'aif-analyze', 'references', 'config-template.yaml'), 'utf8');
+    assert.ok(template.includes('# requirementLint:'));
+    assert.ok(template.includes('#   enabled: false'));
+  });
+});
