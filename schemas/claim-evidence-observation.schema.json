@@ -183,7 +183,8 @@
                 "enum": [
                   "match",
                   "changed",
-                  "not_declared"
+                  "not_declared",
+                  "unverifiable"
                 ]
               },
               "known_source_revision": {
@@ -280,12 +281,18 @@
                   "type": "integer",
                   "minimum": 0,
                   "maximum": 50
+                },
+                "unverifiable": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 50
                 }
               },
               "required": [
                 "match",
                 "changed",
-                "not_declared"
+                "not_declared",
+                "unverifiable"
               ]
             }
           },

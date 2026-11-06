@@ -309,6 +309,17 @@ describe('claim-evidence command honesty surfaces', () => {
       rootDir: root, assessor: MUST_NOT_RUN, output: (value) => outputs2.push(value),
     }), 2);
     assert.ok(JSON.parse(outputs2.join('')).codes.some((code) => String(code).includes('invalid-envelope')));
+
+    // A span beyond the observation schema's safe-integer maximum is a form
+    // error refused before any read: an unavailable source may never turn it
+    // into an operational (exit 1) failure.
+    const oversizedSpan = pairsEnvelope({ claims: [{ claim_id: 'b2', source_ref: { path: 'docs/absent.md', span: { start: 0, end: 9_007_199_254_740_992 } }, relation: 'literal_quote', quote: QUOTE_OK }] });
+    await writeFile(path.join(root, 'oversized.json'), JSON.stringify(oversizedSpan), 'utf8');
+    const outputs3 = [];
+    assert.equal(await runClaimEvidenceCheckCommand(['--change', 'work', '--pairs', 'oversized.json', '--json'], {
+      rootDir: root, assessor: MUST_NOT_RUN, output: (value) => outputs3.push(value),
+    }), 2);
+    assert.ok(JSON.parse(outputs3.join('')).codes.some((code) => String(code).includes('invalid-envelope')), 'oversized span is refused as an envelope form error even when the source is missing');
   });
 
   it('accepts the envelope over stdin and keeps stdin bounded', async () => {
@@ -403,6 +414,7 @@ describe('claim-evidence structural stage', () => {
       { claim_id: 'u2', source_ref: { path: 'docs/bad.md' }, relation: 'paraphrase' },
       { claim_id: 'u3', source_ref: { path: 'docs/huge.md' }, relation: 'paraphrase' },
       { claim_id: 'u4', source_ref: { path: 'docs/ok.md' }, relation: 'paraphrase' },
+      { claim_id: 'u5', source_ref: { path: 'docs/absent.md' }, relation: 'paraphrase', known_source_revision: `sha256:${'a'.repeat(64)}` },
     ] });
     const exit = await runClaimEvidenceCheckCommand(['--change', 'work', '--stdin', '--json'], {
       rootDir: root, readStdin: async () => Buffer.from(JSON.stringify(envelope), 'utf8'), output: (value) => outputs.push(value),
@@ -414,13 +426,18 @@ describe('claim-evidence structural stage', () => {
     assert.equal(checks.u2, 'source_unavailable', 'fatal UTF-8 is unavailable, not truncated');
     assert.equal(checks.u3, 'truncated', 'over-limit source is the honest truncated outcome');
     assert.equal(checks.u4, 'not_applicable');
+    const revisions = Object.fromEntries(observation.structural.pairs.map((pair) => [pair.claim_id, pair.known_revision]));
+    assert.equal(revisions.u5, 'unverifiable', 'a declared revision whose source cannot be read stays declared-but-unverifiable');
+    assert.equal(revisions.u1, 'not_declared', 'not_declared is reserved for an omitted revision');
+    assert.equal(observation.structural.outcome_summary.by_known_revision.unverifiable, 1);
+    assert.equal(observation.structural.pairs.find((pair) => pair.claim_id === 'u5').known_source_revision, `sha256:${'a'.repeat(64)}`);
     const reasons = Object.fromEntries(observation.structural.missing_sources.map((entry) => [entry.path, entry.reason]));
     assert.equal(reasons['docs/absent.md'], 'file-missing');
     assert.equal(reasons['docs/bad.md'], 'utf8-fatal');
     assert.ok(['file_limit', 'unsafe_file'].includes(reasons['docs/huge.md']), `truncation reason: ${reasons['docs/huge.md']}`);
     assert.equal(observation.semantic.coverage.state, 'partial');
     assert.equal(observation.semantic.coverage.scanned_sources, 1);
-    assert.equal(observation.semantic.coverage.declared_sources, 4);
+    assert.equal(observation.semantic.coverage.declared_sources, 5, 'declared_sources counts presented pairs, and u5 declares a second pair over the absent source');
   });
 
   it('counts a carrier that is itself the only source as one scanned input', async () => {
@@ -1096,6 +1113,15 @@ describe('claim-evidence binding revalidation', () => {
     const foreignDigest = structuredClone(observation);
     foreignDigest.structural.pairs[0].quote_span.document_sha256 = `sha256:${'9'.repeat(64)}`;
     assert.equal((await validateObservationBinding(root, foreignDigest)).ok, false, 'foreign document digest is an internal contradiction');
+    // The recorded span digest must match the actual span bytes: editing only
+    // quote_span.span_sha256 in a saved observation is tampering, not a
+    // freshness verdict (the document digest stays internally consistent).
+    const tamperedSpan = structuredClone(observation);
+    tamperedSpan.structural.pairs[0].quote_span.span_sha256 = `sha256:${'0'.repeat(64)}`;
+    assert.equal((await validateObservationBinding(root, tamperedSpan)).ok, false, 'edited span digest is internal tampering');
+    const editedSpan = structuredClone(observation);
+    editedSpan.structural.pairs[0].quote_span.start += 1;
+    assert.equal((await validateObservationBinding(root, editedSpan)).ok, false, 'a shifted span no longer matches the recorded quote bytes');
     const badCompound = structuredClone(observation);
     badCompound.compound.parents = [{ claim_id: 'ghost', parts: ['c1'], verdict: 'not_supported' }];
     assert.equal((await validateObservationBinding(root, badCompound)).ok, false, 'compound parents must match recorded pairs');

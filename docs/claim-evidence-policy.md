@@ -24,7 +24,7 @@ ai-factory aifhub-claim-evidence-check --change <id> [--enabled true|false] (--p
 
 - Fully deterministic over the raw bytes of the presented inputs only: source existence, exact quote spans for `literal_quote` pairs (`Buffer.indexOf` over raw bytes; UTF-8 byte offsets `[start, end)` plus the sha256 of the raw document bytes and of the span bytes), and known-revision metadata.
 - Closed `quote_check` outcomes: `exact_found`; `literal_match_out_of_context` (defined only when a span anchor was presented — the quote bytes exist in the source but outside the presented anchor); `not_found`; `source_unavailable`; `truncated` (over-limit source); `not_applicable` (`paraphrase`/`inference` skip the quote check explicitly). Input spans with an invalid range are refused, never clamped.
-- Known source-revision metadata is a separate dimension (`match | changed | not_declared`) from the semantic stage's freshness probe: a declared revision that no longer matches the current bytes is recorded as `changed` while freshness stays the probe result.
+- Known source-revision metadata is a separate dimension (`match | changed | not_declared | unverifiable`) from the semantic stage's freshness probe: a declared revision that no longer matches the current bytes is recorded as `changed` while freshness stays the probe result. `not_declared` is reserved for an omitted revision; a declared revision whose source cannot be read is `unverifiable`, never silently `not_declared`.
 - Composite claims are split by the caller into atomic parts (`parent_claim_id`); the engine computes a compound roll-up: a parent inherits `supported` only when every presented part carries a `supports` verdict from a completed, non-abstained semantic stage — an `insufficient`, abstained, or absent part keeps the parent `not_supported`.
 
 ## Semantic stage
@@ -36,7 +36,7 @@ ai-factory aifhub-claim-evidence-check --change <id> [--enabled true|false] (--p
 ## Honesty
 
 - The observation schema `aifhub.claim_evidence_observation.v1` is closed (`diagnostic_only: true`, `authorizes: []`) and keeps separate sections: structural checks, semantic assessments, the semantic stage's execution outcome (`run_status`/`freshness`/`abstained`/`coverage`), and the compound roll-up. A `none` result or a clean structural run means nothing was found in the presented scope only — never readiness, verification, or approval.
-- Editing a carrier, a source, the rubric revision, or the schema contract invalidates a persisted observation: read-time revalidation recomputes the composite binding (worktree identity, carrier digest, exact claim refs and split, source digests, checked scope and truncation marks, transport, rubric/engine/helper/contract revisions, language, exclusion policy) and names the drifted fields; a change during the run marks the outcome `stale`.
+- Editing a carrier, a source, the rubric revision, or the schema contract invalidates a persisted observation: read-time revalidation recomputes the composite binding (worktree identity, carrier digest, exact claim refs and split, source digests, checked scope and truncation marks, transport, rubric/engine/helper/contract revisions, language, exclusion policy), re-derives each recorded quote span from the current source bytes (span bounds, document digest, and the recorded span digest), and names the drifted fields; a change during the run marks the outcome `stale`.
 
 ## State and isolation
 

@@ -63,7 +63,7 @@ export const QUOTE_CHECK_OUTCOMES = Object.freeze([
   'truncated',
   'not_applicable',
 ]);
-export const KNOWN_REVISION_OUTCOMES = Object.freeze(['match', 'changed', 'not_declared']);
+export const KNOWN_REVISION_OUTCOMES = Object.freeze(['match', 'changed', 'not_declared', 'unverifiable']);
 export const SEMANTIC_VERDICTS = Object.freeze(['supports', 'contradicts', 'insufficient']);
 export const RELATIONS = Object.freeze(['literal_quote', 'paraphrase', 'inference']);
 export const usage = 'ai-factory aifhub-claim-evidence-check --change <id> [--enabled true|false] (--pairs <path> | --stdin) [--json] [--write]';
@@ -127,7 +127,10 @@ function validateSpanForm(span) {
   const keys = Object.keys(span);
   if (keys.length !== 2 || !keys.includes('start') || !keys.includes('end')) return false;
   const { start, end } = span;
-  if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start) return false;
+  // The observation schema caps span offsets at the safe-integer maximum, so
+  // the form check matches it before any source read: a missing source may
+  // never turn an oversized span into an operational (exit 1) failure.
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || end < start) return false;
   return true;
 }
 
@@ -440,6 +443,9 @@ export function checkStructuralPair(pair, sourceBytes, sourceSha256, sourceOk, r
   if (!sourceOk) {
     const outcome = sourceOutcomeForRead(read);
     record.quote_check = outcome.quote_check;
+    // A declared revision whose source cannot be read was declared but is
+    // unverifiable: reporting `not_declared` would erase the declaration.
+    if (pair.known_source_revision !== undefined) record.known_revision = 'unverifiable';
     return { record, missing: { path: pair.source_ref.path, reason: outcome.reason } };
   }
   if (pair.known_source_revision !== undefined) {
@@ -822,18 +828,6 @@ export async function validateObservationBinding(rootDir, observation, options =
     return { ok: false, code: 'observation-invalid' };
   }
   const inputsByPath = new Map(recordedInputs.map((input) => [input?.path, input]));
-  for (const pair of recordedPairs) {
-    if (pair?.quote_span === null || pair?.quote_span === undefined) continue;
-    const input = inputsByPath.get(pair.source_path);
-    if (!input || input.kind !== 'file') return { ok: false, code: 'observation-invalid' };
-    const { start, end } = pair.quote_span;
-    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || end > (input.bytes ?? 0)) {
-      return { ok: false, code: 'observation-invalid' };
-    }
-    if (pair.quote_span.document_sha256 !== `sha256:${input.sha256}`) {
-      return { ok: false, code: 'observation-invalid' };
-    }
-  }
   const recordedMissing = observation.structural?.missing_sources ?? [];
   if (recordedPairs.filter((pair) => pair?.quote_check === 'source_unavailable' || pair?.quote_check === 'truncated').length > 0
     && (recordedMissing.length === 0 || (semantic.coverage?.state === 'full'))) {
@@ -843,6 +837,7 @@ export async function validateObservationBinding(rootDir, observation, options =
   // recorded observation itself): an edited or renamed input must name its
   // field and flip the recomputed binding.
   const freshRecords = [];
+  const freshByPath = new Map();
   for (const input of recordedInputs) {
     const read = await readRequirementDocument(root, input.path, options);
     freshRecords.push({
@@ -851,6 +846,29 @@ export async function validateObservationBinding(rootDir, observation, options =
       bytes: read.bytes?.length ?? 0,
       kind: read.kind,
     });
+    freshByPath.set(input.path, read.ok ? { bytes: read.bytes, sha256: digest(read.bytes) } : null);
+  }
+  // Quote spans must sit inside the recorded source bytes and carry the
+  // recorded document digest. When the current disk bytes still match the
+  // recorded document digest, the recorded span digest must also match the
+  // actual span bytes: a saved observation whose quote_span.span_sha256 was
+  // edited is internal tampering, not a freshness verdict.
+  for (const pair of recordedPairs) {
+    if (pair?.quote_span === null || pair?.quote_span === undefined) continue;
+    const input = inputsByPath.get(pair.source_path);
+    if (!input || input.kind !== 'file') return { ok: false, code: 'observation-invalid' };
+    const { start, end } = pair.quote_span;
+    if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || end < start || end > (input.bytes ?? 0)) {
+      return { ok: false, code: 'observation-invalid' };
+    }
+    if (pair.quote_span.document_sha256 !== `sha256:${input.sha256}`) {
+      return { ok: false, code: 'observation-invalid' };
+    }
+    const fresh = freshByPath.get(pair.source_path);
+    if (fresh !== null && fresh !== undefined && fresh.sha256 === input.sha256
+      && pair.quote_span.span_sha256 !== `sha256:${digest(fresh.bytes.subarray(start, end))}`) {
+      return { ok: false, code: 'observation-invalid' };
+    }
   }
   const context = await currentClaimEvidenceContext(root, freshRecords, options);
   for (const digestRecord of context.inputDigests) {
