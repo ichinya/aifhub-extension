@@ -167,6 +167,13 @@ const WRAPPER_COMMANDS = [
     module: './commands/aifhub-docs-readability.mjs',
     script: 'docs-readability.mjs',
     args: ['--change', 'add-oauth', '--enabled', 'true', '--file', 'docs/usage.md', '--json']
+  },
+  {
+    name: 'aifhub-requirement-lint',
+    description: 'Run opt-in advisory requirement ambiguity diagnostics for presented requirement sources without changing evidence or authorizing progression.',
+    module: './commands/aifhub-requirement-lint.mjs',
+    script: 'requirement-lint.mjs',
+    args: ['--change', 'add-oauth', '--enabled', 'true', '--file', 'openspec/changes/add-oauth/proposal.md', '--json']
   }
 ];
 
@@ -686,7 +693,8 @@ describe('AIFHub wrapper guidance contract', () => {
         'ai-factory aifhub-migrate-legacy-plans --all --dry-run'
       ]],
       ['injections/core/aif-improve-plan-folder.md', [
-        'ai-factory aifhub-migrate-legacy-plans <change-id> --dry-run'
+        'ai-factory aifhub-migrate-legacy-plans <change-id> --dry-run',
+        'ai-factory aifhub-requirement-lint --change <change-id> --enabled true'
       ]],
       ['injections/core/aif-implement-plan-folder.md', [
         'ai-factory aifhub-migrate-legacy-plans <change-id> --dry-run'
@@ -695,7 +703,8 @@ describe('AIFHub wrapper guidance contract', () => {
         'ai-factory aifhub-migrate-legacy-plans <change-id> --dry-run'
       ]],
       ['injections/core/aif-plan-plan-folder.md', [
-        'ai-factory aifhub-mode status --json'
+        'ai-factory aifhub-mode status --json',
+        'ai-factory aifhub-requirement-lint --change <change-id> --enabled true'
       ]],
       ['agent-files/codex/aifhub-plan-polisher.toml', [
         'ai-factory aifhub-mode status --json'

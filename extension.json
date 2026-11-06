@@ -128,6 +128,11 @@
       "name": "aifhub-docs-readability",
       "description": "Run opt-in non-blocking readability diagnostics for documents bound to an OpenSpec change without changing evidence or authorizing progression.",
       "module": "./commands/aifhub-docs-readability.mjs"
+    },
+    {
+      "name": "aifhub-requirement-lint",
+      "description": "Run opt-in advisory requirement ambiguity diagnostics for presented requirement sources without changing evidence or authorizing progression.",
+      "module": "./commands/aifhub-requirement-lint.mjs"
     }
   ],
   "skills": [

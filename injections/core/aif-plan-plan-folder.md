@@ -146,6 +146,19 @@ Reconcile requirements before exploring an implementation:
 
 Add an exact `## Requirements Reconciliation` section to `proposal.md` when multiple authoritative sources materially constrain the work, a conflict was resolved by an explicit user or project decision, independent behavior dimensions exist, or a representative real artifact is required. Keep it compact: declared authority, cited decisions with source paths, the applicable combination table, and verification evidence. Omit the complete heading and body for simple work where none of these signals applies; never emit a placeholder section. The heading is a fixed English compatibility token parsed by downstream workflow checks: do not translate or rename it, and preserve an existing section verbatim during replanning.
 
+#### Optional requirement ambiguity lint (opt-in, advisory)
+
+- OpenSpec-native only; legacy classic mode never runs this scan. This scan never replaces `## Requirements Reconciliation`, requirement reconciliation gates, or the upstream conflict STOP semantics: a `suspected_requirement_revision_conflict` finding describes suspected ambiguity inside one presented requirement with exactly two source refs and never authorizes editing requirements or deciding for the owner. Cross-source plan-level conflicts stay with the reconciliation gate.
+- Run the scan only when the user enabled it (`aifhub.requirementLint.enabled: true`); never enable it automatically and skip it entirely without an explicit opt-in. Invoke only the installed command:
+
+```bash
+ai-factory aifhub-requirement-lint --change <change-id> --enabled true --file <requirement-source> [--file <requirement-source> ...] --json
+```
+
+- Scan only requirement sources the user or the planning context explicitly presented. Every finding cites an exact source ref and carries a proposed clarifying question: present that question to the user instead of answering it; never insert a numeric SLA, never rewrite the requirement text, never send questions automatically, and never edit canonical artifacts from the lint output.
+- A `none` result means nothing was found in the presented scope only; it is never a readiness, verification, or approval signal. When the lint is disabled, unavailable, or reports a failed, stale, or partial-coverage run, state `advisory scan was not performed` with the bounded reason and continue with unchanged planning behavior; this neither blocks nor unblocks a required gate.
+- Skip findings whose exact source refs were already surfaced by `## Requirements Reconciliation` or an upstream reconciliation gate instead of presenting them twice. When a reconciliation gate already stopped the workflow, a skipped or not-performed scan is not a no-problems signal.
+
 After preserving the raw request, normalize the task into these fields:
 
 - task type
