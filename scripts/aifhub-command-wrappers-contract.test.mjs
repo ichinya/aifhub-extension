@@ -714,6 +714,14 @@ describe('AIFHub wrapper guidance contract', () => {
         'ai-factory aifhub-mode status --json',
         'ai-factory aifhub-requirement-lint --change <change-id> --enabled true'
       ]],
+      ['injections/core/aif-explore-plan-folder.md', [
+        'ai-factory aifhub-claim-evidence-check --change <change-id> --enabled true --stdin --json',
+        'without `--write`'
+      ]],
+      ['injections/core/aif-review-context-providers.md', [
+        'ai-factory aifhub-claim-evidence-check --change <change-id> --enabled true --stdin --json',
+        'without `--write`'
+      ]],
       ['agent-files/codex/aifhub-plan-polisher.toml', [
         'ai-factory aifhub-mode status --json'
       ]],
