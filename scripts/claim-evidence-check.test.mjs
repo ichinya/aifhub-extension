@@ -1370,7 +1370,8 @@ describe('claim-evidence registration contracts', () => {
     const descriptionMatch = /const DESCRIPTION = '([^']+)'/.exec(wrapper);
     assert.ok(descriptionMatch, 'wrapper must pin DESCRIPTION');
     assert.equal(manifest.version, '1.8.1', 'the extension version is never bumped by this change');
-    assert.equal(manifest.commands.length, 27, 'one command added on top of #281 (26 -> 27)');
+    // reason: per-consumer registration edit — #283 added aifhub-trace-link-suggestions (27 -> 28)
+    assert.equal(manifest.commands.length, 28, 'one command added on top of #281 (26 -> 27) and #283 (27 -> 28)');
     assert.ok(contract.includes("name: 'aifhub-claim-evidence-check'"));
     assert.ok(contract.includes(descriptionMatch[1]));
     assert.equal(command.description, descriptionMatch[1], 'extension.json and wrapper descriptions must be byte-identical');
@@ -1392,14 +1393,14 @@ describe('claim-evidence registration contracts', () => {
     assert.equal(improve.includes('aifhub-claim-evidence-check'), false);
   });
 
-  it('pins the skill-file version contract at 0.19.0 in both contract tests', async () => {
+  it('pins the skill-file version contract at 0.20.0 in both contract tests', async () => {
     const skill = await readFile(path.join(REPO_ROOT, 'skills', 'aif-analyze', 'SKILL.md'), 'utf8');
-    assert.match(skill, /^version: 0\.19\.0$/m);
+    assert.match(skill, /^version: 0\.20\.0$/m);
     const reviewPolicy = await readFile(path.join(REPO_ROOT, 'scripts', 'review-policy-contract.test.mjs'), 'utf8');
-    assert.ok(reviewPolicy.includes("'version: 0.19.0'"), 'review-policy pin must target 0.19.0');
+    assert.ok(reviewPolicy.includes("'version: 0.20.0'"), 'review-policy pin must target 0.20.0');
     assert.ok(reviewPolicy.includes('#282'), 'review-policy pin must carry its own #282 reason comment');
     const compat = await readFile(path.join(REPO_ROOT, 'scripts', 'openspec-1-12-compatibility.test.mjs'), 'utf8');
-    assert.match(compat, /version: 0\\\.19\\\.0/);
+    assert.match(compat, /version: 0\\\.20\\\.0/);
   });
 
   it('registers the optional managed key and keeps the required-keys diff clean', async () => {

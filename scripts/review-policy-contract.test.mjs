@@ -89,7 +89,8 @@ describe('durable project review policy', () => {
 
     for (const expected of [
       // reason: claim-evidence opt-in registration bumped aif-analyze 0.17.0 -> 0.19.0 (claimEvidence namespace documentation, #282; the in-flight #281 tail's 0.18.0 bump was never committed, so main carries 0.17.0)
-      'version: 0.19.0',
+      // reason: trace-link-suggestions opt-in registration bumped aif-analyze 0.19.0 -> 0.20.0 (traceLinkSuggestions namespace documentation, #283)
+      'version: 0.20.0',
       '### Step 3.3: Project Review Policy',
       '`reviews.policy_file`',
       'use `REVIEW.md` when the key is missing or empty',

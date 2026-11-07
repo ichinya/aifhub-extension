@@ -117,7 +117,12 @@ async function observeQaSnapshotInner(store, payload, options = {}) {
   // git-guarded pre-write, so the default-root namespace below is the only
   // surface to exclude.
   const claimEvidenceNamespace = p => within(p, `.ai-factory/state/${payload.target.id}/claim-evidence`);
-  const closedNamespace = p => compositionsNamespace(p) || readabilityNamespace(p) || requirementLintNamespace(p) || claimEvidenceNamespace(p);
+  // Closed runtime namespace (#283): advisory trace-link suggestion
+  // observations follow the same rule; the writer refuses custom state roots
+  // and is git-guarded pre-write, so the default-root namespace below is the
+  // only surface to exclude.
+  const traceLinkSuggestionsNamespace = p => within(p, `.ai-factory/state/${payload.target.id}/trace-link-suggestions`);
+  const closedNamespace = p => compositionsNamespace(p) || readabilityNamespace(p) || requirementLintNamespace(p) || claimEvidenceNamespace(p) || traceLinkSuggestionsNamespace(p);
   const names = Object.keys(observed.files).filter(p => !closedNamespace(p));
   requireValue(names.length <= QA_LIMITS.files, 'qa-files-limit', true);
   const collision = new Map();
@@ -229,7 +234,8 @@ async function filesystemSnapshot(store, payload, options) {
     || within(p, `.ai-factory/state/${payload.target.id}/compositions`)
     || within(p, `.ai-factory/state/${payload.target.id}/readability`)
     || within(p, `.ai-factory/state/${payload.target.id}/requirement-lint`)
-    || within(p, `.ai-factory/state/${payload.target.id}/claim-evidence`);
+    || within(p, `.ai-factory/state/${payload.target.id}/claim-evidence`)
+    || within(p, `.ai-factory/state/${payload.target.id}/trace-link-suggestions`);
   const visible = (await git(['ls-files', '--cached', '--others', '--exclude-standard', '-z'])).split('\0').filter(Boolean);
   // Closed namespaces are excluded before the catalog limits: a flood of
   // gitignored paths under compositions/ must not fail the snapshot when the

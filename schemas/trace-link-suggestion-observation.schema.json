@@ -1,0 +1,870 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Trace link suggestion observation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "aifhub.trace_link_suggestions_observation.v1"
+    },
+    "change_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^[a-z0-9][a-z0-9-]{0,99}$"
+    },
+    "generated_at": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "diagnostic_only": {
+      "const": true
+    },
+    "authorizes": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "language": {
+      "enum": [
+        "ru",
+        "en",
+        "unknown"
+      ]
+    },
+    "language_source": {
+      "enum": [
+        "detected",
+        "override"
+      ]
+    },
+    "language_options": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "override": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "override"
+      ]
+    },
+    "structural": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "trace": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "schema_version": {
+              "const": "lekalo/trace-manifest/v0.2.16"
+            },
+            "identity": {
+              "const": "dev.lekalo.trace-manifest@0.2.16"
+            },
+            "completeness": {
+              "enum": [
+                "full",
+                "partial"
+              ]
+            },
+            "manifest_digest": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "path",
+            "sha256",
+            "bytes",
+            "schema_version",
+            "identity",
+            "completeness",
+            "manifest_digest"
+          ]
+        },
+        "scan": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "coverage": {
+              "enum": [
+                "full",
+                "partial",
+                "none"
+              ]
+            },
+            "declared_sources": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            },
+            "scanned_sources": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            },
+            "missing_sources": {
+              "type": "array",
+              "maxItems": 100,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "path",
+                  "reason"
+                ]
+              }
+            }
+          },
+          "required": [
+            "coverage",
+            "declared_sources",
+            "scanned_sources",
+            "missing_sources"
+          ]
+        },
+        "outcome": {
+          "enum": [
+            "candidate",
+            "related_only",
+            "none",
+            "abstain"
+          ]
+        },
+        "outcome_summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "total_nodes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 500
+            },
+            "total_edges": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            "by_outcome": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "candidate": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "related_only": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                }
+              },
+              "required": [
+                "candidate",
+                "related_only"
+              ]
+            }
+          },
+          "required": [
+            "total_nodes",
+            "total_edges",
+            "by_outcome"
+          ]
+        },
+        "nodes": {
+          "type": "array",
+          "maxItems": 500,
+          "items": {
+            "$ref": "#/$defs/graph_node"
+          }
+        },
+        "edges": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": {
+            "$ref": "#/$defs/graph_edge"
+          }
+        }
+      },
+      "required": [
+        "trace",
+        "scan",
+        "outcome",
+        "outcome_summary",
+        "nodes",
+        "edges"
+      ]
+    },
+    "semantic": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "run_status": {
+          "enum": [
+            "complete",
+            "failed",
+            "not_run"
+          ]
+        },
+        "freshness": {
+          "enum": [
+            "current",
+            "stale"
+          ]
+        },
+        "abstained": {
+          "type": "boolean"
+        },
+        "outcome_reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200
+        },
+        "coverage": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "enum": [
+                "full",
+                "partial",
+                "none"
+              ]
+            },
+            "declared_sources": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            },
+            "scanned_sources": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            },
+            "missing_sources": {
+              "type": "array",
+              "maxItems": 100,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "path",
+                  "reason"
+                ]
+              }
+            }
+          },
+          "required": [
+            "state",
+            "declared_sources",
+            "scanned_sources",
+            "missing_sources"
+          ]
+        },
+        "assessments": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "edge_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^edge-[0-9]{1,8}$"
+              },
+              "verdict": {
+                "enum": [
+                  "supports",
+                  "contradicts",
+                  "insufficient"
+                ]
+              },
+              "rationale": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              }
+            },
+            "required": [
+              "edge_id",
+              "verdict",
+              "rationale"
+            ]
+          }
+        }
+      },
+      "required": [
+        "run_status",
+        "freshness",
+        "abstained",
+        "outcome_reason",
+        "coverage",
+        "assessments"
+      ]
+    },
+    "inputs": {
+      "type": "array",
+      "maxItems": 150,
+      "items": {
+        "$ref": "#/$defs/source_input"
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "path": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "code",
+          "path",
+          "detail"
+        ]
+      }
+    },
+    "worktree_identity": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "binding": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "rubric": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "id",
+        "version"
+      ]
+    },
+    "relation_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "relations": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "relation": {
+                "enum": [
+                  "requirement_symbol",
+                  "symbol_scenario",
+                  "symbol_test",
+                  "scenario_test"
+                ]
+              },
+              "from_kind": {
+                "$ref": "#/$defs/node_kind"
+              },
+              "to_kind": {
+                "$ref": "#/$defs/node_kind"
+              }
+            },
+            "required": [
+              "relation",
+              "from_kind",
+              "to_kind"
+            ]
+          }
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "relations"
+      ]
+    },
+    "exclusion_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "id",
+        "version"
+      ]
+    },
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "module": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "parser_version": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "module",
+        "sha256",
+        "parser_version"
+      ]
+    },
+    "helper": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "module": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "module",
+        "sha256"
+      ]
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "const": "aifhub.trace_link_suggestions_observation.v1"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "name",
+        "sha256"
+      ]
+    },
+    "graph_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_nodes": {
+          "const": 500
+        },
+        "max_edges": {
+          "const": 1000
+        },
+        "max_total_elements": {
+          "const": 1500
+        },
+        "max_assertion_refs_per_edge": {
+          "const": 50
+        },
+        "max_observation_bytes": {
+          "const": 1048576
+        },
+        "max_diagnostics": {
+          "const": 200
+        }
+      },
+      "required": [
+        "max_nodes",
+        "max_edges",
+        "max_total_elements",
+        "max_assertion_refs_per_edge",
+        "max_observation_bytes",
+        "max_diagnostics"
+      ]
+    }
+  },
+  "required": [
+    "schema",
+    "change_id",
+    "generated_at",
+    "diagnostic_only",
+    "authorizes",
+    "language",
+    "language_source",
+    "language_options",
+    "structural",
+    "semantic",
+    "inputs",
+    "diagnostics",
+    "worktree_identity",
+    "binding",
+    "rubric",
+    "relation_policy",
+    "exclusion_policy",
+    "engine",
+    "helper",
+    "contract",
+    "graph_limits"
+  ],
+  "$defs": {
+    "node_kind": {
+      "enum": [
+        "requirement",
+        "semantic_symbol",
+        "scenario",
+        "test"
+      ]
+    },
+    "byte_span": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "start": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "end": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ]
+    },
+    "span_anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "span": {
+          "$ref": "#/$defs/byte_span"
+        },
+        "document_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "span_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "path",
+        "span",
+        "document_sha256",
+        "span_sha256"
+      ]
+    },
+    "graph_node": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "node_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "kind": {
+          "$ref": "#/$defs/node_kind"
+        },
+        "exact_ref": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "spec_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "requirement_ref": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
+              },
+              "required": [
+                "spec_path",
+                "requirement_ref"
+              ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "symbol_ref": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256,
+                  "pattern": "^(operation|endpoint):[A-Za-z0-9][A-Za-z0-9._:-]*$"
+                }
+              },
+              "required": [
+                "symbol_ref"
+              ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "spec_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "requirement_ref": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "heading": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "span": {
+                  "$ref": "#/$defs/byte_span"
+                },
+                "document_sha256": {
+                  "type": "string",
+                  "pattern": "^sha256:[a-f0-9]{64}$"
+                },
+                "span_sha256": {
+                  "type": "string",
+                  "pattern": "^sha256:[a-f0-9]{64}$"
+                }
+              },
+              "required": [
+                "spec_path",
+                "requirement_ref",
+                "heading",
+                "span",
+                "document_sha256",
+                "span_sha256"
+              ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^sha256:[a-f0-9]{64}$"
+                }
+              },
+              "required": [
+                "path",
+                "sha256"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "node_id",
+        "kind",
+        "exact_ref"
+      ]
+    },
+    "graph_edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "edge_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^edge-[0-9]{1,8}$"
+        },
+        "from_node_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "to_node_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "relation": {
+          "enum": [
+            "requirement_symbol",
+            "symbol_scenario",
+            "symbol_test",
+            "scenario_test"
+          ]
+        },
+        "outcome": {
+          "enum": [
+            "candidate",
+            "related_only"
+          ]
+        },
+        "behavioral_assertion_refs": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "$ref": "#/$defs/span_anchor"
+          }
+        }
+      },
+      "required": [
+        "edge_id",
+        "from_node_id",
+        "to_node_id",
+        "relation",
+        "outcome",
+        "behavioral_assertion_refs"
+      ]
+    },
+    "source_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "kind": {
+          "enum": [
+            "file",
+            "missing",
+            "malformed"
+          ]
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "kind"
+      ]
+    }
+  }
+}
