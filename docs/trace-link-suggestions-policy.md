@@ -1,0 +1,44 @@
+[Back to Documentation](README.md)
+
+# Trace Link Suggestions Policy
+
+Opt-in, advisory read-only producer of semantic link suggestions `requirement -> semantic symbol -> scenario/test` for OpenSpec-native `/aif-review` and `/aif-improve` (issue #283). The producer is a structural diagnostic, never a verifier and never proof coverage: it never changes evidence, never authorizes progression, never writes `coverage.json`, QA status, or gate results, and never replaces review findings or the requirements reconciliation. A topic match tops out at `related_only`; a `candidate` outcome still requires the user's review decision.
+
+## Command
+
+```text
+ai-factory aifhub-trace-link-suggestions --change <id> [--enabled true|false] [--test <path> ...] [--json] [--write]
+```
+
+- Opt-in: the producer is off by default. Enable per run with `--enabled true|false`, or persist `aifhub.traceLinkSuggestions.enabled: true` under `aifhub:` in `.ai-factory/config.yaml`. Precedence: CLI override > config key > `false`, and it is never enabled automatically. A run without opt-in reports the `not_run` envelope ("advisory scan was not performed", exit 0) and performs no reads beyond the bounded config read that evaluates the switch itself; it never becomes a required-gate failure.
+- Malformed `traceLinkSuggestions` namespace forms the config parser detects explicitly (duplicate keys, `<<` merge keys, `&` anchors, `*` aliases, flow mappings, quoted booleans, unknown nested keys, scalarized sections) keep the producer off with bounded `trace-link-suggestions:<code>` diagnostics.
+- Custody model: the advisory hooks on review and improve invoke the command as a **preview without writing** (no `--write`). Persisting the observation is a separate authorized writer action: an explicit `--write` run. Exit 0 means an honest outcome was formed (including suggestions, degradations, and `not_run` trace outcomes); exit 2 is an invalid invocation or a typed candidate refusal; exit 1 is an operational failure. No exit code participates in verify/done/archive chains.
+
+## Inputs and custody
+
+- Requirements come from the canonical change artifacts of `--change <id>` only (delta specs); base specs are outside the P0 presented scope. Scenarios resolve to the exact `#### Scenario:` heading with a byte span plus raw-document and span SHA-256 over the raw spec bytes (CR/LF/CRLF safe, multibyte offsets).
+- The trace manifest `.ai-factory/traces/<change-id>/lekalo-trace-manifest.json` is read by the engine's own custody reader: only the change's own custody directory, the 32 MiB export limit, and symlink/hardlink refusal. The envelope `{trace, manifestDigest}` is accepted only with the self-checks of the frozen trace normalizer (schema version, identity, digest binding, completeness ⇔ gaps invariant) and the closed engine-owned structural schema for nodes, relations, and gaps. Any refusal is an honest `not_run` with a bounded code — `trace-missing`, `trace-custody`, `export-overflow`, `trace-invalid`, `trace-changed` — never an interpretation of an unknown form and never an empty "success" list.
+- Tests enter the scan only as presented repeatable `--test <path>` inputs; the allowlist is fixed from the presented inputs before any read, and the engine never scans the repository for tests. URLs and paths inside requirement text are data: they never extend the allowlist, never trigger a fetch, and never become a read.
+- In P0 the node/relation format of the trace export is defined by the engine-owned schema plus the fake fixtures (`test/fixtures/trace-link-suggestions/`); no golden file of a live Lekalo export exists. When a live Lekalo appears, the format contract must be re-verified against a real export.
+
+## Suggestions and outcomes
+
+- The observation carries a closed typed graph: `nodes[]` (`requirement | semantic_symbol | scenario | test`, each with a kind-specific exact ref resolved before emit) and `edges[]` (closed relation dictionary `requirement_symbol | symbol_scenario | symbol_test | scenario_test` with pinned kind pairs). N:M links are expressed as explicit edges without cross-product; dedup merges only fully identical typed edges.
+- Every ref is resolved to a real artifact before emit: requirements against the change's parsed delta specs (exact titles, never slugs), symbols against parsed trace nodes, scenarios against exact headings with span digests (duplicate headings are a typed `ambiguous-scenario-ref` refusal, never a first match), tests against the presented files. Unresolvable refs, dangling endpoints, unknown relations, invalid kind pairs, and unsupported policy versions are typed `invalid-candidate:<reason>` refusals (exit 2).
+- Per-edge outcomes are the closed set `candidate | related_only`: a `candidate` requires behavioral anchors — byte spans in the presented test bytes (or the resolved scenario span) that sit outside comments and string literals. A topic-only match stays `related_only`; the lexical level is a topic match, not coverage, and the stopword list is English-only (no RU/EN neutrality is claimed for it).
+- The section-level structural outcome is `candidate | related_only | none | abstain`: `none` only after a full scan with zero suggestions; any partial availability (partial trace completeness, unreadable presented test, graph truncation) degrades to `abstain` — a partial scan never reports `none`. The semantic stage runs through the shared typed-assessment helper with a DI assessor seam; without a live provider it reports an honest `not_run` and the structural section survives untouched.
+
+## State and isolation
+
+- With explicit `--write` the observation `aifhub.trace_link_suggestions_observation.v1` (closed schema, `diagnostic_only: true`, `authorizes: []`) is saved only under `.ai-factory/state/<change-id>/trace-link-suggestions/observation.json` through guarded state-only writes: QA namespace conflicts, source collisions with the destination, file-shadow ancestors, and foreign leaves are refused, and only a previous schema-valid observation of the same change may be replaced. A custom `paths.state` is refused (`state-root-mismatch`) because the QA projection covers only the default state root. The change id must match the custody-safe form `^[a-z0-9][a-z0-9-]{0,99}$` (`invalid-change-id` otherwise).
+- The pre-write git guard refuses a tracked or not-effectively-ignored output for both the observation and the namespace `.gitignore` (the QA snapshot's `actual_diff` channel is unfiltered). The `trace-link-suggestions` namespace is a closed runtime namespace in the QA snapshot projection (all projection points, injected providers included), so writing, overwriting, or deleting an observation cannot shift the required QA fingerprint.
+- Editing a spec, a presented test, the trace manifest, the rubric, the relation policy, the engine/helper/contract revisions, or the recorded candidate payload invalidates a persisted observation: read-time revalidation recomputes the composite binding (worktree identity, trace raw bytes and validated export digest, input digests, full candidate payload digest, graph limits, rubric/relation policy, parser revision, language, exclusion policy), names the drifted fields, and marks the observation stale; a change during the run marks the outcome `stale` through the freshness probe.
+- Acceptance of a suggestion runs only through the existing review/owner workflow: the recorded candidate payload is revalidated immediately before use, and a stale, missing, or ambiguous payload means the suggestion must be refreshed — agreement with an old payload never carries over. Transit decisions are not stored in `REVIEW.md`; the observation stays a runtime-state advisory artifact until the owner acts through an authorized workflow.
+- Advisory only: no `aif-gate-result`, no QA writes, no entry into done-readiness, provider policy, or runner metrics; review findings and the upstream validator are never replaced. Boundary with ClaimEvidenceCheck (#282): that check verifies presented claim↔source pairs on research/review; this producer suggests link gaps on review/improve. A live model provider stays a separate opt-in phase with its own budget, secret exclusion, and egress design.
+
+## See Also
+
+- [Documentation Index](README.md)
+- [Claim Evidence Policy](claim-evidence-policy.md)
+- [Requirement Lint Policy](requirement-lint-policy.md)
+- [Project Review Policy](review-policy.md)
