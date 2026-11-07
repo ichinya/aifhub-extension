@@ -1,0 +1,23 @@
+{
+  "trace": {
+    "schemaVersion": "lekalo/trace-manifest/v0.2.16",
+    "identity": "dev.lekalo.trace-manifest@0.2.16",
+    "completeness": "full",
+    "nodes": [
+      {
+        "symbol": "requirement:Twin"
+      },
+      {
+        "symbol": "operation:twin.thing"
+      }
+    ],
+    "relations": [
+      {
+        "from": "requirement:Twin",
+        "to": "operation:twin.thing"
+      }
+    ],
+    "gaps": []
+  },
+  "manifestDigest": "sha256:bea64797dbd0db0b30df35f988cacd7076ccc5432c3975723b725309547a5052"
+}

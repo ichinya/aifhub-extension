@@ -1,0 +1,35 @@
+{
+  "trace": {
+    "schemaVersion": "lekalo/trace-manifest/v0.2.16",
+    "identity": "dev.lekalo.trace-manifest@0.2.16",
+    "completeness": "partial",
+    "nodes": [
+      {
+        "symbol": "requirement:AuthOptIn"
+      },
+      {
+        "symbol": "scenario:AuthLoginHappy"
+      },
+      {
+        "symbol": "operation:auth.login"
+      }
+    ],
+    "relations": [
+      {
+        "from": "requirement:AuthOptIn",
+        "to": "operation:auth.login"
+      },
+      {
+        "from": "operation:auth.login",
+        "to": "scenario:AuthLoginHappy"
+      }
+    ],
+    "gaps": [
+      {
+        "symbol": "operation:auth.gap",
+        "reason": "unwired"
+      }
+    ]
+  },
+  "manifestDigest": "sha256:74689feb732ba3829bc9a47128bf30c2dfa883273f48ce70d461585b8d3cb93b"
+}

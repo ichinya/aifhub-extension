@@ -49,6 +49,11 @@ aifhub:
   # `--enabled true|false` on `ai-factory aifhub-claim-evidence-check`.
   # claimEvidence:
   #   enabled: false
+  # Optional advisory trace link suggestions (issue #283); default is
+  # false and it must never be enabled automatically. The CLI override is
+  # `--enabled true|false` on `ai-factory aifhub-trace-link-suggestions`.
+  # traceLinkSuggestions:
+  #   enabled: false
 # OpenSpec-native mode writes its own aifhub settings profile only when
 # aifhub.tools.openspec is true.
 

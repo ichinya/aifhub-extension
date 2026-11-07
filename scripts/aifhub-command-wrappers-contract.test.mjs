@@ -181,6 +181,13 @@ const WRAPPER_COMMANDS = [
     module: './commands/aifhub-claim-evidence-check.mjs',
     script: 'claim-evidence-check.mjs',
     args: ['--change', 'add-oauth', '--enabled', 'true', '--pairs', 'docs/research-claims.json', '--json']
+  },
+  {
+    name: 'aifhub-trace-link-suggestions',
+    description: 'Run opt-in advisory trace link suggestions over the closed typed graph of requirements, symbols, scenarios, and tests without changing evidence or authorizing progression.',
+    module: './commands/aifhub-trace-link-suggestions.mjs',
+    script: 'trace-link-suggestions.mjs',
+    args: ['--change', 'add-oauth', '--enabled', 'true', '--test', 'test/auth.spec.mjs', '--json']
   }
 ];
 
@@ -703,7 +710,9 @@ describe('AIFHub wrapper guidance contract', () => {
       ]],
       ['injections/core/aif-improve-plan-folder.md', [
         'ai-factory aifhub-migrate-legacy-plans <change-id> --dry-run',
-        'ai-factory aifhub-requirement-lint --change <change-id> --enabled true'
+        'ai-factory aifhub-requirement-lint --change <change-id> --enabled true',
+        'ai-factory aifhub-trace-link-suggestions --change <change-id> --enabled true --test <test-path> [--test <test-path> ...] --json',
+        'without `--write`'
       ]],
       ['injections/core/aif-implement-plan-folder.md', [
         'ai-factory aifhub-migrate-legacy-plans <change-id> --dry-run'
@@ -721,7 +730,8 @@ describe('AIFHub wrapper guidance contract', () => {
       ]],
       ['injections/core/aif-review-context-providers.md', [
         'ai-factory aifhub-claim-evidence-check --change <change-id> --enabled true --stdin --json',
-        'without `--write`'
+        'without `--write`',
+        'ai-factory aifhub-trace-link-suggestions --change <change-id> --enabled true --test <test-path> [--test <test-path> ...] --json'
       ]],
       ['agent-files/codex/aifhub-plan-polisher.toml', [
         'ai-factory aifhub-mode status --json'
