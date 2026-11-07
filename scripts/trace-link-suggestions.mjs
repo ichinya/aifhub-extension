@@ -642,7 +642,10 @@ export function maskCodeRegions(bytes, mode = 'js') {
     }
     masked[index] = 1;
     if (state === 'line-comment') {
-      if (byte === 0x0A || byte === 0x0D) { masked[index] = 0; state = 'code'; }
+      // A comment can start inside a template interpolation: its end restores
+      // the enclosing context, otherwise the closing `}` of the interpolation
+      // would be read as code and the literal tail after it unmasked.
+      if (byte === 0x0A || byte === 0x0D) { masked[index] = 0; state = enclosingState(); }
     } else if (state === 'block-comment') {
       if (byte === 0x2A && next === 0x2F) { masked[index + 1] = 1; state = enclosingState(); index += 1; }
     } else if (byte === 0x5C) {
@@ -765,7 +768,7 @@ export function validateGraphShape(graph, options = {}) {
 export function assertStructuralInvariants(observation) {
   const structural = observation?.structural;
   if (!structural) throw new TypeError('missing structural section');
-  const { scan, outcome, edges } = structural;
+  const { scan, outcome, nodes, edges } = structural;
   if (!STRUCTURAL_OUTCOMES.includes(outcome)) throw new TypeError('invalid structural outcome');
   // `none` means "no suggestions produced by a full scan": resolved universe
   // nodes may exist (declared scenario/symbol/requirement entities), but not
@@ -786,7 +789,38 @@ export function assertStructuralInvariants(observation) {
   if ((scan.missing_sources ?? []).length > 0 && scan.coverage !== 'partial') {
     throw new TypeError('missing sources require partial coverage');
   }
-  const shape = validateGraphShape({ nodes: structural.nodes, edges });
+  // Declared/scanned accounting: scanned can never exceed declared, and a
+  // full scan reads every declared source (equal counts by construction).
+  if (scan.scanned_sources > scan.declared_sources) {
+    throw new TypeError('scanned sources exceed declared sources');
+  }
+  if (scan.coverage === 'full' && scan.declared_sources !== scan.scanned_sources) {
+    throw new TypeError('full coverage requires equal declared and scanned counts');
+  }
+  // Section outcome and outcome_summary must agree with the emitted edges:
+  // the binding hashes the graph, not these derived fields, so a tampered
+  // none→candidate flip or edited summary counters are caught here (these
+  // invariants run at emit and during read-time revalidation).
+  const summary = structural.outcome_summary ?? {};
+  if ((summary.total_nodes ?? -1) !== nodes.length || (summary.total_edges ?? -1) !== edges.length) {
+    throw new TypeError('outcome_summary disagrees with the graph');
+  }
+  const candidateEdges = edges.filter((edge) => edge?.outcome === 'candidate').length;
+  const relatedEdges = edges.filter((edge) => edge?.outcome === 'related_only').length;
+  if ((summary.by_outcome?.candidate ?? -1) !== candidateEdges || (summary.by_outcome?.related_only ?? -1) !== relatedEdges
+    || candidateEdges + relatedEdges !== edges.length) {
+    throw new TypeError('outcome_summary by_outcome disagrees with the edges');
+  }
+  if (outcome === 'candidate' && (scan.coverage !== 'full' || candidateEdges === 0)) {
+    throw new TypeError('candidate outcome requires full coverage and a candidate edge');
+  }
+  if (outcome === 'related_only' && (scan.coverage !== 'full' || edges.length === 0 || candidateEdges > 0)) {
+    throw new TypeError('related_only outcome requires full coverage with only related_only edges');
+  }
+  if (outcome === 'abstain' && candidateEdges + relatedEdges !== edges.length) {
+    throw new TypeError('abstain outcome must carry only structural edge outcomes');
+  }
+  const shape = validateGraphShape({ nodes, edges });
   if (!shape.ok) throw new TypeError(`invalid graph shape: ${shape.code}`);
 }
 
@@ -1099,10 +1133,12 @@ export async function validateObservationBinding(rootDir, observation, options =
   // The canonical delta-spec inventory is rebuilt from the CURRENT disk tree
   // (bounded walk): a spec added or removed after the observation was written
   // must name its field and flip the binding — the recorded input digests
-  // alone cannot see a spec that was never read.
-  const freshInventory = (await collectDeltaSpecPaths(root, observation.change_id)).sort();
+  // alone cannot see a spec that was never read. A truncated fresh walk
+  // cannot prove inventory equality either, so it degrades to stale.
+  const freshWalk = await collectDeltaSpecPaths(root, observation.change_id);
+  const freshInventory = freshWalk.paths.sort();
   const recordedInventory = Array.isArray(recordedScan.delta_spec_inventory) ? recordedScan.delta_spec_inventory : [];
-  if (freshInventory.join('|') !== recordedInventory.join('|')) mismatched.push('delta_spec_inventory');
+  if (freshWalk.truncated || freshInventory.join('|') !== recordedInventory.join('|')) mismatched.push('delta_spec_inventory');
   const binding = buildAssessmentBinding(traceLinkSuggestionsBindingObject({
     worktreeIdentity,
     changeId: observation.change_id,
@@ -1292,7 +1328,7 @@ export async function writeTraceLinkObservation(rootDir, observation, config, op
 // Structural scan over only the presented inputs
 // ---------------------------------------------------------------------------
 
-function buildGraph({ traceManifest, specs, tests, diagnostics }) {
+function buildGraph({ traceManifest, specs, tests, diagnostics, specsIncomplete = false }) {
   const trace = traceManifest.trace;
   const universe = new Map(); // symbol -> { symbol, kind }
   for (const node of trace.nodes) {
@@ -1304,6 +1340,19 @@ function buildGraph({ traceManifest, specs, tests, diagnostics }) {
     universe.set(node.symbol, { symbol: node.symbol, kind });
   }
   const refusal = (reason, detail) => ({ refusal: { reason, detail: detail === undefined ? null : String(detail).slice(0, 200) } });
+  // When the declared spec inventory is incomplete (unreadable/truncated
+  // specs), a ref that cannot resolve may be a casualty of the missing
+  // source rather than an invented reference: it degrades to a bounded
+  // diagnostic with the affected edges dropped (partial scan) instead of
+  // destroying the whole partial result with a typed refusal. With every
+  // declared spec readable, an unresolvable ref stays a typed refusal.
+  const unresolved = (code, symbol) => {
+    if (specsIncomplete) {
+      diagnostics.push({ code: `${code}-missing-source`, path: traceManifestPathLabel(traceManifest), detail: String(symbol).slice(0, 200) });
+      return { node: null };
+    }
+    return refusal(code, symbol);
+  };
 
   const requirementsByTitle = new Map();
   for (const spec of specs) {
@@ -1338,7 +1387,12 @@ function buildGraph({ traceManifest, specs, tests, diagnostics }) {
       for (const scenario of requirement.scenarios) {
         const nodeId = `scn:${spec.path}#${requirement.title}#${scenario.heading}`;
         if (nodeId.length > 200) return refusal('node-id-overflow', nodeId);
-        if (nodes.has(nodeId)) return refusal('ambiguous-scenario-ref', nodeId);
+        if (nodes.has(nodeId)) {
+          // A duplicate heading inside one readable requirement is real
+          // ambiguity; with an incomplete spec inventory it may also be a
+          // casualty of the missing source, so it degrades the same way.
+          return unresolved('ambiguous-scenario-ref', nodeId);
+        }
         nodes.set(nodeId, {
           node_id: nodeId,
           kind: 'scenario',
@@ -1364,8 +1418,8 @@ function buildGraph({ traceManifest, specs, tests, diagnostics }) {
     if (entry.kind === 'requirement') {
       const key = entry.symbol.slice('requirement:'.length);
       const matches = requirementsByTitle.get(key) ?? [];
-      if (matches.length === 0) return refusal('unresolved-ref', entry.symbol);
-      if (matches.length > 1) return refusal('unresolved-ref', `${entry.symbol}: ambiguous requirement title`);
+      if (matches.length === 0) return unresolved('unresolved-ref', entry.symbol);
+      if (matches.length > 1) return unresolved('unresolved-ref', `${entry.symbol}: ambiguous requirement title`);
       const requirement = matches[0];
       const nodeId = `req:${requirement.spec_path}#${requirement.title}`;
       if (nodeId.length > 200) return refusal('node-id-overflow', nodeId);
@@ -1375,8 +1429,8 @@ function buildGraph({ traceManifest, specs, tests, diagnostics }) {
     // scenario
     const key = entry.symbol.slice('scenario:'.length);
     const matches = scenariosByHeading.get(key) ?? [];
-    if (matches.length === 0) return refusal('unresolved-ref', entry.symbol);
-    if (matches.length > 1) return refusal('ambiguous-scenario-ref', entry.symbol);
+    if (matches.length === 0) return unresolved('unresolved-ref', entry.symbol);
+    if (matches.length > 1) return unresolved('ambiguous-scenario-ref', entry.symbol);
     const { requirement, scenario, spec } = matches[0];
     const nodeId = `scn:${spec.path}#${requirement.title}#${scenario.heading}`;
     return { node: nodes.get(nodeId) };
@@ -1388,6 +1442,9 @@ function buildGraph({ traceManifest, specs, tests, diagnostics }) {
     if (outcome.refusal) return outcome;
     resolvedBySymbol.set(entry.symbol, outcome.node);
   }
+  // Unique resolved trace refs feed the declared/scanned accounting (R6:
+  // duplicate trace nodes count once on both sides).
+  const resolvedTraceRefs = [...resolvedBySymbol.values()].filter((node) => node !== null).length;
   for (const test of tests) {
     if (!test.ok) continue;
     const nodeId = `test:${test.path}`;
@@ -1412,6 +1469,12 @@ function buildGraph({ traceManifest, specs, tests, diagnostics }) {
     }
     const fromNode = resolvedBySymbol.get(relation.from);
     const toNode = resolvedBySymbol.get(relation.to);
+    if (fromNode === null || toNode === null) {
+      // An endpoint attributed to a missing spec source: the affected edge is
+      // dropped, the scan stays partial (never a refusal, never a crash).
+      diagnostics.push({ code: 'edge-dropped-missing-source', path: traceManifestPathLabel(traceManifest), detail: `${relation.from} -> ${relation.to}`.slice(0, 200) });
+      continue;
+    }
     if (fromKind === 'requirement' && toKind === 'semantic_symbol') {
       addEdge('requirement_symbol', fromNode.node_id, toNode.node_id, []);
       continue;
@@ -1513,7 +1576,7 @@ function buildGraph({ traceManifest, specs, tests, diagnostics }) {
     outcome: edge.behavioral_assertion_refs.length > 0 ? 'candidate' : 'related_only',
     behavioral_assertion_refs: edge.behavioral_assertion_refs,
   }));
-  return { nodes: nodeList, edges, truncated, resolvedTraceRefs: resolvedBySymbol.size };
+  return { nodes: nodeList, edges, truncated, resolvedTraceRefs };
 }
 
 function traceManifestPathLabel(traceManifest) {
@@ -1531,8 +1594,11 @@ function testScenarioText(node) {
 // Bounded delta-spec collection (presented scope only)
 // ---------------------------------------------------------------------------
 
-const MAX_DELTA_SPEC_FILES = 200;
+// Inventory caps stay compatible with the observation schema: 100 delta
+// specs + 50 presented tests fit the inputs array (maxItems 150).
+const MAX_DELTA_SPEC_FILES = 100;
 const MAX_DELTA_SPEC_DIRECTORIES = 500;
+const MAX_MISSING_SOURCES = 100;
 
 // Local bounded walk of `openspec/changes/<change-id>/specs/**`: only files
 // named spec.md (parity with the canonical collector's isSpecMarkdown
@@ -1546,36 +1612,67 @@ async function collectDeltaSpecPaths(rootDir, changeId) {
   const files = [];
   const directories = [specsRoot];
   let visitedDirectories = 0;
+  let truncated = false;
+  const markTruncated = (detail) => {
+    truncated = true;
+    return detail;
+  };
   while (directories.length > 0) {
-    if (visitedDirectories >= MAX_DELTA_SPEC_DIRECTORIES || files.length >= MAX_DELTA_SPEC_FILES) break;
+    if (visitedDirectories >= MAX_DELTA_SPEC_DIRECTORIES) {
+      markTruncated('directory-limit');
+      break;
+    }
+    if (files.length >= MAX_DELTA_SPEC_FILES) {
+      markTruncated('inventory-limit');
+      break;
+    }
     const relative = directories.shift();
     visitedDirectories += 1;
     let entries;
     try {
       entries = await readdir(path.join(rootDir, relative), { withFileTypes: true });
-    } catch {
-      continue; // absent specs directory: zero declared delta specs
+    } catch (error) {
+      if (relative === specsRoot) {
+        // The specs root itself is absent: a legitimate zero-declared-spec
+        // change, not a truncated scan.
+        continue;
+      }
+      // A child directory that cannot be listed hides its subtree: the walk
+      // can no longer prove what the inventory contains, so it degrades.
+      markTruncated(`readdir:${error?.code ?? 'error'}`);
+      continue;
     }
     for (const entry of entries.sort((left, right) => sortKey(left.name, right.name))) {
       const childRelative = `${relative}/${entry.name}`;
-      if (entry.isDirectory()) directories.push(childRelative);
       // A symlink named spec.md is a declared entry that must not vanish
       // silently: the bounded read below refuses it and the entry degrades
       // coverage like any other unreadable spec (dangling symlinks included).
-      else if (entry.name === 'spec.md' && (entry.isFile() || entry.isSymbolicLink())) files.push(childRelative);
+      if (entry.name === 'spec.md' && (entry.isFile() || entry.isSymbolicLink())) {
+        files.push(childRelative);
+        if (files.length >= MAX_DELTA_SPEC_FILES) { markTruncated('inventory-limit'); break; }
+        continue;
+      }
+      if (entry.isDirectory()) directories.push(childRelative);
+      else if (entry.isSymbolicLink()) {
+        // A symlinked subdirectory is never traversed (custody escape risk):
+        // its subtree is unknown, so the walk degrades instead of skipping.
+        markTruncated('symlinked-directory');
+        break;
+      }
     }
+    if (truncated) break;
   }
-  return files.slice(0, MAX_DELTA_SPEC_FILES);
+  return { paths: files.slice(0, MAX_DELTA_SPEC_FILES), truncated };
 }
 
 async function collectDeltaSpecs(rootDir, changeId, diagnostics) {
   const specsRoot = `openspec/changes/${changeId}/specs`;
-  const files = await collectDeltaSpecPaths(rootDir, changeId);
-  if (files.length >= MAX_DELTA_SPEC_FILES) {
-    diagnostics.push({ code: 'delta-spec-inventory-truncated', path: specsRoot, detail: 'inventory-limit' });
+  const walk = await collectDeltaSpecPaths(rootDir, changeId);
+  if (walk.truncated) {
+    diagnostics.push({ code: 'delta-spec-inventory-truncated', path: specsRoot, detail: 'inventory-walk-truncated' });
   }
   const specs = [];
-  for (const relative of files) {
+  for (const relative of walk.paths) {
     let bytes = null;
     try {
       bytes = await readProviderFile(rootDir, relative, DOCUMENT_LIMIT);
@@ -1607,7 +1704,7 @@ async function collectDeltaSpecs(rootDir, changeId, diagnostics) {
       requirements: ok ? parseRequirementsFromBytes(bytes, relative) : [],
     });
   }
-  return specs;
+  return { specs, truncated: walk.truncated };
 }
 
 // ---------------------------------------------------------------------------
@@ -1733,7 +1830,8 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
     // named spec.md, parity with the canonical collector's isSpecMarkdown).
     // Base specs, proposal/design/tasks, and every other canonical file are
     // outside the presented scope and are never read; every read is bounded.
-    const specs = await collectDeltaSpecs(rootDir, changeId, diagnostics);
+    const specCollection = await collectDeltaSpecs(rootDir, changeId, diagnostics);
+    const specs = specCollection.specs;
     if (deadlineExceeded()) {
       emit(notRunEnvelope(['deadline-exceeded']), parsed.json);
       return 0;
@@ -1771,18 +1869,29 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
     // Every declared-but-unreadable source is an honest missing entry: spec
     // files (missing, dangling symlink, malformed UTF-8) degrade coverage
     // exactly like unreadable presented tests, so a scan that skipped a
-    // canonical input can never report `none`.
+    // canonical input can never report `none`. The budget cap keeps the
+    // observation within its schema bounds; truncation is itself a coverage
+    // fact recorded as a diagnostic.
     for (const spec of specs) {
       if (!spec.ok) missingSources.push({ path: spec.path, reason: String(spec.reason ?? 'unreadable').slice(0, 200) });
     }
     for (const test of tests) {
       if (!test.ok) missingSources.push({ path: test.path, reason: String(test.code ?? 'unreadable').slice(0, 200) });
     }
+    if (missingSources.length > MAX_MISSING_SOURCES) {
+      missingSources.length = MAX_MISSING_SOURCES;
+      diagnostics.push({ code: 'missing-sources-truncated', path: null, detail: `limit=${MAX_MISSING_SOURCES}` });
+    }
     if (deadlineExceeded()) {
       emit(notRunEnvelope(['deadline-exceeded']), parsed.json);
       return 0;
     }
-    const graph = buildGraph({ traceManifest, specs, tests, diagnostics });
+    // Unreadable declared specs are visible to resolution: trace refs that
+    // cannot resolve while the spec inventory is incomplete are attributed to
+    // the missing sources (affected edges dropped, scan stays partial) instead
+    // of destroying the whole partial result with a typed refusal.
+    const specsIncomplete = specCollection.truncated || specs.some((spec) => !spec.ok);
+    const graph = buildGraph({ traceManifest, specs, tests, diagnostics, specsIncomplete });
     if (graph.refusal) {
       emit(notRunEnvelope([`invalid-candidate:${graph.refusal.reason}`]), parsed.json);
       return 2;
@@ -1796,12 +1905,16 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
     // actually read/resolved. A test is counted once, spec files count even
     // when unreadable (they are declared inputs), unsupported trace kinds are
     // bounded diagnostics rather than declared sources.
-    const supportedTraceNodes = traceManifest.trace.nodes.filter((node) => kindForSymbol(node.symbol) !== null).length;
-    const declaredSources = specs.length + uniqueTestPaths.length + supportedTraceNodes;
+    // Unique supported symbols on both sides: a repeated trace node counts
+    // once as declared and at most once as resolved.
+    const supportedTraceSymbols = new Set(traceManifest.trace.nodes
+      .map((node) => node.symbol)
+      .filter((symbol) => kindForSymbol(symbol) !== null));
+    const declaredSources = specs.length + uniqueTestPaths.length + supportedTraceSymbols.size;
     const scannedSources = specs.filter((spec) => spec.ok).length
       + tests.filter((test) => test.ok).length
       + graph.resolvedTraceRefs;
-    const partial = traceManifest.trace.completeness === 'partial' || graph.truncated || missingSources.length > 0;
+    const partial = traceManifest.trace.completeness === 'partial' || graph.truncated || specCollection.truncated || missingSources.length > 0;
     const coverage = {
       state: partial ? 'partial' : 'full',
       declared_sources: declaredSources,
@@ -1894,14 +2007,25 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
     // Post-scan freshness probe: re-reads current disk state and compares the
     // recomputed binding against the one built from the scanned bytes, so a
     // mid-scan swap yields stale, not a silent current. The probe re-derives
-    // the delta-spec inventory too, so a spec added mid-run drifts.
+    // the delta-spec inventory too, so a spec added mid-run drifts — unless
+    // the scan-time walk was itself truncated: a capped inventory is a prefix
+    // that cannot prove or disprove drift beyond the cap, and the observation
+    // already reports that degradation (partial coverage, abstain). Read-time
+    // revalidation stays conservative: a truncated fresh walk marks stale.
     if (typeof options.mutateDuringScan === 'function') await options.mutateDuringScan();
+    const inventoryProvable = !specCollection.truncated;
+    let probeInventory = deltaSpecInventory;
     const watch = {
       changed: async () => {
         const freshTrace = await readTraceManifest(rootDir, changeId, options);
         if (!freshTrace.ok || freshTrace.sha256 !== structural.trace.sha256 || freshTrace.bytes !== structural.trace.bytes) return true;
-        const freshInventory = (await collectDeltaSpecPaths(rootDir, changeId)).sort();
-        if (freshInventory.join('|') !== deltaSpecInventory.join('|')) return true;
+        if (inventoryProvable) {
+          const freshWalk = await collectDeltaSpecPaths(rootDir, changeId);
+          // A truncated probe walk cannot prove inventory equality: drift wins.
+          if (freshWalk.truncated) return true;
+          probeInventory = freshWalk.paths.sort();
+          if (probeInventory.join('|') !== deltaSpecInventory.join('|')) return true;
+        }
         const freshInputs = [];
         for (const input of inputs) {
           let bytes = null;
@@ -1915,7 +2039,7 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
           trace: { path: structural.trace.path, sha256: freshTrace.sha256, bytes: freshTrace.bytes },
           validatedExportDigest: freshTrace.manifestDigest,
           inputDigests: current.inputDigests,
-          deltaSpecInventory: freshInventory,
+          deltaSpecInventory: probeInventory,
           candidatePayloadDigest,
           graphLimits: { ...GRAPH_LIMITS },
           rubric: current.rubric,
@@ -1942,14 +2066,21 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
       })),
       language: resolvedLanguage,
     };
+    // The semantic stage gets only the REMAINING command budget, not a fresh
+    // full deadline: the deadline bounds the whole command, not its segments.
+    const remainingBudget = Math.max(1, (options.deadlineMs ?? DEFAULT_DEADLINE_MS) - (now() - startedAt));
     const semanticOutcome = await runTypedAssessment({
       assessor: typeof options.assessor === 'function' ? options.assessor : null,
       input: assessorInput,
       coverage,
-      limits: { deadlineMs: options.deadlineMs ?? DEFAULT_DEADLINE_MS, maxFindings: GRAPH_LIMITS.max_edges, maxDiagnostics: MAX_DIAGNOSTICS },
+      limits: { deadlineMs: remainingBudget, maxFindings: GRAPH_LIMITS.max_edges, maxDiagnostics: MAX_DIAGNOSTICS },
       watch,
       now,
     });
+    if (deadlineExceeded()) {
+      emit(notRunEnvelope(['deadline-exceeded']), parsed.json);
+      return 0;
+    }
     const semantic = normalizeSemanticOutcome(semanticOutcome, new Set(graph.edges.map((edge) => edge.edge_id)));
     // Coverage degradations established by the helper (scanned/declared
     // clamps, missing entries) are authoritative for a stage that actually
@@ -1999,6 +2130,12 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
     if (schemaErrors.length > 0) {
       emit(failureEnvelope('operational-failure', ['schema-parity-failure', ...schemaErrors.slice(0, 5).map((error) => error.message)]), parsed.json);
       return 1;
+    }
+    // The deadline bounds the whole command: a budget exhausted between the
+    // scan and the persistence is a bounded not_run, never a half-run write.
+    if (deadlineExceeded()) {
+      emit(notRunEnvelope(['deadline-exceeded']), parsed.json);
+      return 0;
     }
     if (parsed.write) {
       const written = await writeTraceLinkObservation(rootDir, observation, config, options);

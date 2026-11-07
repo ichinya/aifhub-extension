@@ -470,6 +470,45 @@ describe('trace-link-suggestions exact-ref refusals', () => {
     assert.deepEqual(value.codes, ['invalid-candidate:ambiguous-scenario-ref']);
   });
 
+  it('keeps the partial result when trace refs cannot resolve against an unreadable spec', async () => {
+    const root = await makeTemp('aif-tls-brokenspec-');
+    const changeId = 'broken-spec-change';
+    await seedCaseProject(root, changeId, { trace: null, specs: ['specs/spec-en.md'], tests: [] });
+    await mkdir(path.join(root, 'openspec', 'changes', changeId, 'specs', 'broken'), { recursive: true });
+    await writeFile(path.join(root, 'openspec', 'changes', changeId, 'specs', 'broken', 'spec.md'), Buffer.from([0xff, 0xfe, 0x00, 0x01]));
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    // AuthOptIn resolves in the readable spec; GhostRef would resolve into
+    // nothing — with an incomplete inventory it degrades instead of refusing.
+    const trace = {
+      schemaVersion: 'lekalo/trace-manifest/v0.2.16',
+      identity: 'dev.lekalo.trace-manifest@0.2.16',
+      completeness: 'full',
+      nodes: [
+        { symbol: 'requirement:AuthOptIn' },
+        { symbol: 'requirement:GhostRef' },
+        { symbol: 'operation:auth.login' },
+      ],
+      relations: [
+        { from: 'requirement:AuthOptIn', to: 'operation:auth.login' },
+        { from: 'requirement:GhostRef', to: 'operation:auth.login' },
+      ],
+      gaps: [],
+    };
+    await writeFile(manifest, JSON.stringify({ trace, manifestDigest: `sha256:${digest(JSON.stringify(trace))}` }), 'utf8');
+    const { exitCode, value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+    assert.equal(exitCode, 0, JSON.stringify(value?.codes ?? []));
+    assert.equal(value.structural.scan.coverage, 'partial');
+    assert.equal(value.structural.outcome, 'abstain');
+    assert.ok(value.structural.scan.missing_sources.some((entry) => entry.path.endsWith('broken/spec.md')));
+    assert.ok(value.diagnostics.some((entry) => entry.code === 'unresolved-ref-missing-source'), value.diagnostics.map((d) => d.code).join(','));
+    assert.ok(value.diagnostics.some((entry) => entry.code === 'edge-dropped-missing-source'));
+    const survivingEdge = value.structural.edges.find((edge) => edge.relation === 'requirement_symbol'
+      && refOf(value.structural.nodes.find((node) => node.node_id === edge.from_node_id)) === 'req:#AuthOptIn');
+    assert.ok(survivingEdge, 'the edge whose refs resolve in the readable spec survives');
+    assert.equal(value.structural.edges.length, 1, 'only the ghost-attributed edge is dropped');
+  });
+
   it('skips unsupported trace relations with a bounded diagnostic and keeps scanning', async () => {
     const root = await makeTemp('aif-tls-rel-');
     await seedCaseProject(root, 'rel-change', { trace: 'traces/dev-trace-nm.json', specs: ['specs/spec-en.md', 'specs/spec-ru.md'], tests: ['test/auth.spec.mjs'] });
@@ -577,6 +616,20 @@ describe('trace-link-suggestions outcome semantics', () => {
       return found.map((at) => [...Array(needle.length).keys()].every((offset) => !masked[at + offset]));
     };
     assert.deepEqual(occurrences('topic.thing'), [true, false, false, false, false, true]);
+  });
+
+  it('restores the interpolation context after a line comment inside ${...}', () => {
+    const bytes = Buffer.from([
+      'const message = `a ${ // topic.thing in comment',
+      'topic.thing()} tail topic.thing`;',
+    ].join('\n'), 'utf8');
+    const masked = maskCodeRegions(bytes, 'js');
+    const inComment = bytes.indexOf(Buffer.from('topic.thing in comment'));
+    const inCode = bytes.indexOf(Buffer.from('topic.thing()}'));
+    const inTail = bytes.indexOf(Buffer.from('tail topic.thing'));
+    assert.ok([...Array('topic.thing in comment'.length).keys()].every((offset) => masked[inComment + offset]), 'comment inside interpolation stays masked');
+    assert.ok([...Array('topic.thing()'.length).keys()].every((offset) => !masked[inCode + offset]), 'interpolation code after the comment stays anchorable');
+    assert.ok([...Array('tail topic.thing'.length).keys()].every((offset) => masked[inTail + offset]), 'the literal tail after the interpolation stays masked (no false anchor)');
   });
 
   it('masks needles inside nested template interpolations but keeps real interpolation code anchorable', () => {
@@ -695,12 +748,16 @@ describe('trace-link-suggestions N:M graph', () => {
 // ---------------------------------------------------------------------------
 
 describe('trace-link-suggestions binding and revalidation', () => {
-  async function seededWritten(root, changeId = 'bind-change') {
+  async function seededWritten(root, changeId = 'bind-change', options = {}) {
     await seedCaseProject(root, changeId, { trace: 'traces/dev-trace-nm.json', specs: ['specs/spec-en.md', 'specs/spec-ru.md'], tests: ['test/auth.spec.mjs'] });
-    const { exitCode } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--test', 'test/auth.spec.mjs', '--write', '--json']);
+    const { exitCode } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--test', 'test/auth.spec.mjs', '--write', '--json'], options);
     assert.equal(exitCode, 0);
     return parseStrictJson(await readFile(path.join(root, traceLinkPaths(changeId).observation), 'utf8'));
   }
+
+  const supportsAssessor = (input) => ({
+    findings: input.edges.map((edge) => ({ edge_id: edge.edge_id, verdict: 'supports', rationale: 'supports for every edge' })),
+  });
 
   it('is current right after the write and names drifted inputs on edits', async () => {
     const root = await makeTemp('aif-tls-bind-');
@@ -813,12 +870,18 @@ describe('trace-link-suggestions binding and revalidation', () => {
     notRunSemanticEdit.semantic.assessments = [{ edge_id: 'edge-1', verdict: 'supports', rationale: 'assessed without a stage' }];
     assert.equal((await validateObservationBinding(root, notRunSemanticEdit)).code, 'observation-invalid');
 
-    const duplicateAssessmentEdit = structuredClone(observation);
+    // With a real semantic stage the recorded assessments are non-empty, so
+    // the duplicate check is reachable: a duplicated edge_id (schema-valid —
+    // the array carries no uniqueness rule) must fail the revalidation.
+    const assessedRoot = await makeTemp('aif-tls-bind6-');
+    const assessed = await seededWritten(assessedRoot, 'bind-change', { assessor: supportsAssessor });
+    assert.ok(assessed.semantic.assessments.length > 0, 'the fake assessor produced assessments');
+    const duplicateAssessmentEdit = structuredClone(assessed);
     duplicateAssessmentEdit.semantic.assessments = [
       ...duplicateAssessmentEdit.semantic.assessments,
-      { ...duplicateAssessmentEdit.semantic.assessments[0], verdict: 'contradicts' },
+      { ...duplicateAssessmentEdit.semantic.assessments.at(-1), verdict: 'contradicts' },
     ];
-    assert.equal((await validateObservationBinding(root, duplicateAssessmentEdit)).code, 'observation-invalid');
+    assert.equal((await validateObservationBinding(assessedRoot, duplicateAssessmentEdit)).code, 'observation-invalid');
   });
 
   it('rejects tampered nodes whose exact_ref shape does not match their kind', async () => {
@@ -848,6 +911,53 @@ describe('trace-link-suggestions binding and revalidation', () => {
     assert.ok(drifted.mismatched.includes('binding'));
   });
 
+  it('rejects tampered outcome and summary fields that the binding digest cannot see', async () => {
+    const root = await makeTemp('aif-tls-summary-');
+    const observation = await seededWritten(root);
+    assert.equal(observation.structural.outcome, 'candidate');
+    const outcomeEdit = structuredClone(observation);
+    outcomeEdit.structural.outcome = 'none';
+    outcomeEdit.structural.outcome_summary.by_outcome.candidate = 0;
+    outcomeEdit.structural.outcome_summary.by_outcome.related_only = outcomeEdit.structural.edges.length;
+    assert.equal((await validateObservationBinding(root, outcomeEdit)).code, 'observation-invalid');
+
+    const summaryEdit = structuredClone(observation);
+    summaryEdit.structural.outcome_summary.by_outcome.candidate += 1;
+    assert.equal((await validateObservationBinding(root, summaryEdit)).code, 'observation-invalid');
+
+    const countsEdit = structuredClone(observation);
+    countsEdit.structural.outcome_summary.total_edges += 1;
+    assert.equal((await validateObservationBinding(root, countsEdit)).code, 'observation-invalid');
+
+    const scanCountsEdit = structuredClone(observation);
+    scanCountsEdit.structural.outcome = 'related_only';
+    scanCountsEdit.structural.outcome_summary.by_outcome.candidate = 0;
+    scanCountsEdit.structural.outcome_summary.by_outcome.related_only = scanCountsEdit.structural.edges.length;
+    scanCountsEdit.structural.scan.declared_sources = 10;
+    scanCountsEdit.structural.scan.scanned_sources = 0;
+    assert.equal((await validateObservationBinding(root, scanCountsEdit)).code, 'observation-invalid');
+  });
+
+  it('treats a truncated fresh inventory walk as drift, never as proven equality', async () => {
+    const root = await makeTemp('aif-tls-walktrunc-');
+    const observation = await seededWritten(root);
+    // A symlinked subdirectory under specs hides its subtree from the bounded
+    // walk: the fresh inventory cannot prove equality, so the observation
+    // degrades to stale (drift wins) instead of silently comparing prefixes.
+    await mkdir(path.join(root, 'openspec', 'changes', 'bind-change', 'specs', 'hidden'), { recursive: true });
+    let symlinked = false;
+    try {
+      await symlink(path.join(root, 'outside'), path.join(root, 'openspec', 'changes', 'bind-change', 'specs', 'hidden', 'linked'));
+      symlinked = true;
+    } catch {
+      symlinked = false; // symlink privilege unavailable: the malformed-spec and dangling-symlink tests cover the degradation paths
+    }
+    if (!symlinked) return;
+    const drifted = await validateObservationBinding(root, observation);
+    assert.equal(drifted.stale, true);
+    assert.ok(drifted.mismatched.includes('delta_spec_inventory'), drifted.mismatched.join(','));
+  });
+
   it('keeps a malformed-UTF-8 spec consistently classified across write, probe, and revalidation', async () => {
     const root = await makeTemp('aif-tls-malformed-');
     const changeId = 'malformed-spec-change';
@@ -874,6 +984,7 @@ describe('trace-link-suggestions binding and revalidation', () => {
     const root = await makeTemp('aif-tls-danglingspec-');
     const changeId = 'dangling-spec-change';
     await seedCaseProject(root, changeId, { trace: null, specs: ['specs/spec-en.md'], tests: [] });
+    await mkdir(path.join(root, 'openspec', 'changes', changeId, 'specs', 'broken'), { recursive: true });
     let symlinked = false;
     try {
       await symlink(path.join(root, 'no-such-target.md'), path.join(root, 'openspec', 'changes', changeId, 'specs', 'broken', 'spec.md'));
@@ -1236,31 +1347,48 @@ describe('trace-link-suggestions AC7 byte-identity', () => {
     // as the test wrote them: the comparison runs against the post-mutation
     // snapshot BEFORE any restore, so a consumer write would be caught; the
     // original fixture is restored in a finally afterwards.
+    // For the mutated-trace branches the consumer must leave the bytes exactly
+    // as the test wrote them: the snapshot is taken AFTER the test's own
+    // mutation and BEFORE the consumer run (the run itself must not change a
+    // single byte), and the original fixture is restored in a finally.
     const mutatedBranches = [
-      ['partial', async (manifest) => {
-        const partial = parseStrictJson(await readFile(path.join(CORPUS_DIR, 'traces', 'dev-trace-partial.json'), 'utf8'));
-        await writeFile(manifest, JSON.stringify(partial), 'utf8');
-        const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
-        assert.equal(run.exitCode, 0);
-        assert.equal(run.value.structural.outcome, 'abstain');
+      ['partial', {
+        prepare: async (manifest) => {
+          const partial = parseStrictJson(await readFile(path.join(CORPUS_DIR, 'traces', 'dev-trace-partial.json'), 'utf8'));
+          await writeFile(manifest, JSON.stringify(partial), 'utf8');
+        },
+        run: async () => {
+          const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+          assert.equal(run.exitCode, 0);
+          assert.equal(run.value.structural.outcome, 'abstain');
+        },
       }],
-      ['malformed', async (manifest) => {
-        await writeFile(manifest, '{"broken"', 'utf8');
-        const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
-        assert.deepEqual(run.value.codes, ['trace-invalid']);
+      ['malformed', {
+        prepare: async (manifest) => {
+          await writeFile(manifest, '{"broken"', 'utf8');
+        },
+        run: async () => {
+          const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+          assert.deepEqual(run.value.codes, ['trace-invalid']);
+        },
       }],
-      ['overflow', async (manifest) => {
-        await writeFile(manifest, Buffer.alloc(TRACE_EXPORT_LIMIT + 1, 0x20));
-        const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
-        assert.deepEqual(run.value.codes, ['export-overflow']);
+      ['overflow', {
+        prepare: async (manifest) => {
+          await writeFile(manifest, Buffer.alloc(TRACE_EXPORT_LIMIT + 1, 0x20));
+        },
+        run: async () => {
+          const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+          assert.deepEqual(run.value.codes, ['export-overflow']);
+        },
       }],
     ];
     for (const [label, branch] of mutatedBranches) {
       const manifest = path.join(root, traceManifestPath(changeId));
       try {
-        await branch(manifest);
-        const mutated = await readFile(manifest);
-        assert.deepEqual(await readFile(tracePath), mutated, `trace bytes must stay byte-identical to the mutated snapshot: ${label}`);
+        await branch.prepare(manifest);
+        const mutated = await readFile(manifest); // snapshot BEFORE the consumer run
+        await branch.run();
+        assert.deepEqual(await readFile(tracePath), mutated, `trace bytes must stay byte-identical to the pre-run snapshot: ${label}`);
       } finally {
         await writeFile(tracePath, before, 'utf8');
       }
@@ -1601,6 +1729,61 @@ describe('trace-link-suggestions graph limits', () => {
     assert.ok(!value.diagnostics.some((entry) => entry.code === 'assertion-refs-truncated'));
     assert.equal(value.structural.scan.coverage, 'full');
     assert.equal(value.structural.outcome, 'candidate');
+  });
+
+  it('degrades the scan when the delta-spec inventory exceeds its cap', async () => {
+    const root = await makeTemp('aif-tls-speccap-');
+    const changeId = 'spec-cap-change';
+    await seedCaseProject(root, changeId, { trace: null, specs: [], tests: [] });
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    const emptyTrace = { schemaVersion: 'lekalo/trace-manifest/v0.2.16', identity: 'dev.lekalo.trace-manifest@0.2.16', completeness: 'full', nodes: [], relations: [], gaps: [] };
+    await writeFile(manifest, JSON.stringify({ trace: emptyTrace, manifestDigest: `sha256:${digest(JSON.stringify(emptyTrace))}` }), 'utf8');
+    // MAX_DELTA_SPEC_FILES + 1 spec files: the walk cannot declare them all,
+    // so it truncates instead of presenting a complete-looking inventory.
+    for (let index = 0; index <= 100; index += 1) {
+      const cap = path.join(root, 'openspec', 'changes', changeId, 'specs', `cap-${String(index).padStart(3, '0')}`, 'spec.md');
+      await mkdir(path.dirname(cap), { recursive: true });
+      await writeFile(cap, `# Delta ${index}\n`, 'utf8');
+    }
+    const { exitCode, value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+    assert.equal(exitCode, 0);
+    assert.equal(value.structural.scan.coverage, 'partial');
+    assert.equal(value.structural.outcome, 'abstain');
+    assert.ok(value.diagnostics.some((entry) => entry.code === 'delta-spec-inventory-truncated'));
+    assert.equal(value.structural.scan.delta_spec_inventory.length, 100);
+    assert.equal(value.inputs.length, 100, 'inputs stay within the schema maxItems 150');
+  });
+
+  it('counts duplicate trace nodes once in declared and scanned accounting', async () => {
+    const root = await makeTemp('aif-tls-dupsym-');
+    const changeId = 'dup-symbol-change';
+    await seedCaseProject(root, changeId, { trace: null, specs: ['specs/spec-en.md'], tests: [] });
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    const trace = {
+      schemaVersion: 'lekalo/trace-manifest/v0.2.16',
+      identity: 'dev.lekalo.trace-manifest@0.2.16',
+      completeness: 'full',
+      nodes: [
+        { symbol: 'requirement:AuthOptIn' },
+        { symbol: 'operation:dup.thing' },
+        { symbol: 'operation:dup.thing' },
+      ],
+      relations: [],
+      gaps: [],
+    };
+    await writeFile(manifest, JSON.stringify({ trace, manifestDigest: `sha256:${digest(JSON.stringify(trace))}` }), 'utf8');
+    const { exitCode, value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+    assert.equal(exitCode, 0);
+    assert.equal(value.structural.outcome, 'none');
+    assert.equal(value.structural.scan.coverage, 'full');
+    // Two declared duplicate nodes collapse to one unique symbol on both
+    // sides: declared === scanned, the full-scan invariant holds.
+    assert.equal(value.structural.scan.declared_sources, value.structural.scan.scanned_sources);
+    assert.equal(value.structural.scan.declared_sources, 3, '1 spec + 0 tests + 2 unique symbols');
+    const dupNodes = value.structural.nodes.filter((node) => node.node_id === 'operation:dup.thing');
+    assert.equal(dupNodes.length, 1, 'the duplicate resolves to a single graph node');
   });
 
   it('refuses observations above the global byte budget before emit', async () => {

@@ -150,7 +150,7 @@
             },
             "delta_spec_inventory": {
               "type": "array",
-              "maxItems": 200,
+              "maxItems": 100,
               "items": {
                 "type": "string",
                 "minLength": 1,
