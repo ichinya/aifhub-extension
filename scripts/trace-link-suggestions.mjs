@@ -522,7 +522,10 @@ export function parseRequirementsFromBytes(bytes, specPath) {
     // The scenario span ends after the last content line of the scenario
     // block (before the next recognized heading); terminators stay excluded.
     const last = bodyLines.at(-1);
-    currentScenario.end = last ? last.end : currentScenario.start;
+    // An empty scenario keeps its heading-line span (never zero-length):
+    // the heading bytes are real behavioral text, and a zero-length span
+    // would let a trace relation claim a candidate over no bytes at all.
+    currentScenario.end = last ? last.end : currentScenario.end;
     currentRequirement.scenarios.push(currentScenario);
     currentScenario = null;
   };
@@ -687,6 +690,17 @@ function findUnmaskedOccurrences(bytes, masked, needleBytes, limit) {
     let clean = true;
     for (let offset = 0; offset < needleBytes.length; offset += 1) {
       if (masked[found + offset]) { clean = false; break; }
+    }
+    // Identifier boundary on both sides: a match that continues or is
+    // preceded by an identifier character is a longer name (auth.loginWithOtp
+    // contains auth.login) or a differently qualified one (my.auth.login) —
+    // anchoring it would claim a candidate for behavior the test never calls.
+    if (clean) {
+      const before = found > 0 ? bytes[found - 1] : 0;
+      const after = found + needleBytes.length < bytes.length ? bytes[found + needleBytes.length] : 0;
+      const identifierByte = (byte) => (byte >= 0x41 && byte <= 0x5A) || (byte >= 0x61 && byte <= 0x7A)
+        || (byte >= 0x30 && byte <= 0x39) || byte === 0x5F || byte === 0x2D || byte === 0x2E || byte === 0x24;
+      if (identifierByte(before) || identifierByte(after)) { cursor = found + 1; continue; }
     }
     if (clean) {
       // `truncated` means real anchors beyond the cap were dropped: exactly
@@ -1139,6 +1153,9 @@ export async function validateObservationBinding(rootDir, observation, options =
   if ((recordedPolicy.id ?? null) !== context.relationPolicy.id
     || (recordedPolicy.version ?? null) !== context.relationPolicy.version
     || JSON.stringify(recordedPolicy.relations ?? null) !== JSON.stringify(context.relationPolicy.relations)) mismatched.push('relation_policy');
+  const recordedExclusion = observation.exclusion_policy ?? {};
+  if ((recordedExclusion.id ?? null) !== TRACE_LINK_EXCLUSION_POLICY.id
+    || (recordedExclusion.version ?? null) !== TRACE_LINK_EXCLUSION_POLICY.version) mismatched.push('exclusion_policy');
   // The engine never emits a language override; a recorded override is
   // schema-valid tampering, not a state this engine can revalidate.
   if (observation.language_source !== 'detected' || observation.language_options?.override !== null) {
@@ -1651,6 +1668,8 @@ async function collectDeltaSpecPaths(rootDir, changeId) {
   const directories = [specsRoot];
   let visitedDirectories = 0;
   let truncated = false;
+  // Confined root anchor for the per-directory containment check below.
+  const realRoot = await realpath(rootDir);
   const markTruncated = (detail) => {
     truncated = true;
     return detail;
@@ -1666,9 +1685,27 @@ async function collectDeltaSpecPaths(rootDir, changeId) {
     }
     const relative = directories.shift();
     visitedDirectories += 1;
+    // Path confinement (SEC): every walked directory must resolve inside the
+    // project root. A symlinked specs root or subdirectory pointing outside
+    // the project would leak external spec.md paths into the observation —
+    // the walk degrades instead of listing them.
+    let realDirectory;
+    try {
+      realDirectory = await realpath(path.join(rootDir, relative));
+    } catch (error) {
+      // Only a missing specs root is a legitimate zero-declared-spec change;
+      // any other unreadable directory degrades the walk (C1/S1 semantics).
+      if (relative === specsRoot && error?.code === 'ENOENT') continue;
+      markTruncated(`realpath:${error?.code ?? 'error'}`);
+      break;
+    }
+    if (!realDirectory.toLowerCase().startsWith(`${realRoot.toLowerCase()}${path.sep}`)) {
+      markTruncated('path-escape');
+      break;
+    }
     let entries;
     try {
-      entries = await readdir(path.join(rootDir, relative), { withFileTypes: true });
+      entries = await readdir(realDirectory, { withFileTypes: true });
     } catch (error) {
       // Only git-style ENOENT on the specs root itself is a legitimate
       // zero-declared-spec change; EACCES/ENOTDIR or any other failure —

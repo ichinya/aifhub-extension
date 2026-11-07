@@ -1095,6 +1095,141 @@ describe('trace-link-suggestions binding and revalidation', () => {
     assert.ok(value.structural.scan.missing_sources.some((entry) => entry.path.endsWith('broken/spec.md')), 'the dangling spec is a declared missing source');
   });
 
+  it('keeps the exclusion policy under binding enforcement (Devin F4)', async () => {
+    const root = await makeTemp('aif-tls-excl-');
+    const observation = await seededWritten(root);
+    const edited = structuredClone(observation);
+    edited.exclusion_policy = { id: 'tampered-policy', version: 9 };
+    const verdict = await validateObservationBinding(root, edited);
+    // The binding is built from the engine-fixed policy constant (both at
+    // write and revalidation time), so the enforcement is the named field
+    // comparison: an edited policy is always named and always stale.
+    assert.equal(verdict.stale, true);
+    assert.ok(verdict.mismatched.includes('exclusion_policy'), verdict.mismatched.join(','));
+  });
+
+  it('does not anchor partial symbol matches inside longer names (Devin F2)', async () => {
+    const root = await makeTemp('aif-tls-partial-');
+    const changeId = 'partial-symbol-change';
+    await seedCaseProject(root, changeId, { trace: null, specs: [], tests: [] });
+    await writeInlineSpec(root, changeId, 'partial', [
+      '# Delta for partial matching',
+      '',
+      '## ADDED Requirements',
+      '',
+      '### Requirement: PartialSymbol',
+      '',
+      'The partial match rule MUST NOT anchor a longer operation name.',
+      '',
+    ].join('\n'));
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    // The test calls auth.loginWithOtp (a longer name) and never auth.login:
+    // the needle auth.login occurs only inside the longer identifier, so the
+    // identifier boundary must reject every occurrence.
+    const trace = {
+      schemaVersion: 'lekalo/trace-manifest/v0.2.16',
+      identity: 'dev.lekalo.trace-manifest@0.2.16',
+      completeness: 'full',
+      nodes: [{ symbol: 'operation:auth.login' }],
+      relations: [],
+      gaps: [],
+    };
+    await writeFile(manifest, JSON.stringify({ trace, manifestDigest: `sha256:${digest(JSON.stringify(trace))}` }), 'utf8');
+    const testTarget = path.join(root, 'test', 'partial.spec.mjs');
+    await mkdir(path.dirname(testTarget), { recursive: true });
+    await writeFile(testTarget, [
+      "import { test } from 'node:test';",
+      "import { auth } from '../src/auth.mjs';",
+      '',
+      "test('otp path', () => {",
+      "  const session = auth.loginWithOtp('u');",
+      '  session;',
+      '});',
+    ].join('\n'), 'utf8');
+    const { exitCode, value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--test', 'test/partial.spec.mjs', '--json']);
+    assert.equal(exitCode, 0);
+    // Topic match may still emit the edge (lexical level), but zero anchors
+    // keep it related_only: no candidate without real behavioral bytes.
+    const edge = value.structural.edges.find((entry) => entry.relation === 'symbol_test');
+    assert.ok(edge, 'the topic-matched edge is emitted');
+    assert.equal(edge.outcome, 'related_only');
+    assert.equal(edge.behavioral_assertion_refs.length, 0);
+    assert.equal(value.structural.outcome, 'related_only');
+  });
+
+  it('gives empty scenarios a heading-line span, never a zero-length candidate (Devin F3)', async () => {
+    const root = await makeTemp('aif-tls-emptyscn-');
+    const changeId = 'empty-scenario-change';
+    await seedCaseProject(root, changeId, { trace: null, specs: [], tests: [] });
+    await writeInlineSpec(root, changeId, 'empty', [
+      '# Delta for empty scenarios',
+      '',
+      '## ADDED Requirements',
+      '',
+      '### Requirement: EmptyHost',
+      '',
+      'One requirement whose only scenario heading has no body lines.',
+      '',
+      '#### Scenario: Bare',
+      '',
+      '### Requirement: NextOne',
+      '',
+      'The next requirement closes the empty scenario above.',
+      '',
+    ].join('\n'));
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    const trace = {
+      schemaVersion: 'lekalo/trace-manifest/v0.2.16',
+      identity: 'dev.lekalo.trace-manifest@0.2.16',
+      completeness: 'full',
+      nodes: [{ symbol: 'scenario:Bare' }, { symbol: 'operation:empty.thing' }],
+      relations: [{ from: 'operation:empty.thing', to: 'scenario:Bare' }],
+      gaps: [],
+    };
+    await writeFile(manifest, JSON.stringify({ trace, manifestDigest: `sha256:${digest(JSON.stringify(trace))}` }), 'utf8');
+    const { exitCode, value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+    assert.equal(exitCode, 0, JSON.stringify(value?.codes ?? []));
+    const scenarioNode = value.structural.nodes.find((node) => node.kind === 'scenario' && node.exact_ref.heading === 'Bare');
+    assert.ok(scenarioNode, 'the empty scenario resolves');
+    assert.ok(scenarioNode.exact_ref.span.end > scenarioNode.exact_ref.span.start, 'the span covers the heading line, never zero bytes');
+    const bytes = await readFile(path.join(root, 'openspec', 'changes', changeId, 'specs', 'empty', 'spec.md'));
+    assert.equal(scenarioNode.exact_ref.span_sha256, `sha256:${digest(bytes.subarray(scenarioNode.exact_ref.span.start, scenarioNode.exact_ref.span.end))}`);
+    const edge = value.structural.edges.find((entry) => entry.relation === 'symbol_scenario');
+    assert.ok(edge, 'the trace relation is emitted');
+    assert.equal(edge.outcome, 'candidate', 'the heading span is real behavioral bytes');
+  });
+
+  it('never leaks external spec paths through a symlinked specs subtree (Devin F1, SEC)', async () => {
+    const root = await makeTemp('aif-tls-escape-');
+    const changeId = 'escape-change';
+    await seedCaseProject(root, changeId, { trace: null, specs: [], tests: [] });
+    const external = await makeTemp('aif-tls-escape-ext-');
+    const externalSpec = path.join(external, 'secret-cap', 'spec.md');
+    await mkdir(path.dirname(externalSpec), { recursive: true });
+    await writeFile(externalSpec, '# External spec\n\nMust never be declared or read.\n');
+    let symlinked = false;
+    try {
+      await symlink(path.join(external, 'secret-cap'), path.join(root, 'openspec', 'changes', changeId, 'specs', 'linked'));
+      symlinked = true;
+    } catch {
+      symlinked = false; // symlink privilege unavailable: the ENOTDIR test covers the same truncation path
+    }
+    if (!symlinked) return;
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    const emptyTrace = { schemaVersion: 'lekalo/trace-manifest/v0.2.16', identity: 'dev.lekalo.trace-manifest@0.2.16', completeness: 'full', nodes: [], relations: [], gaps: [] };
+    await writeFile(manifest, JSON.stringify({ trace: emptyTrace, manifestDigest: `sha256:${digest(JSON.stringify(emptyTrace))}` }), 'utf8');
+    const { exitCode, value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+    assert.equal(exitCode, 0);
+    assert.equal(JSON.stringify(value).includes('secret-cap'), false, 'external paths never enter the observation');
+    assert.ok(value.diagnostics.some((entry) => entry.code === 'delta-spec-inventory-truncated'));
+    assert.equal(value.structural.scan.coverage, 'partial');
+    assert.equal(value.structural.outcome, 'abstain');
+    assert.deepEqual(value.structural.scan.truncations, ['delta-spec-inventory-truncated']);
+  });
+
   it('refuses a tampered truncated observation promoted to a full none (C3)', async () => {
     const root = await makeTemp('aif-tls-trunctamper-');
     const changeId = 'trunc-tamper-change';
