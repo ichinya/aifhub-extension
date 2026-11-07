@@ -24,8 +24,13 @@ access and no paid calls happen in any test that consumes these files.
   re-verified against a real export. `foreign-trace.json` is placed under a
   different change's custody directory by the test and must never be read.
 - `tests/` — presented test inputs (`--test <path>`): JS test files exercise
-  comment/string-literal masking for behavioral anchors, `.md` test documents
-  carry exact scenario headings (EN and cyrillic) as anchor needles.
+  comment/string-literal masking for behavioral anchors (including nested
+  template interpolations), `.md` test documents carry exact scenario
+  headings (EN and cyrillic) as anchor needles. Masking is per language
+  family (JS, hash-comment, none for prose/unknown extensions — documented
+  P0 limitation); trace refs after the kind prefix follow the Lekalo symbol
+  form, so requirement/scenario titles with spaces or non-ASCII participate
+  through parsed scenarios and test anchors rather than trace refs.
 - `labels.json` — per-case structural expectations (exact edge sets, outcomes,
   coverage, refusals) plus fake-assessor semantic labels.
 

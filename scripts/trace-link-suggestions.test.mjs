@@ -42,6 +42,7 @@ import {
   tokenize,
   intersects,
   maskCodeRegions,
+  maskModeForPath,
   validateGraphShape,
   validateObservationBinding,
   writeTraceLinkObservation,
@@ -81,6 +82,7 @@ async function treeFingerprint(root) {
 // Seeds a disposable project for one corpus case: config, delta specs, trace
 // manifest under the change's own custody directory, presented test inputs.
 async function seedCaseProject(root, changeId, { config = CONFIG_ON, trace = null, specs = [], tests = [], foreignChange = null, foreignTrace = null } = {}) {
+
   await mkdir(path.join(root, '.ai-factory'), { recursive: true });
   if (config !== undefined && config !== null) {
     await writeFile(path.join(root, '.ai-factory', 'config.yaml'), config, 'utf8');
@@ -121,6 +123,14 @@ async function runCommand(root, argv, options = {}) {
   let value = null;
   try { value = parseStrictJson(text); } catch { value = null; }
   return { exitCode, value, text };
+}
+
+// Writes an inline delta spec (test-local scenario, outside the corpus files)
+// into the change's canonical specs tree under the exact spec.md name.
+async function writeInlineSpec(root, changeId, capDir, content) {
+  const target = path.join(root, 'openspec', 'changes', changeId, 'specs', capDir, 'spec.md');
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(target, content, 'utf8');
 }
 
 function refOf(node) {
@@ -191,6 +201,32 @@ describe('trace-link-suggestions arguments and config', () => {
     assert.equal(config.enabledMalformed, true);
     assert.equal(config.enabled, null);
   });
+
+  it('treats a non-mapping line inside the guarded namespace as a malformed form, never a silent skip', () => {
+    const parsed = parseTraceLinkSuggestionsConfigSubset([
+      'aifhub:',
+      '  traceLinkSuggestions:',
+      '    enabled: true',
+      '    this line has no mapping colon at all',
+    ].join('\n'));
+    const codes = parsed.diagnostics.map((entry) => entry.code);
+    assert.ok(codes.includes('trace-link-suggestions:malformed-line'), codes.join(','));
+    // A guarded malformed line keeps the producer off: parsed diagnostics
+    // force enabledMalformed at the config-read layer.
+    assert.ok(parsed.diagnostics.length > 0);
+  });
+
+  it('keeps an unguarded malformed line outside the bounded namespace diagnostics', () => {
+    const parsed = parseTraceLinkSuggestionsConfigSubset([
+      'utilities:',
+      '  this line has no mapping colon at all',
+      'aifhub:',
+      '  traceLinkSuggestions:',
+      '    enabled: true',
+    ].join('\n'));
+    assert.equal(parsed.diagnostics.length, 0);
+    assert.equal(parsed.value.aifhub.traceLinkSuggestions.enabled, true);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -253,11 +289,12 @@ describe('trace-link-suggestions custody reader', () => {
     const changeId = 'link-change';
     await seedCaseProject(root, changeId, { trace: 'traces/dev-trace-nm.json', specs: ['specs/spec-en.md', 'specs/spec-ru.md'], tests: [] });
     const outside = path.join(root, 'outside-trace.json');
-    await writeFile(outside, await readFile(path.join(root, traceManifestPath(changeId))));
-    await rm(path.join(root, traceManifestPath(changeId)));
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await writeFile(outside, await readFile(manifest));
     let linked = false;
     try {
-      await link(outside, path.join(root, traceManifestPath(changeId)));
+      await rm(manifest);
+      await link(outside, manifest);
       linked = true;
     } catch {
       linked = false; // hardlinks unsupported on this volume: the directory refusal above covers the shape
@@ -265,10 +302,14 @@ describe('trace-link-suggestions custody reader', () => {
     if (linked) {
       const { value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
       assert.deepEqual(value.codes, ['trace-custody']);
+      // Remove the hardlink before the symlink attempt: an existing
+      // destination would make the symlink creation fail with EEXIST and be
+      // silently absorbed, leaving the symlink shape untested.
+      await rm(manifest);
     }
     let symlinked = false;
     try {
-      await symlink(outside, path.join(root, traceManifestPath(changeId)));
+      await symlink(outside, manifest);
       symlinked = true;
     } catch {
       symlinked = false; // symlink privilege unavailable: skipped honestly, not asserted
@@ -312,6 +353,55 @@ describe('trace-link-suggestions custody reader', () => {
     assert.equal(exitCode, 0);
     assert.deepEqual(value.codes, ['trace-changed']);
   });
+
+  it('reports an honest none for a full scan with resolvable nodes but zero suggestions', async () => {
+    const root = await makeTemp('aif-tls-none-');
+    const changeId = 'none-change';
+    // (A) resolvable requirement ref, no relations: nodes exist, edges 0.
+    await seedCaseProject(root, changeId, { trace: null, specs: [], tests: [] });
+    await writeInlineSpec(root, changeId, 'none', '# Delta for none\n\n## ADDED Requirements\n\n### Requirement: Good\n\nThe none outcome MUST stay honest for a full scan without suggestions.\n');
+    const { createHash } = await import('node:crypto');
+    const traceA = {
+      schemaVersion: 'lekalo/trace-manifest/v0.2.16',
+      identity: 'dev.lekalo.trace-manifest@0.2.16',
+      completeness: 'full',
+      nodes: [{ symbol: 'requirement:Good' }],
+      relations: [],
+      gaps: [],
+    };
+    const manifestA = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifestA), { recursive: true });
+    await writeFile(manifestA, JSON.stringify({ trace: traceA, manifestDigest: `sha256:${createHash('sha256').update(JSON.stringify(traceA)).digest('hex')}` }), 'utf8');
+    const runA = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+    assert.equal(runA.exitCode, 0, JSON.stringify(runA.value?.codes ?? []));
+    assert.equal(runA.value.structural.outcome, 'none');
+    assert.equal(runA.value.structural.scan.coverage, 'full');
+    assert.equal(runA.value.structural.edges.length, 0);
+    assert.ok(runA.value.structural.nodes.length > 0, 'resolved universe nodes are not suggestions');
+    // (D) unsupported-kind symbols only + a parsed scenario: nodes exist, edges 0.
+    const traceB = {
+      schemaVersion: 'lekalo/trace-manifest/v0.2.16',
+      identity: 'dev.lekalo.trace-manifest@0.2.16',
+      completeness: 'full',
+      nodes: [{ symbol: 'policy:legacy.only' }],
+      relations: [],
+      gaps: [],
+    };
+    await writeFile(manifestA, JSON.stringify({ trace: traceB, manifestDigest: `sha256:${createHash('sha256').update(JSON.stringify(traceB)).digest('hex')}` }), 'utf8');
+    const runB = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+    assert.equal(runB.exitCode, 0, JSON.stringify(runB.value?.codes ?? []));
+    assert.equal(runB.value.structural.outcome, 'none');
+  });
+
+  it('honors the structural deadline as a bounded not_run', async () => {
+    const root = await makeTemp('aif-tls-deadline-');
+    const changeId = 'deadline-change';
+    await seedCaseProject(root, changeId, { trace: 'traces/dev-trace-nm.json', specs: ['specs/spec-en.md', 'specs/spec-ru.md'], tests: [] });
+    const { exitCode, value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json'], { deadlineMs: 0 });
+    assert.equal(exitCode, 0);
+    assert.equal(value.state, 'not_run');
+    assert.deepEqual(value.codes, ['deadline-exceeded']);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -341,6 +431,43 @@ describe('trace-link-suggestions exact-ref refusals', () => {
     const { exitCode, value } = await runCommand(root, ['--change', 'twin-change', '--enabled', 'true', '--json']);
     assert.equal(exitCode, 2);
     assert.deepEqual(value.codes, ['invalid-candidate:unresolved-ref']);
+  });
+
+  it('refuses duplicate scenario headings inside one requirement before any node collapses', async () => {
+    const root = await makeTemp('aif-tls-dupscn-');
+    const changeId = 'dup-scenario-change';
+    // No trace ref names the duplicate: the pre-created scenario nodes must
+    // refuse the ambiguity instead of silently keeping the last span.
+    await seedCaseProject(root, changeId, { trace: null, specs: [], tests: [] });
+    await writeInlineSpec(root, changeId, 'dup', [
+      '# Delta for duplicates',
+      '',
+      '## ADDED Requirements',
+      '',
+      '### Requirement: DupHost',
+      '',
+      'One requirement with two identical scenario headings.',
+      '',
+      '#### Scenario: Same',
+      '',
+      '- GIVEN first',
+      '- WHEN parsed',
+      '- THEN ambiguous',
+      '',
+      '#### Scenario: Same',
+      '',
+      '- GIVEN second',
+      '- WHEN parsed',
+      '- THEN refused',
+      '',
+    ].join('\n'));
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    const emptyTrace = { schemaVersion: 'lekalo/trace-manifest/v0.2.16', identity: 'dev.lekalo.trace-manifest@0.2.16', completeness: 'full', nodes: [], relations: [], gaps: [] };
+    await writeFile(manifest, JSON.stringify({ trace: emptyTrace, manifestDigest: `sha256:${digest(JSON.stringify(emptyTrace))}` }), 'utf8');
+    const { exitCode, value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+    assert.equal(exitCode, 2);
+    assert.deepEqual(value.codes, ['invalid-candidate:ambiguous-scenario-ref']);
   });
 
   it('skips unsupported trace relations with a bounded diagnostic and keeps scanning', async () => {
@@ -450,6 +577,78 @@ describe('trace-link-suggestions outcome semantics', () => {
       return found.map((at) => [...Array(needle.length).keys()].every((offset) => !masked[at + offset]));
     };
     assert.deepEqual(occurrences('topic.thing'), [true, false, false, false, false, true]);
+  });
+
+  it('masks needles inside nested template interpolations but keeps real interpolation code anchorable', () => {
+    const bytes = Buffer.from([
+      'const message = `a ${`topic.thing nested`} c`;',
+      'const value = `${topic.thing()} done`;',
+    ].join('\n'), 'utf8');
+    const masked = maskCodeRegions(bytes, 'js');
+    const first = bytes.indexOf(Buffer.from('topic.thing nested'));
+    const second = bytes.indexOf(Buffer.from('topic.thing()'));
+    assert.ok([...Array('topic.thing nested'.length).keys()].every((offset) => masked[first + offset]), 'nested literal stays masked');
+    assert.ok([...Array('topic.thing()'.length).keys()].every((offset) => !masked[second + offset]), 'interpolation code stays anchorable');
+  });
+
+  it('masks hash-family comments and quotes, and leaves prose unmasked', () => {
+    const hashBytes = Buffer.from([
+      'def run():',
+      "    # topic.thing documented in a comment",
+      "    label = 'topic.thing in string'",
+      '    topic.thing()',
+    ].join('\n'), 'utf8');
+    const masked = maskCodeRegions(hashBytes, 'hash');
+    const commentAt = hashBytes.indexOf(Buffer.from('topic.thing documented'));
+    const stringAt = hashBytes.indexOf(Buffer.from('topic.thing in string'));
+    const callAt = hashBytes.indexOf(Buffer.from('topic.thing()'));
+    assert.ok([...Array('topic.thing documented'.length).keys()].every((offset) => masked[commentAt + offset]));
+    assert.ok([...Array('topic.thing in string'.length).keys()].every((offset) => masked[stringAt + offset]));
+    assert.ok([...Array('topic.thing()'.length).keys()].every((offset) => !masked[callAt + offset]));
+    // Prose/unknown extensions: no recognized comment or literal forms, so
+    // nothing is masked (documented P0 limitation).
+    const proseBytes = Buffer.from("Scenario: user's topic.thing anchor\n", 'utf8');
+    const proseMasked = maskCodeRegions(proseBytes, 'none');
+    assert.ok([...Array(proseBytes.length).keys()].every((offset) => !proseMasked[offset]));
+    assert.equal(maskModeForPath('test/behavior.spec.py'), 'hash');
+    assert.equal(maskModeForPath('test/behavior.spec.mjs'), 'js');
+    assert.equal(maskModeForPath('test/behavior.spec.md'), 'none');
+    assert.equal(maskModeForPath('test/unknown.spec.xyz'), 'none');
+  });
+
+  it('anchors hash-family tests by their own comment forms end-to-end', async () => {
+    const root = await makeTemp('aif-tls-py-');
+    const changeId = 'py-change';
+    await seedCaseProject(root, changeId, { trace: 'traces/heldout-trace-behavior.json', specs: [], tests: [] });
+    await writeInlineSpec(root, changeId, 'behavior', [
+      '# Delta for behavior',
+      '',
+      '## ADDED Requirements',
+      '',
+      '### Requirement: TopicOnly',
+      '',
+      'The topic-only rule MUST stay at related level without behavioral anchors.',
+      '',
+    ].join('\n'));
+    const pyTarget = path.join(root, 'test', 'behavior.spec.py');
+    await mkdir(path.dirname(pyTarget), { recursive: true });
+    await writeFile(pyTarget, [
+      'def test_masked():',
+      "    # topic.thing only in a comment",
+      "    caption = 'topic.thing only in a string'",
+      '    assert caption',
+      '',
+      'def test_real():',
+      '    topic.thing()',
+      '',
+    ].join('\n'), 'utf8');
+    const { exitCode, value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--test', 'test/behavior.spec.py', '--json']);
+    assert.equal(exitCode, 0);
+    const edge = value.structural.edges.find((entry) => entry.relation === 'symbol_test');
+    assert.ok(edge, 'the topic-matched edge is emitted');
+    assert.equal(edge.outcome, 'candidate', 'the real python call is an unmasked anchor');
+    assert.equal(edge.behavioral_assertion_refs.length, 1);
+    assert.ok(edge.behavioral_assertion_refs[0].span.end > edge.behavioral_assertion_refs[0].span.start);
   });
 
   it('never turns a suggestion into coverage, QA status, or a gate result', async () => {
@@ -599,6 +798,98 @@ describe('trace-link-suggestions binding and revalidation', () => {
     partialEdit.structural.outcome = 'candidate';
     assert.throws(() => assertStructuralInvariants(partialEdit));
     assert.equal((await validateObservationBinding(root, partialEdit)).code, 'observation-invalid');
+
+    const fullWithMissingEdit = structuredClone(observation);
+    fullWithMissingEdit.structural.scan.missing_sources = [{ path: 'test/ghost.spec.mjs', reason: 'file-missing' }];
+    assert.equal((await validateObservationBinding(root, fullWithMissingEdit)).code, 'observation-invalid');
+
+    const failedSemanticEdit = structuredClone(observation);
+    failedSemanticEdit.semantic.run_status = 'failed';
+    failedSemanticEdit.semantic.assessments = [{ edge_id: 'edge-999', verdict: 'supports', rationale: 'ghost assessment' }];
+    assert.equal((await validateObservationBinding(root, failedSemanticEdit)).code, 'observation-invalid');
+
+    const notRunSemanticEdit = structuredClone(observation);
+    notRunSemanticEdit.semantic.run_status = 'not_run';
+    notRunSemanticEdit.semantic.assessments = [{ edge_id: 'edge-1', verdict: 'supports', rationale: 'assessed without a stage' }];
+    assert.equal((await validateObservationBinding(root, notRunSemanticEdit)).code, 'observation-invalid');
+
+    const duplicateAssessmentEdit = structuredClone(observation);
+    duplicateAssessmentEdit.semantic.assessments = [
+      ...duplicateAssessmentEdit.semantic.assessments,
+      { ...duplicateAssessmentEdit.semantic.assessments[0], verdict: 'contradicts' },
+    ];
+    assert.equal((await validateObservationBinding(root, duplicateAssessmentEdit)).code, 'observation-invalid');
+  });
+
+  it('rejects tampered nodes whose exact_ref shape does not match their kind', async () => {
+    const root = await makeTemp('aif-tls-kindref-');
+    const observation = await seededWritten(root);
+    const schema = parseStrictJson(await readFile(new URL(`../${CONTRACT_MODULE}`, import.meta.url), 'utf8'));
+    const tampered = structuredClone(observation);
+    const testNode = tampered.structural.nodes.find((node) => node.kind === 'test');
+    testNode.kind = 'semantic_symbol';
+    // The schema's oneOf branches pin kind consts AND ref shapes together.
+    assert.ok(validateJsonAgainstSchema(tampered, schema).length > 0, 'schema rejects the kind/ref mismatch');
+    const shape = validateGraphShape({ nodes: tampered.structural.nodes, edges: tampered.structural.edges });
+    assert.equal(shape.ok, false);
+    assert.equal(shape.code, 'kind-ref-mismatch');
+    assert.equal((await validateObservationBinding(root, tampered)).code, 'observation-invalid');
+  });
+
+  it('marks an observation stale when a delta spec is added after the write', async () => {
+    const root = await makeTemp('aif-tls-inventory-');
+    const observation = await seededWritten(root);
+    const fresh = await validateObservationBinding(root, observation);
+    assert.equal(fresh.stale, false);
+    await writeInlineSpec(root, 'bind-change', 'extra', '# Delta for extra\n\n## ADDED Requirements\n\n### Requirement: LateAddition\n\nA spec added after the write MUST invalidate the observation.\n');
+    const drifted = await validateObservationBinding(root, observation);
+    assert.equal(drifted.stale, true);
+    assert.ok(drifted.mismatched.includes('delta_spec_inventory'), drifted.mismatched.join(','));
+    assert.ok(drifted.mismatched.includes('binding'));
+  });
+
+  it('keeps a malformed-UTF-8 spec consistently classified across write, probe, and revalidation', async () => {
+    const root = await makeTemp('aif-tls-malformed-');
+    const changeId = 'malformed-spec-change';
+    await seedCaseProject(root, changeId, { trace: null, specs: ['specs/spec-en.md'], tests: [] });
+    await mkdir(path.join(root, 'openspec', 'changes', changeId, 'specs', 'broken'), { recursive: true });
+    await writeFile(path.join(root, 'openspec', 'changes', changeId, 'specs', 'broken', 'spec.md'), Buffer.from([0xff, 0xfe, 0x00, 0x01]));
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    await writeFile(manifest, JSON.stringify({ trace: { schemaVersion: 'lekalo/trace-manifest/v0.2.16', identity: 'dev.lekalo.trace-manifest@0.2.16', completeness: 'full', nodes: [], relations: [], gaps: [] }, manifestDigest: `sha256:${digest(JSON.stringify({ schemaVersion: 'lekalo/trace-manifest/v0.2.16', identity: 'dev.lekalo.trace-manifest@0.2.16', completeness: 'full', nodes: [], relations: [], gaps: [] }))}` }), 'utf8');
+    const { exitCode, value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--write', '--json']);
+    assert.equal(exitCode, 0, JSON.stringify(value?.codes ?? []));
+    assert.equal(value.structural.outcome, 'abstain', 'an unreadable declared spec degrades coverage');
+    assert.equal(value.structural.scan.coverage, 'partial');
+    assert.ok(value.structural.scan.missing_sources.some((entry) => entry.path.endsWith('broken/spec.md')), JSON.stringify(value.structural.scan.missing_sources));
+    const malformedInput = value.inputs.find((input) => input.path.endsWith('broken/spec.md'));
+    assert.equal(malformedInput.kind, 'malformed');
+    const observation = parseStrictJson(await readFile(path.join(root, traceLinkPaths(changeId).observation), 'utf8'));
+    const fresh = await validateObservationBinding(root, observation);
+    assert.equal(fresh.stale, false, 'a malformed spec must not be born stale (classification is consistent)');
+    assert.deepEqual(fresh.mismatched, []);
+  });
+
+  it('degrades coverage for a dangling-symlink delta spec instead of skipping it silently', async () => {
+    const root = await makeTemp('aif-tls-danglingspec-');
+    const changeId = 'dangling-spec-change';
+    await seedCaseProject(root, changeId, { trace: null, specs: ['specs/spec-en.md'], tests: [] });
+    let symlinked = false;
+    try {
+      await symlink(path.join(root, 'no-such-target.md'), path.join(root, 'openspec', 'changes', changeId, 'specs', 'broken', 'spec.md'));
+      symlinked = true;
+    } catch {
+      symlinked = false; // symlink privilege unavailable: the malformed-UTF-8 test above covers the same degradation path
+    }
+    if (!symlinked) return;
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    const emptyTrace = { schemaVersion: 'lekalo/trace-manifest/v0.2.16', identity: 'dev.lekalo.trace-manifest@0.2.16', completeness: 'full', nodes: [], relations: [], gaps: [] };
+    await writeFile(manifest, JSON.stringify({ trace: emptyTrace, manifestDigest: `sha256:${digest(JSON.stringify(emptyTrace))}` }), 'utf8');
+    const { exitCode, value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+    assert.equal(exitCode, 0);
+    assert.equal(value.structural.scan.coverage, 'partial');
+    assert.ok(value.structural.scan.missing_sources.some((entry) => entry.path.endsWith('broken/spec.md')), 'the dangling spec is a declared missing source');
   });
 
   it('marks a mid-run swap stale through the freshness probe', async () => {
@@ -941,29 +1232,40 @@ describe('trace-link-suggestions AC7 byte-identity', () => {
       assert.equal(run.exitCode, 0);
       assert.equal(run.value.semantic.freshness, 'stale');
     });
-    await expectIdentical(tracePath, before, 'partial', async () => {
+    // For the mutated-trace branches the consumer must leave the bytes exactly
+    // as the test wrote them: the comparison runs against the post-mutation
+    // snapshot BEFORE any restore, so a consumer write would be caught; the
+    // original fixture is restored in a finally afterwards.
+    const mutatedBranches = [
+      ['partial', async (manifest) => {
+        const partial = parseStrictJson(await readFile(path.join(CORPUS_DIR, 'traces', 'dev-trace-partial.json'), 'utf8'));
+        await writeFile(manifest, JSON.stringify(partial), 'utf8');
+        const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+        assert.equal(run.exitCode, 0);
+        assert.equal(run.value.structural.outcome, 'abstain');
+      }],
+      ['malformed', async (manifest) => {
+        await writeFile(manifest, '{"broken"', 'utf8');
+        const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+        assert.deepEqual(run.value.codes, ['trace-invalid']);
+      }],
+      ['overflow', async (manifest) => {
+        await writeFile(manifest, Buffer.alloc(TRACE_EXPORT_LIMIT + 1, 0x20));
+        const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+        assert.deepEqual(run.value.codes, ['export-overflow']);
+      }],
+    ];
+    for (const [label, branch] of mutatedBranches) {
       const manifest = path.join(root, traceManifestPath(changeId));
-      const partial = parseStrictJson(await readFile(path.join(CORPUS_DIR, 'traces', 'dev-trace-partial.json'), 'utf8'));
-      await writeFile(manifest, JSON.stringify(partial), 'utf8');
-      const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
-      assert.equal(run.exitCode, 0);
-      assert.equal(run.value.structural.outcome, 'abstain');
-      await writeFile(manifest, before, 'utf8');
-    });
-    await expectIdentical(tracePath, before, 'malformed', async () => {
-      const manifest = path.join(root, traceManifestPath(changeId));
-      await writeFile(manifest, '{"broken"', 'utf8');
-      const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
-      assert.deepEqual(run.value.codes, ['trace-invalid']);
-      await writeFile(manifest, before, 'utf8');
-    });
-    await expectIdentical(tracePath, before, 'overflow', async () => {
-      const manifest = path.join(root, traceManifestPath(changeId));
-      await writeFile(manifest, Buffer.alloc(TRACE_EXPORT_LIMIT + 1, 0x20));
-      const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
-      assert.deepEqual(run.value.codes, ['export-overflow']);
-      await writeFile(manifest, before, 'utf8');
-    });
+      try {
+        await branch(manifest);
+        const mutated = await readFile(manifest);
+        assert.deepEqual(await readFile(tracePath), mutated, `trace bytes must stay byte-identical to the mutated snapshot: ${label}`);
+      } finally {
+        await writeFile(tracePath, before, 'utf8');
+      }
+      assert.deepEqual(await readFile(tracePath), before, `restore returns the original bytes: ${label}`);
+    }
   });
 });
 
@@ -1143,7 +1445,40 @@ describe('trace-link-suggestions corpus evaluation (fixtures + labels)', () => {
     assert.equal(value.semantic.run_status, 'not_run');
     assert.equal(value.semantic.assessments.length, 0);
     assert.ok(value.diagnostics.some((entry) => entry.code === 'assessment-not-run' && entry.detail === 'assessor-unavailable'));
+    assert.equal(value.semantic.outcome_reason, 'assessor-unavailable', 'the not_run reason names the concrete cause');
     assert.ok(value.structural.edges.length > 0, 'structural results survive the not_run semantic stage');
+  });
+
+  it('executes every labeled refusal case from labels.json', async () => {
+    const labels = await loadLabels();
+    assert.ok(labels.refusals.length >= 7, `the refusal corpus ships ${labels.refusals.length} cases`);
+    for (const [index, refusal] of labels.refusals.entries()) {
+      const root = await makeTemp(`aif-tls-refusal-${index}-`);
+      const changeId = `refusal-${refusal.id}`;
+      await seedCaseProject(root, changeId, {
+        trace: refusal.foreign_change ? null : refusal.trace,
+        specs: refusal.specs ?? [],
+        tests: refusal.tests ?? [],
+        foreignChange: refusal.foreign_change ? 'other-change' : null,
+        foreignTrace: refusal.foreign_change ? refusal.trace : null,
+      });
+      const { exitCode, value } = await runCommand(root, [
+        '--change', changeId, '--enabled', 'true',
+        ...(refusal.tests ?? []).flatMap((testPath) => ['--test', testPath]),
+        '--json',
+      ]);
+      assert.equal(exitCode, refusal.exit, `${refusal.id} exit code`);
+      if (refusal.exit === 2) {
+        assert.deepEqual(value.codes, [refusal.expected_code], `${refusal.id} refusal code`);
+      } else {
+        assert.equal(value.state, 'not_run', `${refusal.id} is an honest not_run`);
+        assert.deepEqual(value.codes, [refusal.expected_code], `${refusal.id} not_run code`);
+      }
+      if (refusal.foreign_change) {
+        const foreign = await readFile(path.join(root, '.ai-factory', 'traces', 'other-change', 'lekalo-trace-manifest.json'));
+        assert.ok(foreign.length > 0, `${refusal.id}: foreign custody file untouched`);
+      }
+    }
   });
 });
 
@@ -1205,6 +1540,67 @@ describe('trace-link-suggestions graph limits', () => {
     assert.equal(value.structural.scan.coverage, 'partial');
     assert.equal(value.structural.outcome, 'abstain');
     assert.ok(value.diagnostics.some((entry) => entry.code === 'graph-truncated'));
+  });
+
+  it('degrades coverage when behavioral anchors are truncated beyond the per-edge cap', async () => {
+    const root = await makeTemp('aif-tls-anchorlimit-');
+    const changeId = 'anchor-limit-change';
+    const trace = {
+      schemaVersion: 'lekalo/trace-manifest/v0.2.16',
+      identity: 'dev.lekalo.trace-manifest@0.2.16',
+      completeness: 'full',
+      nodes: [{ symbol: 'operation:anchor.thing' }],
+      relations: [],
+      gaps: [],
+    };
+    const { createHash } = await import('node:crypto');
+    const envelope = { trace, manifestDigest: `sha256:${createHash('sha256').update(JSON.stringify(trace)).digest('hex')}` };
+    await seedCaseProject(root, changeId, { specs: [], tests: [] });
+    const manifestPath = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifestPath), { recursive: true });
+    await writeFile(manifestPath, JSON.stringify(envelope), 'utf8');
+    // 55 unmasked occurrences: 50 kept anchors plus dropped real anchors
+    // beyond the cap — a coverage fact, never a silent full scan.
+    const testLines = Array.from({ length: 55 }, () => 'anchor.thing();');
+    const testTarget = path.join(root, 'test', 'anchors.spec.mjs');
+    await mkdir(path.dirname(testTarget), { recursive: true });
+    await writeFile(testTarget, testLines.join('\n'), 'utf8');
+    const { exitCode, value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--test', 'test/anchors.spec.mjs', '--json']);
+    assert.equal(exitCode, 0);
+    const edge = value.structural.edges.find((entry) => entry.relation === 'symbol_test');
+    assert.ok(edge, 'the anchored edge is emitted');
+    assert.equal(edge.behavioral_assertion_refs.length, GRAPH_LIMITS.max_assertion_refs_per_edge);
+    assert.ok(value.diagnostics.some((entry) => entry.code === 'assertion-refs-truncated'));
+    assert.equal(value.structural.scan.coverage, 'partial');
+    assert.equal(value.structural.outcome, 'abstain');
+  });
+
+  it('keeps exactly-at-cap anchor sets complete (no false truncation)', async () => {
+    const root = await makeTemp('aif-tls-anchorcap-');
+    const changeId = 'anchor-cap-change';
+    const trace = {
+      schemaVersion: 'lekalo/trace-manifest/v0.2.16',
+      identity: 'dev.lekalo.trace-manifest@0.2.16',
+      completeness: 'full',
+      nodes: [{ symbol: 'operation:anchor.thing' }],
+      relations: [],
+      gaps: [],
+    };
+    const { createHash } = await import('node:crypto');
+    const envelope = { trace, manifestDigest: `sha256:${createHash('sha256').update(JSON.stringify(trace)).digest('hex')}` };
+    await seedCaseProject(root, changeId, { specs: [], tests: [] });
+    const manifestPath = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifestPath), { recursive: true });
+    await writeFile(manifestPath, JSON.stringify(envelope), 'utf8');
+    const testLines = Array.from({ length: GRAPH_LIMITS.max_assertion_refs_per_edge }, () => 'anchor.thing();');
+    const testTarget = path.join(root, 'test', 'exact.spec.mjs');
+    await mkdir(path.dirname(testTarget), { recursive: true });
+    await writeFile(testTarget, testLines.join('\n'), 'utf8');
+    const { exitCode, value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--test', 'test/exact.spec.mjs', '--json']);
+    assert.equal(exitCode, 0);
+    assert.ok(!value.diagnostics.some((entry) => entry.code === 'assertion-refs-truncated'));
+    assert.equal(value.structural.scan.coverage, 'full');
+    assert.equal(value.structural.outcome, 'candidate');
   });
 
   it('refuses observations above the global byte budget before emit', async () => {
@@ -1272,6 +1668,21 @@ describe('trace-link-suggestions opt-in', () => {
     assert.equal(value.state, 'not_run');
     assert.equal(value.codes[0], 'trace-link-suggestions-disabled');
     assert.ok(value.codes.some((code) => String(code).startsWith('trace-link-suggestions:')));
+  });
+
+  it('keeps the producer off when a guarded namespace line is not a mapping', async () => {
+    const root = await makeTemp('aif-tls-badline-');
+    await seedCaseProject(root, 'bad-line-change', {
+      config: 'aifhub:\n  traceLinkSuggestions:\n    enabled: true\n    broken line without colon\n',
+      trace: 'traces/dev-trace-nm.json',
+      specs: ['specs/spec-en.md'],
+      tests: [],
+    });
+    const { exitCode, value } = await runCommand(root, ['--change', 'bad-line-change', '--json']);
+    assert.equal(exitCode, 0);
+    assert.equal(value.state, 'not_run');
+    assert.equal(value.codes[0], 'trace-link-suggestions-disabled');
+    assert.ok(value.codes.some((code) => code === 'trace-link-suggestions:malformed-line'), value.codes.join(','));
   });
 
   it('gives the CLI override precedence over the config key and refuses invalid change ids early', async () => {

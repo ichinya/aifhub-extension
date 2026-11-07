@@ -147,13 +147,23 @@
                   "reason"
                 ]
               }
+            },
+            "delta_spec_inventory": {
+              "type": "array",
+              "maxItems": 200,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              }
             }
           },
           "required": [
             "coverage",
             "declared_sources",
             "scanned_sources",
-            "missing_sources"
+            "missing_sources",
+            "delta_spec_inventory"
           ]
         },
         "outcome": {
@@ -663,120 +673,189 @@
       ]
     },
     "graph_node": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "node_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "kind": {
+              "const": "requirement"
+            },
+            "exact_ref": {
+              "$ref": "#/$defs/requirement_ref_form"
+            }
+          },
+          "required": [
+            "node_id",
+            "kind",
+            "exact_ref"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "node_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "kind": {
+              "const": "semantic_symbol"
+            },
+            "exact_ref": {
+              "$ref": "#/$defs/symbol_ref_form"
+            }
+          },
+          "required": [
+            "node_id",
+            "kind",
+            "exact_ref"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "node_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "kind": {
+              "const": "scenario"
+            },
+            "exact_ref": {
+              "$ref": "#/$defs/scenario_ref_form"
+            }
+          },
+          "required": [
+            "node_id",
+            "kind",
+            "exact_ref"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "node_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "kind": {
+              "const": "test"
+            },
+            "exact_ref": {
+              "$ref": "#/$defs/test_ref_form"
+            }
+          },
+          "required": [
+            "node_id",
+            "kind",
+            "exact_ref"
+          ]
+        }
+      ]
+    },
+    "requirement_ref_form": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "node_id": {
+        "spec_path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "requirement_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "spec_path",
+        "requirement_ref"
+      ]
+    },
+    "symbol_ref_form": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "symbol_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(operation|endpoint):[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        }
+      },
+      "required": [
+        "symbol_ref"
+      ]
+    },
+    "scenario_ref_form": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "spec_path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "requirement_ref": {
           "type": "string",
           "minLength": 1,
           "maxLength": 200
         },
-        "kind": {
-          "$ref": "#/$defs/node_kind"
+        "heading": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
         },
-        "exact_ref": {
-          "oneOf": [
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "spec_path": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 500
-                },
-                "requirement_ref": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 200
-                }
-              },
-              "required": [
-                "spec_path",
-                "requirement_ref"
-              ]
-            },
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "symbol_ref": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 256,
-                  "pattern": "^(operation|endpoint):[A-Za-z0-9][A-Za-z0-9._:-]*$"
-                }
-              },
-              "required": [
-                "symbol_ref"
-              ]
-            },
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "spec_path": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 500
-                },
-                "requirement_ref": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 200
-                },
-                "heading": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 200
-                },
-                "span": {
-                  "$ref": "#/$defs/byte_span"
-                },
-                "document_sha256": {
-                  "type": "string",
-                  "pattern": "^sha256:[a-f0-9]{64}$"
-                },
-                "span_sha256": {
-                  "type": "string",
-                  "pattern": "^sha256:[a-f0-9]{64}$"
-                }
-              },
-              "required": [
-                "spec_path",
-                "requirement_ref",
-                "heading",
-                "span",
-                "document_sha256",
-                "span_sha256"
-              ]
-            },
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "path": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 500
-                },
-                "sha256": {
-                  "type": "string",
-                  "pattern": "^sha256:[a-f0-9]{64}$"
-                }
-              },
-              "required": [
-                "path",
-                "sha256"
-              ]
-            }
-          ]
+        "span": {
+          "$ref": "#/$defs/byte_span"
+        },
+        "document_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "span_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
         }
       },
       "required": [
-        "node_id",
-        "kind",
-        "exact_ref"
+        "spec_path",
+        "requirement_ref",
+        "heading",
+        "span",
+        "document_sha256",
+        "span_sha256"
+      ]
+    },
+    "test_ref_form": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "path",
+        "sha256"
       ]
     },
     "graph_edge": {

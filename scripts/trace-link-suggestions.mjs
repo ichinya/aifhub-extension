@@ -17,7 +17,7 @@
 // semantic stage reports an honest `not_run`; errors, abstentions, and
 // deadline cutoffs are never coerced into a positive verdict.
 import { randomUUID } from 'node:crypto';
-import { lstat, mkdir, open, readFile, realpath, rename, unlink } from 'node:fs/promises';
+import { lstat, mkdir, open, readdir, readFile, realpath, rename, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -29,7 +29,6 @@ import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
 import { verifyObservationIgnored } from './requirement-lint-git-guard.mjs';
 import { resolveProseLanguage } from './requirement-lint.mjs';
 import { createMarkdownCodeMask } from './markdown-structural-markers.mjs';
-import { collectCanonicalChangeArtifacts } from './openspec-execution-context.mjs';
 import {
   assessmentDigest,
   buildAssessmentBinding,
@@ -199,7 +198,18 @@ export function parseTraceLinkSuggestionsConfigSubset(raw) {
     const withoutComment = stripLineComment(rawLine);
     if (withoutComment.trim().length === 0) continue;
     const match = /^(\s*)([^:]+):(?:\s*(.*))?$/.exec(withoutComment);
-    if (!match) continue;
+    if (!match) {
+      // A non-mapping line inside a guarded context is a malformed namespace
+      // form, never a silent skip: the namespace must not stay enabled
+      // because an unparseable line happened to sit next to `enabled: true`.
+      const parentPath = stack.at(-1).path;
+      if (belowCheck(parentPath) || structural(parentPath)
+        || (parentPath.length >= CHECK_CONFIG_PATH.length
+          && CHECK_CONFIG_PATH.every((part, index) => parentPath[index] === part))) {
+        diagnostics.push(checkConfigDiagnostic('malformed-line', withoutComment.trim().slice(0, 100)));
+      }
+      continue;
+    }
     const indent = match[1].length;
     const key = match[2].trim();
     const rawValue = match[3]?.trim() ?? '';
@@ -340,34 +350,52 @@ function traceInvalid(reason) {
 
 export async function readTraceManifest(rootDir, changeId, options = {}) {
   // Custody rules first: only this change's own directory below the traces
-  // root is ever touched; a foreign path is never read. Path-safety refusals
-  // (symlink/hardlink/escape) are custody refusals, never crashes.
+  // root is ever touched; a foreign path is never read. The whole body is
+  // guarded: every refusal — path safety, vanished files (TOCTOU window
+  // between path resolution and stat/read), stat errors — is a bounded
+  // not_run code, never an exception escaping the {ok, code} contract.
   const relative = traceManifestPath(changeId);
-  let target;
   try {
-    target = await safeProviderPath(rootDir, relative);
-  } catch (error) {
-    return { ok: false, code: 'trace-custody', detail: String(error?.message ?? error).slice(0, 120) };
-  }
-  if (!target.exists) return { ok: false, code: 'trace-missing', detail: relative };
-  const stat = await lstat(target.path);
-  if (!stat.isFile()) return { ok: false, code: 'trace-custody', detail: 'not-a-file' };
-  if (stat.size > TRACE_EXPORT_LIMIT) return { ok: false, code: 'export-overflow', detail: String(stat.size) };
-  const reader = options.readTrace ?? (async (root, rel, limit) => readProviderFile(root, rel, limit));
-  let bytes = null;
-  try {
-    bytes = await reader(rootDir, relative, TRACE_EXPORT_LIMIT);
-  } catch (error) {
-    const message = String(error?.message ?? error);
-    if (message === 'file_limit' || (await lstat(target.path)).size > TRACE_EXPORT_LIMIT) {
-      return { ok: false, code: 'export-overflow', detail: message.slice(0, 120) };
+    let target;
+    try {
+      target = await safeProviderPath(rootDir, relative);
+    } catch (error) {
+      return { ok: false, code: 'trace-custody', detail: String(error?.message ?? error).slice(0, 120) };
     }
-    if (message === 'file_changed') return { ok: false, code: 'trace-changed', detail: relative };
-    if (message === 'unsafe_file' || message === 'unsafe_path') {
-      return { ok: false, code: 'trace-custody', detail: message.slice(0, 120) };
+    if (!target.exists) return { ok: false, code: 'trace-missing', detail: relative };
+    let stat;
+    try {
+      stat = await lstat(target.path);
+    } catch (error) {
+      return { ok: false, code: error?.code === 'ENOENT' ? 'trace-missing' : 'trace-changed', detail: String(error?.message ?? error).slice(0, 120) };
     }
-    return { ok: false, code: 'trace-changed', detail: message.slice(0, 120) };
+    if (!stat.isFile()) return { ok: false, code: 'trace-custody', detail: 'not-a-file' };
+    if (stat.size > TRACE_EXPORT_LIMIT) return { ok: false, code: 'export-overflow', detail: String(stat.size) };
+    const reader = options.readTrace ?? (async (root, rel, limit) => readProviderFile(root, rel, limit));
+    let bytes = null;
+    try {
+      bytes = await reader(rootDir, relative, TRACE_EXPORT_LIMIT);
+    } catch (error) {
+      const message = String(error?.message ?? error);
+      if (message === 'file_limit') {
+        return { ok: false, code: 'export-overflow', detail: message.slice(0, 120) };
+      }
+      if (message === 'file_changed') return { ok: false, code: 'trace-changed', detail: relative };
+      if (message === 'unsafe_file' || message === 'unsafe_path' || message === 'path_unreadable') {
+        return { ok: false, code: 'trace-custody', detail: message.slice(0, 120) };
+      }
+      // A vanished file (or any other stat/read error) is an unstable custody
+      // state, never a crash.
+      return { ok: false, code: error?.code === 'ENOENT' ? 'trace-missing' : 'trace-changed', detail: message.slice(0, 120) };
+    }
+    return await parseTraceEnvelope(bytes, relative);
+  } catch (error) {
+    return { ok: false, code: 'trace-changed', detail: String(error?.message ?? error).slice(0, 120) };
   }
+}
+
+async function parseTraceEnvelope(bytes, relative) {
+  if (bytes === null) return { ok: false, code: 'trace-missing', detail: relative };
   if (bytes === null) return { ok: false, code: 'trace-missing', detail: relative };
   let envelope;
   try {
@@ -422,9 +450,14 @@ export async function readTraceManifest(rootDir, changeId, options = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// Local requirement parser with byte-exact spans (behavioral parity with the
-// module-private `parseRequirements` in scripts/openspec-coverage-matrix.mjs,
-// which is not importable; conformance parity is pinned on shared fixtures).
+// Local requirement parser with byte-exact spans. Behavioral parity with the
+// module-private `parseRequirements` (scripts/openspec-coverage-matrix.mjs)
+// is pinned on the shared fixture surface — requirement titles, scenario
+// headings, and section assignment — and is deliberately NOT a byte-for-byte
+// clone: empty lines are dropped by the byte splitter, scenario keyword
+// composition differs (the coverage matrix prefixes "Scenario N:"), and
+// CR-only/BOM handling is byte-based. The diverging keyword composition is
+// not consumed by edges (topic matching uses node prose, not this list).
 // ---------------------------------------------------------------------------
 
 function splitByteLines(bytes) {
@@ -540,33 +573,92 @@ export function parseRequirementsFromBytes(bytes, specPath) {
 // assertion that only exists inside such a region is not behavioral evidence.
 // ---------------------------------------------------------------------------
 
-export function maskCodeRegions(bytes) {
+// Masking families for behavioral anchor extraction (P0, documented): the
+// JS family (line/block comments, quoted strings, template literals with
+// nested `${...}` interpolations), the hash-comment family (`#` line
+// comments plus quoted strings — no triple-quote handling), and `none` for
+// prose/unknown extensions where there are no recognized comment/literal
+// forms, so nothing is masked (every byte counts). An assertion that only
+// exists inside a masked region is not behavioral evidence.
+const JS_MASK_EXTENSIONS = new Set(['js', 'cjs', 'mjs', 'ts', 'jsx', 'tsx', 'java', 'cs', 'go', 'rs', 'swift', 'kt', 'scala', 'c', 'cc', 'cpp', 'h', 'hpp', 'php', 'json']);
+const HASH_MASK_EXTENSIONS = new Set(['py', 'sh', 'bash', 'zsh', 'rb', 'pl', 'yaml', 'yml', 'toml', 'r', 'jl', 'ps1']);
+
+export function maskModeForPath(testPath) {
+  const base = String(testPath ?? '');
+  const dot = base.lastIndexOf('.');
+  const extension = dot >= 0 ? base.slice(dot + 1).toLowerCase() : '';
+  if (JS_MASK_EXTENSIONS.has(extension)) return 'js';
+  if (HASH_MASK_EXTENSIONS.has(extension)) return 'hash';
+  return 'none';
+}
+
+export function maskCodeRegions(bytes, mode = 'js') {
   const masked = new Uint8Array(bytes.length);
+  if (mode === 'none') return masked;
+  if (mode === 'hash') {
+    let state = 'code';
+    for (let index = 0; index < bytes.length; index += 1) {
+      const byte = bytes[index];
+      if (state === 'code') {
+        if (byte === 0x23) { state = 'line-comment'; masked[index] = 1; continue; }
+        if (byte === 0x27) { state = 'single-quote'; masked[index] = 1; continue; }
+        if (byte === 0x22) { state = 'double-quote'; masked[index] = 1; continue; }
+        continue;
+      }
+      masked[index] = 1;
+      if (state === 'line-comment') {
+        if (byte === 0x0A || byte === 0x0D) { masked[index] = 0; state = 'code'; }
+      } else if (byte === 0x5C) {
+        masked[index + 1] = 1; index += 1;
+      } else if ((state === 'single-quote' && byte === 0x27) || (state === 'double-quote' && byte === 0x22)) {
+        state = 'code';
+      }
+    }
+    return masked;
+  }
+  // js mode: a context stack handles nested template interpolations, so a
+  // needle inside a nested backtick literal stays masked while real code in
+  // `${...}` remains unmasked.
+  const stack = []; // { kind: 'template' } | { kind: 'expr', depth }
+  const enclosingState = () => (stack.length > 0 && stack[stack.length - 1].kind === 'expr' ? 'expr' : 'code');
   let state = 'code';
   for (let index = 0; index < bytes.length; index += 1) {
     const byte = bytes[index];
     const next = bytes[index + 1];
-    if (state === 'code') {
+    if (state === 'code' || state === 'expr') {
       if (byte === 0x2F && next === 0x2F) { state = 'line-comment'; masked[index] = 1; continue; }
       if (byte === 0x2F && next === 0x2A) { state = 'block-comment'; masked[index] = 1; continue; }
       if (byte === 0x27) { state = 'single-quote'; masked[index] = 1; continue; }
       if (byte === 0x22) { state = 'double-quote'; masked[index] = 1; continue; }
-      if (byte === 0x60) { state = 'template'; masked[index] = 1; continue; }
+      if (byte === 0x60) { stack.push({ kind: 'template' }); state = 'template'; masked[index] = 1; continue; }
+      if (state === 'expr') {
+        if (byte === 0x7B) { stack[stack.length - 1].depth += 1; continue; }
+        if (byte === 0x7D) {
+          if (stack[stack.length - 1].depth === 0) { stack.pop(); state = 'template'; masked[index] = 1; }
+          else stack[stack.length - 1].depth -= 1;
+        }
+      }
       continue;
     }
     masked[index] = 1;
     if (state === 'line-comment') {
       if (byte === 0x0A || byte === 0x0D) { masked[index] = 0; state = 'code'; }
     } else if (state === 'block-comment') {
-      if (byte === 0x2A && next === 0x2F) { masked[index + 1] = 1; state = 'code'; index += 1; }
+      if (byte === 0x2A && next === 0x2F) { masked[index + 1] = 1; state = enclosingState(); index += 1; }
     } else if (byte === 0x5C) {
       masked[index + 1] = 1; index += 1; // escaped character stays inside the literal
-    } else if (
-      (state === 'single-quote' && byte === 0x27)
-      || (state === 'double-quote' && byte === 0x22)
-      || (state === 'template' && byte === 0x60)
-    ) {
-      state = 'code';
+    } else if (state === 'single-quote' && byte === 0x27) {
+      state = enclosingState();
+    } else if (state === 'double-quote' && byte === 0x22) {
+      state = enclosingState();
+    } else if (state === 'template' && byte === 0x60) {
+      stack.pop();
+      state = enclosingState();
+    } else if (state === 'template' && byte === 0x24 && next === 0x7B) {
+      masked[index + 1] = 1;
+      stack.push({ kind: 'expr', depth: 0 });
+      state = 'expr';
+      index += 1;
     }
   }
   return masked;
@@ -584,8 +676,10 @@ function findUnmaskedOccurrences(bytes, masked, needleBytes, limit) {
       if (masked[found + offset]) { clean = false; break; }
     }
     if (clean) {
-      occurrences.push({ start: found, end: found + needleBytes.length });
-      if (occurrences.length >= limit) return { occurrences, truncated: true };
+      // `truncated` means real anchors beyond the cap were dropped: exactly
+      // `limit` occurrences is a complete anchor set, not a truncation.
+      if (occurrences.length < limit) occurrences.push({ start: found, end: found + needleBytes.length });
+      else return { occurrences, truncated: true };
     }
     cursor = found + 1;
   }
@@ -618,10 +712,18 @@ function sortKey(left, right) {
 }
 
 // Defense-in-depth validator over the closed graph shape: cross-reference
-// invariants the JSON-Schema subset cannot express (unique node ids, kind ↔
-// exact_ref correlation is schema-side, resolvable endpoints, relation/kind
-// admissibility, outcome/anchor agreement). Exported for tests; also runs
-// before emit and during read-time revalidation.
+// invariants (unique node ids, kind ↔ exact_ref key correlation — the schema
+// oneOf branches pin kind consts AND ref shapes, this re-checks them outside
+// the schema gate too, resolvable endpoints, relation/kind admissibility,
+// outcome/anchor agreement). Exported for tests; also runs before emit and
+// during read-time revalidation.
+const KIND_REF_KEYS = Object.freeze({
+  requirement: ['requirement_ref', 'spec_path'],
+  semantic_symbol: ['symbol_ref'],
+  scenario: ['document_sha256', 'heading', 'requirement_ref', 'span', 'span_sha256', 'spec_path'],
+  test: ['path', 'sha256'],
+});
+
 export function validateGraphShape(graph, options = {}) {
   const policy = options.relationPolicy ?? RELATION_POLICY;
   if (!policy || policy.id !== RELATION_POLICY.id || policy.version !== RELATION_POLICY.version
@@ -634,6 +736,17 @@ export function validateGraphShape(graph, options = {}) {
     if (!node || typeof node !== 'object') return { ok: false, code: 'invalid-node' };
     if (nodeKinds.has(node.node_id)) return { ok: false, code: 'duplicate-node-id' };
     nodeKinds.set(node.node_id, node.kind);
+    // kind ↔ exact_ref correlation: a node whose ref shape does not match its
+    // kind is invalid even though the loose-form subset could not reject it.
+    const expectedKeys = KIND_REF_KEYS[node.kind];
+    const actualKeys = node.exact_ref && typeof node.exact_ref === 'object' && !Array.isArray(node.exact_ref)
+      ? Object.keys(node.exact_ref).sort()
+      : null;
+    if (expectedKeys === undefined || actualKeys === null
+      || actualKeys.length !== expectedKeys.length
+      || actualKeys.some((key, index) => key !== expectedKeys[index])) {
+      return { ok: false, code: 'kind-ref-mismatch' };
+    }
   }
   for (const edge of graph.edges ?? []) {
     if (!edge || typeof nodeKinds.get(edge.from_node_id) !== 'string') return { ok: false, code: 'dangling-endpoint' };
@@ -652,9 +765,13 @@ export function validateGraphShape(graph, options = {}) {
 export function assertStructuralInvariants(observation) {
   const structural = observation?.structural;
   if (!structural) throw new TypeError('missing structural section');
-  const { scan, outcome, nodes, edges } = structural;
+  const { scan, outcome, edges } = structural;
   if (!STRUCTURAL_OUTCOMES.includes(outcome)) throw new TypeError('invalid structural outcome');
-  if (outcome === 'none' && (scan.coverage !== 'full' || nodes.length > 0 || edges.length > 0)) {
+  // `none` means "no suggestions produced by a full scan": resolved universe
+  // nodes may exist (declared scenario/symbol/requirement entities), but not
+  // a single emitted edge — otherwise the section must be `abstain` or carry
+  // per-edge outcomes.
+  if (outcome === 'none' && (scan.coverage !== 'full' || edges.length > 0)) {
     throw new TypeError('none outcome requires a full scan with no suggestions');
   }
   if (scan.coverage === 'partial' && outcome !== 'abstain') {
@@ -663,10 +780,13 @@ export function assertStructuralInvariants(observation) {
   if (outcome === 'abstain' && scan.coverage !== 'partial') {
     throw new TypeError('abstain outcome requires partial coverage');
   }
-  if (scan.coverage === 'none' && nodes.length > 0) {
-    throw new TypeError('none coverage cannot carry nodes');
+  if (scan.coverage === 'none' && edges.length > 0) {
+    throw new TypeError('none coverage cannot carry suggestions');
   }
-  const shape = validateGraphShape({ nodes, edges });
+  if ((scan.missing_sources ?? []).length > 0 && scan.coverage !== 'partial') {
+    throw new TypeError('missing sources require partial coverage');
+  }
+  const shape = validateGraphShape({ nodes: structural.nodes, edges });
   if (!shape.ok) throw new TypeError(`invalid graph shape: ${shape.code}`);
 }
 
@@ -700,6 +820,7 @@ export function inputDigestRecords(inputs) {
 export function traceLinkSuggestionsBindingObject({
   worktreeIdentity, changeId, trace, validatedExportDigest, inputDigests, candidatePayloadDigest,
   graphLimits, rubric, relationPolicy, engine, helper, contract, languageOptions, exclusionPolicy,
+  deltaSpecInventory,
 }) {
   return {
     consumer: TRACE_LINK_CONSUMER_ID,
@@ -709,6 +830,10 @@ export function traceLinkSuggestionsBindingObject({
     trace,
     validated_export_digest: validatedExportDigest,
     input_digests: inputDigests,
+    // The canonical delta-spec inventory (sorted relative paths of the
+    // change's spec.md files) is binding input: a spec added or removed after
+    // the observation was written must invalidate it, not just edited bytes.
+    delta_spec_inventory: deltaSpecInventory,
     candidate_payload_digest: candidatePayloadDigest,
     graph_limits: graphLimits,
     rubric,
@@ -790,10 +915,20 @@ export function normalizeSemanticOutcome(outcome, knownEdgeIds = null) {
     abstained: outcome.abstained,
     outcome_reason: outcome.run_status === 'complete'
       ? (outcome.abstained ? 'assessor-abstain' : null)
-      : String(diagnostics.find((entry) => entry.code !== 'assessment-stale')?.code ?? diagnostics[0]?.code ?? 'unspecified').slice(0, 200),
-    assessments: assessments.sort((left, right) => sortKey(left.edge_id, right.edge_id)),
+      // The not_run reason keeps the concrete cause (e.g. `assessor-unavailable`),
+      // which lives in the diagnostic detail, not in its generic code.
+      : String(diagnostics.find((entry) => entry.code !== 'assessment-stale')?.detail
+        ?? diagnostics.find((entry) => entry.code !== 'assessment-stale')?.code
+        ?? diagnostics[0]?.code
+        ?? 'unspecified').slice(0, 200),
+    // Numeric edge order, not lexicographic (`edge-10` sorts after `edge-9`).
+    assessments: assessments.sort((left, right) => edgeIdNumber(left.edge_id) - edgeIdNumber(right.edge_id)),
     diagnostics,
   };
+}
+
+function edgeIdNumber(edgeId) {
+  return Number.parseInt(String(edgeId).slice('edge-'.length), 10) || 0;
 }
 
 export function assembleObservation({
@@ -874,32 +1009,52 @@ export async function validateObservationBinding(rootDir, observation, options =
   if (worktreeIdentity !== observation.worktree_identity) mismatched.push('worktree_identity');
   const recordedInputs = Array.isArray(observation.inputs) ? observation.inputs : [];
   if (recordedInputs.length > MAX_TEST_INPUTS + 100) return { ok: false, code: 'observation-invalid' };
+  // Cross-field honesty invariants on the recorded observation itself: a
+  // scan with missing sources can never claim full coverage, and a failed,
+  // not_run, or abstained semantic stage can never carry assessments — nor
+  // assessments naming edges that the recorded graph does not contain.
+  const recordedScan = observation.structural?.scan ?? {};
+  if ((recordedScan.missing_sources ?? []).length > 0 && recordedScan.coverage !== 'partial') {
+    return { ok: false, code: 'observation-invalid' };
+  }
+  const recordedSemantic = observation.semantic ?? {};
+  const recordedAssessments = Array.isArray(recordedSemantic.assessments) ? recordedSemantic.assessments : [];
+  const recordedEdgeIds = new Set((observation.structural?.edges ?? []).map((edge) => edge?.edge_id));
+  if ((recordedSemantic.run_status === 'failed' || recordedSemantic.run_status === 'not_run' || recordedSemantic.abstained === true)
+    && recordedAssessments.length > 0) {
+    return { ok: false, code: 'observation-invalid' };
+  }
+  for (const assessment of recordedAssessments) {
+    if (!recordedEdgeIds.has(assessment?.edge_id)) return { ok: false, code: 'observation-invalid' };
+  }
+  if (new Set(recordedAssessments.map((assessment) => assessment?.edge_id)).size !== recordedAssessments.length) {
+    return { ok: false, code: 'observation-invalid' };
+  }
   // Digest records are rebuilt from CURRENT disk bytes (never from the
   // recorded observation itself): an edited or renamed input must name its
   // field and flip the recomputed binding.
   const reader = options.readTestFile ?? (async (dir, rel) => readProviderFile(dir, rel, DOCUMENT_LIMIT));
+  const classifyInputBytes = (bytes) => {
+    if (bytes === null) return { sha256: null, bytes: 0, kind: 'missing' };
+    try {
+      new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+      return { sha256: digest(bytes), bytes: bytes.length, kind: 'file' };
+    } catch {
+      return { sha256: digest(bytes), bytes: bytes.length, kind: 'malformed' };
+    }
+  };
   const freshInputs = [];
   for (const input of recordedInputs) {
     let bytes = null;
     try { bytes = await reader(root, input.path, DOCUMENT_LIMIT); } catch { bytes = null; }
-    let sha256Value = null;
-    let kind = 'missing';
-    let size = 0;
-    if (bytes !== null) {
-      try {
-        new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-        sha256Value = digest(bytes);
-        kind = 'file';
-        size = bytes.length;
-      } catch {
-        sha256Value = bytes.length > 0 ? digest(bytes) : null;
-        kind = 'malformed';
-        size = bytes.length;
-      }
-    }
-    freshInputs.push({ path: input.path, sha256: sha256Value, bytes: size, kind });
+    freshInputs.push({ path: input.path, ...classifyInputBytes(bytes) });
   }
-  const context = await currentTraceLinkContext(root, freshInputs, options);
+  let context;
+  try {
+    context = await currentTraceLinkContext(root, freshInputs, options);
+  } catch {
+    return { ok: false, code: 'root-unreadable' };
+  }
   for (const digestRecord of context.inputDigests) {
     const recorded = recordedInputs.find((candidate) => candidate?.path === digestRecord.path);
     if (!recorded || (recorded.sha256 ?? null) !== digestRecord.sha256 || (recorded.bytes ?? 0) !== digestRecord.bytes
@@ -941,6 +1096,13 @@ export async function validateObservationBinding(rootDir, observation, options =
   if (observation.language_source !== 'detected' || observation.language_options?.override !== null) {
     return { ok: false, code: 'observation-invalid' };
   }
+  // The canonical delta-spec inventory is rebuilt from the CURRENT disk tree
+  // (bounded walk): a spec added or removed after the observation was written
+  // must name its field and flip the binding — the recorded input digests
+  // alone cannot see a spec that was never read.
+  const freshInventory = (await collectDeltaSpecPaths(root, observation.change_id)).sort();
+  const recordedInventory = Array.isArray(recordedScan.delta_spec_inventory) ? recordedScan.delta_spec_inventory : [];
+  if (freshInventory.join('|') !== recordedInventory.join('|')) mismatched.push('delta_spec_inventory');
   const binding = buildAssessmentBinding(traceLinkSuggestionsBindingObject({
     worktreeIdentity,
     changeId: observation.change_id,
@@ -951,6 +1113,7 @@ export async function validateObservationBinding(rootDir, observation, options =
     } : null,
     validatedExportDigest: recordedTrace?.manifest_digest ?? null,
     inputDigests: context.inputDigests,
+    deltaSpecInventory: freshInventory,
     candidatePayloadDigest: assessmentDigest({
       nodes: observation.structural?.nodes ?? [],
       edges: observation.structural?.edges ?? [],
@@ -1010,7 +1173,12 @@ export async function writeTraceLinkObservation(rootDir, observation, config, op
   if (withinCi(`${qaRoot}/`, relative) || relative.toLowerCase() === qaRoot.toLowerCase()) {
     return { ok: false, code: 'qa-namespace-conflict', detail: relative };
   }
-  const root = await realpath(options.rootDir ?? rootDir);
+  let root;
+  try {
+    root = await realpath(options.rootDir ?? rootDir);
+  } catch (error) {
+    return { ok: false, code: 'observation-write-failed', detail: String(error?.message ?? error).slice(0, 200) };
+  }
   const parts = relative.split('/');
   // Read-only sources: the observation destination must never equal a
   // presented input — the writer would overwrite exactly the material the
@@ -1029,7 +1197,12 @@ export async function writeTraceLinkObservation(rootDir, observation, config, op
   const leafConflict = () => ({ ok: false, code: 'observation-leaf-conflict', detail: relative });
   // Leaf ownership: only a previous, fully schema-valid observation of the
   // same change may be replaced; an unreadable previous leaf fails closed.
-  const schemaBytes = await readFile(new URL(`../${CONTRACT_MODULE}`, import.meta.url), 'utf8');
+  let schemaBytes;
+  try {
+    schemaBytes = await readFile(new URL(`../${CONTRACT_MODULE}`, import.meta.url), 'utf8');
+  } catch (error) {
+    return { ok: false, code: 'observation-write-failed', detail: String(error?.message ?? error).slice(0, 200) };
+  }
   const schema = parseStrictJson(schemaBytes);
   const assertLeafWritable = async () => {
     let leafInfo = null;
@@ -1156,12 +1329,16 @@ function buildGraph({ traceManifest, specs, tests, diagnostics }) {
   // node: scenario_test suggestions are derived from parsed scenarios against
   // presented tests (topic match and byte anchors), independent of whether a
   // trace `scenario:` ref names them. Requirement nodes stay trace-referenced
-  // only: the closed relation dictionary has no requirement->test edge.
+  // only: the closed relation dictionary has no requirement->test edge. A
+  // duplicate heading inside one requirement would silently collapse to the
+  // last span in this map, so it is a typed ambiguity refusal before any
+  // suggestion is emitted.
   for (const spec of specs) {
     for (const requirement of spec.requirements) {
       for (const scenario of requirement.scenarios) {
         const nodeId = `scn:${spec.path}#${requirement.title}#${scenario.heading}`;
         if (nodeId.length > 200) return refusal('node-id-overflow', nodeId);
+        if (nodes.has(nodeId)) return refusal('ambiguous-scenario-ref', nodeId);
         nodes.set(nodeId, {
           node_id: nodeId,
           kind: 'scenario',
@@ -1252,40 +1429,56 @@ function buildGraph({ traceManifest, specs, tests, diagnostics }) {
     diagnostics.push({ code: 'unsupported-trace-relation', path: traceManifestPathLabel(traceManifest), detail: `${relation.from} -> ${relation.to}`.slice(0, 200) });
   }
 
+  // Bounded anchor search: the (node × test) product with per-needle
+  // indexOf scans is capped by a global scan budget; exceeding it degrades
+  // the scan to partial (honest abstain) instead of running unbounded work
+  // over a maximal trace export.
+  const MAX_ANCHOR_SCAN_BYTES = 256 * 1024 * 1024;
+  let anchorScanBytes = 0;
+  let scanTruncated = false;
+  let truncatedAnchorScan = false;
   for (const test of tests) {
     if (!test.ok) continue;
     const testNode = nodes.get(`test:${test.path}`);
-    const masked = maskCodeRegions(test.bytes);
+    const masked = maskCodeRegions(test.bytes, maskModeForPath(test.path));
     const testTokens = tokenize(test.text);
     for (const node of nodes.values()) {
-      if (node.kind === 'semantic_symbol') {
-        const needle = node.exact_ref.symbol_ref.slice(node.exact_ref.symbol_ref.indexOf(':') + 1);
-        const { occurrences, truncated } = findUnmaskedOccurrences(test.bytes, masked, Buffer.from(needle, 'utf8'), GRAPH_LIMITS.max_assertion_refs_per_edge);
-        if (truncated) {
-          diagnostics.push({ code: 'assertion-refs-truncated', path: test.path, detail: node.node_id });
-        }
-        const topicMatch = intersects(tokenize(needle), testTokens);
-        if (occurrences.length === 0 && !topicMatch) continue;
-        const anchors = occurrences.map((occurrence) => anchorRecord(test.path, test.bytes, test.sha256, occurrence));
-        addEdge('symbol_test', node.node_id, testNode.node_id, anchors);
-      } else if (node.kind === 'scenario') {
-        const needle = node.exact_ref.heading;
-        const { occurrences, truncated } = findUnmaskedOccurrences(test.bytes, masked, Buffer.from(needle, 'utf8'), GRAPH_LIMITS.max_assertion_refs_per_edge);
-        if (truncated) {
-          diagnostics.push({ code: 'assertion-refs-truncated', path: test.path, detail: node.node_id });
-        }
-        const scenarioText = testScenarioText(node);
-        const topicMatch = intersects(tokenize(scenarioText), testTokens);
-        if (occurrences.length === 0 && !topicMatch) continue;
-        const anchors = occurrences.map((occurrence) => anchorRecord(test.path, test.bytes, test.sha256, occurrence));
-        addEdge('scenario_test', node.node_id, testNode.node_id, anchors);
+      if (anchorScanBytes > MAX_ANCHOR_SCAN_BYTES) {
+        scanTruncated = true;
+        break;
       }
+      let needle = null;
+      if (node.kind === 'semantic_symbol') {
+        needle = node.exact_ref.symbol_ref.slice(node.exact_ref.symbol_ref.indexOf(':') + 1);
+      } else if (node.kind === 'scenario') {
+        needle = node.exact_ref.heading;
+      } else {
+        continue;
+      }
+      // Each needle search charges one haystack pass to the budget.
+      anchorScanBytes += test.bytes.length;
+      const { occurrences, truncated } = findUnmaskedOccurrences(test.bytes, masked, Buffer.from(needle, 'utf8'), GRAPH_LIMITS.max_assertion_refs_per_edge);
+      if (truncated) {
+        // Dropped anchors beyond the cap are a coverage fact: the scan that
+        // truncated can never be presented as `full`.
+        scanTruncated = true;
+        diagnostics.push({ code: 'assertion-refs-truncated', path: test.path, detail: node.node_id });
+      }
+      const topicMatch = intersects(tokenize(needle), testTokens);
+      if (occurrences.length === 0 && !topicMatch) continue;
+      const anchors = occurrences.map((occurrence) => anchorRecord(test.path, test.bytes, test.sha256, occurrence));
+      addEdge(node.kind === 'semantic_symbol' ? 'symbol_test' : 'scenario_test', node.node_id, testNode.node_id, anchors);
     }
+    if (scanTruncated) break;
+  }
+  if (scanTruncated) {
+    truncatedAnchorScan = true;
+    diagnostics.push({ code: 'anchor-scan-truncated', path: null, detail: 'anchor-scan-budget' });
   }
 
   const KIND_ORDER = { requirement: 0, semantic_symbol: 1, scenario: 2, test: 3 };
   let nodeList = [...nodes.values()].sort((left, right) => KIND_ORDER[left.kind] - KIND_ORDER[right.kind] || sortKey(left.node_id, right.node_id));
-  let truncated = false;
+  let truncated = truncatedAnchorScan;
   if (nodeList.length > GRAPH_LIMITS.max_nodes) {
     nodeList = nodeList.slice(0, GRAPH_LIMITS.max_nodes);
     truncated = true;
@@ -1320,7 +1513,7 @@ function buildGraph({ traceManifest, specs, tests, diagnostics }) {
     outcome: edge.behavioral_assertion_refs.length > 0 ? 'candidate' : 'related_only',
     behavioral_assertion_refs: edge.behavioral_assertion_refs,
   }));
-  return { nodes: nodeList, edges, truncated };
+  return { nodes: nodeList, edges, truncated, resolvedTraceRefs: resolvedBySymbol.size };
 }
 
 function traceManifestPathLabel(traceManifest) {
@@ -1332,6 +1525,89 @@ function traceManifestPathLabel(traceManifest) {
 function testScenarioText(node) {
   const ref = node.exact_ref;
   return `${ref.requirement_ref} ${ref.heading}`;
+}
+
+// ---------------------------------------------------------------------------
+// Bounded delta-spec collection (presented scope only)
+// ---------------------------------------------------------------------------
+
+const MAX_DELTA_SPEC_FILES = 200;
+const MAX_DELTA_SPEC_DIRECTORIES = 500;
+
+// Local bounded walk of `openspec/changes/<change-id>/specs/**`: only files
+// named spec.md (parity with the canonical collector's isSpecMarkdown
+// predicate) are declared inputs; every read goes through the bounded
+// provider reader. Base specs, proposal/design/tasks, and everything else in
+// the repository are never read by the engine. Missing, dangling-symlink,
+// and malformed-UTF-8 spec files stay declared-but-unreadable entries: they
+// become missing_sources and degrade coverage, never silently skipped scans.
+async function collectDeltaSpecPaths(rootDir, changeId) {
+  const specsRoot = `openspec/changes/${changeId}/specs`;
+  const files = [];
+  const directories = [specsRoot];
+  let visitedDirectories = 0;
+  while (directories.length > 0) {
+    if (visitedDirectories >= MAX_DELTA_SPEC_DIRECTORIES || files.length >= MAX_DELTA_SPEC_FILES) break;
+    const relative = directories.shift();
+    visitedDirectories += 1;
+    let entries;
+    try {
+      entries = await readdir(path.join(rootDir, relative), { withFileTypes: true });
+    } catch {
+      continue; // absent specs directory: zero declared delta specs
+    }
+    for (const entry of entries.sort((left, right) => sortKey(left.name, right.name))) {
+      const childRelative = `${relative}/${entry.name}`;
+      if (entry.isDirectory()) directories.push(childRelative);
+      // A symlink named spec.md is a declared entry that must not vanish
+      // silently: the bounded read below refuses it and the entry degrades
+      // coverage like any other unreadable spec (dangling symlinks included).
+      else if (entry.name === 'spec.md' && (entry.isFile() || entry.isSymbolicLink())) files.push(childRelative);
+    }
+  }
+  return files.slice(0, MAX_DELTA_SPEC_FILES);
+}
+
+async function collectDeltaSpecs(rootDir, changeId, diagnostics) {
+  const specsRoot = `openspec/changes/${changeId}/specs`;
+  const files = await collectDeltaSpecPaths(rootDir, changeId);
+  if (files.length >= MAX_DELTA_SPEC_FILES) {
+    diagnostics.push({ code: 'delta-spec-inventory-truncated', path: specsRoot, detail: 'inventory-limit' });
+  }
+  const specs = [];
+  for (const relative of files) {
+    let bytes = null;
+    try {
+      bytes = await readProviderFile(rootDir, relative, DOCUMENT_LIMIT);
+    } catch (error) {
+      bytes = null;
+      diagnostics.push({ code: 'malformed-input', path: relative, detail: String(error?.message ?? error).slice(0, 80) });
+    }
+    if (bytes === null) {
+      specs.push({ path: relative, ok: false, reason: 'file-missing', bytes: null, sha256: null, text: '', requirements: [] });
+      diagnostics.push({ code: 'file-missing', path: relative, detail: 'delta-spec' });
+      continue;
+    }
+    let text = '';
+    let ok = true;
+    try {
+      text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    } catch {
+      ok = false;
+      text = '';
+      diagnostics.push({ code: 'malformed-input', path: relative, detail: 'utf8-fatal' });
+    }
+    specs.push({
+      path: relative,
+      ok,
+      reason: ok ? null : 'utf8-fatal',
+      bytes,
+      sha256: digest(bytes),
+      text,
+      requirements: ok ? parseRequirementsFromBytes(bytes, relative) : [],
+    });
+  }
+  return specs;
 }
 
 // ---------------------------------------------------------------------------
@@ -1391,8 +1667,10 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
   const startedAt = now();
 
   const parsed = parseTraceLinkArgs(argv);
+  // A malformed argument list must still honor an explicit `--json` request
+  // regardless of where the flag sat relative to the offending argument.
   if (!parsed.ok) {
-    emit(notRunEnvelope(['invalid-usage', parsed.error]), parsed.json);
+    emit(notRunEnvelope(['invalid-usage', parsed.error]), parsed.json === true || argv.includes('--json'));
     return 2;
   }
   let rootDir;
@@ -1446,28 +1724,19 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
     emit(notRunEnvelope([traceManifest.code]), parsed.json);
     return 0;
   }
+  const deadlineExceeded = () => (now() - startedAt) >= (options.deadlineMs ?? DEFAULT_DEADLINE_MS);
 
   try {
     const diagnostics = [...(config.diagnostics ?? [])];
     // Requirement sources are the canonical change artifacts of this change
-    // only (delta specs); base specs are outside the P0 presented scope.
-    const artifacts = await collectCanonicalChangeArtifacts(changeId, { ...options, rootDir });
-    const specs = [];
-    for (const deltaSpec of artifacts.canonicalArtifacts?.deltaSpecs ?? []) {
-      const bytes = await readProviderFile(rootDir, deltaSpec.path, DOCUMENT_LIMIT);
-      if (bytes === null) {
-        diagnostics.push({ code: 'file-missing', path: deltaSpec.path, detail: 'delta-spec' });
-        continue;
-      }
-      let text = '';
-      try {
-        text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-      } catch {
-        diagnostics.push({ code: 'malformed-input', path: deltaSpec.path, detail: 'utf8-fatal' });
-        specs.push({ path: deltaSpec.path, bytes, sha256: digest(bytes), text: '', requirements: [] });
-        continue;
-      }
-      specs.push({ path: deltaSpec.path, bytes, sha256: digest(bytes), text, requirements: parseRequirementsFromBytes(bytes, deltaSpec.path) });
+    // only: a bounded local walk of the change's own specs directory (files
+    // named spec.md, parity with the canonical collector's isSpecMarkdown).
+    // Base specs, proposal/design/tasks, and every other canonical file are
+    // outside the presented scope and are never read; every read is bounded.
+    const specs = await collectDeltaSpecs(rootDir, changeId, diagnostics);
+    if (deadlineExceeded()) {
+      emit(notRunEnvelope(['deadline-exceeded']), parsed.json);
+      return 0;
     }
     // Test allowlist was fixed from the presented --test inputs before any
     // read (arguments were validated above); each presented path is read
@@ -1499,16 +1768,39 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
     }
 
     const missingSources = [];
+    // Every declared-but-unreadable source is an honest missing entry: spec
+    // files (missing, dangling symlink, malformed UTF-8) degrade coverage
+    // exactly like unreadable presented tests, so a scan that skipped a
+    // canonical input can never report `none`.
+    for (const spec of specs) {
+      if (!spec.ok) missingSources.push({ path: spec.path, reason: String(spec.reason ?? 'unreadable').slice(0, 200) });
+    }
     for (const test of tests) {
       if (!test.ok) missingSources.push({ path: test.path, reason: String(test.code ?? 'unreadable').slice(0, 200) });
+    }
+    if (deadlineExceeded()) {
+      emit(notRunEnvelope(['deadline-exceeded']), parsed.json);
+      return 0;
     }
     const graph = buildGraph({ traceManifest, specs, tests, diagnostics });
     if (graph.refusal) {
       emit(notRunEnvelope([`invalid-candidate:${graph.refusal.reason}`]), parsed.json);
       return 2;
     }
-    const declaredSources = (traceManifest.trace.nodes.length) + uniqueTestPaths.length;
-    const scannedSources = graph.nodes.length + tests.filter((test) => test.ok).length;
+    if (deadlineExceeded()) {
+      emit(notRunEnvelope(['deadline-exceeded']), parsed.json);
+      return 0;
+    }
+    // Consistent units on both sides: declared = delta spec files + presented
+    // test paths + supported-kind trace nodes; scanned = the same universe
+    // actually read/resolved. A test is counted once, spec files count even
+    // when unreadable (they are declared inputs), unsupported trace kinds are
+    // bounded diagnostics rather than declared sources.
+    const supportedTraceNodes = traceManifest.trace.nodes.filter((node) => kindForSymbol(node.symbol) !== null).length;
+    const declaredSources = specs.length + uniqueTestPaths.length + supportedTraceNodes;
+    const scannedSources = specs.filter((spec) => spec.ok).length
+      + tests.filter((test) => test.ok).length
+      + graph.resolvedTraceRefs;
     const partial = traceManifest.trace.completeness === 'partial' || graph.truncated || missingSources.length > 0;
     const coverage = {
       state: partial ? 'partial' : 'full',
@@ -1539,6 +1831,7 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
         declared_sources: coverage.declared_sources,
         scanned_sources: coverage.scanned_sources,
         missing_sources: coverage.missing_sources,
+        delta_spec_inventory: specs.map((spec) => spec.path).sort(),
       },
       outcome,
       outcome_summary: {
@@ -1554,10 +1847,25 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
     const prose = resolveProseLanguage(languageDocs, null);
     const resolvedLanguage = languageDocs.length > 0 ? prose.language : 'unknown';
     const worktreeIdentity = await computeWorktreeIdentity(rootDir, options);
-    const inputs = [
-      ...specs.map((spec) => ({ path: spec.path, sha256: spec.sha256, bytes: spec.bytes.length, kind: 'file' })),
-      ...tests.map((test) => ({ path: test.path, sha256: test.sha256, bytes: test.bytes?.length ?? 0, kind: test.ok ? 'file' : (test.bytes ? 'malformed' : 'missing') })),
+    // One shared byte classifier for the scan, the freshness probe, and
+    // revalidation: a malformed-UTF-8 input records kind `malformed` at write
+    // time and revalidates as `malformed`, so a recorded observation is never
+    // "born stale" and the probe never lies about unchanged inputs.
+    const classifyInputBytes = (bytes) => {
+      if (bytes === null) return { sha256: null, bytes: 0, kind: 'missing' };
+      try {
+        new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+        return { sha256: digest(bytes), bytes: bytes.length, kind: 'file' };
+      } catch {
+        return { sha256: digest(bytes), bytes: bytes.length, kind: 'malformed' };
+      }
+    };
+    const inputRecords = [
+      ...specs.map((spec) => ({ path: spec.path, ...classifyInputBytes(spec.bytes) })),
+      ...tests.map((test) => ({ path: test.path, ...classifyInputBytes(test.bytes) })),
     ];
+    const inputs = inputRecords.map((input) => ({ path: input.path, sha256: input.sha256, bytes: input.bytes, kind: input.kind }));
+    const deltaSpecInventory = specs.map((spec) => spec.path).sort();
     const context = await currentTraceLinkContext(rootDir, inputs, options);
     const candidatePayloadDigest = assessmentDigest({ nodes: graph.nodes, edges: graph.edges });
     const traceBinding = {
@@ -1571,6 +1879,7 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
       trace: traceBinding,
       validatedExportDigest: structural.trace.manifest_digest,
       inputDigests: context.inputDigests,
+      deltaSpecInventory,
       candidatePayloadDigest,
       graphLimits: { ...GRAPH_LIMITS },
       rubric: context.rubric,
@@ -1584,22 +1893,20 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
 
     // Post-scan freshness probe: re-reads current disk state and compares the
     // recomputed binding against the one built from the scanned bytes, so a
-    // mid-scan swap yields stale, not a silent current.
+    // mid-scan swap yields stale, not a silent current. The probe re-derives
+    // the delta-spec inventory too, so a spec added mid-run drifts.
     if (typeof options.mutateDuringScan === 'function') await options.mutateDuringScan();
     const watch = {
       changed: async () => {
         const freshTrace = await readTraceManifest(rootDir, changeId, options);
         if (!freshTrace.ok || freshTrace.sha256 !== structural.trace.sha256 || freshTrace.bytes !== structural.trace.bytes) return true;
+        const freshInventory = (await collectDeltaSpecPaths(rootDir, changeId)).sort();
+        if (freshInventory.join('|') !== deltaSpecInventory.join('|')) return true;
         const freshInputs = [];
         for (const input of inputs) {
           let bytes = null;
           try { bytes = await readProviderFile(rootDir, input.path, DOCUMENT_LIMIT); } catch { bytes = null; }
-          freshInputs.push({
-            path: input.path,
-            sha256: bytes === null ? null : digest(bytes),
-            bytes: bytes?.length ?? 0,
-            kind: bytes === null ? 'missing' : 'file',
-          });
+          freshInputs.push({ path: input.path, ...classifyInputBytes(bytes) });
         }
         const current = await currentTraceLinkContext(rootDir, freshInputs, options);
         return buildAssessmentBinding(traceLinkSuggestionsBindingObject({
@@ -1608,6 +1915,7 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
           trace: { path: structural.trace.path, sha256: freshTrace.sha256, bytes: freshTrace.bytes },
           validatedExportDigest: freshTrace.manifestDigest,
           inputDigests: current.inputDigests,
+          deltaSpecInventory: freshInventory,
           candidatePayloadDigest,
           graphLimits: { ...GRAPH_LIMITS },
           rubric: current.rubric,
