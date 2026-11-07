@@ -1,0 +1,23 @@
+{
+  "trace": {
+    "schemaVersion": "lekalo/trace-manifest/v0.2.16",
+    "identity": "dev.lekalo.trace-manifest@0.2.16",
+    "completeness": "full",
+    "nodes": [
+      {
+        "symbol": "requirement:Ghost"
+      },
+      {
+        "symbol": "operation:ghost.thing"
+      }
+    ],
+    "relations": [
+      {
+        "from": "requirement:Ghost",
+        "to": "operation:ghost.thing"
+      }
+    ],
+    "gaps": []
+  },
+  "manifestDigest": "sha256:a85b6864b571bf74202b44ff580b10e2931df2d8d38d0c0b62c3e3b76fef8494"
+}

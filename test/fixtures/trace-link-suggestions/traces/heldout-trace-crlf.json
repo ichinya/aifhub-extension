@@ -1,0 +1,23 @@
+{
+  "trace": {
+    "schemaVersion": "lekalo/trace-manifest/v0.2.16",
+    "identity": "dev.lekalo.trace-manifest@0.2.16",
+    "completeness": "full",
+    "nodes": [
+      {
+        "symbol": "requirement:CrlfProbe"
+      },
+      {
+        "symbol": "operation:crlf.thing"
+      }
+    ],
+    "relations": [
+      {
+        "from": "requirement:CrlfProbe",
+        "to": "operation:crlf.thing"
+      }
+    ],
+    "gaps": []
+  },
+  "manifestDigest": "sha256:a5c85ce12472e76b47addd045d88397c45d1254bf8986e7a5c3cd22d4a8dfc24"
+}

@@ -340,9 +340,15 @@ function traceInvalid(reason) {
 
 export async function readTraceManifest(rootDir, changeId, options = {}) {
   // Custody rules first: only this change's own directory below the traces
-  // root is ever touched; a foreign path is never read.
+  // root is ever touched; a foreign path is never read. Path-safety refusals
+  // (symlink/hardlink/escape) are custody refusals, never crashes.
   const relative = traceManifestPath(changeId);
-  const target = await safeProviderPath(rootDir, relative);
+  let target;
+  try {
+    target = await safeProviderPath(rootDir, relative);
+  } catch (error) {
+    return { ok: false, code: 'trace-custody', detail: String(error?.message ?? error).slice(0, 120) };
+  }
   if (!target.exists) return { ok: false, code: 'trace-missing', detail: relative };
   const stat = await lstat(target.path);
   if (!stat.isFile()) return { ok: false, code: 'trace-custody', detail: 'not-a-file' };
@@ -959,11 +965,10 @@ export async function validateObservationBinding(rootDir, observation, options =
     exclusionPolicy: { ...TRACE_LINK_EXCLUSION_POLICY },
   }));
   if (binding !== observation.binding) {
-    const structuralOnly = [...mismatched].filter((field) => field !== 'binding').length === mismatched.length;
     // Everything else matches: the only remaining binding input is the
     // candidate payload (nodes + edges + behavioral anchors), so a flipped
     // binding names the edited graph instead of a generic field.
-    if (structuralOnly && mismatched.length === 0) mismatched.push('candidate_payload');
+    if (mismatched.length === 0) mismatched.push('candidate_payload');
     mismatched.push('binding');
   }
   return { ok: true, stale: mismatched.length > 0, mismatched: [...new Set(mismatched)], state: mismatched.length > 0 ? 'stale-observation' : null };
@@ -1147,6 +1152,31 @@ function buildGraph({ traceManifest, specs, tests, diagnostics }) {
   }
 
   const nodes = new Map(); // node_id -> node
+  // Every parsed scenario of the change's delta specs is a declared graph
+  // node: scenario_test suggestions are derived from parsed scenarios against
+  // presented tests (topic match and byte anchors), independent of whether a
+  // trace `scenario:` ref names them. Requirement nodes stay trace-referenced
+  // only: the closed relation dictionary has no requirement->test edge.
+  for (const spec of specs) {
+    for (const requirement of spec.requirements) {
+      for (const scenario of requirement.scenarios) {
+        const nodeId = `scn:${spec.path}#${requirement.title}#${scenario.heading}`;
+        if (nodeId.length > 200) return refusal('node-id-overflow', nodeId);
+        nodes.set(nodeId, {
+          node_id: nodeId,
+          kind: 'scenario',
+          exact_ref: {
+            spec_path: spec.path,
+            requirement_ref: requirement.title,
+            heading: scenario.heading,
+            span: { start: scenario.start, end: scenario.end },
+            document_sha256: SHA256_PREFIX(spec.sha256),
+            span_sha256: SHA256_PREFIX(digest(spec.bytes.subarray(scenario.start, scenario.end))),
+          },
+        });
+      }
+    }
+  }
   const resolveUniverse = (entry) => {
     if (entry.kind === 'semantic_symbol') {
       const nodeId = entry.symbol;
@@ -1172,19 +1202,6 @@ function buildGraph({ traceManifest, specs, tests, diagnostics }) {
     if (matches.length > 1) return refusal('ambiguous-scenario-ref', entry.symbol);
     const { requirement, scenario, spec } = matches[0];
     const nodeId = `scn:${spec.path}#${requirement.title}#${scenario.heading}`;
-    if (nodeId.length > 200) return refusal('node-id-overflow', nodeId);
-    nodes.set(nodeId, {
-      node_id: nodeId,
-      kind: 'scenario',
-      exact_ref: {
-        spec_path: spec.path,
-        requirement_ref: requirement.title,
-        heading: scenario.heading,
-        span: { start: scenario.start, end: scenario.end },
-        document_sha256: SHA256_PREFIX(spec.sha256),
-        span_sha256: SHA256_PREFIX(digest(spec.bytes.subarray(scenario.start, scenario.end))),
-      },
-    });
     return { node: nodes.get(nodeId) };
   };
 
@@ -1517,7 +1534,12 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
         completeness: traceManifest.trace.completeness,
         manifest_digest: traceManifest.manifestDigest,
       },
-      scan: coverage,
+      scan: {
+        coverage: coverage.state,
+        declared_sources: coverage.declared_sources,
+        scanned_sources: coverage.scanned_sources,
+        missing_sources: coverage.missing_sources,
+      },
       outcome,
       outcome_summary: {
         total_nodes: graph.nodes.length,
@@ -1621,7 +1643,17 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
       now,
     });
     const semantic = normalizeSemanticOutcome(semanticOutcome, new Set(graph.edges.map((edge) => edge.edge_id)));
-    const semanticCoverage = { ...coverage };
+    // Coverage degradations established by the helper (scanned/declared
+    // clamps, missing entries) are authoritative for a stage that actually
+    // ran: merge to the honest direction instead of re-asserting the
+    // pre-scan estimate. An abstention never claims scanned coverage.
+    const coverageRank = { none: 0, partial: 1, full: 2 };
+    const helperRan = semanticOutcome.run_status === 'complete';
+    const helperCoverageState = helperRan && coverageRank[semanticOutcome.coverage?.state] !== undefined
+      ? semanticOutcome.coverage.state
+      : coverage.state;
+    const mergedCoverageState = coverageRank[coverage.state] <= coverageRank[helperCoverageState] ? coverage.state : helperCoverageState;
+    const semanticCoverage = semantic.abstained ? { ...coverage, state: 'none' } : { ...coverage, state: mergedCoverageState };
 
     const combinedDiagnostics = [...semantic.diagnostics, ...diagnostics];
     if (combinedDiagnostics.length > MAX_DIAGNOSTICS) {

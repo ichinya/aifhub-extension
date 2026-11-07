@@ -1,0 +1,79 @@
+{
+  "trace": {
+    "schemaVersion": "lekalo/trace-manifest/v0.2.16",
+    "identity": "dev.lekalo.trace-manifest@0.2.16",
+    "completeness": "full",
+    "nodes": [
+      {
+        "symbol": "requirement:AuthOptIn"
+      },
+      {
+        "symbol": "requirement:HonestNotRun"
+      },
+      {
+        "symbol": "scenario:AuthLoginHappy"
+      },
+      {
+        "symbol": "scenario:AuthLoginDenied"
+      },
+      {
+        "symbol": "operation:auth.login"
+      },
+      {
+        "symbol": "operation:auth.logout"
+      },
+      {
+        "symbol": "operation:ru.adapter"
+      },
+      {
+        "symbol": "endpoint:api.session"
+      },
+      {
+        "symbol": "policy:legacy.thing"
+      },
+      {
+        "symbol": "module:legacy.helper"
+      }
+    ],
+    "relations": [
+      {
+        "from": "requirement:AuthOptIn",
+        "to": "operation:auth.login"
+      },
+      {
+        "from": "requirement:AuthOptIn",
+        "to": "operation:auth.logout"
+      },
+      {
+        "from": "requirement:AuthOptIn",
+        "to": "endpoint:api.session"
+      },
+      {
+        "from": "requirement:HonestNotRun",
+        "to": "operation:ru.adapter"
+      },
+      {
+        "from": "operation:auth.login",
+        "to": "scenario:AuthLoginHappy"
+      },
+      {
+        "from": "operation:auth.login",
+        "to": "scenario:AuthLoginDenied"
+      },
+      {
+        "from": "operation:auth.logout",
+        "to": "scenario:AuthLoginHappy"
+      },
+      {
+        "from": "requirement:AuthOptIn",
+        "to": "scenario:AuthLoginHappy"
+      },
+      {
+        "from": "operation:auth.logout",
+        "to": "operation:auth.login"
+      }
+    ],
+    "gaps": []
+  },
+  "manifestDigest": "sha256:c3b180eb92af781d4a0398fab80a7668197276892366312cb244ed3389664f73"
+}

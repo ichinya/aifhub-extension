@@ -1,0 +1,213 @@
+{
+  "provenance": {
+    "declared_only": true,
+    "statement": "Every case cites only files shipped in this directory; the corpus test copies them into a disposable temp project and presents test files exclusively through repeatable --test inputs. Nothing is fetched, synthesized, or read from outside the materialized fixture copy at run time; no network access and no paid calls happen in any consuming test.",
+    "trace_format": "lekalo/trace-manifest/v0.2.16 envelope {trace, manifestDigest}; the engine-owned structural schema for nodes/relations/gaps is defined by scripts/trace-link-suggestions.mjs, not by a golden file of a live Lekalo export (P1 assumption)."
+  },
+  "thresholds": {
+    "negative_false_accusations": 0
+  },
+  "labels_discipline": "Structural labels below pin pipeline and guard behavior only (exact edge sets, outcomes, refusals, coverage). They say nothing about semantic precision of a future live model: expected_semantic is consumed by an injected fake assessor, and no live-eval thresholds are derivable from this fake suite.",
+  "cases": [
+    {
+      "id": "dev-nm",
+      "kind": "positive",
+      "trace": "traces/dev-trace-nm.json",
+      "specs": ["specs/spec-en.md", "specs/spec-ru.md"],
+      "tests": ["test/auth.spec.mjs", "test/auth.spec.md", "test/ru.spec.md"],
+      "assessor": true,
+      "expected_structural": {
+        "outcome": "candidate",
+        "coverage": "full",
+        "unsupported_trace_node_kinds": 2,
+        "unsupported_trace_relations": 2,
+        "edges": [
+          { "relation": "requirement_symbol", "from": "req:#AuthOptIn", "to": "operation:auth.login", "outcome": "related_only", "anchors": 0 },
+          { "relation": "requirement_symbol", "from": "req:#AuthOptIn", "to": "operation:auth.logout", "outcome": "related_only", "anchors": 0 },
+          { "relation": "requirement_symbol", "from": "req:#AuthOptIn", "to": "endpoint:api.session", "outcome": "related_only", "anchors": 0 },
+          { "relation": "requirement_symbol", "from": "req:#HonestNotRun", "to": "operation:ru.adapter", "outcome": "related_only", "anchors": 0 },
+          { "relation": "symbol_scenario", "from": "operation:auth.login", "to": "scn:#AuthLoginDenied", "outcome": "candidate", "anchors": 1 },
+          { "relation": "symbol_scenario", "from": "operation:auth.login", "to": "scn:#AuthLoginHappy", "outcome": "candidate", "anchors": 1 },
+          { "relation": "symbol_scenario", "from": "operation:auth.logout", "to": "scn:#AuthLoginHappy", "outcome": "candidate", "anchors": 1 },
+          { "relation": "symbol_test", "from": "operation:auth.login", "to": "test:test/auth.spec.mjs", "outcome": "candidate", "anchors": 1 },
+          { "relation": "symbol_test", "from": "operation:auth.logout", "to": "test:test/auth.spec.mjs", "outcome": "related_only", "anchors": 0 },
+          { "relation": "scenario_test", "from": "scn:#AuthLoginDenied", "to": "test:test/auth.spec.md", "outcome": "candidate", "anchors": 1 },
+          { "relation": "scenario_test", "from": "scn:#AuthLoginHappy", "to": "test:test/auth.spec.md", "outcome": "candidate", "anchors": 1 },
+          { "relation": "scenario_test", "from": "scn:#Честный исход", "to": "test:test/ru.spec.md", "outcome": "candidate", "anchors": 1 }
+        ]
+      },
+      "expected_semantic": {
+        "supports": 7,
+        "insufficient": 5,
+        "rule": "fake assessor verdicts: candidate edges -> supports, related_only edges -> insufficient"
+      }
+    },
+    {
+      "id": "dev-partial-trace",
+      "kind": "truncated",
+      "trace": "traces/dev-trace-partial.json",
+      "specs": ["specs/spec-en.md"],
+      "tests": ["test/auth.spec.mjs"],
+      "expected_structural": {
+        "outcome": "abstain",
+        "coverage": "partial",
+        "edges": [
+          { "relation": "requirement_symbol", "from": "req:#AuthOptIn", "to": "operation:auth.login", "outcome": "related_only", "anchors": 0 },
+          { "relation": "symbol_scenario", "from": "operation:auth.login", "to": "scn:#AuthLoginHappy", "outcome": "candidate", "anchors": 1 },
+          { "relation": "symbol_test", "from": "operation:auth.login", "to": "test:test/auth.spec.mjs", "outcome": "candidate", "anchors": 1 }
+        ]
+      }
+    },
+    {
+      "id": "dev-test-missing",
+      "kind": "missing",
+      "trace": "traces/dev-trace-nm.json",
+      "specs": ["specs/spec-en.md", "specs/spec-ru.md"],
+      "tests": ["test/auth.spec.mjs", "test/ghost.spec.mjs"],
+      "ghost_test": true,
+      "expected_structural": {
+        "outcome": "abstain",
+        "coverage": "partial",
+        "missing_sources": ["test/ghost.spec.mjs"],
+        "edges": [
+          { "relation": "requirement_symbol", "from": "req:#AuthOptIn", "to": "operation:auth.login", "outcome": "related_only", "anchors": 0 },
+          { "relation": "requirement_symbol", "from": "req:#AuthOptIn", "to": "operation:auth.logout", "outcome": "related_only", "anchors": 0 },
+          { "relation": "requirement_symbol", "from": "req:#AuthOptIn", "to": "endpoint:api.session", "outcome": "related_only", "anchors": 0 },
+          { "relation": "requirement_symbol", "from": "req:#HonestNotRun", "to": "operation:ru.adapter", "outcome": "related_only", "anchors": 0 },
+          { "relation": "symbol_scenario", "from": "operation:auth.login", "to": "scn:#AuthLoginDenied", "outcome": "candidate", "anchors": 1 },
+          { "relation": "symbol_scenario", "from": "operation:auth.login", "to": "scn:#AuthLoginHappy", "outcome": "candidate", "anchors": 1 },
+          { "relation": "symbol_scenario", "from": "operation:auth.logout", "to": "scn:#AuthLoginHappy", "outcome": "candidate", "anchors": 1 },
+          { "relation": "symbol_test", "from": "operation:auth.login", "to": "test:test/auth.spec.mjs", "outcome": "candidate", "anchors": 1 },
+          { "relation": "symbol_test", "from": "operation:auth.logout", "to": "test:test/auth.spec.mjs", "outcome": "related_only", "anchors": 0 }
+        ]
+      }
+    },
+    {
+      "id": "heldout-behavior",
+      "kind": "behavior",
+      "trace": "traces/heldout-trace-behavior.json",
+      "specs": ["specs/spec-en.md"],
+      "tests": ["test/behavior-real.spec.mjs", "test/behavior-masked.spec.mjs"],
+      "assessor": true,
+      "expected_structural": {
+        "outcome": "candidate",
+        "coverage": "full",
+        "edges": [
+          { "relation": "requirement_symbol", "from": "req:#TopicOnly", "to": "operation:topic.thing", "outcome": "related_only", "anchors": 0 },
+          { "relation": "symbol_test", "from": "operation:topic.thing", "to": "test:test/behavior-real.spec.mjs", "outcome": "candidate", "anchors": 1 },
+          { "relation": "symbol_test", "from": "operation:topic.thing", "to": "test:test/behavior-masked.spec.mjs", "outcome": "related_only", "anchors": 0 }
+        ]
+      },
+      "expected_semantic": {
+        "supports": 1,
+        "insufficient": 2,
+        "rule": "fake assessor verdicts: candidate edges -> supports, related_only edges -> insufficient"
+      }
+    },
+    {
+      "id": "heldout-topic-only",
+      "kind": "behavior-negative",
+      "negative": true,
+      "trace": "traces/heldout-trace-behavior.json",
+      "specs": ["specs/spec-en.md"],
+      "tests": ["test/behavior-masked.spec.mjs"],
+      "expected_structural": {
+        "outcome": "related_only",
+        "coverage": "full",
+        "edges": [
+          { "relation": "requirement_symbol", "from": "req:#TopicOnly", "to": "operation:topic.thing", "outcome": "related_only", "anchors": 0 },
+          { "relation": "symbol_test", "from": "operation:topic.thing", "to": "test:test/behavior-masked.spec.mjs", "outcome": "related_only", "anchors": 0 }
+        ]
+      }
+    },
+    {
+      "id": "heldout-crlf",
+      "kind": "ru-en",
+      "trace": "traces/heldout-trace-crlf.json",
+      "specs": ["specs/spec-crlf.md"],
+      "tests": ["test/crlf.spec.md"],
+      "expected_structural": {
+        "outcome": "candidate",
+        "coverage": "full",
+        "edges": [
+          { "relation": "requirement_symbol", "from": "req:#CrlfProbe", "to": "operation:crlf.thing", "outcome": "related_only", "anchors": 0 },
+          { "relation": "scenario_test", "from": "scn:#Кириллический CRLF", "to": "test:test/crlf.spec.md", "outcome": "candidate", "anchors": 1 },
+          { "relation": "symbol_test", "from": "operation:crlf.thing", "to": "test:test/crlf.spec.md", "outcome": "related_only", "anchors": 0 }
+        ]
+      }
+    },
+    {
+      "id": "heldout-adv",
+      "kind": "adversarial",
+      "trace": "traces/heldout-trace-adv.json",
+      "specs": ["specs/spec-adv.md"],
+      "tests": ["test/adv.spec.mjs"],
+      "expected_structural": {
+        "outcome": "candidate",
+        "coverage": "full",
+        "edges": [
+          { "relation": "requirement_symbol", "from": "req:#AdvThing", "to": "operation:adv.thing", "outcome": "related_only", "anchors": 0 },
+          { "relation": "symbol_test", "from": "operation:adv.thing", "to": "test:test/adv.spec.mjs", "outcome": "candidate", "anchors": 1 }
+        ]
+      },
+      "forbidden_echo": ["https://evil.example/payload", "owner approved", "docs/secret.md"]
+    }
+  ],
+  "refusals": [
+    {
+      "id": "heldout-unresolved-ref",
+      "trace": "traces/heldout-trace-unresolved.json",
+      "specs": ["specs/spec-en.md"],
+      "tests": [],
+      "expected_code": "invalid-candidate:unresolved-ref",
+      "exit": 2
+    },
+    {
+      "id": "heldout-ambiguous-scenario",
+      "trace": "traces/heldout-trace-ambiguous.json",
+      "specs": ["specs/spec-amb.md"],
+      "tests": [],
+      "expected_code": "invalid-candidate:ambiguous-scenario-ref",
+      "exit": 2
+    },
+    {
+      "id": "heldout-duplicate-requirement",
+      "trace": "traces/heldout-trace-duplicate-req.json",
+      "specs": ["specs/spec-twin.md"],
+      "tests": [],
+      "expected_code": "invalid-candidate:unresolved-ref",
+      "exit": 2
+    },
+    {
+      "id": "heldout-bad-version",
+      "trace": "traces/heldout-trace-bad-version.json",
+      "expected_code": "trace-invalid",
+      "exit": 0
+    },
+    {
+      "id": "heldout-bad-hash",
+      "trace": "traces/heldout-trace-bad-hash.json",
+      "expected_code": "trace-invalid",
+      "exit": 0
+    },
+    {
+      "id": "heldout-gaps-invariant",
+      "trace": "traces/heldout-trace-gaps-invariant.json",
+      "expected_code": "trace-invalid",
+      "exit": 0
+    },
+    {
+      "id": "dev-trace-missing",
+      "trace": null,
+      "expected_code": "trace-missing",
+      "exit": 0
+    },
+    {
+      "id": "dev-foreign-custody",
+      "trace": "traces/foreign-trace.json",
+      "foreign_change": true,
+      "expected_code": "trace-missing",
+      "exit": 0
+    }
+  ]
+}

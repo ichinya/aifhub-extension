@@ -1,0 +1,20 @@
+{
+  "trace": {
+    "schemaVersion": "lekalo/trace-manifest/v0.2.16",
+    "identity": "dev.lekalo.trace-manifest@0.2.16",
+    "completeness": "full",
+    "nodes": [
+      {
+        "symbol": "operation:bad.thing"
+      }
+    ],
+    "relations": [],
+    "gaps": [
+      {
+        "symbol": "operation:bad.gap",
+        "reason": "unwired"
+      }
+    ]
+  },
+  "manifestDigest": "sha256:da4a8945122e75db3d9353cf85d29a6b7df8deeab0db4dd6333bf4da95cfce73"
+}

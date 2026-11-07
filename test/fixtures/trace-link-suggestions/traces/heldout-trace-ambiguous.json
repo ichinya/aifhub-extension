@@ -1,0 +1,23 @@
+{
+  "trace": {
+    "schemaVersion": "lekalo/trace-manifest/v0.2.16",
+    "identity": "dev.lekalo.trace-manifest@0.2.16",
+    "completeness": "full",
+    "nodes": [
+      {
+        "symbol": "scenario:Duplicate"
+      },
+      {
+        "symbol": "operation:amb.thing"
+      }
+    ],
+    "relations": [
+      {
+        "from": "operation:amb.thing",
+        "to": "scenario:Duplicate"
+      }
+    ],
+    "gaps": []
+  },
+  "manifestDigest": "sha256:a0877f9595eb1accac424d5ac0386897f42be9f013cbff88686465560dde1876"
+}
