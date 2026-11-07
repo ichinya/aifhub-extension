@@ -1,0 +1,31 @@
+{
+  "schema": "aifhub.claim_evidence_pairs.v1",
+  "carrier": {
+    "path": "research/research-ru.md"
+  },
+  "checked_scope": "многоязычная цитата поверх CRLF-источника",
+  "claims": [
+    {
+      "claim_id": "r1",
+      "claim_ref": "строка 3 исследования",
+      "source_ref": {
+        "path": "sources/spec-ru-crlf.md"
+      },
+      "relation": "literal_quote",
+      "quote": "Сессия ОБЯЗАНА завершаться после 30 минут бездействия."
+    },
+    {
+      "claim_id": "r2",
+      "claim_ref": "строка 3 исследования",
+      "source_ref": {
+        "path": "sources/spec-ru.md",
+        "span": {
+          "start": 39,
+          "end": 170
+        }
+      },
+      "relation": "literal_quote",
+      "quote": "Форма входа ОБЯЗАНА проверять адрес электронной почты перед отправкой."
+    }
+  ]
+}

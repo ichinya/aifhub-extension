@@ -174,6 +174,13 @@ const WRAPPER_COMMANDS = [
     module: './commands/aifhub-requirement-lint.mjs',
     script: 'requirement-lint.mjs',
     args: ['--change', 'add-oauth', '--enabled', 'true', '--file', 'openspec/changes/add-oauth/proposal.md', '--json']
+  },
+  {
+    name: 'aifhub-claim-evidence-check',
+    description: 'Run opt-in advisory claim evidence diagnostics for presented claim-source pairs without changing evidence or authorizing progression.',
+    module: './commands/aifhub-claim-evidence-check.mjs',
+    script: 'claim-evidence-check.mjs',
+    args: ['--change', 'add-oauth', '--enabled', 'true', '--pairs', 'docs/research-claims.json', '--json']
   }
 ];
 
@@ -639,7 +646,8 @@ describe('AIFHub wrapper guidance contract', () => {
         'ai-factory aifhub-migrate-legacy-plans <change-id> --dry-run',
         'ai-factory aifhub-migrate-legacy-plans --all --dry-run',
         'ai-factory aifhub-done-finalizer --change <change-id> --json',
-        'ai-factory aifhub-requirement-lint --change <id> [--enabled true|false]'
+        'ai-factory aifhub-requirement-lint --change <id> [--enabled true|false]',
+        'ai-factory aifhub-claim-evidence-check --change <id> [--enabled true|false]'
       ]],
       ['docs/openspec-validation.md', [
         'ai-factory aifhub-write-gate-evidence --change add-oauth-login --gate rules',
@@ -706,6 +714,14 @@ describe('AIFHub wrapper guidance contract', () => {
       ['injections/core/aif-plan-plan-folder.md', [
         'ai-factory aifhub-mode status --json',
         'ai-factory aifhub-requirement-lint --change <change-id> --enabled true'
+      ]],
+      ['injections/core/aif-explore-plan-folder.md', [
+        'ai-factory aifhub-claim-evidence-check --change <change-id> --enabled true --stdin --json',
+        'without `--write`'
+      ]],
+      ['injections/core/aif-review-context-providers.md', [
+        'ai-factory aifhub-claim-evidence-check --change <change-id> --enabled true --stdin --json',
+        'without `--write`'
       ]],
       ['agent-files/codex/aifhub-plan-polisher.toml', [
         'ai-factory aifhub-mode status --json'

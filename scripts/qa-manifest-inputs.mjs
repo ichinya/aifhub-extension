@@ -112,7 +112,13 @@ async function observeQaSnapshotInner(store, payload, options = {}) {
   // follow the same rule; the writer refuses custom state roots, so the
   // default-root namespace below is the only surface to exclude.
   const requirementLintNamespace = p => within(p, `.ai-factory/state/${payload.target.id}/requirement-lint`);
-  const names = Object.keys(observed.files).filter(p => !compositionsNamespace(p) && !readabilityNamespace(p) && !requirementLintNamespace(p));
+  // Closed runtime namespace (#282): advisory claim-evidence observations use
+  // the same projection rule; the writer refuses custom state roots and is
+  // git-guarded pre-write, so the default-root namespace below is the only
+  // surface to exclude.
+  const claimEvidenceNamespace = p => within(p, `.ai-factory/state/${payload.target.id}/claim-evidence`);
+  const closedNamespace = p => compositionsNamespace(p) || readabilityNamespace(p) || requirementLintNamespace(p) || claimEvidenceNamespace(p);
+  const names = Object.keys(observed.files).filter(p => !closedNamespace(p));
   requireValue(names.length <= QA_LIMITS.files, 'qa-files-limit', true);
   const collision = new Map();
   const directoryCase = new Map();
@@ -125,7 +131,7 @@ async function observeQaSnapshotInner(store, payload, options = {}) {
       directoryCase.set(prefix.toLowerCase(), prefix);
     }
   }
-  const directories = new Set((observed.directory_names ?? []).filter(p => !compositionsNamespace(p) && !readabilityNamespace(p) && !requirementLintNamespace(p)));
+  const directories = new Set((observed.directory_names ?? []).filter(p => !closedNamespace(p)));
   requireValue(directories.size <= QA_LIMITS.files && [...directories].every(p => Object.hasOwn(observed.files, p)
     && observed.files[p] === null), 'directory-catalog-invalid', true);
   let bytes = 0;
@@ -145,7 +151,7 @@ async function observeQaSnapshotInner(store, payload, options = {}) {
     files[relative] = data === null ? { kind: directories.has(relative) ? 'directory' : 'missing' } : { kind: 'file', sha256: digest(data),
       projection: material ? null : metadataProjection(relative, data) };
   }
-  const ignored = sorted((observed.ignored_names ?? []).filter(p => !compositionsNamespace(p) && !readabilityNamespace(p) && !requirementLintNamespace(p)));
+  const ignored = sorted((observed.ignored_names ?? []).filter(p => !closedNamespace(p)));
   requireValue(ignored.length <= QA_LIMITS.files, 'qa-files-limit', true);
   for (const p of ignored) {
     sourcePath(p);
@@ -156,7 +162,7 @@ async function observeQaSnapshotInner(store, payload, options = {}) {
   requireValue(new Set([...names, ...ignored]).size <= QA_LIMITS.files, 'qa-files-limit', true);
   requireValue(observed.modules && Object.keys(observed.modules).length > 0
     && Object.values(observed.modules).every(hash => SHA.test(hash)), 'module-identity-unproven', true);
-  const changedPaths = sorted((observed.changed_paths ?? []).filter(p => !compositionsNamespace(p) && !readabilityNamespace(p) && !requirementLintNamespace(p)));
+  const changedPaths = sorted((observed.changed_paths ?? []).filter(p => !closedNamespace(p)));
   requireValue(changedPaths.length <= QA_LIMITS.files, 'qa-files-limit', true);
   for (const p of changedPaths) {
     sourcePath(p);
@@ -222,7 +228,8 @@ async function filesystemSnapshot(store, payload, options) {
   const excluded = p => within(p, '.git') || qaInternal(p)
     || within(p, `.ai-factory/state/${payload.target.id}/compositions`)
     || within(p, `.ai-factory/state/${payload.target.id}/readability`)
-    || within(p, `.ai-factory/state/${payload.target.id}/requirement-lint`);
+    || within(p, `.ai-factory/state/${payload.target.id}/requirement-lint`)
+    || within(p, `.ai-factory/state/${payload.target.id}/claim-evidence`);
   const visible = (await git(['ls-files', '--cached', '--others', '--exclude-standard', '-z'])).split('\0').filter(Boolean);
   // Closed namespaces are excluded before the catalog limits: a flood of
   // gitignored paths under compositions/ must not fail the snapshot when the

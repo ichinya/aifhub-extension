@@ -8,3 +8,4 @@
 *.pdf binary
 *.zip binary
 test/fixtures/docs-readability/crlf-bom.md -text
+test/fixtures/claim-evidence/sources/spec-ru-crlf.md -text

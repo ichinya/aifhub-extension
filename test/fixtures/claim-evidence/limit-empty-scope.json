@@ -1,0 +1,16 @@
+{
+  "schema": "aifhub.claim_evidence_pairs.v1",
+  "carrier": {
+    "path": "research/login-research.md"
+  },
+  "checked_scope": "",
+  "claims": [
+    {
+      "claim_id": "l1",
+      "source_ref": {
+        "path": "sources/spec-login.md"
+      },
+      "relation": "paraphrase"
+    }
+  ]
+}

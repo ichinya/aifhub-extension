@@ -1,0 +1,269 @@
+{
+  "schema": "aifhub.claim_evidence_labels.v1",
+  "thresholds": {
+    "negative_false_accusations": 0,
+    "label_match": "exact"
+  },
+  "provenance": "declared-only: every envelope cites files shipped in this directory; nothing is fetched or synthesized at run time",
+  "semantic_provenance": "expected_semantic verdicts are pipeline fixtures consumed by the DI fake assessor in the corpus test; with no live provider they prove transport and compound roll-up, not semantic accuracy (no live-eval thresholds are derivable from this fake suite)",
+  "metrics": {
+    "precision": "measured in the corpus test over structural exact_found against labels; kept outside any binding",
+    "recall": "measured in the corpus test over labeled positives; kept outside any binding",
+    "false_accusation_rate": "measured over negative cases (exact_found on a labeled non-exact case); threshold 0",
+    "cost_latency": "measured separately in the corpus test wall clock; never mixed into quality metrics"
+  },
+  "groups": {
+    "dev": {
+      "dev-exact-quote.json": {
+        "negative": false,
+        "expected_pairs": [
+          {
+            "claim_id": "q1",
+            "quote_check": "exact_found",
+            "known_revision": "not_declared"
+          },
+          {
+            "claim_id": "q2",
+            "quote_check": "exact_found",
+            "known_revision": "not_declared"
+          }
+        ],
+        "expected_semantic": [
+          {
+            "claim_id": "q1",
+            "verdict": "supports",
+            "rationale": "label fixture: exact quote inside the presented source"
+          },
+          {
+            "claim_id": "q2",
+            "verdict": "supports",
+            "rationale": "label fixture: exact quote at the presented span"
+          }
+        ]
+      },
+      "dev-fabricated-quote.json": {
+        "negative": true,
+        "expected_pairs": [
+          {
+            "claim_id": "f1",
+            "quote_check": "not_found",
+            "known_revision": "not_declared"
+          }
+        ],
+        "expected_semantic": [
+          {
+            "claim_id": "f1",
+            "verdict": "insufficient",
+            "rationale": "label fixture: fabricated quote has no presented support"
+          }
+        ]
+      },
+      "dev-out-of-context.json": {
+        "negative": true,
+        "expected_pairs": [
+          {
+            "claim_id": "o1",
+            "quote_check": "literal_match_out_of_context",
+            "known_revision": "not_declared"
+          }
+        ],
+        "expected_semantic": [
+          {
+            "claim_id": "o1",
+            "verdict": "insufficient",
+            "rationale": "label fixture: literal match sits outside the presented anchor"
+          }
+        ]
+      },
+      "dev-outdated-revision.json": {
+        "negative": false,
+        "expected_pairs": [
+          {
+            "claim_id": "v1",
+            "quote_check": "exact_found",
+            "known_revision": "changed"
+          }
+        ],
+        "expected_semantic": [
+          {
+            "claim_id": "v1",
+            "verdict": "insufficient",
+            "rationale": "label fixture: declared revision no longer matches the source bytes"
+          }
+        ]
+      },
+      "dev-compound-partly-supported.json": {
+        "negative": false,
+        "expected_pairs": [
+          {
+            "claim_id": "compound-1",
+            "quote_check": "exact_found",
+            "known_revision": "not_declared"
+          },
+          {
+            "claim_id": "part-ok",
+            "quote_check": "exact_found",
+            "known_revision": "not_declared"
+          },
+          {
+            "claim_id": "part-bad",
+            "quote_check": "not_found",
+            "known_revision": "not_declared"
+          }
+        ],
+        "expected_semantic": [
+          {
+            "claim_id": "compound-1",
+            "verdict": "supports",
+            "rationale": "label fixture: the parent claim own pair is supported"
+          },
+          {
+            "claim_id": "part-ok",
+            "verdict": "supports",
+            "rationale": "label fixture: part supported"
+          },
+          {
+            "claim_id": "part-bad",
+            "verdict": "insufficient",
+            "rationale": "label fixture: fabricated part has no support"
+          }
+        ]
+      },
+      "dev-unavailable-source.json": {
+        "negative": false,
+        "expected_pairs": [
+          {
+            "claim_id": "u1",
+            "quote_check": "source_unavailable",
+            "known_revision": "not_declared"
+          },
+          {
+            "claim_id": "u2",
+            "quote_check": "source_unavailable",
+            "known_revision": "not_declared"
+          }
+        ],
+        "expected_semantic": [
+          {
+            "claim_id": "u1",
+            "verdict": "insufficient",
+            "rationale": "label fixture: source unavailable"
+          },
+          {
+            "claim_id": "u2",
+            "verdict": "insufficient",
+            "rationale": "label fixture: source unreadable"
+          }
+        ]
+      },
+      "dev-ru-crlf-multibyte.json": {
+        "negative": false,
+        "expected_pairs": [
+          {
+            "claim_id": "r1",
+            "quote_check": "exact_found",
+            "known_revision": "not_declared"
+          },
+          {
+            "claim_id": "r2",
+            "quote_check": "exact_found",
+            "known_revision": "not_declared"
+          }
+        ],
+        "expected_semantic": [
+          {
+            "claim_id": "r1",
+            "verdict": "supports",
+            "rationale": "label fixture: RU quote over CRLF"
+          },
+          {
+            "claim_id": "r2",
+            "verdict": "supports",
+            "rationale": "label fixture: RU quote at span"
+          }
+        ]
+      },
+      "dev-injection.json": {
+        "negative": true,
+        "expected_pairs": [
+          {
+            "claim_id": "i1",
+            "quote_check": "not_found",
+            "known_revision": "not_declared"
+          },
+          {
+            "claim_id": "i2",
+            "quote_check": "not_applicable",
+            "known_revision": "not_declared"
+          }
+        ],
+        "expected_semantic": [
+          {
+            "claim_id": "i1",
+            "verdict": "insufficient",
+            "rationale": "label fixture: hostile quote is not in the presented source"
+          },
+          {
+            "claim_id": "i2",
+            "verdict": "insufficient",
+            "rationale": "label fixture: inference over presented source only"
+          }
+        ]
+      }
+    },
+    "heldout": {
+      "heldout-en-paraphrase.json": {
+        "negative": false,
+        "expected_pairs": [
+          {
+            "claim_id": "p1",
+            "quote_check": "not_applicable",
+            "known_revision": "not_declared"
+          },
+          {
+            "claim_id": "p2",
+            "quote_check": "not_applicable",
+            "known_revision": "not_declared"
+          }
+        ],
+        "expected_semantic": [
+          {
+            "claim_id": "p1",
+            "verdict": "insufficient",
+            "rationale": "label fixture: paraphrase carries no quote check"
+          },
+          {
+            "claim_id": "p2",
+            "verdict": "insufficient",
+            "rationale": "label fixture: inference carries no quote check"
+          }
+        ]
+      },
+      "heldout-ru-exact.json": {
+        "negative": false,
+        "expected_pairs": [
+          {
+            "claim_id": "h1",
+            "quote_check": "exact_found",
+            "known_revision": "not_declared"
+          }
+        ],
+        "expected_semantic": [
+          {
+            "claim_id": "h1",
+            "verdict": "supports",
+            "rationale": "label fixture: held-out RU exact quote"
+          }
+        ]
+      }
+    },
+    "limit": {
+      "limit-empty-scope.json": {
+        "negative": false,
+        "expected_pairs": null,
+        "expected_semantic": null,
+        "expected_envelope_error": "invalid-envelope"
+      }
+    }
+  }
+}
