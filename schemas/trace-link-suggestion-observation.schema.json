@@ -156,6 +156,24 @@
                 "minLength": 1,
                 "maxLength": 500
               }
+            },
+            "missing_sources_count": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            },
+            "truncations": {
+              "type": "array",
+              "maxItems": 10,
+              "items": {
+                "enum": [
+                  "graph-truncated",
+                  "anchor-scan-truncated",
+                  "delta-spec-inventory-truncated",
+                  "missing-sources-truncated",
+                  "declared-sources-truncated"
+                ]
+              }
             }
           },
           "required": [
@@ -163,7 +181,9 @@
             "declared_sources",
             "scanned_sources",
             "missing_sources",
-            "delta_spec_inventory"
+            "delta_spec_inventory",
+            "missing_sources_count",
+            "truncations"
           ]
         },
         "outcome": {

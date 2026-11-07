@@ -90,6 +90,17 @@ export const usage = 'ai-factory aifhub-trace-link-suggestions --change <id> [--
 // Single change-id form (custody contract `safeId`): stricter than the #282
 // observation schema, validated explicitly before any read (decision 7).
 export const CHANGE_ID_FORM = /^[a-z0-9][a-z0-9-]{0,99}$/;
+// Coverage-fact diagnostics survive the bounded diagnostics budget (S3):
+// a consumer must see that missing_sources or the anchor scan was truncated
+// even when ordinary diagnostics fill the budget.
+export const COVERAGE_FACT_DIAGNOSTIC_CODES = Object.freeze(new Set([
+  'missing-sources-truncated',
+  'delta-spec-inventory-truncated',
+  'anchor-scan-truncated',
+  'assertion-refs-truncated',
+  'declared-sources-truncated',
+  'graph-truncated',
+]));
 // Mirror of the frozen TEST_PATH_PATTERN shape (scripts/openspec-coverage-matrix.mjs:27,
 // module-private): presented test inputs must match this form; conformance
 // parity is pinned on shared fixtures.
@@ -395,7 +406,6 @@ export async function readTraceManifest(rootDir, changeId, options = {}) {
 }
 
 async function parseTraceEnvelope(bytes, relative) {
-  if (bytes === null) return { ok: false, code: 'trace-missing', detail: relative };
   if (bytes === null) return { ok: false, code: 'trace-missing', detail: relative };
   let envelope;
   try {
@@ -789,6 +799,18 @@ export function assertStructuralInvariants(observation) {
   if ((scan.missing_sources ?? []).length > 0 && scan.coverage !== 'partial') {
     throw new TypeError('missing sources require partial coverage');
   }
+  if ((scan.truncations ?? []).length > 0 && scan.coverage !== 'partial') {
+    throw new TypeError('recorded truncations require partial coverage');
+  }
+  if (scan.coverage === 'full' && ((scan.truncations ?? []).length > 0 || (scan.missing_sources_count ?? 0) > 0)) {
+    throw new TypeError('full coverage cannot carry truncations or missing sources');
+  }
+  if ((scan.missing_sources ?? []).length > (scan.missing_sources_count ?? 0)) {
+    throw new TypeError('missing_sources list cannot exceed its true count');
+  }
+  if (structural.trace.completeness === 'partial' && scan.coverage !== 'partial') {
+    throw new TypeError('partial trace completeness requires partial coverage');
+  }
   // Declared/scanned accounting: scanned can never exceed declared, and a
   // full scan reads every declared source (equal counts by construction).
   if (scan.scanned_sources > scan.declared_sources) {
@@ -1042,7 +1064,7 @@ export async function validateObservationBinding(rootDir, observation, options =
   const mismatched = [];
   if (worktreeIdentity !== observation.worktree_identity) mismatched.push('worktree_identity');
   const recordedInputs = Array.isArray(observation.inputs) ? observation.inputs : [];
-  if (recordedInputs.length > MAX_TEST_INPUTS + 100) return { ok: false, code: 'observation-invalid' };
+  if (recordedInputs.length > MAX_TEST_INPUTS + MAX_DELTA_SPEC_FILES) return { ok: false, code: 'observation-invalid' };
   // Cross-field honesty invariants on the recorded observation itself: a
   // scan with missing sources can never claim full coverage, and a failed,
   // not_run, or abstained semantic stage can never carry assessments — nor
@@ -1068,15 +1090,6 @@ export async function validateObservationBinding(rootDir, observation, options =
   // recorded observation itself): an edited or renamed input must name its
   // field and flip the recomputed binding.
   const reader = options.readTestFile ?? (async (dir, rel) => readProviderFile(dir, rel, DOCUMENT_LIMIT));
-  const classifyInputBytes = (bytes) => {
-    if (bytes === null) return { sha256: null, bytes: 0, kind: 'missing' };
-    try {
-      new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-      return { sha256: digest(bytes), bytes: bytes.length, kind: 'file' };
-    } catch {
-      return { sha256: digest(bytes), bytes: bytes.length, kind: 'malformed' };
-    }
-  };
   const freshInputs = [];
   for (const input of recordedInputs) {
     let bytes = null;
@@ -1105,7 +1118,8 @@ export async function validateObservationBinding(rootDir, observation, options =
     mismatched.push('trace');
   } else if (!recordedTrace || recordedTrace.path !== traceManifestPath(observation.change_id)
     || recordedTrace.sha256 !== freshTrace.sha256 || recordedTrace.bytes !== freshTrace.bytes
-    || recordedTrace.manifest_digest !== freshTrace.manifestDigest) {
+    || recordedTrace.manifest_digest !== freshTrace.manifestDigest
+    || recordedTrace.completeness !== freshTrace.trace.completeness) {
     mismatched.push('trace');
   }
   const recordedEngine = observation.engine ?? {};
@@ -1171,6 +1185,22 @@ export async function validateObservationBinding(rootDir, observation, options =
     mismatched.push('binding');
   }
   return { ok: true, stale: mismatched.length > 0, mismatched: [...new Set(mismatched)], state: mismatched.length > 0 ? 'stale-observation' : null };
+}
+
+
+// One shared byte classifier for the scan, the freshness probe, and
+// revalidation (F4: single definition): a malformed-UTF-8 input records kind
+// "malformed" at write time and revalidates as "malformed", so a recorded
+// observation is never "born stale" and the probe never lies about unchanged
+// inputs.
+function classifyInputBytes(bytes) {
+  if (bytes === null) return { sha256: null, bytes: 0, kind: 'missing' };
+  try {
+    new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    return { sha256: digest(bytes), bytes: bytes.length, kind: 'file' };
+  } catch {
+    return { sha256: digest(bytes), bytes: bytes.length, kind: 'malformed' };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1341,11 +1371,14 @@ function buildGraph({ traceManifest, specs, tests, diagnostics, specsIncomplete 
   }
   const refusal = (reason, detail) => ({ refusal: { reason, detail: detail === undefined ? null : String(detail).slice(0, 200) } });
   // When the declared spec inventory is incomplete (unreadable/truncated
-  // specs), a ref that cannot resolve may be a casualty of the missing
-  // source rather than an invented reference: it degrades to a bounded
-  // diagnostic with the affected edges dropped (partial scan) instead of
-  // destroying the whole partial result with a typed refusal. With every
-  // declared spec readable, an unresolvable ref stays a typed refusal.
+  // specs), a ref with ZERO readable matches may be a casualty of the
+  // missing source rather than an invented reference: it degrades to a
+  // bounded diagnostic with the affected edges dropped (partial scan)
+  // instead of destroying the whole partial result with a typed refusal.
+  // Proven ambiguity among READABLE specs (>= 2 matches, duplicate headings)
+  // is real evidence and always refuses, inventory state notwithstanding.
+  // The helper must only be consumed per-symbol (its {node:null} result is
+  // never a buildGraph return value).
   const unresolved = (code, symbol) => {
     if (specsIncomplete) {
       diagnostics.push({ code: `${code}-missing-source`, path: traceManifestPathLabel(traceManifest), detail: String(symbol).slice(0, 200) });
@@ -1381,18 +1414,15 @@ function buildGraph({ traceManifest, specs, tests, diagnostics, specsIncomplete 
   // only: the closed relation dictionary has no requirement->test edge. A
   // duplicate heading inside one requirement would silently collapse to the
   // last span in this map, so it is a typed ambiguity refusal before any
-  // suggestion is emitted.
+  // suggestion is emitted. The duplicate is proven by READABLE spec bytes, so
+  // it refuses unconditionally — an incomplete inventory cannot create or
+  // excuse it, and a {node:null} here would break the buildGraph contract.
   for (const spec of specs) {
     for (const requirement of spec.requirements) {
       for (const scenario of requirement.scenarios) {
         const nodeId = `scn:${spec.path}#${requirement.title}#${scenario.heading}`;
         if (nodeId.length > 200) return refusal('node-id-overflow', nodeId);
-        if (nodes.has(nodeId)) {
-          // A duplicate heading inside one readable requirement is real
-          // ambiguity; with an incomplete spec inventory it may also be a
-          // casualty of the missing source, so it degrades the same way.
-          return unresolved('ambiguous-scenario-ref', nodeId);
-        }
+        if (nodes.has(nodeId)) return refusal('ambiguous-scenario-ref', nodeId);
         nodes.set(nodeId, {
           node_id: nodeId,
           kind: 'scenario',
@@ -1418,8 +1448,11 @@ function buildGraph({ traceManifest, specs, tests, diagnostics, specsIncomplete 
     if (entry.kind === 'requirement') {
       const key = entry.symbol.slice('requirement:'.length);
       const matches = requirementsByTitle.get(key) ?? [];
+      // Zero readable matches may be a casualty of a missing spec (downgraded
+      // when the inventory is incomplete); two or more readable matches are
+      // proven ambiguity and always refuse, inventory state notwithstanding.
       if (matches.length === 0) return unresolved('unresolved-ref', entry.symbol);
-      if (matches.length > 1) return unresolved('unresolved-ref', `${entry.symbol}: ambiguous requirement title`);
+      if (matches.length > 1) return refusal('unresolved-ref', `${entry.symbol}: ambiguous requirement title`);
       const requirement = matches[0];
       const nodeId = `req:${requirement.spec_path}#${requirement.title}`;
       if (nodeId.length > 200) return refusal('node-id-overflow', nodeId);
@@ -1430,7 +1463,7 @@ function buildGraph({ traceManifest, specs, tests, diagnostics, specsIncomplete 
     const key = entry.symbol.slice('scenario:'.length);
     const matches = scenariosByHeading.get(key) ?? [];
     if (matches.length === 0) return unresolved('unresolved-ref', entry.symbol);
-    if (matches.length > 1) return unresolved('ambiguous-scenario-ref', entry.symbol);
+    if (matches.length > 1) return refusal('ambiguous-scenario-ref', entry.symbol);
     const { requirement, scenario, spec } = matches[0];
     const nodeId = `scn:${spec.path}#${requirement.title}#${scenario.heading}`;
     return { node: nodes.get(nodeId) };
@@ -1541,10 +1574,13 @@ function buildGraph({ traceManifest, specs, tests, diagnostics, specsIncomplete 
 
   const KIND_ORDER = { requirement: 0, semantic_symbol: 1, scenario: 2, test: 3 };
   let nodeList = [...nodes.values()].sort((left, right) => KIND_ORDER[left.kind] - KIND_ORDER[right.kind] || sortKey(left.node_id, right.node_id));
+  const truncations = [];
+  if (truncatedAnchorScan) truncations.push('anchor-scan-truncated');
   let truncated = truncatedAnchorScan;
   if (nodeList.length > GRAPH_LIMITS.max_nodes) {
     nodeList = nodeList.slice(0, GRAPH_LIMITS.max_nodes);
     truncated = true;
+    truncations.push('graph-truncated');
     diagnostics.push({ code: 'graph-truncated', path: null, detail: 'nodes' });
   }
   const keptNodeIds = new Set(nodeList.map((node) => node.node_id));
@@ -1561,11 +1597,13 @@ function buildGraph({ traceManifest, specs, tests, diagnostics, specsIncomplete 
   if (edgeList.length > GRAPH_LIMITS.max_edges) {
     edgeList = edgeList.slice(0, GRAPH_LIMITS.max_edges);
     truncated = true;
+    truncations.push('graph-truncated');
     diagnostics.push({ code: 'graph-truncated', path: null, detail: 'edges' });
   }
   if (nodeList.length + edgeList.length > GRAPH_LIMITS.max_total_elements) {
     edgeList = edgeList.slice(0, Math.max(0, GRAPH_LIMITS.max_total_elements - nodeList.length));
     truncated = true;
+    truncations.push('graph-truncated');
     diagnostics.push({ code: 'graph-truncated', path: null, detail: 'total' });
   }
   const edges = edgeList.map((edge, index) => ({
@@ -1576,7 +1614,7 @@ function buildGraph({ traceManifest, specs, tests, diagnostics, specsIncomplete 
     outcome: edge.behavioral_assertion_refs.length > 0 ? 'candidate' : 'related_only',
     behavioral_assertion_refs: edge.behavioral_assertion_refs,
   }));
-  return { nodes: nodeList, edges, truncated, resolvedTraceRefs };
+  return { nodes: nodeList, edges, truncated, resolvedTraceRefs, truncations };
 }
 
 function traceManifestPathLabel(traceManifest) {
@@ -1632,13 +1670,11 @@ async function collectDeltaSpecPaths(rootDir, changeId) {
     try {
       entries = await readdir(path.join(rootDir, relative), { withFileTypes: true });
     } catch (error) {
-      if (relative === specsRoot) {
-        // The specs root itself is absent: a legitimate zero-declared-spec
-        // change, not a truncated scan.
-        continue;
-      }
-      // A child directory that cannot be listed hides its subtree: the walk
-      // can no longer prove what the inventory contains, so it degrades.
+      // Only git-style ENOENT on the specs root itself is a legitimate
+      // zero-declared-spec change; EACCES/ENOTDIR or any other failure —
+      // root or child — hides its subtree, so the walk degrades instead of
+      // presenting a silent full scan (S1/C1).
+      if (relative === specsRoot && error?.code === 'ENOENT') continue;
       markTruncated(`readdir:${error?.code ?? 'error'}`);
       continue;
     }
@@ -1648,8 +1684,10 @@ async function collectDeltaSpecPaths(rootDir, changeId) {
       // silently: the bounded read below refuses it and the entry degrades
       // coverage like any other unreadable spec (dangling symlinks included).
       if (entry.name === 'spec.md' && (entry.isFile() || entry.isSymbolicLink())) {
-        files.push(childRelative);
+        // The cap is only a truncation when a 101st declared file is actually
+        // encountered: exactly 100 specs are a complete inventory (S1).
         if (files.length >= MAX_DELTA_SPEC_FILES) { markTruncated('inventory-limit'); break; }
+        files.push(childRelative);
         continue;
       }
       if (entry.isDirectory()) directories.push(childRelative);
@@ -1878,8 +1916,14 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
     for (const test of tests) {
       if (!test.ok) missingSources.push({ path: test.path, reason: String(test.code ?? 'unreadable').slice(0, 200) });
     }
+    // The true missing count is captured BEFORE the cap (S3): a consumer must
+    // see that the missing_sources list itself was truncated even when the
+    // diagnostic tail is dropped by the bounded diagnostics budget.
+    const missingSourcesCount = missingSources.length;
+    let missingSourcesCapped = false;
     if (missingSources.length > MAX_MISSING_SOURCES) {
       missingSources.length = MAX_MISSING_SOURCES;
+      missingSourcesCapped = true;
       diagnostics.push({ code: 'missing-sources-truncated', path: null, detail: `limit=${MAX_MISSING_SOURCES}` });
     }
     if (deadlineExceeded()) {
@@ -1910,16 +1954,34 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
     const supportedTraceSymbols = new Set(traceManifest.trace.nodes
       .map((node) => node.symbol)
       .filter((symbol) => kindForSymbol(symbol) !== null));
-    const declaredSources = specs.length + uniqueTestPaths.length + supportedTraceSymbols.size;
-    const scannedSources = specs.filter((spec) => spec.ok).length
+    // The declared/scanned schema maximum (100000) cannot express the largest
+    // admissible trace (100000 supported nodes + specs + tests): when the
+    // accounting overflows, the counts clamp to the schema bound and the
+    // degradation is recorded as a truncation (partial -> abstain), never a
+    // schema-parity crash.
+    const MAX_ACCOUNTED_SOURCES = 100000;
+    let truncations = [...graph.truncations];
+    if (specCollection.truncated) truncations.push('delta-spec-inventory-truncated');
+    if (missingSourcesCapped) truncations.push('missing-sources-truncated');
+    let declaredSources = specs.length + uniqueTestPaths.length + supportedTraceSymbols.size;
+    let scannedSources = specs.filter((spec) => spec.ok).length
       + tests.filter((test) => test.ok).length
       + graph.resolvedTraceRefs;
-    const partial = traceManifest.trace.completeness === 'partial' || graph.truncated || specCollection.truncated || missingSources.length > 0;
+    if (declaredSources > MAX_ACCOUNTED_SOURCES || scannedSources > MAX_ACCOUNTED_SOURCES) {
+      truncations.push('declared-sources-truncated');
+      diagnostics.push({ code: 'declared-sources-truncated', path: null, detail: `limit=${MAX_ACCOUNTED_SOURCES}` });
+      declaredSources = Math.min(declaredSources, MAX_ACCOUNTED_SOURCES);
+      scannedSources = Math.min(scannedSources, MAX_ACCOUNTED_SOURCES);
+    }
+    truncations.sort();
+    const partial = traceManifest.trace.completeness === 'partial' || truncations.length > 0 || missingSources.length > 0;
     const coverage = {
       state: partial ? 'partial' : 'full',
       declared_sources: declaredSources,
       scanned_sources: scannedSources,
       missing_sources: missingSources,
+      missing_sources_count: missingSourcesCount,
+      truncations,
     };
     if (traceManifest.trace.completeness === 'partial') {
       diagnostics.push({ code: 'trace-incomplete', path: traceManifestPath(changeId), detail: 'completeness=partial' });
@@ -1945,6 +2007,8 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
         scanned_sources: coverage.scanned_sources,
         missing_sources: coverage.missing_sources,
         delta_spec_inventory: specs.map((spec) => spec.path).sort(),
+        missing_sources_count: coverage.missing_sources_count,
+        truncations: coverage.truncations,
       },
       outcome,
       outcome_summary: {
@@ -1964,15 +2028,6 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
     // revalidation: a malformed-UTF-8 input records kind `malformed` at write
     // time and revalidates as `malformed`, so a recorded observation is never
     // "born stale" and the probe never lies about unchanged inputs.
-    const classifyInputBytes = (bytes) => {
-      if (bytes === null) return { sha256: null, bytes: 0, kind: 'missing' };
-      try {
-        new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-        return { sha256: digest(bytes), bytes: bytes.length, kind: 'file' };
-      } catch {
-        return { sha256: digest(bytes), bytes: bytes.length, kind: 'malformed' };
-      }
-    };
     const inputRecords = [
       ...specs.map((spec) => ({ path: spec.path, ...classifyInputBytes(spec.bytes) })),
       ...tests.map((test) => ({ path: test.path, ...classifyInputBytes(test.bytes) })),
@@ -2068,6 +2123,12 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
     };
     // The semantic stage gets only the REMAINING command budget, not a fresh
     // full deadline: the deadline bounds the whole command, not its segments.
+    // An exhausted budget stops here — the assessor is never invoked just to
+    // have its result discarded by the final deadline check (S2).
+    if (deadlineExceeded()) {
+      emit(notRunEnvelope(['deadline-exceeded']), parsed.json);
+      return 0;
+    }
     const remainingBudget = Math.max(1, (options.deadlineMs ?? DEFAULT_DEADLINE_MS) - (now() - startedAt));
     const semanticOutcome = await runTypedAssessment({
       assessor: typeof options.assessor === 'function' ? options.assessor : null,
@@ -2077,10 +2138,6 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
       watch,
       now,
     });
-    if (deadlineExceeded()) {
-      emit(notRunEnvelope(['deadline-exceeded']), parsed.json);
-      return 0;
-    }
     const semantic = normalizeSemanticOutcome(semanticOutcome, new Set(graph.edges.map((edge) => edge.edge_id)));
     // Coverage degradations established by the helper (scanned/declared
     // clamps, missing entries) are authoritative for a stage that actually
@@ -2092,11 +2149,29 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
       ? semanticOutcome.coverage.state
       : coverage.state;
     const mergedCoverageState = coverageRank[coverage.state] <= coverageRank[helperCoverageState] ? coverage.state : helperCoverageState;
-    const semanticCoverage = semantic.abstained ? { ...coverage, state: 'none' } : { ...coverage, state: mergedCoverageState };
+    // The semantic coverage section has its own closed shape (no scan
+    // accounting fields): project it explicitly instead of spreading the
+    // structural coverage object.
+    const semanticCoverage = {
+      state: semantic.abstained ? 'none' : mergedCoverageState,
+      declared_sources: coverage.declared_sources,
+      scanned_sources: coverage.scanned_sources,
+      missing_sources: coverage.missing_sources,
+    };
 
     const combinedDiagnostics = [...semantic.diagnostics, ...diagnostics];
     if (combinedDiagnostics.length > MAX_DIAGNOSTICS) {
-      combinedDiagnostics.length = Math.max(1, MAX_DIAGNOSTICS - 1);
+      // Coverage-fact markers survive the bounded diagnostics budget (S3):
+      // a consumer must learn that missing_sources or the anchor scan was
+      // truncated even when ordinary diagnostics fill the budget.
+      const reserved = combinedDiagnostics.filter((entry) => COVERAGE_FACT_DIAGNOSTIC_CODES.has(entry?.code));
+      const ordinary = combinedDiagnostics.filter((entry) => !COVERAGE_FACT_DIAGNOSTIC_CODES.has(entry?.code));
+      const replacement = [
+        ...ordinary.slice(0, Math.max(0, MAX_DIAGNOSTICS - 1 - reserved.length)),
+        ...reserved,
+      ].slice(0, MAX_DIAGNOSTICS - 1);
+      combinedDiagnostics.length = 0;
+      combinedDiagnostics.push(...replacement);
       combinedDiagnostics.push({ code: 'diagnostics-truncated', path: null, detail: `limit=${MAX_DIAGNOSTICS}` });
     }
     const observation = assembleObservation({

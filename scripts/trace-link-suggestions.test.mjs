@@ -27,6 +27,7 @@ import {
   NOT_RUN_CODES,
   RELATION_POLICY,
   STATE_ROOT,
+  TEST_PATH_FORM,
   TRACE_EXPORT_LIMIT,
   TRACE_LINK_CONSUMER_ID,
   TRACE_LINK_NAMESPACE,
@@ -89,7 +90,8 @@ async function seedCaseProject(root, changeId, { config = CONFIG_ON, trace = nul
   }
   for (const spec of specs) {
     // Delta specs must be named spec.md inside their capability directory
-    // (collectCanonicalChangeArtifacts collects exactly spec.md files).
+    // (parity with the canonical collector's isSpecMarkdown predicate; the
+    // engine's own bounded walk declares exactly these files).
     const capDir = path.basename(spec, '.md');
     const target = path.join(root, 'openspec', 'changes', changeId, 'specs', capDir, 'spec.md');
     await mkdir(path.dirname(target), { recursive: true });
@@ -402,6 +404,56 @@ describe('trace-link-suggestions custody reader', () => {
     assert.equal(value.state, 'not_run');
     assert.deepEqual(value.codes, ['deadline-exceeded']);
   });
+
+  it('never invokes the assessor once the command budget is exhausted (S2)', async () => {
+    const root = await makeTemp('aif-tls-deadline2-');
+    const changeId = 'deadline-assessor-change';
+    await seedCaseProject(root, changeId, { trace: 'traces/dev-trace-nm.json', specs: ['specs/spec-en.md', 'specs/spec-ru.md'], tests: [] });
+    let assessorCalls = 0;
+    let helperDeadline = null;
+    const countingAssessor = (input, context) => {
+      assessorCalls += 1;
+      helperDeadline = context?.deadlineMs ?? null;
+      return { findings: [] };
+    };
+    const { exitCode, value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json'], {
+      deadlineMs: 0,
+      assessor: countingAssessor,
+    });
+    assert.equal(exitCode, 0);
+    assert.equal(value.state, 'not_run');
+    assert.deepEqual(value.codes, ['deadline-exceeded']);
+    assert.equal(assessorCalls, 0, 'the exhausted budget stops before the semantic stage');
+    assert.equal(helperDeadline, null);
+  });
+
+  it('clamps declared/scanned accounting at the schema maximum instead of a parity crash (C4)', async () => {
+    const root = await makeTemp('aif-tls-clamp-');
+    const changeId = 'clamp-change';
+    await seedCaseProject(root, changeId, { trace: null, specs: ['specs/spec-en.md'], tests: [] });
+    // 100000 supported symbols (the trace envelope limit) + 1 spec = 100001
+    // declared sources: one above the schema maximum.
+    const nodes = Array.from({ length: 100000 }, (_, index) => ({ symbol: `operation:mass.symbol${index}` }));
+    const trace = {
+      schemaVersion: 'lekalo/trace-manifest/v0.2.16',
+      identity: 'dev.lekalo.trace-manifest@0.2.16',
+      completeness: 'full',
+      nodes,
+      relations: [],
+      gaps: [],
+    };
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    await writeFile(manifest, JSON.stringify({ trace, manifestDigest: `sha256:${digest(JSON.stringify(trace))}` }), 'utf8');
+    const { exitCode, value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+    assert.equal(exitCode, 0, JSON.stringify(value?.codes ?? []));
+    assert.equal(value.structural.scan.coverage, 'partial');
+    assert.equal(value.structural.outcome, 'abstain');
+    assert.equal(value.structural.scan.declared_sources, 100000);
+    assert.equal(value.structural.scan.scanned_sources, 100000);
+    assert.deepEqual(value.structural.scan.truncations, ['declared-sources-truncated', 'graph-truncated']);
+    assert.ok(value.diagnostics.some((entry) => entry.code === 'declared-sources-truncated'));
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -467,6 +519,46 @@ describe('trace-link-suggestions exact-ref refusals', () => {
     await writeFile(manifest, JSON.stringify({ trace: emptyTrace, manifestDigest: `sha256:${digest(JSON.stringify(emptyTrace))}` }), 'utf8');
     const { exitCode, value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
     assert.equal(exitCode, 2);
+    assert.deepEqual(value.codes, ['invalid-candidate:ambiguous-scenario-ref']);
+  });
+
+  it('refuses duplicate scenario headings even when the spec inventory is incomplete (C2/F1)', async () => {
+    const root = await makeTemp('aif-tls-dupscn2-');
+    const changeId = 'dup-broken-change';
+    await seedCaseProject(root, changeId, { trace: null, specs: [], tests: [] });
+    await writeInlineSpec(root, changeId, 'dup', [
+      '# Delta for duplicates',
+      '',
+      '## ADDED Requirements',
+      '',
+      '### Requirement: DupHost',
+      '',
+      'One requirement with two identical scenario headings.',
+      '',
+      '#### Scenario: Same',
+      '',
+      '- GIVEN first',
+      '- WHEN parsed',
+      '- THEN ambiguous',
+      '',
+      '#### Scenario: Same',
+      '',
+      '- GIVEN second',
+      '- WHEN parsed',
+      '- THEN refused',
+      '',
+    ].join('\n'));
+    // The duplicate is proven by READABLE spec bytes: an unreadable sibling
+    // spec must neither excuse it nor crash the graph builder (the round-2
+    // {node:null} leak returned a non-graph from buildGraph and crashed).
+    await mkdir(path.join(root, 'openspec', 'changes', changeId, 'specs', 'broken'), { recursive: true });
+    await writeFile(path.join(root, 'openspec', 'changes', changeId, 'specs', 'broken', 'spec.md'), Buffer.from([0xff, 0xfe, 0x00, 0x01]));
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    const emptyTrace = { schemaVersion: 'lekalo/trace-manifest/v0.2.16', identity: 'dev.lekalo.trace-manifest@0.2.16', completeness: 'full', nodes: [], relations: [], gaps: [] };
+    await writeFile(manifest, JSON.stringify({ trace: emptyTrace, manifestDigest: `sha256:${digest(JSON.stringify(emptyTrace))}` }), 'utf8');
+    const { exitCode, value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+    assert.equal(exitCode, 2, JSON.stringify(value?.codes ?? []));
     assert.deepEqual(value.codes, ['invalid-candidate:ambiguous-scenario-ref']);
   });
 
@@ -1001,6 +1093,61 @@ describe('trace-link-suggestions binding and revalidation', () => {
     assert.equal(exitCode, 0);
     assert.equal(value.structural.scan.coverage, 'partial');
     assert.ok(value.structural.scan.missing_sources.some((entry) => entry.path.endsWith('broken/spec.md')), 'the dangling spec is a declared missing source');
+  });
+
+  it('refuses a tampered truncated observation promoted to a full none (C3)', async () => {
+    const root = await makeTemp('aif-tls-trunctamper-');
+    const changeId = 'trunc-tamper-change';
+    // 600 supported symbols: the graph truncates to 500 nodes (partial, abstain).
+    await seedCaseProject(root, changeId, { trace: null, specs: [], tests: [] });
+    const nodes = Array.from({ length: 600 }, (_, index) => ({ symbol: `operation:bulk.symbol${index}` }));
+    const trace = {
+      schemaVersion: 'lekalo/trace-manifest/v0.2.16',
+      identity: 'dev.lekalo.trace-manifest@0.2.16',
+      completeness: 'full',
+      nodes,
+      relations: [],
+      gaps: [],
+    };
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    await writeFile(manifest, JSON.stringify({ trace, manifestDigest: `sha256:${digest(JSON.stringify(trace))}` }), 'utf8');
+    const { exitCode } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--write', '--json']);
+    assert.equal(exitCode, 0);
+    const observation = parseStrictJson(await readFile(path.join(root, traceLinkPaths(changeId).observation), 'utf8'));
+    assert.deepEqual(observation.structural.scan.truncations, ['graph-truncated']);
+    assert.equal(observation.structural.outcome, 'abstain');
+    // The codex probe: coverage->full, outcome->none, summary rewritten while
+    // the binding stays untouched. The required truncations field is a
+    // coverage fact the tamper does not clear.
+    const tampered = structuredClone(observation);
+    tampered.structural.scan.coverage = 'full';
+    tampered.structural.outcome = 'none';
+    tampered.structural.outcome_summary.by_outcome.candidate = 0;
+    tampered.structural.outcome_summary.by_outcome.related_only = 0;
+    assert.equal((await validateObservationBinding(root, tampered)).code, 'observation-invalid');
+    // Even clearing the truncations leaves a contradiction: none-with-nodes
+    // is now a legitimate shape, but the observation still carries 600
+    // declared sources while a coordinated tamper that also rewrites the
+    // truncations list is a fresh-honest-observation rewrite — the documented
+    // trust boundary (internal inconsistency is caught; a full rewrite with
+    // recomputed facts is indistinguishable from an honest re-run).
+    const cleared = structuredClone(observation);
+    cleared.structural.scan.coverage = 'full';
+    cleared.structural.outcome = 'none';
+    cleared.structural.scan.truncations = [];
+    cleared.structural.outcome_summary.by_outcome.candidate = 0;
+    cleared.structural.outcome_summary.by_outcome.related_only = 0;
+    const verdict = await validateObservationBinding(root, cleared);
+    assert.equal(verdict.ok, true, 'fully-coordinated rewrites pass the consistency layer by design');
+    // The partial-trace-completeness ceiling stays enforced regardless:
+    // raising coverage on a recorded partial trace breaks the invariant
+    // before any comparison runs.
+    const partialTrace = structuredClone(observation);
+    partialTrace.structural.trace.completeness = 'partial';
+    partialTrace.structural.scan.coverage = 'full';
+    partialTrace.structural.outcome = 'none';
+    assert.equal((await validateObservationBinding(root, partialTrace)).code, 'observation-invalid');
   });
 
   it('marks a mid-run swap stale through the freshness probe', async () => {
@@ -1637,6 +1784,118 @@ describe('trace-link-suggestions local parser parity', () => {
     assert.equal(intersects(tokenize('auth adapter'), tokenize('adapter gate')), true);
     assert.equal(intersects(tokenize('auth adapter'), tokenize('unrelated')), false);
   });
+
+  // S5 (round-1 #13): conformance parity against the FROZEN parser, not just
+  // the engine's own expectations. buildOpenSpecCoverageMatrix is the public
+  // oracle over the module-private parseRequirements: its requirement ids are
+  // derived from the parsed titles in parse order, so a title/heading/section
+  // divergence between the two parsers shifts the id sequence. The test-local
+  // slug formula is an independent third implementation (not imported from
+  // the engine), giving a three-way check on the shared fixture specs.
+  it('matches the frozen coverage matrix requirement sequence on shared fixtures (S5)', async () => {
+    const { buildOpenSpecCoverageMatrix } = await import('./openspec-coverage-matrix.mjs');
+    const root = await makeTemp('aif-tls-matrix-');
+    const changeId = 'parity-change';
+    const specFiles = ['specs/spec-en.md', 'specs/spec-ru.md', 'specs/spec-crlf.md'];
+    for (const spec of specFiles) {
+      const target = path.join(root, 'openspec', 'changes', changeId, 'specs', path.basename(spec, '.md'), 'spec.md');
+      await mkdir(path.dirname(target), { recursive: true });
+      await cp(path.join(CORPUS_DIR, spec), target);
+    }
+    await writeInlineSpec(root, changeId, 'extra', '# Delta for extra\n\n## ADDED Requirements\n\n### Requirement: TopicOnly\n\nThe topic-only rule MUST stay at related level without behavioral anchors.\n\n#### Scenario: ExtraScenario\n\n- GIVEN extra\n- WHEN parsed\n- THEN one\n\n### Requirement: ЧестныйИсход\n\nКириллический заголовок требования без ASCII-слага для fallback-ветки.\n');
+    await writeFile(path.join(root, 'openspec', 'changes', changeId, 'proposal.md'), '# Proposal\n\n## Why\n\nparity fixture.\n', 'utf8');
+    await writeFile(path.join(root, 'openspec', 'changes', changeId, 'tasks.md'), '- [ ] 1.1 Task\n', 'utf8');
+    const matrix = await buildOpenSpecCoverageMatrix({
+      changeId,
+      rootDir: root,
+      skipVerifyEvidence: true,
+      generatedRules: [],
+      traceInputs: { contents: [], sources: [] },
+      statePath: path.join(root, '.ai-factory', 'state', changeId),
+      qaPath: path.join(root, '.ai-factory', 'qa', changeId),
+      rootDir: root,
+    });
+    const frozenIds = matrix.requirements.map((requirement) => requirement.id);
+    // Independent slug oracle (mirrors the frozen requirementId formula).
+    const slugify = (value) => String(value ?? '').toLowerCase().replace(/[`'"]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    const expectedIds = [];
+    let globalIndex = 0;
+    // The frozen collector sorts delta specs by localeCompare of the relative
+    // path: the oracle replays that exact order.
+    const sortedSpecPaths = [
+      'openspec/changes/parity-change/specs/extra/spec.md',
+      'openspec/changes/parity-change/specs/spec-crlf/spec.md',
+      'openspec/changes/parity-change/specs/spec-en/spec.md',
+      'openspec/changes/parity-change/specs/spec-ru/spec.md',
+    ].sort((left, right) => left.localeCompare(right));
+    for (const relative of sortedSpecPaths) {
+      const specDir = path.basename(path.dirname(relative));
+      const bytes = await readFile(path.join(root, relative));
+      for (const requirement of parseRequirementsFromBytes(bytes, relative)) {
+        globalIndex += 1;
+        const slug = slugify(requirement.title);
+        expectedIds.push(`${slugify(specDir)}.${slug || `requirement-${globalIndex}`}`);
+      }
+    }
+    assert.ok(frozenIds.length > 0, 'the frozen matrix parsed the fixture change');
+    assert.equal(frozenIds.length, expectedIds.length, `requirement count parity: frozen ${JSON.stringify(frozenIds)} vs local ${JSON.stringify(expectedIds)}`);
+    assert.deepEqual(frozenIds, expectedIds, 'requirement id sequence parity (titles, order, cyrillic fallback)');
+    // cyrillic titles collapse to empty slugs and fall back to ordinal ids in
+    // BOTH parsers: the sequence parity above pins that behavior too.
+    assert.ok(expectedIds.some((id) => id.includes('.requirement-')), 'the cyrillic fallback path is exercised');
+  });
+
+  it('matches the frozen test-path classification through the matrix oracle (S5)', async () => {
+    const { buildOpenSpecCoverageMatrix } = await import('./openspec-coverage-matrix.mjs');
+    const root = await makeTemp('aif-tls-matrix2-');
+    const changeId = 'classification-change';
+    await writeInlineSpec(root, changeId, 'probe', [
+      '# Delta for classification',
+      '',
+      '## ADDED Requirements',
+      '',
+      '### Requirement: Zqy Marker classification probe',
+      '',
+      'The classification probe requirement mentions zqy marker behavior once.',
+      '',
+      '#### Scenario: ProbeScenario',
+      '',
+      '- GIVEN probe',
+      '- WHEN classified',
+      '- THEN parity',
+      '',
+    ].join('\n'));
+    await writeFile(path.join(root, 'openspec', 'changes', changeId, 'proposal.md'), '# Proposal\n\n## Why\n\nclassification parity fixture.\n', 'utf8');
+    await writeFile(path.join(root, 'openspec', 'changes', changeId, 'tasks.md'), '- [ ] 1.1 Zqy Marker classification probe fixtures: test/zqy-marker.spec.mjs src/zqy-marker.js docs/zqy-marker.md\n', 'utf8');
+    for (const relative of ['test/zqy-marker.spec.mjs', 'src/zqy-marker.js', 'docs/zqy-marker.md']) {
+      await mkdir(path.dirname(path.join(root, relative)), { recursive: true });
+      await writeFile(path.join(root, relative), '// classification fixture\n', 'utf8');
+    }
+    const matrix = await buildOpenSpecCoverageMatrix({
+      changeId,
+      rootDir: root,
+      skipVerifyEvidence: true,
+      generatedRules: [],
+      traceInputs: { contents: [], sources: [] },
+      statePath: path.join(root, '.ai-factory', 'state', changeId),
+      qaPath: path.join(root, '.ai-factory', 'qa', changeId),
+      rootDir: root,
+    });
+    const requirement = matrix.requirements.find((entry) => entry.id.startsWith('probe.'));
+    assert.ok(requirement, 'the probe requirement is parsed by the frozen matrix');
+    // The frozen classifier (classifyEvidencePaths/TEST_PATH_PATTERN) sorted
+    // the matched paths into test vs implementation vs dropped (docs).
+    const frozenTests = new Set(requirement.test_evidence);
+    const frozenImplementation = new Set(requirement.implementation_evidence);
+    assert.deepEqual([...frozenTests].sort(), ['test/zqy-marker.spec.mjs']);
+    assert.deepEqual([...frozenImplementation].sort(), ['src/zqy-marker.js']);
+    assert.equal(frozenTests.has('docs/zqy-marker.md'), false, 'docs paths are evidence for neither channel');
+    // The engine's TEST_PATH_FORM must agree with the frozen classification
+    // on every path in the shared shape.
+    assert.equal(TEST_PATH_FORM.test('test/zqy-marker.spec.mjs'), true);
+    assert.equal(TEST_PATH_FORM.test('src/zqy-marker.js'), false);
+    assert.equal(TEST_PATH_FORM.test('docs/zqy-marker.md'), false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1731,6 +1990,55 @@ describe('trace-link-suggestions graph limits', () => {
     assert.equal(value.structural.outcome, 'candidate');
   });
 
+  it('keeps exactly-at-cap spec inventories complete and truncates one file beyond', async () => {
+    const root = await makeTemp('aif-tls-speccap2-');
+    const changeId = 'spec-cap-boundary-change';
+    await seedCaseProject(root, changeId, { trace: null, specs: [], tests: [] });
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    const emptyTrace = { schemaVersion: 'lekalo/trace-manifest/v0.2.16', identity: 'dev.lekalo.trace-manifest@0.2.16', completeness: 'full', nodes: [], relations: [], gaps: [] };
+    await writeFile(manifest, JSON.stringify({ trace: emptyTrace, manifestDigest: `sha256:${digest(JSON.stringify(emptyTrace))}` }), 'utf8');
+    const writeSpecs = async (count) => {
+      for (let index = 0; index < count; index += 1) {
+        const cap = path.join(root, 'openspec', 'changes', changeId, 'specs', `cap-${String(index).padStart(3, '0')}`, 'spec.md');
+        await mkdir(path.dirname(cap), { recursive: true });
+        await writeFile(cap, `# Delta ${index}\n`, 'utf8');
+      }
+    };
+    await writeSpecs(100);
+    const exact = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+    assert.equal(exact.exitCode, 0);
+    assert.equal(exact.value.structural.scan.coverage, 'full', 'exactly 100 specs are a complete inventory (S1)');
+    assert.equal(exact.value.structural.outcome, 'none');
+    assert.deepEqual(exact.value.structural.scan.truncations, []);
+    await writeSpecs(101);
+    const overflow = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+    assert.equal(overflow.exitCode, 0);
+    assert.equal(overflow.value.structural.scan.coverage, 'partial');
+    assert.ok(overflow.value.diagnostics.some((entry) => entry.code === 'delta-spec-inventory-truncated'));
+    assert.deepEqual(overflow.value.structural.scan.truncations, ['delta-spec-inventory-truncated']);
+  });
+
+  it('degrades the scan when the specs root is unreadable (ENOTDIR), never a silent full scan', async () => {
+    const root = await makeTemp('aif-tls-enotdir-');
+    const changeId = 'enotdir-change';
+    await seedCaseProject(root, changeId, { trace: null, specs: [], tests: [] });
+    // The specs path is a regular FILE: readdir fails with ENOTDIR — only a
+    // genuine ENOENT means "zero declared specs".
+    await mkdir(path.join(root, 'openspec', 'changes', changeId), { recursive: true });
+    await writeFile(path.join(root, 'openspec', 'changes', changeId, 'specs'), 'not a directory');
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    const emptyTrace = { schemaVersion: 'lekalo/trace-manifest/v0.2.16', identity: 'dev.lekalo.trace-manifest@0.2.16', completeness: 'full', nodes: [], relations: [], gaps: [] };
+    await writeFile(manifest, JSON.stringify({ trace: emptyTrace, manifestDigest: `sha256:${digest(JSON.stringify(emptyTrace))}` }), 'utf8');
+    const { exitCode, value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+    assert.equal(exitCode, 0);
+    assert.equal(value.structural.scan.coverage, 'partial');
+    assert.equal(value.structural.outcome, 'abstain');
+    assert.ok(value.diagnostics.some((entry) => entry.code === 'delta-spec-inventory-truncated'));
+    assert.deepEqual(value.structural.scan.truncations, ['delta-spec-inventory-truncated']);
+  });
+
   it('degrades the scan when the delta-spec inventory exceeds its cap', async () => {
     const root = await makeTemp('aif-tls-speccap-');
     const changeId = 'spec-cap-change';
@@ -1784,6 +2092,42 @@ describe('trace-link-suggestions graph limits', () => {
     assert.equal(value.structural.scan.declared_sources, 3, '1 spec + 0 tests + 2 unique symbols');
     const dupNodes = value.structural.nodes.filter((node) => node.node_id === 'operation:dup.thing');
     assert.equal(dupNodes.length, 1, 'the duplicate resolves to a single graph node');
+  });
+
+  it('keeps coverage-fact markers when the diagnostics budget is exhausted (S3)', async () => {
+    const root = await makeTemp('aif-tls-diagcap-');
+    const changeId = 'diag-cap-change';
+    await seedCaseProject(root, changeId, { trace: null, specs: [], tests: [] });
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    const emptyTrace = { schemaVersion: 'lekalo/trace-manifest/v0.2.16', identity: 'dev.lekalo.trace-manifest@0.2.16', completeness: 'full', nodes: [], relations: [], gaps: [] };
+    await writeFile(manifest, JSON.stringify({ trace: emptyTrace, manifestDigest: `sha256:${digest(JSON.stringify(emptyTrace))}` }), 'utf8');
+    // 100 malformed specs (the collector cap) plus 50 presented missing
+    // tests: 150 missing entries, capped at 100, with over two hundred
+    // ordinary diagnostics — the bounded diagnostics budget is exhausted,
+    // but the missing-sources-truncated coverage fact survives.
+    for (let index = 0; index < 100; index += 1) {
+      const cap = path.join(root, 'openspec', 'changes', changeId, 'specs', `broken-${String(index).padStart(3, '0')}`, 'spec.md');
+      await mkdir(path.dirname(cap), { recursive: true });
+      await writeFile(cap, Buffer.from([0xff, 0xfe, 0x00, 0x01]));
+    }
+    const missingTests = Array.from({ length: 50 }, (_, index) => `test/ghost-${String(index).padStart(2, '0')}.spec.mjs`);
+    // The bounded diagnostics budget is exhausted by a diagnostics-flooding
+    // fake assessor (a DI-legitimate scenario): ordinary entries fill the
+    // budget while the coverage-fact marker must survive.
+    const floodingAssessor = () => ({
+      findings: [],
+      diagnostics: Array.from({ length: 250 }, (_, index) => ({ code: `assessor-note-${index}`, path: null, detail: 'filler' })),
+    });
+    const { exitCode, value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', ...missingTests.flatMap((testPath) => ['--test', testPath]), '--json'], { assessor: floodingAssessor });
+    assert.equal(exitCode, 0);
+    assert.equal(value.structural.scan.missing_sources.length, 100, 'the missing list stays within its schema cap');
+    assert.equal(value.structural.scan.missing_sources_count, 150, 'the true missing count survives the cap');
+    assert.ok(value.diagnostics.some((entry) => entry.code === 'missing-sources-truncated'), 'the coverage-fact marker survives the diagnostics cap');
+    assert.ok(value.diagnostics.some((entry) => entry.code === 'diagnostics-truncated'), 'the budget marker is recorded');
+    assert.equal(value.structural.scan.coverage, 'partial');
+    assert.equal(value.structural.outcome, 'abstain');
+    assert.ok(value.structural.scan.truncations.includes('missing-sources-truncated'));
   });
 
   it('refuses observations above the global byte budget before emit', async () => {
