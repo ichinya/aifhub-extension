@@ -12,7 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { canonical, digest } from './workflow-state-store.mjs';
+import { canonical, digest, WorkflowError } from './workflow-state-store.mjs';
 import { parseStrictJson } from './json-strict.mjs';
 import { validateJsonAgainstSchema } from './json-schema-subset.mjs';
 import { prepareQaManifest } from './qa-manifest.mjs';
@@ -1078,5 +1078,181 @@ describe('decision-corrections config registration', () => {
     const diff = await buildAnalyzeConfigDiff({ rootDir: root });
     assert.equal(diff.ok, true, JSON.stringify(diff.errors ?? []));
     assert.equal((diff.missing ?? []).length, 0, 'optional decision-corrections key must never appear as a missing required key');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Corpus evaluation (fixtures + labels): every shipped case file is driven
+// through the store in an isolated temp project and compared against
+// labels.json with the exact-match rule. Declared-only provenance; the
+// corpus proves transport/guards/lifecycle, never provider quality.
+// ---------------------------------------------------------------------------
+
+import { cp } from 'node:fs/promises';
+
+const CORPUS_DIR = path.join(REPO_ROOT, 'test', 'fixtures', 'decision-corrections');
+const CORPUS_LABELS = parseStrictJson(await readFile(path.join(CORPUS_DIR, 'labels.json'), 'utf8'));
+
+async function corpusCase(file, { digest = undefined } = {}) {
+  const input = parseStrictJson(await readFile(path.join(CORPUS_DIR, 'cases', file), 'utf8'));
+  if (digest !== undefined) input.evolution = { ...input.evolution, proposal_digest: digest };
+  return input;
+}
+
+async function corpusProject(prefix, { seedTransaction = false } = {}) {
+  const root = await makeTemp(prefix);
+  await mkdir(path.join(root, 'docs'), { recursive: true });
+  await cp(path.join(CORPUS_DIR, 'sources', 'spec.md'), path.join(root, 'docs', 'spec.md'));
+  await cp(path.join(CORPUS_DIR, 'sources', 'spec-crlf.md'), path.join(root, 'docs', 'spec-crlf.md'));
+  await writeFile(path.join(root, 'docs', 'extra.md'), 'extra provenance input\n');
+  if (seedTransaction) {
+    await writeFile(path.join(root, 'docs', 'evidence.md'), 'evidence for the corpus transaction\n');
+    const proposal = {
+      transaction_id: 'tx-corpus',
+      skill: 'aif-implement',
+      after: '# Updated context for the corpus transaction\n',
+      reason: 'repair installed helper context',
+      evidence: ['docs/evidence.md'],
+    };
+    const proposed = await evolutionCommand('propose', proposal, { rootDir: root });
+    await evolutionCommand('apply', { transaction_id: 'tx-corpus', proposal_digest: proposed.proposal_digest }, { rootDir: root });
+  }
+  return root;
+}
+
+async function corpusSave(root, input, { corruptDigest = false } = {}) {
+  try {
+    const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
+    if (preview.idempotent) return { ok: 'idempotent', saved: preview };
+    const echo = corruptDigest ? 'e'.repeat(64) : preview.payload_digest;
+    const saved = await decisionCorrectionsCommand('save', { ...input, payload_digest: echo }, { rootDir: root, ...STORE_OPTIONS() });
+    return { ok: 'ok', saved };
+  } catch (error) {
+    if (!(error instanceof WorkflowError)) throw error;
+    return { ok: error.code };
+  }
+}
+
+async function corpusLifecycle(root, action, input, digest = undefined) {
+  try {
+    const result = await decisionCorrectionsCommand(action, {
+      case_id: input.case_id, scope: input.scope,
+      ...(action === 'confirm' ? { expected_label: input.expected_label, payload_digest: digest } : {}),
+    }, { rootDir: root, ...STORE_OPTIONS() });
+    return { ok: result.case.status };
+  } catch (error) {
+    if (!(error instanceof WorkflowError)) throw error;
+    return { ok: error.code };
+  }
+}
+
+describe('decision-corrections corpus evaluation (fixtures + labels)', () => {
+  it('matches every declared dev case label exactly', async () => {
+    const root = await corpusProject('aif-dc-corpus-dev-', { seedTransaction: true });
+    const txView = await evolutionCommand('show', { transaction_id: 'tx-corpus' }, { rootDir: root });
+    for (const [file, labels] of Object.entries(CORPUS_LABELS.groups.dev)) {
+      if (labels.expected.role === 'redaction-material') continue; // consumed by the dev-redaction leg
+      const input = await corpusCase(file, { digest: labels.expected.evolution_active ? txView.proposal_digest : undefined });
+      const saved = await corpusSave(root, input, { corruptDigest: labels.expected.save === 'payload-mismatch' });
+      assert.equal(saved.ok, labels.expected.save, `${file}: save outcome`);
+      if (labels.expected.save !== 'ok') continue;
+      if (labels.expected.resave === 'idempotent') {
+        const resaved = await corpusSave(root, input);
+        assert.equal(resaved.ok, 'idempotent', `${file}: repeated save must stay idempotent`);
+      }
+      if (labels.expected.confirm === 'ok') {
+        const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
+        const confirmed = await corpusLifecycle(root, 'confirm', input, preview.payload_digest);
+        assert.equal(confirmed.ok, labels.expected.status ?? 'confirmed', `${file}: confirm outcome`);
+      }
+      if (labels.expected.redaction) {
+        const v2 = await corpusCase('dev-redaction-v2.json');
+        const redactionPreview = await decisionCorrectionsCommand('preview', v2, { rootDir: root, ...STORE_OPTIONS() });
+        assert.equal(redactionPreview.payload.fixture.version, labels.expected.redaction.version, `${file}: redaction version`);
+        const redactionSave = await decisionCorrectionsCommand('save', { ...v2, payload_digest: redactionPreview.payload_digest }, { rootDir: root, ...STORE_OPTIONS() });
+        assert.equal(redactionSave.case.status, labels.expected.redaction.status, `${file}: redaction demotes to draft`);
+        assert.equal(redactionSave.case.payload.expected_label_confirmed, labels.expected.redaction.confirmed, `${file}: redaction resets confirmation`);
+        const reconfirmPreview = await decisionCorrectionsCommand('preview', v2, { rootDir: root, ...STORE_OPTIONS() });
+        const reconfirmed = await corpusLifecycle(root, 'confirm', v2, reconfirmPreview.payload_digest);
+        assert.equal(reconfirmed.ok, 'confirmed', `${file}: re-confirmation needs the fresh digest`);
+      }
+      if (labels.expected.new_identity === true) {
+        const listed = await decisionCorrectionsCommand('list', { scope: 'work' }, { rootDir: root, ...STORE_OPTIONS() });
+        const original = listed.cases.find((item) => item.case_id === 'dev-valid-case');
+        const next = listed.cases.find((item) => item.case_id === 'dev-question-v2');
+        assert.ok(original && next, `${file}: both question versions coexist`);
+        assert.notEqual(next.logical_identity, original.logical_identity, `${file}: next question version is a new identity`);
+        assert.equal(original.status, 'confirmed', `${file}: the original confirmed fixture stays untouched`);
+      }
+      if (labels.expected.evolution_active === true) {
+        const shown = await decisionCorrectionsCommand('show', { case_id: input.case_id, scope: input.scope }, { rootDir: root, ...STORE_OPTIONS() });
+        assert.equal(shown.evolution.active, true, `${file}: applied transaction is an active application`);
+      }
+      if (labels.expected.bytes_exact === true) {
+        const shown = await decisionCorrectionsCommand('show', { case_id: input.case_id, scope: input.scope }, { rootDir: root, ...STORE_OPTIONS() });
+        const crlfBytes = (await readFile(path.join(CORPUS_DIR, 'sources', 'spec-crlf.md'))).toString('utf8');
+        assert.equal(shown.case.payload.fixture.files[0].bytes, crlfBytes, `${file}: CRLF fixture bytes stay exact`);
+      }
+    }
+    // Scope separation across the two scope files: same material identity,
+    // different scope inputs, no merge.
+    const alpha = await decisionCorrectionsCommand('list', { scope: 'alpha' }, { rootDir: root, ...STORE_OPTIONS() });
+    const beta = await decisionCorrectionsCommand('list', { scope: 'beta' }, { rootDir: root, ...STORE_OPTIONS() });
+    assert.equal(alpha.cases.length, 1);
+    assert.equal(beta.cases.length, 1);
+    assert.notEqual(alpha.cases[0].logical_identity, beta.cases[0].logical_identity, 'scope is an identity input: no merge');
+  });
+
+  it('runs the confirmed dev set and matches the labeled run outcomes', async () => {
+    const root = await corpusProject('aif-dc-corpus-run-');
+    await writeFile(path.join(root, 'docs', 'extra.md'), 'extra provenance input\n');
+    for (const file of ['dev-valid-case.json', 'dev-ambiguous.json', 'dev-stale-inputs.json']) {
+      const input = await corpusCase(file);
+      const saved = await corpusSave(root, input);
+      assert.equal(saved.ok, 'ok', `${file}: save`);
+      // Confirm every leg first: staleness is detected at replay time, after
+      // the drift below, and only confirmed cases enter the replay.
+      const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
+      const confirmed = await corpusLifecycle(root, 'confirm', input, preview.payload_digest);
+      assert.equal(confirmed.ok, 'confirmed', `${file}: confirm`);
+    }
+    await writeFile(path.join(root, 'docs', 'extra.md'), 'extra provenance input changed\n');
+    const run = await decisionCorrectionsCommand('run', { scope: 'work' }, { rootDir: root, ...STORE_OPTIONS() });
+    const byId = Object.fromEntries(run.run.cases.map((item) => [item.case_id, item]));
+    assert.equal(byId['dev-valid-case'].outcome, CORPUS_LABELS.groups.dev['dev-valid-case.json'].expected.run_outcome,
+      'the bundle enables the requirement lint, so replay completes and the label comparison decides');
+    assert.equal(byId['dev-ambiguous'].outcome, 'ambiguous');
+    assert.equal(byId['dev-stale-inputs'].outcome, 'stale');
+    assert.equal(run.run.honesty_note, HONESTY_NOTE);
+  });
+
+  it('keeps held-out cases report-only under the same labels discipline', async () => {
+    const root = await corpusProject('aif-dc-corpus-heldout-');
+    for (const [file, labels] of Object.entries(CORPUS_LABELS.groups.heldout)) {
+      const input = await corpusCase(file);
+      const saved = await corpusSave(root, input);
+      assert.equal(saved.ok, labels.expected.save, `${file}: held-out save`);
+      const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
+      assert.equal((await corpusLifecycle(root, 'confirm', input, preview.payload_digest)).ok, labels.expected.confirm, `${file}: confirm refused`);
+      assert.equal((await corpusLifecycle(root, 'reject', input)).ok, labels.expected.reject, `${file}: reject refused`);
+      assert.equal((await corpusLifecycle(root, 'supersede', input)).ok, labels.expected.supersede, `${file}: supersede refused`);
+    }
+    const run = await decisionCorrectionsCommand('run', { scope: 'work' }, { rootDir: root, ...STORE_OPTIONS() });
+    assert.deepEqual(run.run.cases.map((item) => item.outcome), ['skipped_draft'], 'held-out drafts are never replayed');
+  });
+
+  it('refuses every limit case with its labeled typed code and leaves no artifacts', async () => {
+    const root = await corpusProject('aif-dc-corpus-limit-', { seedTransaction: true });
+    const txView = await evolutionCommand('show', { transaction_id: 'tx-corpus' }, { rootDir: root });
+    for (const [file, labels] of Object.entries(CORPUS_LABELS.groups.limit)) {
+      // The limit fixtures keep their labeled (wrong) digests: only
+      // dev-tx-link receives the sealed real digest.
+      const input = await corpusCase(file);
+      const saved = await corpusSave(root, input);
+      assert.equal(saved.ok, labels.expected.save, `${file}: typed refusal`);
+    }
+    const casesDir = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE, 'work', 'cases');
+    assert.deepEqual((await readdirSafe(casesDir)).filter((name) => name.endsWith('.json')), [],
+      'refused limit saves leave no case artifacts');
   });
 });

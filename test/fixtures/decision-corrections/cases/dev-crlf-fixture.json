@@ -1,0 +1,51 @@
+{
+  "case_id": "dev-crlf-fixture",
+  "scope": "work",
+  "partition": "development",
+  "ambiguity": "clear",
+  "identity": {
+    "source_observation": {
+      "schema": "aifhub.requirement_lint_observation.v1",
+      "change_id": "work",
+      "structural": {
+        "requirements": 2
+      }
+    },
+    "subject_revision": "rev-crlf",
+    "input_paths": [
+      "docs/spec-crlf.md"
+    ],
+    "question": {
+      "id": "are requirements consistent",
+      "version": "1"
+    },
+    "rubric": {
+      "id": "consistency",
+      "version": "1"
+    }
+  },
+  "fixture": {
+    "kind": "redacted",
+    "files": [
+      {
+        "path": "docs/spec-crlf.md",
+        "media_type": "text/markdown",
+        "bytes": "# Spec\r\n\r\n- R1: The system shall store data (crlf).\r\n"
+      }
+    ]
+  },
+  "original_assessment": {
+    "consumer": "requirements_semantic_lint",
+    "verdict": "two findings reported",
+    "summary": null
+  },
+  "expected_label": "no findings reported",
+  "rationale": null,
+  "feedback": null,
+  "replay": {
+    "args": [
+      "--change",
+      "work"
+    ]
+  }
+}
