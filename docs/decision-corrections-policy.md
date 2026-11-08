@@ -120,8 +120,15 @@ matching the original verdict is `false_regression`, anything else is
 `label_change` — computed only over complete observations. A not-performed
 advisory scan (no enabling config, no assessor) is an honest `not_run`, a
 drifted provenance input or corrupted fixture is `stale` (checked before any
-engine call), ambiguous cases are counted but never scored, and drafts are
-skipped. Run records (`aifhub.decision_correction_run.v1`) preview by
+engine call), ambiguous cases are counted but never scored, drafts are
+skipped, and a stored record whose integrity cannot be proven is reported as
+`invalid_record` instead of silently disappearing from the report. Fixture
+files carry an input role: role-input files are presented to the replayed
+consumer with its own input flag (a claim-evidence pairs envelope, a
+trace-link test file matching the frozen test path form, a requirement-lint
+file), role-support files are materialized into the replay root only
+(sources, the trace custody manifest, replay configuration); bundles that
+could not produce a well-formed replay argv refuse at save time. Run records (`aifhub.decision_correction_run.v1`) preview by
 default and persist only with `--write`, carrying the verbatim honesty note:
 
 > Run verifies the current implementation against stored fixtures; it does
