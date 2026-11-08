@@ -1,10 +1,13 @@
 # Decision Corrections Fixtures
 
-Offline corpus for `scripts/decision-corrections.test.mjs` (issue #285). Every
-case file cites only files shipped in this directory (declared-only
-provenance); nothing is fetched, synthesized, or read from outside the
-materialized fixture copy at run time. No network access and no paid calls
-happen in any test that consumes these files.
+Offline corpus for `scripts/decision-corrections.test.mjs` (issue #285).
+Declared-only provenance: every case file cites the shipped `sources/` of
+this directory plus deterministic offline setup artifacts that the corpus
+test itself creates in its disposable temp project (`docs/extra.md`, the
+transaction evidence/context files); nothing is fetched, synthesized, or
+read from outside the materialized fixture copy and the test root at run
+time. No network access and no paid calls happen in any test that consumes
+these files.
 
 ## Layout
 

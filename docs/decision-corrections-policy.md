@@ -133,12 +133,15 @@ its adapter contract is a design sketch only and is not implemented here.
 ## Partitions and held-out immunity
 
 `development | calibration | held_out` is a closed enum, an identity input,
-and immutable after confirmation. Held-out is report-only: every
-outcome-affecting mutation (`confirm`, `reject`, `supersede`) refuses
-`held-out-tuning` at the request-formation boundary before any engine runs,
-and replay never scores held-out outcomes. The fixture corpus is
-declared-only: it proves store transport, guards, and lifecycle — labels
-say nothing about provider accuracy.
+and immutable after confirmation. Held-out is strictly report-only:
+`confirm`, `reject`, `supersede` on a held-out case and a fixture revision of
+an existing held-out case refuse `held-out-tuning` at the request-formation
+boundary before any engine runs (creating a held-out case is allowed — the
+partition is chosen at save time; confirming one is not possible), and the
+replay never measures a held-out case: it reports `report_only` without an
+engine call or a signature, so nothing about the held-out partition can feed
+tuning. The fixture corpus is declared-only: it proves store transport,
+guards, and lifecycle — labels say nothing about provider accuracy.
 
 ## Retention and delete
 

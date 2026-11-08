@@ -3,7 +3,7 @@
   "thresholds": {
     "label_match": "exact"
   },
-  "provenance": "declared-only: every case cites files shipped in this directory (sources/); nothing is fetched or synthesized at run time",
+  "provenance": "declared-only: every case cites the shipped sources/ of this directory plus deterministic offline setup artifacts created by the corpus test itself (docs/extra.md, the transaction evidence/context files); nothing is fetched or synthesized from outside the fixture copy and the test root",
   "semantic_provenance": "expected outcomes are pipeline fixtures consumed by the corpus test against the local store and replay engines; with no live provider they prove transport, guards, and lifecycle, not provider quality (no live-eval thresholds are derivable from this fake suite)",
   "heldout_discipline": "heldout-*.json files are labeled under the same discipline but never used to tune detectors; the store refuses every outcome-affecting mutation on held-out cases (held-out-tuning) and replay stays report-only",
   "groups": {
