@@ -1041,3 +1041,42 @@ describe('decision-corrections CLI contracts', () => {
     assert.deepEqual(afterDelete, afterWrite);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Config registration (#285): the optional opt-in key is declared with the
+// sibling format, the template keeps it commented out, and the managed
+// config diff never reports it as a missing required key.
+// ---------------------------------------------------------------------------
+
+describe('decision-corrections config registration', () => {
+  it('registers the optional managed key and keeps the required-keys diff clean', async () => {
+    const manifest = parseStrictJson(await readFile(path.join(REPO_ROOT, 'skills', 'aif-analyze', 'references', 'config-keys.json'), 'utf8'));
+    const entry = manifest.keys.find((item) => item.key === 'aifhub.decisionCorrections.enabled');
+    assert.ok(entry, 'config-keys must declare aifhub.decisionCorrections.enabled');
+    assert.equal(entry.required, false, 'the decision corrections opt-in must stay optional');
+    assert.equal(entry.since, '1.8.1');
+    assert.ok(!manifest.keys.some((item) => item.key.startsWith('aifhub.decisionCorrections.') && item.key !== 'aifhub.decisionCorrections.enabled'),
+      'policy keys must not be exposed');
+    const template = await readFile(path.join(REPO_ROOT, 'skills', 'aif-analyze', 'references', 'config-template.yaml'), 'utf8');
+    assert.ok(template.includes('# decisionCorrections:'));
+    assert.ok(template.includes('#   enabled: false'));
+    // The preserve-line in SKILL.md and the command registration join in the
+    // deferred group (step 10, after #284 merges); the key itself never
+    // appears as a missing required key in the managed diff.
+    const { buildAnalyzeConfigDiff } = await import('./aif-analyze-config-diff.mjs');
+    const { renderConfigForMode } = await import('./aif-artifact-sync.mjs');
+    const root = await makeTemp('aif-dc-diff-');
+    const rendered = renderConfigForMode('', 'openspec', { analyzeSkillVersion: '0.11.0' });
+    const lines = rendered.split('\n');
+    const hubIndex = lines.findIndex((line) => /^aifhub:$/.test(line));
+    assert.ok(hubIndex >= 0, 'fresh openspec config must contain the aifhub hub');
+    let insertAt = lines.findIndex((line, index) => index > hubIndex && /^\S/.test(line));
+    if (insertAt < 0) insertAt = lines.length;
+    lines.splice(insertAt, 0, '  decisionCorrections:', '    enabled: false');
+    await mkdir(path.join(root, '.ai-factory'), { recursive: true });
+    await writeFile(path.join(root, '.ai-factory', 'config.yaml'), lines.join('\n'), 'utf8');
+    const diff = await buildAnalyzeConfigDiff({ rootDir: root });
+    assert.equal(diff.ok, true, JSON.stringify(diff.errors ?? []));
+    assert.equal((diff.missing ?? []).length, 0, 'optional decision-corrections key must never appear as a missing required key');
+  });
+});

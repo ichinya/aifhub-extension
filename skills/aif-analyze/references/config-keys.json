@@ -76,6 +76,12 @@
       "purpose": "Boolean opt-in for advisory trace link suggestions (aifhub-trace-link-suggestions); default false, CLI --enabled overrides."
     },
     {
+      "key": "aifhub.decisionCorrections.enabled",
+      "required": false,
+      "since": "1.8.1",
+      "purpose": "Boolean opt-in for the project-scoped decision correction fixture store (aifhub-decision-corrections); default false, CLI --enabled overrides."
+    },
+    {
       "key": "paths.plans",
       "required": true,
       "since": "1.0.0",

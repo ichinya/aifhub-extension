@@ -54,6 +54,11 @@ aifhub:
   # `--enabled true|false` on `ai-factory aifhub-trace-link-suggestions`.
   # traceLinkSuggestions:
   #   enabled: false
+  # Optional project-scoped decision correction fixture store (issue #285);
+  # default is false and it must never be enabled automatically. The CLI
+  # override is `--enabled true|false` on `ai-factory aifhub-decision-corrections`.
+  # decisionCorrections:
+  #   enabled: false
 # OpenSpec-native mode writes its own aifhub settings profile only when
 # aifhub.tools.openspec is true.
 
