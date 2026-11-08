@@ -902,7 +902,7 @@ describe('decision-corrections replay runner', () => {
     await seedStoreProject(root);
     // The replayed requirement-lint structural stage over the enabled fixture
     // produces a known signature; three cases pin the three comparison branches.
-    const knownSignature = 'run_status=complete; findings=none; diagnostics=none; codes=none';
+    const knownSignature = 'run_status=complete; findings=none; diagnostics=none';
     const holdsInput = baseCaseInput({ case_id: 'dev-holds', identity: { ...baseCaseInput().identity, subject_revision: 'rev-holds' }, expected_label: knownSignature });
     await saveCase(root, holdsInput);
     await confirmCase(root, holdsInput);
@@ -1526,6 +1526,15 @@ describe('decision-corrections held-out corpus revision refusal', () => {
 // invalid_record visibility, list hardening, and end-to-end consumer bundles.
 // ---------------------------------------------------------------------------
 
+async function gitInit(root) {
+  const child = spawn('git', ['init', '--initial-branch=main'], { cwd: root, windowsHide: true });
+  await new Promise((resolve, reject) => { child.on('error', reject); child.on('close', () => resolve()); });
+  for (const args of [['config', 'user.email', 'fixture@example.com'], ['config', 'user.name', 'fixture'], ['add', '.'], ['commit', '-m', 'init']]) {
+    const step = spawn('git', args, { cwd: root, windowsHide: true });
+    await new Promise((resolve, reject) => { step.on('error', reject); step.on('close', (code) => code === 0 ? resolve() : reject(new Error(`git \${args.join(' ')} exited \${code}`))); });
+  }
+}
+
 function plantedCaseEnvelope(record) {
   return { checksum: digest(record), record };
 }
@@ -1844,3 +1853,216 @@ async function lstatExists(target) {
     return false;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Review round 3 (#285): effective-ignore proof for the atomic temp shape,
+// request-scoped cleanup that never deletes shared ignore infrastructure,
+// exact-code branch tests, persisted traversal containment, old-label
+// signature stability, role-less legacy idempotency, and sanitized
+// invalid_record entries.
+// ---------------------------------------------------------------------------
+
+describe('decision-corrections review round 3', () => {
+  it('refuses a save when a preserved narrow .gitignore leaves the temp shape visible', async () => {
+    const root = await makeTemp('aif-dc-r3-narrow-');
+    await seedStoreProject(root);
+    // The effective-ignore question only exists inside a git worktree: seed
+    // one so verifyObservationIgnored evaluates the real ignore rules.
+    await gitInit(root);
+    // A pre-existing namespace .gitignore with narrow rules: ensureRuntime
+    // Gitignore preserves it, so `*.tmp` siblings would NOT be ignored.
+    const namespaceDir = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE);
+    await mkdir(namespaceDir, { recursive: true });
+    await writeFile(path.join(namespaceDir, '.gitignore'), '*.json\n!.gitignore\n');
+    // The digest echo must be valid so the pre-materialization pass clears
+    // and the probe guard (after prepareNamespace) is the refusing branch.
+    const input = baseCaseInput();
+    const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
+    const outputs = [];
+    const exit = await runDecisionCorrectionsCommand(['save', '--json'], {
+      rootDir: root, enabled: true, output: (value) => outputs.push(value),
+      readStdin: async () => Buffer.from(JSON.stringify({ ...input, payload_digest: preview.payload_digest }), 'utf8'),
+    });
+    assert.equal(exit, 1, 'the save must refuse when the temp shape is not effectively ignored');
+    assert.equal(JSON.parse(outputs.join('')).code, 'observation-path-not-ignored');
+    const stored = await readdirSafe(path.join(namespaceDir, 'work', 'cases'));
+    assert.deepEqual(stored.filter((name) => name.endsWith('.json')), [], 'no case file is written behind an ineffective ignore');
+    assert.equal((await readdirSafe(namespaceDir)).includes('.gitignore'), true, 'the pre-existing ignore file is never deleted');
+    assert.equal((await readdirSafe(path.join(namespaceDir, 'work', 'cases'))).some((name) => name.endsWith('.tmp')), false, 'no temp file was ever materialized');
+  });
+
+  it('keeps the shared .gitignore when another writer holds the scope lock', async () => {
+    const root = await makeTemp('aif-dc-r3-locked-');
+    await seedStoreProject(root);
+    // Writer "A" state: namespace .gitignore exists (created by A) and A is
+    // mid-flight holding the scope lock; writer B must fail state-locked
+    // WITHOUT deleting the shared ignore infrastructure.
+    const namespaceDir = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE);
+    const lockPath = path.join(namespaceDir, 'work', 'write.lock');
+    await mkdir(path.dirname(lockPath), { recursive: true });
+    await writeFile(path.join(namespaceDir, '.gitignore'), '*\n!.gitignore\n');
+    const { open } = await import('node:fs/promises');
+    const handle = await open(lockPath, 'wx');
+    try {
+      await assert.rejects(
+        () => saveCase(root, baseCaseInput()),
+        (error) => error?.code === 'state-locked',
+      );
+    } finally {
+      await handle.close();
+      await rm(lockPath, { force: true });
+    }
+    assert.equal((await readdirSafe(namespaceDir)).includes('.gitignore'), true, 'the concurrent writer’s ignore file survives B’s failed save');
+  });
+
+  it('reaches the observation-source-collision save guard through a direct save call', async () => {
+    const root = await makeTemp('aif-dc-r3-collide-');
+    await seedStoreProject(root);
+    const destinationRelative = `.ai-factory/state/${DECISION_CORRECTIONS_NAMESPACE}/work/cases/r3-collide.json`;
+    const destination = path.join(root, ...destinationRelative.split('/'));
+    await mkdir(path.dirname(destination), { recursive: true });
+    await writeFile(destination, 'presented input bytes');
+    await assert.rejects(
+      () => decisionCorrectionsCommand('save', {
+        ...baseCaseInput({ case_id: 'r3-collide', identity: { ...baseCaseInput().identity, input_paths: [destinationRelative] } }),
+        payload_digest: 'a'.repeat(64),
+      }, { rootDir: root, ...STORE_OPTIONS() }),
+      (error) => error?.code === 'observation-source-collision' && error.blocked === true,
+      'the save-level collision guard fires before the identity pass',
+    );
+    assert.equal(await readFile(destination, 'utf8'), 'presented input bytes', 'the presented input is untouched');
+  });
+
+  it('pins the overwrite-leaf refusal to the exact invariant code', async () => {
+    const root = await makeTemp('aif-dc-r3-overwrite-');
+    await seedStoreProject(root);
+    await saveCase(root, baseCaseInput({ case_id: 'r3-leaf' }));
+    const caseFile = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE, 'work', 'cases', 'r3-leaf.json');
+    const envelope = parseStrictJson(await readFile(caseFile, 'utf8'));
+    envelope.record.payload.logical_identity = 'b'.repeat(64);
+    envelope.record.payload_digest = digest(canonical(envelope.record.payload));
+    envelope.checksum = digest(envelope.record);
+    await writeFile(caseFile, `${JSON.stringify(envelope, null, 2)}\n`);
+    const revision = baseCaseInput({
+      case_id: 'r3-leaf',
+      fixture: { kind: 'redacted', files: baseCaseInput().fixture.files.map((file) => ({ ...file, bytes: `${file.bytes}<!-- x -->\n` })) },
+    });
+    await assert.rejects(
+      () => decisionCorrectionsCommand('save', { ...revision, payload_digest: 'c'.repeat(64) }, { rootDir: root, ...STORE_OPTIONS() }),
+      (error) => error?.code === 'logical-identity-mismatch',
+      'the pre-materialization pass refuses the invariant-broken leaf with its own code',
+    );
+  });
+
+  it('bounds a persisted traversal path to its case (invalid_record, engine untouched)', async () => {
+    const root = await makeTemp('aif-dc-r3-traverse-');
+    await seedStoreProject(root);
+    const input = baseCaseInput({ case_id: 'r3-traverse' });
+    await saveCase(root, input);
+    await confirmCase(root, input);
+    // Persisted adversarial fixture path: the schema has no path pattern, so
+    // only the replay-path revalidation can catch it.
+    const caseFile = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE, 'work', 'cases', 'r3-traverse.json');
+    const envelope = parseStrictJson(await readFile(caseFile, 'utf8'));
+    envelope.record.payload.fixture.files[0].path = '../escape.md';
+    envelope.record.payload_digest = digest(canonical(envelope.record.payload));
+    envelope.checksum = digest(envelope.record);
+    await writeFile(caseFile, `${JSON.stringify(envelope, null, 2)}\n`);
+    let engineCalls = 0;
+    const run = await decisionCorrectionsCommand('run', { scope: 'work', case_ids: ['r3-traverse'] }, {
+      rootDir: root, ...STORE_OPTIONS(),
+      replayEngines: { requirements_semantic_lint: async () => { engineCalls += 1; return 0; } },
+    });
+    const [traversalOutcome, traversalReason] = run.run.cases.map((item) => [item.outcome, item.signature])[0];
+    assert.equal(traversalOutcome, 'invalid_record');
+    assert.ok(['unsafe-path', 'unsafe-fixture-path'].includes(traversalReason), `typed reason, got \${traversalReason}`);
+    assert.equal(engineCalls, 0, 'the engine is never invoked for a case with an unsafe persisted path');
+    assert.equal(run.run.counts.development.invalid_record, 1);
+    assert.equal(await lstatExists(path.join(root, 'escape.md')), false, 'nothing escapes the replay root');
+  });
+
+  it('keeps old-format stored labels stable when the engine output gains no codes field', async () => {
+    const root = await makeTemp('aif-dc-r3-oldlabel-');
+    await seedStoreProject(root);
+    const knownSignature = 'run_status=complete; findings=none; diagnostics=none';
+    const input = baseCaseInput({ case_id: 'r3-oldlabel', expected_label: knownSignature });
+    await saveCase(root, input);
+    await confirmCase(root, input);
+    const run = await decisionCorrectionsCommand('run', { scope: 'work' }, { rootDir: root, ...STORE_OPTIONS() });
+    assert.equal(run.run.cases.find((item) => item.case_id === 'r3-oldlabel').outcome, 'holds',
+      'a stored pre-codes label must keep holding when the observation shape is unchanged');
+  });
+
+  it('keeps role-less legacy bundles idempotent without demoting confirmation', async () => {
+    const root = await makeTemp('aif-dc-r3-legacy-');
+    await seedStoreProject(root);
+    const input = baseCaseInput({ case_id: 'r3-legacy' });
+    const { preview } = await saveCase(root, input);
+    await confirmCase(root, input);
+    // Strip the optional role key from the stored bundle: a legacy record
+    // written before roles existed must still compare idempotent.
+    const caseFile = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE, 'work', 'cases', 'r3-legacy.json');
+    const envelope = parseStrictJson(await readFile(caseFile, 'utf8'));
+    for (const file of envelope.record.payload.fixture.files) delete file.role;
+    envelope.record.payload_digest = digest(canonical(envelope.record.payload));
+    envelope.checksum = digest(envelope.record);
+    await writeFile(caseFile, `${JSON.stringify(envelope, null, 2)}\n`);
+    const legacyPreview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
+    assert.equal(legacyPreview.idempotent, true, 'the role-less legacy record previews as idempotent');
+    const resaved = await decisionCorrectionsCommand('save', { ...input, payload_digest: legacyPreview.payload_digest }, { rootDir: root, ...STORE_OPTIONS() });
+    assert.equal(resaved.idempotent, true, 'a role-less legacy record must stay idempotent (roles derive from paths)');
+    assert.equal(resaved.case.status, 'confirmed', 'the idempotent re-save keeps the confirmation');
+    void preview;
+  });
+
+  it('sanitizes invalid_record entries so a hostile record cannot break the run schema', async () => {
+    const root = await makeTemp('aif-dc-r3-sanitize-');
+    await seedStoreProject(root);
+    await saveCase(root, baseCaseInput({ case_id: 'r3-hostile' }));
+    const caseFile = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE, 'work', 'cases', 'r3-hostile.json');
+    const envelope = parseStrictJson(await readFile(caseFile, 'utf8'));
+    envelope.record.payload.case_id = '!!bad-case-id-that-is-way-longer-than-eighty-characters-and-fails-the-pattern-check';
+    envelope.record.payload.original_assessment.consumer = 'unknown-consumer';
+    envelope.record.payload_digest = digest(canonical(envelope.record.payload));
+    envelope.checksum = digest(envelope.record);
+    await writeFile(caseFile, `${JSON.stringify(envelope, null, 2)}\n`);
+    const run = await decisionCorrectionsCommand('run', { scope: 'work' }, { rootDir: root, ...STORE_OPTIONS() });
+    assert.deepEqual(run.run.cases.map((item) => item.outcome), ['invalid_record'], 'the run schema stays valid');
+    assert.equal(run.run.cases[0].case_id, 'r3-hostile', 'the diagnostic identity mirrors the filename for a hostile case_id');
+    assert.equal(run.run.cases[0].consumer, 'requirements_semantic_lint', 'an untrusted consumer mirrors the default engine');
+    assert.equal(run.run.counts.development.invalid_record, 1);
+  });
+
+  it('degrades a claim bundle without consumable inputs to an honest not_run', async () => {
+    const root = await makeTemp('aif-dc-r3-nopairs-');
+    await seedStoreProject(root);
+    const input = baseCaseInput({
+      case_id: 'r3-nopairs',
+      original_assessment: { consumer: 'claim_evidence_check', verdict: 'old verdict', summary: null },
+      fixture: { kind: 'synthetic', files: [
+        { path: 'pairs.json', media_type: 'application/json', bytes: '{"schema":"aifhub.claim_evidence_pairs.v1"}' },
+        { path: 'docs/spec.md', media_type: 'text/markdown', bytes: SPEC_BYTES, role: 'support' },
+        { path: '.ai-factory/config.yaml', media_type: 'text/yaml', bytes: 'aifhub:\n  claimEvidence:\n    enabled: true\n' },
+      ] },
+    });
+    await saveCase(root, input);
+    await confirmCase(root, input);
+    // Legacy/adversarial shape planted on the stored record: the pairs
+    // envelope moved under `.ai-factory/` makes every file support — zero
+    // role-input files. Such a bundle cannot be created through save (the
+    // grammar gate refuses), so it is planted directly.
+    {
+      const caseFile = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE, 'work', 'cases', 'r3-nopairs.json');
+      const envelope = parseStrictJson(await readFile(caseFile, 'utf8'));
+      envelope.record.payload.fixture.files = envelope.record.payload.fixture.files.map((file) => ({
+        ...file, path: file.path.startsWith('.ai-factory/') ? file.path : `.ai-factory/moved/${file.path}`,
+      }));
+      envelope.record.payload_digest = digest(canonical(envelope.record.payload));
+      envelope.checksum = digest(envelope.record);
+      await writeFile(caseFile, `${JSON.stringify(envelope, null, 2)}\n`);
+    }
+    const run = await decisionCorrectionsCommand('run', { scope: 'work' }, { rootDir: root, ...STORE_OPTIONS() });
+    assert.equal(run.run.cases[0].outcome, 'not_run', 'the replayed producer refuses the missing --pairs honestly');
+    assert.ok(run.run.cases[0].signature.includes('codes=empty-input'), run.run.cases[0].signature);
+  });
+});

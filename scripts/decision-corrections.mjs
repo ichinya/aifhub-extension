@@ -417,11 +417,21 @@ function normalizeFixtureFile(entry) {
   // root only (sources, custody manifests, replay configuration). The default
   // follows the consumer grammars: engine-owned support paths under
   // `.ai-factory/` default to support, everything else defaults to input.
+  // The role is serialized ONLY when the caller provided it explicitly: the
+  // path-derived default is recomputable at read time, so omitting it keeps
+  // the stored bytes (and therefore the digest and the idempotent re-save
+  // comparison) stable across engine versions that change the default rule.
   const role = entry.role === undefined
     ? (fixturePath.startsWith('.ai-factory/') ? 'support' : 'input')
     : entry.role;
   requireValue(role === 'input' || role === 'support', 'invalid-fixture-role');
-  return { path: fixturePath, media_type: entry.media_type, sha256: digest(Buffer.from(entry.bytes, 'utf8')), bytes: entry.bytes, role };
+  const normalized = { path: fixturePath, media_type: entry.media_type, sha256: digest(Buffer.from(entry.bytes, 'utf8')), bytes: entry.bytes };
+  if (entry.role !== undefined) normalized.role = role;
+  return normalized;
+}
+
+function deriveRole(fixtureFile) {
+  return fixtureFile.role ?? (fixtureFile.path.startsWith('.ai-factory/') ? 'support' : 'input');
 }
 
 function normalizeReplayArgs(args) {
@@ -474,7 +484,7 @@ function buildPayload(scope, input, identityMaterial, fixtureVersion, expectedLa
   // Save-time consumer grammar checks: input roles must be able to produce a
   // well-formed replay argv for this consumer, otherwise the bundle would
   // only degrade to a dishonest not_run at replay time.
-  const inputFiles = files.filter((file) => file.role === 'input');
+  const inputFiles = files.filter((file) => deriveRole(file) === 'input');
   if (input.original_assessment.consumer === 'claim_evidence_check') {
     requireValue(inputFiles.length === 1, 'invalid-fixture-input-count', true);
   } else if (input.original_assessment.consumer === 'requirements_semantic_lint') {
@@ -580,9 +590,25 @@ async function guardOwnedSurfaces(root, relatives, options = {}) {
 
 async function prepareNamespace(root) {
   try {
-    await ensureRuntimeGitignore(root, NAMESPACE_ROOT);
+    const action = await ensureRuntimeGitignore(root, NAMESPACE_ROOT);
+    return { ok: true, action: action.action };
   } catch (error) {
     return { ok: false, code: 'runtime-gitignore-failed', detail: String(error?.message ?? error).slice(0, 200) };
+  }
+}
+
+// Pre-mutation git guard for the atomic write's transient sibling: the store
+// generates `<dest>.<uuid>.tmp` internally (workflow-state-store.mjs), so the
+// exact name cannot be pre-guarded. `git check-ignore` evaluates ignore rules
+// for non-existent paths, so probing a representative sibling of the same
+// shape proves the whole temp pattern `<dest>.*.tmp` is effectively ignored —
+// including the case where a PRE-EXISTING namespace .gitignore with narrow
+// rules was preserved by ensureRuntimeGitignore and leaves `*.tmp` visible.
+async function assertTempAreaIgnored(root, destinationFile, options = {}) {
+  const probe = `${destinationFile}.write-probe.tmp`;
+  const verdict = await (options.gitGuard ?? verifyObservationIgnored)(root, probe, options);
+  if (!verdict.ok || verdict.tracked) {
+    return { ok: false, code: verdict.ok ? 'observation-path-tracked' : verdict.code, detail: verdict.detail ?? probe };
   }
   return null;
 }
@@ -813,20 +839,23 @@ export async function saveDecisionCorrection(input, options = {}) {
     }
   }
   await assertGuard(await guardOwnedSurfaces(rootDir, [caseFile, `${NAMESPACE_ROOT}/.gitignore`, lockPath], options));
-  const gitignoreExisted = await lstat(path.join(rootDir, ...`${NAMESPACE_ROOT}/.gitignore`.split('/')))
-    .then(() => true).catch(() => false);
-  await assertGuard(await prepareNamespace(rootDir));
+  let namespaceAction = 'preserve';
   try {
+    const namespace = await prepareNamespace(rootDir);
+    namespaceAction = namespace.ok ? namespace.action : 'preserve';
+    await assertGuard(namespace.ok === true ? null : namespace);
+    // Pre-mutation git guard for the transient write sibling: a preserved
+    // pre-existing namespace .gitignore may carry narrow rules that leave
+    // `<dest>.*.tmp` visible, which would put a tracked temp file into the
+    // QA `actual_diff` channel the moment the atomic write runs.
+    await assertGuard(await assertTempAreaIgnored(rootDir, caseFile, options));
     return await store.lock(lockPath, async () => {
       // Dedup-check and write are serialized by the scope write lock: the
       // idempotent/revision/collision matrix is race-free within this
       // helper's serialization model. Windows case-only collisions (case and
       // scope directory aliases) are refused deterministically before any
       // payload resolution. The atomic write's transient `<dest>.<uuid>.tmp`
-      // lives inside the already-guarded scope directories and its name is
-      // collision-free by construction (fresh store-generated UUID), so the
-      // pre-mutation guard over the case leaf, the lock, and the namespace
-      // .gitignore covers every path this request can create.
+      // shape was proven effectively ignored by the probe guard above.
       await assertNoScopeCollision(store, scope);
       await assertNoCaseCollision(store, scopeDir, `${caseId}.json`);
       const identityMaterial = await normalizeIdentityInput(scope, input.partition, input.identity, store);
@@ -860,19 +889,23 @@ export async function saveDecisionCorrection(input, options = {}) {
       return { ok: true, action: 'save', idempotent: false, created: true, case: record };
     });
   } catch (error) {
-    // Cleanup of artifacts this request created during materialization: if
-    // the namespace .gitignore did not exist before and the failure happened
-    // after prepareNamespace, restore the fresh-project state. Only empty
-    // directories are removed, only inside the namespace, and a .gitignore
-    // that a concurrent writer now depends on is left alone (best-effort,
-    // never removing pre-existing state).
-    if (!gitignoreExisted) {
-      const { rm: remove, rmdir } = await import('node:fs/promises');
-      const gitignoreAbsolute = path.join(rootDir, ...`${NAMESPACE_ROOT}/.gitignore`.split('/'));
-      await remove(gitignoreAbsolute, { force: true }).catch(() => {});
-      for (const dir of [`${NAMESPACE_ROOT}/${scope}/cases`, `${NAMESPACE_ROOT}/${scope}`, NAMESPACE_ROOT]) {
-        await rmdir(path.join(rootDir, ...dir.split('/'))).catch(() => {});
-      }
+    // Cleanup of artifacts THIS request created during materialization: empty
+    // scope directories are removed deepest-first, and the namespace
+    // .gitignore is removed only when OUR prepareNamespace call created it
+    // (action 'create') AND it is the sole remaining namespace entry — so a
+    // pre-existing or concurrently-created ignore file (with whatever rule
+    // scope its owner chose) is never deleted out from under another writer.
+    const { rmdir, readdir } = await import('node:fs/promises');
+    for (const dir of [`${NAMESPACE_ROOT}/${scope}/cases`, `${NAMESPACE_ROOT}/${scope}`]) {
+      await rmdir(path.join(rootDir, ...dir.split('/'))).catch(() => {});
+    }
+    const namespaceAbsolute = path.join(rootDir, ...NAMESPACE_ROOT.split('/'));
+    let remaining = [];
+    try { remaining = await readdir(namespaceAbsolute); } catch { remaining = []; }
+    if (namespaceAction === 'create' && remaining.length === 1 && remaining[0] === '.gitignore') {
+      const { rm: remove } = await import('node:fs/promises');
+      await remove(path.join(namespaceAbsolute, '.gitignore'), { force: true }).catch(() => {});
+      await rmdir(namespaceAbsolute).catch(() => {});
     }
     throw error;
   }
@@ -915,7 +948,9 @@ async function lifecycleCommand(action, input, options) {
     requireValue(existing.payload.partition !== 'held_out', 'held-out-tuning', true);
   }
   await assertGuard(await guardOwnedSurfaces(rootDir, [caseFile, `${NAMESPACE_ROOT}/.gitignore`, lockPath], options));
-  await assertGuard(await prepareNamespace(rootDir));
+  const lifecycleNamespace = await prepareNamespace(rootDir);
+  await assertGuard(lifecycleNamespace.ok === true ? null : lifecycleNamespace);
+  await assertGuard(await assertTempAreaIgnored(rootDir, caseFile, options));
   return store.lock(lockPath, async () => {
     const record = await loadCaseRecord(store, rootDir, scope, caseId);
     // Held-out immunity is enforced before any mutation logic: report-only
@@ -1118,10 +1153,14 @@ export function extractOutcomeSignature(text) {
   addPart('diagnostics', (Array.isArray(parsed?.diagnostics) ? parsed.diagnostics : [])
     .map((entry) => (entry && typeof entry.code === 'string' ? entry.code : null)));
   // Advisory not_run/failure envelopes carry their refusal codes in `codes`
-  // instead of `diagnostics`; including them keeps those outcomes
-  // distinguishable (disabled vs trace-invalid vs trace-missing).
-  addPart('codes', (Array.isArray(parsed?.codes) ? parsed.codes : [])
-    .filter((code) => typeof code === 'string' && code.length > 0));
+  // instead of `diagnostics`; the section is included ONLY when the envelope
+  // defines it, so complete-observation signatures stay byte-stable across
+  // engine versions that gain the field (a stored label compared against a
+  // silently appended `codes=none` would flip holds into label_change).
+  if (Array.isArray(parsed?.codes)) {
+    addPart('codes', parsed.codes
+      .filter((code) => typeof code === 'string' && code.length > 0));
+  }
   return {
     run_status: runStatus,
     signature: parts.join('; '),
@@ -1143,7 +1182,7 @@ const REPLAY_INPUT_FLAGS = Object.freeze({
 });
 
 function fixtureInputFiles(fixtureFiles) {
-  return fixtureFiles.filter((file) => (file.role ?? (file.path.startsWith('.ai-factory/') ? 'support' : 'input')) === 'input');
+  return fixtureFiles.filter((file) => deriveRole(file) === 'input');
 }
 
 function synthesizeReplayArgs(consumer, replayArgs, fixtureFiles) {
@@ -1153,10 +1192,10 @@ function synthesizeReplayArgs(consumer, replayArgs, fixtureFiles) {
   if (consumer === 'claim_evidence_check') {
     // The single role-input file is the pairs envelope (count enforced at
     // save time); role-support files are the sources its refs read from the
-    // replay root. An envelope that does not parse as a claim-evidence
-    // envelope degrades honestly: the replayed producer refuses it and the
-    // outcome is not_run.
-    synthesized.push(inputFlag, inputFiles[0].path);
+    // replay root. Legacy or adversarial stores may hold a bundle with zero
+    // input files — omitting --pairs lets the replayed producer refuse with
+    // its own honest invalid-usage instead of a TypeError escaping here.
+    if (inputFiles.length > 0) synthesized.push(inputFlag, inputFiles[0].path);
   } else {
     for (const file of inputFiles) synthesized.push(inputFlag, file.path);
   }
@@ -1205,18 +1244,37 @@ export async function runDecisionCorrectionReplay(input, options = {}) {
     ? { ...REPLAY_ENGINES, ...options.replayEngines }
     : REPLAY_ENGINES;
   for (const name of caseFiles) {
-    const record = await readCaseRecord(store, scopeDir, name, { strict: false }).catch((error) => {
-      if (error instanceof WorkflowError) return null;
-      throw error;
-    });
-    if (record === null) continue;
-    if (wanted !== null && !wanted.includes(record.payload.case_id)) continue;
+    const fileNameIdentity = name.replace(/\.json$/, '');
+    let record = null;
+    try {
+      record = await readCaseRecord(store, scopeDir, name, { strict: false });
+    } catch (error) {
+      if (!(error instanceof WorkflowError)) throw error;
+      // A checksum-invalid (corrupt envelope) leaf is a read failure, not an
+      // absent case: it stays visible with a diagnostic identity derived from
+      // the filename instead of silently disappearing from the report.
+      record = null;
+      if (error.code !== 'invalid-state') throw error;
+    }
+    // Diagnostic identity is built only from schema-compatible values: an
+    // untrusted case_id mirrors the filename when it fails the identifier
+    // pattern, and an untrusted consumer mirrors the default engine — the
+    // invalid_record entry must never break the run-record schema itself.
+    const trustedCaseId = record !== null
+      && typeof record.payload?.case_id === 'string'
+      && /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/.test(record.payload.case_id)
+      ? record.payload.case_id : fileNameIdentity;
+    if (wanted !== null && !wanted.includes(trustedCaseId)) continue;
+    const trustedConsumer = record !== null
+      && typeof record.payload?.original_assessment?.consumer === 'string'
+      && Object.hasOwn(REPLAY_ENGINES, record.payload.original_assessment.consumer)
+      ? record.payload.original_assessment.consumer : 'requirements_semantic_lint';
     const base = {
-      case_id: record.payload?.case_id ?? name.replace(/\.json$/, ''),
-      consumer: typeof record.payload?.original_assessment?.consumer === 'string' ? record.payload.original_assessment.consumer : 'requirements_semantic_lint',
-      partition: PARTITIONS.includes(record.payload?.partition) ? record.payload.partition : 'development',
-      status: STATUSES.includes(record.status) ? record.status : 'draft',
-      ambiguity: AMBIGUITY_STATES.includes(record.payload?.ambiguity) ? record.payload.ambiguity : 'clear',
+      case_id: trustedCaseId,
+      consumer: trustedConsumer,
+      partition: PARTITIONS.includes(record?.payload?.partition) ? record.payload.partition : 'development',
+      status: STATUSES.includes(record?.status) ? record.status : 'draft',
+      ambiguity: AMBIGUITY_STATES.includes(record?.payload?.ambiguity) ? record.payload.ambiguity : 'clear',
       signature: null,
     };
     // Full schema/invariant validation on the replay path: the stored record
@@ -1224,16 +1282,25 @@ export async function runDecisionCorrectionReplay(input, options = {}) {
     // anywhere or fed to an engine. A record that cannot prove its integrity
     // gets an explicit diagnostic outcome instead of silently disappearing
     // from the run report.
-    try {
-      validateRecordOrThrow(record);
-    } catch {
+    let validationFailed = record === null;
+    if (record !== null) {
+      try {
+        validateRecordOrThrow(record);
+      } catch {
+        validationFailed = true;
+      }
+    }
+    if (validationFailed) {
       results.push({ ...base, outcome: 'invalid_record' });
-      const partitionCounts = counts[base.partition];
-      partitionCounts.cases += 1;
-      partitionCounts.invalid_record += 1;
+      const invalidCounts = counts[base.partition];
+      invalidCounts.cases += 1;
+      invalidCounts.invalid_record += 1;
       continue;
     }
     const payload = record.payload;
+    // A valid record stored under a different scope belongs to that scope's
+    // own run (an aliased directory on a case-insensitive filesystem); it is
+    // excluded here and reported by its owning scope, not as invalid.
     if (payload.scope !== scope) continue;
     const partitionCounts = counts[payload.partition];
     partitionCounts.cases += 1;
@@ -1287,53 +1354,72 @@ export async function runDecisionCorrectionReplay(input, options = {}) {
       continue;
     }
     const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'aif-dc-replay-'));
+    let replayOutcome = null;
+    let replaySignature = null;
+    let replayArgs = null;
+    let materializationFailed = null;
     try {
-      for (const file of payload.fixture.files) {
-        // The stored record re-proves its own containment here: every fixture
-        // path must re-pass the portable-path rules so the write below stays
-        // inside the replay temp root by construction.
-        const safePath = portablePath(file.path);
-        const target = path.join(tempRoot, ...safePath.split('/'));
-        requireValue(target.startsWith(tempRoot + path.sep), 'unsafe-fixture-path');
-        await mkdir(path.dirname(target), { recursive: true });
-        await writeFile(target, file.bytes, 'utf8');
-      }
-      const replayArgs = synthesizeReplayArgs(payload.original_assessment.consumer, normalizeReplayArgs(payload.replay.args), payload.fixture.files);
-      const chunks = [];
-      let exitCode;
       try {
-        exitCode = await engine(replayArgs, {
-          rootDir: tempRoot,
-          output: (value) => chunks.push(String(value)),
-          assessor: typeof options.assessor === 'function' ? options.assessor : undefined,
-          now: typeof options.now === 'function' ? options.now : undefined,
-        });
-      } catch {
-        exitCode = 2;
-      }
-      let outcome = 'not_run';
-      let signature = null;
-      try {
-        const extracted = extractOutcomeSignature(chunks.join(''));
-        signature = extracted.signature.slice(0, 500);
-        // Label comparison happens only for a complete observation: a failed,
-        // abstained, or not-performed advisory run is never coerced into a
-        // verdict (it is honestly reported as not_run).
-        if (extracted.run_status === 'complete' && exitCode === 0) {
-          const normalizedSignature = normalizeLabelText(signature);
-          if (normalizedSignature === normalizeLabelText(payload.expected_label)) outcome = 'holds';
-          else if (normalizedSignature === normalizeLabelText(payload.original_assessment.verdict)) outcome = 'false_regression';
-          else outcome = 'label_change';
+        for (const file of payload.fixture.files) {
+          // The stored record re-proves its own containment here: every fixture
+          // path must re-pass the portable-path rules so the write below stays
+          // inside the replay temp root by construction. A persisted
+          // traversal/unsafe path fails THIS case only.
+          const safePath = portablePath(file.path);
+          const target = path.join(tempRoot, ...safePath.split('/'));
+          requireValue(target.startsWith(tempRoot + path.sep), 'unsafe-fixture-path');
+          await mkdir(path.dirname(target), { recursive: true });
+          await writeFile(target, file.bytes, 'utf8');
         }
-      } catch {
-        outcome = 'not_run';
-        signature = null;
+        replayArgs = synthesizeReplayArgs(payload.original_assessment.consumer, normalizeReplayArgs(payload.replay.args), payload.fixture.files);
+      } catch (error) {
+        // Materialization or argv synthesis failure (persisted unsafe path,
+        // legacy bundle without consumable inputs) is bounded to this case.
+        materializationFailed = error instanceof WorkflowError ? error.code : 'replay-preparation-failed';
       }
-      if (outcome === 'holds') partitionCounts.holds += 1;
-      else if (outcome === 'false_regression') partitionCounts.false_regression += 1;
-      else if (outcome === 'label_change') partitionCounts.label_change += 1;
-      else if (outcome === 'not_run') partitionCounts.not_run += 1;
-      results.push({ ...outcomeBase, outcome, signature });
+      if (materializationFailed === null) {
+        const chunks = [];
+        let exitCode;
+        try {
+          exitCode = await engine(replayArgs, {
+            rootDir: tempRoot,
+            output: (value) => chunks.push(String(value)),
+            assessor: typeof options.assessor === 'function' ? options.assessor : undefined,
+            now: typeof options.now === 'function' ? options.now : undefined,
+          });
+        } catch {
+          exitCode = 2;
+        }
+        let outcome = 'not_run';
+        let signature = null;
+        try {
+          const extracted = extractOutcomeSignature(chunks.join(''));
+          signature = extracted.signature.slice(0, 500);
+          // Label comparison happens only for a complete observation: a failed,
+          // abstained, or not-performed advisory run is never coerced into a
+          // verdict (it is honestly reported as not_run).
+          if (extracted.run_status === 'complete' && exitCode === 0) {
+            const normalizedSignature = normalizeLabelText(signature);
+            if (normalizedSignature === normalizeLabelText(payload.expected_label)) outcome = 'holds';
+            else if (normalizedSignature === normalizeLabelText(payload.original_assessment.verdict)) outcome = 'false_regression';
+            else outcome = 'label_change';
+          }
+        } catch {
+          outcome = 'not_run';
+          signature = null;
+        }
+        replayOutcome = outcome;
+        replaySignature = signature;
+      } else {
+        replayOutcome = 'invalid_record';
+        replaySignature = materializationFailed;
+      }
+      if (replayOutcome === 'holds') partitionCounts.holds += 1;
+      else if (replayOutcome === 'false_regression') partitionCounts.false_regression += 1;
+      else if (replayOutcome === 'label_change') partitionCounts.label_change += 1;
+      else if (replayOutcome === 'not_run') partitionCounts.not_run += 1;
+      else if (replayOutcome === 'invalid_record') partitionCounts.invalid_record += 1;
+      results.push({ ...outcomeBase, outcome: replayOutcome, signature: replaySignature });
     } finally {
       await rm(tempRoot, { recursive: true, force: true }).catch(() => {});
     }
@@ -1361,7 +1447,9 @@ export async function runDecisionCorrectionReplay(input, options = {}) {
   }
   const runFile = `${scopeDir}/runs/${runRecord.run_id}.json`;
   await assertGuard(await guardOwnedSurfaces(rootDir, [runFile, `${NAMESPACE_ROOT}/.gitignore`, `${scopeDir}/write.lock`], options));
-  await assertGuard(await prepareNamespace(rootDir));
+  const runNamespace = await prepareNamespace(rootDir);
+  await assertGuard(runNamespace.ok === true ? null : runNamespace);
+  await assertGuard(await assertTempAreaIgnored(rootDir, runFile, options));
   return store.lock(`${scopeDir}/write.lock`, async () => {
     // Run-record leaf ownership: a run id collision (however unlikely for a
     // fresh random id) must never silently overwrite an existing run record.
