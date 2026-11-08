@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Decision correction run record v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "aifhub.decision_correction_run.v1"
+    },
+    "diagnostic_only": {
+      "const": true
+    },
+    "authorizes": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$"
+    },
+    "scope": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$"
+    },
+    "written": {
+      "type": "boolean"
+    },
+    "honesty_note": {
+      "const": "Run verifies the current implementation against stored fixtures; it does not measure provider quality."
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "development": {
+          "$ref": "#/$defs/partitionCounts"
+        },
+        "calibration": {
+          "$ref": "#/$defs/partitionCounts"
+        },
+        "held_out": {
+          "$ref": "#/$defs/partitionCounts"
+        }
+      },
+      "required": [
+        "development",
+        "calibration",
+        "held_out"
+      ]
+    },
+    "cases": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$"
+          },
+          "consumer": {
+            "enum": [
+              "requirements_semantic_lint",
+              "claim_evidence_check",
+              "trace_link_suggestions"
+            ]
+          },
+          "partition": {
+            "enum": [
+              "development",
+              "calibration",
+              "held_out"
+            ]
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "confirmed",
+              "rejected",
+              "superseded"
+            ]
+          },
+          "ambiguity": {
+            "enum": [
+              "clear",
+              "ambiguous"
+            ]
+          },
+          "outcome": {
+            "enum": [
+              "holds",
+              "false_regression",
+              "label_change",
+              "ambiguous",
+              "not_run",
+              "stale",
+              "skipped_draft",
+              "unsupported_consumer"
+            ]
+          },
+          "signature": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "case_id",
+          "consumer",
+          "partition",
+          "status",
+          "ambiguity",
+          "outcome",
+          "signature"
+        ]
+      }
+    }
+  },
+  "required": [
+    "schema",
+    "diagnostic_only",
+    "authorizes",
+    "run_id",
+    "scope",
+    "written",
+    "honesty_note",
+    "counts",
+    "cases"
+  ],
+  "$defs": {
+    "partitionCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cases": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "holds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "false_regression": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "label_change": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "ambiguous": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "not_run": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "stale": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        }
+      },
+      "required": [
+        "cases",
+        "holds",
+        "false_regression",
+        "label_change",
+        "ambiguous",
+        "not_run",
+        "stale"
+      ]
+    }
+  }
+}

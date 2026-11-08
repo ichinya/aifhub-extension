@@ -1,0 +1,322 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Decision correction fixture v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "aifhub.decision_correction_fixture.v1"
+    },
+    "diagnostic_only": {
+      "const": true
+    },
+    "authorizes": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "status": {
+      "enum": [
+        "draft",
+        "confirmed",
+        "rejected",
+        "superseded"
+      ]
+    },
+    "status_reason": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 2000
+    },
+    "payload_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "payload": {
+      "$ref": "#/$defs/payload"
+    }
+  },
+  "required": [
+    "schema",
+    "diagnostic_only",
+    "authorizes",
+    "status",
+    "status_reason",
+    "payload_digest",
+    "payload"
+  ],
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$"
+    },
+    "boundedText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    },
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        }
+      },
+      "required": [
+        "id",
+        "version"
+      ]
+    },
+    "fixtureFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "media_type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "bytes": {
+          "type": "string",
+          "maxLength": 131072
+        }
+      },
+      "required": [
+        "path",
+        "media_type",
+        "sha256",
+        "bytes"
+      ]
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "case_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "scope": {
+          "$ref": "#/$defs/identifier"
+        },
+        "partition": {
+          "enum": [
+            "development",
+            "calibration",
+            "held_out"
+          ]
+        },
+        "ambiguity": {
+          "enum": [
+            "clear",
+            "ambiguous"
+          ]
+        },
+        "logical_identity": {
+          "$ref": "#/$defs/digest"
+        },
+        "identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "scope": {
+              "$ref": "#/$defs/identifier"
+            },
+            "partition": {
+              "enum": [
+                "development",
+                "calibration",
+                "held_out"
+              ]
+            },
+            "source_observation": {
+              "type": "object"
+            },
+            "subject_revision": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "input_revisions": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/digest"
+              }
+            },
+            "question": {
+              "$ref": "#/$defs/question"
+            },
+            "rubric": {
+              "$ref": "#/$defs/question"
+            }
+          },
+          "required": [
+            "scope",
+            "partition",
+            "source_observation",
+            "subject_revision",
+            "input_revisions",
+            "question",
+            "rubric"
+          ]
+        },
+        "fixture": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "version": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000
+            },
+            "kind": {
+              "enum": [
+                "redacted",
+                "synthetic"
+              ]
+            },
+            "files": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 8,
+              "items": {
+                "$ref": "#/$defs/fixtureFile"
+              }
+            }
+          },
+          "required": [
+            "version",
+            "kind",
+            "files"
+          ]
+        },
+        "original_assessment": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "consumer": {
+              "enum": [
+                "requirements_semantic_lint",
+                "claim_evidence_check",
+                "trace_link_suggestions"
+              ]
+            },
+            "verdict": {
+              "$ref": "#/$defs/boundedText"
+            },
+            "summary": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 2000
+            }
+          },
+          "required": [
+            "consumer",
+            "verdict",
+            "summary"
+          ]
+        },
+        "expected_label": {
+          "$ref": "#/$defs/boundedText"
+        },
+        "expected_label_confirmed": {
+          "type": "boolean"
+        },
+        "rationale": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 2000
+        },
+        "feedback": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 2000
+        },
+        "replay": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "type": "array",
+              "maxItems": 40,
+              "items": {
+                "type": "string",
+                "maxLength": 200
+              }
+            }
+          },
+          "required": [
+            "args"
+          ]
+        },
+        "evolution": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "transaction_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80,
+                  "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$"
+                },
+                "proposal_digest": {
+                  "$ref": "#/$defs/digest"
+                }
+              },
+              "required": [
+                "transaction_id",
+                "proposal_digest"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "case_id",
+        "scope",
+        "partition",
+        "ambiguity",
+        "logical_identity",
+        "identity",
+        "fixture",
+        "original_assessment",
+        "expected_label",
+        "expected_label_confirmed",
+        "rationale",
+        "feedback",
+        "replay",
+        "evolution"
+      ]
+    }
+  }
+}
