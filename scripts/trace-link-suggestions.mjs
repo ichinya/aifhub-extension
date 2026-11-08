@@ -758,6 +758,7 @@ export function validateGraphShape(graph, options = {}) {
     return { ok: false, code: 'unsupported-version' };
   }
   const allowed = new Map(policy.relations.map((entry) => [`${entry.from_kind}>${entry.to_kind}`, entry.relation]));
+  const knownRelations = new Set(policy.relations.map((entry) => entry.relation));
   const nodeKinds = new Map();
   for (const node of graph.nodes ?? []) {
     if (!node || typeof node !== 'object') return { ok: false, code: 'invalid-node' };
@@ -778,9 +779,15 @@ export function validateGraphShape(graph, options = {}) {
   for (const edge of graph.edges ?? []) {
     if (!edge || typeof nodeKinds.get(edge.from_node_id) !== 'string') return { ok: false, code: 'dangling-endpoint' };
     if (typeof nodeKinds.get(edge.to_node_id) !== 'string') return { ok: false, code: 'dangling-endpoint' };
+    // Classification order mirrors the delta contract: a relation name that
+    // is not in the closed vocabulary is `unknown-relation`; a KNOWN name
+    // whose endpoint kinds do not admit it is exactly `invalid-kind-pair`
+    // (delta scenario: relation `symbol_test` from `scenario` to `test`).
     const expected = allowed.get(`${nodeKinds.get(edge.from_node_id)}>${nodeKinds.get(edge.to_node_id)}`);
-    if (expected === undefined) return { ok: false, code: 'invalid-kind-pair' };
-    if (edge.relation !== expected) return { ok: false, code: 'unknown-relation' };
+    if (expected === undefined || edge.relation !== expected) {
+      if (!knownRelations.has(edge.relation)) return { ok: false, code: 'unknown-relation' };
+      return { ok: false, code: 'invalid-kind-pair' };
+    }
     if (!EDGE_OUTCOMES.includes(edge.outcome)) return { ok: false, code: 'invalid-outcome' };
     if (edge.outcome === 'candidate' && (!Array.isArray(edge.behavioral_assertion_refs) || edge.behavioral_assertion_refs.length === 0)) {
       return { ok: false, code: 'candidate-without-anchor' };
@@ -1845,6 +1852,21 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
     emit(notRunEnvelope(['invalid-usage', parsed.error]), parsed.json === true || argv.includes('--json'));
     return 2;
   }
+  // Explicit change-id validation happens before ANY read (decision 7): the
+  // custody form is checked before the project-root, config, trace, and test
+  // reads, so a disabled producer can never swallow a custody-invalid
+  // invocation — a malformed id is a typed exit-2 refusal, not a silent
+  // "advisory scan was not performed".
+  if (typeof parsed.changeId !== 'string') {
+    emit(notRunEnvelope(['missing-change']), parsed.json);
+    return 2;
+  }
+  // Single custody-safe change-id form (decision 7): broader #282-style forms
+  // are refused, not normalized.
+  if (!CHANGE_ID_FORM.test(parsed.changeId)) {
+    emit(notRunEnvelope(['invalid-change-id']), parsed.json);
+    return 2;
+  }
   let rootDir;
   try {
     rootDir = await realpath(options.rootDir ?? process.cwd());
@@ -1866,16 +1888,8 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
     emit(notRunEnvelope(codes), parsed.json);
     return 0;
   }
-  if (typeof parsed.changeId !== 'string') {
-    emit(notRunEnvelope(['missing-change']), parsed.json);
-    return 2;
-  }
-  // Single custody-safe change-id form, validated explicitly before any read
-  // (decision 7): broader #282-style forms are refused, not normalized.
-  if (!CHANGE_ID_FORM.test(parsed.changeId)) {
-    emit(notRunEnvelope(['invalid-change-id']), parsed.json);
-    return 2;
-  }
+  // Presence and form were already validated before any read (decision 7);
+  // the disabled branch above can no longer swallow a custody-invalid id.
   const changeId = parsed.changeId;
   if (parsed.testPaths.length > MAX_TEST_INPUTS) {
     emit(notRunEnvelope(['test-inputs-limit-exceeded']), parsed.json);
@@ -2231,7 +2245,17 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
       binding,
       diagnostics: combinedDiagnostics,
     });
-    assertStructuralInvariants(observation);
+    // The engine-owned builder cannot produce a shape-violating graph, so
+    // this is a defensive gate: if it ever fires, the delta contract demands
+    // a typed `invalid-candidate:<code>` refusal before any persistence —
+    // never a crash and never a written observation.
+    try {
+      assertStructuralInvariants(observation);
+    } catch (error) {
+      const shapeCode = /invalid graph shape: ([a-z-]+)/.exec(String(error?.message ?? error))?.[1] ?? 'invalid-shape';
+      emit(notRunEnvelope([`invalid-candidate:${shapeCode}`]), parsed.json);
+      return 2;
+    }
     if (Buffer.byteLength(JSON.stringify(observation, null, 2), 'utf8') > GRAPH_LIMITS.max_observation_bytes) {
       emit(notRunEnvelope(['invalid-candidate:observation-overflow']), parsed.json);
       return 2;

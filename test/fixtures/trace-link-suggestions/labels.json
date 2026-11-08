@@ -203,7 +203,7 @@
       "exit": 0
     },
     {
-      "id": "dev-foreign-custody",
+      "id": "dev-foreign-neighbor-ignored",
       "trace": "traces/foreign-trace.json",
       "foreign_change": true,
       "expected_code": "trace-missing",
