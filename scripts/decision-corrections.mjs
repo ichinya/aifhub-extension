@@ -282,7 +282,7 @@ export function hasCorrectionsLeak(value) {
   return /[A-Za-z]:\\\\/.test(text)
     || /[A-Za-z]:\//.test(text)
     || /\\\\\\\\/.test(text)
-    || /"(?:\/Users|\/home|\/tmp|\/var\/tmp|\/private\/tmp|\/mnt|\/Volumes)\//.test(text)
+    || /(?:^|[^A-Za-z0-9])(?:\/Users|\/home|\/tmp|\/var\/tmp|\/private\/tmp|\/mnt|\/Volumes)\//.test(text)
     || /\b(?:sk|ghp|github_pat)_[A-Za-z0-9_=-]{12,}/i.test(text)
     || /BEGIN (?:RSA|OPENSSH|EC|DSA)? ?PRIVATE KEY/i.test(text)
     || /\braw_transcript\b/i.test(text)
@@ -474,6 +474,10 @@ function buildPayload(scope, input, identityMaterial, fixtureVersion, expectedLa
   let totalBytes = 0;
   for (const entry of input.fixture.files) {
     const normalized = normalizeFixtureFile(entry);
+    // A repeated fixture path would let the replay's second write silently
+    // overwrite the first: the confirmed bundle must map paths one-to-one
+    // onto the evidence it stores.
+    requireValue(!files.some((file) => file.path === normalized.path), 'duplicate-fixture-path', true);
     totalBytes += Buffer.byteLength(normalized.bytes, 'utf8');
     requireValue(totalBytes <= MAX_FIXTURE_TOTAL_BYTES, 'fixture-too-large');
     files.push(normalized);
@@ -539,10 +543,13 @@ export function assertPayloadInvariants(record) {
   // The displayed partition drives the held-out guard and replay bucketing,
   // so a schema-valid record must not diverge from the identity partition.
   requireValue(payload.identity.partition === payload.partition, 'identity-partition-mismatch');
-  requireValue(payloadDigest(payload) === record.payload_digest, 'payload-digest-mismatch');
+  // Fixture digests come first: corrupted evidence must surface as
+  // `fixture-digest-mismatch` (classified stale by the replay policy), not
+  // be masked by the aggregate payload-digest check.
   for (const file of payload.fixture.files) {
     requireValue(digest(Buffer.from(file.bytes, 'utf8')) === file.sha256, 'fixture-digest-mismatch');
   }
+  requireValue(payloadDigest(payload) === record.payload_digest, 'payload-digest-mismatch');
   assertStoredIdentityMaterial(payload.identity);
   requireValue(computeLogicalIdentity(payload.identity) === payload.logical_identity, 'logical-identity-mismatch');
   if (record.status === 'confirmed') {
@@ -1127,28 +1134,35 @@ export function extractOutcomeSignature(text) {
     : typeof parsed?.state === 'string' ? parsed.state
       : typeof parsed?.semantic?.run_status === 'string' ? parsed.semantic.run_status : null;
   const parts = [];
-  const addPart = (label, values) => {
-    const clean = [...new Set(values.filter((value) => typeof value === 'string' && value.length > 0))].sort();
-    parts.push(`${label}=${clean.length > 0 ? clean.join('|') : 'none'}`);
+  // Occurrence-preserving projection: repeated entries stay in the signature
+  // (type|type for two same-type findings) so losing one of two identical
+  // findings changes the signature instead of hiding behind dedup — the
+  // label comparison would otherwise report holds on a changed assessment.
+  const addPart = (label, values, { dedup = true } = {}) => {
+    const clean = values.filter((value) => typeof value === 'string' && value.length > 0);
+    const projected = dedup ? [...new Set(clean)].sort() : clean.sort();
+    parts.push(`${label}=${projected.length > 0 ? projected.join('|') : 'none'}`);
   };
   addPart('run_status', runStatus === null ? [] : [runStatus]);
   addPart('findings', (Array.isArray(parsed?.findings) ? parsed.findings : [])
-    .map((finding) => (finding && typeof finding.type === 'string' ? finding.type : null)));
+    .map((finding) => (finding && typeof finding.type === 'string' ? finding.type : null)), { dedup: false });
   // Consumer-specific outcome material: claim-evidence carries quote checks
   // and semantic verdicts, trace-link carries the structural outcome and the
   // emitted relation kinds. Sections are included only when the producer
   // defines them, so a signature stays deterministic per observation shape.
+  // Occurrence-sensitive sections use dedup:false: losing one of two
+  // identical entries must change the signature.
   if (parsed && typeof parsed === 'object' && Array.isArray(parsed.structural?.pairs)) {
-    addPart('quote_checks', parsed.structural.pairs.map((pair) => (pair && typeof pair.quote_check === 'string' ? pair.quote_check : null)));
+    addPart('quote_checks', parsed.structural.pairs.map((pair) => (pair && typeof pair.quote_check === 'string' ? pair.quote_check : null)), { dedup: false });
   }
   if (parsed && typeof parsed === 'object' && Array.isArray(parsed.semantic?.assessments)) {
-    addPart('verdicts', parsed.semantic.assessments.map((assessment) => (assessment && typeof assessment.verdict === 'string' ? assessment.verdict : null)));
+    addPart('verdicts', parsed.semantic.assessments.map((assessment) => (assessment && typeof assessment.verdict === 'string' ? assessment.verdict : null)), { dedup: false });
   }
   if (parsed && typeof parsed === 'object' && typeof parsed.structural?.outcome === 'string') {
     addPart('outcome', [parsed.structural.outcome]);
   }
   if (parsed && typeof parsed === 'object' && Array.isArray(parsed.structural?.edges)) {
-    addPart('relations', parsed.structural.edges.map((edge) => (edge && typeof edge.relation === 'string' ? edge.relation : null)));
+    addPart('relations', parsed.structural.edges.map((edge) => (edge && typeof edge.relation === 'string' ? edge.relation : null)), { dedup: false });
   }
   addPart('diagnostics', (Array.isArray(parsed?.diagnostics) ? parsed.diagnostics : [])
     .map((entry) => (entry && typeof entry.code === 'string' ? entry.code : null)));
@@ -1283,18 +1297,30 @@ export async function runDecisionCorrectionReplay(input, options = {}) {
     // gets an explicit diagnostic outcome instead of silently disappearing
     // from the run report.
     let validationFailed = record === null;
+    let fixtureDrifted = false;
     if (record !== null) {
       try {
         validateRecordOrThrow(record);
-      } catch {
+      } catch (error) {
         validationFailed = true;
+        // The policy buckets a corrupted fixture under `stale` (the evidence
+        // drifted from its recorded digest), while every other invariant
+        // failure means the stored record itself is not trustworthy.
+        if (error instanceof WorkflowError && error.code === 'fixture-digest-mismatch') fixtureDrifted = true;
       }
     }
     if (validationFailed) {
-      results.push({ ...base, outcome: 'invalid_record' });
-      const invalidCounts = counts[base.partition];
-      invalidCounts.cases += 1;
-      invalidCounts.invalid_record += 1;
+      if (fixtureDrifted) {
+        const driftCounts = counts[base.partition];
+        driftCounts.cases += 1;
+        driftCounts.stale += 1;
+        results.push({ ...base, outcome: 'stale', signature: 'fixture-digest-mismatch' });
+      } else {
+        results.push({ ...base, outcome: 'invalid_record' });
+        const invalidCounts = counts[base.partition];
+        invalidCounts.cases += 1;
+        invalidCounts.invalid_record += 1;
+      }
       continue;
     }
     const payload = record.payload;
@@ -1394,12 +1420,17 @@ export async function runDecisionCorrectionReplay(input, options = {}) {
         let signature = null;
         try {
           const extracted = extractOutcomeSignature(chunks.join(''));
-          signature = extracted.signature.slice(0, 500);
+          // Label comparison uses the FULL signature: the stored summary field
+          // is bounded at 500 characters for the schema, but comparing the
+          // truncated prefix would let changes beyond the bound produce false
+          // holds/false_regression.
+          const fullSignature = extracted.signature;
+          signature = fullSignature.slice(0, 500);
           // Label comparison happens only for a complete observation: a failed,
           // abstained, or not-performed advisory run is never coerced into a
           // verdict (it is honestly reported as not_run).
           if (extracted.run_status === 'complete' && exitCode === 0) {
-            const normalizedSignature = normalizeLabelText(signature);
+            const normalizedSignature = normalizeLabelText(fullSignature);
             if (normalizedSignature === normalizeLabelText(payload.expected_label)) outcome = 'holds';
             else if (normalizedSignature === normalizeLabelText(payload.original_assessment.verdict)) outcome = 'false_regression';
             else outcome = 'label_change';

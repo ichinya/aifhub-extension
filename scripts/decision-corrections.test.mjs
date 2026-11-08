@@ -2066,3 +2066,137 @@ describe('decision-corrections review round 3', () => {
     assert.ok(run.run.cases[0].signature.includes('codes=empty-input'), run.run.cases[0].signature);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Devin PR-review round (#296): duplicate fixture paths, occurrence-preserving
+// signatures, full-signature comparison, fixture-corruption staleness, and
+// embedded private paths in leak checks.
+// ---------------------------------------------------------------------------
+
+describe('decision-corrections devin PR-review round', () => {
+  it('refuses a duplicate fixture path at save time', async () => {
+    const root = await makeTemp('aif-dc-d4-dup-');
+    await seedStoreProject(root);
+    const input = baseCaseInput({ case_id: 'd4-dup' });
+    input.fixture.files.push({ path: 'docs/spec.md', media_type: 'text/markdown', bytes: 'overwriting bytes' });
+    await assert.rejects(
+      () => saveCase(root, input),
+      (error) => error?.code === 'duplicate-fixture-path' && error.blocked === true,
+      'a repeated fixture path would let replay overwrite stored evidence',
+    );
+  });
+
+  it('keeps repeated findings occurrence-sensitive in the signature', async () => {
+    const two = extractOutcomeSignature(JSON.stringify({
+      run_status: 'complete',
+      findings: [{ type: 'ambiguity' }, { type: 'ambiguity' }],
+      diagnostics: [],
+    }));
+    const one = extractOutcomeSignature(JSON.stringify({
+      run_status: 'complete',
+      findings: [{ type: 'ambiguity' }],
+      diagnostics: [],
+    }));
+    assert.notEqual(two.signature, one.signature, 'losing one of two same-type findings must change the signature');
+    assert.ok(two.signature.includes('findings=ambiguity|ambiguity'), two.signature);
+    assert.ok(one.signature.includes('findings=ambiguity'), one.signature);
+  });
+
+  it('compares labels against the full signature, not the truncated stored prefix', async () => {
+    const root = await makeTemp('aif-dc-d4-trunc-');
+    await seedStoreProject(root);
+    // Shared 500+ char prefix, diverging tail: comparing the stored
+    // 500-character prefix would falsely hold; the full-signature comparison
+    // must classify label_change.
+    const sharedPrefix = 'run_status=complete; findings=none; diagnostics=none; padding=' + 'p'.repeat(480);
+    const input = baseCaseInput({
+      case_id: 'd4-trunc',
+      identity: { ...baseCaseInput().identity, subject_revision: 'rev-trunc' },
+      expected_label: `${sharedPrefix}; tail=EXPECTED`,
+    });
+    await saveCase(root, input);
+    await confirmCase(root, input);
+    const spyObservation = JSON.stringify({
+      run_status: 'complete',
+      findings: [],
+      diagnostics: [],
+      padding_note: `${sharedPrefix}; tail=REPLAYED`,
+    });
+    // Padding notes are not part of the real signature; instead make the
+    // observation carry a long diagnostics list so the real signature exceeds
+    // 500 characters with the expected prefix and a diverging tail.
+    const longDiagnostics = Array.from({ length: 60 }, (_, index) => ({ code: `pad-${String(index).padStart(3, '0')}` }));
+    const longObservation = JSON.stringify({
+      run_status: 'complete',
+      findings: [],
+      diagnostics: longDiagnostics,
+    });
+    void spyObservation;
+    void longObservation;
+    const stored = parseStrictJson(await readFile(path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE, 'work', 'cases', 'd4-trunc.json'), 'utf8'));
+    const expectedFull = `run_status=complete; findings=none; diagnostics=pad-000|pad-001|pad-002|pad-003|pad-004|pad-005|pad-006|pad-007|pad-008|pad-009|pad-010|pad-011|pad-012|pad-013|pad-014|pad-015|pad-016|pad-017|pad-018|pad-019|pad-020|pad-021|pad-022|pad-023|pad-024|pad-025|pad-026|pad-027|pad-028|pad-029|pad-030|pad-031|pad-032|pad-033|pad-034|pad-035|pad-036|pad-037|pad-038|pad-039|pad-040|pad-041|pad-042|pad-043|pad-044|pad-045|pad-046|pad-047|pad-048|pad-049|pad-050|pad-051|pad-052|pad-053|pad-054|pad-055|pad-056|pad-057|pad-058|pad-059; codes=none`;
+    // Overwrite the confirmed label with the full-length expected signature.
+    stored.record.payload.expected_label = expectedFull;
+    stored.record.payload_digest = digest(canonical(stored.record.payload));
+    stored.checksum = digest(stored.record);
+    await writeFile(path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE, 'work', 'cases', 'd4-trunc.json'), `${JSON.stringify(stored, null, 2)}\n`);
+    // The spy emits the same signature but with a diverging tail beyond the
+    // 500-character stored bound.
+    const divergingDiagnostics = longDiagnostics.slice(0, 59);
+    const spyEngine = async (argv, engineOptions) => {
+      const chunks = [];
+      const render = (value) => { chunks.push(value); };
+      void render;
+      const replayed = `run_status=complete; findings=none; diagnostics=${[...divergingDiagnostics.map((d) => d.code), 'pad-tail'].sort().join('|')}; codes=none`;
+      void replayed;
+      const observation = JSON.stringify({
+        run_status: 'complete',
+        findings: [],
+        diagnostics: [...divergingDiagnostics, { code: 'pad-tail' }],
+      });
+      engineOptions.output(`${observation}\n`);
+      return 0;
+    };
+    const run = await decisionCorrectionsCommand('run', { scope: 'work' }, {
+      rootDir: root, ...STORE_OPTIONS(),
+      replayEngines: { requirements_semantic_lint: spyEngine },
+    });
+    const entry = run.run.cases.find((item) => item.case_id === 'd4-trunc');
+    assert.equal(entry.outcome, 'label_change', 'a diverging tail beyond the 500-char stored prefix must not falsely hold');
+    assert.equal(entry.signature.length, 500, 'the stored signature stays bounded at 500 characters');
+  });
+
+  it('classifies a corrupted fixture as stale per the policy', async () => {
+    const root = await makeTemp('aif-dc-d4-corrupt-');
+    await seedStoreProject(root);
+    const input = baseCaseInput({ case_id: 'd4-corrupt' });
+    await saveCase(root, input);
+    await confirmCase(root, input);
+    // Corrupt the evidence bytes AND keep the envelope self-consistent: the
+    // fixture digest invariant must catch it and the run must classify stale.
+    const caseFile = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE, 'work', 'cases', 'd4-corrupt.json');
+    const envelope = parseStrictJson(await readFile(caseFile, 'utf8'));
+    envelope.record.payload.fixture.files[0].bytes = `${envelope.record.payload.fixture.files[0].bytes}tampered`;
+    envelope.record.payload_digest = digest(canonical(envelope.record.payload));
+    envelope.checksum = digest(envelope.record);
+    await writeFile(caseFile, `${JSON.stringify(envelope, null, 2)}\n`);
+    const run = await decisionCorrectionsCommand('run', { scope: 'work' }, { rootDir: root, ...STORE_OPTIONS() });
+    assert.deepEqual(run.run.cases.map((item) => [item.outcome, item.signature]), [['stale', 'fixture-digest-mismatch']],
+      'corrupted fixture evidence is stale per the policy, not invalid_record');
+    assert.equal(run.run.counts.development.stale, 1);
+    assert.equal(run.run.counts.development.invalid_record, 0);
+  });
+
+  it('refuses an embedded private unix path that does not follow a JSON quote', async () => {
+    const root = await makeTemp('aif-dc-d4-leak-');
+    await seedStoreProject(root);
+    await assert.rejects(
+      () => saveCase(root, baseCaseInput({ case_id: 'd4-leak', rationale: 'see /home/alice/private notes' })),
+      (error) => error?.code === 'privacy-leak',
+      'an embedded private path must trip the leak predicate without a leading quote',
+    );
+    assert.equal(hasCorrectionsLeak({ note: 'see /home/alice/private notes' }), true);
+    // Legitimate repo-relative references stay allowed.
+    assert.equal(hasCorrectionsLeak({ note: 'see docs/research.md for details' }), false);
+  });
+});
