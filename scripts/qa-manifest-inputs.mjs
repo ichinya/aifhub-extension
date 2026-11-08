@@ -122,13 +122,18 @@ async function observeQaSnapshotInner(store, payload, options = {}) {
   // and is git-guarded pre-write, so the default-root namespace below is the
   // only surface to exclude.
   const traceLinkSuggestionsNamespace = p => within(p, `.ai-factory/state/${payload.target.id}/trace-link-suggestions`);
+  // Closed runtime namespace (#284): advisory context-selection overlay
+  // observations follow the same rule; the writer refuses custom state roots
+  // and is git-guarded pre-write, so the default-root namespace below is the
+  // only surface to exclude.
+  const contextSelectionOverlayNamespace = p => within(p, `.ai-factory/state/${payload.target.id}/context-selection-overlay`);
   // Closed runtime namespace (#285): project-scoped decision-correction
   // fixture cases and run records live under a CONSTANT store namespace (the
   // store is shared by the whole command, not owned by one QA target), so the
   // predicate is literal and not parameterized by payload.target.id; the
   // writer refuses custom state roots and is git-guarded pre-write.
   const decisionCorrectionsNamespace = p => within(p, '.ai-factory/state/decision-corrections');
-  const closedNamespace = p => compositionsNamespace(p) || readabilityNamespace(p) || requirementLintNamespace(p) || claimEvidenceNamespace(p) || traceLinkSuggestionsNamespace(p) || decisionCorrectionsNamespace(p);
+  const closedNamespace = p => compositionsNamespace(p) || readabilityNamespace(p) || requirementLintNamespace(p) || claimEvidenceNamespace(p) || traceLinkSuggestionsNamespace(p) || contextSelectionOverlayNamespace(p) || decisionCorrectionsNamespace(p);
   // Declared roots inside a closed runtime namespace fail closed on the
   // provider path too: without this check an injected provider whose scope
   // covers a closed namespace would silently hide that scope's own content
@@ -248,6 +253,7 @@ async function filesystemSnapshot(store, payload, options) {
     || within(p, `.ai-factory/state/${payload.target.id}/requirement-lint`)
     || within(p, `.ai-factory/state/${payload.target.id}/claim-evidence`)
     || within(p, `.ai-factory/state/${payload.target.id}/trace-link-suggestions`)
+    || within(p, `.ai-factory/state/${payload.target.id}/context-selection-overlay`)
     // Closed runtime namespace (#285): constant store namespace shared by the
     // whole aifhub-decision-corrections command, not owned by one QA target.
     || within(p, '.ai-factory/state/decision-corrections');
