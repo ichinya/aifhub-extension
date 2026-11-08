@@ -5,6 +5,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  ASSESSMENT_CONSUMER_IDS,
   ASSESSMENT_COVERAGE_STATES,
   ASSESSMENT_FRESHNESS_STATES,
   ASSESSMENT_RUN_STATES,
@@ -54,6 +55,18 @@ describe('typed-assessment binding', () => {
   it('canonicalizes arrays and nested objects deterministically', () => {
     assert.equal(assessmentCanonical({ b: [1, { a: 2 }], a: 'x' }), '{"a":"x","b":[1,{"a":2}]}');
     assert.equal(assessmentCanonical('raw'), '"raw"');
+  });
+
+  // #284: the closed consumer registry is a contract surface — the
+  // context-selection overlay registers as the fourth typed-assessment
+  // consumer, and the helper stays consumer-neutral otherwise.
+  it('pins the closed consumer registry to the four advisory consumers', () => {
+    assert.deepEqual([...ASSESSMENT_CONSUMER_IDS], [
+      'requirements_semantic_lint',
+      'claim_evidence_check',
+      'trace_link_suggestions',
+      'context_selection_overlay',
+    ]);
   });
 });
 
