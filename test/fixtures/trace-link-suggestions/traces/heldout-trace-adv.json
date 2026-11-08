@@ -1,0 +1,23 @@
+{
+  "trace": {
+    "schemaVersion": "lekalo/trace-manifest/v0.2.16",
+    "identity": "dev.lekalo.trace-manifest@0.2.16",
+    "completeness": "full",
+    "nodes": [
+      {
+        "symbol": "requirement:AdvThing"
+      },
+      {
+        "symbol": "operation:adv.thing"
+      }
+    ],
+    "relations": [
+      {
+        "from": "requirement:AdvThing",
+        "to": "operation:adv.thing"
+      }
+    ],
+    "gaps": []
+  },
+  "manifestDigest": "sha256:235e069fab29e8533c10fe44e2e65d60546f6613553f550d0879a21c9f82f0b5"
+}

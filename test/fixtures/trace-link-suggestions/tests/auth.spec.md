@@ -1,0 +1,2 @@
+AuthLoginHappy
+AuthLoginDenied
