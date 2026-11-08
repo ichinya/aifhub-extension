@@ -125,7 +125,19 @@ export function parseDecisionCorrectionsConfigSubset(raw) {
     const withoutComment = stripLineComment(rawLine);
     if (withoutComment.trim().length === 0) continue;
     const match = /^(\s*)([^:]+):(?:\s*(.*))?$/.exec(withoutComment);
-    if (!match) continue;
+    if (!match) {
+      // A non-mapping line inside a guarded context is a malformed namespace
+      // form, never a silent skip: the mechanism must not stay enabled
+      // because an unparseable line happened to sit next to `enabled: true`
+      // (parity with the trace-link parser's malformed-line diagnostic).
+      const parentPath = stack.at(-1).path;
+      if (belowNamespace(parentPath) || structural(parentPath)
+        || (parentPath.length >= CORRECTIONS_CONFIG_PATH.length
+          && CORRECTIONS_CONFIG_PATH.every((part, index) => parentPath[index] === part))) {
+        diagnostics.push(correctionsConfigDiagnostic('malformed-line', withoutComment.trim().slice(0, 100)));
+      }
+      continue;
+    }
     const indent = match[1].length;
     const key = match[2].trim();
     const rawValue = match[3]?.trim() ?? '';
@@ -296,14 +308,13 @@ export function projectIdentityObservation(value) {
 }
 
 function leakFreeText(value, code, max) {
-  requireValue(typeof value === 'string', code);
+  requireValue(typeof value === 'string' && value.trim().length > 0, code);
   requireValue(!hasCorrectionsLeak(value), 'privacy-leak', true);
-  // NUL and oversize are refused with the field's own typed code, not the
-  // generic bounded-text code, so hostile bodies are attributable in
-  // diagnostics.
+  // NUL, oversize, and empty bodies are refused with the field's own typed
+  // code, not the generic bounded-text code, so hostile bodies are
+  // attributable in diagnostics.
   requireValue(!value.includes('\0') && value.length <= max, code);
-  const trimmed = boundedText(value, max);
-  return trimmed;
+  return boundedText(value, max);
 }
 
 // Normalizes caller identity input into the canonical identity material.
@@ -319,6 +330,13 @@ async function normalizeIdentityInput(scope, partition, identityInput, store) {
   const subjectRevision = leakFreeText(identityInput.subject_revision, 'invalid-subject-revision', 200);
   requireValue(Array.isArray(identityInput.input_paths) && identityInput.input_paths.length > 0
     && identityInput.input_paths.length <= MAX_INPUT_REVISIONS, 'invalid-input-revisions');
+  for (const inputPath of identityInput.input_paths) {
+    const normalized = portablePath(inputPath);
+    // Provenance inputs live in the presented project surface, never inside
+    // the corrections store itself (a store file citing itself as evidence
+    // would make the digest self-referential).
+    requireValue(!withinNamespace(normalized), 'self-referential-input', true);
+  }
   const inputRevisions = await store.references(identityInput.input_paths);
   requireValue(Object.keys(inputRevisions).length > 0, 'invalid-input-revisions');
   requireValue(!hasCorrectionsLeak({ question: identityInput.question, rubric: identityInput.rubric }), 'privacy-leak', true);
@@ -376,6 +394,9 @@ export function computeLogicalIdentity(identityMaterial) {
 function normalizeFixtureFile(entry) {
   fields(entry, ['path', 'media_type', 'bytes'], []);
   const fixturePath = portablePath(String(entry.path));
+  // The schema caps fixture paths at 300; refusing here keeps the typed field
+  // code instead of a generic case-schema-invalid refusal at write time.
+  requireValue(fixturePath.length <= 300, 'unsafe-fixture-path');
   requireValue(!hasCorrectionsLeak({ path: fixturePath, media_type: entry.media_type }), 'privacy-leak', true);
   requireValue(typeof entry.media_type === 'string' && entry.media_type.length > 0 && entry.media_type.length <= 100, 'invalid-fixture-media-type');
   requireValue(typeof entry.bytes === 'string', 'invalid-fixture-bytes');
@@ -391,7 +412,8 @@ function normalizeReplayArgs(args) {
     // the runner itself, and path/command syntax in caller args is refused.
     requireValue(!/[\0\\/:<>"|?*\x00-\x1f]/.test(arg), 'unsafe-replay-arg');
     requireValue(!arg.startsWith('-') || /^--[a-z][a-z0-9._-]*$/i.test(arg) || /^--[a-z][a-z0-9._-]*=[^\s]+$/i.test(arg), 'unsafe-replay-arg');
-    requireValue(arg !== '--write', 'replay-write-forbidden', true);
+    // The replay must never write: refuse --write in any case or value form.
+    requireValue(!/^--write(=.*)?$/i.test(arg), 'replay-write-forbidden', true);
     requireValue(arg.toLowerCase() !== '--json', 'unsafe-replay-arg');
     return arg;
   });
@@ -451,6 +473,10 @@ function payloadDigest(payload) {
   return digest(canonical(payload));
 }
 
+function withinNamespace(relative) {
+  return relative === NAMESPACE_ROOT || relative.startsWith(`${NAMESPACE_ROOT}/`);
+}
+
 function casePaths(scope, caseId) {
   const scopeDir = `${NAMESPACE_ROOT}/${scope}`;
   return { scopeDir, caseFile: `${scopeDir}/cases/${caseId}.json`, lockPath: `${scopeDir}/write.lock` };
@@ -463,6 +489,9 @@ function validateRecordSchema(record) {
 export function assertPayloadInvariants(record) {
   const payload = record.payload;
   requireValue(payload.identity.scope === payload.scope, 'identity-scope-mismatch');
+  // The displayed partition drives the held-out guard and replay bucketing,
+  // so a schema-valid record must not diverge from the identity partition.
+  requireValue(payload.identity.partition === payload.partition, 'identity-partition-mismatch');
   requireValue(payloadDigest(payload) === record.payload_digest, 'payload-digest-mismatch');
   for (const file of payload.fixture.files) {
     requireValue(digest(Buffer.from(file.bytes, 'utf8')) === file.sha256, 'fixture-digest-mismatch');
@@ -522,12 +551,19 @@ async function prepareNamespace(root) {
 }
 
 async function assertGuard(guard) {
-  requireValue(guard === null, guard?.code ?? 'writer-guard-failed', true);
-  requireValue(guard?.detail === undefined || guard?.detail === null || !hasCorrectionsLeak(guard), 'privacy-leak', true);
+  if (guard === null) return;
+  // Scan the guard payload before refusing on its code: a leaking guard
+  // detail is reduced to the typed privacy code, nothing engine-derived with
+  // hostile content is ever thrown through.
+  requireValue(!hasCorrectionsLeak(guard), 'privacy-leak', true);
+  requireValue(false, guard.code ?? 'writer-guard-failed', true);
 }
 
 // Windows case-only path/id collisions must fail closed: a directory already
-// holding a name that differs only by case cannot host a second entry.
+// holding a name that differs only by case cannot host a second entry. The
+// same rule applies to the scope directory itself: on a case-insensitive
+// filesystem `alpha` and `Alpha` would resolve to one store directory while
+// carrying two different logical identities (scope is an identity input).
 async function assertNoCaseCollision(store, scopeDir, targetName) {
   let entries = [];
   try { entries = await readdir(path.join(store.root, ...`${scopeDir}/cases`.split('/'))); } catch (error) {
@@ -539,9 +575,23 @@ async function assertNoCaseCollision(store, scopeDir, targetName) {
   requireValue(!conflict, 'case-collision', true);
 }
 
+async function assertNoScopeCollision(store, scope) {
+  let entries = [];
+  try { entries = await readdir(path.join(store.root, ...NAMESPACE_ROOT.split('/'))); } catch (error) {
+    if (error?.code === 'ENOENT') return;
+    throw error;
+  }
+  const lower = scope.toLowerCase();
+  const conflict = entries.find((name) => name.toLowerCase() === lower && name !== scope);
+  requireValue(!conflict, 'scope-collision', true);
+}
+
 async function readCaseRecord(store, scopeDir, filename, { strict } = { strict: true }) {
   const record = await store.load(`${scopeDir}/cases/${filename}`);
-  if (record === null || record.schema !== DECISION_CORRECTIONS_SCHEMA) {
+  if (record === null || record.schema !== DECISION_CORRECTIONS_SCHEMA
+    || !record.payload || typeof record.payload !== 'object') {
+    // Non-strict readers (list/run dedup scans) skip a record whose shape is
+    // broken beyond its schema token instead of crashing on its payload.
     if (strict) throw new WorkflowError('case-leaf-conflict', true);
     return null;
   }
@@ -586,7 +636,10 @@ async function resolveEffectivePayload(store, scope, caseId, input, identityMate
   const { caseFile } = casePaths(scope, caseId);
   const existing = await store.load(caseFile);
   if (existing !== null) {
+    // Leaf ownership is full-strength on the overwrite path: only a fully
+    // schema-valid, invariant-clean case of the same case_id may be replaced.
     requireValue(existing.schema === DECISION_CORRECTIONS_SCHEMA && existing.payload?.case_id === caseId, 'case-leaf-conflict', true);
+    validateRecordOrThrow(existing);
     requireValue(existing.payload.logical_identity === computeLogicalIdentity(identityMaterial), 'case-identity-collision', true);
     // Idempotency compares the rebuilt material against the stored payload
     // adopting the stored lifecycle flag: a re-save of the identical material
@@ -595,6 +648,13 @@ async function resolveEffectivePayload(store, scope, caseId, input, identityMate
     if (sameMaterial === existing.payload_digest) {
       return { payload: existing.payload, digestValue: existing.payload_digest, idempotent: true, existing };
     }
+    // Held-out immunity covers the revision flow: a fixture revision of a
+    // held-out case would author a new held-out outcome, which is exactly the
+    // tuning the partition immunity forbids. An idempotent re-save of the
+    // identical material stays allowed (it authors nothing), and first-time
+    // saves keep every partition available (the partition is chosen at save
+    // time).
+    requireValue(existing.payload.partition !== 'held_out', 'held-out-tuning', true);
     const version = existing.payload.fixture.version + 1;
     const payload = buildPayload(scope, input, identityMaterial, version);
     return { payload, digestValue: payloadDigest(payload), idempotent: false, existing };
@@ -625,6 +685,7 @@ export async function previewDecisionCorrection(input, options = {}) {
   const scope = identifier(input.scope);
   const caseId = identifier(input.case_id);
   const { scopeDir } = casePaths(scope, caseId);
+  await assertNoScopeCollision(store, scope);
   await assertNoCaseCollision(store, scopeDir, `${caseId}.json`);
   const identityMaterial = await normalizeIdentityInput(scope, input.partition, input.identity, store);
   const resolved = await resolveEffectivePayload(store, scope, caseId, input, identityMaterial);
@@ -640,7 +701,10 @@ export async function previewDecisionCorrection(input, options = {}) {
 
 // Evolution links are resolved in-process (show semantics): the check never
 // inspects evidence freshness or the current target — a historical receipt is
-// reported as such and never presented as an active application.
+// reported as such and never presented as an active application. A link to a
+// missing or invalid transaction is a typed refusal on every surface that
+// resolves it (save and show); only an existing transaction's rolled_back
+// state degrades to a report with the receipt kept visible.
 async function verifyEvolutionLink(casePayload, rootDir) {
   if (casePayload.evolution === null) return { linked: false, active: false };
   let view = null;
@@ -652,8 +716,7 @@ async function verifyEvolutionLink(casePayload, rootDir) {
     code = error.code;
   }
   if (view === null) {
-    requireValue(code === 'missing-or-invalid-transaction', code ?? 'missing-or-invalid-transaction', true);
-    return { linked: true, active: false, transaction_status: null, digest_matched: false, error: code };
+    requireValue(false, code ?? 'missing-or-invalid-transaction', true);
   }
   const digestMatched = view.proposal_digest === casePayload.evolution.proposal_digest;
   requireValue(digestMatched, 'proposal-mismatch', true);
@@ -670,6 +733,10 @@ async function loadCaseRecord(store, rootDir, scope, caseId) {
   const record = await store.load(caseFile);
   requireValue(record !== null && record.schema === DECISION_CORRECTIONS_SCHEMA && record.payload?.case_id === caseId, 'case-not-found', true);
   validateRecordOrThrow(record);
+  // The scope is part of the store path and of the identity: on a
+  // case-insensitive filesystem a case-only alias of the scope directory
+  // could otherwise surface a neighboring scope's record here.
+  requireValue(record.payload.scope === scope, 'case-not-found', true);
   return record;
 }
 
@@ -679,21 +746,32 @@ export async function saveDecisionCorrection(input, options = {}) {
   const scope = identifier(input.scope);
   const caseId = identifier(input.case_id);
   const { caseFile, scopeDir, lockPath } = casePaths(scope, caseId);
+  // The destination must never be one of the presented provenance inputs:
+  // saving over exactly the material the case cites would corrupt the record.
+  const sourceCollision = (input.identity?.input_paths ?? []).find((inputPath) => {
+    try { return portablePath(inputPath).toLowerCase() === caseFile.toLowerCase(); } catch { return false; }
+  });
+  requireValue(!sourceCollision, 'observation-source-collision', true);
   await assertGuard(await guardOwnedSurfaces(rootDir, [caseFile, `${NAMESPACE_ROOT}/.gitignore`, lockPath], options));
   await assertGuard(await prepareNamespace(rootDir));
   return store.lock(lockPath, async () => {
     // Dedup-check and write are serialized by the scope write lock: the
     // idempotent/revision/collision matrix is race-free within this helper's
-    // serialization model. Windows case-only collisions are refused
-    // deterministically before any payload resolution.
+    // serialization model. Windows case-only collisions (case and scope
+    // directory aliases) are refused deterministically before any payload
+    // resolution.
+    await assertNoScopeCollision(store, scope);
     await assertNoCaseCollision(store, scopeDir, `${caseId}.json`);
     const identityMaterial = await normalizeIdentityInput(scope, input.partition, input.identity, store);
     const resolved = await resolveEffectivePayload(store, scope, caseId, input, identityMaterial);
+    // The digest echo is checked unconditionally — including the idempotent
+    // branch: a repeated save of identical material with a stale or wrong
+    // echo is a digest-bound contract violation, not a free pass.
+    requireValue(input.payload_digest === resolved.digestValue, 'payload-mismatch', true);
     if (resolved.idempotent) {
       // Same identity + same payload -> no new record, confirmation untouched.
       return { ok: true, action: 'save', idempotent: true, case: resolved.existing };
     }
-    requireValue(input.payload_digest === resolved.digestValue, 'payload-mismatch', true);
     const identityOwner = await findIdentityOwner(store, scope, resolved.payload.logical_identity, caseId);
     if (identityOwner !== null) throw new WorkflowError('revision-conflict', true);
     if (resolved.payload.evolution !== null) {
@@ -774,27 +852,51 @@ export async function deleteDecisionCorrection(input, options = {}) {
   // a save holds the lock would race the dedup matrix.
   return store.lock(`${scopeDir}/write.lock`, async () => {
     const { unlink } = await import('node:fs/promises');
+    const gitGuard = options.gitGuard ?? verifyObservationIgnored;
     const absolute = path.join(store.root, ...caseFile.split('/'));
     let existed = false;
+    // On a case-insensitive filesystem the requested path may resolve to a
+    // neighboring case whose name differs only by case: the record under the
+    // resolved leaf must prove it belongs to the requested case_id (and
+    // scope) before anything is removed. An absent case honestly reports
+    // `deleted: false`.
+    let owned = false;
     try {
+      const record = await store.load(caseFile);
+      if (record !== null) {
+        // A leaf that resolves to a different case (Windows case-only alias)
+        // is a collision, not an absent case: refuse instead of silently
+        // reporting `deleted: false`.
+        requireValue(record.schema === DECISION_CORRECTIONS_SCHEMA
+          && record.payload?.case_id === caseId && record.payload?.scope === scope, 'case-collision', true);
+        owned = true;
+      }
+    } catch (error) {
+      if (error instanceof WorkflowError && error.code === 'invalid-state') owned = false;
+      else if (error instanceof WorkflowError) throw error;
+      else throw error;
+    }
+    if (owned) {
       // Deleting a tracked file would shift the QA `actual_diff` channel, so
       // the guard above already refused any tracked owned surface; removal
       // itself only touches ignored runtime state.
       await unlink(absolute);
       existed = true;
-    } catch (error) {
-      if (error?.code !== 'ENOENT') throw error;
     }
     // Cleanup of owned transient surfaces: a crashed writer may leave temp
     // siblings; the case-scoped cleanup never touches other cases or the
-    // namespace .gitignore. A repeated delete honestly reports `deleted:false`.
+    // namespace .gitignore, and it removes only effectively-ignored names —
+    // a force-added tracked temp sibling would shift the QA `actual_diff`
+    // channel if deleted, so it is left in place. A repeated delete honestly
+    // reports `deleted: false`.
     let entries = [];
     try { entries = await readdir(path.join(store.root, ...`${scopeDir}/cases`.split('/'))); } catch { entries = []; }
     for (const name of entries) {
-      if (name.startsWith(`${caseId}.json.`) && name.endsWith('.tmp')) {
-        await rm(path.join(store.root, ...`${scopeDir}/cases`.split('/'), name), { force: true });
-        existed = true;
-      }
+      if (!name.startsWith(`${caseId}.json.`) || !name.endsWith('.tmp')) continue;
+      const verdict = await gitGuard(rootDir, `${scopeDir}/cases/${name}`, options).catch(() => ({ ok: false }));
+      if (!verdict.ok || verdict.tracked) continue;
+      await rm(path.join(store.root, ...`${scopeDir}/cases`.split('/'), name), { force: true });
+      existed = true;
     }
     return { ok: true, action: 'delete', deleted: existed };
   });
@@ -805,15 +907,18 @@ export async function listDecisionCorrections(input, options = {}) {
   const store = await storeFor(rootDir);
   const scope = identifier(input.scope);
   const { scopeDir } = casePaths(scope, 'x');
+  // Request validation happens before the empty-scope fast path, so a
+  // malformed limit/filter refusal is symmetric whether or not any case
+  // exists yet.
+  const limit = input.limit === undefined ? MAX_RUN_CASES : input.limit;
+  requireValue(Number.isInteger(limit) && limit >= 1 && limit <= MAX_RUN_CASES, 'invalid-limit');
+  if (input.status_filter !== undefined) requireValue(STATUSES.includes(input.status_filter), 'invalid-status-filter');
+  if (input.partition_filter !== undefined) requireValue(PARTITIONS.includes(input.partition_filter), 'invalid-partition-filter');
   let entries = [];
   try { entries = await readdir(path.join(store.root, ...`${scopeDir}/cases`.split('/'))); } catch (error) {
     if (error?.code === 'ENOENT') return { ok: true, action: 'list', scope, cases: [] };
     throw error;
   }
-  const limit = input.limit === undefined ? MAX_RUN_CASES : input.limit;
-  requireValue(Number.isInteger(limit) && limit >= 1 && limit <= MAX_RUN_CASES, 'invalid-limit');
-  if (input.status_filter !== undefined) requireValue(STATUSES.includes(input.status_filter), 'invalid-status-filter');
-  if (input.partition_filter !== undefined) requireValue(PARTITIONS.includes(input.partition_filter), 'invalid-partition-filter');
   // Sidecars (write.lock, *.tmp, .gitignore) and foreign names never enter
   // the listing: only schema-shaped case files are projected.
   const caseFiles = entries.filter((name) => /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}\.json$/.test(name)).sort();
@@ -825,6 +930,10 @@ export async function listDecisionCorrections(input, options = {}) {
       throw error;
     });
     if (record === null) continue;
+    // On a case-insensitive filesystem an alias scope directory would resolve
+    // to a neighboring scope's cases: only records whose stored scope equals
+    // the requested scope are listed.
+    if (record.payload.scope !== scope) continue;
     if (input.status_filter !== undefined && record.status !== input.status_filter) continue;
     if (input.partition_filter !== undefined && record.payload.partition !== input.partition_filter) continue;
     summaries.push({
@@ -862,21 +971,45 @@ export async function showDecisionCorrection(input, options = {}) {
 // never against the real project tree.
 // ---------------------------------------------------------------------------
 
-function extractOutcomeSignature(text) {
+export function extractOutcomeSignature(text) {
   const parsed = parseStrictJson(text);
-  // Observation envelopes carry `run_status`; the advisory not_run/failure
-  // envelopes carry `state` — both map onto the same honest outcome.
+  // Run status lives in different places per producer: the advisory
+  // not_run/failure envelopes carry `state`, requirement-lint observations
+  // carry top-level `run_status`, and claim-evidence / trace-link
+  // observations carry `semantic.run_status`. All map onto the same honest
+  // outcome; a producer whose status cannot be located is honestly unknown.
   const runStatus = typeof parsed?.run_status === 'string' ? parsed.run_status
-    : typeof parsed?.state === 'string' ? parsed.state : null;
-  const findingTypes = [...new Set((Array.isArray(parsed?.findings) ? parsed.findings : [])
-    .map((finding) => (finding && typeof finding.type === 'string' && finding.type.length > 0 ? finding.type : null))
-    .filter((value) => value !== null))].sort();
-  const diagnosticCodes = [...new Set((Array.isArray(parsed?.diagnostics) ? parsed.diagnostics : [])
-    .map((entry) => (entry && typeof entry.code === 'string' && entry.code.length > 0 ? entry.code : null))
-    .filter((value) => value !== null))].sort();
+    : typeof parsed?.state === 'string' ? parsed.state
+      : typeof parsed?.semantic?.run_status === 'string' ? parsed.semantic.run_status : null;
+  const parts = [];
+  const addPart = (label, values) => {
+    const clean = [...new Set(values.filter((value) => typeof value === 'string' && value.length > 0))].sort();
+    parts.push(`${label}=${clean.length > 0 ? clean.join('|') : 'none'}`);
+  };
+  addPart('run_status', runStatus === null ? [] : [runStatus]);
+  addPart('findings', (Array.isArray(parsed?.findings) ? parsed.findings : [])
+    .map((finding) => (finding && typeof finding.type === 'string' ? finding.type : null)));
+  // Consumer-specific outcome material: claim-evidence carries quote checks
+  // and semantic verdicts, trace-link carries the structural outcome and the
+  // emitted relation kinds. Sections are included only when the producer
+  // defines them, so a signature stays deterministic per observation shape.
+  if (parsed && typeof parsed === 'object' && Array.isArray(parsed.structural?.pairs)) {
+    addPart('quote_checks', parsed.structural.pairs.map((pair) => (pair && typeof pair.quote_check === 'string' ? pair.quote_check : null)));
+  }
+  if (parsed && typeof parsed === 'object' && Array.isArray(parsed.semantic?.assessments)) {
+    addPart('verdicts', parsed.semantic.assessments.map((assessment) => (assessment && typeof assessment.verdict === 'string' ? assessment.verdict : null)));
+  }
+  if (parsed && typeof parsed === 'object' && typeof parsed.structural?.outcome === 'string') {
+    addPart('outcome', [parsed.structural.outcome]);
+  }
+  if (parsed && typeof parsed === 'object' && Array.isArray(parsed.structural?.edges)) {
+    addPart('relations', parsed.structural.edges.map((edge) => (edge && typeof edge.relation === 'string' ? edge.relation : null)));
+  }
+  addPart('diagnostics', (Array.isArray(parsed?.diagnostics) ? parsed.diagnostics : [])
+    .map((entry) => (entry && typeof entry.code === 'string' ? entry.code : null)));
   return {
     run_status: runStatus,
-    signature: `run_status=${runStatus ?? 'unknown'}; findings=${findingTypes.length > 0 ? findingTypes.join('|') : 'none'}; diagnostics=${diagnosticCodes.length > 0 ? diagnosticCodes.join('|') : 'none'}`,
+    signature: parts.join('; '),
   };
 }
 
@@ -894,13 +1027,25 @@ const REPLAY_INPUT_FLAGS = Object.freeze({
   trace_link_suggestions: '--test',
 });
 
+// Trace-link reads its requirement/symbol material exclusively from its own
+// custody manifest at `.ai-factory/traces/<change-id>/lekalo-trace-manifest.json`
+// relative to the replay root; a support file presented as `--test` would be
+// refused as invalid-test-input. The replay convention therefore keeps every
+// fixture file under `.ai-factory/` in place (the bundle must carry the
+// custody manifest there) and presents only the files outside it as tests.
 function synthesizeReplayArgs(consumer, replayArgs, fixtureFiles) {
   const inputFlag = REPLAY_INPUT_FLAGS[consumer];
   const synthesized = [...replayArgs];
   if (consumer === 'claim_evidence_check') {
     // The pairs envelope is the primary presented input; remaining fixture
-    // files are the sources its refs read from the replay root.
+    // files are the sources its refs read from the replay root. An envelope
+    // that does not parse as a claim-evidence envelope degrades honestly:
+    // the replayed producer refuses it and the outcome is not_run.
     synthesized.push(inputFlag, fixtureFiles[0].path);
+  } else if (consumer === 'trace_link_suggestions') {
+    for (const file of fixtureFiles) {
+      if (!file.path.startsWith('.ai-factory/')) synthesized.push(inputFlag, file.path);
+    }
   } else {
     for (const file of fixtureFiles) synthesized.push(inputFlag, file.path);
   }
@@ -910,7 +1055,7 @@ function synthesizeReplayArgs(consumer, replayArgs, fixtureFiles) {
 
 function freshPartitionCounts() {
   return Object.fromEntries(PARTITIONS.map((partition) => [partition, {
-    cases: 0, holds: 0, false_regression: 0, label_change: 0, ambiguous: 0, not_run: 0, stale: 0,
+    cases: 0, holds: 0, false_regression: 0, label_change: 0, ambiguous: 0, not_run: 0, stale: 0, report_only: 0,
   }]));
 }
 
@@ -932,7 +1077,14 @@ export async function runDecisionCorrectionReplay(input, options = {}) {
   }
   const limit = runInput.limit === undefined ? MAX_RUN_CASES : runInput.limit;
   requireValue(Number.isInteger(limit) && limit >= 1 && limit <= MAX_RUN_CASES, 'invalid-limit');
-  const caseFiles = entries.filter((name) => /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}\.json$/.test(name)).sort().slice(0, limit);
+  // An explicitly selected case must not silently fall out of the run because
+  // of an alphabetical position past the limit: the wanted filter applies
+  // before the limit slices.
+  const caseFiles = entries
+    .filter((name) => /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}\.json$/.test(name))
+    .filter((name) => wanted === null || wanted.includes(name.replace(/\.json$/, '')))
+    .sort()
+    .slice(0, limit);
   const results = [];
   const counts = freshPartitionCounts();
   for (const name of caseFiles) {
@@ -942,6 +1094,14 @@ export async function runDecisionCorrectionReplay(input, options = {}) {
     });
     if (record === null) continue;
     if (wanted !== null && !wanted.includes(record.payload.case_id)) continue;
+    // Full schema/invariant validation on the replay path: the stored record
+    // must be provably clean before its fixture bytes are materialized
+    // anywhere or fed to an engine.
+    try {
+      validateRecordOrThrow(record);
+    } catch {
+      continue;
+    }
     const payload = record.payload;
     const partitionCounts = counts[payload.partition];
     partitionCounts.cases += 1;
@@ -962,6 +1122,14 @@ export async function runDecisionCorrectionReplay(input, options = {}) {
       // reports them separately instead of scoring them.
       partitionCounts.ambiguous += 1;
       results.push({ ...base, outcome: 'ambiguous' });
+      continue;
+    }
+    if (payload.partition === 'held_out') {
+      // Held-out is strictly report-only: the runner never measures a
+      // held-out case — no engine call, no signature, no scored outcome —
+      // so nothing about the held-out partition can feed tuning.
+      partitionCounts.report_only += 1;
+      results.push({ ...base, outcome: 'report_only' });
       continue;
     }
     // Stale detection BEFORE any engine call: drifted input revisions or a
@@ -989,7 +1157,12 @@ export async function runDecisionCorrectionReplay(input, options = {}) {
     const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'aif-dc-replay-'));
     try {
       for (const file of payload.fixture.files) {
-        const target = path.join(tempRoot, ...file.path.split('/'));
+        // The stored record re-proves its own containment here: every fixture
+        // path must re-pass the portable-path rules so the write below stays
+        // inside the replay temp root by construction.
+        const safePath = portablePath(file.path);
+        const target = path.join(tempRoot, ...safePath.split('/'));
+        requireValue(target.startsWith(tempRoot + path.sep), 'unsafe-fixture-path');
         await mkdir(path.dirname(target), { recursive: true });
         await writeFile(target, file.bytes, 'utf8');
       }
@@ -1055,6 +1228,13 @@ export async function runDecisionCorrectionReplay(input, options = {}) {
   await assertGuard(await guardOwnedSurfaces(rootDir, [runFile, `${NAMESPACE_ROOT}/.gitignore`, `${scopeDir}/write.lock`], options));
   await assertGuard(await prepareNamespace(rootDir));
   return store.lock(`${scopeDir}/write.lock`, async () => {
+    // Run-record leaf ownership: a run id collision (however unlikely for a
+    // fresh random id) must never silently overwrite an existing run record.
+    const existingRun = await store.load(runFile).catch((error) => {
+      if (error instanceof WorkflowError) return { invalid: true };
+      throw error;
+    });
+    requireValue(!existingRun, 'run-record-conflict', true);
     const persisted = { ...runRecord, written: true };
     await store.save(runFile, persisted);
     return { ok: true, action: 'run', preview: false, run: persisted };
@@ -1138,8 +1318,9 @@ async function readStdinBounded(limit, options) {
 function sanitizeEnvelope(envelope) {
   if (!hasCorrectionsLeak(envelope)) return envelope;
   // Defense in depth: an envelope that trips the leak predicate is reduced to
-  // its refusal code; nothing engine-derived is echoed.
-  return { ok: envelope.ok === true, code: 'privacy-leak' };
+  // a blocked refusal; nothing engine-derived is echoed, whatever the
+  // envelope's original ok flag was.
+  return { ok: false, code: 'privacy-leak' };
 }
 
 export async function runDecisionCorrectionsCommand(argv = process.argv.slice(2), options = {}) {
@@ -1147,7 +1328,11 @@ export async function runDecisionCorrectionsCommand(argv = process.argv.slice(2)
   const emit = (value, json) => output(json ? `${JSON.stringify(value, null, 2)}\n` : `${JSON.stringify(value)}\n`);
   const parsed = parseDecisionCorrectionsArgs(argv);
   if (!parsed.ok) {
-    emit({ ok: false, code: 'invalid-usage', detail: parsed.error.slice(0, 200) }, argv.includes('--json'));
+    // The usage error text mirrors caller argv (unknown flags/actions), so it
+    // passes through the same leak scan before any print: a token-, URL-, or
+    // path-shaped argv fragment is never echoed back.
+    const envelope = sanitizeEnvelope({ ok: false, code: 'invalid-usage', detail: parsed.error.slice(0, 200) });
+    emit(envelope, argv.includes('--json'));
     return 2;
   }
   try {
@@ -1163,12 +1348,24 @@ export async function runDecisionCorrectionsCommand(argv = process.argv.slice(2)
     requireValue(input && typeof input === 'object' && !Array.isArray(input), 'invalid-json');
     if (parsed.write) input.write = true;
     for (const [key, value] of Object.entries(parsed.flags)) {
-      requireValue(!Object.hasOwn(input, key) || input[key] === value, 'conflicting-input');
-      input[key] = key === 'limit' ? Number(value) : value;
+      // Compare in the same domain as the body field: the limit flag arrives
+      // as a string but the stdin field is a number, so coercion happens
+      // before the conflict check, not after.
+      const coerced = key === 'limit' ? Number(value) : value;
+      requireValue(!Object.hasOwn(input, key) || input[key] === coerced, 'conflicting-input');
+      input[key] = coerced;
     }
     const cliOptions = { ...options, enabled: parsed.enabled !== undefined ? parsed.enabled : options.enabled };
     const result = await decisionCorrectionsCommand(parsed.action, input, cliOptions);
-    emit(sanitizeEnvelope({ ok: true, ...result }), parsed.json);
+    const envelope = sanitizeEnvelope({ ok: true, ...result });
+    if (envelope.ok !== true) {
+      // A success result whose envelope trips the leak predicate is reduced
+      // to a blocked refusal and exits blocked, not silently as ok:false with
+      // exit 0.
+      emit(envelope, parsed.json);
+      return 1;
+    }
+    emit(envelope, parsed.json);
     return 0;
   } catch (error) {
     const blocked = error instanceof WorkflowError && error.blocked;

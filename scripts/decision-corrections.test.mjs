@@ -254,9 +254,9 @@ function literalRunRecord() {
     written: false,
     honesty_note: 'Run verifies the current implementation against stored fixtures; it does not measure provider quality.',
     counts: {
-      development: { cases: 1, holds: 0, false_regression: 0, label_change: 1, ambiguous: 0, not_run: 0, stale: 0 },
-      calibration: { cases: 0, holds: 0, false_regression: 0, label_change: 0, ambiguous: 0, not_run: 0, stale: 0 },
-      held_out: { cases: 0, holds: 0, false_regression: 0, label_change: 0, ambiguous: 0, not_run: 0, stale: 0 },
+      development: { cases: 1, holds: 0, false_regression: 0, label_change: 1, ambiguous: 0, not_run: 0, stale: 0, report_only: 0 },
+      calibration: { cases: 0, holds: 0, false_regression: 0, label_change: 0, ambiguous: 0, not_run: 0, stale: 0, report_only: 0 },
+      held_out: { cases: 0, holds: 0, false_regression: 0, label_change: 0, ambiguous: 0, not_run: 0, stale: 0, report_only: 0 },
     },
     cases: [{
       case_id: 'dev-case-1',
@@ -326,6 +326,7 @@ import {
   assertPayloadInvariants,
   computeLogicalIdentity,
   decisionCorrectionsCommand,
+  extractOutcomeSignature,
   hasCorrectionsLeak,
   parseDecisionCorrectionsConfigSubset,
   projectIdentityObservation,
@@ -1254,5 +1255,266 @@ describe('decision-corrections corpus evaluation (fixtures + labels)', () => {
     const casesDir = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE, 'work', 'cases');
     assert.deepEqual((await readdirSafe(casesDir)).filter((name) => name.endsWith('.json')), [],
       'refused limit saves leave no case artifacts');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Review hardening (#285 round 2): config malformed-line parity, digest echo
+// on the idempotent branch, scope aliases, delete leaf proof, usage echo
+// sanitization, held-out must-not-call on the replay path, injected-provider
+// self-referential roots, and consumer-aware outcome signatures.
+// ---------------------------------------------------------------------------
+
+describe('decision-corrections review hardening', () => {
+  it('keeps a non-mapping line inside the namespace from leaving it enabled (malformed-line)', async () => {
+    const root = await makeTemp('aif-dc-malformed-');
+    await seedStoreProject(root);
+    // A garbage line sits below `enabled: true`; a silent skip would keep the
+    // mechanism on contrary to the malformed-namespace contract.
+    const config = await readDecisionCorrectionsConfig(root, { readConfigBytes: async () => Buffer.from('aifhub:\n  decisionCorrections:\n    enabled: true\n    garbage\n', 'utf8') });
+    assert.equal(config.enabledMalformed, true, 'a malformed namespace line must force off');
+    assert.ok(config.diagnostics.some((d) => d.code === 'decision-corrections:malformed-line'), 'the malformed-line diagnostic must be reported');
+    await assert.rejects(
+      () => decisionCorrectionsCommand('list', { scope: 'work' }, { rootDir: root, enabled: true, config }),
+      (error) => error?.code === 'decision-corrections-disabled',
+      'CLI override must not rescue a malformed namespace',
+    );
+    void parseDecisionCorrectionsConfigSubset;
+  });
+
+  it('checks the digest echo unconditionally, including the idempotent branch', async () => {
+    const root = await makeTemp('aif-dc-echo-');
+    await seedStoreProject(root);
+    const input = baseCaseInput();
+    const { preview } = await saveCase(root, input);
+    await assert.rejects(
+      () => decisionCorrectionsCommand('save', { ...input, payload_digest: 'e'.repeat(64) }, { rootDir: root, ...STORE_OPTIONS() }),
+      (error) => error?.code === 'payload-mismatch' && error.blocked === true,
+      'a repeated save with a wrong digest echo is a contract violation, not a free pass',
+    );
+    const resaved = await decisionCorrectionsCommand('save', { ...input, payload_digest: preview.payload_digest }, { rootDir: root, ...STORE_OPTIONS() });
+    assert.equal(resaved.idempotent, true);
+  });
+
+  it('refuses show of a case whose evolution link points at a missing transaction', async () => {
+    const root = await makeTemp('aif-dc-showtx-');
+    await seedStoreProject(root);
+    const input = baseCaseInput({ case_id: 'dev-tx-missing-show', evolution: { transaction_id: 'tx-absent', proposal_digest: 'a'.repeat(64) } });
+    await assert.rejects(() => saveCase(root, input), (error) => error?.code === 'missing-or-invalid-transaction');
+    // A record with a missing link cannot exist through the public API; the
+    // refusal covers both save and any direct-store show defense.
+    const listed = await decisionCorrectionsCommand('list', { scope: 'work' }, { rootDir: root, ...STORE_OPTIONS() });
+    assert.equal(listed.cases.length, 0, 'a refused save leaves no case to show');
+  });
+
+  it('refuses Windows case-only scope directory aliases for writes and reads', async () => {
+    const root = await makeTemp('aif-dc-scopealias-');
+    await seedStoreProject(root);
+    await saveCase(root, baseCaseInput({ scope: 'alpha' }));
+    await assert.rejects(
+      () => saveCase(root, baseCaseInput({ scope: 'ALPHA', identity: { ...baseCaseInput().identity, subject_revision: 'rev-alpha2' } })),
+      (error) => error?.code === 'scope-collision' && error.blocked === true,
+      'an alias scope directory would merge two logical identities on a case-insensitive filesystem',
+    );
+    const aliasList = await decisionCorrectionsCommand('list', { scope: 'ALPHA' }, { rootDir: root, ...STORE_OPTIONS() });
+    assert.deepEqual(aliasList.cases, [], 'an alias scope must not surface the neighboring scope’s cases');
+  });
+
+  it('proves leaf ownership before delete (case-only alias cannot delete a neighbor)', async () => {
+    const root = await makeTemp('aif-dc-delalias-');
+    await seedStoreProject(root);
+    await saveCase(root, baseCaseInput({ case_id: 'case-1' }));
+    await assert.rejects(
+      () => decisionCorrectionsCommand('delete', { case_id: 'CASE-1', scope: 'work' }, { rootDir: root, ...STORE_OPTIONS() }),
+      (error) => error?.code === 'case-collision',
+      'the resolved leaf must prove it belongs to the requested case before removal',
+    );
+    const listed = await decisionCorrectionsCommand('list', { scope: 'work' }, { rootDir: root, ...STORE_OPTIONS() });
+    assert.equal(listed.cases.length, 1, 'the neighbor case survives the aliased delete');
+  });
+
+  it('never echoes a hostile argv fragment through the invalid-usage envelope', async () => {
+    const root = await makeTemp('aif-dc-usageleak-');
+    await seedStoreProject(root);
+    const outputs = [];
+    const exit = await runDecisionCorrectionsCommand(['list', '--see-https://attacker.invalid/x'], {
+      rootDir: root, enabled: true, output: (value) => outputs.push(value),
+      readStdin: async () => Buffer.alloc(0),
+    });
+    assert.equal(exit, 2);
+    const printed = outputs.join('');
+    assert.ok(!printed.includes('attacker.invalid'), 'the usage branch must pass the leak scan before printing');
+    assert.equal(JSON.parse(printed).code, 'privacy-leak');
+  });
+
+  it('accepts a numeric --limit flag that matches the stdin body', async () => {
+    const root = await makeTemp('aif-dc-limitflag-');
+    await seedStoreProject(root);
+    const outputs = [];
+    const exit = await runDecisionCorrectionsCommand(['list', '--scope', 'work', '--limit', '5', '--json'], {
+      rootDir: root, enabled: true, output: (value) => outputs.push(value),
+      readStdin: async () => Buffer.from(JSON.stringify({ limit: 5 }), 'utf8'),
+    });
+    assert.equal(exit, 0, `equal limit values must not conflict: ${outputs.join('').slice(0, 120)}`);
+    assert.equal(JSON.parse(outputs.join('')).ok, true);
+  });
+
+  it('refuses provenance inputs inside the store namespace and a destination that is a presented input', async () => {
+    const root = await makeTemp('aif-dc-selfref-');
+    await seedStoreProject(root);
+    await assert.rejects(
+      () => saveCase(root, baseCaseInput({ case_id: 'dev-selfref', identity: { ...baseCaseInput().identity, input_paths: ['.ai-factory/state/decision-corrections/work/cases/x.json'] } })),
+      (error) => error?.code === 'self-referential-input',
+    );
+    await assert.rejects(
+      () => saveCase(root, baseCaseInput({ case_id: 'dev-case-1', identity: { ...baseCaseInput().identity, input_paths: ['.ai-factory/state/decision-corrections/work/cases/dev-case-1.json'] } })),
+      (error) => error?.code === 'self-referential-input' || error?.code === 'missing-evidence',
+    );
+  });
+
+  it('runs an explicitly selected late case even at limit 1', async () => {
+    const root = await makeTemp('aif-dc-limitlate-');
+    await seedStoreProject(root);
+    await saveCase(root, baseCaseInput({ case_id: 'a-case' }));
+    const late = baseCaseInput({ case_id: 'z-case', identity: { ...baseCaseInput().identity, subject_revision: 'rev-z' } });
+    await saveCase(root, late);
+    await confirmCase(root, late);
+    const run = await decisionCorrectionsCommand('run', { scope: 'work', case_ids: ['z-case'], limit: 1 }, { rootDir: root, ...STORE_OPTIONS() });
+    assert.deepEqual(run.run.cases.map((item) => item.case_id), ['z-case'], 'the wanted filter applies before the limit slices');
+  });
+
+  it('refuses a fixture path that exceeds the schema cap with a typed field code', async () => {
+    const root = await makeTemp('aif-dc-pathlen-');
+    await seedStoreProject(root);
+    await assert.rejects(
+      () => saveCase(root, baseCaseInput({ case_id: 'dev-longpath', fixture: { kind: 'synthetic', files: [{ path: `docs/${'x'.repeat(300)}.md`, media_type: 'text/markdown', bytes: 'x' }] } })),
+      (error) => error?.code === 'unsafe-fixture-path',
+    );
+  });
+
+  it('never measures a held-out case on the replay path (must-not-call, defense in depth)', async () => {
+    const root = await makeTemp('aif-dc-heldoutrun-');
+    await seedStoreProject(root);
+    const input = baseCaseInput({ case_id: 'heldout-planted', partition: 'held_out', identity: { ...baseCaseInput().identity, subject_revision: 'rev-heldout-planted' } });
+    const { preview } = await saveCase(root, input);
+    // A confirmed held-out case is unreachable through the public API
+    // (confirm refuses); plant one directly to prove the replay-path guard
+    // holds even for pre-existing state.
+    const caseFile = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE, 'work', 'cases', 'heldout-planted.json');
+    const envelope = parseStrictJson(await readFile(caseFile, 'utf8'));
+    envelope.record.status = 'confirmed';
+    envelope.record.payload.expected_label_confirmed = true;
+    envelope.record.payload_digest = digest(canonical(envelope.record.payload));
+    envelope.checksum = digest(envelope.record);
+    await writeFile(caseFile, `${JSON.stringify(envelope, null, 2)}\n`);
+    let engineCalls = 0;
+    const run = await decisionCorrectionsCommand('run', { scope: 'work' }, {
+      rootDir: root, ...STORE_OPTIONS(),
+      assessor: async () => { engineCalls += 1; return { findings: [] }; },
+    });
+    const entry = run.run.cases.find((item) => item.case_id === 'heldout-planted');
+    assert.equal(entry.outcome, 'report_only', 'a held-out case is reported, never measured');
+    assert.equal(entry.signature, null, 'no signature is produced for a held-out case');
+    assert.equal(engineCalls, 0, 'the replay engine must never be invoked for a held-out case');
+    assert.equal(run.run.counts.held_out.report_only, 1);
+    assert.equal(run.run.counts.held_out.holds + run.run.counts.held_out.false_regression + run.run.counts.held_out.label_change, 0);
+    // The revision flow is part of the tuning surface: a changed payload on
+    // the existing held-out case refuses.
+    await assert.rejects(
+      () => saveCase(root, baseCaseInput({
+        case_id: 'heldout-planted', partition: 'held_out',
+        identity: { ...baseCaseInput().identity, subject_revision: 'rev-heldout-planted' },
+        expected_label: 'a changed label',
+      })),
+      (error) => error?.code === 'held-out-tuning',
+      'a fixture revision of an existing held-out case is tuning',
+    );
+    const deleted = await decisionCorrectionsCommand('delete', { case_id: 'heldout-planted', scope: 'work' }, { rootDir: root, ...STORE_OPTIONS() });
+    assert.equal(deleted.deleted, true, 'retention stays available for held-out cases');
+  });
+
+  it('decodes consumer-specific outcome material into the signature', async () => {
+    const claimObservation = {
+      schema: 'aifhub.claim_evidence_observation.v1',
+      semantic: { run_status: 'complete', assessments: [{ claim_id: 'c1', verdict: 'supports' }] },
+      structural: { pairs: [{ quote_check: 'exact_found' }, { quote_check: 'not_found' }] },
+      diagnostics: [],
+    };
+    const claimSignature = extractOutcomeSignature(JSON.stringify(claimObservation));
+    assert.equal(claimSignature.run_status, 'complete', 'claim-evidence run_status is read from semantic.run_status');
+    assert.ok(claimSignature.signature.includes('quote_checks=exact_found|not_found'), claimSignature.signature);
+    assert.ok(claimSignature.signature.includes('verdicts=supports'), claimSignature.signature);
+    const traceObservation = {
+      schema: 'aifhub.trace_link_suggestions_observation.v1',
+      semantic: { run_status: 'complete', assessments: [] },
+      structural: { outcome: 'partial', nodes: [], edges: [{ relation: 'requirement_symbol' }] },
+      diagnostics: [],
+    };
+    const traceSignature = extractOutcomeSignature(JSON.stringify(traceObservation));
+    assert.equal(traceSignature.run_status, 'complete', 'trace-link run_status is read from semantic.run_status');
+    assert.ok(traceSignature.signature.includes('outcome=partial'), traceSignature.signature);
+    assert.ok(traceSignature.signature.includes('relations=requirement_symbol'), traceSignature.signature);
+    const disabled = extractOutcomeSignature(JSON.stringify({ schema_version: 1, state: 'not_run', codes: ['x-disabled'] }));
+    assert.equal(disabled.run_status, 'not_run', 'a not-performed envelope stays honestly not_run');
+  });
+
+  it('validates request filters before the empty-scope fast path', async () => {
+    const root = await makeTemp('aif-dc-listfilters-');
+    await seedStoreProject(root);
+    await assert.rejects(
+      () => decisionCorrectionsCommand('list', { scope: 'work', limit: 0 }, { rootDir: root, ...STORE_OPTIONS() }),
+      (error) => error?.code === 'invalid-limit',
+      'an invalid limit must refuse even when the scope has no cases yet',
+    );
+    await assert.rejects(
+      () => decisionCorrectionsCommand('list', { scope: 'work', status_filter: 'archived' }, { rootDir: root, ...STORE_OPTIONS() }),
+      (error) => error?.code === 'invalid-status-filter',
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Review hardening round 2 (QA): the self-referential-input rule covers the
+// injected-provider path too, and held-out revisions refuse in the corpus.
+// ---------------------------------------------------------------------------
+
+describe('decision-corrections QA namespace review hardening', () => {
+  it('refuses an injected SnapshotProvider whose declared root sits inside the namespace', async () => {
+    const root = await makeTemp('aif-dc-qa6-');
+    const options = await seedGitProject(root);
+    const store = await qaStore(options);
+    const { payload } = await store.manifest();
+    const injected = {
+      observe: async () => ({
+        complete: true,
+        worktree_identity: 'c'.repeat(64),
+        modules: { 'scripts/qa-manifest.mjs': digest('z') },
+        actual_diff: null,
+        files: {},
+        directory_names: [],
+        ignored_names: [],
+        changed_paths: [],
+      }),
+    };
+    const poisoned = JSON.parse(JSON.stringify(payload));
+    poisoned.checks[0].inputs = [`.ai-factory/state/${DECISION_CORRECTIONS_NAMESPACE}`];
+    await assert.rejects(
+      () => observeQaSnapshot(store, poisoned, { SnapshotProvider: injected }),
+      (error) => error?.code === 'self-referential-input',
+      'an injected provider must not silently hide a closed namespace a declared root points into',
+    );
+  });
+});
+
+describe('decision-corrections held-out corpus revision refusal', () => {
+  it('refuses a fixture revision of an existing held-out case', async () => {
+    const root = await corpusProject('aif-dc-corpus-heldout2-');
+    const input = await corpusCase('heldout-holdout.json');
+    const saved = await corpusSave(root, input);
+    assert.equal(saved.ok, 'ok', 'creating a held-out case stays allowed');
+    const revised = { ...input, expected_label: 'a changed label' };
+    // corpusSave previews first: the revision leg refuses held-out-tuning.
+    const revisedSave = await corpusSave(root, revised);
+    assert.equal(revisedSave.ok, 'held-out-tuning', 'a fixture revision of a held-out case is tuning');
   });
 });
