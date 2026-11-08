@@ -143,6 +143,11 @@
       "name": "aifhub-trace-link-suggestions",
       "description": "Run opt-in advisory trace link suggestions over the closed typed graph of requirements, symbols, scenarios, and tests without changing evidence or authorizing progression.",
       "module": "./commands/aifhub-trace-link-suggestions.mjs"
+    },
+    {
+      "name": "aifhub-context-selection-overlay",
+      "description": "Run opt-in advisory context selection over the exact baseline SessionBrief for presented supporting candidates without changing evidence, replacing the protected minimum, or authorizing progression.",
+      "module": "./commands/aifhub-context-selection-overlay.mjs"
     }
   ],
   "skills": [
