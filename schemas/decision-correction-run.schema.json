@@ -97,7 +97,8 @@
               "stale",
               "skipped_draft",
               "unsupported_consumer",
-              "report_only"
+              "report_only",
+              "invalid_record"
             ]
           },
           "signature": {
@@ -175,6 +176,11 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 100000
+        },
+        "invalid_record": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
         }
       },
       "required": [
@@ -185,7 +191,8 @@
         "ambiguous",
         "not_run",
         "stale",
-        "report_only"
+        "report_only",
+        "invalid_record"
       ]
     }
   }

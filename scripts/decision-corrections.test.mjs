@@ -254,9 +254,9 @@ function literalRunRecord() {
     written: false,
     honesty_note: 'Run verifies the current implementation against stored fixtures; it does not measure provider quality.',
     counts: {
-      development: { cases: 1, holds: 0, false_regression: 0, label_change: 1, ambiguous: 0, not_run: 0, stale: 0, report_only: 0 },
-      calibration: { cases: 0, holds: 0, false_regression: 0, label_change: 0, ambiguous: 0, not_run: 0, stale: 0, report_only: 0 },
-      held_out: { cases: 0, holds: 0, false_regression: 0, label_change: 0, ambiguous: 0, not_run: 0, stale: 0, report_only: 0 },
+      development: { cases: 1, holds: 0, false_regression: 0, label_change: 1, ambiguous: 0, not_run: 0, stale: 0, report_only: 0, invalid_record: 0 },
+      calibration: { cases: 0, holds: 0, false_regression: 0, label_change: 0, ambiguous: 0, not_run: 0, stale: 0, report_only: 0, invalid_record: 0 },
+      held_out: { cases: 0, holds: 0, false_regression: 0, label_change: 0, ambiguous: 0, not_run: 0, stale: 0, report_only: 0, invalid_record: 0 },
     },
     cases: [{
       case_id: 'dev-case-1',
@@ -334,6 +334,7 @@ import {
   runDecisionCorrectionsCommand,
 } from './decision-corrections.mjs';
 import { evolutionCommand } from './evolution-transactions.mjs';
+import { runRequirementLintCommand } from './requirement-lint.mjs';
 
 const SPEC_BYTES = '# Spec\n\n- R1: The system shall store data.\n- R2: The system shall not lose data.\n';
 const ENABLED_CONFIG = 'aifhub:\n  requirementLint:\n    enabled: true\n';
@@ -901,7 +902,7 @@ describe('decision-corrections replay runner', () => {
     await seedStoreProject(root);
     // The replayed requirement-lint structural stage over the enabled fixture
     // produces a known signature; three cases pin the three comparison branches.
-    const knownSignature = 'run_status=complete; findings=none; diagnostics=none';
+    const knownSignature = 'run_status=complete; findings=none; diagnostics=none; codes=none';
     const holdsInput = baseCaseInput({ case_id: 'dev-holds', identity: { ...baseCaseInput().identity, subject_revision: 'rev-holds' }, expected_label: knownSignature });
     await saveCase(root, holdsInput);
     await confirmCase(root, holdsInput);
@@ -1239,7 +1240,7 @@ describe('decision-corrections corpus evaluation (fixtures + labels)', () => {
       assert.equal((await corpusLifecycle(root, 'supersede', input)).ok, labels.expected.supersede, `${file}: supersede refused`);
     }
     const run = await decisionCorrectionsCommand('run', { scope: 'work' }, { rootDir: root, ...STORE_OPTIONS() });
-    assert.deepEqual(run.run.cases.map((item) => item.outcome), ['skipped_draft'], 'held-out drafts are never replayed');
+    assert.deepEqual(run.run.cases.map((item) => item.outcome), ['report_only'], 'held-out cases are never replayed in any status');
   });
 
   it('refuses every limit case with its labeled typed code and leaves no artifacts', async () => {
@@ -1518,3 +1519,328 @@ describe('decision-corrections held-out corpus revision refusal', () => {
     assert.equal(revisedSave.ok, 'held-out-tuning', 'a fixture revision of a held-out case is tuning');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Review round 2 (#285): pre-mutation temp guards, portable delete preflight,
+// run scope guard, held-out branch order, replay-engine spy boundary,
+// invalid_record visibility, list hardening, and end-to-end consumer bundles.
+// ---------------------------------------------------------------------------
+
+function plantedCaseEnvelope(record) {
+  return { checksum: digest(record), record };
+}
+
+async function plantCaseRecord(root, scope, caseId, mutate) {
+  const caseFile = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE, scope, 'cases', `${caseId}.json`);
+  const envelope = parseStrictJson(await readFile(caseFile, 'utf8'));
+  mutate(envelope.record);
+  envelope.record.payload_digest = digest(canonical(envelope.record.payload));
+  envelope.checksum = digest(envelope.record);
+  await writeFile(caseFile, `${JSON.stringify(envelope, null, 2)}\n`);
+}
+
+describe('decision-corrections review round 2', () => {
+  it('guards temp siblings before the first mutation and refuses instead of skipping', async () => {
+    const root = await makeTemp('aif-dc-r2-sib-');
+    await seedStoreProject(root);
+    await saveCase(root, baseCaseInput({ case_id: 'r2-case' }));
+    const casesDir = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE, 'work', 'cases');
+    await writeFile(path.join(casesDir, 'r2-case.json.planted.tmp'), 'planted');
+    const guardCalls = [];
+    const refusingGuard = async (rootDir, relative) => {
+      guardCalls.push(relative);
+      // Pass the case leaf and namespace surfaces; only the planted temp
+      // sibling is tracked, so the refusal proves the sibling guard ran
+      // before the case unlink.
+      if (relative.endsWith('.tmp')) return { ok: false, code: 'observation-path-tracked', detail: relative };
+      return { ok: true, gitWorktree: true, ignored: true, tracked: false };
+    };
+    await assert.rejects(
+      () => decisionCorrectionsCommand('delete', { case_id: 'r2-case', scope: 'work' }, { rootDir: root, ...STORE_OPTIONS(), gitGuard: refusingGuard }),
+      (error) => error?.code === 'observation-path-tracked' && error.blocked === true,
+      'a tracked temp sibling refuses the whole delete before any mutation',
+    );
+    assert.ok(guardCalls.some((p) => p.endsWith('r2-case.json.planted.tmp')), 'the sibling must be guarded before the case leaf is unlinked');
+    const listed = await decisionCorrectionsCommand('list', { scope: 'work' }, { rootDir: root, ...STORE_OPTIONS() });
+    assert.equal(listed.cases.length, 1, 'the case survives the refused delete');
+    assert.ok((await readdirSafe(casesDir)).some((name) => name.endsWith('.tmp')), 'nothing was removed when the guard refused');
+  });
+
+  it('refuses a present-but-unproven leaf on delete instead of reporting deleted:false', async () => {
+    const root = await makeTemp('aif-dc-r2-corrupt-');
+    await seedStoreProject(root);
+    await saveCase(root, baseCaseInput({ case_id: 'r2-corrupt' }));
+    const caseFile = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE, 'work', 'cases', 'r2-corrupt.json');
+    await writeFile(caseFile, '{"checksum":"broken","record":{"case_id":"r2-corrupt"}}');
+    await assert.rejects(
+      () => decisionCorrectionsCommand('delete', { case_id: 'r2-corrupt', scope: 'work' }, { rootDir: root, ...STORE_OPTIONS() }),
+      (error) => error?.code === 'case-leaf-conflict' && error.blocked === true,
+      'a corrupt leaf cannot prove ownership: refusal, not a silent deleted:false',
+    );
+    // The corrupt leaf also blocks saves in the scope (identity scan), so the
+    // typed refusal is the honest recovery boundary for the owner.
+    await assert.rejects(
+      () => saveCase(root, baseCaseInput({ case_id: 'r2-other', identity: { ...baseCaseInput().identity, subject_revision: 'rev-other' } })),
+      (error) => error?.code === 'invalid-state',
+    );
+    assert.ok(await lstatExists(caseFile), 'the corrupt file stays on disk until the owner resolves it');
+  });
+
+  it('keeps the run scoped: alias scope replays nothing and labels the record with the requested scope', async () => {
+    const root = await makeTemp('aif-dc-r2-runscope-');
+    await seedStoreProject(root);
+    await saveCase(root, baseCaseInput({ scope: 'alpha' }));
+    await confirmCase(root, baseCaseInput({ scope: 'alpha' }));
+    await assert.rejects(
+      () => decisionCorrectionsCommand('run', { scope: 'ALPHA' }, { rootDir: root, ...STORE_OPTIONS() }),
+      (error) => error?.code === 'scope-collision',
+      'an alias scope refuses the run on every platform (portable preflight)',
+    );
+  });
+
+  it('reports held-out cases as report_only in any status, before draft and ambiguity branches', async () => {
+    const root = await makeTemp('aif-dc-r2-heldorder-');
+    await seedStoreProject(root);
+    await saveCase(root, baseCaseInput({ case_id: 'held-draft', partition: 'held_out', identity: { ...baseCaseInput().identity, subject_revision: 'rev-h1' } }));
+    await saveCase(root, baseCaseInput({ case_id: 'held-ambiguous', partition: 'held_out', ambiguity: 'ambiguous', identity: { ...baseCaseInput().identity, subject_revision: 'rev-h2' } }));
+    let engineCalls = 0;
+    const run = await decisionCorrectionsCommand('run', { scope: 'work' }, {
+      rootDir: root, ...STORE_OPTIONS(),
+      replayEngines: {
+        requirements_semantic_lint: async () => { engineCalls += 1; return 0; },
+      },
+    });
+    const byId = Object.fromEntries(run.run.cases.map((item) => [item.case_id, item]));
+    assert.equal(byId['held-draft'].outcome, 'report_only', 'held-out drafts are report_only, not skipped_draft');
+    assert.equal(byId['held-ambiguous'].outcome, 'report_only', 'held-out ambiguous cases are report_only, not ambiguous');
+    assert.equal(engineCalls, 0, 'no replay engine is invoked for held-out cases');
+    assert.equal(run.run.counts.held_out.report_only, 2);
+    assert.equal(run.run.counts.held_out.cases, 2);
+    assert.equal(run.run.counts.development.cases, 0);
+  });
+
+  it('spies the replay engine dispatch boundary with a positive control', async () => {
+    const root = await makeTemp('aif-dc-r2-spy-');
+    await seedStoreProject(root);
+    const devInput = baseCaseInput({ case_id: 'dev-spy' });
+    await saveCase(root, devInput);
+    await confirmCase(root, devInput);
+    const heldInput = baseCaseInput({ case_id: 'held-spy', partition: 'held_out', identity: { ...baseCaseInput().identity, subject_revision: 'rev-spy' } });
+    await saveCase(root, heldInput);
+    const calls = [];
+    const spyEngine = async (argv, engineOptions) => {
+      calls.push(argv);
+      // Pass the runner's own output collector through: the spy sits on the
+      // dispatch boundary, not on the output channel.
+      return runRequirementLintCommand(argv, engineOptions);
+    };
+    const run = await decisionCorrectionsCommand('run', { scope: 'work' }, {
+      rootDir: root, ...STORE_OPTIONS(),
+      replayEngines: { requirements_semantic_lint: spyEngine },
+    });
+    const byId = Object.fromEntries(run.run.cases.map((item) => [item.case_id, item]));
+    assert.ok(['holds', 'false_regression', 'label_change'].includes(byId['dev-spy'].outcome),
+      `positive control: the spy runs the real engine over the development case (got ${byId['dev-spy'].outcome})`);
+    assert.ok(byId['dev-spy'].signature.startsWith('run_status='), 'the spy captured a parsed engine observation');
+    assert.equal(byId['held-spy'].outcome, 'report_only');
+    assert.deepEqual(calls.filter((argv) => argv.includes('--write')), [], 'the spy never sees a --write flag');
+    assert.equal(calls.length, 1, 'exactly the development case reached the engine dispatch boundary');
+  });
+
+  it('reports a corrupt case as invalid_record instead of dropping it from the run', async () => {
+    const root = await makeTemp('aif-dc-r2-invalid-');
+    await seedStoreProject(root);
+    await saveCase(root, baseCaseInput({ case_id: 'broken-case' }));
+    const caseFile = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE, 'work', 'cases', 'broken-case.json');
+    const envelope = parseStrictJson(await readFile(caseFile, 'utf8'));
+    delete envelope.record.payload.expected_label;
+    envelope.record.payload_digest = digest(canonical(envelope.record.payload));
+    envelope.checksum = digest(envelope.record);
+    await writeFile(caseFile, `${JSON.stringify(envelope, null, 2)}\n`);
+    const run = await decisionCorrectionsCommand('run', { scope: 'work', case_ids: ['broken-case'] }, { rootDir: root, ...STORE_OPTIONS() });
+    assert.deepEqual(run.run.cases.map((item) => item.outcome), ['invalid_record'], 'an explicitly selected corrupt case stays visible with a typed outcome');
+    assert.equal(run.run.counts.development.invalid_record, 1);
+    const listed = await decisionCorrectionsCommand('list', { scope: 'work' }, { rootDir: root, ...STORE_OPTIONS() });
+    assert.deepEqual(listed.cases, [], 'the listing skips a structurally broken record instead of crashing');
+  });
+
+  it('refuses an invalid overwrite leaf and an occupied run leaf', async () => {
+    const root = await makeTemp('aif-dc-r2-leaf-');
+    await seedStoreProject(root);
+    await saveCase(root, baseCaseInput({ case_id: 'r2-leaf' }));
+    // Break the stored record in a way the checksum envelope cannot see: the
+    // logical identity no longer derives from the stored material.
+    const caseFile = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE, 'work', 'cases', 'r2-leaf.json');
+    const envelope = parseStrictJson(await readFile(caseFile, 'utf8'));
+    envelope.record.payload.logical_identity = 'b'.repeat(64);
+    envelope.record.payload_digest = digest(canonical(envelope.record.payload));
+    envelope.checksum = digest(envelope.record);
+    await writeFile(caseFile, `${JSON.stringify(envelope, null, 2)}\n`);
+    const revision = baseCaseInput({
+      case_id: 'r2-leaf',
+      fixture: { kind: 'redacted', files: baseCaseInput().fixture.files.map((file) => ({ ...file, bytes: `${file.bytes}<!-- x -->\n` })) },
+    });
+    // Both preview and save resolve the stored leaf and must refuse: an
+    // overwrite proves the stored record fully valid before replacing it.
+    await assert.rejects(
+      () => decisionCorrectionsCommand('preview', revision, { rootDir: root, ...STORE_OPTIONS() }),
+      (error) => error?.code === 'logical-identity-mismatch',
+      'preview refuses an invariant-broken stored leaf',
+    );
+    await assert.rejects(
+      () => decisionCorrectionsCommand('save', { ...revision, payload_digest: 'c'.repeat(64) }, { rootDir: root, ...STORE_OPTIONS() }),
+      (error) => ['logical-identity-mismatch', 'payload-mismatch'].includes(error?.code),
+      'save refuses an invariant-broken stored leaf before any materialization',
+    );
+    // Occupied run leaf: the test seam pins the run id.
+    const occupied = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE, 'work', 'runs', 'r2run.json');
+    await mkdir(path.dirname(occupied), { recursive: true });
+    await writeFile(occupied, '{}');
+    await assert.rejects(
+      () => decisionCorrectionsCommand('run', { scope: 'work', case_ids: ['no-case'], write: true }, { rootDir: root, ...STORE_OPTIONS(), runId: 'r2run' }),
+      (error) => error?.code === 'run-record-conflict',
+    );
+  });
+
+  it('refuses show of a planted record whose evolution link points at a missing transaction', async () => {
+    const root = await makeTemp('aif-dc-r2-show-');
+    await seedStoreProject(root);
+    const input = baseCaseInput({ case_id: 'r2-show' });
+    await saveCase(root, input);
+    await plantCaseRecord(root, 'work', 'r2-show', (record) => {
+      record.payload.evolution = { transaction_id: 'tx-absent', proposal_digest: 'a'.repeat(64) };
+    });
+    await assert.rejects(
+      () => decisionCorrectionsCommand('show', { case_id: 'r2-show', scope: 'work' }, { rootDir: root, ...STORE_OPTIONS() }),
+      (error) => error?.code === 'missing-or-invalid-transaction' && error.blocked === true,
+      'the fixed branch: show resolves the link itself and refuses a missing transaction',
+    );
+  });
+
+  it('refuses a destination that is a presented input at save time (reaches the fixed branch)', async () => {
+    const root = await makeTemp('aif-dc-r2-collision-');
+    await seedStoreProject(root);
+    // The destination file must exist for the provenance read to succeed;
+    // the collision refusal then fires in save, not in preview.
+    const destination = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE, 'work', 'cases', 'r2-collide.json');
+    await mkdir(path.dirname(destination), { recursive: true });
+    await writeFile(destination, 'would-be-overwritten');
+    await assert.rejects(
+      () => saveCase(root, baseCaseInput({ case_id: 'r2-collide', identity: { ...baseCaseInput().identity, input_paths: ['.ai-factory/state/decision-corrections/work/cases/r2-collide.json'] } })),
+      (error) => error?.code === 'observation-source-collision' || error?.code === 'self-referential-input',
+    );
+    assert.equal(await readFile(destination, 'utf8'), 'would-be-overwritten', 'the presented input file is untouched');
+  });
+
+  it('leaves a fresh project clean when a save refuses before materialization', async () => {
+    const root = await makeTemp('aif-dc-r2-fresh-');
+    await seedStoreProject(root);
+    const namespaceDir = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE);
+    const input = baseCaseInput();
+    await assert.rejects(
+      () => decisionCorrectionsCommand('save', { ...input, payload_digest: 'f'.repeat(64) }, { rootDir: root, ...STORE_OPTIONS() }),
+      (error) => error?.code === 'payload-mismatch',
+      'the pre-materialization pass refuses the digest echo before anything is created',
+    );
+    assert.equal(await lstatExists(namespaceDir), false, 'a refused save on a fresh root leaves no namespace directory behind');
+  });
+
+  it('refuses a fixture role bundle that cannot produce a valid replay argv', async () => {
+    const root = await makeTemp('aif-dc-r2-roles-');
+    await seedStoreProject(root);
+    // Trace-link inputs must match the frozen test path form.
+    await assert.rejects(
+      () => saveCase(root, baseCaseInput({
+        case_id: 'r2-trace-role',
+        original_assessment: { consumer: 'trace_link_suggestions', verdict: 'v', summary: null },
+        fixture: { kind: 'synthetic', files: [{ path: 'docs/spec.md', media_type: 'text/markdown', bytes: 'x' }] },
+      })),
+      (error) => error?.code === 'invalid-test-input-role',
+      'a canonical spec presented as a trace test input is refused at save time',
+    );
+    // Claim-evidence takes exactly one pairs envelope.
+    await assert.rejects(
+      () => saveCase(root, baseCaseInput({
+        case_id: 'r2-claim-role',
+        original_assessment: { consumer: 'claim_evidence_check', verdict: 'v', summary: null },
+        fixture: { kind: 'synthetic', files: [
+          { path: 'pairs.json', media_type: 'application/json', bytes: '{}' },
+          { path: 'pairs2.json', media_type: 'application/json', bytes: '{}' },
+        ] },
+      })),
+      (error) => error?.code === 'invalid-fixture-input-count',
+    );
+    // An explicit support role keeps a project file out of the consumer argv.
+    const supportOnly = baseCaseInput({
+      case_id: 'r2-req-support',
+      fixture: { kind: 'synthetic', files: [
+        { path: 'docs/spec.md', media_type: 'text/markdown', bytes: SPEC_BYTES, role: 'support' },
+      ] },
+    });
+    await assert.rejects(
+      () => saveCase(root, supportOnly),
+      (error) => error?.code === 'invalid-fixture-input-count',
+      'requirement-lint needs at least one role-input file',
+    );
+  });
+
+  it('replays claim-evidence and trace-link bundles end to end with correct input roles', async () => {
+    const root = await makeTemp('aif-dc-r2-e2e-');
+    await seedStoreProject(root);
+    const pairsEnvelope = {
+      schema: 'aifhub.claim_evidence_pairs.v1',
+      carrier: { path: 'docs/research.md' },
+      checked_scope: 'e2e replay scope',
+      claims: [
+        { claim_id: 'c1', claim_ref: 'storage requirement', source_ref: { path: 'docs/spec.md' }, relation: 'inference' },
+      ],
+    };
+    const claimInput = baseCaseInput({
+      case_id: 'r2-claim-e2e',
+      original_assessment: { consumer: 'claim_evidence_check', verdict: 'old verdict', summary: null },
+      identity: { ...baseCaseInput().identity, subject_revision: 'rev-claim' },
+      fixture: { kind: 'synthetic', files: [
+        { path: 'pairs.json', media_type: 'application/json', bytes: `${JSON.stringify(pairsEnvelope, null, 2)}\n` },
+        { path: 'docs/research.md', media_type: 'text/markdown', bytes: '# Research\n\nresearch line\n', role: 'support' },
+        { path: 'docs/spec.md', media_type: 'text/markdown', bytes: SPEC_BYTES, role: 'support' },
+        { path: '.ai-factory/config.yaml', media_type: 'text/yaml', bytes: 'aifhub:\n  claimEvidence:\n    enabled: true\n' },
+      ] },
+    });
+    await saveCase(root, claimInput);
+    await confirmCase(root, claimInput);
+    const traceInput = baseCaseInput({
+      case_id: 'r2-trace-e2e',
+      original_assessment: { consumer: 'trace_link_suggestions', verdict: 'old verdict', summary: null },
+      identity: { ...baseCaseInput().identity, subject_revision: 'rev-trace' },
+      fixture: { kind: 'synthetic', files: [
+        { path: '.ai-factory/traces/work/lekalo-trace-manifest.json', media_type: 'application/json', bytes: '{"schema_version":"bogus"}' },
+        { path: 'tests/demo.test.js', media_type: 'text/javascript', bytes: 'test("demo", () => {});\n' },
+        { path: '.ai-factory/config.yaml', media_type: 'text/yaml', bytes: 'aifhub:\n  traceLinkSuggestions:\n    enabled: true\n' },
+      ] },
+    });
+    await saveCase(root, traceInput);
+    await confirmCase(root, traceInput);
+    const run = await decisionCorrectionsCommand('run', { scope: 'work' }, { rootDir: root, ...STORE_OPTIONS() });
+    const byId = Object.fromEntries(run.run.cases.map((item) => [item.case_id, item]));
+    // Claim-evidence: the valid pairs envelope passes the structural stage
+    // (quote_checks extracted from a parsed observation); the semantic stage
+    // without a DI assessor is an honest not_run.
+    assert.equal(byId['r2-claim-e2e'].outcome, 'not_run');
+    assert.ok(byId['r2-claim-e2e'].signature.includes('quote_checks=not_applicable'), byId['r2-claim-e2e'].signature);
+    // Trace-link: the test file passes the frozen path form and the custody
+    // manifest is read from its support path — the bogus manifest is reported
+    // as trace-invalid, never as invalid-test-input or invalid-usage.
+    assert.equal(byId['r2-trace-e2e'].outcome, 'not_run');
+    assert.ok(byId['r2-trace-e2e'].signature.includes('codes=trace-invalid'), byId['r2-trace-e2e'].signature);
+    assert.ok(!byId['r2-trace-e2e'].signature.includes('invalid-test-input'), byId['r2-trace-e2e'].signature);
+  });
+});
+
+async function lstatExists(target) {
+  try {
+    await (await import('node:fs/promises')).lstat(target);
+    return true;
+  } catch {
+    return false;
+  }
+}

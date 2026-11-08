@@ -93,6 +93,12 @@
           "minLength": 1,
           "maxLength": 100
         },
+        "role": {
+          "enum": [
+            "input",
+            "support"
+          ]
+        },
         "sha256": {
           "$ref": "#/$defs/digest"
         },

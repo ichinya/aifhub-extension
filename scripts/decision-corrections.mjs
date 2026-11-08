@@ -365,7 +365,18 @@ function assertStoredIdentityMaterial(material) {
   requireValue(material && typeof material === 'object' && !Array.isArray(material), 'invalid-identity');
   fields(material, ['scope', 'partition', 'source_observation', 'subject_revision', 'input_revisions', 'question', 'rubric'], []);
   requireValue(PARTITIONS.includes(material.partition), 'invalid-partition');
+  // Read-time bounds mirror the write-time input rules: the schema leaves
+  // source_observation and input_revisions unconstrained, so the invariants
+  // carry the cardinality, size, and allowlist guarantees instead.
   requireValue(material.source_observation && typeof material.source_observation === 'object' && !Array.isArray(material.source_observation), 'invalid-identity-source');
+  const reprojection = projectIdentityObservation(material.source_observation);
+  requireValue(canonical(reprojection) === canonical(material.source_observation), 'identity-source-not-allowlisted');
+  requireValue(canonical(reprojection).length <= MAX_IDENTITY_SOURCE_CHARS, 'identity-source-oversize');
+  const revisions = material.input_revisions;
+  requireValue(revisions && typeof revisions === 'object' && !Array.isArray(revisions), 'invalid-input-revisions');
+  const revisionKeys = Object.keys(revisions);
+  requireValue(revisionKeys.length > 0 && revisionKeys.length <= MAX_INPUT_REVISIONS, 'invalid-input-revisions');
+  requireValue(revisionKeys.every((key) => /^[a-f0-9]{64}$/.test(revisions[key])), 'invalid-input-revisions');
 }
 
 export function computeLogicalIdentity(identityMaterial) {
@@ -392,7 +403,7 @@ export function computeLogicalIdentity(identityMaterial) {
 // ---------------------------------------------------------------------------
 
 function normalizeFixtureFile(entry) {
-  fields(entry, ['path', 'media_type', 'bytes'], []);
+  fields(entry, ['path', 'media_type', 'bytes'], ['role']);
   const fixturePath = portablePath(String(entry.path));
   // The schema caps fixture paths at 300; refusing here keeps the typed field
   // code instead of a generic case-schema-invalid refusal at write time.
@@ -401,7 +412,16 @@ function normalizeFixtureFile(entry) {
   requireValue(typeof entry.media_type === 'string' && entry.media_type.length > 0 && entry.media_type.length <= 100, 'invalid-fixture-media-type');
   requireValue(typeof entry.bytes === 'string', 'invalid-fixture-bytes');
   requireValue(Buffer.byteLength(entry.bytes, 'utf8') <= MAX_FIXTURE_FILE_BYTES, 'fixture-too-large');
-  return { path: fixturePath, media_type: entry.media_type, sha256: digest(Buffer.from(entry.bytes, 'utf8')), bytes: entry.bytes };
+  // Replay input roles: 'input' files are presented to the replayed consumer
+  // with its own input flag; 'support' files are materialized into the replay
+  // root only (sources, custody manifests, replay configuration). The default
+  // follows the consumer grammars: engine-owned support paths under
+  // `.ai-factory/` default to support, everything else defaults to input.
+  const role = entry.role === undefined
+    ? (fixturePath.startsWith('.ai-factory/') ? 'support' : 'input')
+    : entry.role;
+  requireValue(role === 'input' || role === 'support', 'invalid-fixture-role');
+  return { path: fixturePath, media_type: entry.media_type, sha256: digest(Buffer.from(entry.bytes, 'utf8')), bytes: entry.bytes, role };
 }
 
 function normalizeReplayArgs(args) {
@@ -451,6 +471,23 @@ function buildPayload(scope, input, identityMaterial, fixtureVersion, expectedLa
   casePayload.fixture = { version: fixtureVersion, kind: input.fixture.kind, files };
   fields(input.original_assessment, ['consumer', 'verdict', 'summary'], []);
   requireValue(Object.hasOwn(REPLAY_ENGINES, input.original_assessment.consumer), 'unsupported-consumer');
+  // Save-time consumer grammar checks: input roles must be able to produce a
+  // well-formed replay argv for this consumer, otherwise the bundle would
+  // only degrade to a dishonest not_run at replay time.
+  const inputFiles = files.filter((file) => file.role === 'input');
+  if (input.original_assessment.consumer === 'claim_evidence_check') {
+    requireValue(inputFiles.length === 1, 'invalid-fixture-input-count', true);
+  } else if (input.original_assessment.consumer === 'requirements_semantic_lint') {
+    requireValue(inputFiles.length >= 1, 'invalid-fixture-input-count', true);
+  } else if (input.original_assessment.consumer === 'trace_link_suggestions') {
+    // Trace-link presented test inputs must match the frozen TEST_PATH_FORM;
+    // anything else is refused here instead of degrading to
+    // invalid-test-input at replay time (form mirrored from
+    // scripts/trace-link-suggestions.mjs:107).
+    requireValue(inputFiles.length >= 1, 'invalid-fixture-input-count', true);
+    const TEST_PATH_FORM = /(^|\/)(test|tests|__tests__)\/|[._-](test|spec)\.[A-Za-z0-9]+$/i;
+    requireValue(inputFiles.every((file) => TEST_PATH_FORM.test(file.path)), 'invalid-test-input-role', true);
+  }
   casePayload.original_assessment = {
     consumer: input.original_assessment.consumer,
     verdict: leakFreeText(input.original_assessment.verdict, 'invalid-original-verdict', 2000),
@@ -674,6 +711,13 @@ async function findIdentityOwner(store, scope, logicalIdentity, excludeCaseId) {
   for (const name of caseFiles) {
     const record = await readCaseRecord(store, scopeDir, name, { strict: false });
     if (record === null) continue;
+    // A checksum-valid but structurally broken record cannot prove identity
+    // ownership: validate-and-skip keeps the dedup scan TypeError-free.
+    try {
+      validateRecordOrThrow(record);
+    } catch {
+      continue;
+    }
     if (record.payload.logical_identity === logicalIdentity && record.payload.case_id !== excludeCaseId) return record;
   }
   return null;
@@ -752,46 +796,86 @@ export async function saveDecisionCorrection(input, options = {}) {
     try { return portablePath(inputPath).toLowerCase() === caseFile.toLowerCase(); } catch { return false; }
   });
   requireValue(!sourceCollision, 'observation-source-collision', true);
-  await assertGuard(await guardOwnedSurfaces(rootDir, [caseFile, `${NAMESPACE_ROOT}/.gitignore`, lockPath], options));
-  await assertGuard(await prepareNamespace(rootDir));
-  return store.lock(lockPath, async () => {
-    // Dedup-check and write are serialized by the scope write lock: the
-    // idempotent/revision/collision matrix is race-free within this helper's
-    // serialization model. Windows case-only collisions (case and scope
-    // directory aliases) are refused deterministically before any payload
-    // resolution.
+  // Read-only validation pass BEFORE any filesystem materialization: on a
+  // fresh project a refused save must not leave a namespace .gitignore or
+  // store directories behind. The authoritative resolution repeats under the
+  // lock (dedup is race-free there); this pass only front-runs the common
+  // refusal branches.
+  {
     await assertNoScopeCollision(store, scope);
     await assertNoCaseCollision(store, scopeDir, `${caseId}.json`);
     const identityMaterial = await normalizeIdentityInput(scope, input.partition, input.identity, store);
     const resolved = await resolveEffectivePayload(store, scope, caseId, input, identityMaterial);
-    // The digest echo is checked unconditionally — including the idempotent
-    // branch: a repeated save of identical material with a stale or wrong
-    // echo is a digest-bound contract violation, not a free pass.
     requireValue(input.payload_digest === resolved.digestValue, 'payload-mismatch', true);
-    if (resolved.idempotent) {
-      // Same identity + same payload -> no new record, confirmation untouched.
-      return { ok: true, action: 'save', idempotent: true, case: resolved.existing };
-    }
-    const identityOwner = await findIdentityOwner(store, scope, resolved.payload.logical_identity, caseId);
-    if (identityOwner !== null) throw new WorkflowError('revision-conflict', true);
-    if (resolved.payload.evolution !== null) {
+    if (!resolved.idempotent && resolved.payload.evolution !== null) {
       const link = await verifyEvolutionLink(resolved.payload, rootDir);
       requireValue(link.active === true, link.error ?? 'transaction-not-applied', true);
     }
-    const record = {
-      schema: DECISION_CORRECTIONS_SCHEMA,
-      diagnostic_only: true,
-      authorizes: [],
-      status: 'draft',
-      status_reason: null,
-      payload_digest: resolved.digestValue,
-      payload: resolved.payload,
-    };
-    validateRecordOrThrow(record);
-    requireValue(!hasCorrectionsLeak(record), 'privacy-leak', true);
-    await store.save(caseFile, record);
-    return { ok: true, action: 'save', idempotent: false, created: true, case: record };
-  });
+  }
+  await assertGuard(await guardOwnedSurfaces(rootDir, [caseFile, `${NAMESPACE_ROOT}/.gitignore`, lockPath], options));
+  const gitignoreExisted = await lstat(path.join(rootDir, ...`${NAMESPACE_ROOT}/.gitignore`.split('/')))
+    .then(() => true).catch(() => false);
+  await assertGuard(await prepareNamespace(rootDir));
+  try {
+    return await store.lock(lockPath, async () => {
+      // Dedup-check and write are serialized by the scope write lock: the
+      // idempotent/revision/collision matrix is race-free within this
+      // helper's serialization model. Windows case-only collisions (case and
+      // scope directory aliases) are refused deterministically before any
+      // payload resolution. The atomic write's transient `<dest>.<uuid>.tmp`
+      // lives inside the already-guarded scope directories and its name is
+      // collision-free by construction (fresh store-generated UUID), so the
+      // pre-mutation guard over the case leaf, the lock, and the namespace
+      // .gitignore covers every path this request can create.
+      await assertNoScopeCollision(store, scope);
+      await assertNoCaseCollision(store, scopeDir, `${caseId}.json`);
+      const identityMaterial = await normalizeIdentityInput(scope, input.partition, input.identity, store);
+      const resolved = await resolveEffectivePayload(store, scope, caseId, input, identityMaterial);
+      // The digest echo is checked unconditionally — including the idempotent
+      // branch: a repeated save of identical material with a stale or wrong
+      // echo is a digest-bound contract violation, not a free pass.
+      requireValue(input.payload_digest === resolved.digestValue, 'payload-mismatch', true);
+      if (resolved.idempotent) {
+        // Same identity + same payload -> no new record, confirmation untouched.
+        return { ok: true, action: 'save', idempotent: true, case: resolved.existing };
+      }
+      const identityOwner = await findIdentityOwner(store, scope, resolved.payload.logical_identity, caseId);
+      if (identityOwner !== null) throw new WorkflowError('revision-conflict', true);
+      if (resolved.payload.evolution !== null) {
+        const link = await verifyEvolutionLink(resolved.payload, rootDir);
+        requireValue(link.active === true, link.error ?? 'transaction-not-applied', true);
+      }
+      const record = {
+        schema: DECISION_CORRECTIONS_SCHEMA,
+        diagnostic_only: true,
+        authorizes: [],
+        status: 'draft',
+        status_reason: null,
+        payload_digest: resolved.digestValue,
+        payload: resolved.payload,
+      };
+      validateRecordOrThrow(record);
+      requireValue(!hasCorrectionsLeak(record), 'privacy-leak', true);
+      await store.save(caseFile, record);
+      return { ok: true, action: 'save', idempotent: false, created: true, case: record };
+    });
+  } catch (error) {
+    // Cleanup of artifacts this request created during materialization: if
+    // the namespace .gitignore did not exist before and the failure happened
+    // after prepareNamespace, restore the fresh-project state. Only empty
+    // directories are removed, only inside the namespace, and a .gitignore
+    // that a concurrent writer now depends on is left alone (best-effort,
+    // never removing pre-existing state).
+    if (!gitignoreExisted) {
+      const { rm: remove, rmdir } = await import('node:fs/promises');
+      const gitignoreAbsolute = path.join(rootDir, ...`${NAMESPACE_ROOT}/.gitignore`.split('/'));
+      await remove(gitignoreAbsolute, { force: true }).catch(() => {});
+      for (const dir of [`${NAMESPACE_ROOT}/${scope}/cases`, `${NAMESPACE_ROOT}/${scope}`, NAMESPACE_ROOT]) {
+        await rmdir(path.join(rootDir, ...dir.split('/'))).catch(() => {});
+      }
+    }
+    throw error;
+  }
 }
 
 function lifecycleTransition(record, status, reason) {
@@ -817,6 +901,19 @@ async function lifecycleCommand(action, input, options) {
   const scope = identifier(input.scope);
   const caseId = identifier(input.case_id);
   const { caseFile, lockPath } = casePaths(scope, caseId);
+  // Read-only pre-pass before materialization: the common refusal branches
+  // (missing case, held-out partition) fire before any namespace artifact is
+  // created; the authoritative re-load repeats under the lock.
+  {
+    const existing = await store.load(caseFile).catch((error) => {
+      if (error instanceof WorkflowError && error.code === 'invalid-state') throw new WorkflowError('case-leaf-conflict', true);
+      throw error;
+    });
+    requireValue(existing !== null && existing.schema === DECISION_CORRECTIONS_SCHEMA
+      && existing.payload?.case_id === caseId && existing.payload?.scope === scope, 'case-not-found', true);
+    validateRecordOrThrow(existing);
+    requireValue(existing.payload.partition !== 'held_out', 'held-out-tuning', true);
+  }
   await assertGuard(await guardOwnedSurfaces(rootDir, [caseFile, `${NAMESPACE_ROOT}/.gitignore`, lockPath], options));
   await assertGuard(await prepareNamespace(rootDir));
   return store.lock(lockPath, async () => {
@@ -848,33 +945,46 @@ export async function deleteDecisionCorrection(input, options = {}) {
   const caseId = identifier(input.case_id);
   const { caseFile, scopeDir } = casePaths(scope, caseId);
   await assertGuard(await guardOwnedSurfaces(rootDir, [caseFile, `${NAMESPACE_ROOT}/.gitignore`, `${scopeDir}/write.lock`], options));
+  const gitGuard = options.gitGuard ?? verifyObservationIgnored;
+  // Pre-mutation guard of every surface this delete may touch: the case leaf
+  // and any temp sibling it may own are verified BEFORE the first mutation —
+  // a tracked or not-effectively-ignored sibling refuses the whole delete
+  // (fail closed) instead of being silently skipped mid-mutation.
+  let siblingNames = [];
+  try { siblingNames = await readdir(path.join(store.root, ...`${scopeDir}/cases`.split('/'))); } catch { siblingNames = []; }
+  siblingNames = siblingNames.filter((name) => name.startsWith(`${caseId}.json.`) && name.endsWith('.tmp'));
+  for (const name of siblingNames) {
+    const verdict = await gitGuard(rootDir, `${scopeDir}/cases/${name}`, options).catch(() => ({ ok: false, code: 'git-verify-failed' }));
+    requireValue(verdict.ok === true && verdict.tracked !== true, verdict.code ?? 'observation-path-tracked', true);
+  }
   // Removal is serialized with the other scope writers: deleting a case while
   // a save holds the lock would race the dedup matrix.
   return store.lock(`${scopeDir}/write.lock`, async () => {
     const { unlink } = await import('node:fs/promises');
-    const gitGuard = options.gitGuard ?? verifyObservationIgnored;
     const absolute = path.join(store.root, ...caseFile.split('/'));
     let existed = false;
+    // Deterministic case-only alias preflight (portable across
+    // case-sensitive and case-insensitive filesystems): a sibling name that
+    // differs only by case is a collision on every platform.
+    await assertNoCaseCollision(store, scopeDir, `${caseId}.json`);
     // On a case-insensitive filesystem the requested path may resolve to a
     // neighboring case whose name differs only by case: the record under the
     // resolved leaf must prove it belongs to the requested case_id (and
     // scope) before anything is removed. An absent case honestly reports
-    // `deleted: false`.
+    // `deleted: false`; a present leaf whose ownership cannot be proven
+    // (corrupt envelope) refuses instead of silently keeping the file.
     let owned = false;
-    try {
-      const record = await store.load(caseFile);
-      if (record !== null) {
-        // A leaf that resolves to a different case (Windows case-only alias)
-        // is a collision, not an absent case: refuse instead of silently
-        // reporting `deleted: false`.
-        requireValue(record.schema === DECISION_CORRECTIONS_SCHEMA
-          && record.payload?.case_id === caseId && record.payload?.scope === scope, 'case-collision', true);
-        owned = true;
-      }
-    } catch (error) {
-      if (error instanceof WorkflowError && error.code === 'invalid-state') owned = false;
-      else if (error instanceof WorkflowError) throw error;
-      else throw error;
+    const record = await store.load(caseFile).catch((error) => {
+      if (error instanceof WorkflowError && error.code === 'invalid-state') throw new WorkflowError('case-leaf-conflict', true);
+      throw error;
+    });
+    if (record !== null) {
+      // A leaf that resolves to a different case (Windows case-only alias) is
+      // a collision, not an absent case: refuse instead of silently reporting
+      // `deleted: false`.
+      requireValue(record.schema === DECISION_CORRECTIONS_SCHEMA
+        && record.payload?.case_id === caseId && record.payload?.scope === scope, 'case-collision', true);
+      owned = true;
     }
     if (owned) {
       // Deleting a tracked file would shift the QA `actual_diff` channel, so
@@ -883,18 +993,9 @@ export async function deleteDecisionCorrection(input, options = {}) {
       await unlink(absolute);
       existed = true;
     }
-    // Cleanup of owned transient surfaces: a crashed writer may leave temp
-    // siblings; the case-scoped cleanup never touches other cases or the
-    // namespace .gitignore, and it removes only effectively-ignored names —
-    // a force-added tracked temp sibling would shift the QA `actual_diff`
-    // channel if deleted, so it is left in place. A repeated delete honestly
-    // reports `deleted: false`.
-    let entries = [];
-    try { entries = await readdir(path.join(store.root, ...`${scopeDir}/cases`.split('/'))); } catch { entries = []; }
-    for (const name of entries) {
-      if (!name.startsWith(`${caseId}.json.`) || !name.endsWith('.tmp')) continue;
-      const verdict = await gitGuard(rootDir, `${scopeDir}/cases/${name}`, options).catch(() => ({ ok: false }));
-      if (!verdict.ok || verdict.tracked) continue;
+    // Cleanup of owned transient surfaces, verified ignored before the first
+    // mutation above. A repeated delete honestly reports `deleted: false`.
+    for (const name of siblingNames) {
       await rm(path.join(store.root, ...`${scopeDir}/cases`.split('/'), name), { force: true });
       existed = true;
     }
@@ -930,6 +1031,15 @@ export async function listDecisionCorrections(input, options = {}) {
       throw error;
     });
     if (record === null) continue;
+    // A checksum-valid record whose shape is broken must not crash the
+    // listing with a TypeError on its payload projection: the same
+    // validate-and-skip rule the replay path applies keeps the listing
+    // bounded and honest.
+    try {
+      validateRecordOrThrow(record);
+    } catch {
+      continue;
+    }
     // On a case-insensitive filesystem an alias scope directory would resolve
     // to a neighboring scope's cases: only records whose stored scope equals
     // the requested scope are listed.
@@ -1007,6 +1117,11 @@ export function extractOutcomeSignature(text) {
   }
   addPart('diagnostics', (Array.isArray(parsed?.diagnostics) ? parsed.diagnostics : [])
     .map((entry) => (entry && typeof entry.code === 'string' ? entry.code : null)));
+  // Advisory not_run/failure envelopes carry their refusal codes in `codes`
+  // instead of `diagnostics`; including them keeps those outcomes
+  // distinguishable (disabled vs trace-invalid vs trace-missing).
+  addPart('codes', (Array.isArray(parsed?.codes) ? parsed.codes : [])
+    .filter((code) => typeof code === 'string' && code.length > 0));
   return {
     run_status: runStatus,
     signature: parts.join('; '),
@@ -1027,27 +1142,23 @@ const REPLAY_INPUT_FLAGS = Object.freeze({
   trace_link_suggestions: '--test',
 });
 
-// Trace-link reads its requirement/symbol material exclusively from its own
-// custody manifest at `.ai-factory/traces/<change-id>/lekalo-trace-manifest.json`
-// relative to the replay root; a support file presented as `--test` would be
-// refused as invalid-test-input. The replay convention therefore keeps every
-// fixture file under `.ai-factory/` in place (the bundle must carry the
-// custody manifest there) and presents only the files outside it as tests.
+function fixtureInputFiles(fixtureFiles) {
+  return fixtureFiles.filter((file) => (file.role ?? (file.path.startsWith('.ai-factory/') ? 'support' : 'input')) === 'input');
+}
+
 function synthesizeReplayArgs(consumer, replayArgs, fixtureFiles) {
   const inputFlag = REPLAY_INPUT_FLAGS[consumer];
   const synthesized = [...replayArgs];
+  const inputFiles = fixtureInputFiles(fixtureFiles);
   if (consumer === 'claim_evidence_check') {
-    // The pairs envelope is the primary presented input; remaining fixture
-    // files are the sources its refs read from the replay root. An envelope
-    // that does not parse as a claim-evidence envelope degrades honestly:
-    // the replayed producer refuses it and the outcome is not_run.
-    synthesized.push(inputFlag, fixtureFiles[0].path);
-  } else if (consumer === 'trace_link_suggestions') {
-    for (const file of fixtureFiles) {
-      if (!file.path.startsWith('.ai-factory/')) synthesized.push(inputFlag, file.path);
-    }
+    // The single role-input file is the pairs envelope (count enforced at
+    // save time); role-support files are the sources its refs read from the
+    // replay root. An envelope that does not parse as a claim-evidence
+    // envelope degrades honestly: the replayed producer refuses it and the
+    // outcome is not_run.
+    synthesized.push(inputFlag, inputFiles[0].path);
   } else {
-    for (const file of fixtureFiles) synthesized.push(inputFlag, file.path);
+    for (const file of inputFiles) synthesized.push(inputFlag, file.path);
   }
   synthesized.push('--json');
   return synthesized;
@@ -1055,7 +1166,7 @@ function synthesizeReplayArgs(consumer, replayArgs, fixtureFiles) {
 
 function freshPartitionCounts() {
   return Object.fromEntries(PARTITIONS.map((partition) => [partition, {
-    cases: 0, holds: 0, false_regression: 0, label_change: 0, ambiguous: 0, not_run: 0, stale: 0, report_only: 0,
+    cases: 0, holds: 0, false_regression: 0, label_change: 0, ambiguous: 0, not_run: 0, stale: 0, report_only: 0, invalid_record: 0,
   }]));
 }
 
@@ -1066,6 +1177,9 @@ export async function runDecisionCorrectionReplay(input, options = {}) {
   const store = await storeFor(rootDir);
   const scope = identifier(runInput.scope);
   const { scopeDir } = casePaths(scope, 'x');
+  // Scope alias guard: the run must never replay a neighboring scope's cases
+  // through a case-insensitive directory alias (scope is an identity input).
+  await assertNoScopeCollision(store, scope);
   let entries = [];
   try { entries = await readdir(path.join(store.root, ...`${scopeDir}/cases`.split('/'))); } catch (error) {
     if (error?.code === 'ENOENT') entries = [];
@@ -1087,6 +1201,9 @@ export async function runDecisionCorrectionReplay(input, options = {}) {
     .slice(0, limit);
   const results = [];
   const counts = freshPartitionCounts();
+  const engines = (options.replayEngines && typeof options.replayEngines === 'object')
+    ? { ...REPLAY_ENGINES, ...options.replayEngines }
+    : REPLAY_ENGINES;
   for (const name of caseFiles) {
     const record = await readCaseRecord(store, scopeDir, name, { strict: false }).catch((error) => {
       if (error instanceof WorkflowError) return null;
@@ -1094,18 +1211,33 @@ export async function runDecisionCorrectionReplay(input, options = {}) {
     });
     if (record === null) continue;
     if (wanted !== null && !wanted.includes(record.payload.case_id)) continue;
+    const base = {
+      case_id: record.payload?.case_id ?? name.replace(/\.json$/, ''),
+      consumer: typeof record.payload?.original_assessment?.consumer === 'string' ? record.payload.original_assessment.consumer : 'requirements_semantic_lint',
+      partition: PARTITIONS.includes(record.payload?.partition) ? record.payload.partition : 'development',
+      status: STATUSES.includes(record.status) ? record.status : 'draft',
+      ambiguity: AMBIGUITY_STATES.includes(record.payload?.ambiguity) ? record.payload.ambiguity : 'clear',
+      signature: null,
+    };
     // Full schema/invariant validation on the replay path: the stored record
     // must be provably clean before its fixture bytes are materialized
-    // anywhere or fed to an engine.
+    // anywhere or fed to an engine. A record that cannot prove its integrity
+    // gets an explicit diagnostic outcome instead of silently disappearing
+    // from the run report.
     try {
       validateRecordOrThrow(record);
     } catch {
+      results.push({ ...base, outcome: 'invalid_record' });
+      const partitionCounts = counts[base.partition];
+      partitionCounts.cases += 1;
+      partitionCounts.invalid_record += 1;
       continue;
     }
     const payload = record.payload;
+    if (payload.scope !== scope) continue;
     const partitionCounts = counts[payload.partition];
     partitionCounts.cases += 1;
-    const base = {
+    const outcomeBase = {
       case_id: payload.case_id,
       consumer: payload.original_assessment.consumer,
       partition: payload.partition,
@@ -1113,23 +1245,23 @@ export async function runDecisionCorrectionReplay(input, options = {}) {
       ambiguity: payload.ambiguity,
       signature: null,
     };
+    if (payload.partition === 'held_out') {
+      // Held-out is strictly report-only for ANY status: the runner never
+      // measures a held-out case — no engine call, no signature, no scored
+      // outcome — so nothing about the held-out partition can feed tuning.
+      partitionCounts.report_only += 1;
+      results.push({ ...outcomeBase, outcome: 'report_only' });
+      continue;
+    }
     if (record.status !== 'confirmed' || payload.expected_label_confirmed !== true) {
-      results.push({ ...base, outcome: 'skipped_draft' });
+      results.push({ ...outcomeBase, outcome: 'skipped_draft' });
       continue;
     }
     if (payload.ambiguity === 'ambiguous') {
       // Ambiguous cases stay outside the scored confirmed set; the runner
       // reports them separately instead of scoring them.
       partitionCounts.ambiguous += 1;
-      results.push({ ...base, outcome: 'ambiguous' });
-      continue;
-    }
-    if (payload.partition === 'held_out') {
-      // Held-out is strictly report-only: the runner never measures a
-      // held-out case — no engine call, no signature, no scored outcome —
-      // so nothing about the held-out partition can feed tuning.
-      partitionCounts.report_only += 1;
-      results.push({ ...base, outcome: 'report_only' });
+      results.push({ ...outcomeBase, outcome: 'ambiguous' });
       continue;
     }
     // Stale detection BEFORE any engine call: drifted input revisions or a
@@ -1146,12 +1278,12 @@ export async function runDecisionCorrectionReplay(input, options = {}) {
     }
     if (drifted !== null) {
       partitionCounts.stale += 1;
-      results.push({ ...base, outcome: 'stale', signature: drifted });
+      results.push({ ...outcomeBase, outcome: 'stale', signature: drifted });
       continue;
     }
-    const engine = REPLAY_ENGINES[payload.original_assessment.consumer];
+    const engine = engines[payload.original_assessment.consumer];
     if (!engine) {
-      results.push({ ...base, outcome: 'unsupported_consumer' });
+      results.push({ ...outcomeBase, outcome: 'unsupported_consumer' });
       continue;
     }
     const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'aif-dc-replay-'));
@@ -1201,7 +1333,7 @@ export async function runDecisionCorrectionReplay(input, options = {}) {
       else if (outcome === 'false_regression') partitionCounts.false_regression += 1;
       else if (outcome === 'label_change') partitionCounts.label_change += 1;
       else if (outcome === 'not_run') partitionCounts.not_run += 1;
-      results.push({ ...base, outcome, signature });
+      results.push({ ...outcomeBase, outcome, signature });
     } finally {
       await rm(tempRoot, { recursive: true, force: true }).catch(() => {});
     }
@@ -1210,7 +1342,10 @@ export async function runDecisionCorrectionReplay(input, options = {}) {
     schema: DECISION_CORRECTION_RUN_SCHEMA,
     diagnostic_only: true,
     authorizes: [],
-    run_id: randomUUID().slice(0, 8),
+    // `options.runId` is a test-only seam: it lets the suite pre-occupy a run
+    // leaf and prove the collision refusal deterministically.
+    run_id: typeof options.runId === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/.test(options.runId)
+      ? options.runId : randomUUID().slice(0, 8),
     scope,
     written: false,
     honesty_note: HONESTY_NOTE,
