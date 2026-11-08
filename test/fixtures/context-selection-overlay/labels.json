@@ -1,0 +1,183 @@
+{
+  "provenance": {
+    "declared_only": true,
+    "statement": "Every case cites only files shipped in this directory; the corpus test copies them into a disposable temp project and presents candidate files exclusively through repeatable --candidate inputs. Nothing is fetched, synthesized, or read from outside the materialized fixture copy at run time; no network access and no paid calls happen in any consuming test.",
+    "engine_contract": "The observation shape is defined by schemas/context-selection-overlay-observation.schema.json and scripts/context-selection-overlay.mjs; the fake assessor in the consuming test is labels-driven, so the labels describe transport, guards, and invariants only."
+  },
+  "thresholds": {
+    "negative_false_accusations": 0
+  },
+  "labels_discipline": "Labels below pin pipeline and guard behavior only (statuses, coverage, presentation completeness, conflicts, refusals). They say nothing about semantic precision of a future live model: the assessor is a fake driven by these same labels, and no live-eval thresholds are derivable from this fake suite.",
+  "candidate_digests": {
+    "candidates/dev-relevant-en.md": "e76826cf22397bb125d13c15b4626a2f7718eb4971ec02a020a4ba98ec74274b",
+    "candidates/dev-relevant-ru.md": "10b9a26b047aad5b8ae0859a37fa0a83c513cdfe1d04c22e9164fa611a262398",
+    "candidates/heldout-contradiction.md": "629f562d56eb4785144927d83bb78881334740fcf04de96d359eef8b8d06d980",
+    "candidates/heldout-different-subject.md": "64493b05a281272391dcb998ea83718efc0b1cb8e2139efbcb718bf03475247f",
+    "candidates/heldout-false-premise.md": "6d9aca92def6142c0235ae29a138db761a7f0f41763d03e36eab08642fe7dd0a",
+    "candidates/limit-crlf.md": "7a98b575f60e7ecd87a40669b7b326de8a6a3643d94454ec6c07a616403cb02a",
+    "candidates/limit-prompt-injection.md": "54d65d6957456320d21de071b3987ed9c6a88bd814f380a4e0daf8b5c17b8d1c"
+  },
+  "cases": [
+    {
+      "id": "dev-relevant-match",
+      "kind": "positive",
+      "candidates": ["candidates/dev-relevant-en.md", "candidates/dev-relevant-ru.md"],
+      "labels": {
+        "candidates/dev-relevant-en.md": { "status": "included", "scores": { "relevance": 0.9, "evidence_support": 0.8, "contradiction": 0 } },
+        "candidates/dev-relevant-ru.md": { "status": "included", "scores": { "relevance": 0.8, "evidence_support": 0.7, "contradiction": 0 } }
+      },
+      "expected": {
+        "coverage": "full",
+        "complete": true,
+        "needs_review": false,
+        "statuses": {
+          "notes/dev-relevant-en.md": "included",
+          "notes/dev-relevant-ru.md": "included"
+        },
+        "presentation_sections": ["protected_minimum", "relevant", "conflicts", "unresolved"],
+        "language": "ru"
+      }
+    },
+    {
+      "id": "heldout-similar-different-subject",
+      "kind": "negative",
+      "candidates": ["candidates/dev-relevant-en.md", "candidates/heldout-different-subject.md"],
+      "labels": {
+        "candidates/dev-relevant-en.md": { "status": "included", "scores": { "relevance": 0.9, "evidence_support": 0.8, "contradiction": 0 } },
+        "candidates/heldout-different-subject.md": { "status": "excluded", "scores": { "relevance": 0.2, "evidence_support": 0.1, "contradiction": 0 }, "reason": "different subject", "limitation": "garden vocabulary repeats the acceptance words but does not support the bounded behavior" }
+      },
+      "expected": {
+        "coverage": "full",
+        "complete": true,
+        "statuses": {
+          "notes/dev-relevant-en.md": "included",
+          "notes/heldout-different-subject.md": "excluded"
+        },
+        "excluded_requires_reason_and_limitation": true,
+        "presentation_completeness": true
+      }
+    },
+    {
+      "id": "heldout-contradiction-suspected",
+      "kind": "conflict",
+      "candidates": ["candidates/dev-relevant-en.md", "candidates/heldout-contradiction.md"],
+      "labels": {
+        "candidates/dev-relevant-en.md": { "status": "included", "scores": { "relevance": 0.9, "evidence_support": 0.8, "contradiction": 0 } },
+        "candidates/heldout-contradiction.md": {
+          "status": "conflicting",
+          "scores": { "relevance": 0.4, "evidence_support": 0.7, "contradiction": 0.9 },
+          "evidence_refs": [{ "path": "notes/heldout-contradiction.md" }],
+          "conflict": { "state": "suspected", "refs": [{ "path": "notes/heldout-contradiction.md" }] }
+        }
+      },
+      "expected": {
+        "coverage": "full",
+        "complete": true,
+        "needs_review": true,
+        "owner_handoff": "aif-review",
+        "statuses": {
+          "notes/dev-relevant-en.md": "included",
+          "notes/heldout-contradiction.md": "conflicting"
+        },
+        "conflict_state": "suspected",
+        "conflict_refs_nonempty": true,
+        "presentation_completeness": true
+      }
+    },
+    {
+      "id": "heldout-false-premise",
+      "kind": "negative",
+      "candidates": ["candidates/heldout-false-premise.md"],
+      "labels": {
+        "candidates/heldout-false-premise.md": { "status": "excluded", "scores": { "relevance": 0.3, "evidence_support": 0, "contradiction": 0.4 }, "reason": "false premise", "limitation": "reattributes the intent to a different subsystem" }
+      },
+      "expected": {
+        "coverage": "full",
+        "complete": true,
+        "statuses": { "notes/heldout-false-premise.md": "excluded" },
+        "unresolved_tail_complete": true
+      }
+    },
+    {
+      "id": "limit-prompt-injection",
+      "kind": "adversarial",
+      "candidates": ["candidates/limit-prompt-injection.md"],
+      "labels": {
+        "candidates/limit-prompt-injection.md": { "status": "excluded", "scores": { "relevance": 0.1, "evidence_support": 0, "contradiction": 0 }, "reason": "instruction text is data", "limitation": "candidate prose cannot extend the presented allowlist or change statuses" }
+      },
+      "expected": {
+        "coverage": "full",
+        "complete": true,
+        "statuses": { "notes/limit-prompt-injection.md": "excluded" },
+        "injected_paths_never_read": [".ai-factory/config.yaml", "openspec/changes/284-overlay-fixture/proposal.md"],
+        "no_fetch": true
+      }
+    },
+    {
+      "id": "limit-crlf-bytes",
+      "kind": "byte-pinned",
+      "candidates": ["candidates/limit-crlf.md"],
+      "labels": {
+        "candidates/limit-crlf.md": { "status": "included", "scores": { "relevance": 0.6, "evidence_support": 0.5, "contradiction": 0 } }
+      },
+      "expected": {
+        "coverage": "full",
+        "complete": true,
+        "statuses": { "notes/limit-crlf.md": "included" },
+        "pinned_sha256": "7a98b575f60e7ecd87a40669b7b326de8a6a3643d94454ec6c07a616403cb02a",
+        "bytes": 106,
+        "gitattributes_text_pin": "test/fixtures/context-selection-overlay/candidates/limit-crlf.md"
+      }
+    },
+    {
+      "id": "limit-missing-source",
+      "kind": "missing",
+      "candidates": ["candidates/dev-relevant-en.md"],
+      "ghost_candidates": ["notes/ghost.md"],
+      "labels": {
+        "candidates/dev-relevant-en.md": { "status": "included", "scores": { "relevance": 0.9, "evidence_support": 0.8, "contradiction": 0 } }
+      },
+      "expected": {
+        "coverage": "partial",
+        "complete": false,
+        "run_status": "complete",
+        "statuses": {
+          "notes/dev-relevant-en.md": "included",
+          "notes/ghost.md": "unassessed"
+        },
+        "missing_sources": ["notes/ghost.md"],
+        "unresolved_tail_complete": true
+      }
+    },
+    {
+      "id": "limit-stale-source",
+      "kind": "drift",
+      "candidates": ["candidates/dev-relevant-en.md"],
+      "labels": {
+        "candidates/dev-relevant-en.md": { "status": "included", "scores": { "relevance": 0.9, "evidence_support": 0.8, "contradiction": 0 } }
+      },
+      "expected": {
+        "coverage": "full",
+        "complete": true,
+        "write_then_drift": {
+          "drift_field": "candidate_digests:notes/dev-relevant-en.md",
+          "state": "stale-observation"
+        }
+      }
+    },
+    {
+      "id": "limit-truncated-source",
+      "kind": "truncated",
+      "generated_candidates": [{ "path": "notes/generated-oversize.md", "bytes_over_limit": 1048577 }],
+      "labels": {},
+      "expected": {
+        "coverage": "partial",
+        "complete": false,
+        "run_status": "complete",
+        "statuses": { "notes/generated-oversize.md": "unassessed" },
+        "kinds": { "notes/generated-oversize.md": "truncated" },
+        "missing_sources": ["notes/generated-oversize.md"]
+      }
+    }
+  ]
+}

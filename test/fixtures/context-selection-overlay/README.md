@@ -1,0 +1,38 @@
+# Context Selection Overlay Fixtures
+
+Offline corpus for `scripts/context-selection-overlay.test.mjs` (issue #284).
+Every case cites only files shipped in this directory (declared-only
+provenance); the corpus test copies them into a disposable temp project and
+presents candidate files exclusively through repeatable `--candidate` inputs.
+Nothing is fetched, synthesized, or read from outside the materialized fixture
+copy at run time. No network access and no paid calls happen in any test that
+consumes these files.
+
+## Layout
+
+- `candidates/` — presented supporting candidates (`--candidate <path>`).
+  `dev-relevant-en.md`/`dev-relevant-ru.md` carry EN and RU prose that
+  supports the seeded baseline behavior; `heldout-different-subject.md`
+  repeats the acceptance vocabulary over a different subject;
+  `heldout-contradiction.md` contradicts the documented acceptance example
+  (low-similarity conflict with exact refs); `heldout-false-premise.md`
+  re-attributes the intent to a different subsystem;
+  `limit-prompt-injection.md` embeds instruction text, repository paths, and
+  a fake URL — all of it is data: the engine never reads the named paths,
+  never fetches, and the fake assessor's verdict comes from the labels, not
+  from the embedded instructions; `limit-crlf.md` uses CRLF line endings
+  pinned byte-exact via `-text` in the repository root `.gitattributes` (the
+  labels record its exact sha256 and byte length).
+- `labels.json` — per-case structural expectations: `candidate_digests`
+  (byte pins), per-case `labels` consumed by the labels-driven fake assessor,
+  and `expected` observation facts (statuses, coverage, presentation
+  completeness, conflict state, drift field, refusals).
+
+## Labels
+
+`labels.json` records, per case, the expected statuses and coverage facts
+with exact matches required. `thresholds.negative_false_accusations` is 0: a
+case whose labels require no `included` status must never produce one. The
+labels prove pipeline, transport, guard, and invariant behavior only — with
+no live provider they say nothing about semantic accuracy of a future model,
+and no live-eval thresholds are derivable from this fake suite.

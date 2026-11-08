@@ -1451,3 +1451,159 @@ describe('context-selection-overlay schema-runtime parity', () => {
     assert.equal((await currentOverlayContext()).contract.name, CONTEXT_SELECTION_SCHEMA);
   });
 });
+
+
+// ---------------------------------------------------------------------------
+// Corpus evaluation over test/fixtures/context-selection-overlay (labels.json
+// discipline: transport/guards/invariants, never semantic accuracy)
+// ---------------------------------------------------------------------------
+
+const CORPUS_DIR = path.join(REPO_ROOT, 'test', 'fixtures', 'context-selection-overlay');
+const CORPUS_LABELS = parseStrictJson(await readFile(path.join(CORPUS_DIR, 'labels.json'), 'utf8'));
+
+describe('context-selection-overlay corpus evaluation (fixtures + labels)', () => {
+  it('pins the shipped candidate bytes to the labels digests', async () => {
+    for (const [relative, sha] of Object.entries(CORPUS_LABELS.candidate_digests)) {
+      const bytes = await readFile(path.join(CORPUS_DIR, relative));
+      assert.equal(digest(bytes), sha, relative);
+    }
+  });
+
+  it('keeps a CRLF candidate byte-exact across the checkout', async () => {
+    const crlf = CORPUS_LABELS.cases.find((entry) => entry.id === 'limit-crlf-bytes');
+    const bytes = await readFile(path.join(CORPUS_DIR, 'candidates/limit-crlf.md'));
+    assert.equal(digest(bytes), crlf.expected.pinned_sha256);
+    assert.equal(bytes.length, crlf.expected.bytes);
+    assert.ok(bytes.includes(Buffer.from('\r\n')), 'the fixture ships real CRLF bytes');
+  });
+
+  for (const entry of CORPUS_LABELS.cases.filter((item) => !item.expected.write_then_drift)) {
+    it(`corpus case ${entry.id}: statuses, coverage, and presentation match the labels`, async () => {
+      const root = await makeTemp('aif-cso-corpus-');
+      const { changeId } = await seedBriefProject(root);
+      await compile(root, changeId);
+      const presented = [];
+      for (const relative of entry.candidates ?? []) {
+        const target = `notes/${path.basename(relative)}`;
+        await put(root, target, await readFile(path.join(CORPUS_DIR, relative)));
+        presented.push(target);
+      }
+      for (const ghost of entry.ghost_candidates ?? []) presented.push(ghost);
+      for (const generated of entry.generated_candidates ?? []) {
+        await put(root, generated.path, 'z'.repeat(generated.bytes_over_limit));
+        presented.push(generated.path);
+      }
+      const labelsByPath = new Map(Object.entries(entry.labels ?? {}).map(([relative, label]) => [`notes/${path.basename(relative)}`, label]));
+      const assessor = rankedAssessor((input) => input.candidates.map((candidate) => {
+        const label = labelsByPath.get(candidate.path) ?? {};
+        const sha = digest(Buffer.from(candidate.text, 'utf8'));
+        const refs = (label.evidence_refs ?? []).map((ref) => ({
+          path: candidate.path,
+          document_sha256: sha,
+          ...(ref.span ? { span: ref.span } : {}),
+        }));
+        return {
+          candidate_id: candidate.candidate_id,
+          ...(label.status ? { status: label.status } : {}),
+          scores: label.scores ?? null,
+          reason: label.reason ?? null,
+          limitation: label.limitation ?? null,
+          evidence_refs: refs,
+          conflict: label.conflict ? { state: label.conflict.state, refs: label.conflict.refs.map(() => ({ path: candidate.path, document_sha256: sha })) } : null,
+        };
+      }));
+      const fingerprints = new Map();
+      for (const watched of entry.expected.injected_paths_never_read ?? []) {
+        fingerprints.set(watched, await readFile(path.join(root, watched)));
+      }
+      const run = await runCommand(root, [
+        '--change', changeId, '--enabled', 'true',
+        ...presented.flatMap((candidate) => ['--candidate', candidate]),
+        '--json',
+      ], { assessor });
+      assert.equal(run.exitCode, 0, run.text.slice(0, 400));
+      const observation = run.value;
+      assert.notEqual(observation.state, 'not_run', 'enabled cases never land in the not_run envelope');
+      assert.equal(observation.coverage.state, entry.expected.coverage);
+      assert.equal(observation.complete, entry.expected.complete);
+      if (entry.expected.run_status) assert.equal(observation.run_status, entry.expected.run_status);
+      if (entry.expected.needs_review !== undefined) assert.equal(observation.needs_review, entry.expected.needs_review);
+      if (entry.expected.owner_handoff !== undefined) assert.equal(observation.owner_handoff, entry.expected.owner_handoff);
+      if (entry.expected.language) assert.equal(observation.language, entry.expected.language);
+      if (entry.expected.presentation_sections) {
+        assert.deepEqual(observation.presentation.map((section) => section.section), entry.expected.presentation_sections);
+      }
+      // Presentation completeness: every candidate sits in exactly one
+      // non-protected section, and the protected section mirrors the
+      // verbatim baseline manifest.
+      const flatRefs = observation.presentation.filter((section) => section.section !== 'protected_minimum').flatMap((section) => section.refs);
+      assert.equal(new Set(flatRefs).size, flatRefs.length, 'presentation completeness');
+      assert.equal(flatRefs.length, observation.candidates.length);
+      // Negative-false accusation guard: the included set is exactly the
+      // labels' included set, never larger.
+      const includedExpected = new Set(Object.entries(entry.expected.statuses ?? {}).filter(([, status]) => status === 'included').map(([statusPath]) => statusPath));
+      const includedActual = new Set(observation.candidates.filter((candidate) => candidate.status === 'included').map((candidate) => candidate.path));
+      assert.deepEqual([...includedActual].sort(), [...includedExpected].sort());
+      for (const [candidatePath, status] of Object.entries(entry.expected.statuses ?? {})) {
+        const candidate = observation.candidates.find((item) => item.path === candidatePath);
+        assert.ok(candidate, `${candidatePath} recorded`);
+        assert.equal(candidate.status, status);
+        if (entry.expected.kinds?.[candidatePath]) assert.equal(candidate.kind, entry.expected.kinds[candidatePath]);
+        if (status === 'excluded') {
+          assert.ok(candidate.reason && candidate.limitation, 'excluded carries reason and limitation');
+        }
+        if (status === 'conflicting') {
+          assert.equal(candidate.conflict.state, entry.expected.conflict_state);
+          assert.ok(candidate.conflict.refs.length > 0);
+        }
+      }
+      for (const missing of entry.expected.missing_sources ?? []) {
+        assert.ok(observation.coverage.missing_sources.some((source) => source.path === missing), missing);
+      }
+      // Adversarial transport facts: named paths stay unread bytes.
+      for (const [watched, before] of fingerprints) {
+        assert.deepEqual(await readFile(path.join(root, watched)), before, `${watched} never read by the overlay`);
+      }
+      if (entry.expected.injected_paths_never_read) {
+        assert.equal(observation.candidates.length, presented.length, 'the allowlist is exactly the presented candidates');
+      }
+    });
+  }
+
+  it('corpus case limit-stale-source: a drifted candidate invalidates the recorded observation with its field named', async () => {
+    const entry = CORPUS_LABELS.cases.find((item) => item.id === 'limit-stale-source');
+    const root = await makeTemp('aif-cso-corpus-stale-');
+    const { changeId } = await seedBriefProject(root);
+    await compile(root, changeId);
+    const presented = [];
+    for (const relative of entry.candidates) {
+      const target = `notes/${path.basename(relative)}`;
+      await put(root, target, await readFile(path.join(CORPUS_DIR, relative)));
+      presented.push(target);
+    }
+    const assessor = rankedAssessor((input) => input.candidates.map((candidate) => {
+      const label = entry.labels[`candidates/${path.basename(candidate.path)}`];
+      return {
+        candidate_id: candidate.candidate_id,
+        status: label.status,
+        scores: label.scores,
+        reason: null,
+        limitation: null,
+        evidence_refs: [],
+        conflict: null,
+      };
+    }));
+    const run = await runCommand(root, [
+      '--change', changeId, '--enabled', 'true',
+      ...presented.flatMap((candidate) => ['--candidate', candidate]),
+      '--write', '--json',
+    ], { assessor });
+    assert.equal(run.exitCode, 0);
+    assert.equal(run.value.complete, entry.expected.complete);
+    await put(root, presented[0], 'Rewritten bytes that drift the pinned digest.\n');
+    const verdict = await validateSelectionBinding(root, run.value);
+    assert.equal(verdict.stale, true);
+    assert.equal(verdict.state, entry.expected.write_then_drift.state);
+    assert.ok(verdict.mismatched.includes(entry.expected.write_then_drift.drift_field));
+  });
+});
