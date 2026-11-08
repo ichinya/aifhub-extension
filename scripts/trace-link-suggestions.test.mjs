@@ -1693,7 +1693,8 @@ describe('trace-link-suggestions registration contracts', () => {
     const descriptionMatch = /const DESCRIPTION = '([^']+)'/.exec(wrapper);
     assert.ok(descriptionMatch, 'wrapper must pin DESCRIPTION');
     assert.equal(manifest.version, '1.8.1', 'the extension version is never bumped by this change');
-    assert.equal(manifest.commands.length, 28, 'one command added on top of #282 (27 -> 28)');
+    // reason: per-consumer registration edit — #284 added aifhub-context-selection-overlay (28 -> 29)
+    assert.equal(manifest.commands.length, 29, 'one command added on top of #281 (26 -> 27), #283 (27 -> 28), and #284 (28 -> 29)');
     assert.ok(contract.includes("name: 'aifhub-trace-link-suggestions'"));
     assert.ok(contract.includes(descriptionMatch[1]));
     assert.equal(command.description, descriptionMatch[1], 'extension.json and wrapper descriptions must be byte-identical');
