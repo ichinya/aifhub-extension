@@ -129,6 +129,12 @@ async function observeQaSnapshotInner(store, payload, options = {}) {
   // writer refuses custom state roots and is git-guarded pre-write.
   const decisionCorrectionsNamespace = p => within(p, '.ai-factory/state/decision-corrections');
   const closedNamespace = p => compositionsNamespace(p) || readabilityNamespace(p) || requirementLintNamespace(p) || claimEvidenceNamespace(p) || traceLinkSuggestionsNamespace(p) || decisionCorrectionsNamespace(p);
+  // Declared roots inside a closed runtime namespace fail closed on the
+  // provider path too: without this check an injected provider whose scope
+  // covers a closed namespace would silently hide that scope's own content
+  // from the projection while still reporting a complete snapshot (the
+  // filesystem path enforces the same rule at `self-referential-input`).
+  requireValue(!allDeclaredRoots(payload).some(p => closedNamespace(p)), 'self-referential-input', true);
   const names = Object.keys(observed.files).filter(p => !closedNamespace(p));
   requireValue(names.length <= QA_LIMITS.files, 'qa-files-limit', true);
   const collision = new Map();
