@@ -122,7 +122,13 @@ async function observeQaSnapshotInner(store, payload, options = {}) {
   // and is git-guarded pre-write, so the default-root namespace below is the
   // only surface to exclude.
   const traceLinkSuggestionsNamespace = p => within(p, `.ai-factory/state/${payload.target.id}/trace-link-suggestions`);
-  const closedNamespace = p => compositionsNamespace(p) || readabilityNamespace(p) || requirementLintNamespace(p) || claimEvidenceNamespace(p) || traceLinkSuggestionsNamespace(p);
+  // Closed runtime namespace (#285): project-scoped decision-correction
+  // fixture cases and run records live under a CONSTANT store namespace (the
+  // store is shared by the whole command, not owned by one QA target), so the
+  // predicate is literal and not parameterized by payload.target.id; the
+  // writer refuses custom state roots and is git-guarded pre-write.
+  const decisionCorrectionsNamespace = p => within(p, '.ai-factory/state/decision-corrections');
+  const closedNamespace = p => compositionsNamespace(p) || readabilityNamespace(p) || requirementLintNamespace(p) || claimEvidenceNamespace(p) || traceLinkSuggestionsNamespace(p) || decisionCorrectionsNamespace(p);
   const names = Object.keys(observed.files).filter(p => !closedNamespace(p));
   requireValue(names.length <= QA_LIMITS.files, 'qa-files-limit', true);
   const collision = new Map();
@@ -235,7 +241,10 @@ async function filesystemSnapshot(store, payload, options) {
     || within(p, `.ai-factory/state/${payload.target.id}/readability`)
     || within(p, `.ai-factory/state/${payload.target.id}/requirement-lint`)
     || within(p, `.ai-factory/state/${payload.target.id}/claim-evidence`)
-    || within(p, `.ai-factory/state/${payload.target.id}/trace-link-suggestions`);
+    || within(p, `.ai-factory/state/${payload.target.id}/trace-link-suggestions`)
+    // Closed runtime namespace (#285): constant store namespace shared by the
+    // whole aifhub-decision-corrections command, not owned by one QA target.
+    || within(p, '.ai-factory/state/decision-corrections');
   const visible = (await git(['ls-files', '--cached', '--others', '--exclude-standard', '-z'])).split('\0').filter(Boolean);
   // Closed namespaces are excluded before the catalog limits: a flood of
   // gitignored paths under compositions/ must not fail the snapshot when the
