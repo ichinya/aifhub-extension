@@ -188,6 +188,13 @@ const WRAPPER_COMMANDS = [
     module: './commands/aifhub-trace-link-suggestions.mjs',
     script: 'trace-link-suggestions.mjs',
     args: ['--change', 'add-oauth', '--enabled', 'true', '--test', 'test/auth.spec.mjs', '--json']
+  },
+  {
+    name: 'aifhub-context-selection-overlay',
+    description: 'Run opt-in advisory context selection over the exact baseline SessionBrief for presented supporting candidates without changing evidence, replacing the protected minimum, or authorizing progression.',
+    module: './commands/aifhub-context-selection-overlay.mjs',
+    script: 'context-selection-overlay.mjs',
+    args: ['--change', 'add-oauth', '--enabled', 'true', '--candidate', 'notes/research.md', '--json']
   }
 ];
 

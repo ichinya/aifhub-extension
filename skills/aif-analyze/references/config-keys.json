@@ -76,6 +76,12 @@
       "purpose": "Boolean opt-in for advisory trace link suggestions (aifhub-trace-link-suggestions); default false, CLI --enabled overrides."
     },
     {
+      "key": "aifhub.contextSelectionOverlay.enabled",
+      "required": false,
+      "since": "1.8.1",
+      "purpose": "Boolean opt-in for advisory context selection overlay (aifhub-context-selection-overlay); default false, CLI --enabled overrides. Enable per run through the CLI: editing config.yaml shifts the baseline SessionBrief digest (issue #284)."
+    },
+    {
       "key": "aifhub.decisionCorrections.enabled",
       "required": false,
       "since": "1.8.1",

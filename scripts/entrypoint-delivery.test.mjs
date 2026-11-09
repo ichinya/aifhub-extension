@@ -65,7 +65,8 @@ it('source and installed manifests are deterministic, read-only, and reject miss
 it('raw kernels retain budgets, marker-first boundaries and mandatory reference routes', async () => {
   await validatePromptReferences(repo);
   const budgets = [
-    ['injections/core/aif-implement-plan-folder.md', 65, 85], ['skills/aif-done/SKILL.md', 90, 120],
+    // reason: #284 added the compact advisory context-selection-overlay preview section to the implement override (74 -> 86 lines)
+    ['injections/core/aif-implement-plan-folder.md', 65, 100], ['skills/aif-done/SKILL.md', 90, 120],
     ['agent-files/claude/aifhub-implement-worker.md', 40, 55], ['agent-files/codex/aifhub-implement-worker.toml', 36, 51],
     ['skills/shared/QUESTION-TOOL.md', 35, 50],
   ];

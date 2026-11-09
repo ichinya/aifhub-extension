@@ -275,6 +275,46 @@ describe('trace-link-suggestions custody reader', () => {
     assert.ok(foreign.length > 0, 'foreign file untouched on disk');
   });
 
+  // Delta scenario (specs/trace-link-suggestions/spec.md:45): a trace that
+  // resolves to foreign custody bytes refuses with `trace-custody` — here the
+  // own custody path itself is a hardlink to the foreign manifest, so the
+  // custody refusal is real (no foreign directory scanning is added; the
+  // reader still touches only the own fixed path).
+  it('refuses an own custody path linked to foreign manifest bytes (trace-custody)', async (t) => {
+    const root = await makeTemp('aif-tls-foreign-link-');
+    const changeId = 'my-change';
+    await seedCaseProject(root, changeId, { trace: null, specs: ['specs/spec-en.md'], tests: [], foreignChange: 'other-change', foreignTrace: 'traces/foreign-trace.json' });
+    const ownManifest = path.join(root, '.ai-factory', 'traces', changeId, 'lekalo-trace-manifest.json');
+    const foreignManifest = path.join(root, '.ai-factory', 'traces', 'other-change', 'lekalo-trace-manifest.json');
+    await mkdir(path.dirname(ownManifest), { recursive: true });
+    const foreignBefore = await readFile(foreignManifest);
+    let linked = false;
+    try {
+      await link(foreignManifest, ownManifest);
+      linked = true;
+    } catch (error) {
+      // A green suite must not silently depend on an environment quirk
+      // (review F12): only the known hardlink-denial failure skips the run —
+      // every unexpected link() error propagates and fails the test.
+      if (error?.code === 'EPERM' || error?.code === 'EACCES' || error?.code === 'ENOSYS') {
+        linked = false;
+      } else {
+        throw error;
+      }
+    }
+    if (!linked) {
+      t.skip('hardlink creation denied on this host/volume; the directory and manifest link refusals above cover the custody shape');
+      return;
+    }
+    const { exitCode, value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+    assert.equal(exitCode, 0);
+    assert.equal(value.state, 'not_run');
+    assert.deepEqual(value.codes, ['trace-custody']);
+    assert.equal(value.message, 'advisory scan was not performed');
+    const foreignAfter = await readFile(foreignManifest);
+    assert.deepEqual(foreignAfter, foreignBefore, 'foreign custody bytes untouched');
+  });
+
   it('refuses a manifest path that is a directory (trace-custody)', async () => {
     const root = await makeTemp('aif-tls-dir-');
     const changeId = 'dir-change';
@@ -286,41 +326,56 @@ describe('trace-link-suggestions custody reader', () => {
     assert.deepEqual(value.codes, ['trace-custody']);
   });
 
-  it('refuses hardlinked and symlinked manifests (trace-custody)', async () => {
+  it('refuses a hardlinked manifest (trace-custody)', async (t) => {
     const root = await makeTemp('aif-tls-link-');
     const changeId = 'link-change';
     await seedCaseProject(root, changeId, { trace: 'traces/dev-trace-nm.json', specs: ['specs/spec-en.md', 'specs/spec-ru.md'], tests: [] });
     const outside = path.join(root, 'outside-trace.json');
     const manifest = path.join(root, traceManifestPath(changeId));
     await writeFile(outside, await readFile(manifest));
-    let linked = false;
     try {
       await rm(manifest);
       await link(outside, manifest);
-      linked = true;
-    } catch {
-      linked = false; // hardlinks unsupported on this volume: the directory refusal above covers the shape
+    } catch (error) {
+      // Only the known hardlink-denial codes skip this shape; unexpected
+      // link() failures propagate (review F12 — a green suite must not
+      // silently depend on an environment quirk, and each link form owns
+      // its own skip so an unavailable shape stays visible).
+      if (error?.code === 'EPERM' || error?.code === 'EACCES' || error?.code === 'ENOSYS') {
+        t.skip('hardlink creation denied on this host/volume');
+        return;
+      }
+      throw error;
     }
-    if (linked) {
-      const { value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
-      assert.deepEqual(value.codes, ['trace-custody']);
-      // Remove the hardlink before the symlink attempt: an existing
-      // destination would make the symlink creation fail with EEXIST and be
-      // silently absorbed, leaving the symlink shape untested.
-      await rm(manifest);
-    }
-    let symlinked = false;
+    const { value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+    assert.deepEqual(value.codes, ['trace-custody']);
+    // Remove the hardlink before the symlink test re-seeds: an existing
+    // destination would make the symlink creation fail with EEXIST and be
+    // silently absorbed, leaving the symlink shape untested.
+    await rm(manifest);
+  });
+
+  it('refuses a symlinked manifest (trace-custody)', async (t) => {
+    const root = await makeTemp('aif-tls-symlink-');
+    const changeId = 'link-change';
+    await seedCaseProject(root, changeId, { trace: 'traces/dev-trace-nm.json', specs: ['specs/spec-en.md', 'specs/spec-ru.md'], tests: [] });
+    const outside = path.join(root, 'outside-trace.json');
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await writeFile(outside, await readFile(manifest));
     try {
+      await rm(manifest);
       await symlink(outside, manifest);
-      symlinked = true;
-    } catch {
-      symlinked = false; // symlink privilege unavailable: skipped honestly, not asserted
+    } catch (error) {
+      // Same policy: only symlink-privilege denials skip; unexpected errors
+      // fail the test instead of silently narrowing coverage.
+      if (error?.code === 'EPERM' || error?.code === 'EACCES' || error?.code === 'ENOSYS') {
+        t.skip('symlink creation denied on this host/volume');
+        return;
+      }
+      throw error;
     }
-    if (symlinked) {
-      const { value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
-      assert.deepEqual(value.codes, ['trace-custody']);
-    }
-    assert.ok(linked || symlinked, 'at least one link refusal shape must be exercised');
+    const { value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+    assert.deepEqual(value.codes, ['trace-custody']);
   });
 
   it('refuses exports above the 32 MiB contract limit (export-overflow)', async () => {
@@ -625,9 +680,27 @@ describe('trace-link-suggestions exact-ref refusals', () => {
       nodes,
       edges: [{ edge_id: 'edge-1', from_node_id: 'req:a#A', to_node_id: 'operation:x', relation: 'requirement_symbol', outcome: 'related_only', behavioral_assertion_refs: [] }],
     }), { ok: true });
+    // A KNOWN relation name over a kind pair that does not admit it is
+    // exactly `invalid-kind-pair` (delta scenario), never `unknown-relation`:
+    // the name `symbol_scenario` sits in the closed vocabulary, the pair
+    // requirement>semantic_symbol does not admit it.
     assert.equal(validateGraphShape({
       nodes,
       edges: [{ edge_id: 'edge-1', from_node_id: 'req:a#A', to_node_id: 'operation:x', relation: 'symbol_scenario', outcome: 'related_only', behavioral_assertion_refs: [] }],
+    }).code, 'invalid-kind-pair');
+    // Exact delta scenario (specs/trace-link-suggestions/spec.md:35): a
+    // candidate edge `symbol_test` from `scenario` to `test` refuses with
+    // `invalid-kind-pair`, exit 2, before any observation is written.
+    assert.equal(validateGraphShape({
+      nodes,
+      edges: [{ edge_id: 'edge-1', from_node_id: 'scn:a#A#H', to_node_id: 'test:t.spec.mjs', relation: 'symbol_test', outcome: 'related_only', behavioral_assertion_refs: [] }],
+    }).code, 'invalid-kind-pair');
+    // A truly unknown relation name is `unknown-relation` regardless of the
+    // (also invalid) endpoint pair — the closed vocabulary has no
+    // `requirement_test` relation at all.
+    assert.equal(validateGraphShape({
+      nodes,
+      edges: [{ edge_id: 'edge-1', from_node_id: 'req:a#A', to_node_id: 'test:t.spec.mjs', relation: 'requirement_test', outcome: 'related_only', behavioral_assertion_refs: [] }],
     }).code, 'unknown-relation');
     assert.equal(validateGraphShape({
       nodes,
@@ -974,6 +1047,29 @@ describe('trace-link-suggestions binding and revalidation', () => {
       { ...duplicateAssessmentEdit.semantic.assessments.at(-1), verdict: 'contradicts' },
     ];
     assert.equal((await validateObservationBinding(assessedRoot, duplicateAssessmentEdit)).code, 'observation-invalid');
+  });
+
+  it('refuses the exact delta kind-pair violation on revalidation before binding drift is even considered', async () => {
+    const root = await makeTemp('aif-tls-kindpair-');
+    const observation = await seededWritten(root);
+    const scenarioNode = observation.structural.nodes.find((node) => node.kind === 'scenario');
+    const testNode = observation.structural.nodes.find((node) => node.kind === 'test');
+    assert.ok(scenarioNode && testNode, 'the seeded observation carries scenario and test nodes');
+    // The exact delta input (specs/trace-link-suggestions/spec.md:35): a
+    // candidate edge `symbol_test` from `scenario` to `test`. The name is in
+    // the closed vocabulary, so the shape gate refuses with
+    // `invalid-kind-pair` (assertStructuralInvariants throws
+    // `invalid graph shape: invalid-kind-pair`) before any binding drift is
+    // named — the recorded observation is never accepted.
+    const pairEdit = structuredClone(observation);
+    const edge = pairEdit.structural.edges.find((entry) => entry.to_node_id === testNode.node_id);
+    assert.ok(edge, 'the seeded observation carries an edge into the test node');
+    // Retarget the edge to the exact delta input: known name `symbol_test`
+    // over the scenario>test pair.
+    edge.from_node_id = scenarioNode.node_id;
+    edge.relation = 'symbol_test';
+    assert.throws(() => assertStructuralInvariants(pairEdit), /invalid graph shape: invalid-kind-pair/);
+    assert.equal((await validateObservationBinding(root, pairEdit)).code, 'observation-invalid');
   });
 
   it('rejects tampered nodes whose exact_ref shape does not match their kind', async () => {
@@ -1693,7 +1789,8 @@ describe('trace-link-suggestions registration contracts', () => {
     const descriptionMatch = /const DESCRIPTION = '([^']+)'/.exec(wrapper);
     assert.ok(descriptionMatch, 'wrapper must pin DESCRIPTION');
     assert.equal(manifest.version, '1.8.1', 'the extension version is never bumped by this change');
-    assert.equal(manifest.commands.length, 28, 'one command added on top of #282 (27 -> 28)');
+    // reason: per-consumer registration edit — #284 added aifhub-context-selection-overlay (28 -> 29)
+    assert.equal(manifest.commands.length, 29, 'one command added on top of #281 (26 -> 27), #283 (27 -> 28), and #284 (28 -> 29)');
     assert.ok(contract.includes("name: 'aifhub-trace-link-suggestions'"));
     assert.ok(contract.includes(descriptionMatch[1]));
     assert.equal(command.description, descriptionMatch[1], 'extension.json and wrapper descriptions must be byte-identical');
@@ -1713,13 +1810,13 @@ describe('trace-link-suggestions registration contracts', () => {
     assert.ok(template.includes('#   enabled: false'));
     const skill = await readFile(path.join(REPO_ROOT, 'skills', 'aif-analyze', 'SKILL.md'), 'utf8');
     assert.ok(skill.includes('Preserve existing `aifhub.traceLinkSuggestions.enabled` values and never enable the trace link suggestions automatically.'));
-    assert.match(skill, /^version: 0\.20\.0$/m);
+    assert.match(skill, /^version: 0\.21\.0$/m);
 
     const reviewPolicy = await readFile(path.join(REPO_ROOT, 'scripts', 'review-policy-contract.test.mjs'), 'utf8');
-    assert.ok(reviewPolicy.includes("'version: 0.20.0'"), 'review-policy pin must target 0.20.0');
+    assert.ok(reviewPolicy.includes("'version: 0.21.0'"), 'review-policy pin must target 0.21.0');
     assert.ok(reviewPolicy.includes('#283'), 'review-policy pin must carry its own #283 reason comment');
     const compat = await readFile(path.join(REPO_ROOT, 'scripts', 'openspec-1-12-compatibility.test.mjs'), 'utf8');
-    assert.match(compat, /version: 0\\\.20\\\.0/);
+    assert.match(compat, /version: 0\\\.21\\\.0/);
 
     const { buildAnalyzeConfigDiff } = await import('./aif-analyze-config-diff.mjs');
     const { renderConfigForMode } = await import('./aif-artifact-sync.mjs');
@@ -1889,6 +1986,142 @@ describe('trace-link-suggestions corpus evaluation (fixtures + labels)', () => {
         assert.ok(foreign.length > 0, `${refusal.id}: foreign custody file untouched`);
       }
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Exact delta scenarios pinned by specs/trace-link-suggestions/spec.md
+// ---------------------------------------------------------------------------
+
+describe('trace-link-suggestions exact delta scenarios', () => {
+  it('preserves the exact N:M delta shape: one symbol over three scenarios and two scenarios sharing one test', async () => {
+    const root = await makeTemp('aif-tls-nm-exact-');
+    const changeId = 'nm-exact-change';
+    await seedCaseProject(root, changeId, { trace: null, specs: [], tests: [] });
+    await writeInlineSpec(root, changeId, 'nm', [
+      '# Delta for nm',
+      '',
+      '## ADDED Requirements',
+      '',
+      '### Requirement: NmHost',
+      '',
+      'The N:M host requirement keeps every explicit edge.',
+      '',
+      '#### Scenario: NmAlpha',
+      '',
+      '- GIVEN alpha',
+      '- WHEN parsed',
+      '- THEN one',
+      '',
+      '#### Scenario: NmBeta',
+      '',
+      '- GIVEN beta',
+      '- WHEN parsed',
+      '- THEN two',
+      '',
+      '#### Scenario: NmGamma',
+      '',
+      '- GIVEN gamma',
+      '- WHEN parsed',
+      '- THEN three',
+      '',
+    ].join('\n'));
+    const trace = {
+      schemaVersion: 'lekalo/trace-manifest/v0.2.16',
+      identity: 'dev.lekalo.trace-manifest@0.2.16',
+      completeness: 'full',
+      nodes: [
+        { symbol: 'operation:nm.sym' },
+        { symbol: 'scenario:NmAlpha' },
+        { symbol: 'scenario:NmBeta' },
+        { symbol: 'scenario:NmGamma' },
+      ],
+      relations: [
+        { from: 'operation:nm.sym', to: 'scenario:NmAlpha' },
+        { from: 'operation:nm.sym', to: 'scenario:NmBeta' },
+        { from: 'operation:nm.sym', to: 'scenario:NmGamma' },
+      ],
+      gaps: [],
+    };
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    await writeFile(manifest, JSON.stringify({ trace, manifestDigest: `sha256:${digest(JSON.stringify(trace))}` }), 'utf8');
+    await mkdir(path.join(root, 'test'), { recursive: true });
+    await writeFile(path.join(root, 'test', 'nm-shared.spec.mjs'), 'export const NmAlpha = 1;\nexport const NmBeta = 2;\n', 'utf8');
+    const { exitCode, value } = await runCommand(root, [
+      '--change', changeId, '--enabled', 'true', '--test', 'test/nm-shared.spec.mjs', '--json',
+    ]);
+    assert.equal(exitCode, 0, JSON.stringify(value?.codes ?? []));
+    const { nodes, edges } = value.structural;
+    // Exactly five N:M edges: 3 × symbol_scenario + 2 × scenario_test. The
+    // shared test is one node with two incoming scenario_test edges; no
+    // cross-product edge is generated and no edge collapses to 1:1.
+    assert.equal(edges.length, 5, JSON.stringify(edgesAsLabels(value)));
+    const scenarioNodes = nodes.filter((node) => node.kind === 'scenario');
+    const testNodes = nodes.filter((node) => node.kind === 'test');
+    assert.equal(scenarioNodes.length, 3);
+    assert.equal(testNodes.length, 1, 'only the presented test becomes a node');
+    const symbolScenarios = edges.filter((edge) => edge.relation === 'symbol_scenario');
+    assert.equal(symbolScenarios.length, 3, 'one symbol over three scenarios stays three explicit edges');
+    assert.deepEqual(symbolScenarios.map((edge) => edge.to_node_id).sort(), scenarioNodes.map((node) => node.node_id).sort());
+    const scenarioTests = edges.filter((edge) => edge.relation === 'scenario_test');
+    assert.equal(scenarioTests.length, 2, 'the two anchored scenarios share the one test');
+    assert.deepEqual([...new Set(scenarioTests.map((edge) => edge.to_node_id))], [testNodes[0].node_id]);
+    assert.equal(edges.some((edge) => edge.relation === 'symbol_test'), false, 'no symbol_test edge is invented by the scan');
+  });
+
+  it('never creates nodes or edges for an existing but unpresented test file', async () => {
+    const root = await makeTemp('aif-tls-unpresented-');
+    const changeId = 'unpresented-change';
+    await seedCaseProject(root, changeId, { trace: null, specs: [], tests: [] });
+    await writeInlineSpec(root, changeId, 'probe', [
+      '# Delta for unpresented',
+      '',
+      '## ADDED Requirements',
+      '',
+      '### Requirement: UnpresentedHost',
+      '',
+      'The host requirement mentions the unpresented boundary once.',
+      '',
+      '#### Scenario: UnpresentedProbe',
+      '',
+      '- GIVEN probe',
+      '- WHEN parsed',
+      '- THEN one',
+      '',
+    ].join('\n'));
+    // Both files exist in the repo; only one is presented through --test.
+    const trace = {
+      schemaVersion: 'lekalo/trace-manifest/v0.2.16',
+      identity: 'dev.lekalo.trace-manifest@0.2.16',
+      completeness: 'full',
+      nodes: [
+        { symbol: 'operation:up.sym' },
+        { symbol: 'scenario:UnpresentedProbe' },
+      ],
+      relations: [
+        { from: 'operation:up.sym', to: 'scenario:UnpresentedProbe' },
+      ],
+      gaps: [],
+    };
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    await writeFile(manifest, JSON.stringify({ trace, manifestDigest: `sha256:${digest(JSON.stringify(trace))}` }), 'utf8');
+    await mkdir(path.join(root, 'test'), { recursive: true });
+    await writeFile(path.join(root, 'test', 'presented.spec.mjs'), 'export const UnpresentedProbe = 1;\n', 'utf8');
+    await writeFile(path.join(root, 'test', 'unpresented.spec.mjs'), 'export const UnpresentedProbe = 2;\n', 'utf8');
+    const { exitCode, value } = await runCommand(root, [
+      '--change', changeId, '--enabled', 'true', '--test', 'test/presented.spec.mjs', '--json',
+    ]);
+    assert.equal(exitCode, 0, JSON.stringify(value?.codes ?? []));
+    const { nodes, edges } = value.structural;
+    const testNodes = nodes.filter((node) => node.kind === 'test');
+    assert.equal(testNodes.length, 1, 'only the presented test becomes a node');
+    assert.equal(testNodes[0].exact_ref.path, 'test/presented.spec.mjs');
+    assert.equal(edges.some((edge) => JSON.stringify(edge).includes('unpresented.spec.mjs')), false, 'no edge references the unpresented file');
+    const inputPaths = (value.inputs ?? []).map((input) => input.path);
+    assert.ok(inputPaths.includes('test/presented.spec.mjs'), 'the presented test is a scanned input');
+    assert.equal(inputPaths.includes('test/unpresented.spec.mjs'), false, 'the unpresented file is not part of the scanned inputs');
   });
 });
 
@@ -2365,6 +2598,73 @@ describe('trace-link-suggestions opt-in', () => {
     assert.deepEqual(invalid.value.codes, ['invalid-change-id']);
     assert.equal(CHANGE_ID_FORM.test('Bad_Change'), false);
     assert.equal(CHANGE_ID_FORM.test('ok-change-1'), true);
+  });
+
+  // RC283-001 regression: the change-id form is validated before ANY read
+  // (decision 7), so a disabled producer can never swallow a custody-invalid
+  // invocation. The accessor-based `config` option counts engine-side config
+  // accesses; the getter is declared inline so no spread evaluates it.
+  it('refuses a custody-invalid change-id even when the producer stays disabled, before any read', async () => {
+    const root = await makeTemp('aif-tls-slug-off-');
+    await seedCaseProject(root, 'valid-slug', { config: null, trace: null, specs: [], tests: [] });
+    const counter = { accesses: 0 };
+    const outputs = [];
+    const exitCode = await runTraceLinkSuggestionsCommand(['--change', 'Bad_Change', '--json'], {
+      rootDir: root,
+      output: (value) => outputs.push(value),
+      get config() {
+        counter.accesses += 1;
+        return undefined;
+      },
+    });
+    assert.equal(exitCode, 2);
+    const value = parseStrictJson(outputs.join(''));
+    assert.deepEqual(value.codes, ['invalid-change-id']);
+    assert.equal(value.state, 'not_run');
+    assert.equal(counter.accesses, 0, 'config must not be read before change-id validation');
+  });
+
+  it('refuses a custody-invalid change-id under a malformed namespace instead of the disabled branch', async () => {
+    const root = await makeTemp('aif-tls-slug-mal-');
+    await seedCaseProject(root, 'valid-slug', {
+      config: 'aifhub:\n  traceLinkSuggestions:\n    enabled: "true"\n',
+      trace: null,
+      specs: [],
+      tests: [],
+    });
+    const counter = { accesses: 0 };
+    const outputs = [];
+    const exitCode = await runTraceLinkSuggestionsCommand(['--change', 'Bad_Change', '--write', '--json'], {
+      rootDir: root,
+      output: (value) => outputs.push(value),
+      get config() {
+        counter.accesses += 1;
+        return undefined;
+      },
+    });
+    assert.equal(exitCode, 2);
+    const value = parseStrictJson(outputs.join(''));
+    assert.deepEqual(value.codes, ['invalid-change-id']);
+    assert.equal(counter.accesses, 0, 'malformed config must not be consulted for a custody-invalid id');
+  });
+
+  it('refuses a missing change-id before any read instead of the disabled branch', async () => {
+    const root = await makeTemp('aif-tls-slug-miss-');
+    await seedCaseProject(root, 'valid-slug', { config: null, trace: null, specs: [], tests: [] });
+    const counter = { accesses: 0 };
+    const outputs = [];
+    const exitCode = await runTraceLinkSuggestionsCommand(['--json'], {
+      rootDir: root,
+      output: (value) => outputs.push(value),
+      get config() {
+        counter.accesses += 1;
+        return undefined;
+      },
+    });
+    assert.equal(exitCode, 2);
+    const value = parseStrictJson(outputs.join(''));
+    assert.deepEqual(value.codes, ['missing-change']);
+    assert.equal(counter.accesses, 0);
   });
 
   it('refuses non-test and unsafe test inputs before any read', async () => {

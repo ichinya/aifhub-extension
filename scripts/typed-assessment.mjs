@@ -18,6 +18,10 @@ export const ASSESSMENT_CONSUMER_IDS = Object.freeze([
   'requirements_semantic_lint',
   'claim_evidence_check',
   'trace_link_suggestions',
+  // #284: consumer-side context-selection overlay; the helper stays
+  // consumer-neutral — baseline fallback, candidate registry completeness and
+  // owner confirmation are owned by the consumer module.
+  'context_selection_overlay',
 ]);
 
 // Binding/cache key material must stay deterministic: wall-clock time, run
