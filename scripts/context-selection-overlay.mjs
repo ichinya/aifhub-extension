@@ -49,6 +49,13 @@ export const CANDIDATE_READ_LIMIT = 1024 * 1024;
 export const MAX_CANDIDATES = 50;
 export const MAX_PROTECTED_ENTRIES = 1024;
 export const MAX_EVIDENCE_REFS_PER_CANDIDATE = 20;
+// The schema caps every span endpoint at the JSON-safe-integer bound
+// (schemas/context-selection-overlay-observation.schema.json); the
+// normalizer enforces the same ceiling so an oversized-but-integer span is
+// dropped at the refs boundary instead of surviving normalization and
+// detonating the final schema gate into an operational-failure that would
+// discard the whole baseline projection (review RG284-003).
+export const MAX_SPAN_VALUE = 9007199254740991;
 export const MAX_MISSING = 100;
 export const MAX_PRESENTATION_SECTIONS = 4;
 export const MAX_PRESENTATION_BYTES = 1024 * 1024;
@@ -497,9 +504,15 @@ function sanitizeEvidenceRef(ref, diagnostics, candidateId) {
   if (ref.span !== undefined) {
     // Exactness over availability: a ref whose span is present-but-garbage is
     // dropped outright — a pointer that cannot be trusted is worse than none.
+    // The schema ceiling is checked HERE, at the refs boundary: an
+    // oversized-but-integer span (Number.isInteger(1e20) is true) must not
+    // survive normalization only to detonate the final schema gate into an
+    // operational-failure that discards the protected-minimum projection
+    // (review RG284-003).
     if (!ref.span || typeof ref.span !== 'object' || Array.isArray(ref.span)
       || !Number.isInteger(ref.span.start) || !Number.isInteger(ref.span.end)
-      || ref.span.start < 0 || ref.span.end < ref.span.start) {
+      || ref.span.start < 0 || ref.span.end < ref.span.start
+      || ref.span.start > MAX_SPAN_VALUE || ref.span.end > MAX_SPAN_VALUE) {
       diagnostics.push({ code: 'evidence-ref-invalid', path: candidateId, detail: 'span outside the closed shape' });
       return null;
     }
@@ -1234,11 +1247,17 @@ export async function writeOverlayObservation(rootDir, observation, config, opti
   if (firstRejection) return firstRejection;
   // QA isolation guard: the writer refuses a tracked or
   // not-effectively-ignored output for EVERY path it may create — the
-  // observation and the namespace .gitignore (the QA snapshot's
-  // `actual_diff` channel has no namespace filter).
+  // observation, the namespace .gitignore, and the temporary payload
+  // (review RG284-002: the temporary name is FIXED before the first guard
+  // call so every owned surface is checked before ANY write; a pre-existing
+  // `!*.tmp`-style un-ignore rule in a user-managed .gitignore is caught by
+  // the guard itself instead of silently trusting ensureRuntimeGitignore,
+  // which preserves existing rules rather than replacing them).
   const gitGuard = options.gitGuard ?? verifyObservationIgnored;
   const gitignoreRelative = `${paths.directory}/.gitignore`;
-  for (const guarded of [relative, gitignoreRelative]) {
+  const tempName = `${parts[parts.length - 1]}.${randomUUID()}.tmp`;
+  const temporaryRelative = `${paths.directory}/${tempName}`;
+  for (const guarded of [relative, gitignoreRelative, temporaryRelative]) {
     const verdict = await gitGuard(root, guarded, options);
     if (!verdict.ok) return { ok: false, code: verdict.code, detail: verdict.detail ?? null };
   }
@@ -1292,7 +1311,10 @@ export async function writeOverlayObservation(rootDir, observation, config, opti
   // bytes inside the attacker-moved directory, never a written observation);
   // the refusal detail names the limit.
   const payload = `${JSON.stringify(observation, null, 2)}\n`;
-  const tempName = `${parts[parts.length - 1]}.${randomUUID()}.tmp`;
+  // The temporary name was fixed BEFORE the first git-guard call (review
+  // RG284-002) so the payload path could be guarded together with the
+  // observation and the namespace .gitignore; here it only gets bound to the
+  // live directory.
   const temporary = path.join(liveDirectory, tempName);
   const openFile = options.openFile ?? open;
   let renamed = false;
@@ -1662,6 +1684,40 @@ export async function runContextSelectionOverlayCommand(argv = process.argv.slic
     const prose = resolveProseLanguage(languageDocs, null);
     const resolvedLanguage = languageDocs.length > 0 ? prose.language : 'unknown';
 
+    // Freshness probe (decision D9): re-hash the candidates and re-inspect
+    // the brief. A drifted candidate, a recomputed baseline, or a moved
+    // worktree marks the outcome stale — the conservative honest direction.
+    // The probe is defined for EVERY collected outcome, not only the
+    // semantic path: the budget-blocked branch below runs it explicitly,
+    // because its failed projection still pins the baseline verbatim and
+    // must never declare `current` without re-confirmation (review
+    // RG284-001). The same DI seams as intake and read-time revalidation are
+    // used, so a test-injected reader/inspector cannot create a probe that
+    // sees a different world than the run (review F10).
+    const freshProbe = async () => {
+      const reader = options.readCandidate ?? ((dir, rel) => readProviderFile(dir, rel, CANDIDATE_READ_LIMIT));
+      const inspect = options.inspectBrief ?? inspectSessionBrief;
+      for (const candidate of candidates) {
+        let bytes = null;
+        let error = null;
+        try { bytes = await reader(rootDir, candidate.path, CANDIDATE_READ_LIMIT); } catch (readError) { error = readError; }
+        const fresh = await classifyCandidateInput(rootDir, candidate.path, bytes, error);
+        if (fresh.kind !== candidate.kind || fresh.sha256 !== candidate.sha256 || fresh.bytes !== candidate.bytes) return true;
+      }
+      try {
+        const freshInspection = await inspect({ changeId, rootDir, includeBrief: false, ...options.inspectOptions });
+        if (!freshInspection || freshInspection.status !== 'valid' || freshInspection.digest !== brief.digest) return true;
+      } catch {
+        return true;
+      }
+      try {
+        if (await computeWorktreeIdentity(rootDir, options) !== worktreeIdentity) return true;
+      } catch {
+        return true;
+      }
+      return false;
+    };
+
     if (budgetBlocked) {
       // Fail-closed projection: the protected minimum is presented verbatim,
       // every candidate stays unassessed, and the diagnostics name the
@@ -1683,6 +1739,16 @@ export async function runContextSelectionOverlayCommand(argv = process.argv.slic
         evidence_refs: [],
         conflict: null,
       }));
+      // Freshness probe on the collected failed outcome (review RG284-001):
+      // the verbatim baseline projection still carries a freshness claim, so
+      // it must be re-confirmed by the same bounded probe the semantic path
+      // uses — never declared `current` by default. An unconfirmed probe
+      // keeps the projection verbatim and honestly marks the outcome stale
+      // with a bounded diagnostic.
+      if (await freshProbe()) {
+        freshness = 'stale';
+        diagnostics.push({ code: 'freshness-unconfirmed', path: null, detail: 'budget-blocked projection could not be re-confirmed' });
+      }
     } else {
       // Bounded assessor input: baseline intent/outcome/surface plus the
       // readable candidate texts (bounded per candidate in UTF-8 bytes — the
@@ -1718,36 +1784,6 @@ export async function runContextSelectionOverlayCommand(argv = process.argv.slic
         changeId,
         baseline: baselineComponents,
         candidateDigests,
-      };
-      const freshProbe = async () => {
-        // Freshness probe (decision D9): re-hash the candidates and
-        // re-inspect the brief. A drifted candidate, a recomputed baseline,
-        // or a moved worktree marks the outcome stale — the conservative
-        // honest direction. The same DI seams as intake and read-time
-        // revalidation are used, so a test-injected reader/inspector cannot
-        // create a probe that sees a different world than the run (review
-        // F10).
-        const reader = options.readCandidate ?? ((dir, rel) => readProviderFile(dir, rel, CANDIDATE_READ_LIMIT));
-        const inspect = options.inspectBrief ?? inspectSessionBrief;
-        for (const candidate of candidates) {
-          let bytes = null;
-          let error = null;
-          try { bytes = await reader(rootDir, candidate.path, CANDIDATE_READ_LIMIT); } catch (readError) { error = readError; }
-          const fresh = await classifyCandidateInput(rootDir, candidate.path, bytes, error);
-          if (fresh.kind !== candidate.kind || fresh.sha256 !== candidate.sha256 || fresh.bytes !== candidate.bytes) return true;
-        }
-        try {
-          const freshInspection = await inspect({ changeId, rootDir, includeBrief: false, ...options.inspectOptions });
-          if (!freshInspection || freshInspection.status !== 'valid' || freshInspection.digest !== brief.digest) return true;
-        } catch {
-          return true;
-        }
-        try {
-          if (await computeWorktreeIdentity(rootDir, options) !== worktreeIdentity) return true;
-        } catch {
-          return true;
-        }
-        return false;
       };
       const outcome = await runTypedAssessment({
         assessor: options.assessor,

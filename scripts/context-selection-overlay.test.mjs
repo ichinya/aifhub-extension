@@ -36,6 +36,7 @@ import {
   MAX_CANDIDATES,
   MAX_EVIDENCE_REFS_PER_CANDIDATE,
   MAX_PRESENTATION_BYTES,
+  MAX_SPAN_VALUE,
   MAX_PRESENTATION_SECTIONS,
   PRESENTATION_POLICY,
   STATE_ROOT,
@@ -997,6 +998,52 @@ describe('context-selection-overlay invariant gates', () => {
 // ---------------------------------------------------------------------------
 
 describe('context-selection-overlay budget', () => {
+  it('re-confirms freshness with the shared probe before emitting a budget-blocked failed projection (review RG284-001)', async () => {
+    const root = await makeTemp('aif-cso-oversize-probe-');
+    const big = 'P'.repeat(1100 * 1024);
+    const { changeId } = await seedBriefProject(root, { proposalContent: `${briefProposal()}\n${big}\n` });
+    await compile(root, changeId);
+    const brief = await readStoredBrief(root, changeId);
+    // The DI seam must see the intake inspection AND the probe
+    // re-inspection — a single call would mean the budget-blocked branch
+    // skipped the probe and declared freshness by default.
+    let inspections = 0;
+    const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--candidate', 'notes/research.md', '--json'], {
+      assessor: rankedAssessor(() => []),
+      inspectBrief: async (input) => {
+        inspections += 1;
+        return inspectSessionBrief(input);
+      },
+    });
+    assert.equal(run.exitCode, 0);
+    assert.equal(run.value.run_status, 'failed');
+    assert.equal(run.value.freshness, 'current', 'a confirmed probe may keep the failed projection current');
+    assert.deepEqual(run.value.manifest.protected_minimum, brief.context_manifest);
+    assert.equal(inspections, 2, 'intake inspect + probe re-inspect');
+  });
+
+  it('marks a budget-blocked projection stale when the probe cannot confirm it (review RG284-001)', async () => {
+    const root = await makeTemp('aif-cso-oversize-drift-');
+    const big = 'P'.repeat(1100 * 1024);
+    const { changeId } = await seedBriefProject(root, { proposalContent: `${briefProposal()}\n${big}\n` });
+    await compile(root, changeId);
+    const brief = await readStoredBrief(root, changeId);
+    // The probe re-reads the candidate through the same seam as intake; a
+    // reader that serves different bytes on the probe pass simulates drift.
+    let reads = 0;
+    const driftingReader = async (dir, rel, limit) => {
+      reads += 1;
+      return reads > 1 ? Buffer.from('drifted probe bytes\n', 'utf8') : readProviderFile(dir, rel, limit);
+    };
+    const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--candidate', 'notes/research.md', '--json'], { assessor: rankedAssessor(() => []), readCandidate: driftingReader });
+    assert.equal(run.exitCode, 0);
+    assert.equal(run.value.run_status, 'failed');
+    assert.equal(run.value.freshness, 'stale', 'an unconfirmed probe never leaves the collected outcome current');
+    assert.ok(run.value.diagnostics.some((entry) => entry.code === 'freshness-unconfirmed'));
+    assert.deepEqual(run.value.manifest.protected_minimum, brief.context_manifest, 'the verbatim projection survives the stale mark');
+    assert.equal(run.value.candidates[0].status, 'unassessed');
+  });
+
   it('fails closed when the protected minimum alone exceeds the presentation budget', async () => {
     const root = await makeTemp('aif-cso-oversize-');
     const big = 'P'.repeat(1100 * 1024);
@@ -1457,6 +1504,35 @@ describe('context-selection-overlay writer guards', () => {
     assert.equal(await exists(root, 'custom'), false);
   });
 
+  it('passes the FULL owned-surface set through the git guard before the first write (review RG284-002)', async () => {
+    const root = await makeTemp('aif-cso-writer-guardset-');
+    // The temporary payload name is fixed before the first guard call, so
+    // the guard sees every path the writer may create: the observation
+    // leaf, the namespace .gitignore, and the `<observation>.<uuid>.tmp`
+    // payload — a pre-existing `!*.tmp` un-ignore rule can no longer slip a
+    // tracked temp past a guard that only covered the two stable surfaces.
+    const guardedPaths = [];
+    const written = await writeOverlayObservation(root, observationFor(), configFor(), {
+      gitGuard: async (dir, relative) => {
+        guardedPaths.push(relative);
+        return { ok: true };
+      },
+    });
+    assert.equal(written.ok, true);
+    assert.equal(guardedPaths.length, 3, `guarded surfaces: ${JSON.stringify(guardedPaths)}`);
+    const namespacePrefix = `${STATE_ROOT}/writer-change/${CONTEXT_SELECTION_NAMESPACE}/`;
+    for (const guarded of guardedPaths) {
+      assert.ok(guarded.startsWith(namespacePrefix), `every guarded surface lives in the namespace: ${guarded}`);
+    }
+    assert.ok(guardedPaths.includes(`${namespacePrefix}observation.json`), 'the observation leaf is guarded');
+    assert.ok(guardedPaths.includes(`${namespacePrefix}.gitignore`), 'the namespace .gitignore is guarded');
+    const tempPath = guardedPaths.find((guarded) => /\.tmp$/.test(guarded));
+    assert.ok(tempPath, 'the temporary payload is guarded under its fixed pre-write name');
+    assert.match(path.basename(tempPath), /^observation\.json\.[0-9a-f-]{36}\.tmp$/, 'the temp name is deterministic in shape and guarded before creation');
+    const writtenFiles = (await readdir(path.join(root, namespacePrefix))).sort();
+    assert.deepEqual(writtenFiles, ['.gitignore', 'observation.json'], 'no temp payload survives a successful rename');
+  });
+
   it('refuses tracked and not-ignored outputs through the git guard before the first write', async () => {
     const root = await makeTemp('aif-cso-writer2-');
     const { spawn } = await import('node:child_process');
@@ -1860,6 +1936,64 @@ describe('context-selection-overlay candidate intake primitives', () => {
     assert.equal(refs[0].span_sha256, 'b'.repeat(64));
     assert.ok(diagnostics.some((entry) => entry.code === 'evidence-ref-invalid'));
   });
+
+  it('drops evidence spans above the schema ceiling at the refs boundary, never via the final schema gate (review RG284-003)', async () => {
+    const diagnostics = [];
+    // `Number.isInteger(1e20)` is true and the endpoint ordering holds, so
+    // only the schema ceiling distinguishes this ref: the normalizer must
+    // drop it with a bounded diagnostic — a ref that survives normalization
+    // only to fail the final schema gate would replace the whole observation
+    // with an operational-failure and discard the baseline projection.
+    const oversized = { path: 'ok.md', document_sha256: 'a'.repeat(64), span: { start: 0, end: 1e20 } };
+    const included = normalizeAssessorFindings({
+      run_status: 'complete',
+      abstained: false,
+      findings: [
+        {
+          candidate_id: 'cand-0', status: 'included', scores: null, reason: 'r', limitation: null,
+          evidence_refs: [oversized, { path: 'ok.md', document_sha256: 'a'.repeat(64), span: { start: 0, end: 2 } }],
+          conflict: null,
+        },
+      ],
+    }, [{ candidate_id: 'cand-0', path: 'ok.md', sha256: 'a'.repeat(64), bytes: 2, kind: 'file', text: '' }], diagnostics);
+    assert.equal(included.get('cand-0').evidence_refs.length, 1, 'only the in-bounds ref survives');
+    assert.ok(diagnostics.some((entry) => entry.code === 'evidence-ref-invalid'));
+    // A conflicting finding loses its LAST valid evidence ref the same way
+    // and takes the existing typed drop — the candidate stays unassessed;
+    // the run never crashes and never loses the protected minimum.
+    const dropped = normalizeAssessorFindings({
+      run_status: 'complete',
+      abstained: false,
+      findings: [
+        {
+          candidate_id: 'cand-0', status: 'conflicting', scores: null, reason: 'r', limitation: null,
+          evidence_refs: [oversized],
+          conflict: { state: 'suspected', refs: [{ path: 'ok.md', document_sha256: 'a'.repeat(64) }] },
+        },
+      ],
+    }, [{ candidate_id: 'cand-0', path: 'ok.md', sha256: 'a'.repeat(64), bytes: 2, kind: 'file', text: '' }], diagnostics);
+    assert.equal(dropped.size, 0, 'a conflicting finding without any surviving exact ref is dropped');
+    assert.ok(diagnostics.some((entry) => entry.code === 'conflict-without-evidence-refs'));
+  });
+
+  it('keeps the baseline projection when an assessor evidence span exceeds the schema ceiling end-to-end (review RG284-003)', async () => {
+    const root = await makeTemp('aif-cso-span-ceiling-');
+    const { changeId } = await seedBriefProject(root);
+    await compile(root, changeId);
+    const brief = await readStoredBrief(root, changeId);
+    const assessor = rankedAssessor((input) => input.candidates.map((candidate) => finding(candidate.candidate_id, {
+      evidence_refs: [{ path: 'notes/research.md', document_sha256: 'a'.repeat(64), span: { start: 0, end: 1e20 } }],
+    })));
+    const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--candidate', 'notes/research.md', '--json'], { assessor });
+    // The oversized-but-integer span is dropped at the refs boundary; the
+    // run completes with the verbatim protected minimum — it never degrades
+    // into `operational-failure/schema-parity-failure` with no manifest.
+    assert.equal(run.exitCode, 0, `text: ${run.text.slice(0, 400)}`);
+    assert.notEqual(run.value.state, 'operational-failure');
+    assert.deepEqual(run.value.manifest.protected_minimum, brief.context_manifest);
+    assert.ok(run.value.diagnostics.some((entry) => entry.code === 'evidence-ref-invalid'));
+    assert.equal(run.value.candidates[0].status, 'included');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1897,6 +2031,8 @@ describe('context-selection-overlay schema-runtime parity', () => {
       ['protected_minimum', 'relevant', 'conflicts', 'unresolved'],
     );
     assert.ok(evidenceShape.properties.document_sha256, 'evidence refs carry document digests');
+    assert.equal(evidenceShape.properties.span.properties.start.maximum, MAX_SPAN_VALUE, 'the refs normalizer ceiling matches the schema span cap');
+    assert.equal(evidenceShape.properties.span.properties.end.maximum, MAX_SPAN_VALUE, 'both span endpoints share the normalizer ceiling');
     assert.equal(Object.hasOwn(candidateShape, 'dependentRequired'), true);
   });
 
