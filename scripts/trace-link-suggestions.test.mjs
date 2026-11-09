@@ -326,54 +326,56 @@ describe('trace-link-suggestions custody reader', () => {
     assert.deepEqual(value.codes, ['trace-custody']);
   });
 
-  it('refuses hardlinked and symlinked manifests (trace-custody)', async () => {
+  it('refuses a hardlinked manifest (trace-custody)', async (t) => {
     const root = await makeTemp('aif-tls-link-');
     const changeId = 'link-change';
     await seedCaseProject(root, changeId, { trace: 'traces/dev-trace-nm.json', specs: ['specs/spec-en.md', 'specs/spec-ru.md'], tests: [] });
     const outside = path.join(root, 'outside-trace.json');
     const manifest = path.join(root, traceManifestPath(changeId));
     await writeFile(outside, await readFile(manifest));
-    let linked = false;
     try {
       await rm(manifest);
       await link(outside, manifest);
-      linked = true;
     } catch (error) {
-      // Only the known hardlink-denial codes skip the shape; unexpected
+      // Only the known hardlink-denial codes skip this shape; unexpected
       // link() failures propagate (review F12 — a green suite must not
-      // silently depend on an environment quirk).
+      // silently depend on an environment quirk, and each link form owns
+      // its own skip so an unavailable shape stays visible).
       if (error?.code === 'EPERM' || error?.code === 'EACCES' || error?.code === 'ENOSYS') {
-        linked = false;
-      } else {
-        throw error;
+        t.skip('hardlink creation denied on this host/volume');
+        return;
       }
+      throw error;
     }
-    if (linked) {
-      const { value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
-      assert.deepEqual(value.codes, ['trace-custody']);
-      // Remove the hardlink before the symlink attempt: an existing
-      // destination would make the symlink creation fail with EEXIST and be
-      // silently absorbed, leaving the symlink shape untested.
-      await rm(manifest);
-    }
-    let symlinked = false;
+    const { value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+    assert.deepEqual(value.codes, ['trace-custody']);
+    // Remove the hardlink before the symlink test re-seeds: an existing
+    // destination would make the symlink creation fail with EEXIST and be
+    // silently absorbed, leaving the symlink shape untested.
+    await rm(manifest);
+  });
+
+  it('refuses a symlinked manifest (trace-custody)', async (t) => {
+    const root = await makeTemp('aif-tls-symlink-');
+    const changeId = 'link-change';
+    await seedCaseProject(root, changeId, { trace: 'traces/dev-trace-nm.json', specs: ['specs/spec-en.md', 'specs/spec-ru.md'], tests: [] });
+    const outside = path.join(root, 'outside-trace.json');
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await writeFile(outside, await readFile(manifest));
     try {
+      await rm(manifest);
       await symlink(outside, manifest);
-      symlinked = true;
     } catch (error) {
       // Same policy: only symlink-privilege denials skip; unexpected errors
       // fail the test instead of silently narrowing coverage.
       if (error?.code === 'EPERM' || error?.code === 'EACCES' || error?.code === 'ENOSYS') {
-        symlinked = false;
-      } else {
-        throw error;
+        t.skip('symlink creation denied on this host/volume');
+        return;
       }
+      throw error;
     }
-    if (symlinked) {
-      const { value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
-      assert.deepEqual(value.codes, ['trace-custody']);
-    }
-    assert.ok(linked || symlinked, 'at least one link refusal shape must be exercised');
+    const { value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+    assert.deepEqual(value.codes, ['trace-custody']);
   });
 
   it('refuses exports above the 32 MiB contract limit (export-overflow)', async () => {
