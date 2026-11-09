@@ -1236,10 +1236,11 @@ export async function writeOverlayObservation(rootDir, observation, config, opti
   }
   // TOCTOU re-check after materialization: the live directory must resolve to
   // the same real path (no symlink/junction swap). The identity comparison is
-  // CASE-SENSITIVE (review F01 residual): realpath returns the on-disk
-  // casing on both sides, so folding case would let a swap to a
-  // different-case sibling namespace pass as "the same" directory; a
-  // mismatch is refused, never normalized.
+  // CASE-SENSITIVE and lexically strict (review F01 residual (a)): both
+  // values are realpaths, and any divergence — including a differently cased
+  // component or a delete-and-recreate by the same name — is refused, never
+  // normalized. This is a conservative point-in-time identity check, not an
+  // absolute atomicity guarantee.
   const withinRoot = (value) => {
     const relativeLive = path.relative(path.resolve(root), path.resolve(value));
     return relativeLive !== '' && !relativeLive.startsWith('..') && !path.isAbsolute(relativeLive);
@@ -1261,12 +1262,14 @@ export async function writeOverlayObservation(rootDir, observation, config, opti
   // namespace directory swapped to a symlink/junction between the earlier
   // checks and the rename must not redirect the observation outside the
   // project root (review F01 — the leaf-only check did not close the window).
-  // Residual honesty (documented in design): a swap between the temp write
-  // and this re-check is a refusal, but the temp payload may already sit in
-  // the MOVED directory — the cleanup below unlinks through BOTH the stale
-  // physical path and the swapped path, and a temp that still survives a
-  // concurrent move-delete race is bounded diagnostic-free bytes under the
-  // closed state namespace, never a written observation.
+  // Cleanup ownership (review F01 residual (b) + M2): the temporary file is
+  // stat-identified at creation, and a refused run unlinks ONLY the object
+  // whose device/inode identity still matches that record — a swap that
+  // moved the temp to an unknown location, or an attacker-planted same-named
+  // file behind the swapped path, is never unlinked. A temp whose identity
+  // cannot be found stays honestly unreclaimed (bounded diagnostic-free
+  // bytes inside the attacker-moved directory, never a written observation);
+  // the refusal detail names the limit.
   const payload = `${JSON.stringify(observation, null, 2)}\n`;
   const tempName = `${parts[parts.length - 1]}.${randomUUID()}.tmp`;
   const temporary = path.join(liveDirectory, tempName);
@@ -1274,37 +1277,79 @@ export async function writeOverlayObservation(rootDir, observation, config, opti
   let renamed = false;
   let swapped = false;
   let liveAfter = null;
+  let tempIdentity = null;
+  let outcome = null;
+  const reclaimTemp = async () => {
+    if (tempIdentity === null) return true;
+    const candidates = [temporary, ...(swapped && liveAfter ? [path.join(liveAfter, tempName)] : [])];
+    for (const candidate of candidates) {
+      try {
+        const info = await lstat(candidate);
+        if (info.isFile() && info.dev === tempIdentity.dev && info.ino === tempIdentity.ino) {
+          await unlink(candidate);
+          return true;
+        }
+      } catch {
+        // Absent or unreadable at this candidate path: the next candidate
+        // (or the honest unreclaimed note) handles it.
+      }
+    }
+    return false;
+  };
   try {
     const handle = await openFile(temporary, 'wx', 0o600);
-    try { await handle.writeFile(payload, 'utf8'); } finally { await handle.close(); }
+    try {
+      await handle.writeFile(payload, 'utf8');
+    } finally {
+      await handle.close();
+    }
+    try {
+      const info = await lstat(temporary);
+      tempIdentity = { dev: info.dev, ino: info.ino };
+    } catch {
+      // An unstatable temp cannot be written or renamed anyway; the write
+      // failure below carries the cause.
+      tempIdentity = null;
+    }
     if (typeof options.beforeRename === 'function') await options.beforeRename();
     try {
       liveAfter = await realpath(directory);
     } catch (error) {
       liveAfter = null;
-      return { ok: false, code: 'observation-write-failed', detail: String(error?.message ?? error).slice(0, 200) };
+      outcome = { ok: false, code: 'observation-write-failed', detail: String(error?.message ?? error).slice(0, 200) };
+      return outcome;
     }
     if (path.resolve(liveAfter) !== path.resolve(liveDirectory) || !withinRoot(liveAfter)) {
       swapped = true;
-      return { ok: false, code: 'file-shadow', detail: parts.slice(0, -1).join('/') };
+      outcome = { ok: false, code: 'file-shadow', detail: parts.slice(0, -1).join('/') };
+      return outcome;
     }
     const thirdRejection = await assertLeafWritable();
-    if (thirdRejection) return thirdRejection;
+    if (thirdRejection) {
+      outcome = thirdRejection;
+      return outcome;
+    }
     await rename(temporary, leaf);
     renamed = true;
-    return { ok: true, path: relative };
+    outcome = { ok: true, path: relative };
+    return outcome;
   } catch (error) {
-    return { ok: false, code: 'observation-write-failed', detail: String(error?.message ?? error).slice(0, 200) };
+    outcome = { ok: false, code: 'observation-write-failed', detail: String(error?.message ?? error).slice(0, 200) };
+    return outcome;
   } finally {
     if (!renamed) {
-      // The stale physical path covers the un-moved case; after a detected
-      // swap the temp payload may live under the SWAPPED directory, so the
-      // cleanup also unlinks through the fresh realpath (review F01
-      // residual (b) — the temp must not strand behind the swap).
-      await unlink(temporary).catch(() => {});
-      if (swapped && liveAfter) await unlink(path.join(liveAfter, tempName)).catch(() => {});
+      const reclaimed = await reclaimTemp();
+      // The refusal names its own cleanup limit: a swapped-away temp whose
+      // identity no longer resolves at any known path is NOT chased (an
+      // unlink of an unverified object would break the state-only mutation
+      // boundary) — the bounded bytes stay in the attacker-moved directory.
+      if (!reclaimed && outcome && outcome.ok === false && swapped) {
+        const note = `${outcome.detail ?? ''}; temporary payload could not be reclaimed after the namespace swap`.slice(0, 200);
+        outcome.detail = note;
+      }
     }
   }
+  return outcome;
 }
 
 // ---------------------------------------------------------------------------

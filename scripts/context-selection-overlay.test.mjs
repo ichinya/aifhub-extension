@@ -1475,56 +1475,100 @@ describe('context-selection-overlay writer guards', () => {
     // realpath identity refuses it (review F01 residual (a)). On a
     // case-INSENSITIVE filesystem the scenario is physically unrealizable —
     // the cased sibling aliases the namespace itself — so the shape is
-    // skipped with its reason instead of silently passing.
+    // skipped with its reason instead of silently passing. Only an
+    // uppercase-probe ENOENT proves aliasing absence; every other probe
+    // error propagates (review M1 — a silent probe must not fail the suite
+    // on case-sensitive CI before the writer shape is even exercised).
     const changeDir = path.join(root, STATE_ROOT, 'writer-change');
     const namespaceDir = path.join(changeDir, CONTEXT_SELECTION_NAMESPACE);
     const caseSibling = path.join(changeDir, 'Context-Selection-Overlay');
     const probe = path.join(root, 'case-probe');
     await mkdir(probe, { recursive: true });
-    const aliased = await realpath(path.join(root, 'CASE-PROBE'));
-    const caseInsensitive = path.resolve(aliased) === path.resolve(probe);
+    let caseInsensitive = false;
+    try {
+      const aliased = await realpath(path.join(root, 'CASE-PROBE'));
+      caseInsensitive = path.resolve(aliased) === path.resolve(probe);
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+      caseInsensitive = false;
+    }
     await rm(probe, { recursive: true, force: true });
     if (caseInsensitive) {
       t.skip('case-insensitive filesystem: a different-case sibling aliases the namespace itself, the swap scenario cannot exist here');
       return;
     }
     await mkdir(caseSibling, { recursive: true });
+    const foreignSwap = path.join(changeDir, 'foreign-swap');
+    await mkdir(foreignSwap, { recursive: true });
     const swapped = await writeOverlayObservation(root, observation, configFor(), {
       gitGuard: async () => ({ ok: true }),
       beforeRename: async () => {
-        await rm(namespaceDir, { recursive: true, force: true });
-        await symlink(caseSibling, namespaceDir, 'junction');
+        // The rename+swap scenario (review M1): the namespace directory is
+        // MOVED to the different-case sibling — our freshly written temp
+        // travels with it — and a junction to a foreign directory takes the
+        // namespace name. The identity check refuses; the temp must remain
+        // verifiably OURS wherever the attacker moved it.
+        await rename(namespaceDir, caseSibling);
+        await symlink(foreignSwap, namespaceDir, 'junction');
       },
     });
     assert.equal(swapped.ok, false, 'a different-case namespace swap is a refusal, never a normalized match');
     assert.equal(swapped.code, 'file-shadow');
     assert.equal(await exists(root, `${STATE_ROOT}/writer-change/Context-Selection-Overlay/observation.json`), false, 'nothing was renamed through the swap');
+    assert.equal(await exists(root, `${STATE_ROOT}/writer-change/foreign-swap/observation.json`), false, 'nothing landed in the foreign swap target');
     await rm(namespaceDir, { force: true });
     await rm(caseSibling, { recursive: true, force: true });
+    await rm(foreignSwap, { recursive: true, force: true });
   });
 
-  it('refuses a junction swap to a foreign sibling and leaves no stranded temp (review F01 residual (b))', async () => {
-    const root = await makeTemp('aif-cso-junction2-');
+  it('reclaims only its own temp and never unlinks an unverified same-named file behind a swap (review F01 (b) + M2)', async () => {
+    const root = await makeTemp('aif-cso-junction3-');
     const observation = observationFor();
+    // Sequential rename+swap without a race (review F01 residual (b)): the
+    // namespace moves to a backup directory together with our temp payload,
+    // then a junction to a foreign directory takes its name. Both cleanup
+    // candidates (the stale path through the junction and the swapped
+    // realpath) resolve into the FOREIGN directory — an ownership-blind
+    // cleanup would strand the payload in the backup AND delete the
+    // attacker's same-named sentinel there. The identity-verified cleanup
+    // does neither: the sentinel survives untouched, and the refusal detail
+    // honestly names the unreclaimed temp.
     const changeDir = path.join(root, STATE_ROOT, 'writer-change');
     const namespaceDir = path.join(changeDir, CONTEXT_SELECTION_NAMESPACE);
+    const backupDir = path.join(changeDir, 'backup-namespace');
     const foreignSibling = path.join(changeDir, 'foreign-namespace');
     await mkdir(foreignSibling, { recursive: true });
     const swapped = await writeOverlayObservation(root, observation, configFor(), {
       gitGuard: async () => ({ ok: true }),
       beforeRename: async () => {
-        await rm(namespaceDir, { recursive: true, force: true });
+        // The attacker watches the namespace and clones our temp name into
+        // the foreign directory before the swap lands.
+        const tempEntry = (await readdir(namespaceDir)).find((name) => name.endsWith('.tmp'));
+        assert.ok(tempEntry, 'the writer temp exists before the swap');
+        await writeFile(path.join(foreignSibling, tempEntry), 'attacker sentinel — must survive');
+        await rename(namespaceDir, backupDir);
         await symlink(foreignSibling, namespaceDir, 'junction');
       },
     });
-    assert.equal(swapped.ok, false, 'a junction swap between temp-write and rename is refused');
+    assert.equal(swapped.ok, false, 'the rename+swap is refused');
     assert.equal(swapped.code, 'file-shadow');
-    assert.equal(await exists(root, `${STATE_ROOT}/writer-change/foreign-namespace/observation.json`), false, 'nothing was renamed through the swap');
-    // The cleanup unlinks through the stale physical path AND the swapped
-    // realpath (F01 residual (b)): no temp payload strands in the sibling.
-    const stranded = (await readdir(foreignSibling, { recursive: true })).filter((name) => String(name).endsWith('.tmp'));
-    assert.deepEqual(stranded, [], 'no temp payload strands behind the swap');
+    assert.ok(String(swapped.detail).includes('could not be reclaimed'), `the refusal names the unreclaimed temp: ${swapped.detail}`);
+    // The attacker's sentinel survives: an unverified object is never
+    // unlinked through the swapped path (review M2).
+    const foreignEntries = await readdir(foreignSibling);
+    assert.equal(foreignEntries.length, 1, 'exactly the sentinel remains in the foreign directory');
+    assert.equal(await readFile(path.join(foreignSibling, foreignEntries[0]), 'utf8'), 'attacker sentinel — must survive');
+    // The temp payload stays in the attacker-moved backup: the writer cannot
+    // chase an unknown location and honestly says so instead of deleting
+    // unverified objects.
+    const backupEntries = await readdir(backupDir);
+    const backupTemp = backupEntries.find((name) => name.endsWith('.tmp'));
+    assert.ok(backupTemp, 'the unreclaimed temp stays in the moved directory');
+    assert.match(await readFile(path.join(backupDir, backupTemp), 'utf8'), /"change_id": "writer-change"/, 'the stranded temp is our payload');
+    assert.equal(await exists(root, `${STATE_ROOT}/writer-change/backup-namespace/observation.json`), false, 'no observation was written');
+    assert.equal(await exists(root, `${STATE_ROOT}/writer-change/foreign-namespace/observation.json`), false, 'no observation was renamed through the swap');
     await rm(namespaceDir, { force: true });
+    await rm(backupDir, { recursive: true, force: true });
     await rm(foreignSibling, { recursive: true, force: true });
   });
 });
