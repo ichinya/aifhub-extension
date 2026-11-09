@@ -280,7 +280,7 @@ describe('trace-link-suggestions custody reader', () => {
   // own custody path itself is a hardlink to the foreign manifest, so the
   // custody refusal is real (no foreign directory scanning is added; the
   // reader still touches only the own fixed path).
-  it('refuses an own custody path linked to foreign manifest bytes (trace-custody)', async () => {
+  it('refuses an own custody path linked to foreign manifest bytes (trace-custody)', async (t) => {
     const root = await makeTemp('aif-tls-foreign-link-');
     const changeId = 'my-change';
     await seedCaseProject(root, changeId, { trace: null, specs: ['specs/spec-en.md'], tests: [], foreignChange: 'other-change', foreignTrace: 'traces/foreign-trace.json' });
@@ -292,21 +292,27 @@ describe('trace-link-suggestions custody reader', () => {
     try {
       await link(foreignManifest, ownManifest);
       linked = true;
-    } catch {
-      linked = false; // hardlinks unsupported on this volume: the directory/link refusals above cover the shape
+    } catch (error) {
+      // A green suite must not silently depend on an environment quirk
+      // (review F12): only the known hardlink-denial failure skips the run —
+      // every unexpected link() error propagates and fails the test.
+      if (error?.code === 'EPERM' || error?.code === 'EACCES' || error?.code === 'ENOSYS') {
+        linked = false;
+      } else {
+        throw error;
+      }
     }
-    if (linked) {
-      const { exitCode, value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
-      assert.equal(exitCode, 0);
-      assert.equal(value.state, 'not_run');
-      assert.deepEqual(value.codes, ['trace-custody']);
-      assert.equal(value.message, 'advisory scan was not performed');
-      const foreignAfter = await readFile(foreignManifest);
-      assert.deepEqual(foreignAfter, foreignBefore, 'foreign custody bytes untouched');
+    if (!linked) {
+      t.skip('hardlink creation denied on this host/volume; the directory and manifest link refusals above cover the custody shape');
+      return;
     }
-    // Link creation unavailable on this volume: the directory and manifest
-    // link refusals above cover the custody shape; skipped honestly, not
-    // asserted.
+    const { exitCode, value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+    assert.equal(exitCode, 0);
+    assert.equal(value.state, 'not_run');
+    assert.deepEqual(value.codes, ['trace-custody']);
+    assert.equal(value.message, 'advisory scan was not performed');
+    const foreignAfter = await readFile(foreignManifest);
+    assert.deepEqual(foreignAfter, foreignBefore, 'foreign custody bytes untouched');
   });
 
   it('refuses a manifest path that is a directory (trace-custody)', async () => {
@@ -332,8 +338,15 @@ describe('trace-link-suggestions custody reader', () => {
       await rm(manifest);
       await link(outside, manifest);
       linked = true;
-    } catch {
-      linked = false; // hardlinks unsupported on this volume: the directory refusal above covers the shape
+    } catch (error) {
+      // Only the known hardlink-denial codes skip the shape; unexpected
+      // link() failures propagate (review F12 — a green suite must not
+      // silently depend on an environment quirk).
+      if (error?.code === 'EPERM' || error?.code === 'EACCES' || error?.code === 'ENOSYS') {
+        linked = false;
+      } else {
+        throw error;
+      }
     }
     if (linked) {
       const { value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
@@ -347,8 +360,14 @@ describe('trace-link-suggestions custody reader', () => {
     try {
       await symlink(outside, manifest);
       symlinked = true;
-    } catch {
-      symlinked = false; // symlink privilege unavailable: skipped honestly, not asserted
+    } catch (error) {
+      // Same policy: only symlink-privilege denials skip; unexpected errors
+      // fail the test instead of silently narrowing coverage.
+      if (error?.code === 'EPERM' || error?.code === 'EACCES' || error?.code === 'ENOSYS') {
+        symlinked = false;
+      } else {
+        throw error;
+      }
     }
     if (symlinked) {
       const { value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
