@@ -121,7 +121,7 @@ ai-factory aifhub-trace-link-suggestions --change <change-id> --enabled true --t
 #### Advisory context selection overlay (opt-in, preview only)
 
 - OpenSpec-native only; legacy classic mode never runs it. This scan is advisory context about presented supporting candidates layered on top of the exact baseline SessionBrief: it never replaces the baseline, never rewrites review findings or the requirements reconciliation, never executes the deferred `compact_supporting_context` policy, and never becomes a second gate or an `aif-gate-result`. The semantic stage without a live provider reports an honest `not_run`.
-- Run the scan only when the user enabled it (`aifhub.contextSelectionOverlay.enabled: true`); never enable it automatically and skip it entirely without an explicit opt-in. Invoke only the installed command, without `--write` — this hook is a preview and writes nothing; persisting an observation is a separate authorized writer action (`ai-factory aifhub-context-selection-overlay --write`) taken only on an explicit user request:
+- Run the scan only when the user enabled it for this run — the config key `aifhub.contextSelectionOverlay.enabled: true`, or an explicit per-run CLI opt-in (`--enabled true`) the user asked for; never enable it automatically and skip it entirely without an explicit opt-in. Invoke only the installed command, without `--write` — this hook is a preview and writes nothing; persisting an observation is a separate authorized writer action (`ai-factory aifhub-context-selection-overlay --write`) taken only on an explicit user request:
 
 ```bash
 ai-factory aifhub-context-selection-overlay --change <change-id> --enabled true --candidate <candidate-path> [--candidate <candidate-path> ...] --json

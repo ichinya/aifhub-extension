@@ -705,6 +705,27 @@ describe('context-selection-overlay closed status model', () => {
     assert.deepEqual(validateJsonAgainstSchema(run.value, schema), [], 'the degraded observation is schema-valid');
   });
 
+  it('degrades coverage when the helper truncates an oversized findings array (review round 4, Devin)', async () => {
+    const root = await makeTemp('aif-cso-ftrunc-');
+    const changeId = await seeded(root);
+    // maxFindings == MAX_CANDIDATES == 50: a 51-findings array is truncated
+    // by the helper (coverage downgraded to partial there), even though the
+    // kept head assessed the only real candidate. The overlay must not
+    // present a complete selection on top of a helper-reported degradation.
+    const assessor = rankedAssessor((input) => {
+      const head = finding(input.candidates[0].candidate_id);
+      const tail = Array.from({ length: 50 }, (_, index) => finding(`cand-unknown-${index}`));
+      return [head, ...tail];
+    });
+    const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--candidate', 'notes/research.md', '--json'], { assessor });
+    assert.equal(run.exitCode, 0);
+    assert.equal(run.value.run_status, 'complete');
+    assert.equal(run.value.candidates[0].status, 'included', 'the assessed head survives the truncation');
+    assert.ok(run.value.diagnostics.some((entry) => entry.code === 'findings-truncated'), 'the helper marker is copied into the observation');
+    assert.equal(run.value.coverage.state, 'partial', 'the helper coverage fact degrades the overlay coverage');
+    assert.equal(run.value.complete, false);
+  });
+
   it('bounds oversized assessor diagnostics to the schema instead of a schema-parity crash (review R1)', async () => {
     const root = await makeTemp('aif-cso-bigdiag-');
     const changeId = await seeded(root);
@@ -1077,6 +1098,8 @@ describe('context-selection-overlay budget', () => {
     assert.equal(run.value.owner_handoff, 'aif-review');
     assert.equal(run.value.complete, false);
     assert.equal(run.value.coverage.state, 'partial');
+    assert.equal(run.value.budget.fits, false, 'budget.fits states the true measured total, even in the refs-only degradation (review round 4, Devin)');
+    assert.ok(run.value.budget.estimated >= run.value.budget.limit, 'the estimated sum includes the refs bytes');
     assert.ok(run.value.diagnostics.some((entry) => entry.code === 'conflict-evidence-refs-only'));
   });
 
@@ -1119,6 +1142,25 @@ describe('context-selection-overlay binding and revalidation', () => {
     assert.match(observation.worktree_identity, /^[a-f0-9]{64}$/);
     const verdict = await validateSelectionBinding(root, observation);
     assert.deepEqual(verdict, { ok: true, stale: false, mismatched: [], state: null });
+  });
+
+  it('names a kind transition the digest pins cannot see (missing becomes oversized, review round 4, Devin)', async () => {
+    const root = await makeTemp('aif-cso-kindflip-');
+    const { changeId } = await seedBriefProject(root);
+    await compile(root, changeId);
+    const assessor = rankedAssessor((input) => input.candidates.map((candidate) => finding(candidate.candidate_id)));
+    const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--candidate', 'notes/research.md', '--candidate', 'notes/ghost.md', '--json'], { assessor });
+    const observation = run.value;
+    const ghost = observation.candidates.find((candidate) => candidate.path === 'notes/ghost.md');
+    assert.equal(ghost.kind, 'missing');
+    assert.equal((await validateSelectionBinding(root, observation)).stale, false);
+    // The ghost candidate appears on disk as an oversized file: its fresh
+    // classification is `truncated` — the SAME null digest and zero bytes as
+    // the recorded missing pin, so only the kind flip exposes the drift.
+    await put(root, 'notes/ghost.md', 'g'.repeat(1024 * 1024 + 1));
+    const verdict = await validateSelectionBinding(root, observation);
+    assert.equal(verdict.stale, true, 'a missing-to-truncated kind transition is never fresh');
+    assert.ok(verdict.mismatched.includes('candidates:notes/ghost.md'), `named: ${verdict.mismatched.join(',')}`);
   });
 
   it('names a drifted candidate field and marks the recorded observation stale', async () => {
@@ -1727,6 +1769,7 @@ describe('context-selection-overlay candidate intake primitives', () => {
     assert.equal(projection.records[0].status, 'included');
     assert.equal(projection.records[1].status, 'conflicting', 'a conflict is never budget-demoted');
     assert.equal(projection.conflictFits, false, 'oversized conflict metadata degrades honestly');
+    assert.equal(projection.fits, false, 'the measured total counts the refs bytes even in the refs-only degradation (review round 4, Devin)');
     assert.ok(projection.diagnostics.some((entry) => entry.code === 'conflict-evidence-refs-only'));
   });
 

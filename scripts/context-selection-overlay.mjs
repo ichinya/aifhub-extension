@@ -759,12 +759,15 @@ export function projectSelection({ candidates, assessments, rankedIds, minimumRe
     }
   }
   // Conflict refs metadata (pointers, not content) is the last budget
-  // consumer. When even the pointers no longer fit, the conflicts STAY in
-  // the `conflicts` section — a conflict is never suppressed — and the run
-  // honestly reports the degraded projection.
-  const conflictFits = estimated + conflictRefsBytes <= limit;
+  // consumer and ALWAYS counts toward the measured total (review round 4,
+  // Devin: a refs-only degradation must not leave `budget.fits: true` while
+  // the true projection exceeds the limit). When even the pointers no longer
+  // fit, the conflicts STAY in the `conflicts` section — a conflict is never
+  // suppressed — and the run honestly reports the degraded projection
+  // (`fits: false`, coverage partial, `complete: false`, needs_review).
+  estimated += conflictRefsBytes;
+  const conflictFits = estimated <= limit;
   if (!conflictFits) diagnostics.push({ code: 'conflict-evidence-refs-only', path: null, detail: `refsBytes=${conflictRefsBytes} estimated=${estimated} limit=${limit}` });
-  else estimated += conflictRefsBytes;
   const fits = estimated <= limit;
   const hasDemotions = demoted > 0;
   return { records, manifestIncluded, manifestExcluded, estimated, fits, demoted, hasDemotions, conflictFits, diagnostics };
@@ -804,7 +807,11 @@ export function assertOverlayInvariants(observation) {
   if (observation.abstained === true && (observation.coverage?.state !== 'none' || candidates.some((candidate) => candidate.status !== 'unassessed'))) {
     throw new TypeError('abstained run stays selection-free with none coverage');
   }
-  if (observation.budget?.fits === false && observation.run_status === 'complete') {
+  if (observation.budget?.fits === false && observation.complete === true) {
+    // The AND model refuses completeness on a non-fitting budget (review
+    // round 4, Devin: `fits` states the true measured total — the refs-only
+    // conflict degradation legitimately reports `fits: false` on a
+    // `run_status: 'complete'` partial success whose `complete` is false).
     throw new TypeError('a non-fitting budget can never complete');
   }
   const byId = new Map(candidates.map((candidate) => [candidate.candidate_id, candidate]));
@@ -1025,7 +1032,10 @@ export async function validateSelectionBinding(rootDir, observation, options = {
   if (worktreeIdentity !== observation.worktree_identity) mismatched.push('worktree_identity');
   // Recorded candidate pins are rebuilt from CURRENT disk bytes, never from
   // the recorded observation: an edited, renamed, or vanished candidate must
-  // name its field and flip the recomputed binding.
+  // name its field and flip the recomputed binding. Kind transitions are
+  // compared per recorded candidate record as well (review round 4, Devin):
+  // a missing candidate that BECAME oversized truncates to the same null
+  // digest and zero bytes, so only the kind flip exposes the drift.
   const reader = options.readCandidate ?? (async (dir, rel) => readProviderFile(dir, rel, CANDIDATE_READ_LIMIT));
   const recorded = Array.isArray(observation.candidate_digests) ? observation.candidate_digests : [];
   for (const pin of recorded) {
@@ -1035,6 +1045,17 @@ export async function validateSelectionBinding(rootDir, observation, options = {
     const fresh = await classifyCandidateInput(root, pin.path, bytes, error);
     if ((pin.sha256 ?? null) !== fresh.sha256 || (pin.bytes ?? 0) !== fresh.bytes) {
       mismatched.push(`candidate_digests:${pin.path}`);
+    }
+  }
+  const recordedRecords = Array.isArray(observation.candidates) ? observation.candidates : [];
+  for (const record of recordedRecords) {
+    if (!record || typeof record.path !== 'string') continue;
+    let bytes = null;
+    let error = null;
+    try { bytes = await reader(root, record.path, CANDIDATE_READ_LIMIT); } catch (readError) { error = readError; }
+    const fresh = await classifyCandidateInput(root, record.path, bytes, error);
+    if (fresh.kind !== record.kind) {
+      mismatched.push(`candidates:${record.path}`);
     }
   }
   // The baseline is re-inspected through the same read-only API; a stale,
@@ -1834,7 +1855,13 @@ export async function runContextSelectionOverlayCommand(argv = process.argv.slic
         // reports it as partial — assessed candidates survive, `complete`
         // flips false.
         const assessorLeftUnassessed = records.some((record) => record.status === 'unassessed' && record.reason === 'assessor-left-unassessed');
-        if (missingSources.length > 0 || assessorLeftUnassessed || projection.hasDemotions || !projection.fits || !projection.conflictFits) {
+        // The helper owns its own coverage facts (review round 4, Devin: a
+        // findings-array truncation beyond maxFindings downgrades the
+        // helper's normalized coverage to partial even when the kept head
+        // assessed every candidate) — the overlay never presents a full
+        // selection on top of a helper-reported degradation.
+        const helperCoveragePartial = outcome.coverage?.state === 'partial';
+        if (missingSources.length > 0 || assessorLeftUnassessed || helperCoveragePartial || projection.hasDemotions || !projection.fits || !projection.conflictFits) {
           coverage.state = 'partial';
         }
         // AND completeness (decision D7): assessment complete && budget
