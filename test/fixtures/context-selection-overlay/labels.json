@@ -1,7 +1,7 @@
 {
   "provenance": {
     "declared_only": true,
-    "statement": "Every case cites only files shipped in this directory; the corpus test copies them into a disposable temp project and presents candidate files exclusively through repeatable --candidate inputs. Nothing is fetched, synthesized, or read from outside the materialized fixture copy at run time; no network access and no paid calls happen in any consuming test.",
+    "statement": "Every case cites only files shipped in this directory (declared-only provenance); the corpus test copies them into a disposable temp project and presents candidate files exclusively through repeatable --candidate inputs. The only generated material is the explicitly declared limit-truncated-source recipe (an oversize body built inline in the temp project, which cannot ship byte-pinned). Nothing is fetched from outside the materialized fixture copy at run time, a recording reader keeps candidate reads inside the presented allowlist, and no network access or paid calls happen in any consuming test.",
     "engine_contract": "The observation shape is defined by schemas/context-selection-overlay-observation.schema.json and scripts/context-selection-overlay.mjs; the fake assessor in the consuming test is labels-driven, so the labels describe transport, guards, and invariants only."
   },
   "thresholds": {

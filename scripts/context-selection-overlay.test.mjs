@@ -7,12 +7,13 @@
 // accuracy of a future model.
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { cp, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { digest } from './workflow-state-store.mjs';
+import { readProviderFile } from './provider-files.mjs';
 import { parseStrictJson } from './json-strict.mjs';
 import { validateJsonAgainstSchema } from './json-schema-subset.mjs';
 import { prepareQaManifest } from './qa-manifest.mjs';
@@ -396,13 +397,22 @@ describe('context-selection-overlay fallback matrix', () => {
     // The clock is injected and advances only when the assessor is invoked:
     // the pre-assessment deadline checks always see zero elapsed time (no
     // flaky not_run under load), while the hanging assessor runs out the
-    // cooperative deadline the moment it starts.
+    // cooperative deadline the moment it starts. The baseline inspector
+    // answers the FIRST call (the run's own inspection) and hangs afterwards,
+    // so the helper's freshness probe deterministically loses its 1ms race —
+    // `stale` is pinned without betting on real fs speed (review R2-N3).
     let clock = 0;
     const assessorTimeout = async () => {
       clock = 500;
       return new Promise(() => {});
     };
-    const timeoutRun = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--candidate', 'notes/research.md', '--json'], { assessor: assessorTimeout, deadlineMs: 400, now: () => clock });
+    let inspectCalls = 0;
+    const hangingInspect = async (args) => {
+      inspectCalls += 1;
+      if (inspectCalls === 1) return inspectSessionBrief(args);
+      return new Promise(() => {});
+    };
+    const timeoutRun = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--candidate', 'notes/research.md', '--json'], { assessor: assessorTimeout, deadlineMs: 400, now: () => clock, inspectBrief: hangingInspect });
     // Once the semantic stage has produced material, the honest outcome is
     // the collected failed observation — verbatim minimum, every candidate
     // unassessed, freshness stale — never a late not_run replacement
@@ -507,6 +517,93 @@ describe('context-selection-overlay closed status model', () => {
     assert.deepEqual(run.value.presentation.find((section) => section.section === 'unresolved').refs, [excluded.candidate_id]);
     assert.equal(run.value.complete, true, 'an assessor exclusion is a real result, not a budget failure');
     assert.ok(run.value.manifest.excluded.some((entry) => entry.path === 'notes/off-topic.md'));
+  });
+
+  it('defaults the limitation only for excluded findings, never for included ones (review R2-N1)', async () => {
+    const root = await makeTemp('aif-cso-limit-');
+    const changeId = await seeded(root);
+    await put(root, 'notes/second.md', 'Second bounded research fragment about the accepted input behavior.\n');
+    const assessor = rankedAssessor((input) => input.candidates.map((candidate) => candidate.path.endsWith('second.md')
+      // An excluded finding with NO limitation gets the honest default.
+      ? finding(candidate.candidate_id, { status: 'excluded', reason: 'weak support', limitation: null })
+      : finding(candidate.candidate_id)));
+    const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--candidate', 'notes/research.md', '--candidate', 'notes/second.md', '--json'], { assessor });
+    assert.equal(run.exitCode, 0);
+    const byPath = new Map(run.value.candidates.map((candidate) => [candidate.path, candidate]));
+    // The included candidate keeps the assessor's own limitation (null): an
+    // included record must never carry "excluded by the assessor" metadata.
+    assert.equal(byPath.get('notes/research.md').status, 'included');
+    assert.equal(byPath.get('notes/research.md').limitation, null);
+    assert.equal(byPath.get('notes/second.md').status, 'excluded');
+    assert.equal(byPath.get('notes/second.md').limitation, 'excluded by the assessor');
+  });
+
+  it('deduplicates exact duplicate --candidate arguments and refuses only case collisions (review R2-N2)', async () => {
+    const root = await makeTemp('aif-cso-dupe-');
+    const changeId = await seeded(root);
+    const assessor = rankedAssessor((input) => input.candidates.map((candidate) => finding(candidate.candidate_id)));
+    const dupe = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--candidate', 'notes/research.md', '--candidate', 'notes/research.md', '--json'], { assessor });
+    assert.equal(dupe.exitCode, 0, 'an exact duplicate keeps the documented dedup behavior, not a typed refusal');
+    assert.equal(dupe.value.candidates.length, 1, 'the repeated argument is assessed once');
+    assert.ok(dupe.value.diagnostics.some((entry) => entry.code === 'duplicate-candidate'));
+    // A case collision between DISTINCT spellings is still a typed refusal.
+    const collision = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--candidate', 'notes/research.md', '--candidate', 'Notes/Research.md', '--json'], { assessor });
+    assert.equal(collision.exitCode, 2);
+    assert.ok(collision.value.codes[0].startsWith('candidate-path-case-collision'));
+  });
+
+  it('never spends the budget on an unreadable candidate or an assessment of its id (review R2-N3)', async () => {
+    const root = await makeTemp('aif-cso-phantom-');
+    const changeId = await seeded(root);
+    const brief = await readStoredBrief(root, changeId);
+    const remaining = MAX_PRESENTATION_BYTES - brief.budget.source_bytes;
+    // Invalid UTF-8 lead byte plus a large body: a big MALFORMED candidate —
+    // it carries real byte length but can never be presented, so it must
+    // never consume the presentation budget. The assessor below simulates a
+    // provider that guesses the un-presented id (`notes/bad.md` sorts first,
+    // so it would be cand-0) and includes it: normalization must drop the
+    // outside-envelope finding and the budget pre-pass must not spend bytes
+    // on a candidate that can never be presented.
+    await put(root, 'notes/bad.md', Buffer.concat([Buffer.from([0xff]), Buffer.from('q'.repeat(Math.max(1, Math.floor(remaining * 0.7))))]));
+    const assessor = rankedAssessor((input) => {
+      assert.deepEqual(input.candidates.map((candidate) => candidate.path), ['notes/research.md'], 'the assessor is presented only readable candidates');
+      return [finding('cand-0', { reason: 'phantom first rank' }), finding(input.candidates[0].candidate_id)];
+    });
+    const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--candidate', 'notes/bad.md', '--candidate', 'notes/research.md', '--json'], { assessor });
+    assert.equal(run.exitCode, 0);
+    const byPath = new Map(run.value.candidates.map((candidate) => [candidate.path, candidate]));
+    assert.equal(byPath.get('notes/bad.md').kind, 'malformed');
+    assert.equal(byPath.get('notes/bad.md').status, 'unassessed', 'an assessment of an unreadable candidate id is dropped');
+    assert.equal(byPath.get('notes/research.md').status, 'included', 'the real candidate is not displaced by phantom budget spend');
+    assert.ok(run.value.diagnostics.some((entry) => entry.code === 'unknown-candidate-reference'), 'the assessor never saw the malformed candidate as input');
+    assert.ok(run.value.budget.estimated < MAX_PRESENTATION_BYTES);
+  });
+
+  it('spends the budget in the ACCEPTED assessment order, not the raw findings order (review R2-N4)', async () => {
+    const root = await makeTemp('aif-cso-accepted-');
+    const changeId = await seeded(root);
+    const brief = await readStoredBrief(root, changeId);
+    const remaining = MAX_PRESENTATION_BYTES - brief.budget.source_bytes;
+    await put(root, 'notes/aaa.md', 'a'.repeat(Math.max(1, Math.floor(remaining * 0.6))));
+    await put(root, 'notes/bbb.md', 'b'.repeat(Math.max(1, Math.floor(remaining * 0.6))));
+    const assessor = rankedAssessor((input) => {
+      const aaa = input.candidates.find((candidate) => candidate.path === 'notes/aaa.md');
+      const bbb = input.candidates.find((candidate) => candidate.path === 'notes/bbb.md');
+      return [
+        // An early DROPPED finding for aaa must not keep aaa on an early
+        // rank: the accepted order is bbb first, aaa second.
+        { candidate_id: aaa.candidate_id, status: 'included', scores: { relevance: 7, evidence_support: 8, contradiction: 9 }, reason: 'invalid', limitation: null, evidence_refs: [], conflict: null },
+        finding(bbb.candidate_id, { scores: { relevance: 1, evidence_support: 1, contradiction: 0 } }),
+        finding(aaa.candidate_id, { scores: { relevance: 0.9, evidence_support: 0.8, contradiction: 0 } }),
+      ];
+    });
+    const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--candidate', 'notes/aaa.md', '--candidate', 'notes/bbb.md', '--json'], { assessor });
+    assert.equal(run.exitCode, 0);
+    const statuses = new Map(run.value.candidates.map((candidate) => [candidate.path, candidate]));
+    assert.equal(statuses.get('notes/bbb.md').status, 'included', 'the first ACCEPTED assessment wins the budget');
+    assert.equal(statuses.get('notes/aaa.md').status, 'excluded');
+    assert.equal(statuses.get('notes/aaa.md').reason, 'presentation-budget-exceeded');
+    assert.ok(run.value.diagnostics.some((entry) => entry.code === 'invalid-assessment'));
   });
 
   it('keeps suspected conflicts visible at any relevance rank and never records owner confirmation', async () => {
@@ -617,11 +714,15 @@ describe('context-selection-overlay closed status model', () => {
     // to bounded metadata instead of failing schema parity with exit 1.
     const assessor = async (input) => ({
       findings: input.candidates.map((candidate) => finding(candidate.candidate_id)),
-      diagnostics: [{
-        code: 'd'.repeat(300),
-        path: 'p'.repeat(600),
-        detail: 'x'.repeat(700),
-      }],
+      diagnostics: [
+        { code: 'd'.repeat(300), path: 'p'.repeat(600), detail: 'x'.repeat(700) },
+        // An empty code passes a typeof check but violates the schema
+        // minLength: it is dropped with its own marker, never a parity crash
+        // (review R2/codex N5). Wrong-typed fields normalize to null.
+        { code: '', path: 'p', detail: 'd' },
+        { code: 123, path: 'p', detail: 'd' },
+        { code: 'kept', path: 123, detail: 456 },
+      ],
     });
     const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--candidate', 'notes/research.md', '--json'], { assessor });
     assert.equal(run.exitCode, 0);
@@ -630,6 +731,9 @@ describe('context-selection-overlay closed status model', () => {
     const copied = run.value.diagnostics.filter((entry) => entry.code.startsWith('d'));
     assert.equal(copied.length, 1, 'the diagnostic survives bounded');
     assert.ok(copied[0].code.length <= 200 && copied[0].path.length <= 500 && copied[0].detail.length <= 500);
+    const kept = run.value.diagnostics.find((entry) => entry.code === 'kept');
+    assert.deepEqual(kept, { code: 'kept', path: null, detail: null }, 'wrong-typed fields normalize to null');
+    assert.equal(run.value.diagnostics.filter((entry) => entry.code === 'assessor-diagnostic-dropped').length, 2, 'every code-less entry is a named drop');
   });
 
   it('missing, malformed, and over-limit candidates stay unassessed with coverage evidence', async () => {
@@ -1360,28 +1464,68 @@ describe('context-selection-overlay writer guards', () => {
     assert.equal(corrupted.code, 'observation-leaf-conflict');
   });
 
-  it('re-checks the namespace directory identity after the temp write, before the rename (review F01)', async () => {
+  it('re-checks the namespace directory identity after the temp write, before the rename (review F01)', async (t) => {
     const root = await makeTemp('aif-cso-junction-');
     const observation = observationFor();
-    // A junction/symlink swap between the earlier containment checks and the
-    // rename must not redirect the observation outside the resolved
-    // namespace: the writer re-realpaths the ancestry after the temp write
-    // and refuses the swap.
-    const swapTarget = path.join(root, 'swap-target');
-    await mkdir(swapTarget, { recursive: true });
-    const namespaceDir = path.join(root, STATE_ROOT, 'writer-change', CONTEXT_SELECTION_NAMESPACE);
+    // A swap between the earlier checks and the rename must not redirect the
+    // observation into a DIFFERENT namespace. The redirect below is a
+    // different-CASE sibling — a case-folded comparison treats it as "the
+    // same" directory and would rename the observation straight through the
+    // junction, escaping the closed QA namespace; the exact, case-sensitive
+    // realpath identity refuses it (review F01 residual (a)). On a
+    // case-INSENSITIVE filesystem the scenario is physically unrealizable —
+    // the cased sibling aliases the namespace itself — so the shape is
+    // skipped with its reason instead of silently passing.
+    const changeDir = path.join(root, STATE_ROOT, 'writer-change');
+    const namespaceDir = path.join(changeDir, CONTEXT_SELECTION_NAMESPACE);
+    const caseSibling = path.join(changeDir, 'Context-Selection-Overlay');
+    const probe = path.join(root, 'case-probe');
+    await mkdir(probe, { recursive: true });
+    const aliased = await realpath(path.join(root, 'CASE-PROBE'));
+    const caseInsensitive = path.resolve(aliased) === path.resolve(probe);
+    await rm(probe, { recursive: true, force: true });
+    if (caseInsensitive) {
+      t.skip('case-insensitive filesystem: a different-case sibling aliases the namespace itself, the swap scenario cannot exist here');
+      return;
+    }
+    await mkdir(caseSibling, { recursive: true });
     const swapped = await writeOverlayObservation(root, observation, configFor(), {
       gitGuard: async () => ({ ok: true }),
       beforeRename: async () => {
         await rm(namespaceDir, { recursive: true, force: true });
-        await symlink(swapTarget, namespaceDir, 'junction');
+        await symlink(caseSibling, namespaceDir, 'junction');
       },
     });
-    assert.equal(swapped.ok, false, 'a directory swap between temp-write and rename is refused');
+    assert.equal(swapped.ok, false, 'a different-case namespace swap is a refusal, never a normalized match');
     assert.equal(swapped.code, 'file-shadow');
+    assert.equal(await exists(root, `${STATE_ROOT}/writer-change/Context-Selection-Overlay/observation.json`), false, 'nothing was renamed through the swap');
     await rm(namespaceDir, { force: true });
-    assert.equal(await exists(root, `swap-target/${observation.change_id}/${CONTEXT_SELECTION_NAMESPACE}/observation.json`), false, 'nothing was renamed through the swap');
-    assert.equal(await exists(root, `swap-target/${CONTEXT_SELECTION_NAMESPACE}/observation.json`), false);
+    await rm(caseSibling, { recursive: true, force: true });
+  });
+
+  it('refuses a junction swap to a foreign sibling and leaves no stranded temp (review F01 residual (b))', async () => {
+    const root = await makeTemp('aif-cso-junction2-');
+    const observation = observationFor();
+    const changeDir = path.join(root, STATE_ROOT, 'writer-change');
+    const namespaceDir = path.join(changeDir, CONTEXT_SELECTION_NAMESPACE);
+    const foreignSibling = path.join(changeDir, 'foreign-namespace');
+    await mkdir(foreignSibling, { recursive: true });
+    const swapped = await writeOverlayObservation(root, observation, configFor(), {
+      gitGuard: async () => ({ ok: true }),
+      beforeRename: async () => {
+        await rm(namespaceDir, { recursive: true, force: true });
+        await symlink(foreignSibling, namespaceDir, 'junction');
+      },
+    });
+    assert.equal(swapped.ok, false, 'a junction swap between temp-write and rename is refused');
+    assert.equal(swapped.code, 'file-shadow');
+    assert.equal(await exists(root, `${STATE_ROOT}/writer-change/foreign-namespace/observation.json`), false, 'nothing was renamed through the swap');
+    // The cleanup unlinks through the stale physical path AND the swapped
+    // realpath (F01 residual (b)): no temp payload strands in the sibling.
+    const stranded = (await readdir(foreignSibling, { recursive: true })).filter((name) => String(name).endsWith('.tmp'));
+    assert.deepEqual(stranded, [], 'no temp payload strands behind the swap');
+    await rm(namespaceDir, { force: true });
+    await rm(foreignSibling, { recursive: true, force: true });
   });
 });
 
@@ -1540,6 +1684,28 @@ describe('context-selection-overlay candidate intake primitives', () => {
     assert.equal(projection.records[1].status, 'conflicting', 'a conflict is never budget-demoted');
     assert.equal(projection.conflictFits, false, 'oversized conflict metadata degrades honestly');
     assert.ok(projection.diagnostics.some((entry) => entry.code === 'conflict-evidence-refs-only'));
+  });
+
+  it('the freshness probe reads through the same injected reader seam as intake (review F10 residual)', async () => {
+    const root = await makeTemp('aif-cso-probe-');
+    const { changeId } = await seedBriefProject(root);
+    await compile(root, changeId);
+    await put(root, 'notes/a.md', 'alpha research fragment about the bounded behavior.\n');
+    await put(root, 'notes/b.md', 'beta research fragment about the bounded behavior.\n');
+    const reads = [];
+    const recordingReader = async (dir, rel, limit) => {
+      reads.push(rel);
+      return readProviderFile(dir, rel, limit);
+    };
+    const assessor = rankedAssessor((input) => input.candidates.map((candidate) => finding(candidate.candidate_id)));
+    const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--candidate', 'notes/a.md', '--candidate', 'notes/b.md', '--json'], { assessor, readCandidate: recordingReader });
+    assert.equal(run.exitCode, 0);
+    assert.equal(run.value.complete, true);
+    // Intake reads each candidate once; the freshness probe re-hashes each
+    // once more — through the SAME injected seam. Fewer than four reads
+    // would mean the probe silently bypassed the injection.
+    assert.ok(reads.length >= 4, `intake+probe reads recorded: ${reads.length}`);
+    assert.deepEqual([...new Set(reads)].sort(), ['notes/a.md', 'notes/b.md'], 'the probe never reads outside the presented allowlist');
   });
 
   it('the projector spends the budget in rankedIds order, not path order (review R1-6 unit)', () => {
@@ -1723,12 +1889,28 @@ describe('context-selection-overlay corpus evaluation (fixtures + labels)', () =
       for (const watched of entry.expected.watched_paths_byte_identical ?? []) {
         fingerprints.set(watched, await readFile(path.join(root, watched)));
       }
+      // A recording candidate reader proves the read guarantee positively
+      // (review F13/F09 residual): every candidate-path read the engine
+      // performs — intake AND freshness probe — stays inside the presented
+      // allowlist, so text inside a candidate never triggers an extra read.
+      const candidateReads = [];
       const run = await runCommand(root, [
         '--change', changeId, '--enabled', 'true',
         ...presented.flatMap((candidate) => ['--candidate', candidate]),
         '--json',
-      ], { assessor });
+      ], {
+        assessor,
+        readCandidate: async (dir, rel, limit) => {
+          candidateReads.push(rel);
+          return readProviderFile(dir, rel, limit);
+        },
+      });
       assert.equal(run.exitCode, 0, run.text.slice(0, 400));
+      assert.ok(candidateReads.length > 0, 'candidate reads go through the injected reader');
+      const presentedSet = new Set(presented);
+      for (const readPath of candidateReads) {
+        assert.ok(presentedSet.has(readPath), `a candidate read outside the allowlist: ${readPath}`);
+      }
       const observation = run.value;
       assert.notEqual(observation.state, 'not_run', 'enabled cases never land in the not_run envelope');
       assert.equal(observation.coverage.state, entry.expected.coverage);

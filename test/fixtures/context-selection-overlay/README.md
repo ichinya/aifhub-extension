@@ -25,11 +25,15 @@ corpus — it says nothing about semantic accuracy of a future live model.
   (low-similarity conflict with exact refs); `heldout-false-premise.md`
   re-attributes the intent to a different subsystem;
   `limit-prompt-injection.md` embeds instruction text, repository paths, and
-  a fake URL — all of it is data: the engine never reads the named paths,
-  never fetches, and the fake assessor's verdict comes from the labels, not
-  from the embedded instructions; `limit-crlf.md` uses CRLF line endings
-  pinned byte-exact via `-text` in the repository root `.gitattributes` (the
-  labels record its exact sha256 and byte length).
+  a fake URL — all of it is data: the embedded paths never extend the
+  presented allowlist or trigger an extra candidate read (the corpus runs a
+  recording reader that proves every candidate-path read stays inside the
+  presented inputs; the named baseline files are legal reads for the
+  read-only SessionBrief inspector), the engine never fetches, and the fake
+  assessor's verdict comes from the labels, not from the embedded
+  instructions; `limit-crlf.md` uses CRLF line endings pinned byte-exact via
+  `-text` in the repository root `.gitattributes` (the labels record its
+  exact sha256 and byte length).
 - `labels.json` — per-case structural expectations: `candidate_digests`
   (byte pins), per-case `labels` consumed by the labels-driven fake assessor,
   and `expected` observation facts (statuses, coverage, presentation

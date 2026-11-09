@@ -552,7 +552,14 @@ const BOUNDED_TEXT = (value) => (typeof value === 'string' ? (value.length > 500
 
 export function normalizeAssessorFindings(outcome, candidates, diagnostics) {
   if (outcome.run_status !== 'complete' || outcome.abstained === true) return new Map();
-  const byId = new Map(candidates.map((candidate) => [candidate.candidate_id, candidate]));
+  // The assessor was presented ONLY readable candidates as assessable input;
+  // a finding for a missing/malformed/truncated candidate id (whose content
+  // the assessor never saw) is an outside-envelope reference and is dropped
+  // like any unknown id — its candidate stays honestly unassessed (review
+  // R2-N3/codex N3).
+  const byId = new Map(candidates
+    .filter((candidate) => candidate.kind === 'file')
+    .map((candidate) => [candidate.candidate_id, candidate]));
   const assessments = new Map();
   for (const finding of Array.isArray(outcome.findings) ? outcome.findings : []) {
     const candidate = finding && typeof finding === 'object' && !Array.isArray(finding) ? byId.get(finding.candidate_id) : null;
@@ -619,10 +626,14 @@ export function normalizeAssessorFindings(outcome, candidates, diagnostics) {
       status: finding.status,
       scores,
       reason,
-      // The engine invariant demands a non-empty limitation for `excluded`;
-      // an assessor leaving it empty gets the honest default here instead of
-      // an invariant failure downstream (review R1-3).
-      limitation: typeof limitation === 'string' && limitation.length > 0 ? limitation : 'excluded by the assessor',
+      // The engine invariant demands a non-empty limitation for `excluded`
+      // only (review R2-N1): an included candidate keeps the assessor's own
+      // limitation (usually null) — a default phrased "excluded by the
+      // assessor" on an INCLUDED record would be self-contradictory
+      // metadata.
+      limitation: finding.status === 'excluded' && !(typeof limitation === 'string' && limitation.length > 0)
+        ? 'excluded by the assessor'
+        : limitation,
       evidence_refs: sanitizeRefs(finding.evidence_refs, diagnostics, candidate.candidate_id),
       conflict: null,
     });
@@ -652,10 +663,15 @@ export function projectSelection({ candidates, assessments, rankedIds, minimumRe
   // array order passed as `rankedIds` — never the path-sorted intake order
   // (review R1-6/devin probe B: a path-early candidate must not beat a
   // top-ranked one under budget pressure). Candidates the assessor marked
-  // `excluded` do not consume budget; conflicting candidates are refs-only.
+  // `excluded` do not consume budget; conflicting candidates are refs-only;
+  // and only READABLE candidates consume budget — an unreadable candidate
+  // becomes `unassessed` regardless of any assessment, so it must never
+  // spend the presentation budget a real supporting candidate needs
+  // (review R2-N3/codex N3).
   const rank = new Map((Array.isArray(rankedIds) ? rankedIds : []).map((id, index) => [id, index]));
   const includable = candidates
-    .filter((candidate) => assessments.get(candidate.candidate_id)?.status === 'included')
+    .filter((candidate) => candidate.kind === 'file'
+      && assessments.get(candidate.candidate_id)?.status === 'included')
     .sort((left, right) => (rank.get(left.candidate_id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(right.candidate_id) ?? Number.MAX_SAFE_INTEGER));
   const demotedIds = new Set();
   const demotionDetails = new Map();
@@ -1219,14 +1235,22 @@ export async function writeOverlayObservation(rootDir, observation, config, opti
     return { ok: false, code: 'observation-write-failed', detail: String(error?.message ?? error).slice(0, 200) };
   }
   // TOCTOU re-check after materialization: the live directory must resolve to
-  // the same real path (no symlink/junction swap).
+  // the same real path (no symlink/junction swap). The identity comparison is
+  // CASE-SENSITIVE (review F01 residual): realpath returns the on-disk
+  // casing on both sides, so folding case would let a swap to a
+  // different-case sibling namespace pass as "the same" directory; a
+  // mismatch is refused, never normalized.
+  const withinRoot = (value) => {
+    const relativeLive = path.relative(path.resolve(root), path.resolve(value));
+    return relativeLive !== '' && !relativeLive.startsWith('..') && !path.isAbsolute(relativeLive);
+  };
   let liveDirectory;
   try {
     liveDirectory = await realpath(directory);
   } catch (error) {
     return { ok: false, code: 'observation-write-failed', detail: String(error?.message ?? error).slice(0, 200) };
   }
-  if (path.resolve(liveDirectory).toLowerCase() !== path.resolve(directory).toLowerCase()) {
+  if (path.resolve(liveDirectory) !== path.resolve(directory) || !withinRoot(liveDirectory)) {
     return { ok: false, code: 'file-shadow', detail: parts.slice(0, -1).join('/') };
   }
   const secondRejection = await assertLeafWritable();
@@ -1237,21 +1261,31 @@ export async function writeOverlayObservation(rootDir, observation, config, opti
   // namespace directory swapped to a symlink/junction between the earlier
   // checks and the rename must not redirect the observation outside the
   // project root (review F01 — the leaf-only check did not close the window).
+  // Residual honesty (documented in design): a swap between the temp write
+  // and this re-check is a refusal, but the temp payload may already sit in
+  // the MOVED directory — the cleanup below unlinks through BOTH the stale
+  // physical path and the swapped path, and a temp that still survives a
+  // concurrent move-delete race is bounded diagnostic-free bytes under the
+  // closed state namespace, never a written observation.
   const payload = `${JSON.stringify(observation, null, 2)}\n`;
-  const temporary = path.join(liveDirectory, `${parts[parts.length - 1]}.${randomUUID()}.tmp`);
+  const tempName = `${parts[parts.length - 1]}.${randomUUID()}.tmp`;
+  const temporary = path.join(liveDirectory, tempName);
   const openFile = options.openFile ?? open;
   let renamed = false;
+  let swapped = false;
+  let liveAfter = null;
   try {
     const handle = await openFile(temporary, 'wx', 0o600);
     try { await handle.writeFile(payload, 'utf8'); } finally { await handle.close(); }
     if (typeof options.beforeRename === 'function') await options.beforeRename();
-    let liveAfter;
     try {
       liveAfter = await realpath(directory);
     } catch (error) {
+      liveAfter = null;
       return { ok: false, code: 'observation-write-failed', detail: String(error?.message ?? error).slice(0, 200) };
     }
-    if (path.resolve(liveAfter).toLowerCase() !== path.resolve(liveDirectory).toLowerCase()) {
+    if (path.resolve(liveAfter) !== path.resolve(liveDirectory) || !withinRoot(liveAfter)) {
+      swapped = true;
       return { ok: false, code: 'file-shadow', detail: parts.slice(0, -1).join('/') };
     }
     const thirdRejection = await assertLeafWritable();
@@ -1262,7 +1296,14 @@ export async function writeOverlayObservation(rootDir, observation, config, opti
   } catch (error) {
     return { ok: false, code: 'observation-write-failed', detail: String(error?.message ?? error).slice(0, 200) };
   } finally {
-    if (!renamed) await unlink(temporary).catch(() => {});
+    if (!renamed) {
+      // The stale physical path covers the un-moved case; after a detected
+      // swap the temp payload may live under the SWAPPED directory, so the
+      // cleanup also unlinks through the fresh realpath (review F01
+      // residual (b) — the temp must not strand behind the swap).
+      await unlink(temporary).catch(() => {});
+      if (swapped && liveAfter) await unlink(path.join(liveAfter, tempName)).catch(() => {});
+    }
   }
 }
 
@@ -1431,13 +1472,22 @@ export async function runContextSelectionOverlayCommand(argv = process.argv.slic
       return 2;
     }
   }
-  // Case-insensitive collisions between presented paths are refused before
-  // any read (review R1 low): on case-insensitive filesystems two such paths
-  // are the same file, on case-sensitive ones they are two files — no single
-  // intake decision is honest across both, so the presentation is typed and
-  // the owner presents one spelling.
-  const lowerSeen = new Map();
+  // Case-insensitive collisions between DISTINCT presented paths are refused
+  // before any read (review R1 low): on case-insensitive filesystems two such
+  // paths are the same file, on case-sensitive ones they are two files — no
+  // single intake decision is honest across both, so the presentation is
+  // typed and the owner presents one spelling. EXACT duplicates are not a
+  // collision (review R2-N2): they keep the documented dedup behavior — the
+  // intake below assesses them once with a `duplicate-candidate` diagnostic.
+  const exactSeen = new Set();
+  const distinctPaths = [];
   for (const candidatePath of parsed.candidatePaths) {
+    if (exactSeen.has(candidatePath)) continue;
+    exactSeen.add(candidatePath);
+    distinctPaths.push(candidatePath);
+  }
+  const lowerSeen = new Map();
+  for (const candidatePath of distinctPaths) {
     const key = candidatePath.toLowerCase();
     if (lowerSeen.has(key)) {
       emit(notRunEnvelope([`candidate-path-case-collision:${lowerSeen.get(key)}|${candidatePath}`.slice(0, 200)]), parsed.json);
@@ -1646,14 +1696,20 @@ export async function runContextSelectionOverlayCommand(argv = process.argv.slic
       // bounds are enforced HERE, at the copy boundary — every field is
       // capped to its closed maximum so an oversized provider diagnostic
       // degrades to bounded metadata instead of a schema-parity crash
-      // (review R1: the same fail-open class as dropped findings).
+      // (review R1: the same fail-open class as dropped findings). An entry
+      // without a usable code (empty string, wrong shape) is dropped with
+      // its own bounded marker — an uncodeable diagnostic can never reach
+      // the schema gate (review R2/codex N5: `''` passes a typeof check but
+      // violates the schema `minLength: 1`).
       for (const entry of Array.isArray(outcome.diagnostics) ? outcome.diagnostics : []) {
-        if (entry && typeof entry === 'object' && typeof entry.code === 'string') {
+        if (entry && typeof entry === 'object' && typeof entry.code === 'string' && entry.code.length > 0) {
           diagnostics.push({
             code: entry.code.slice(0, 200),
             path: typeof entry.path === 'string' ? entry.path.slice(0, 500) : null,
             detail: typeof entry.detail === 'string' ? entry.detail.slice(0, 500) : null,
           });
+        } else if (entry !== null && entry !== undefined) {
+          diagnostics.push({ code: 'assessor-diagnostic-dropped', path: null, detail: 'malformed diagnostic entry' });
         }
       }
       if (outcome.run_status !== 'complete') {
@@ -1699,12 +1755,13 @@ export async function runContextSelectionOverlayCommand(argv = process.argv.slic
         }));
       } else {
         const assessments = normalizeAssessorFindings(outcome, candidates, diagnostics);
-        // The assessor's ranking order is the findings array order restricted
-        // to the accepted assessments (review R1-6/devin probe B): the budget
-        // is spent top-ranked first, not path-sorted first.
-        const rankedIds = [...new Set((Array.isArray(outcome.findings) ? outcome.findings : [])
-          .map((finding) => (finding && typeof finding === 'object' && !Array.isArray(finding) ? finding.candidate_id : null))
-          .filter((id) => typeof id === 'string' && assessments.has(id)))];
+        // The assessor's ranking order is the ACCEPTED assessments order —
+        // the normalization Map preserves findings-array insertion order of
+        // exactly the kept entries (review R2-N4/codex N4: rebuilding ranks
+        // from the raw findings array would let an early DROPPED finding for
+        // candidate X outrank a later accepted one and win the budget). The
+        // budget is spent top-ranked first, not path-sorted first.
+        const rankedIds = [...assessments.keys()];
         // Conflict refs metadata bytes (pointers only) are budget-relevant.
         const conflictRefsBytes = [...assessments.values()]
           .filter((assessment) => assessment.status === 'conflicting')
