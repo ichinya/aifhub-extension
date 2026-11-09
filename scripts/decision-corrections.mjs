@@ -8,8 +8,9 @@
 // artifact: `diagnostic_only: true` and `authorizes: []` — it never verifies
 // facts, never creates an `aif-gate-result`, never writes QA evidence, and
 // never grants workflow authority. The replay runner's honesty note is a
-// contract term, not decoration: run verifies the current implementation
-// against stored fixtures; it does not measure provider quality.
+// contract term quoted verbatim from the change spec — the Russian literal
+// below is normative, its English gloss reads: run verifies the current
+// implementation against stored fixtures; it does not measure provider quality.
 import { mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile, lstat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -42,21 +43,23 @@ export const MAX_INPUT_REVISIONS = 100;
 export const MAX_REPLAY_ARGS = 40;
 export const MAX_RUN_CASES = 200;
 export const MAX_IDENTITY_SOURCE_CHARS = 64 * 1024;
-export const HONESTY_NOTE = 'Run verifies the current implementation against stored fixtures; it does not measure provider quality.';
+export const HONESTY_NOTE = 'run проверяет текущую реализацию на fixture, а не provider-качество';
 
 const STATUSES = Object.freeze(['draft', 'confirmed', 'rejected', 'superseded']);
 const PARTITIONS = Object.freeze(['development', 'calibration', 'held_out']);
 const AMBIGUITY_STATES = Object.freeze(['clear', 'ambiguous']);
 const FIXTURE_KINDS = Object.freeze(['redacted', 'synthetic']);
 // Replay map (solution 2-A): exported run commands with a DI assessor seam.
-// `context_selection_overlay` is intentionally absent: its run-command
-// contract is not a pinned DI surface in this repository, so replay reports
-// an honest `unsupported_consumer` instead of guessing an integration.
+// `context_selection_overlay` has no pinned run-command DI surface yet, so it
+// is accepted at intake (its cases are storeable) while the replay reports an
+// honest `unsupported_consumer` outcome without calling any engine — instead
+// of refusing the whole case at save time.
 const REPLAY_ENGINES = Object.freeze({
   requirements_semantic_lint: runRequirementLintCommand,
   claim_evidence_check: runClaimEvidenceCheckCommand,
   trace_link_suggestions: runTraceLinkSuggestionsCommand,
 });
+const SUPPORTED_REPLAY_CONSUMERS = Object.freeze([...Object.keys(REPLAY_ENGINES), 'context_selection_overlay']);
 // Allowlist projection of the identity source observation, applied BEFORE
 // assessmentCanonical (observation schemas require `generated_at`, which is a
 // banned binding key and would throw). Release-pinned SHAs (binding, engine,
@@ -267,21 +270,24 @@ export async function readDecisionCorrectionsConfig(rootDir, options = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// Typed privacy predicate: superset of the promote-metadata leak detector,
-// extended with URL-scheme shapes. Applied to the serialized case, the
-// preview/diagnostics output, and the CLI envelope before any persistence or
-// print — a detected leak is a blocked refusal, never a warning.
+// Typed privacy predicate: a leak-class superset of the promote-metadata
+// detector, evaluated on the same JSON-serialized form and extended with
+// URL-scheme shapes and unquoted unix-path anchors. On the serialized form
+// the base any-backslash rule translates 1:1: a real backslash inside a
+// value serializes as a doubled pair (matched below), while control
+// characters encode as single-backslash sequences (`\n`, `\r`, `\t`, ...),
+// so stored multiline fixture bytes never trip the path rule — the pair rule
+// fires exactly on real backslash material, including relative paths like
+// `private\notes`. Applied to the serialized case, the preview/diagnostics
+// output, and the CLI envelope before any persistence or print — a detected
+// leak is a blocked refusal, never a warning.
 // ---------------------------------------------------------------------------
 
 export function hasCorrectionsLeak(value) {
   let text;
   try { text = JSON.stringify(value) ?? ''; } catch { return true; }
-  // Patterns operate on the JSON-serialized form: a real backslash appears as
-  // a doubled escape, so an escaped newline (`...x:\n`) must NOT match the
-  // drive-letter rule — only a genuine drive/UNC/scheme shape does.
-  return /[A-Za-z]:\\\\/.test(text)
+  return /\\\\/.test(text)
     || /[A-Za-z]:\//.test(text)
-    || /\\\\\\\\/.test(text)
     || /(?:^|[^A-Za-z0-9])(?:\/Users|\/home|\/tmp|\/var\/tmp|\/private\/tmp|\/mnt|\/Volumes)\//.test(text)
     || /\b(?:sk|ghp|github_pat)_[A-Za-z0-9_=-]{12,}/i.test(text)
     || /BEGIN (?:RSA|OPENSSH|EC|DSA)? ?PRIVATE KEY/i.test(text)
@@ -484,7 +490,10 @@ function buildPayload(scope, input, identityMaterial, fixtureVersion, expectedLa
   }
   casePayload.fixture = { version: fixtureVersion, kind: input.fixture.kind, files };
   fields(input.original_assessment, ['consumer', 'verdict', 'summary'], []);
-  requireValue(Object.hasOwn(REPLAY_ENGINES, input.original_assessment.consumer), 'unsupported-consumer');
+  // Consumers without a pinned run-command DI surface stay storeable: the
+  // replay bucket (below) reports their honest `unsupported_consumer` outcome,
+  // so refusing them here would hide corrections from the store entirely.
+  requireValue(SUPPORTED_REPLAY_CONSUMERS.includes(input.original_assessment.consumer), 'unsupported-consumer');
   // Save-time consumer grammar checks: input roles must be able to produce a
   // well-formed replay argv for this consumer, otherwise the bundle would
   // only degrade to a dishonest not_run at replay time.
@@ -1281,7 +1290,7 @@ export async function runDecisionCorrectionReplay(input, options = {}) {
     if (wanted !== null && !wanted.includes(trustedCaseId)) continue;
     const trustedConsumer = record !== null
       && typeof record.payload?.original_assessment?.consumer === 'string'
-      && Object.hasOwn(REPLAY_ENGINES, record.payload.original_assessment.consumer)
+      && SUPPORTED_REPLAY_CONSUMERS.includes(record.payload.original_assessment.consumer)
       ? record.payload.original_assessment.consumer : 'requirements_semantic_lint';
     const base = {
       case_id: trustedCaseId,
@@ -1376,6 +1385,10 @@ export async function runDecisionCorrectionReplay(input, options = {}) {
     }
     const engine = engines[payload.original_assessment.consumer];
     if (!engine) {
+      // Honest diagnostic outcome for a storeable consumer whose run-command
+      // DI surface is not pinned yet: no engine call, no signature, and the
+      // case is bucketed under not_run instead of being scored.
+      partitionCounts.not_run += 1;
       results.push({ ...outcomeBase, outcome: 'unsupported_consumer' });
       continue;
     }

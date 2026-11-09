@@ -87,8 +87,11 @@ what a confirmed case tests.
 
 ## Privacy
 
-A typed leak predicate (superset of the promote-metadata detector, extended
-with URL schemes) scans the serialized case, the preview output, the run
+A typed leak predicate (a leak-class superset of the promote-metadata
+detector on the JSON-serialized form — JSON escape pairs such as `\n` inside
+stored fixture bytes are content encoding, not leak material, while any real
+backslash shape in a value refuses — extended with URL schemes) scans the
+serialized case, the preview output, the run
 record, diagnostics, and the CLI envelope before any persistence or print;
 a detected leak refuses `privacy-leak` (blocked) and nothing is echoed.
 Rationale, feedback, labels, and reasons carry field-specific bounded
@@ -129,8 +132,11 @@ trace-link test file matching the frozen test path form, a requirement-lint
 file), role-support files are materialized into the replay root only
 (sources, the trace custody manifest, replay configuration); bundles that
 could not produce a well-formed replay argv refuse at save time. Run records (`aifhub.decision_correction_run.v1`) preview by
-default and persist only with `--write`, carrying the verbatim honesty note:
+default and persist only with `--write`, carrying the verbatim honesty note quoted from the change spec (the Russian literal is
+normative; its English gloss follows):
 
+> «run проверяет текущую реализацию на fixture, а не provider-качество»
+>
 > Run verifies the current implementation against stored fixtures; it does
 > not measure provider quality.
 

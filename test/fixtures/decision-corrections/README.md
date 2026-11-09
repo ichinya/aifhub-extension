@@ -32,8 +32,10 @@ these files.
 refusal code for `limit-` cases. The corpus proves store transport, guards,
 and lifecycle only — with no live provider it says nothing about provider
 quality, and no live-eval thresholds are derivable from this fake suite. The
-replay runner's honesty note stays a contract term: run verifies the current
-implementation against stored fixtures; it does not measure provider quality.
+replay runner's honesty note stays a contract term quoted verbatim from the
+change spec: «run проверяет текущую реализацию на fixture, а не
+provider-качество» (run verifies the current implementation against stored
+fixtures; it does not measure provider quality).
 `dev-tx-link.json` carries a `SEALED-BY-TEST` proposal digest placeholder:
 the corpus test seeds a real evolution transaction and substitutes the
 sealed digest before the save, and never reads it from the repo at run time.

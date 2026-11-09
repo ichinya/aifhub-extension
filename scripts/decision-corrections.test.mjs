@@ -210,7 +210,7 @@ function literalCasePayload() {
     identity: {
       scope: 'work',
       partition: 'development',
-      source_observation: { schema: 'aifhub.requirement_lint_observation.v1', structural: { requirements: 2 } },
+      source_observation: { schema: 'aifhub.requirement_lint_observation.v1', change_id: 'work', language: 'ru', inputs: [{ path: 'docs/spec.md', sha256: null, bytes: 82, kind: 'file' }] },
       subject_revision: 'r1',
       input_revisions: { 'docs/spec.md': fixtureSha256(FIXTURE_BYTES) },
       question: { id: 'are requirements consistent', version: '1' },
@@ -252,7 +252,7 @@ function literalRunRecord() {
     run_id: 'run-0001',
     scope: 'work',
     written: false,
-    honesty_note: 'Run verifies the current implementation against stored fixtures; it does not measure provider quality.',
+    honesty_note: 'run проверяет текущую реализацию на fixture, а не provider-качество',
     counts: {
       development: { cases: 1, holds: 0, false_regression: 0, label_change: 1, ambiguous: 0, not_run: 0, stale: 0, report_only: 0, invalid_record: 0 },
       calibration: { cases: 0, holds: 0, false_regression: 0, label_change: 0, ambiguous: 0, not_run: 0, stale: 0, report_only: 0, invalid_record: 0 },
@@ -276,13 +276,25 @@ describe('decision-corrections closed schema parity', () => {
     assert.deepEqual(validateJsonAgainstSchema(literalRunRecord(), RUN_SCHEMA), []);
   });
 
-  it('rejects an extra field at the record and payload levels', () => {
+  it('rejects an extra field at the record, payload, and nested identity levels', () => {
     const record = literalCaseRecord();
     record.telemetry = true;
     assert.ok(validateJsonAgainstSchema(record, CASE_SCHEMA).length > 0, 'record-level additionalProperties must be closed');
     const payloadRecord = literalCaseRecord();
     payloadRecord.payload.export_to = 'somewhere';
     assert.ok(validateJsonAgainstSchema(payloadRecord, CASE_SCHEMA).length > 0, 'payload-level additionalProperties must be closed');
+    const nestedRecord = literalCaseRecord();
+    nestedRecord.payload.identity.source_observation.structural = { requirements: 2 };
+    assert.ok(
+      validateJsonAgainstSchema(nestedRecord, CASE_SCHEMA).length > 0,
+      'nested identity projection fields must stay inside the closed producer union grammar',
+    );
+    const unknownObservationKey = literalCaseRecord();
+    unknownObservationKey.payload.identity.source_observation.coverage = {};
+    assert.ok(
+      validateJsonAgainstSchema(unknownObservationKey, CASE_SCHEMA).length > 0,
+      'identity projection keys stay on the declared allowlist',
+    );
     const run = literalRunRecord();
     run.extra = 1;
     assert.ok(validateJsonAgainstSchema(run, RUN_SCHEMA).length > 0, 'run-record additionalProperties must be closed');
@@ -313,6 +325,58 @@ describe('decision-corrections closed schema parity', () => {
     outcomeRun.cases[0].outcome = 'tuned';
     assert.ok(validateJsonAgainstSchema(outcomeRun, RUN_SCHEMA).length > 0, 'run outcomes must stay in the closed set');
   });
+
+  it('resolves every $ref inside both closed schemas', () => {
+    for (const schema of [CASE_SCHEMA, RUN_SCHEMA]) {
+      const refs = [];
+      const walk = (node) => {
+        if (Array.isArray(node)) return node.forEach(walk);
+        if (!node || typeof node !== 'object') return;
+        if (typeof node.$ref === 'string') {
+          const resolved = node.$ref.slice(2).split('/').reduce(
+            (acc, part) => acc?.[part.replaceAll('~1', '/').replaceAll('~0', '~')],
+            schema,
+          );
+          refs.push({ ref: node.$ref, resolved: resolved !== undefined });
+        }
+        for (const value of Object.values(node)) walk(value);
+      };
+      walk(schema);
+      assert.ok(refs.length > 0, 'the schema inventory actually found references');
+      assert.deepEqual(refs.filter((item) => !item.resolved), [], `every $ref resolves inside ${schema.title}`);
+    }
+  });
+
+  it('accepts conforming producer projections from every grammar branch', () => {
+    const identitySchema = CASE_SCHEMA.$defs.payload.properties.identity.properties.source_observation;
+    const sha = (seed) => `sha256:${seed.repeat(64)}`;
+    // trace-link structural branch: exercises the scenario ref form and the
+    // behavioral span anchors (the identity_byte_span transitive refs).
+    const tlStructural = {
+      trace: { path: '.ai-factory/traces/work/lekalo-trace-manifest.json', sha256: 'a'.repeat(64), bytes: 10, schema_version: 'lekalo/trace-manifest/v0.2.16', identity: 'dev.lekalo.trace-manifest@0.2.16', completeness: 'full', manifest_digest: sha('b') },
+      scan: { coverage: 'full', declared_sources: 1, scanned_sources: 1, missing_sources: [], delta_spec_inventory: ['docs/spec.md'], missing_sources_count: 0, truncations: [] },
+      outcome: 'candidate',
+      outcome_summary: { total_nodes: 1, total_edges: 1, by_outcome: { candidate: 1, related_only: 0 } },
+      nodes: [{ node_id: 'n1', kind: 'scenario', exact_ref: { spec_path: 'docs/spec.md', requirement_ref: 'R1', heading: 'Scenario', span: { start: 0, end: 1 }, document_sha256: sha('c'), span_sha256: sha('d') } }],
+      edges: [{ edge_id: 'edge-1', from_node_id: 'n1', to_node_id: 'n1', relation: 'requirement_symbol', outcome: 'candidate', behavioral_assertion_refs: [{ path: 'docs/spec.md', span: { start: 0, end: 1 }, document_sha256: sha('e'), span_sha256: sha('f') }] }],
+    };
+    assert.deepEqual(
+      validateJsonAgainstSchema({ schema: 'aifhub.trace_link_suggestions_observation.v1', change_id: 'work', language: 'en', structural: tlStructural }, identitySchema, { rootSchema: CASE_SCHEMA }),
+      [],
+      'a trace-link producer projection must pass the closed union grammar',
+    );
+    // claim-evidence semantic branch: exercises the claim assessment items.
+    const ceSemantic = {
+      run_status: 'complete', freshness: 'current', abstained: false, outcome_reason: null,
+      coverage: { state: 'full', declared_sources: 0, scanned_sources: 0, missing_sources: [] },
+      assessments: [{ claim_id: 'claim-1', verdict: 'supports', rationale: 'literal quote found' }],
+    };
+    assert.deepEqual(
+      validateJsonAgainstSchema({ schema: 'aifhub.claim_evidence_observation.v1', change_id: 'work', language: 'en', semantic: ceSemantic }, identitySchema, { rootSchema: CASE_SCHEMA }),
+      [],
+      'a claim-evidence producer projection must pass the closed union grammar',
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -338,6 +402,10 @@ import { runRequirementLintCommand } from './requirement-lint.mjs';
 
 const SPEC_BYTES = '# Spec\n\n- R1: The system shall store data.\n- R2: The system shall not lose data.\n';
 const ENABLED_CONFIG = 'aifhub:\n  requirementLint:\n    enabled: true\n';
+// The verbatim honesty note is a contract term quoted from the delta spec.
+// Assertions compare against this independent literal (never against the
+// imported constant alone) so a drifted runtime translation cannot pass.
+const HONESTY_NOTE_LITERAL = 'run проверяет текущую реализацию на fixture, а не provider-качество';
 
 async function readdirSafe(dir) {
   try {
@@ -362,7 +430,7 @@ function baseCaseInput(overrides = {}) {
     partition: 'development',
     ambiguity: 'clear',
     identity: {
-      source_observation: { schema: 'aifhub.requirement_lint_observation.v1', change_id: 'work', structural: { requirements: 2 } },
+      source_observation: { schema: 'aifhub.requirement_lint_observation.v1', change_id: 'work', language: 'ru', inputs: [{ path: 'docs/spec.md', sha256: null, bytes: 82, kind: 'file' }] },
       subject_revision: 'r1',
       input_paths: ['docs/spec.md'],
       question: { id: 'are requirements consistent', version: '1' },
@@ -668,6 +736,12 @@ describe('decision-corrections lifecycle, ambiguity, and re-confirmation', () =>
     const saved = await decisionCorrectionsCommand('save', { ...redacted, payload_digest: redactionPreview.payload_digest }, { rootDir: root, ...STORE_OPTIONS() });
     assert.equal(saved.case.status, 'draft');
     assert.equal(saved.case.payload.expected_label_confirmed, false);
+    // After the rewrite the PRE-redaction digest still confirms nothing: the
+    // binding is to the exact new fixture bytes, not to the case history.
+    await assert.rejects(
+      () => decisionCorrectionsCommand('confirm', { case_id: input.case_id, scope: input.scope, expected_label: input.expected_label, payload_digest: preview.payload_digest }, { rootDir: root, ...STORE_OPTIONS() }),
+      (error) => error?.code === 'payload-mismatch',
+    );
     const reConfirmed = await decisionCorrectionsCommand('confirm', {
       case_id: input.case_id, scope: input.scope, expected_label: input.expected_label, payload_digest: redactionPreview.payload_digest,
     }, { rootDir: root, ...STORE_OPTIONS() });
@@ -675,14 +749,52 @@ describe('decision-corrections lifecycle, ambiguity, and re-confirmation', () =>
     assert.equal(reConfirmed.case.payload.fixture.version, 2);
   });
 
-  it('supports reject and supersede on every status', async () => {
+  it('supports confirm, reject and supersede on every status with idempotent repeats', async () => {
     const root = await makeTemp('aif-dc-lifecycle-');
     await seedStoreProject(root);
-    await saveCase(root, baseCaseInput({ case_id: 'dev-reject-1' }));
-    const rejected = await decisionCorrectionsCommand('reject', { case_id: 'dev-reject-1', scope: 'work', reason: 'superseded by review' }, { rootDir: root, ...STORE_OPTIONS() });
-    assert.equal(rejected.case.status, 'rejected');
-    const reRejected = await decisionCorrectionsCommand('reject', { case_id: 'dev-reject-1', scope: 'work' }, { rootDir: root, ...STORE_OPTIONS() });
-    assert.equal(reRejected.case.status, 'rejected', 'transitions are defined on every status and repeatable');
+    // Independent enumeration: every (source status x action) cell starts
+    // from a freshly seeded case driven to the source status, so the
+    // transition matrix is proven cell by cell, not through drifted state.
+    const actionForStatus = { confirmed: 'confirm', rejected: 'reject', superseded: 'supersede' };
+    const expectedForAction = { confirm: 'confirmed', reject: 'rejected', supersede: 'superseded' };
+    let revision = 0;
+    const seedTo = async (caseId, target) => {
+      const input = baseCaseInput({
+        case_id: caseId,
+        identity: { ...baseCaseInput().identity, subject_revision: `rev-mx-${revision += 1}` },
+      });
+      await saveCase(root, input);
+      if (target === 'draft') return input;
+      const body = { case_id: caseId, scope: 'work' };
+      if (target !== 'confirmed') body.reason = `mx seed ${target}`;
+      if (target === 'confirmed') {
+        const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
+        body.expected_label = input.expected_label;
+        body.payload_digest = preview.payload_digest;
+      }
+      const seeded = await decisionCorrectionsCommand(actionForStatus[target], body, { rootDir: root, ...STORE_OPTIONS() });
+      assert.equal(seeded.case.status, target, `${caseId}: seed status ${target}`);
+      return input;
+    };
+    for (const sourceStatus of ['draft', 'confirmed', 'rejected', 'superseded']) {
+      for (const action of ['confirm', 'reject', 'supersede']) {
+        const caseId = `dev-mx-${sourceStatus}-${action}`;
+        const input = await seedTo(caseId, sourceStatus);
+        for (let repeat = 1; repeat <= 2; repeat += 1) {
+          const body = { case_id: caseId, scope: 'work' };
+          if (action !== 'confirm') body.reason = `mx ${action} ${repeat}`;
+          if (action === 'confirm') {
+            // A confirm always binds the expected label to the CURRENT
+            // fixture digest: read it from the live record via preview.
+            const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
+            body.expected_label = input.expected_label;
+            body.payload_digest = preview.payload_digest;
+          }
+          const result = await decisionCorrectionsCommand(action, body, { rootDir: root, ...STORE_OPTIONS() });
+          assert.equal(result.case.status, expectedForAction[action], `${action} is defined on source status ${sourceStatus} (repeat ${repeat})`);
+        }
+      }
+    }
     await saveCase(root, baseCaseInput({ case_id: 'dev-supersede-1', identity: { ...baseCaseInput().identity, subject_revision: 'rev-supersede' }, ambiguity: 'ambiguous' }));
     const superseded = await decisionCorrectionsCommand('supersede', { case_id: 'dev-supersede-1', scope: 'work' }, { rootDir: root, ...STORE_OPTIONS() });
     assert.equal(superseded.case.status, 'superseded');
@@ -708,6 +820,17 @@ describe('decision-corrections privacy fail-closed', () => {
       );
     }
     assert.equal(hasCorrectionsLeak({ unc: '\\\\\\\\server' }), true, 'UNC shapes are leak indicators');
+    // Superset differential (rules-gate rounds 1-2 counter-examples): every
+    // real single-backslash shape in a value is path material and refuses,
+    // regardless of the character after the backslash, while JSON escape
+    // sequences of stored multiline fixture bytes are content encoding and
+    // keep saving (the redaction suite saves multiline bytes).
+    assert.equal(hasCorrectionsLeak({ note: 'private\\memo' }), true, 'a real single backslash is leak material');
+    assert.equal(hasCorrectionsLeak({ note: 'private\\notes' }), true, 'backslash+n is path material, not an encoded newline');
+    assert.equal(hasCorrectionsLeak({ note: 'private\\todo' }), true, 'backslash+t is path material, not an encoded tab');
+    assert.equal(hasCorrectionsLeak({ note: 'private\\u1234' }), true, 'backslash+u is path material, not a unicode escape');
+    assert.equal(hasCorrectionsLeak({ note: 'line1\nline2' }), false, 'escaped newlines are content encoding, not leaks');
+    assert.equal(hasCorrectionsLeak({ note: 'line1\r\nline2' }), false, 'CR/LF control chars stay content encodings');
     await assert.rejects(
       () => saveCase(root, baseCaseInput({ case_id: 'case-oversize', identity: { ...baseCaseInput().identity, subject_revision: 'rev-oversize' }, rationale: 'x'.repeat(3000) })),
       (error) => error?.code === 'invalid-rationale',
@@ -844,7 +967,7 @@ describe('decision-corrections replay runner', () => {
     const previewRun = await decisionCorrectionsCommand('run', { scope: 'work' }, { rootDir: root, ...STORE_OPTIONS() });
     assert.equal(previewRun.preview, true);
     assert.equal(previewRun.run.written, false);
-    assert.equal(previewRun.run.honesty_note, HONESTY_NOTE, 'the honesty note is verbatim in the output');
+    assert.equal(previewRun.run.honesty_note, HONESTY_NOTE_LITERAL, 'the honesty note is verbatim in the output');
     const runsDir = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE, 'work', 'runs');
     assert.deepEqual(await readdirSafe(runsDir), [], 'a preview run persists nothing');
     const writtenRun = await decisionCorrectionsCommand('run', { scope: 'work', write: true }, { rootDir: root, ...STORE_OPTIONS() });
@@ -945,11 +1068,44 @@ describe('decision-corrections replay runner', () => {
     );
   });
 
-  it('refuses an unsupported consumer at save time', async () => {
+  it('stores a consumer without a pinned run-command surface and reports an honest unsupported_consumer replay outcome', async () => {
     const root = await makeTemp('aif-dc-run5-');
     await seedStoreProject(root);
+    // context_selection_overlay has no pinned run-command DI surface yet: the
+    // case stays storeable (its grammars are not enforced), and the replay
+    // must report the honest unsupported_consumer outcome without ever
+    // calling an engine (must-not-call) and without scoring the case.
+    const input = baseCaseInput({
+      case_id: 'dev-overlay-1',
+      identity: { ...baseCaseInput().identity, subject_revision: 'rev-overlay' },
+      original_assessment: { consumer: 'context_selection_overlay', verdict: 'overlay verdict', summary: null },
+    });
+    await saveCase(root, input);
+    await confirmCase(root, input);
+    let engineCalls = 0;
+    const spyEngine = async () => { engineCalls += 1; return 0; };
+    const run = await decisionCorrectionsCommand('run', { scope: 'work' }, {
+      rootDir: root,
+      ...STORE_OPTIONS(),
+      replayEngines: {
+        requirements_semantic_lint: spyEngine,
+        claim_evidence_check: spyEngine,
+        trace_link_suggestions: spyEngine,
+      },
+    });
+    const entry = run.run.cases.find((item) => item.case_id === 'dev-overlay-1');
+    assert.equal(entry.outcome, 'unsupported_consumer', 'a consumer without a run-command surface is honest unsupported_consumer');
+    assert.equal(entry.signature, null, 'no engine signature exists for an unsupported consumer');
+    assert.equal(engineCalls, 0, 'no engine is called for an unsupported consumer');
+    assert.equal(run.run.counts.development.not_run, 1, 'the unsupported outcome lands in the honest not_run bucket');
+    assert.equal(run.run.counts.development.cases, 1);
+    // A consumer outside the closed intake allowlist is still refused.
     await assert.rejects(
-      () => saveCase(root, baseCaseInput({ case_id: 'dev-unknown-consumer', original_assessment: { consumer: 'context_selection_overlay', verdict: 'x', summary: null } })),
+      () => saveCase(root, baseCaseInput({
+        case_id: 'dev-unknown-consumer',
+        identity: { ...baseCaseInput().identity, subject_revision: 'rev-unknown' },
+        original_assessment: { consumer: 'made_up_consumer', verdict: 'x', summary: null },
+      })),
       (error) => error?.code === 'unsupported-consumer',
     );
   });
@@ -1225,7 +1381,7 @@ describe('decision-corrections corpus evaluation (fixtures + labels)', () => {
       'the bundle enables the requirement lint, so replay completes and the label comparison decides');
     assert.equal(byId['dev-ambiguous'].outcome, 'ambiguous');
     assert.equal(byId['dev-stale-inputs'].outcome, 'stale');
-    assert.equal(run.run.honesty_note, HONESTY_NOTE);
+    assert.equal(run.run.honesty_note, HONESTY_NOTE_LITERAL);
   });
 
   it('keeps held-out cases report-only under the same labels discipline', async () => {
@@ -2134,7 +2290,11 @@ describe('decision-corrections devin PR-review round', () => {
     void spyObservation;
     void longObservation;
     const stored = parseStrictJson(await readFile(path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE, 'work', 'cases', 'd4-trunc.json'), 'utf8'));
-    const expectedFull = `run_status=complete; findings=none; diagnostics=pad-000|pad-001|pad-002|pad-003|pad-004|pad-005|pad-006|pad-007|pad-008|pad-009|pad-010|pad-011|pad-012|pad-013|pad-014|pad-015|pad-016|pad-017|pad-018|pad-019|pad-020|pad-021|pad-022|pad-023|pad-024|pad-025|pad-026|pad-027|pad-028|pad-029|pad-030|pad-031|pad-032|pad-033|pad-034|pad-035|pad-036|pad-037|pad-038|pad-039|pad-040|pad-041|pad-042|pad-043|pad-044|pad-045|pad-046|pad-047|pad-048|pad-049|pad-050|pad-051|pad-052|pad-053|pad-054|pad-055|pad-056|pad-057|pad-058|pad-059; codes=none`;
+    // The expected signature form mirrors exactly what the extractor derives
+    // from a `findings: []` observation (no codes section — it is included
+    // only when the envelope defines a codes array), so the diverging tail
+    // below is the ONLY difference between the compared signatures.
+    const expectedFull = `run_status=complete; findings=none; diagnostics=pad-000|pad-001|pad-002|pad-003|pad-004|pad-005|pad-006|pad-007|pad-008|pad-009|pad-010|pad-011|pad-012|pad-013|pad-014|pad-015|pad-016|pad-017|pad-018|pad-019|pad-020|pad-021|pad-022|pad-023|pad-024|pad-025|pad-026|pad-027|pad-028|pad-029|pad-030|pad-031|pad-032|pad-033|pad-034|pad-035|pad-036|pad-037|pad-038|pad-039|pad-040|pad-041|pad-042|pad-043|pad-044|pad-045|pad-046|pad-047|pad-048|pad-049|pad-050|pad-051|pad-052|pad-053|pad-054|pad-055|pad-056|pad-057|pad-058|pad-059`;
     // Overwrite the confirmed label with the full-length expected signature.
     stored.record.payload.expected_label = expectedFull;
     stored.record.payload_digest = digest(canonical(stored.record.payload));
@@ -2144,11 +2304,6 @@ describe('decision-corrections devin PR-review round', () => {
     // 500-character stored bound.
     const divergingDiagnostics = longDiagnostics.slice(0, 59);
     const spyEngine = async (argv, engineOptions) => {
-      const chunks = [];
-      const render = (value) => { chunks.push(value); };
-      void render;
-      const replayed = `run_status=complete; findings=none; diagnostics=${[...divergingDiagnostics.map((d) => d.code), 'pad-tail'].sort().join('|')}; codes=none`;
-      void replayed;
       const observation = JSON.stringify({
         run_status: 'complete',
         findings: [],

@@ -26,7 +26,7 @@
       "type": "boolean"
     },
     "honesty_note": {
-      "const": "Run verifies the current implementation against stored fixtures; it does not measure provider quality."
+      "const": "run проверяет текущую реализацию на fixture, а не provider-качество"
     },
     "counts": {
       "type": "object",
@@ -63,7 +63,8 @@
             "enum": [
               "requirements_semantic_lint",
               "claim_evidence_check",
-              "trace_link_suggestions"
+              "trace_link_suggestions",
+              "context_selection_overlay"
             ]
           },
           "partition": {

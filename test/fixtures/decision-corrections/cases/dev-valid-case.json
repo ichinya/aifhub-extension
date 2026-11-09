@@ -7,9 +7,15 @@
     "source_observation": {
       "schema": "aifhub.requirement_lint_observation.v1",
       "change_id": "work",
-      "structural": {
-        "requirements": 2
-      }
+      "language": "ru",
+      "inputs": [
+        {
+          "path": "docs/spec.md",
+          "sha256": null,
+          "bytes": 81,
+          "kind": "file"
+        }
+      ]
     },
     "subject_revision": "r1",
     "input_paths": [

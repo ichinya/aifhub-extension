@@ -155,7 +155,702 @@
               ]
             },
             "source_observation": {
-              "type": "object"
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "schema": {
+                  "enum": [
+                    "aifhub.requirement_lint_observation.v1",
+                    "aifhub.claim_evidence_observation.v1",
+                    "aifhub.trace_link_suggestions_observation.v1"
+                  ]
+                },
+                "change_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "pattern": "^[A-Za-z0-9._-]+$"
+                },
+                "language": {
+                  "enum": [
+                    "ru",
+                    "en",
+                    "unknown"
+                  ]
+                },
+                "structural": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "checked_scope": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "carrier": {
+                          "$ref": "#/$defs/identity_source_input"
+                        },
+                        "pairs": {
+                          "type": "array",
+                          "maxItems": 50,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "claim_id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$"
+                              },
+                              "parent_claim_id": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "maxLength": 200,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$"
+                              },
+                              "claim_ref": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "maxLength": 500
+                              },
+                              "source_path": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 500
+                              },
+                              "source_span": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                  "start": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "end": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  }
+                                },
+                                "required": [
+                                  "start",
+                                  "end"
+                                ]
+                              },
+                              "relation": {
+                                "enum": [
+                                  "literal_quote",
+                                  "paraphrase",
+                                  "inference"
+                                ]
+                              },
+                              "quote_sha256": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "pattern": "^[a-f0-9]{64}$"
+                              },
+                              "quote_check": {
+                                "enum": [
+                                  "exact_found",
+                                  "literal_match_out_of_context",
+                                  "not_found",
+                                  "source_unavailable",
+                                  "truncated",
+                                  "not_applicable"
+                                ]
+                              },
+                              "quote_span": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                  "start": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "end": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "document_sha256": {
+                                    "type": "string",
+                                    "pattern": "^sha256:[a-f0-9]{64}$"
+                                  },
+                                  "span_sha256": {
+                                    "type": "string",
+                                    "pattern": "^sha256:[a-f0-9]{64}$"
+                                  }
+                                },
+                                "required": [
+                                  "start",
+                                  "end",
+                                  "document_sha256",
+                                  "span_sha256"
+                                ]
+                              },
+                              "known_revision": {
+                                "enum": [
+                                  "match",
+                                  "changed",
+                                  "not_declared",
+                                  "unverifiable"
+                                ]
+                              },
+                              "known_source_revision": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "pattern": "^sha256:[a-f0-9]{64}$"
+                              }
+                            },
+                            "required": [
+                              "claim_id",
+                              "parent_claim_id",
+                              "claim_ref",
+                              "source_path",
+                              "source_span",
+                              "relation",
+                              "quote_sha256",
+                              "quote_check",
+                              "quote_span",
+                              "known_revision",
+                              "known_source_revision"
+                            ]
+                          }
+                        },
+                        "outcome_summary": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "total": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 50
+                            },
+                            "by_quote_check": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "exact_found": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 50
+                                },
+                                "literal_match_out_of_context": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 50
+                                },
+                                "not_found": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 50
+                                },
+                                "source_unavailable": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 50
+                                },
+                                "truncated": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 50
+                                },
+                                "not_applicable": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 50
+                                }
+                              },
+                              "required": [
+                                "exact_found",
+                                "literal_match_out_of_context",
+                                "not_found",
+                                "source_unavailable",
+                                "truncated",
+                                "not_applicable"
+                              ]
+                            },
+                            "by_known_revision": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "match": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 50
+                                },
+                                "changed": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 50
+                                },
+                                "not_declared": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 50
+                                },
+                                "unverifiable": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 50
+                                }
+                              },
+                              "required": [
+                                "match",
+                                "changed",
+                                "not_declared",
+                                "unverifiable"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "total",
+                            "by_quote_check",
+                            "by_known_revision"
+                          ]
+                        },
+                        "missing_sources": {
+                          "type": "array",
+                          "maxItems": 100,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "path": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 500
+                              },
+                              "reason": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
+                              }
+                            },
+                            "required": [
+                              "path",
+                              "reason"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "checked_scope",
+                        "carrier",
+                        "pairs",
+                        "outcome_summary",
+                        "missing_sources"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "trace": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "path": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 500
+                            },
+                            "sha256": {
+                              "type": "string",
+                              "pattern": "^[a-f0-9]{64}$"
+                            },
+                            "bytes": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "schema_version": {
+                              "const": "lekalo/trace-manifest/v0.2.16"
+                            },
+                            "identity": {
+                              "const": "dev.lekalo.trace-manifest@0.2.16"
+                            },
+                            "completeness": {
+                              "enum": [
+                                "full",
+                                "partial"
+                              ]
+                            },
+                            "manifest_digest": {
+                              "type": "string",
+                              "pattern": "^sha256:[a-f0-9]{64}$"
+                            }
+                          },
+                          "required": [
+                            "path",
+                            "sha256",
+                            "bytes",
+                            "schema_version",
+                            "identity",
+                            "completeness",
+                            "manifest_digest"
+                          ]
+                        },
+                        "scan": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "coverage": {
+                              "enum": [
+                                "full",
+                                "partial",
+                                "none"
+                              ]
+                            },
+                            "declared_sources": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100000
+                            },
+                            "scanned_sources": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100000
+                            },
+                            "missing_sources": {
+                              "type": "array",
+                              "maxItems": 100,
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                  "path": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                  },
+                                  "reason": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 200
+                                  }
+                                },
+                                "required": [
+                                  "path",
+                                  "reason"
+                                ]
+                              }
+                            },
+                            "delta_spec_inventory": {
+                              "type": "array",
+                              "maxItems": 100,
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 500
+                              }
+                            },
+                            "missing_sources_count": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100000
+                            },
+                            "truncations": {
+                              "type": "array",
+                              "maxItems": 10,
+                              "items": {
+                                "enum": [
+                                  "graph-truncated",
+                                  "anchor-scan-truncated",
+                                  "delta-spec-inventory-truncated",
+                                  "missing-sources-truncated",
+                                  "declared-sources-truncated"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "coverage",
+                            "declared_sources",
+                            "scanned_sources",
+                            "missing_sources",
+                            "delta_spec_inventory",
+                            "missing_sources_count",
+                            "truncations"
+                          ]
+                        },
+                        "outcome": {
+                          "enum": [
+                            "candidate",
+                            "related_only",
+                            "none",
+                            "abstain"
+                          ]
+                        },
+                        "outcome_summary": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "total_nodes": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 500
+                            },
+                            "total_edges": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000
+                            },
+                            "by_outcome": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "candidate": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 1000
+                                },
+                                "related_only": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 1000
+                                }
+                              },
+                              "required": [
+                                "candidate",
+                                "related_only"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "total_nodes",
+                            "total_edges",
+                            "by_outcome"
+                          ]
+                        },
+                        "nodes": {
+                          "type": "array",
+                          "maxItems": 500,
+                          "items": {
+                            "$ref": "#/$defs/identity_graph_node"
+                          }
+                        },
+                        "edges": {
+                          "type": "array",
+                          "maxItems": 1000,
+                          "items": {
+                            "$ref": "#/$defs/identity_graph_edge"
+                          }
+                        }
+                      },
+                      "required": [
+                        "trace",
+                        "scan",
+                        "outcome",
+                        "outcome_summary",
+                        "nodes",
+                        "edges"
+                      ]
+                    }
+                  ]
+                },
+                "semantic": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "run_status": {
+                      "enum": [
+                        "complete",
+                        "failed",
+                        "not_run"
+                      ]
+                    },
+                    "freshness": {
+                      "enum": [
+                        "current",
+                        "stale"
+                      ]
+                    },
+                    "abstained": {
+                      "type": "boolean"
+                    },
+                    "outcome_reason": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 200
+                    },
+                    "coverage": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "state": {
+                          "enum": [
+                            "full",
+                            "partial",
+                            "none"
+                          ]
+                        },
+                        "declared_sources": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100000
+                        },
+                        "scanned_sources": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100000
+                        },
+                        "missing_sources": {
+                          "type": "array",
+                          "maxItems": 100,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "path": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 500
+                              },
+                              "reason": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
+                              }
+                            },
+                            "required": [
+                              "path",
+                              "reason"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "declared_sources",
+                        "scanned_sources",
+                        "missing_sources"
+                      ]
+                    },
+                    "assessments": {
+                      "type": "array",
+                      "maxItems": 1000,
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "claim_id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$"
+                              },
+                              "verdict": {
+                                "enum": [
+                                  "supports",
+                                  "contradicts",
+                                  "insufficient"
+                                ]
+                              },
+                              "rationale": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 500
+                              }
+                            },
+                            "required": [
+                              "claim_id",
+                              "verdict",
+                              "rationale"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "edge_id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64,
+                                "pattern": "^edge-[0-9]{1,8}$"
+                              },
+                              "verdict": {
+                                "enum": [
+                                  "supports",
+                                  "contradicts",
+                                  "insufficient"
+                                ]
+                              },
+                              "rationale": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 500
+                              }
+                            },
+                            "required": [
+                              "edge_id",
+                              "verdict",
+                              "rationale"
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "run_status",
+                    "freshness",
+                    "abstained",
+                    "outcome_reason",
+                    "coverage",
+                    "assessments"
+                  ]
+                },
+                "inputs": {
+                  "type": "array",
+                  "maxItems": 150,
+                  "items": {
+                    "$ref": "#/$defs/identity_source_input"
+                  }
+                },
+                "rubric": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "version"
+                  ]
+                }
+              }
             },
             "subject_revision": {
               "type": "string",
@@ -223,7 +918,8 @@
               "enum": [
                 "requirements_semantic_lint",
                 "claim_evidence_check",
-                "trace_link_suggestions"
+                "trace_link_suggestions",
+                "context_selection_overlay"
               ]
             },
             "verdict": {
@@ -322,6 +1018,327 @@
         "feedback",
         "replay",
         "evolution"
+      ]
+    },
+    "identity_source_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "kind": {
+          "enum": [
+            "file",
+            "missing",
+            "malformed"
+          ]
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "kind"
+      ]
+    },
+    "identity_graph_node": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "node_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "kind": {
+              "const": "requirement"
+            },
+            "exact_ref": {
+              "$ref": "#/$defs/identity_requirement_ref_form"
+            }
+          },
+          "required": [
+            "node_id",
+            "kind",
+            "exact_ref"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "node_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "kind": {
+              "const": "semantic_symbol"
+            },
+            "exact_ref": {
+              "$ref": "#/$defs/identity_symbol_ref_form"
+            }
+          },
+          "required": [
+            "node_id",
+            "kind",
+            "exact_ref"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "node_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "kind": {
+              "const": "scenario"
+            },
+            "exact_ref": {
+              "$ref": "#/$defs/identity_scenario_ref_form"
+            }
+          },
+          "required": [
+            "node_id",
+            "kind",
+            "exact_ref"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "node_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "kind": {
+              "const": "test"
+            },
+            "exact_ref": {
+              "$ref": "#/$defs/identity_test_ref_form"
+            }
+          },
+          "required": [
+            "node_id",
+            "kind",
+            "exact_ref"
+          ]
+        }
+      ]
+    },
+    "identity_graph_edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "edge_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^edge-[0-9]{1,8}$"
+        },
+        "from_node_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "to_node_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "relation": {
+          "enum": [
+            "requirement_symbol",
+            "symbol_scenario",
+            "symbol_test",
+            "scenario_test"
+          ]
+        },
+        "outcome": {
+          "enum": [
+            "candidate",
+            "related_only"
+          ]
+        },
+        "behavioral_assertion_refs": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "$ref": "#/$defs/identity_span_anchor"
+          }
+        }
+      },
+      "required": [
+        "edge_id",
+        "from_node_id",
+        "to_node_id",
+        "relation",
+        "outcome",
+        "behavioral_assertion_refs"
+      ]
+    },
+    "identity_requirement_ref_form": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "spec_path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "requirement_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "spec_path",
+        "requirement_ref"
+      ]
+    },
+    "identity_symbol_ref_form": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "symbol_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^(operation|endpoint):[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        }
+      },
+      "required": [
+        "symbol_ref"
+      ]
+    },
+    "identity_scenario_ref_form": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "spec_path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "requirement_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "heading": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "span": {
+          "$ref": "#/$defs/identity_byte_span"
+        },
+        "document_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "span_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "spec_path",
+        "requirement_ref",
+        "heading",
+        "span",
+        "document_sha256",
+        "span_sha256"
+      ]
+    },
+    "identity_test_ref_form": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "path",
+        "sha256"
+      ]
+    },
+    "identity_span_anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "span": {
+          "$ref": "#/$defs/identity_byte_span"
+        },
+        "document_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "span_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "path",
+        "span",
+        "document_sha256",
+        "span_sha256"
+      ]
+    },
+    "identity_byte_span": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "start": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "end": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "start",
+        "end"
       ]
     }
   }
