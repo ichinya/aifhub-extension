@@ -1,0 +1,56 @@
+{
+  "case_id": "dev-redaction",
+  "scope": "work",
+  "partition": "development",
+  "ambiguity": "clear",
+  "identity": {
+    "source_observation": {
+      "schema": "aifhub.requirement_lint_observation.v1",
+      "change_id": "work",
+      "structural": {
+        "requirements": 2
+      }
+    },
+    "subject_revision": "rev-redaction",
+    "input_paths": [
+      "docs/spec.md"
+    ],
+    "question": {
+      "id": "are requirements consistent",
+      "version": "1"
+    },
+    "rubric": {
+      "id": "consistency",
+      "version": "1"
+    }
+  },
+  "fixture": {
+    "kind": "synthetic",
+    "files": [
+      {
+        "path": ".ai-factory/config.yaml",
+        "media_type": "text/yaml",
+        "bytes": "aifhub:\n  requirementLint:\n    enabled: true\n"
+      },
+      {
+        "path": "docs/spec.md",
+        "media_type": "text/markdown",
+        "bytes": "# Spec\n\n- R1: The system shall store data.\n- R2: The system shall not lose data.\n"
+      }
+    ]
+  },
+  "original_assessment": {
+    "consumer": "requirements_semantic_lint",
+    "verdict": "two findings reported",
+    "summary": null
+  },
+  "expected_label": "no findings reported",
+  "rationale": null,
+  "feedback": null,
+  "replay": {
+    "args": [
+      "--change",
+      "work"
+    ]
+  }
+}

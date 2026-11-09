@@ -1,0 +1,171 @@
+{
+  "schema": "aifhub.decision_correction_labels.v1",
+  "thresholds": {
+    "label_match": "exact"
+  },
+  "provenance": "declared-only: every case cites the shipped sources/ of this directory plus deterministic offline setup artifacts created by the corpus test itself (docs/extra.md, the transaction evidence/context files); nothing is fetched or synthesized from outside the fixture copy and the test root",
+  "semantic_provenance": "expected outcomes are pipeline fixtures consumed by the corpus test against the local store and replay engines; with no live provider they prove transport, guards, and lifecycle, not provider quality (no live-eval thresholds are derivable from this fake suite)",
+  "heldout_discipline": "heldout-*.json files are labeled under the same discipline but never used to tune detectors; the store refuses every outcome-affecting mutation on held-out cases (held-out-tuning) and replay stays report-only",
+  "groups": {
+    "dev": {
+      "dev-valid-case.json": {
+        "negative": false,
+        "expected": {
+          "save": "ok",
+          "confirm": "ok",
+          "status": "confirmed",
+          "run_outcome": "label_change",
+          "run_note": "the bundle enables the requirement lint, so replay completes and the label comparison decides"
+        }
+      },
+      "dev-invalid-observation.json": {
+        "negative": false,
+        "expected": {
+          "save": "identity-source-empty"
+        }
+      },
+      "dev-stale-inputs.json": {
+        "negative": false,
+        "expected": {
+          "save": "ok",
+          "confirm": "ok",
+          "run_outcome": "stale"
+        }
+      },
+      "dev-repeat-save.json": {
+        "negative": false,
+        "expected": {
+          "save": "ok",
+          "confirm": "ok",
+          "resave": "idempotent",
+          "status": "confirmed"
+        }
+      },
+      "dev-scope-alpha.json": {
+        "negative": false,
+        "expected": {
+          "save": "ok"
+        }
+      },
+      "dev-scope-beta.json": {
+        "negative": false,
+        "expected": {
+          "save": "ok",
+          "scope_separate": true
+        }
+      },
+      "dev-preview-digest-mismatch.json": {
+        "negative": false,
+        "expected": {
+          "save": "payload-mismatch",
+          "artifacts": "none"
+        }
+      },
+      "dev-ambiguous.json": {
+        "negative": false,
+        "expected": {
+          "save": "ok",
+          "confirm": "ok",
+          "run_outcome": "ambiguous"
+        }
+      },
+      "dev-redaction.json": {
+        "negative": false,
+        "expected": {
+          "save": "ok",
+          "confirm": "ok",
+          "redaction": {
+            "version": 2,
+            "status": "draft",
+            "confirmed": false
+          },
+          "reconfirm": "ok"
+        }
+      },
+      "dev-redaction-v2.json": {
+        "negative": false,
+        "expected": {
+          "role": "redaction-material"
+        }
+      },
+      "dev-question-v2.json": {
+        "negative": false,
+        "expected": {
+          "save": "ok",
+          "new_identity": true,
+          "original_confirmed_unchanged": true
+        }
+      },
+      "dev-tx-link.json": {
+        "negative": false,
+        "expected": {
+          "save": "ok",
+          "evolution_active": true
+        }
+      },
+      "dev-crlf-fixture.json": {
+        "negative": false,
+        "expected": {
+          "save": "ok",
+          "confirm": "ok",
+          "bytes_exact": true
+        }
+      }
+    },
+    "heldout": {
+      "heldout-holdout.json": {
+        "negative": false,
+        "expected": {
+          "save": "ok",
+          "confirm": "held-out-tuning",
+          "reject": "held-out-tuning",
+          "supersede": "held-out-tuning"
+        }
+      }
+    },
+    "limit": {
+      "limit-malicious-url.json": {
+        "negative": true,
+        "expected": {
+          "save": "privacy-leak"
+        }
+      },
+      "limit-malicious-command.json": {
+        "negative": true,
+        "expected": {
+          "save": "privacy-leak"
+        }
+      },
+      "limit-nul-body.json": {
+        "negative": true,
+        "expected": {
+          "save": "invalid-feedback"
+        }
+      },
+      "limit-secret-token.json": {
+        "negative": true,
+        "expected": {
+          "save": "privacy-leak"
+        }
+      },
+      "limit-tx-missing.json": {
+        "negative": true,
+        "expected": {
+          "save": "missing-or-invalid-transaction"
+        }
+      },
+      "limit-tx-digest.json": {
+        "negative": true,
+        "expected": {
+          "save": "proposal-mismatch"
+        }
+      },
+      "limit-oversize-body.json": {
+        "negative": true,
+        "expected": {
+          "save": "invalid-rationale"
+        }
+      }
+    }
+  }
+}
