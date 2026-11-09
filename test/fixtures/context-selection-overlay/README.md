@@ -4,9 +4,16 @@ Offline corpus for `scripts/context-selection-overlay.test.mjs` (issue #284).
 Every case cites only files shipped in this directory (declared-only
 provenance); the corpus test copies them into a disposable temp project and
 presents candidate files exclusively through repeatable `--candidate` inputs.
-Nothing is fetched, synthesized, or read from outside the materialized fixture
-copy at run time. No network access and no paid calls happen in any test that
-consumes these files.
+Nothing is fetched or read from outside the materialized fixture copy at run
+time, and no network access or paid calls happen in any test that consumes
+these files. The only generated material is explicitly declared: case
+`limit-truncated-source` builds its oversize candidate in the temp project
+from an inline recipe (`'z'.repeat(...)`, declared in `labels.json`) because
+an oversized fixture file cannot ship byte-pinned. `labels.json` pins the
+sha256 of every shipped candidate; the corpus test verifies the shipped bytes
+against those digests before any run. The `negative_false_accusations: 0`
+threshold verifies label-projection fidelity of the fake assessor over this
+corpus — it says nothing about semantic accuracy of a future live model.
 
 ## Layout
 

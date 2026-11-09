@@ -7,7 +7,7 @@
 // accuracy of a future model.
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { cp, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -41,6 +41,7 @@ import {
   assertOverlayInvariants,
   assembleObservation,
   baselineBindingComponents,
+  boundAssessmentText,
   buildProtectedMinimum,
   candidateDigestRecords,
   currentOverlayContext,
@@ -177,6 +178,17 @@ describe('context-selection-overlay argument custody', () => {
     assert.deepEqual(malformed.value.codes, ['invalid-change-id']);
     assert.equal(CHANGE_ID_FORM.test('../escape'), false);
     assert.equal(CHANGE_ID_FORM.test('valid-change'), true);
+  });
+
+  it('refuses case-insensitive candidate path collisions before any read (review R1 low)', async () => {
+    const root = await makeTemp('aif-cso-case-');
+    const run = await runCommand(root, ['--change', 'c', '--enabled', 'true', '--candidate', 'notes/research.md', '--candidate', 'Notes/Research.md', '--json']);
+    assert.equal(run.exitCode, 2);
+    assert.equal(run.value.state, 'not_run');
+    assert.ok(run.value.codes[0].startsWith('candidate-path-case-collision'), `got ${run.value.codes[0]}`);
+    // A single candidate (or two genuinely distinct paths) is unaffected.
+    const single = await runCommand(root, ['--change', 'c', '--enabled', 'true', '--candidate', 'notes/research.md', '--json']);
+    assert.notEqual(single.exitCode, 2);
   });
 });
 
@@ -381,14 +393,27 @@ describe('context-selection-overlay fallback matrix', () => {
     const invalidRun = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--candidate', 'notes/research.md', '--json'], { assessor: assessorInvalid });
     assert.equal(invalidRun.value.run_status, 'failed');
     assert.equal(invalidRun.value.candidates[0].status, 'unassessed');
-    const assessorTimeout = () => new Promise(() => {});
-    const timeoutRun = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--candidate', 'notes/research.md', '--json'], { assessor: assessorTimeout, deadlineMs: 40 });
-    // The deadline bounds the whole command: a race-settled timeout is also
-    // past the pre-persistence gate, so the honest outcome is the bounded
-    // not_run envelope — never a half-run write, never a fake projection.
+    // The clock is injected and advances only when the assessor is invoked:
+    // the pre-assessment deadline checks always see zero elapsed time (no
+    // flaky not_run under load), while the hanging assessor runs out the
+    // cooperative deadline the moment it starts.
+    let clock = 0;
+    const assessorTimeout = async () => {
+      clock = 500;
+      return new Promise(() => {});
+    };
+    const timeoutRun = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--candidate', 'notes/research.md', '--json'], { assessor: assessorTimeout, deadlineMs: 400, now: () => clock });
+    // Once the semantic stage has produced material, the honest outcome is
+    // the collected failed observation — verbatim minimum, every candidate
+    // unassessed, freshness stale — never a late not_run replacement
+    // (review F04 / decision D8). Only the pre-assessment deadline checks
+    // produce a bounded not_run envelope.
     assert.equal(timeoutRun.exitCode, 0);
-    assert.equal(timeoutRun.value.state, 'not_run');
-    assert.ok(timeoutRun.value.codes.includes('deadline-exceeded'));
+    assert.equal(timeoutRun.value.run_status, 'failed');
+    assert.equal(timeoutRun.value.complete, false);
+    assert.equal(timeoutRun.value.freshness, 'stale', 'the helper probe past the deadline marks the outcome stale');
+    assert.equal(timeoutRun.value.candidates[0].status, 'unassessed');
+    assert.deepEqual(timeoutRun.value.manifest.protected_minimum, brief.context_manifest, 'protected minimum stays verbatim on timeout');
     assert.equal(compiled.ok, true);
   });
 
@@ -548,6 +573,63 @@ describe('context-selection-overlay closed status model', () => {
     const byPath = new Map(run.value.candidates.map((candidate) => [candidate.path, candidate]));
     assert.equal(byPath.get('notes/research.md').status, 'included', 'keep-first wins for duplicated ids');
     assert.equal(byPath.get('notes/second.md').status, 'unassessed', 'every dropped finding leaves its candidate unassessed');
+    // Dropped findings on a readable candidate are a degradation (review
+    // F05): the run stays complete at the status level but coverage degrades
+    // and the AND model refuses completeness.
+    assert.equal(run.value.coverage.state, 'partial');
+    assert.equal(run.value.complete, false);
+  });
+
+  it('drops a conflict with conflict refs but empty evidence refs instead of failing the run (review R1-3)', async () => {
+    const root = await makeTemp('aif-cso-evref-');
+    const changeId = await seeded(root);
+    // devin probe D reproduction: `conflict.refs` is valid, `evidence_refs`
+    // is empty — normalization must drop the finding with a diagnostic, the
+    // candidate stays unassessed, and the run completes honestly instead of
+    // crashing on the engine invariant (operational-failure exit 1).
+    const sha = digest(Buffer.from('Research notes describing the bounded behavior and its valid input acceptance example.\n'));
+    const assessor = rankedAssessor(() => [
+      finding('cand-0', {
+        status: 'conflicting',
+        conflict: { state: 'suspected', refs: [{ path: 'notes/research.md', document_sha256: sha }] },
+        evidence_refs: [],
+      }),
+    ]);
+    const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--candidate', 'notes/research.md', '--json'], { assessor });
+    assert.equal(run.exitCode, 0);
+    assert.equal(run.value.run_status, 'complete', 'no operational failure, no invariant crash');
+    assert.equal(run.value.state, undefined);
+    assert.equal(run.value.candidates[0].status, 'unassessed');
+    assert.equal(run.value.candidates[0].conflict, null);
+    assert.ok(run.value.diagnostics.some((entry) => entry.code === 'conflict-without-evidence-refs'));
+    assert.equal(run.value.coverage.state, 'partial');
+    assert.equal(run.value.complete, false);
+    const schema = parseStrictJson(await readFile(path.join(REPO_ROOT, CONTRACT_MODULE), 'utf8'));
+    assert.deepEqual(validateJsonAgainstSchema(run.value, schema), [], 'the degraded observation is schema-valid');
+  });
+
+  it('bounds oversized assessor diagnostics to the schema instead of a schema-parity crash (review R1)', async () => {
+    const root = await makeTemp('aif-cso-bigdiag-');
+    const changeId = await seeded(root);
+    // The helper passes raw assessor diagnostics through verbatim; the
+    // engine bounds them at the copy boundary (schema: code<=200,
+    // path<=500, detail<=500) so an oversized provider diagnostic degrades
+    // to bounded metadata instead of failing schema parity with exit 1.
+    const assessor = async (input) => ({
+      findings: input.candidates.map((candidate) => finding(candidate.candidate_id)),
+      diagnostics: [{
+        code: 'd'.repeat(300),
+        path: 'p'.repeat(600),
+        detail: 'x'.repeat(700),
+      }],
+    });
+    const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--candidate', 'notes/research.md', '--json'], { assessor });
+    assert.equal(run.exitCode, 0);
+    const schema = parseStrictJson(await readFile(path.join(REPO_ROOT, CONTRACT_MODULE), 'utf8'));
+    assert.deepEqual(validateJsonAgainstSchema(run.value, schema), [], 'the observation stays schema-valid');
+    const copied = run.value.diagnostics.filter((entry) => entry.code.startsWith('d'));
+    assert.equal(copied.length, 1, 'the diagnostic survives bounded');
+    assert.ok(copied[0].code.length <= 200 && copied[0].path.length <= 500 && copied[0].detail.length <= 500);
   });
 
   it('missing, malformed, and over-limit candidates stay unassessed with coverage evidence', async () => {
@@ -831,6 +913,35 @@ describe('context-selection-overlay budget', () => {
     assert.ok(run.value.manifest.excluded.some((entry) => entry.path === 'notes/second.md'));
   });
 
+  it('spends the budget in the assessor ranking order, never in path order (review R1-6)', async () => {
+    const root = await makeTemp('aif-cso-rank-');
+    const { changeId } = await seedBriefProject(root);
+    await compile(root, changeId);
+    const brief = await readStoredBrief(root, changeId);
+    const remaining = MAX_PRESENTATION_BYTES - brief.budget.source_bytes;
+    // `notes/aaa.md` sorts before `notes/zzz.md` in the path-sorted intake,
+    // but the assessor ranks `zzz` FIRST. Under pressure the ranking must
+    // win: zzz is included, aaa is demoted (devin probe B reproduction).
+    await put(root, 'notes/aaa.md', 'a'.repeat(Math.max(1, Math.floor(remaining * 0.6))));
+    await put(root, 'notes/zzz.md', 'z'.repeat(Math.max(1, Math.floor(remaining * 0.6))));
+    const assessor = rankedAssessor((input) => {
+      const aaa = input.candidates.find((candidate) => candidate.path === 'notes/aaa.md');
+      const zzz = input.candidates.find((candidate) => candidate.path === 'notes/zzz.md');
+      return [
+        finding(zzz.candidate_id, { scores: { relevance: 1, evidence_support: 1, contradiction: 0 }, reason: 'top ranked' }),
+        finding(aaa.candidate_id, { scores: { relevance: 0.9, evidence_support: 0.8, contradiction: 0 }, reason: 'second ranked' }),
+      ];
+    });
+    const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--candidate', 'notes/aaa.md', '--candidate', 'notes/zzz.md', '--json'], { assessor });
+    assert.equal(run.exitCode, 0);
+    const statuses = new Map(run.value.candidates.map((candidate) => [candidate.path, candidate]));
+    assert.equal(statuses.get('notes/zzz.md').status, 'included', 'the top-ranked candidate wins the budget regardless of its path');
+    const demoted = statuses.get('notes/aaa.md');
+    assert.equal(demoted.status, 'excluded');
+    assert.equal(demoted.reason, 'presentation-budget-exceeded', 'the lower-ranked candidate is the exhaustive tail');
+    assert.equal(run.value.complete, false);
+  });
+
   it('keeps conflicts presentable as refs-only with review handoff when the metadata no longer fits', async () => {
     const root = await makeTemp('aif-cso-refsonly-');
     const { changeId } = await seedBriefProject(root);
@@ -950,6 +1061,36 @@ describe('context-selection-overlay binding and revalidation', () => {
     engineTampered.engine.sha256 = 'f'.repeat(64);
     const engineVerdict = await validateSelectionBinding(root, engineTampered);
     assert.ok(engineVerdict.mismatched.includes('engine'));
+  });
+
+  it('refuses manifest projection tampering and names a stale protected minimum (review F02/F08)', async () => {
+    const root = await makeTemp('aif-cso-stale3-');
+    const { changeId } = await seedBriefProject(root);
+    await compile(root, changeId);
+    const assessor = rankedAssessor((input) => input.candidates.map((candidate) => finding(candidate.candidate_id)));
+    const run = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--candidate', 'notes/research.md', '--json'], { assessor });
+    const observation = run.value;
+    assert.equal((await validateSelectionBinding(root, observation)).stale, false);
+    // A manifest edited WITHOUT its candidates breaks the projection
+    // consistency layer: refused outright, never revalidated as fresh.
+    const pinTampered = structuredClone(observation);
+    pinTampered.manifest.included = [];
+    const pinVerdict = await validateSelectionBinding(root, pinTampered);
+    assert.equal(pinVerdict.code, 'observation-invalid', 'manifest.included must mirror the included candidates');
+    // A conflict recorded on an included candidate is the same tamper class.
+    const conflictTampered = structuredClone(observation);
+    conflictTampered.candidates[0].conflict = { state: 'suspected', refs: [{ path: 'x', document_sha256: 'a'.repeat(64) }] };
+    assert.equal((await validateSelectionBinding(root, conflictTampered)).code, 'observation-invalid');
+    // A CONSISTENT truncation of the protected minimum (manifest + section
+    // edited together, invariant clean) is caught against the CURRENT
+    // baseline manifest at revalidation and named.
+    const minimumTampered = structuredClone(observation);
+    minimumTampered.manifest.protected_minimum = minimumTampered.manifest.protected_minimum.slice(0, 1);
+    const minimumSection = minimumTampered.presentation.find((section) => section.section === 'protected_minimum');
+    minimumSection.refs = minimumSection.refs.slice(0, 1);
+    const minimumVerdict = await validateSelectionBinding(root, minimumTampered);
+    assert.equal(minimumVerdict.stale, true, 'a consistent truncation is never fresh');
+    assert.ok(minimumVerdict.mismatched.includes('baseline:protected_minimum'), `named: ${minimumVerdict.mismatched.join(',')}`);
   });
 
   it('refuses a structurally invalid or schema-violating recorded observation outright', async () => {
@@ -1218,6 +1359,30 @@ describe('context-selection-overlay writer guards', () => {
     assert.equal(corrupted.ok, false, 'an unreadable previous leaf fails closed');
     assert.equal(corrupted.code, 'observation-leaf-conflict');
   });
+
+  it('re-checks the namespace directory identity after the temp write, before the rename (review F01)', async () => {
+    const root = await makeTemp('aif-cso-junction-');
+    const observation = observationFor();
+    // A junction/symlink swap between the earlier containment checks and the
+    // rename must not redirect the observation outside the resolved
+    // namespace: the writer re-realpaths the ancestry after the temp write
+    // and refuses the swap.
+    const swapTarget = path.join(root, 'swap-target');
+    await mkdir(swapTarget, { recursive: true });
+    const namespaceDir = path.join(root, STATE_ROOT, 'writer-change', CONTEXT_SELECTION_NAMESPACE);
+    const swapped = await writeOverlayObservation(root, observation, configFor(), {
+      gitGuard: async () => ({ ok: true }),
+      beforeRename: async () => {
+        await rm(namespaceDir, { recursive: true, force: true });
+        await symlink(swapTarget, namespaceDir, 'junction');
+      },
+    });
+    assert.equal(swapped.ok, false, 'a directory swap between temp-write and rename is refused');
+    assert.equal(swapped.code, 'file-shadow');
+    await rm(namespaceDir, { force: true });
+    assert.equal(await exists(root, `swap-target/${observation.change_id}/${CONTEXT_SELECTION_NAMESPACE}/observation.json`), false, 'nothing was renamed through the swap');
+    assert.equal(await exists(root, `swap-target/${CONTEXT_SELECTION_NAMESPACE}/observation.json`), false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1370,11 +1535,53 @@ describe('context-selection-overlay candidate intake primitives', () => {
       ['cand-0', { status: 'included', scores: null, reason: null, limitation: null, evidence_refs: [], conflict: null }],
       ['cand-1', { status: 'conflicting', scores: null, reason: null, limitation: null, evidence_refs: [], conflict: { state: 'suspected', refs: [{ path: 'small.md', document_sha256: 'a'.repeat(64) }] } }],
     ]);
-    const projection = projectSelection({ candidates, assessments, protectedMinimum: [], minimumRequired: 0, conflictRefsBytes: 10_000, limit: 1000 });
+    const projection = projectSelection({ candidates, assessments, rankedIds: ['cand-0', 'cand-1'], minimumRequired: 0, conflictRefsBytes: 10_000, limit: 1000 });
     assert.equal(projection.records[0].status, 'included');
     assert.equal(projection.records[1].status, 'conflicting', 'a conflict is never budget-demoted');
     assert.equal(projection.conflictFits, false, 'oversized conflict metadata degrades honestly');
     assert.ok(projection.diagnostics.some((entry) => entry.code === 'conflict-evidence-refs-only'));
+  });
+
+  it('the projector spends the budget in rankedIds order, not path order (review R1-6 unit)', () => {
+    const candidates = [
+      { candidate_id: 'cand-0', path: 'aaa.md', sha256: 'a'.repeat(64), bytes: 700, kind: 'file' },
+      { candidate_id: 'cand-1', path: 'zzz.md', sha256: 'a'.repeat(64), bytes: 700, kind: 'file' },
+    ];
+    const assessment = (reason) => ({ status: 'included', scores: null, reason, limitation: null, evidence_refs: [], conflict: null });
+    const assessments = new Map([['cand-0', assessment('second')], ['cand-1', assessment('top')]]);
+    // Ranking puts zzz first: zzz fits, aaa does not — the path-order
+    // behavior (aaa included) must never return.
+    const projection = projectSelection({ candidates, assessments, rankedIds: ['cand-1', 'cand-0'], minimumRequired: 0, conflictRefsBytes: 0, limit: 1000 });
+    const byId = new Map(projection.records.map((record) => [record.candidate_id, record]));
+    assert.equal(byId.get('cand-1').status, 'included');
+    assert.equal(byId.get('cand-0').status, 'excluded');
+    assert.equal(byId.get('cand-0').reason, 'presentation-budget-exceeded');
+    assert.deepEqual(projection.manifestIncluded.map((pin) => pin.path), ['zzz.md']);
+  });
+
+  it('bounds assessor text in UTF-8 bytes without splitting a code point (review F07)', () => {
+    const ascii = boundAssessmentText('a'.repeat(MAX_ASSESSMENT_TEXT + 10), MAX_ASSESSMENT_TEXT);
+    assert.equal(ascii.truncated, true);
+    assert.equal(Buffer.byteLength(ascii.text, 'utf8'), MAX_ASSESSMENT_TEXT);
+    // Cyrillic: two bytes per code unit, so a 40000-char file is 80000 bytes
+    // and the byte bound (not the code-unit bound) fires.
+    const cyrillicText = 'и'.repeat(40000);
+    const cyrillic = boundAssessmentText(cyrillicText, MAX_ASSESSMENT_TEXT);
+    assert.equal(cyrillic.truncated, true);
+    assert.ok(Buffer.byteLength(cyrillic.text, 'utf8') <= MAX_ASSESSMENT_TEXT);
+    assert.ok(cyrillic.text.length < cyrillicText.length, 'the code-unit count alone under-counted multibyte bytes');
+    // An emoji cut lands inside the surrogate sequence: the bound backs off
+    // to the last complete UTF-8 sequence instead of a lone surrogate.
+    const emojiText = `${'b'.repeat(MAX_ASSESSMENT_TEXT - 2)}😀`;
+    const emoji = boundAssessmentText(emojiText, MAX_ASSESSMENT_TEXT);
+    assert.equal(emoji.truncated, true);
+    assert.equal(emoji.text.includes('\uFFFD'), false, 'no replacement char from a split sequence');
+    assert.equal([...emoji.text].at(-1), 'b', 'the cut backs off to the last complete sequence');
+    assert.ok(Buffer.byteLength(emoji.text, 'utf8') <= MAX_ASSESSMENT_TEXT);
+    // At-the-boundary content is passed through untouched.
+    const exact = boundAssessmentText('x'.repeat(MAX_ASSESSMENT_TEXT), MAX_ASSESSMENT_TEXT);
+    assert.equal(exact.truncated, false);
+    assert.equal(exact.text.length, MAX_ASSESSMENT_TEXT);
   });
 
   it('sanitizes evidence refs to portable paths with real digests', () => {
@@ -1513,7 +1720,7 @@ describe('context-selection-overlay corpus evaluation (fixtures + labels)', () =
         };
       }));
       const fingerprints = new Map();
-      for (const watched of entry.expected.injected_paths_never_read ?? []) {
+      for (const watched of entry.expected.watched_paths_byte_identical ?? []) {
         fingerprints.set(watched, await readFile(path.join(root, watched)));
       }
       const run = await runCommand(root, [
@@ -1560,11 +1767,16 @@ describe('context-selection-overlay corpus evaluation (fixtures + labels)', () =
       for (const missing of entry.expected.missing_sources ?? []) {
         assert.ok(observation.coverage.missing_sources.some((source) => source.path === missing), missing);
       }
-      // Adversarial transport facts: named paths stay unread bytes.
+      // Adversarial transport facts: the watched paths stay byte-identical
+      // across the run. This is a mutation guard, not a read oracle — it
+      // proves the overlay never MODIFIES these surfaces; watched baseline
+      // inputs (config.yaml, proposal.md) are legal reads for the read-only
+      // SessionBrief inspector (review F09: the guard does not claim
+      // "never read", it claims "never rewritten").
       for (const [watched, before] of fingerprints) {
-        assert.deepEqual(await readFile(path.join(root, watched)), before, `${watched} never read by the overlay`);
+        assert.deepEqual(await readFile(path.join(root, watched)), before, `${watched} stays byte-identical across the run`);
       }
-      if (entry.expected.injected_paths_never_read) {
+      if (entry.expected.watched_paths_byte_identical) {
         assert.equal(observation.candidates.length, presented.length, 'the allowlist is exactly the presented candidates');
       }
     });

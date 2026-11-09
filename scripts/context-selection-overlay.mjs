@@ -332,15 +332,38 @@ function classifyCandidateBytes(bytes, error) {
     }
   }
   const message = String(error?.message ?? error ?? '');
-  if (message === 'file_limit' || message === 'unsafe_file') {
-    // The candidate exists but exceeds the bounded read limit: an honest
+  if (message === 'file_limit' || message === 'file_changed') {
+    // The read started and was cut short by the bounded reader: an honest
     // truncation, never a silently partial document.
-    return { sha256: null, bytes: 0, kind: 'truncated', reason: 'file-limit' };
+    return { sha256: null, bytes: 0, kind: 'truncated', reason: message === 'file_changed' ? 'file-changed' : 'file-limit' };
   }
-  if (message === 'file_changed') {
-    return { sha256: null, bytes: 0, kind: 'truncated', reason: 'file-changed' };
+  if (message === 'unsafe_file' || message === 'unsafe_path') {
+    // The read was REFUSED before any content was verified (hardlink or
+    // non-regular file, path outside the portable containment): a form
+    // refusal, not a truncation and not an absence. The `unsafe_file`
+    // oversize sub-case is refined by `classifyCandidateInput` below.
+    return { sha256: null, bytes: 0, kind: 'malformed', reason: message === 'unsafe_file' ? 'unsafe-file' : 'unsafe-path' };
   }
   return { sha256: null, bytes: 0, kind: 'missing', reason: message ? message.slice(0, 200) : 'file-missing' };
+}
+
+// The bounded reader signals oversize files through `unsafe_file` together
+// with hardlink/non-regular shapes; only the oversize sub-case is a real
+// truncation. One metadata-only stat (no content read) separates them so the
+// classification stays honest at intake, probe, and revalidation time.
+async function classifyCandidateInput(rootDir, candidatePath, bytes, error) {
+  const classified = classifyCandidateBytes(bytes, error);
+  if (classified.kind === 'malformed' && classified.reason === 'unsafe-file') {
+    try {
+      const info = await lstat(path.join(rootDir, candidatePath));
+      if (info.isFile() && info.size > CANDIDATE_READ_LIMIT) {
+        return { sha256: null, bytes: 0, kind: 'truncated', reason: 'file-limit' };
+      }
+    } catch {
+      // Unstatable at classification time: the refusal form stands.
+    }
+  }
+  return classified;
 }
 
 export async function readCandidates(rootDir, candidatePaths, diagnostics, options = {}) {
@@ -365,7 +388,7 @@ export async function readCandidates(rootDir, candidatePaths, diagnostics, optio
       bytes = null;
       error = readError;
     }
-    const classified = classifyCandidateBytes(bytes, error);
+    const classified = await classifyCandidateInput(rootDir, candidatePath, bytes, error);
     if (classified.kind !== 'file') {
       diagnostics.push({ code: `candidate-${classified.kind}`, path: candidatePath, detail: classified.reason });
     }
@@ -390,6 +413,32 @@ function safeDecode(bytes) {
   } catch {
     return '';
   }
+}
+
+// Bounded assessor text in UTF-8 BYTES (review F07): the 64 KiB policy limit
+// is a byte budget, so multibyte content (Cyrillic, emoji) cannot exceed it
+// by counting UTF-16 code units, and the cut backs off to the last complete
+// UTF-8 sequence — it never splits a code point mid-sequence.
+export function boundAssessmentText(text, limit) {
+  if (typeof text !== 'string') return { text: '', truncated: false };
+  let byteLength = Buffer.byteLength(text, 'utf8');
+  if (byteLength <= limit) return { text, truncated: false };
+  const buffer = Buffer.from(text, 'utf8');
+  let end = limit;
+  let scan = end;
+  let continuation = 0;
+  while (scan > 0 && (buffer[scan - 1] & 0xC0) === 0x80) {
+    continuation += 1;
+    scan -= 1;
+  }
+  if (scan > 0) {
+    const lead = buffer[scan - 1];
+    const expected = lead >= 0xF0 ? 4 : lead >= 0xE0 ? 3 : lead >= 0xC0 ? 2 : 1;
+    if (expected > 1 && continuation + 1 < expected) end = scan - 1;
+  }
+  const bounded = buffer.subarray(0, end).toString('utf8');
+  byteLength = Buffer.byteLength(bounded, 'utf8');
+  return { text: bounded, truncated: true, bytes: byteLength };
 }
 
 // ---------------------------------------------------------------------------
@@ -489,6 +538,13 @@ function sanitizeScores(rawScores, diagnostics, candidateId) {
     diagnostics.push({ code: 'invalid-assessment', path: candidateId, detail: 'scores outside the closed triple' });
     return { invalid: true };
   }
+  // A partially invalid triple keeps its valid numbers but never silently:
+  // every dropped field is named.
+  const unboundedFields = ['relevance', 'evidence_support', 'contradiction']
+    .filter((field) => rawScores[field] !== undefined && rawScores[field] !== null && scores[field] === null);
+  if (unboundedFields.length > 0) {
+    diagnostics.push({ code: 'invalid-score-field', path: candidateId, detail: `unbounded fields: ${unboundedFields.join(',')}`.slice(0, 500) });
+  }
   return scores;
 }
 
@@ -531,6 +587,20 @@ export function normalizeAssessorFindings(outcome, candidates, diagnostics) {
         continue;
       }
       const evidenceRefs = sanitizeRefs(finding.evidence_refs, diagnostics, candidate.candidate_id);
+      if (evidenceRefs.length === 0) {
+        // Same honesty at the second refs leg: a conflicting candidate with
+        // conflict refs but NO exact evidence refs would violate the engine
+        // invariant (`conflicting ⇒ non-empty exact refs`) and crash the run
+        // downstream. It is a dropped finding with a diagnostic, never an
+        // invariant failure — the candidate stays unassessed.
+        diagnostics.push({ code: 'conflict-without-evidence-refs', path: candidate.candidate_id, detail: 'conflict finding dropped' });
+        continue;
+      }
+      if (finding.conflict?.state !== undefined && finding.conflict?.state !== 'suspected' && finding.conflict?.state !== 'owner_confirmed') {
+        // Unknown state vocabularies normalize to `suspected` visibly: the
+        // coercion is a bounded diagnostic, not a silent rewrite.
+        diagnostics.push({ code: 'conflict-state-normalized', path: candidate.candidate_id, detail: String(finding.conflict.state).slice(0, 200) });
+      }
       assessments.set(candidate.candidate_id, {
         status: 'conflicting',
         scores,
@@ -549,7 +619,10 @@ export function normalizeAssessorFindings(outcome, candidates, diagnostics) {
       status: finding.status,
       scores,
       reason,
-      limitation,
+      // The engine invariant demands a non-empty limitation for `excluded`;
+      // an assessor leaving it empty gets the honest default here instead of
+      // an invariant failure downstream (review R1-3).
+      limitation: typeof limitation === 'string' && limitation.length > 0 ? limitation : 'excluded by the assessor',
       evidence_refs: sanitizeRefs(finding.evidence_refs, diagnostics, candidate.candidate_id),
       conflict: null,
     });
@@ -569,12 +642,32 @@ const idOrder = (left, right) => {
   return number(left) - number(right);
 };
 
-export function projectSelection({ candidates, assessments, protectedMinimum, minimumRequired, conflictRefsBytes, limit }) {
+export function projectSelection({ candidates, assessments, rankedIds, minimumRequired, conflictRefsBytes, limit }) {
   const diagnostics = [];
   const manifestIncluded = [];
   const manifestExcluded = [];
   let estimated = minimumRequired;
   let demoted = 0;
+  // Greedy inclusion follows the assessor's ranking order — the findings
+  // array order passed as `rankedIds` — never the path-sorted intake order
+  // (review R1-6/devin probe B: a path-early candidate must not beat a
+  // top-ranked one under budget pressure). Candidates the assessor marked
+  // `excluded` do not consume budget; conflicting candidates are refs-only.
+  const rank = new Map((Array.isArray(rankedIds) ? rankedIds : []).map((id, index) => [id, index]));
+  const includable = candidates
+    .filter((candidate) => assessments.get(candidate.candidate_id)?.status === 'included')
+    .sort((left, right) => (rank.get(left.candidate_id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(right.candidate_id) ?? Number.MAX_SAFE_INTEGER));
+  const demotedIds = new Set();
+  const demotionDetails = new Map();
+  for (const candidate of includable) {
+    if (estimated + candidate.bytes > limit) {
+      demotedIds.add(candidate.candidate_id);
+      demotionDetails.set(candidate.candidate_id, `estimated=${estimated + candidate.bytes} limit=${limit}`);
+      demoted += 1;
+      continue;
+    }
+    estimated += candidate.bytes;
+  }
   const records = candidates.map((candidate) => {
     const assessment = assessments.get(candidate.candidate_id);
     const readable = candidate.kind === 'file';
@@ -630,19 +723,17 @@ export function projectSelection({ candidates, assessments, protectedMinimum, mi
         limitation: assessment.limitation ?? 'excluded by the assessor',
       };
     }
-    // Greedy inclusion in the assessor's ranking order (findings order):
-    // a candidate that does not fit the remaining budget is demoted with an
-    // explicit reason and limitation — an exhaustive tail, never a silent cut.
-    if (estimated + candidate.bytes > limit) {
-      demoted += 1;
+    if (demotedIds.has(candidate.candidate_id)) {
+      // A candidate that does not fit the remaining budget is demoted with an
+      // explicit reason and limitation — an exhaustive tail, never a silent
+      // cut.
       return {
         ...base,
         status: 'excluded',
         reason: 'presentation-budget-exceeded',
-        limitation: `estimated=${estimated + candidate.bytes} limit=${limit}`,
+        limitation: demotionDetails.get(candidate.candidate_id) ?? `limit=${limit}`,
       };
     }
-    estimated += candidate.bytes;
     manifestIncluded.push({ path: candidate.path, sha256: candidate.sha256, bytes: candidate.bytes });
     return { ...base, status: 'included', reason: assessment.reason, limitation: assessment.limitation };
   });
@@ -714,6 +805,11 @@ export function assertOverlayInvariants(observation) {
       // v1 writes only `suspected` (decision D6): a recorded
       // `owner_confirmed` is schema-valid tampering, never an engine output.
       if (candidate.conflict.state !== 'suspected') throw new TypeError('the engine only records suspected conflicts');
+    } else if (candidate.conflict !== null) {
+      // A non-conflicting candidate carries no conflict object: a recorded
+      // conflict on an included/excluded/unassessed candidate is projection
+      // tampering, never an engine output (review R1 low grab-bag).
+      throw new TypeError('only a conflicting candidate may carry a conflict');
     }
     if (candidate.status === 'excluded'
       && !(typeof candidate.reason === 'string' && candidate.reason.length > 0
@@ -763,6 +859,29 @@ export function assertOverlayInvariants(observation) {
   const expectedPaths = (observation.manifest?.protected_minimum ?? []).map((entry) => entry.path);
   if (!minimumSection || minimumSection.refs.join('|') !== expectedPaths.join('|')) {
     throw new TypeError('protected_minimum section must reference the verbatim baseline manifest');
+  }
+  // Consistency layer (review F08, #283 precedent): the manifest projection
+  // must mirror the candidate records exactly. A manifest edited without its
+  // candidates (or vice versa) is tampering, never an engine output; the
+  // byte-level equality of the sorted pin triples catches consistent
+  // substitution of verify-level pins.
+  const manifest = observation.manifest;
+  if (manifest === undefined || manifest === null || typeof manifest !== 'object' || Array.isArray(manifest)) {
+    if (candidates.some((candidate) => candidate.status === 'included' || candidate.status === 'excluded')) {
+      throw new TypeError('missing manifest projection for assessed candidates');
+    }
+  } else {
+    const pinKey = (pin) => `${pin?.path ?? ''}\u0000${pin?.sha256 ?? ''}\u0000${String(pin?.bytes ?? 0)}`;
+    const recordedIncluded = [...(Array.isArray(manifest.included) ? manifest.included : [])].map(pinKey).sort();
+    const expectedIncluded = candidates.filter((candidate) => candidate.status === 'included').map(pinKey).sort();
+    if (recordedIncluded.join('|') !== expectedIncluded.join('|')) {
+      throw new TypeError('manifest.included must mirror the included candidates exactly');
+    }
+    const recordedExcluded = [...(Array.isArray(manifest.excluded) ? manifest.excluded : [])].map(pinKey).sort();
+    const expectedExcluded = candidates.filter((candidate) => candidate.status === 'excluded').map(pinKey).sort();
+    if (recordedExcluded.join('|') !== expectedExcluded.join('|')) {
+      throw new TypeError('manifest.excluded must mirror the excluded candidates exactly');
+    }
   }
 }
 
@@ -897,7 +1016,7 @@ export async function validateSelectionBinding(rootDir, observation, options = {
     let bytes = null;
     let error = null;
     try { bytes = await reader(root, pin.path, CANDIDATE_READ_LIMIT); } catch (readError) { error = readError; }
-    const fresh = classifyCandidateBytes(bytes, error);
+    const fresh = await classifyCandidateInput(root, pin.path, bytes, error);
     if ((pin.sha256 ?? null) !== fresh.sha256 || (pin.bytes ?? 0) !== fresh.bytes) {
       mismatched.push(`candidate_digests:${pin.path}`);
     }
@@ -921,6 +1040,17 @@ export async function validateSelectionBinding(rootDir, observation, options = {
       if (JSON.stringify(recordedBaseline[field] ?? null) !== JSON.stringify(value ?? null)) {
         mismatched.push(`baseline:${field}`);
       }
+    }
+    // The recorded protected minimum is a baseline projection, not an
+    // assessor output: it is compared against the CURRENT baseline manifest
+    // verbatim, so a consistent truncation or substitution of the recorded
+    // manifest can never pass as fresh (review F02 — the engine invariant
+    // only compares the section against the recorded manifest itself).
+    const recordedMinimum = Array.isArray(observation.manifest?.protected_minimum) ? observation.manifest.protected_minimum : [];
+    const freshMinimum = (Array.isArray(inspection.brief.context_manifest) ? inspection.brief.context_manifest : [])
+      .map((entry) => ({ path: entry?.path, sha256: entry?.sha256, fidelity: entry?.fidelity }));
+    if (JSON.stringify(recordedMinimum) !== JSON.stringify(freshMinimum)) {
+      mismatched.push('baseline:protected_minimum');
     }
   }
   let context;
@@ -1101,9 +1231,12 @@ export async function writeOverlayObservation(rootDir, observation, config, opti
   }
   const secondRejection = await assertLeafWritable();
   if (secondRejection) return secondRejection;
-  // Atomic write owned by this module: the third ownership check runs after
-  // the temporary write and immediately before the rename, closing the
-  // check-then-rename window a foreign replacement could slip through.
+  // Atomic write owned by this module: after the temporary write and
+  // immediately before the rename, BOTH the ancestry and the leaf are
+  // re-verified (mirror of trace-link-suggestions custody re-checks): a
+  // namespace directory swapped to a symlink/junction between the earlier
+  // checks and the rename must not redirect the observation outside the
+  // project root (review F01 — the leaf-only check did not close the window).
   const payload = `${JSON.stringify(observation, null, 2)}\n`;
   const temporary = path.join(liveDirectory, `${parts[parts.length - 1]}.${randomUUID()}.tmp`);
   const openFile = options.openFile ?? open;
@@ -1112,6 +1245,15 @@ export async function writeOverlayObservation(rootDir, observation, config, opti
     const handle = await openFile(temporary, 'wx', 0o600);
     try { await handle.writeFile(payload, 'utf8'); } finally { await handle.close(); }
     if (typeof options.beforeRename === 'function') await options.beforeRename();
+    let liveAfter;
+    try {
+      liveAfter = await realpath(directory);
+    } catch (error) {
+      return { ok: false, code: 'observation-write-failed', detail: String(error?.message ?? error).slice(0, 200) };
+    }
+    if (path.resolve(liveAfter).toLowerCase() !== path.resolve(liveDirectory).toLowerCase()) {
+      return { ok: false, code: 'file-shadow', detail: parts.slice(0, -1).join('/') };
+    }
     const thirdRejection = await assertLeafWritable();
     if (thirdRejection) return thirdRejection;
     await rename(temporary, leaf);
@@ -1183,8 +1325,16 @@ function notRunEnvelope(codes) {
   };
 }
 
+// A failure envelope is not a not_run: the message names what actually
+// happened instead of the generic "advisory scan was not performed" (review
+// R1 low — observation-not-saved and operational failures DID run).
+const FAILURE_MESSAGES = Object.freeze({
+  'observation-not-saved': 'advisory observation was not saved',
+  'operational-failure': 'advisory scan failed: no gate evidence was produced',
+});
+
 function failureEnvelope(state, codes) {
-  return { schema_version: 1, diagnostic_only: true, state, codes, message: NOT_RUN_MESSAGE, usage, authorizes: [] };
+  return { schema_version: 1, diagnostic_only: true, state, codes, message: FAILURE_MESSAGES[state] ?? NOT_RUN_MESSAGE, usage, authorizes: [] };
 }
 
 function renderHuman(value) {
@@ -1277,9 +1427,23 @@ export async function runContextSelectionOverlayCommand(argv = process.argv.slic
   }
   for (const candidatePath of parsed.candidatePaths) {
     if (!validateFileForm(candidatePath)) {
-      emit(notRunEnvelope([`invalid-candidate-input:${candidatePath}`]), parsed.json);
+      emit(notRunEnvelope([`invalid-candidate-input:${String(candidatePath).slice(0, 200)}`]), parsed.json);
       return 2;
     }
+  }
+  // Case-insensitive collisions between presented paths are refused before
+  // any read (review R1 low): on case-insensitive filesystems two such paths
+  // are the same file, on case-sensitive ones they are two files — no single
+  // intake decision is honest across both, so the presentation is typed and
+  // the owner presents one spelling.
+  const lowerSeen = new Map();
+  for (const candidatePath of parsed.candidatePaths) {
+    const key = candidatePath.toLowerCase();
+    if (lowerSeen.has(key)) {
+      emit(notRunEnvelope([`candidate-path-case-collision:${lowerSeen.get(key)}|${candidatePath}`.slice(0, 200)]), parsed.json);
+      return 2;
+    }
+    lowerSeen.set(key, candidatePath);
   }
   const deadlineExceeded = () => (now() - startedAt) >= (options.deadlineMs ?? DEFAULT_DEADLINE_MS);
   try {
@@ -1326,7 +1490,6 @@ export async function runContextSelectionOverlayCommand(argv = process.argv.slic
     // verbatim with measured bytes joined from the brief sources.
     const protectedBuild = buildProtectedMinimum(brief, diagnostics);
     missingSources.push(...protectedBuild.missing);
-    const missingCount = missingSources.length;
     let missingCapped = false;
     if (missingSources.length > MAX_MISSING) {
       missingSources.length = MAX_MISSING;
@@ -1406,8 +1569,11 @@ export async function runContextSelectionOverlayCommand(argv = process.argv.slic
       }));
     } else {
       // Bounded assessor input: baseline intent/outcome/surface plus the
-      // readable candidate texts (bounded per candidate). The protected
-      // minimum travels as pointers, never as content.
+      // readable candidate texts (bounded per candidate in UTF-8 bytes — the
+      // policy limit is a byte budget, not a UTF-16 code-unit count, so
+      // Cyrillic or emoji content cannot silently exceed it; the cut never
+      // splits a multi-byte sequence). The protected minimum travels as
+      // pointers, never as content.
       const assessorInput = {
         language: resolvedLanguage,
         baseline: {
@@ -1419,11 +1585,11 @@ export async function runContextSelectionOverlayCommand(argv = process.argv.slic
           protected_minimum: protectedBuild.protected_minimum,
         },
         candidates: candidates.filter((candidate) => candidate.kind === 'file').map((candidate) => {
-          const text = candidate.text.length > MAX_ASSESSMENT_TEXT ? candidate.text.slice(0, MAX_ASSESSMENT_TEXT) : candidate.text;
-          if (text.length < candidate.text.length) {
-            diagnostics.push({ code: 'candidate-text-truncated', path: candidate.path, detail: `limit=${MAX_ASSESSMENT_TEXT}` });
+          const bounded = boundAssessmentText(candidate.text, MAX_ASSESSMENT_TEXT);
+          if (bounded.truncated) {
+            diagnostics.push({ code: 'candidate-text-truncated', path: candidate.path, detail: `limit=${MAX_ASSESSMENT_TEXT} bytes` });
           }
-          return { candidate_id: candidate.candidate_id, path: candidate.path, bytes: candidate.bytes, text };
+          return { candidate_id: candidate.candidate_id, path: candidate.path, bytes: candidate.bytes, text: bounded.text };
         }),
       };
       // The assessor gets only the REMAINING command budget, not a fresh
@@ -1441,16 +1607,21 @@ export async function runContextSelectionOverlayCommand(argv = process.argv.slic
         // Freshness probe (decision D9): re-hash the candidates and
         // re-inspect the brief. A drifted candidate, a recomputed baseline,
         // or a moved worktree marks the outcome stale — the conservative
-        // honest direction.
+        // honest direction. The same DI seams as intake and read-time
+        // revalidation are used, so a test-injected reader/inspector cannot
+        // create a probe that sees a different world than the run (review
+        // F10).
+        const reader = options.readCandidate ?? ((dir, rel) => readProviderFile(dir, rel, CANDIDATE_READ_LIMIT));
+        const inspect = options.inspectBrief ?? inspectSessionBrief;
         for (const candidate of candidates) {
           let bytes = null;
           let error = null;
-          try { bytes = await readProviderFile(rootDir, candidate.path, CANDIDATE_READ_LIMIT); } catch (readError) { error = readError; }
-          const fresh = classifyCandidateBytes(bytes, error);
+          try { bytes = await reader(rootDir, candidate.path, CANDIDATE_READ_LIMIT); } catch (readError) { error = readError; }
+          const fresh = await classifyCandidateInput(rootDir, candidate.path, bytes, error);
           if (fresh.kind !== candidate.kind || fresh.sha256 !== candidate.sha256 || fresh.bytes !== candidate.bytes) return true;
         }
         try {
-          const freshInspection = await inspectSessionBrief({ changeId, rootDir, includeBrief: false, ...options.inspectOptions });
+          const freshInspection = await inspect({ changeId, rootDir, includeBrief: false, ...options.inspectOptions });
           if (!freshInspection || freshInspection.status !== 'valid' || freshInspection.digest !== brief.digest) return true;
         } catch {
           return true;
@@ -1471,9 +1642,18 @@ export async function runContextSelectionOverlayCommand(argv = process.argv.slic
         now,
       });
       freshness = outcome.freshness === 'stale' ? 'stale' : 'current';
+      // The helper passes assessor diagnostics through verbatim; the schema
+      // bounds are enforced HERE, at the copy boundary — every field is
+      // capped to its closed maximum so an oversized provider diagnostic
+      // degrades to bounded metadata instead of a schema-parity crash
+      // (review R1: the same fail-open class as dropped findings).
       for (const entry of Array.isArray(outcome.diagnostics) ? outcome.diagnostics : []) {
         if (entry && typeof entry === 'object' && typeof entry.code === 'string') {
-          diagnostics.push({ code: entry.code, path: entry.path ?? null, detail: entry.detail ?? null });
+          diagnostics.push({
+            code: entry.code.slice(0, 200),
+            path: typeof entry.path === 'string' ? entry.path.slice(0, 500) : null,
+            detail: typeof entry.detail === 'string' ? entry.detail.slice(0, 500) : null,
+          });
         }
       }
       if (outcome.run_status !== 'complete') {
@@ -1519,6 +1699,12 @@ export async function runContextSelectionOverlayCommand(argv = process.argv.slic
         }));
       } else {
         const assessments = normalizeAssessorFindings(outcome, candidates, diagnostics);
+        // The assessor's ranking order is the findings array order restricted
+        // to the accepted assessments (review R1-6/devin probe B): the budget
+        // is spent top-ranked first, not path-sorted first.
+        const rankedIds = [...new Set((Array.isArray(outcome.findings) ? outcome.findings : [])
+          .map((finding) => (finding && typeof finding === 'object' && !Array.isArray(finding) ? finding.candidate_id : null))
+          .filter((id) => typeof id === 'string' && assessments.has(id)))];
         // Conflict refs metadata bytes (pointers only) are budget-relevant.
         const conflictRefsBytes = [...assessments.values()]
           .filter((assessment) => assessment.status === 'conflicting')
@@ -1526,7 +1712,7 @@ export async function runContextSelectionOverlayCommand(argv = process.argv.slic
         const projection = projectSelection({
           candidates,
           assessments,
-          protectedMinimum: protectedBuild.protected_minimum,
+          rankedIds,
           minimumRequired: protectedBuild.minimumRequired,
           conflictRefsBytes,
           limit: MAX_PRESENTATION_BYTES,
@@ -1540,7 +1726,13 @@ export async function runContextSelectionOverlayCommand(argv = process.argv.slic
         const conflicting = records.filter((record) => record.status === 'conflicting');
         needsReview = conflicting.length > 0;
         ownerHandoff = conflicting.length > 0 ? 'aif-review' : null;
-        if (missingSources.length > 0 || projection.hasDemotions || !projection.fits || !projection.conflictFits) {
+        // A readable candidate the assessor never assessed (empty findings
+        // without abstain, or every finding dropped by normalization) is a
+        // degradation, not full coverage (review F05): the honest AND model
+        // reports it as partial — assessed candidates survive, `complete`
+        // flips false.
+        const assessorLeftUnassessed = records.some((record) => record.status === 'unassessed' && record.reason === 'assessor-left-unassessed');
+        if (missingSources.length > 0 || assessorLeftUnassessed || projection.hasDemotions || !projection.fits || !projection.conflictFits) {
           coverage.state = 'partial';
         }
         // AND completeness (decision D7): assessment complete && budget
@@ -1629,13 +1821,13 @@ export async function runContextSelectionOverlayCommand(argv = process.argv.slic
       emit(failureEnvelope('operational-failure', ['schema-parity-failure', ...schemaErrors.slice(0, 5).map((error) => error.message)]), parsed.json);
       return 1;
     }
-    // The deadline bounds the whole command: a budget exhausted between the
-    // assessment and the persistence is a bounded not_run, never a half-run
-    // write.
-    if (deadlineExceeded()) {
-      emit(notRunEnvelope(['deadline-exceeded']), parsed.json);
-      return 0;
-    }
+    // No deadline short-circuit past the semantic stage (review F04): once
+    // assessment material exists, the honest outcome is the collected
+    // observation — a timeout INSIDE the helper already degraded freshness to
+    // `stale` and hard failures kept the verbatim minimum with every
+    // candidate unassessed. A late cutoff must never replace that honest
+    // projection with a not_run envelope. Only the pre-assessment deadline
+    // checks above produce not_run.
     if (parsed.write) {
       const written = await writeOverlayObservation(rootDir, observation, config, options);
       if (!written.ok) {

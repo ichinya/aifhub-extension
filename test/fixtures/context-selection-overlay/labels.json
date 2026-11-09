@@ -109,7 +109,7 @@
         "coverage": "full",
         "complete": true,
         "statuses": { "notes/limit-prompt-injection.md": "excluded" },
-        "injected_paths_never_read": [".ai-factory/config.yaml", "openspec/changes/284-overlay-fixture/proposal.md"],
+        "watched_paths_byte_identical": [".ai-factory/config.yaml", "openspec/changes/284-overlay-fixture/proposal.md"],
         "no_fetch": true
       }
     },
