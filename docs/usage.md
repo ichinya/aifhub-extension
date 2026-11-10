@@ -1246,7 +1246,7 @@ Opt-in live-driver (без скачивания, при явном разреш�
 npm run smoke:ai-factory-2-18 -- --v217-command <absolute-node> --v217-arg <local-2.17.0-bin> --v217-root <local-2.17.0-root> --v222-command <absolute-node> --v222-arg <local-2.22.0-bin> --v222-root <local-2.22.0-root> --extension-root <local-extension-root>
 ```
 
-`--v222-arg` повторяется для каждого argv token, как v218/v219/v220. Ноль или несколько target groups дают NOT_RUN до записи. Live smoke в этом change: NOTRUN (opt-in); deterministic pass не доказывает published install, release, deployment или пользовательскую migration. Команда `upgrade` сознательно вне harness; `update --force` и targeted `extension update aifhub-extension --force` сохраняют свои роли.
+`--v222-arg` повторяется для каждого argv token, как v218/v219/v220. Ноль или несколько target groups дают NOT_RUN до записи. Live smoke в этом change выполнен opt-in (built exact-tag 2.17.0 root + локальный 2.22.0 toolchain): preflight и clean-install init/extension-add PASS, затем FAIL на пред-существующих дрейфах live-ассертов, не связанных с 2.22 (legacy canonical-config маркер против tools mapping; raw-bytes против transformer-rendered install) — PASS не заявляется. Deterministic pass не доказывает published install, release, deployment или пользовательскую migration. Команда `upgrade` сознательно вне harness; `update --force` и targeted `extension update aifhub-extension --force` сохраняют свои роли.
 
 ## Mode Switching and Sync
 

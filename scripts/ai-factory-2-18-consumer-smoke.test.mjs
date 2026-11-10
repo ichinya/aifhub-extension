@@ -191,13 +191,10 @@ async function createFakeToolchain(root, key, version) {
   if (reference !== null) {
     await writeFixture(packageRoot, AI_FACTORY_2220_RELEASE_SENTINELS.implementGateUpstreamPath, reference);
   }
-  if (version === EXPECTED_AI_FACTORY_VERSIONS.v222 && (implementFixtureShape === 'other-reference' || implementFixtureShape === 'injection-only')) {
-    // Gate present somewhere else in the tree: never satisfies the pinned path.
+  if (version === EXPECTED_AI_FACTORY_VERSIONS.v222 && implementFixtureShape === 'other-reference') {
+    // Gate present in a different upstream reference: never satisfies the pinned path.
     const gate = `**3.1.1: ${AI_FACTORY_2220_RELEASE_SENTINELS.implementReconciliationGate}**`;
-    const offReference = implementFixtureShape === 'other-reference'
-      ? 'skills/aif-implement/references/OTHER.md'
-      : 'skills/aif-implement/references/injected/TASK.md';
-    await writeFixture(packageRoot, offReference, `${gate}\n`);
+    await writeFixture(packageRoot, 'skills/aif-implement/references/OTHER.md', `${gate}\n`);
   }
   if ([EXPECTED_AI_FACTORY_VERSIONS.v219, EXPECTED_AI_FACTORY_VERSIONS.v220, EXPECTED_AI_FACTORY_VERSIONS.v222].includes(version)) {
     await writeFixture(
@@ -772,7 +769,27 @@ describe('AI Factory 2.18/2.19 consumer compatibility smoke', () => {
     it('rejects an off-reference v222 gate: ' + shape, async () => {
       implementFixtureShape = shape;
       try {
-        const harness = await createHarness({ target: 'v222' });
+        const harness = await createHarness({
+          target: 'v222',
+          mutateInstalledInjection: shape === 'injection-only'
+            ? async ({ projectDir, stage }) => {
+                // Gate carried only inside the managed marker block of the
+                // installed consumer copy; the pinned upstream reference has
+                // none, so the smoke must still fail closed (issue #290).
+                if (stage !== 'clean-install') return;
+                const codex = (await readJson(path.join(projectDir, '.ai-factory.json'))).agents.find(a => a.id === 'codex');
+                const installed = path.join(projectDir, codex.skillsDir, 'aif-implement', 'SKILL.md');
+                const start = '<!-- aif-ext:aifhub-extension:aif-implement:prepend:start -->';
+                const content = await readFile(installed, 'utf8');
+                assert.ok(content.includes(start), 'fixture requires the managed marker pair');
+                await writeFile(
+                  installed,
+                  content.replace(start, `${start}\n**3.1.1: ${AI_FACTORY_2220_RELEASE_SENTINELS.implementReconciliationGate}**`),
+                  'utf8'
+                );
+              }
+            : undefined
+        });
         const result = await runAiFactory218ConsumerSmoke({
           toolchains: harness.toolchains,
           extensionRoot: REPO_ROOT,

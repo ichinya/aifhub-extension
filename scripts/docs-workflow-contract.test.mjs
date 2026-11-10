@@ -763,6 +763,57 @@ describe('complete OpenSpec workflow documentation contract', () => {
       assertIncludes(compatibility, text, '2.20 ownership and deferred contract');
   });
 
+  it('documents the AI Factory 2.22 reviewed release contract, sentinel path and closed deferred map', async () => {
+    const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
+    const readme = await readRepoFile('README.md');
+    const usage = await readRepoFile('docs/usage.md');
+    const compatibility = await readRepoFile('docs/openspec-compatibility.md');
+    const docsIndex = await readRepoFile('docs/README.md');
+    const contextPolicy = await readRepoFile('docs/context-loading-policy.md');
+    const changelog = await readRepoFile('CHANGELOG.md');
+
+    // Newest-first: the 2.22 release section must sit above the 2.20 section,
+    // and removing or reordering it must fail this contract.
+    const sectionIndex = compatibility.indexOf('## AI Factory 2.22 Reviewed Release');
+    assert.ok(sectionIndex > -1, 'compatibility must document the 2.22 reviewed release');
+    assert.ok(sectionIndex < compatibility.indexOf('## AI Factory 2.20 Reviewed Release'), '2.22 section must precede 2.20');
+    assert.ok(readme.indexOf('### AI Factory 2.22 Reviewed Release') > -1
+      && readme.indexOf('### AI Factory 2.22 Reviewed Release') < readme.indexOf('### AI Factory 2.20 Reviewed Release'), 'README 2.22 section newest-first');
+    assertIncludes(docsIndex, 'AI Factory 2.22 reviewed baseline', 'docs index 2.22 header');
+    assertIncludes(contextPolicy, 'AI Factory 2.22 Context Boundaries', 'context policy 2.22 header');
+    assertIncludes(changelog, 'Кумулятивная адаптация reviewed baseline AI Factory 2.20.0 → 2.22.0', 'changelog 2.22 entry');
+
+    for (const text of [
+      '144 commits and 275 changed files',
+      '4723d0bbc3b2fae0306d9934545fdd2d193c9578',
+      'a3d42681f43f644c4f01d2daf80e56a01d1893aa',
+      'a528cd49b214ae250fc9bda02721e48a8d8fee9a',
+      'skills/aif-implement/references/IMPLEMENT-TASK.md',
+      'selective references (#199)',
+      'instruction manifests (#190)',
+      'tool permissions (#198/#208)',
+      'question contract (#195/#210)',
+      'aif-skills-audit (#188)',
+      'aif-plan-overview', 'aif-quality-setup', 'aif-roadmap-next',
+      '`commands`', '`instructions`', '`completion-hook`', '`worktree-check`'
+    ]) assertIncludes(compatibility, text, '2.22 provenance, sentinel path, closed deferred map and ownership');
+
+    const notes = metadata.sources['ai-factory'].notes;
+    for (const text of [
+      '144 commits and 275 changed files',
+      '4723d0bbc3b2fae0306d9934545fdd2d193c9578',
+      'a3d42681f43f644c4f01d2daf80e56a01d1893aa',
+      'a528cd49b214ae250fc9bda02721e48a8d8fee9a',
+      '7a209115ab4ae283738c43ad243c218e12559356',
+      'references/IMPLEMENT-TASK.md',
+      'Closed deferred map of the 2.20 ledger'
+    ]) assertIncludes(notes, text, '2.22 cumulative ledger');
+
+    assertIncludes(usage, 'skills/aif-implement/references/IMPLEMENT-TASK.md', 'usage v222 sentinel path');
+    assertIncludes(usage, 'v222=2.22.0', 'usage v222 slot');
+    assertIncludes(usage, 'v222-command', 'usage v222 live flags');
+  });
+
   it('documents the published AI Factory 2.19.0 release, selectable 2.18.1/2.19.0 executable targets, and ownership boundaries', async () => {
     const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
     const manifest = JSON.parse(await readRepoFile('extension.json'));
