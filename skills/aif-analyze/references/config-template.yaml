@@ -141,6 +141,12 @@ workflow:
   # Upstream 2.20+ optional workflow.explore_mode / plan_mode / improve_check
   # resolve through defaults regular / ask / false when omitted. Leading mode
   # tokens override config; AIFHub gates every resolved ultra before any write.
+  #
+  # Upstream 2.22+ optional workflow.fix_mode / workflow.fix_patch stay
+  # upstream-owned: this template does not declare them. Verified upstream
+  # defaults (tag 2.22.0 config-template): fix_mode: ask, fix_patch: true;
+  # /aif-fix resolves them through upstream defaults when omitted. Ultra gate
+  # AI_FACTORY_ULTRA_MIN_VERSION stays 2.18.0; these keys are out of its scope.
   # Auto-create missing directories when needed
   auto_create_dirs: true
   

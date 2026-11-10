@@ -738,10 +738,10 @@ describe('complete OpenSpec workflow documentation contract', () => {
   it('keeps the cumulative 2.20 release contract, schema pin and deferred boundaries', async () => {
     const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
     const manifest = JSON.parse(await readRepoFile('extension.json'));
-    assert.equal(metadata.sources['ai-factory'].version, '2.20.0');
-    assert.equal(metadata.sources['ai-factory'].baselineVersion, '2.20.0');
-    assert.equal(metadata.sources['ai-factory'].lastSync, '2026-10-30');
-    assert.equal(manifest.$schema, 'https://raw.githubusercontent.com/lee-to/ai-factory/2.20.0/schemas/extension.schema.json');
+    assert.equal(metadata.sources['ai-factory'].version, '2.22.0');
+    assert.equal(metadata.sources['ai-factory'].baselineVersion, '2.22.0');
+    assert.equal(metadata.sources['ai-factory'].lastSync, '2026-11-11');
+    assert.equal(manifest.$schema, 'https://raw.githubusercontent.com/lee-to/ai-factory/2.22.0/schemas/extension.schema.json');
     const notes = metadata.sources['ai-factory'].notes;
     for (const text of ['64 commits and 124 changed files', 'c38ff6ffe183ccf39b01774be892fcf64d9169c1',
       'skill-targets.ts', 'skills-migration.ts', 'installer.ts', 'extension-ops.ts', 'injections.ts',
@@ -778,9 +778,9 @@ describe('complete OpenSpec workflow documentation contract', () => {
     const combinedDocs = [readme, changelog, usage, compatibility, docsIndex, contextPolicy, mcpDocs, handoff].join('\n');
 
     assert.equal(metadata.compat['ai-factory'], '>=2.11.0 <3.0.0', 'aifhub-extension.json compat.ai-factory');
-    assert.equal(metadata.sources['ai-factory'].version, '2.20.0', 'aifhub-extension.json sources.ai-factory.version');
-    assert.equal(metadata.sources['ai-factory'].baselineVersion, '2.20.0', 'aifhub-extension.json sources.ai-factory.baselineVersion');
-    assert.equal(metadata.sources['ai-factory'].lastSync, '2026-10-30', 'aifhub-extension.json sources.ai-factory.lastSync');
+    assert.equal(metadata.sources['ai-factory'].version, '2.22.0', 'aifhub-extension.json sources.ai-factory.version');
+    assert.equal(metadata.sources['ai-factory'].baselineVersion, '2.22.0', 'aifhub-extension.json sources.ai-factory.baselineVersion');
+    assert.equal(metadata.sources['ai-factory'].lastSync, '2026-11-11', 'aifhub-extension.json sources.ai-factory.lastSync');
     assertIncludes(metadata.sources['ai-factory'].notes, 'published AI Factory 2.19.0 release', 'aifhub-extension.json sources.ai-factory.notes');
     assertIncludes(metadata.sources['ai-factory'].notes, 'e144f95c89de0d0cb6c9b38dbe8c2907b00dc5ce', '2.19 release custody: exact tag commit');
     assertIncludes(metadata.sources['ai-factory'].notes, 'matching the npm ai-factory@2.19.0 gitHead', '2.19 release custody: npm provenance');
