@@ -31,20 +31,31 @@ export const EXPECTED_AI_FACTORY_VERSIONS = Object.freeze({
   v218Boundary: AI_FACTORY_ULTRA_MIN_VERSION,
   v218: '2.18.1',
   v219: '2.19.0',
-  v220: '2.20.0'
+  v220: '2.20.0',
+  v222: '2.22.0'
 });
-export const CONSUMER_TARGET_KEYS = Object.freeze(['v218', 'v219', 'v220']);
+export const CONSUMER_TARGET_KEYS = Object.freeze(['v218', 'v219', 'v220', 'v222']);
 export const AI_FACTORY_RELEASE_SENTINELS = Object.freeze({
   implementReconciliationGate: 'Run the requirement consistency gate',
   implementConflictToken: 'ERROR [requirement-conflict]',
   qaCheckBrowserReplay: 'browser-replay',
-  warmupSkillPath: 'skills/aif-warmup/SKILL.md'
+  warmupSkillPath: 'skills/aif-warmup/SKILL.md',
+  // Path-aware gate source (issue #290): 2.22.0 moved the requirement
+  // consistency gate into the implement references architecture, so every
+  // record pins the exact file the gate is read from. Historical targets keep
+  // the SKILL.md binding unchanged.
+  implementGateUpstreamPath: 'skills/aif-implement/SKILL.md'
+});
+export const AI_FACTORY_2220_RELEASE_SENTINELS = Object.freeze({
+  ...AI_FACTORY_RELEASE_SENTINELS,
+  implementGateUpstreamPath: 'skills/aif-implement/references/IMPLEMENT-TASK.md'
 });
 // Retained export for callers of the historical v219 fixture contract.
 export const AI_FACTORY_2190_RELEASE_SENTINELS = AI_FACTORY_RELEASE_SENTINELS;
 export const RELEASE_SENTINELS_BY_TARGET = Object.freeze({
   v219: AI_FACTORY_RELEASE_SENTINELS,
-  v220: AI_FACTORY_RELEASE_SENTINELS
+  v220: AI_FACTORY_RELEASE_SENTINELS,
+  v222: AI_FACTORY_2220_RELEASE_SENTINELS
 });
 export const AI_FACTORY_2181_EXPLORE_SENTINELS = Object.freeze({
   coherenceHeading: '#### Research Coherence Gate (all persisted modes)',
@@ -893,12 +904,26 @@ async function inspectImplementUpstreamContract(projectDir, extension, toolchain
 
   let reconciliationGateCount = null;
   let conflictTokenCount = null;
+  let reconciliationGatePath = null;
   const sentinels = RELEASE_SENTINELS_BY_TARGET[toolchain.key];
   if (sentinels) {
-    reconciliationGateCount = countOccurrences(upstream, sentinels.implementReconciliationGate);
+    // Path-aware gate source (issue #290): the gate is counted on the exact
+    // version-pinned file; SKILL.md keeps byte-equality and the conflict token.
+    reconciliationGatePath = sentinels.implementGateUpstreamPath;
+    const gatePath = path.resolve(toolchain.provenanceRoot, ...sentinels.implementGateUpstreamPath.split('/'));
+    assertContract(isWithin(toolchain.provenanceRoot, gatePath), flow, 'unsafe-upstream-implement-gate-source', {
+      path: sentinels.implementGateUpstreamPath
+    });
+    assertContract(await exists(gatePath), flow, 'missing-upstream-implement-gate-source', {
+      path: sentinels.implementGateUpstreamPath
+    });
+    const gateBytes = await readFile(gatePath);
+    const gateSource = gateBytes.toString('utf8');
+    reconciliationGateCount = countOccurrences(gateSource, sentinels.implementReconciliationGate);
     conflictTokenCount = countOccurrences(upstream, sentinels.implementConflictToken);
     assertContract(reconciliationGateCount === 1, flow, 'upstream-implement-reconciliation-gate-mismatch', {
-      count: reconciliationGateCount
+      count: reconciliationGateCount,
+      path: sentinels.implementGateUpstreamPath
     });
     assertContract(conflictTokenCount >= 1, flow, 'upstream-implement-conflict-token-mismatch', {
       count: conflictTokenCount
@@ -910,6 +935,7 @@ async function inspectImplementUpstreamContract(projectDir, extension, toolchain
     injectionMarkerCount,
     reconciliationGateCount,
     conflictTokenCount,
+    reconciliationGatePath,
     upstreamDigest: sha256(upstreamBytes)
   };
 }

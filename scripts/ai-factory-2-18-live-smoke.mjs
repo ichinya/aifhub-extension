@@ -21,6 +21,9 @@ const VALUE_OPTIONS = new Map([
   ['--v220-command', 'v220Command'],
   ['--v220-arg', 'v220Arg'],
   ['--v220-root', 'v220Root'],
+  ['--v222-command', 'v222Command'],
+  ['--v222-arg', 'v222Arg'],
+  ['--v222-root', 'v222Root'],
   ['--extension-root', 'extensionRoot'],
   ['--timeout-ms', 'timeoutMs'],
   ['--comspec', 'comSpec']
@@ -32,11 +35,12 @@ function usage() {
     '  npm run smoke:ai-factory-2-18 -- \\',
     '    --v217-command <absolute executable> --v217-arg <local bin/ai-factory.js> --v217-root <local package root> \\',
     '    (--v218-command <absolute executable> --v218-arg <local bin/ai-factory.js> --v218-root <local package root> |',
-    '     --v219-command <absolute executable> --v219-arg <local bin/ai-factory.js> --v219-root <local package root> | --v220-command <absolute executable> --v220-arg <local bin/ai-factory.js> --v220-root <local package root>) \\',
+    '     --v219-command <absolute executable> --v219-arg <local bin/ai-factory.js> --v219-root <local package root> | --v220-command <absolute executable> --v220-arg <local bin/ai-factory.js> --v220-root <local package root> |',
+    '     --v222-command <absolute executable> --v222-arg <local bin/ai-factory.js> --v222-root <local package root>) \\',
     '    --extension-root <local aifhub-extension checkout> [--timeout-ms 120000] [--allow-network]',
     '',
-    'Exactly one target group is required: --v218-* binds the exact AI Factory 2.18.1 target, --v219-* binds the exact 2.19.0 target, and --v220-* binds the exact 2.20.0 target; --v217-* binds the 2.17.0 update source.',
-    'Repeat --v217-arg, --v218-arg, --v219-arg, or --v220-arg for each fixed argv token. No package is downloaded.',
+    'Exactly one target group is required: --v218-* binds the exact AI Factory 2.18.1 target, --v219-* binds the exact 2.19.0 target, --v220-* binds the exact 2.20.0 target, and --v222-* binds the exact 2.22.0 target; --v217-* binds the 2.17.0 update source.',
+    'Repeat --v217-arg, --v218-arg, --v219-arg, --v220-arg, or --v222-arg for each fixed argv token. No package is downloaded.',
     'On Windows a caller may instead pass a local .cmd command; the driver uses the explicit/default ComSpec adapter with shell=false.'
   ].join('\n');
 }
@@ -47,6 +51,7 @@ function parseArguments(argv) {
     v218Arg: [],
     v219Arg: [],
     v220Arg: [],
+    v222Arg: [],
     allowNetwork: false,
     help: false
   };
@@ -65,7 +70,7 @@ function parseArguments(argv) {
     if (index + 1 >= argv.length) throw new Error('missing-option-value');
     const value = argv[index + 1];
     index += 1;
-    if (key === 'v217Arg' || key === 'v218Arg' || key === 'v219Arg' || key === 'v220Arg') parsed[key].push(value);
+    if (key === 'v217Arg' || key === 'v218Arg' || key === 'v219Arg' || key === 'v220Arg' || key === 'v222Arg') parsed[key].push(value);
     else parsed[key] = value;
   }
   return parsed;
@@ -124,7 +129,8 @@ async function main() {
   const targetGroups = [
     ['v218', parsed.v218Command, parsed.v218Root, parsed.v218Arg],
     ['v219', parsed.v219Command, parsed.v219Root, parsed.v219Arg],
-    ['v220', parsed.v220Command, parsed.v220Root, parsed.v220Arg]
+    ['v220', parsed.v220Command, parsed.v220Root, parsed.v220Arg],
+    ['v222', parsed.v222Command, parsed.v222Root, parsed.v222Arg]
   ];
   const boundTargets = targetGroups.filter(([, command, root, args]) => command || root || args.length > 0);
   if (boundTargets.length > 1) {
@@ -138,7 +144,7 @@ async function main() {
     if (!command) missing.push(`--${key}-command`);
     if (!root) missing.push(`--${key}-root`);
   } else {
-    missing.push('--v218-command|--v219-command|--v220-command', '--v218-root|--v219-root|--v220-root');
+    missing.push('--v218-command|--v219-command|--v220-command|--v222-command', '--v218-root|--v219-root|--v220-root|--v222-root');
   }
   if (missing.length > 0) {
     const result = notRunResult('missing-live-prerequisite', missing);

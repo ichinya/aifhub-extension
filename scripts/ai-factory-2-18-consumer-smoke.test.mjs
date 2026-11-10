@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import {
   AI_FACTORY_2181_EXPLORE_SENTINELS,
   AI_FACTORY_2190_RELEASE_SENTINELS,
+  AI_FACTORY_2220_RELEASE_SENTINELS,
   RELEASE_SENTINELS_BY_TARGET,
   CONSUMER_TARGET_KEYS,
   EXPECTED_AI_FACTORY_VERSIONS,
@@ -95,6 +96,10 @@ function fakeExploreBase(version) {
   ].join('\n');
 }
 
+// Negative-fixture shape for the off-reference v222 gate tests. Set before
+// createHarness so the fake installer and the fake toolchain stay byte-consistent.
+let implementFixtureShape = 'default';
+
 function fakeImplementBase(version) {
   const base = [
     '---',
@@ -114,7 +119,40 @@ function fakeImplementBase(version) {
       ''
     );
   }
+  if (version === EXPECTED_AI_FACTORY_VERSIONS.v222) {
+    // Mirror the real 2.22.0 references architecture: the requirement
+    // consistency gate moved into references/IMPLEMENT-TASK.md while the
+    // conflict token stays in SKILL.md (issue #290).
+    base.push(
+      `On a clear unresolved conflict emit \`${AI_FACTORY_2220_RELEASE_SENTINELS.implementConflictToken}\` and stop.`,
+      ''
+    );
+    if (implementFixtureShape === 'skill-only') {
+      base.push(`**3.1.1: ${AI_FACTORY_2220_RELEASE_SENTINELS.implementReconciliationGate}**`, '');
+    }
+  }
   return base.join('\n');
+}
+
+function fakeImplementReference(version) {
+  if (version !== EXPECTED_AI_FACTORY_VERSIONS.v222) return null;
+  if (implementFixtureShape === 'missing-reference') return null;
+  const gate = `**3.1.1: ${AI_FACTORY_2220_RELEASE_SENTINELS.implementReconciliationGate}**`;
+  const body = [
+    '---',
+    'name: aif-implement reference',
+    `description: Fake AI Factory ${version} implement task reference.`,
+    '---',
+    '',
+    '# Implement task',
+    '',
+    implementFixtureShape === 'skill-only' || implementFixtureShape === 'other-reference' || implementFixtureShape === 'injection-only'
+      ? '3.1.1: gate removed'
+      : gate,
+    ''
+  ];
+  if (implementFixtureShape === 'duplicate-gate') body.push(gate, '');
+  return body.join('\n');
 }
 
 function fakeReviewBase(version) {
@@ -149,7 +187,19 @@ async function createFakeToolchain(root, key, version) {
   await writeFixture(packageRoot, 'skills/aif-explore/SKILL.md', fakeExploreBase(version));
   await writeFixture(packageRoot, 'skills/aif-review/SKILL.md', fakeReviewBase(version));
   await writeFixture(packageRoot, 'skills/aif-implement/SKILL.md', fakeImplementBase(version));
-  if ([EXPECTED_AI_FACTORY_VERSIONS.v219, EXPECTED_AI_FACTORY_VERSIONS.v220].includes(version)) {
+  const reference = fakeImplementReference(version);
+  if (reference !== null) {
+    await writeFixture(packageRoot, AI_FACTORY_2220_RELEASE_SENTINELS.implementGateUpstreamPath, reference);
+  }
+  if (version === EXPECTED_AI_FACTORY_VERSIONS.v222 && (implementFixtureShape === 'other-reference' || implementFixtureShape === 'injection-only')) {
+    // Gate present somewhere else in the tree: never satisfies the pinned path.
+    const gate = `**3.1.1: ${AI_FACTORY_2220_RELEASE_SENTINELS.implementReconciliationGate}**`;
+    const offReference = implementFixtureShape === 'other-reference'
+      ? 'skills/aif-implement/references/OTHER.md'
+      : 'skills/aif-implement/references/injected/TASK.md';
+    await writeFixture(packageRoot, offReference, `${gate}\n`);
+  }
+  if ([EXPECTED_AI_FACTORY_VERSIONS.v219, EXPECTED_AI_FACTORY_VERSIONS.v220, EXPECTED_AI_FACTORY_VERSIONS.v222].includes(version)) {
     await writeFixture(
       packageRoot,
       'skills/aif-qa-check/SKILL.md',
@@ -667,15 +717,97 @@ describe('AI Factory 2.18/2.19 consumer compatibility smoke', () => {
     assert.equal(EXPECTED_AI_FACTORY_VERSIONS.v218Boundary, '2.18.0');
     assert.equal(EXPECTED_AI_FACTORY_VERSIONS.v218, '2.18.1');
     assert.equal(EXPECTED_AI_FACTORY_VERSIONS.v219, '2.19.0');
-    assert.deepEqual([...CONSUMER_TARGET_KEYS], ['v218', 'v219', 'v220']);
+    assert.deepEqual([...CONSUMER_TARGET_KEYS], ['v218', 'v219', 'v220', 'v222']);
     assert.equal(EXPECTED_AI_FACTORY_VERSIONS.v220, '2.20.0');
+    assert.equal(EXPECTED_AI_FACTORY_VERSIONS.v222, '2.22.0');
     assert.equal(RELEASE_SENTINELS_BY_TARGET.v220, RELEASE_SENTINELS_BY_TARGET.v219);
+    assert.equal(RELEASE_SENTINELS_BY_TARGET.v219.implementGateUpstreamPath, 'skills/aif-implement/SKILL.md');
+    assert.equal(RELEASE_SENTINELS_BY_TARGET.v222.implementGateUpstreamPath, 'skills/aif-implement/references/IMPLEMENT-TASK.md');
     assert.equal(aiFactoryVersionIncludesTransfer('2.17.0'), false);
     assert.equal(aiFactoryVersionIncludesTransfer('2.18.0'), true);
     assert.equal(aiFactoryVersionIncludesTransfer('2.18.1'), true);
     assert.equal(aiFactoryVersionIncludesTransfer('2.19.0'), true);
+    assert.equal(aiFactoryVersionIncludesTransfer('2.22.0'), true);
     assert.equal(aiFactoryVersionIncludesTransfer('2.18.1-rc.1'), false);
     assert.equal(aiFactoryVersionIncludesTransfer('latest'), false);
+  });
+
+  it('runs the same consumer contracts against an injected 2.22.0 target toolchain', async () => {
+    const harness = await createHarness({ target: 'v222' });
+    const result = await runAiFactory218ConsumerSmoke({
+      toolchains: harness.toolchains,
+      extensionRoot: REPO_ROOT,
+      runner: harness.runner,
+      workspaceFactory: harness.workspaceFactory,
+      timeoutMs: 5_000,
+      evidence: 'deterministic'
+    });
+
+    assert.equal(result.status, SMOKE_STATUS.PASS, `failure=${JSON.stringify(result.failure ?? null)}`);
+    assert.equal(result.versions.v217.reported, '2.17.0');
+    assert.equal(result.versions.v222.expected, '2.22.0');
+    assert.equal(result.versions.v222.reported, '2.22.0');
+    assert.equal(result.flows.cleanInstall.version, '2.22.0');
+    assert.equal(result.flows.globalUpdate.toVersion, '2.22.0');
+    assert.equal(result.flows.cleanInstall.status, SMOKE_STATUS.PASS);
+    assert.equal(result.flows.globalUpdate.status, SMOKE_STATUS.PASS);
+    assert.equal(result.flows.targetedUpdate.status, SMOKE_STATUS.PASS);
+    assert.ok(result.events.some((entry) => entry.step === 'init-2.22'), 'v222 target must record the init-2.22 step');
+    for (const flow of ['cleanInstall', 'globalUpdate', 'targetedUpdate']) {
+      assert.equal(result.flows[flow].upstreamExplore.upstreamVersion, '2.22.0');
+      assert.equal(result.flows[flow].upstreamExplore.injectionMarkerCount, 1);
+      assert.equal(result.flows[flow].upstreamImplement.upstreamVersion, '2.22.0');
+      assert.equal(result.flows[flow].upstreamImplement.injectionMarkerCount, 1);
+      // Path-aware binding: the gate lives in the pinned reference, the conflict
+      // token stays on SKILL.md.
+      assert.equal(result.flows[flow].upstreamImplement.reconciliationGatePath, 'skills/aif-implement/references/IMPLEMENT-TASK.md');
+      assert.equal(result.flows[flow].upstreamImplement.reconciliationGateCount, 1);
+      assert.ok(result.flows[flow].upstreamImplement.conflictTokenCount >= 1);
+      assert.ok(result.flows[flow].releaseSurface.browserReplayCount >= 1);
+      assert.equal(result.flows[flow].releaseSurface.warmupSkillPresent, true);
+    }
+  });
+
+  for (const shape of ['skill-only', 'other-reference', 'injection-only', 'missing-reference', 'duplicate-gate']) {
+    it('rejects an off-reference v222 gate: ' + shape, async () => {
+      implementFixtureShape = shape;
+      try {
+        const harness = await createHarness({ target: 'v222' });
+        const result = await runAiFactory218ConsumerSmoke({
+          toolchains: harness.toolchains,
+          extensionRoot: REPO_ROOT,
+          runner: harness.runner,
+          workspaceFactory: harness.workspaceFactory,
+          timeoutMs: 5_000,
+          evidence: 'deterministic'
+        });
+        assert.equal(result.status, SMOKE_STATUS.FAIL, `shape=${shape}`);
+        if (shape === 'missing-reference') assert.equal(result.failure.code, 'missing-upstream-implement-gate-source');
+        else assert.equal(result.failure.code, 'upstream-implement-reconciliation-gate-mismatch', `shape=${shape}`);
+      } finally {
+        implementFixtureShape = 'default';
+      }
+    });
+  }
+
+  it('rejects two bound consumer target toolchains including v222 before any project mutation', async () => {
+    const harness = await createHarness({ target: 'v220' });
+    harness.toolchains.v222 = await createFakeToolchain(harness.root, 'v222', EXPECTED_AI_FACTORY_VERSIONS.v222);
+    const result = await runAiFactory218ConsumerSmoke({
+      toolchains: harness.toolchains,
+      extensionRoot: REPO_ROOT,
+      runner: harness.runner,
+      workspaceFactory: harness.workspaceFactory,
+      timeoutMs: 5_000,
+      evidence: 'deterministic'
+    });
+
+    assert.equal(result.status, SMOKE_STATUS.NOT_RUN);
+    assert.equal(result.failure.flow, 'preflight');
+    assert.equal(result.failure.code, 'ambiguous-target-toolchain');
+    assert.deepEqual(result.failure.details, { candidates: ['v220', 'v222'] });
+    assert.equal(harness.trace.some((entry) => entry.type === 'workspace'), false);
+    assert.equal(harness.runner.calls.length, 0);
   });
 
   it('runs the same consumer contracts against an injected 2.19.0 target toolchain', async () => {
@@ -800,7 +932,7 @@ describe('AI Factory 2.18/2.19 consumer compatibility smoke', () => {
     assert.equal(result.status, SMOKE_STATUS.NOT_RUN);
     assert.equal(result.failure.flow, 'preflight');
     assert.equal(result.failure.code, 'missing-target-toolchain');
-    assert.deepEqual(result.failure.details, { candidates: ['v218', 'v219', 'v220'] });
+    assert.deepEqual(result.failure.details, { candidates: ['v218', 'v219', 'v220', 'v222'] });
     assert.equal(harness.trace.some((entry) => entry.type === 'workspace'), false);
     assert.equal(harness.runner.calls.length, 0);
   });
