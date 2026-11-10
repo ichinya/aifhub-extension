@@ -233,6 +233,15 @@ async function ensureBaseSkill(projectDir, skillName, version, skillsDir = '.cod
     `${skillsDir}/${skillName}/SKILL.md`,
     content
   );
+  if (skillName === 'aif-implement') {
+    // Model the real installer copying the implement references architecture:
+    // the installed consumer tree carries the pinned gate reference too, so
+    // the smoke can verify it on the installed side (issue #290 review).
+    const reference = fakeImplementReference(version);
+    if (reference !== null) {
+      await writeFixture(projectDir, `${skillsDir}/aif-implement/references/IMPLEMENT-TASK.md`, reference);
+    }
+  }
 }
 
 async function applyFakeInjection(projectDir, extensionName, injection, extensionRoot) {
@@ -328,7 +337,8 @@ async function fakeInit(projectDir, version, cliArgs, manifest) {
   const selectedSkills = requested === 'all'
     ? [...new Set([...injectionTargets, 'aif-loop', ...(aiFactoryVersionIncludesTransfer(version) ? ['aif-transfer'] : [])])].sort()
     : requested.split(',').filter(Boolean).sort();
-  const shared = version === EXPECTED_AI_FACTORY_VERSIONS.v220 && await stat(path.join(projectDir, '.agents')).then(s => s.isDirectory()).catch(() => false);
+  const shared = (version === EXPECTED_AI_FACTORY_VERSIONS.v220 || version === EXPECTED_AI_FACTORY_VERSIONS.v222)
+    && await stat(path.join(projectDir, '.agents')).then(s => s.isDirectory()).catch(() => false);
   const skillsDir = shared ? '.agents/skills' : '.codex/skills';
   for (const skillName of selectedSkills) await ensureBaseSkill(projectDir, skillName, version, skillsDir);
   await mkdir(path.join(projectDir, '.codex', 'agents'), { recursive: true });
@@ -384,7 +394,8 @@ function createFakeExecutor({
   reportedVersions = {},
   failWhen,
   targetedNoop = false,
-  mutateInstalledInjection
+  mutateInstalledInjection,
+  mutateInstalledReference
 } = {}) {
   const calls = [];
   const runner = async (request) => {
@@ -410,13 +421,15 @@ function createFakeExecutor({
     if (cliArgs[0] === 'extension' && cliArgs[1] === 'add') {
       await installFakeExtension(request.cwd, cliArgs[2]);
       await mutateInstalledInjection?.({ projectDir: request.cwd, stage: 'clean-install' });
+      await mutateInstalledReference?.({ projectDir: request.cwd, stage: 'clean-install' });
       return successfulProcess();
     }
     if (cliArgs[0] === 'update' && cliArgs[1] === '--force') {
       const ledgerPath = path.join(request.cwd, '.ai-factory.json');
       const ledger = await readJson(ledgerPath);
       ledger.version = version;
-      if (version === EXPECTED_AI_FACTORY_VERSIONS.v220 && await stat(path.join(request.cwd, '.agents')).then(s => s.isDirectory()).catch(() => false)) {
+      if ((version === EXPECTED_AI_FACTORY_VERSIONS.v220 || version === EXPECTED_AI_FACTORY_VERSIONS.v222)
+        && await stat(path.join(request.cwd, '.agents')).then(s => s.isDirectory()).catch(() => false)) {
         const codex = ledger.agents.find(a => a.id === 'codex');
         if (codex.skillsDir !== '.agents/skills') {
           await rename(path.join(request.cwd, codex.skillsDir), path.join(request.cwd, '.agents/skills'));
@@ -438,6 +451,7 @@ function createFakeExecutor({
         await installFakeExtension(request.cwd, extension.source);
       }
       await mutateInstalledInjection?.({ projectDir: request.cwd, stage: 'global-update' });
+      await mutateInstalledReference?.({ projectDir: request.cwd, stage: 'global-update' });
       return successfulProcess();
     }
     if (
@@ -451,6 +465,7 @@ function createFakeExecutor({
         const record = ledger.extensions.find((entry) => entry.name === 'aifhub-extension');
         await installFakeExtension(request.cwd, record.source);
         await mutateInstalledInjection?.({ projectDir: request.cwd, stage: 'targeted-update' });
+        await mutateInstalledReference?.({ projectDir: request.cwd, stage: 'targeted-update' });
       }
       return successfulProcess();
     }
@@ -464,7 +479,15 @@ function createFakeExecutor({
   return runner;
 }
 
-async function createHarness({ reportedVersions, failWhen, targetedNoop = false, mutateInstalledInjection, target = 'v218', sharedCodex = false } = {}) {
+async function createHarness({
+  reportedVersions,
+  failWhen,
+  targetedNoop = false,
+  mutateInstalledInjection,
+  mutateInstalledReference,
+  target = 'v218',
+  sharedCodex = false
+} = {}) {
   const root = await createTempRoot();
   const manifest = await readJson(path.join(REPO_ROOT, 'extension.json'));
   const toolchains = {
@@ -478,7 +501,8 @@ async function createHarness({ reportedVersions, failWhen, targetedNoop = false,
     reportedVersions,
     failWhen,
     targetedNoop,
-    mutateInstalledInjection
+    mutateInstalledInjection,
+    mutateInstalledReference
   });
   const baseFactory = createTemporaryWorkspaceFactory({ temporaryRoot: root });
   const workspaceFactory = async (label) => {
@@ -756,9 +780,11 @@ describe('AI Factory 2.18/2.19 consumer compatibility smoke', () => {
       assert.equal(result.flows[flow].upstreamImplement.upstreamVersion, '2.22.0');
       assert.equal(result.flows[flow].upstreamImplement.injectionMarkerCount, 1);
       // Path-aware binding: the gate lives in the pinned reference, the conflict
-      // token stays on SKILL.md.
+      // token stays on SKILL.md. The installed consumer copy of that reference
+      // is verified too (existence plus byte equality), not only upstream.
       assert.equal(result.flows[flow].upstreamImplement.reconciliationGatePath, 'skills/aif-implement/references/IMPLEMENT-TASK.md');
       assert.equal(result.flows[flow].upstreamImplement.reconciliationGateCount, 1);
+      assert.ok(result.flows[flow].upstreamImplement.installedGateDigest, 'installed gate reference must be verified and recorded');
       assert.ok(result.flows[flow].upstreamImplement.conflictTokenCount >= 1);
       assert.ok(result.flows[flow].releaseSurface.browserReplayCount >= 1);
       assert.equal(result.flows[flow].releaseSurface.warmupSkillPresent, true);
@@ -806,6 +832,59 @@ describe('AI Factory 2.18/2.19 consumer compatibility smoke', () => {
       }
     });
   }
+
+  for (const shape of ['installed-reference-missing', 'installed-reference-drift']) {
+    it('rejects a broken installed v222 gate reference: ' + shape, async () => {
+      const harness = await createHarness({
+        target: 'v222',
+        mutateInstalledReference: async ({ projectDir }) => {
+          const codex = (await readJson(path.join(projectDir, '.ai-factory.json'))).agents.find(a => a.id === 'codex');
+          const installed = path.join(projectDir, codex.skillsDir, 'aif-implement', 'references', 'IMPLEMENT-TASK.md');
+          if (shape === 'installed-reference-missing') {
+            await rm(installed, { force: true });
+          } else {
+            await writeFile(installed, (await readFile(installed, 'utf8')).replace('3.1.1', '3.1.2'), 'utf8');
+          }
+        }
+      });
+      const result = await runAiFactory218ConsumerSmoke({
+        toolchains: harness.toolchains,
+        extensionRoot: REPO_ROOT,
+        runner: harness.runner,
+        workspaceFactory: harness.workspaceFactory,
+        timeoutMs: 5_000,
+        evidence: 'deterministic'
+      });
+      assert.equal(result.status, SMOKE_STATUS.FAIL, `shape=${shape}`);
+      assert.equal(
+        result.failure.code,
+        shape === 'installed-reference-missing' ? 'missing-installed-implement-gate-source' : 'installed-implement-gate-bytes-changed',
+        `shape=${shape}`
+      );
+    });
+  }
+
+  it('runs the v222 consumer contracts through the shared .agents/skills route', async () => {
+    const harness = await createHarness({ target: 'v222', sharedCodex: true });
+    const result = await runAiFactory218ConsumerSmoke({
+      toolchains: harness.toolchains,
+      extensionRoot: REPO_ROOT,
+      runner: harness.runner,
+      workspaceFactory: harness.workspaceFactory,
+      timeoutMs: 5_000,
+      evidence: 'deterministic'
+    });
+
+    assert.equal(result.status, SMOKE_STATUS.PASS, `failure=${JSON.stringify(result.failure ?? null)}`);
+    for (const flow of ['cleanInstall', 'globalUpdate', 'targetedUpdate']) {
+      assert.equal(result.flows[flow].status, SMOKE_STATUS.PASS, `flow=${flow}`);
+      assert.equal(result.flows[flow].upstreamImplement.reconciliationGatePath, 'skills/aif-implement/references/IMPLEMENT-TASK.md');
+      assert.equal(result.flows[flow].upstreamImplement.reconciliationGateCount, 1);
+      assert.ok(result.flows[flow].upstreamImplement.installedGateDigest, `flow=${flow}: installed gate reference must be verified`);
+      assert.ok(result.flows[flow].releaseSurface.browserReplayCount >= 1);
+      assert.equal(result.flows[flow].releaseSurface.warmupSkillPresent, true);
+    }
+  });
 
   it('rejects two bound consumer target toolchains including v222 before any project mutation', async () => {
     const harness = await createHarness({ target: 'v220' });

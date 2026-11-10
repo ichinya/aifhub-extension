@@ -905,6 +905,7 @@ async function inspectImplementUpstreamContract(projectDir, extension, toolchain
   let reconciliationGateCount = null;
   let conflictTokenCount = null;
   let reconciliationGatePath = null;
+  let installedGateDigest = null;
   const sentinels = RELEASE_SENTINELS_BY_TARGET[toolchain.key];
   if (sentinels) {
     // Path-aware gate source (issue #290): the gate is counted on the exact
@@ -928,6 +929,25 @@ async function inspectImplementUpstreamContract(projectDir, extension, toolchain
     assertContract(conflictTokenCount >= 1, flow, 'upstream-implement-conflict-token-mismatch', {
       count: conflictTokenCount
     });
+    // Installed-side binding (review round 3, issue #290): when the pinned
+    // gate lives outside the implement SKILL.md, the installed consumer tree
+    // must also carry that reference — a broken install or update that omits
+    // or mutates it must fail closed in every flow, not pass by reading the
+    // upstream copy alone.
+    if (sentinels.implementGateUpstreamPath !== 'skills/aif-implement/SKILL.md') {
+      const installedGatePath = path.join(
+        await consumerSkillsRoot(projectDir, flow),
+        ...sentinels.implementGateUpstreamPath.split('/').slice(1)
+      );
+      assertContract(await exists(installedGatePath), flow, 'missing-installed-implement-gate-source', {
+        path: sentinels.implementGateUpstreamPath
+      });
+      const installedGateBytes = await readFile(installedGatePath);
+      assertContract(installedGateBytes.equals(gateBytes), flow, 'installed-implement-gate-bytes-changed', {
+        path: sentinels.implementGateUpstreamPath
+      });
+      installedGateDigest = sha256(installedGateBytes);
+    }
   }
 
   return {
@@ -936,6 +956,7 @@ async function inspectImplementUpstreamContract(projectDir, extension, toolchain
     reconciliationGateCount,
     conflictTokenCount,
     reconciliationGatePath,
+    installedGateDigest,
     upstreamDigest: sha256(upstreamBytes)
   };
 }
@@ -1232,6 +1253,7 @@ async function runCleanInstallFlow(context) {
       packagedPolicyDigest: promptLanguage.packagedPolicyDigest,
       exploreUpstreamDigest: upstreamExplore.upstreamDigest,
       implementUpstreamDigest: upstreamImplement.upstreamDigest,
+      implementInstalledGateDigest: upstreamImplement.installedGateDigest,
       transferCount: transfer.fileCount,
       adapterCount: adapters.length,
       managedAgentCount: agents.count
