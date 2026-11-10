@@ -18,9 +18,9 @@ OpenSpec-native artifacts в `openspec/` являются canonical. AI Factory 
 
 OpenSpec CLI features вызываются через AIFHub wrappers и `scripts/openspec-runner.mjs`; OpenSpec skills или slash commands extension не устанавливает.
 
-## AI Factory 2.20 reviewed baseline
+## AI Factory 2.22 reviewed baseline
 
-[2.20 release ledger](openspec-compatibility.md#ai-factory-220-reviewed-release): resolved workflow defaults, shared Codex ledger paths, exact v220 alongside v218/v219 smoke slots, schema pin, upstream review-validation-failed boundary и deferred post-#199 карта. [Usage](usage.md#ai-factory-220-workflow-defaults-and-consumer-smoke) содержит opt-in live flags.
+[2.22 release ledger](openspec-compatibility.md#ai-factory-222-reviewed-release): кумулятивная адаптация после 2.20 (v220) — path-aware v222 reference-path sentinels рядом с историческими v218/v219/v220 слотами, schema pin 2.22.0 blob `a3d42681…`, закрытие deferred-карты ledger 2.20, ownership четырёх новых upstream-скиллов и четырёх новых CLI-команд. Исторический [2.20 ledger](openspec-compatibility.md#ai-factory-220-reviewed-release) сохраняет resolved workflow defaults, shared Codex ledger paths, upstream review-validation-failed boundary и deferred post-#199 карту. [Usage](usage.md#ai-factory-220-workflow-defaults-and-consumer-smoke) содержит opt-in live flags.
 
 ## Порядок Чтения
 

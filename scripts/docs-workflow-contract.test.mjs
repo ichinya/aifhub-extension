@@ -1145,7 +1145,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
     }
     for (const expected of [
       'exact `2.17.0` update-source executors',
-      'one selectable `2.18.1` (`v218`) or `2.19.0` (`v219`) target executor',
+      'one selectable `2.18.1` (`v218`), `2.19.0` (`v219`), `2.20.0` (`v220`) or `2.22.0` (`v222`) target executor',
       'Exactly one target group is required per run',
       '--v219-*',
       '`2.18.0` remains a separate stable feature boundary',

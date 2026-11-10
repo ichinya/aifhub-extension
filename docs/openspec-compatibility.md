@@ -379,6 +379,58 @@ AI Factory 2.19 adds upstream-owned browser replay evidence under the same branc
 
 Branch-scoped `qa-check.md` and `browser-replay/` artifacts are not change-scoped AIFHub evidence. They cannot by themselves satisfy `/aif-verify`, `/aif-done`, `coverage.json`, rules evidence, `done-readiness.json`, `done.md`, or `openspec-archive.json`; no implicit bridge is registered.
 
+## AI Factory 2.22 Reviewed Release
+
+Reviewed baseline: опубликованный тег [`2.22.0`](https://github.com/lee-to/ai-factory/releases/tag/2.22.0), commit `4723d0bbc3b2fae0306d9934545fdd2d193c9578`, matching the npm `ai-factory@2.22.0` `gitHead`. Полный кумулятивный range `2.20.0...2.22.0` (включая промежуточный `2.21.0`, tag/npm `gitHead` `a528cd49b214ae250fc9bda02721e48a8d8fee9a`): **144 commits and 275 changed files** (`compare` без усечения, `truncated: null`). Дата review: 2026-11-11. Ре-аудит выполнен на чистом built exact-tag дереве; предыдущий cumulative ledger 2.20/2.19/2.18 сохранён ниже и в prose `sources.ai-factory.notes`; диапазон `>=2.11.0 <3.0.0` и ultra boundary `>=2.18.0` не изменены. Upstream уже существует тег `2.23.0` — вне скоупа этого review, `compat` его покрывает.
+
+### AI Factory 2.22 surface audit
+
+Compare API возвращает усечённую статистику (`+0/-0 modified`) для большинства файлов — факты дельт сняты per-file `git diff` на exact tag; нулевые/отсутствующие stats ≠ unchanged.
+
+| Material surface | Факты | Вердикт |
+|---|---|---|
+| `schemas/extension.schema.json` | blob `a82b8a0b…` → `a3d42681f43f644c4f01d2daf80e56a01d1893aa` (8394 bytes); дельта аддитивна: optional `toolPermissions` (Claude Code-only), optional `agents[].homeSkillsDir`; текущий extension.json валиден против новой схемы | **adapter** (byte-sync + перепин; поле в манифесте не объявляется) |
+| `src/core/config.ts` (+11/−2) | `useSymlinks`, `skillSymlinks`; windsurf `.windsurf/skills` legacy default | **no-op** (наш runtime-скоуп codex+claude) |
+| `src/core/extension-ops.ts` (+23) | `applyExtensionToolPermissions`/`removeExtensionToolPermissions`; `resolveSkillTargets` select-option | **no-op** (нет деклараций `toolPermissions`) |
+| `src/core/extensions.ts` (+30) | парсинг/валидация `toolPermissions`, `homeSkillsDir` | **no-op** (поле не объявляется) |
+| `src/core/installer.ts` (+104) | `includeRequiredSkills`, `assertRequiredSkillTargetsSafe` (required-skill safety) | **retain** (поведенческая ре-проверка через smoke/core-matrix) |
+| `src/core/skill-targets.ts` (+37) | `usesSharedDevinProfile` (devin+windsurf), render context v2 | **no-op** (наш runtime-скоуп codex+claude) |
+| `src/core/skills-migration.ts` (+62) | receipt-proven outdated-relaxation: outdated proofs, retained файлы, mode-conflict guard | **retain** — migration boundary: unknown/modified/linked по-прежнему fail-closed |
+| `src/core/injections.ts` | blob `7a209115ab4ae283738c43ad243c218e12559356` идентичен на 2.20.0/2.21.0/2.22.0 | **no-op** (механика prepend/strip не изменилась) |
+| `skills/aif/references/config-template.yaml` (+43) | writing-профиль; `workflow.fix_mode: ask`, `workflow.fix_patch: true` (defaults подтверждены на теге); `roadmap_next_mode`/`roadmap_next_capacity`; `plan_structure: classic` | **adapter** (bounded-комментарий в нашем `skills/aif-analyze/references/config-template.yaml`; ultra-гейт не меняется) |
+| `skills/aif/references/update-config.mjs` (+1/−1) | регистрация `workflow.plan_structure` в config schema | **no-op** |
+| `skills/aif-implement/SKILL.md` (+105/−912) + `references/IMPLEMENT-*.md` (12 файлов) | extraction references-архитектуры: consistency gate переехал в `references/IMPLEMENT-TASK.md` (1×), conflict token остался в SKILL.md (1×, `:209`) | **adapter** (path-aware sentinel binding v222: gate из закреплённого reference, conflict/byte-equality/marker на SKILL.md) |
+| `skills/aif-verify/SKILL.md` (+40/−408), `skills/aif-fix/SKILL.md` (+71/−422) | extraction references; fix_mode/fix_patch defaults | **retain** (upstream-owned тела; prepend-граница не затронута) |
+| `skills/aif-plan/SKILL.md` (+302/−20) | `workflow.plan_structure` (classic\|task-based), commit strategy / TDD granularity вопросы, `+coupling`, Selected roadmap scope с `/aif-roadmap-next` handoff, Runtime-aware questions | **retain** (legacy plan-creation семантика; наша OpenSpec-native planning-workflow не пересекается — решение в design) |
+| `skills/aif-commit/SKILL.md` (+158/−14), `skills/aif-evolve/SKILL.md` (+205/−112), `skills/aif-improve/SKILL.md` (+54/−3), `skills/aif-explore/SKILL.md` (+30/−1), `skills/aif-review/SKILL.md` (+44/−2) | commit-стратегии, evolve ownership, вопросный контракт, sentinel-совместимые правки | **retain** (sentinels explore/review на 2.22 подтверждены: coherence/ultra/ordering по 1×, `Task` 1×, `Language: \`en\` (English)` 1×) |
+| `skills/aif-roadmap/SKILL.md`, `aif-architecture/SKILL.md`, `aif-archive/SKILL.md`, `aif-rules-check/SKILL.md` (+24/0) | shared skill-context слои | **no-op** |
+| Новые CLI-команды: `commands`, `instructions`, `completion-hook`, `worktree-check` | каталог проектных команд без исполнения; запись instruction composition; opt-in Claude Code Stop verifier-адаптер; диагностика worktree readiness | **no-op** (per-command ledger-строки; completion-hook — см. boundary ниже) |
+| Новые upstream-скиллы: `aif-plan-overview`, `aif-quality-setup`, `aif-roadmap-next`, `aif-skills-audit` | upstream-owned | **no-copy/no-op** (коллизий имён нет; `aif-roadmap-next` ≠ наша maturity-audit-инъекция) |
+| `HANDOFF`-поверхность (`mcp__handoff__*` в allowed-tools aif-plan/aif-implement/aif-fix) | upstream 2.22 | **no-op** (пересечений с нашими скриптами/инъекциями нет — grep 0 hits; в чужие проверки не «просачивается») |
+| `package.json`, docs/*, `.github/*`, subagents, transformers | version bump (2.22.0), docs, infra | **no-op** |
+
+### Workflow defaults и ownership
+
+Runtime-aware questions: `AskUserQuestion`/`Questions` описывают интент, а не требуемое имя тулзы; разрешён только фактически exposed и permitted вопросный инструмент с его схемой, иначе plain text с нумерованными опциями. Наши `skills/shared/QUESTION-TOOL.md` и план-folder overlays остаются когерентными: QUESTION-TOOL явно уступает фактическим runtime-ограничениям («Actual runtime tool restrictions win over historical examples»), overlays в Codex Default mode предписывают plain text — строгость overlays валидна, правка текста не требуется. `workflow.plan_structure` (default `classic`), `workflow.fix_mode` (default `ask`), `workflow.fix_patch` (default `true`), `+coupling`, `/aif-roadmap-next` handoff и TDD-granularity вопросы — upstream-owned legacy plan-creation семантика; AIFHub не расширяет резолвер (`AI_FACTORY_ULTRA_MIN_VERSION = '2.18.0'` без потолка) и не объявляет новые ключи в своём шаблоне.
+
+Instruction manifests: upstream 2.22 несёт `instruction-manifest.ts`, `instruction-inventory.ts`, `schemas/instruction-manifest.schema.json` и хранилище `.ai-factory/instruction-runs/`. Граница владения — «разделение владения механизмами и форматами», а не «отсутствие общих файлов»: инвентарь AIFHub-композиции шире инъекций (entrypoints/references), SessionBrief digest считается только от producer. Upstream manifest не получает authority над SessionBrief digest; adapter «manifest → composition digest» не реализуется. Completion-hook: opt-in Claude Code Stop verifier-адаптер — его Stop-событие не становится AIFHub accepted evidence (`aifhub.observed-check.v1` остаётся независимым producer с собственной custody); свой Stop-адаптер не ставится. Tool permissions: схема синхронизирована, поле не объявляется, `EXTENSION_TOP_LEVEL_KEYS` не расширяется.
+
+### Implement references и migration boundary
+
+На 2.22.0 sentinel «Run the requirement consistency gate» находится ровно 1× в `skills/aif-implement/references/IMPLEMENT-TASK.md` (0× в SKILL.md), а `ERROR [requirement-conflict]` — 1× в `skills/aif-implement/SKILL.md` (и в reference). Consumer smoke v222 читает gate из version-specific пути (`implementGateUpstreamPath`); исторические v218/v219/v220 bindings остаются строго в SKILL.md, негативный тест «reference не спасает отсутствующий SKILL-sentinel» сохранён. Gate вне закреплённого reference (SKILL.md, другой reference, инъекция), отсутствующий reference-файл и duplicate gate дают FAIL.
+
+Upstream миграция получила receipt-proven outdated-relaxation (доказательство outdated-состояния позволяет перенести пользовательские файлы), но unknown/modified файлы и linked entries по-прежнему блокируют preflight fail-closed; подтверждено core-матрицей 2.22. Ownership audit: `aif-analyze`/`aif-done`/`aif-mode` — не bundled имена, `replaces` отсутствует, 18 agentFiles (9 codex + 9 claude) и 13 injection targets не коллидируют; installer collision safety доказана на actual-tag матрице.
+
+### Schema и release scope
+
+`extension.json.$schema` перепинен к `https://raw.githubusercontent.com/lee-to/ai-factory/2.22.0/schemas/extension.schema.json`; локальная `schemas/extension.schema.json` byte-sync'нута до blob `a3d42681f43f644c4f01d2daf80e56a01d1893aa` (детерминированный git-blob sha1-ассерт в default suite, byte-equality в reviewed-target матрице). Дельта схемы аддитивна (optional `toolPermissions`, optional `agents[].homeSkillsDir`); extension version, MCP, commands, Node >=18 и зависимости не меняются.
+
+### Закрытие deferred-карты ledger 2.20
+
+Пять отложенных поверхностей получают явные dispositions: selective references (#199) — закрыта sentinel-переносом и reference-проверками 2.22-матрицы (собственный selected-reference routing сохранён); instruction manifests (#190) — retain (граница владения выше); tool permissions (#198/#208) — no-op; question contract (#195/#210) — coherence review выполнен, правка текста не требуется (вопросный контракт когерентен); aif-skills-audit (#188) — retain no-op. Неопределённые follow-up не создаются. Lekalo adapter (готов), OpenSpec 1.14–1.15 и hlv v1.1.0 — отдельные follow-up issues вне этого change.
+
+Отдельная offline core matrix для 2.22 запускается без CLI/network: тест `scripts/ai-factory-2-22-core-contract.test.mjs` с переменной `AIFHUB_TEST_AI_FACTORY_222_ROOT=<built-exact-tag-tree>` (runtime — `node --test`). Она проверяет реальный `composeInstalledExtensionSkills` (13 инъекций × 3 прохода, marker-once, byte-equality rendered baseline без нормализации), strip roots, rollback injection-only targets, migration blockers и наличие/байты upstream references implement references-архитектуры. Историческая 2.20-матрица (`scripts/ai-factory-2-20-core-contract.test.mjs`, `AIFHUB_TEST_AI_FACTORY_220_ROOT`) сохранена как meaningful regression и больше не сравнивает живую локальную схему — byte-equality принадлежит reviewed-target матрице 2.22. Smoke v222 использует version-specific reference-path sentinels; v218/v219/v220 — прежний строгий SKILL.md set. Live smoke — opt-in, без запуска NOTRUN; deterministic fixtures не доказывают live install, CI или production. См. [Usage](usage.md#ai-factory-220-workflow-defaults-and-consumer-smoke).
+
 ## AI Factory 2.20 Reviewed Release
 
 Reviewed baseline: опубликованный тег `2.20.0`, commit `c38ff6ffe183ccf39b01774be892fcf64d9169c1`, matching the npm `ai-factory@2.20.0` `gitHead`. Полный range `2.19.0...2.20.0`: **64 commits and 124 changed files**. Дата review: 2026-10-30. Предыдущий cumulative ledger 2.19/2.18 сохранён ниже и в prose `sources.ai-factory.notes`; диапазон `>=2.11.0 <3.0.0` и ultra boundary `>=2.18.0` не изменены.

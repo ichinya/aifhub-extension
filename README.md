@@ -146,6 +146,10 @@ It does not replace `/aif-commit`. After `/aif-done`, run `/aif-commit` or your 
 
 The config also records the aif-analyze skill version under `analyze.skill_version`. Before patching an existing config, `/aif-analyze` runs the read-only deterministic diff `ai-factory aifhub-analyze-config-diff --json`, which compares the config against the extension's required-keys manifest, reports what would be added and why, and takes a fast path when the config is already up to date.
 
+### AI Factory 2.22 Reviewed Release
+
+Current reviewed AI Factory baseline is `2.22.0` (144 commits and 275 changed files cumulatively since 2.20.0, including 2.21.0; tag `4723d0bbc3b2fae0306d9934545fdd2d193c9578` = npm `gitHead`). The extension schema is byte-synced to the 2.22.0 blob (`a3d42681…`, additive `toolPermissions`/`homeSkillsDir` fields), the consumer smoke adds exact v222 with a version-specific reference-path sentinel binding, and the cumulative surface audit records adapter/retain/no-op dispositions including four new upstream skills and four new CLI commands. See [2.22 surface audit and closed deferred map](docs/openspec-compatibility.md#ai-factory-222-reviewed-release) and [workflow defaults / v222 smoke](docs/usage.md#ai-factory-220-workflow-defaults-and-consumer-smoke). Compat `>=2.11.0 <3.0.0` and extension version are unchanged; live smoke remains opt-in.
+
 ### AI Factory 2.20 Reviewed Release
 
 Current reviewed AI Factory baseline is `2.20.0` (64 commits and 124 changed files since 2.19.0; tag `c38ff6ffe183ccf39b01774be892fcf64d9169c1`). Resolved workflow defaults pass the ultra version gate; leading explore `regular` overrides configured ultra. Consumer smoke adds exact v220 alongside v218/v219 and resolves shared Codex `.agents/skills` through the installation ledger. See [2.20 surface audit and deferred map](docs/openspec-compatibility.md#ai-factory-220-reviewed-release) and [workflow defaults / v220 smoke](docs/usage.md#ai-factory-220-workflow-defaults-and-consumer-smoke). Compat `>=2.11.0 <3.0.0` and extension version are unchanged; live smoke remains opt-in.

@@ -374,7 +374,7 @@ Research is supporting context in both artifact modes. Regular `/aif-explore <to
 `extension.json` follows the upstream AI Factory extension manifest schema and should not contain AIFHub-private fields. Its `$schema` value points at:
 
 ```text
-https://raw.githubusercontent.com/lee-to/ai-factory/2.20.0/schemas/extension.schema.json
+https://raw.githubusercontent.com/lee-to/ai-factory/2.22.0/schemas/extension.schema.json
 ```
 
 The private AIFHub metadata contract lives in `aifhub-extension.json` and is described by `schemas/aifhub-extension.schema.json`. `compat.ai-factory` and `sources.*` belong there, not in `extension.json`.
