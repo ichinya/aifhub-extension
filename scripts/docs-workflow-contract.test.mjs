@@ -815,6 +815,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
   });
 
   it('documents the AI Factory 2.23 reviewed release contract, dispatch boundary and v223 slot', async () => {
+    const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
     const readme = await readRepoFile('README.md');
     const usage = await readRepoFile('docs/usage.md');
     const compatibility = await readRepoFile('docs/openspec-compatibility.md');
@@ -848,6 +849,21 @@ describe('complete OpenSpec workflow documentation contract', () => {
     assertIncludes(readme, '2.23.0', 'README 2.23 baseline');
     assertIncludes(docsIndex, '2.23', 'docs index 2.23 token');
     assertIncludes(contextPolicy, '2.23', 'context policy 2.23 token');
+
+    const notes = metadata.sources['ai-factory'].notes;
+    for (const text of [
+      '8 commits and 46 changed files',
+      '38190bbc253cf99bf70d612941eb9020e1b3bb3e',
+      'eabdfe9c8015e07ac7334bb9a66c262d94034d08',
+      'annotated',
+      '7a209115ab4ae283738c43ad243c218e12559356',
+      '69ff94a0862d82290a0da9af379f7cfaf55394ca1f93f8e899699d4f6ef842b0',
+      'no-config',
+      'manual_dispatch',
+      'stays out of scope of the initial 2.22 review',
+      'noncanonical-openspec-config',
+      'provesReleaseOrDeployment: false'
+    ]) assertIncludes(notes, text, '2.23 cumulative ledger');
   });
 
   it('documents the published AI Factory 2.19.0 release, selectable 2.18.1/2.19.0 executable targets, and ownership boundaries', async () => {
