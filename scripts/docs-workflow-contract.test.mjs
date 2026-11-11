@@ -781,7 +781,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
       && readme.indexOf('### AI Factory 2.22 Reviewed Release') < readme.indexOf('### AI Factory 2.20 Reviewed Release'), 'README 2.22 section newest-first');
     assertIncludes(docsIndex, 'AI Factory 2.22 reviewed baseline', 'docs index 2.22 header');
     assertIncludes(contextPolicy, 'AI Factory 2.22 Context Boundaries', 'context policy 2.22 header');
-    assertIncludes(changelog, 'Кумулятивная адаптация reviewed baseline AI Factory 2.20.0 → 2.22.0', 'changelog 2.22 entry');
+    assertIncludes(changelog, 'Кумулятивная адаптация reviewed baseline AI Factory 2.20.0 → 2.23.0', 'changelog cumulative entry');
 
     for (const text of [
       '144 commits and 275 changed files',
