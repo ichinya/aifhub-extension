@@ -32,9 +32,10 @@ export const EXPECTED_AI_FACTORY_VERSIONS = Object.freeze({
   v218: '2.18.1',
   v219: '2.19.0',
   v220: '2.20.0',
-  v222: '2.22.0'
+  v222: '2.22.0',
+  v223: '2.23.0'
 });
-export const CONSUMER_TARGET_KEYS = Object.freeze(['v218', 'v219', 'v220', 'v222']);
+export const CONSUMER_TARGET_KEYS = Object.freeze(['v218', 'v219', 'v220', 'v222', 'v223']);
 export const AI_FACTORY_RELEASE_SENTINELS = Object.freeze({
   implementReconciliationGate: 'Run the requirement consistency gate',
   implementConflictToken: 'ERROR [requirement-conflict]',
@@ -50,12 +51,17 @@ export const AI_FACTORY_2220_RELEASE_SENTINELS = Object.freeze({
   ...AI_FACTORY_RELEASE_SENTINELS,
   implementGateUpstreamPath: 'skills/aif-implement/references/IMPLEMENT-TASK.md'
 });
+// 2.23.0 keeps the contract layer byte-identical to 2.22.0 (custody re-audit,
+// issue #290): the gate still lives in the pinned reference file, so the v223
+// sentinel record reuses the same reference-path binding.
+export const AI_FACTORY_2230_RELEASE_SENTINELS = AI_FACTORY_2220_RELEASE_SENTINELS;
 // Retained export for callers of the historical v219 fixture contract.
 export const AI_FACTORY_2190_RELEASE_SENTINELS = AI_FACTORY_RELEASE_SENTINELS;
 export const RELEASE_SENTINELS_BY_TARGET = Object.freeze({
   v219: AI_FACTORY_RELEASE_SENTINELS,
   v220: AI_FACTORY_RELEASE_SENTINELS,
-  v222: AI_FACTORY_2220_RELEASE_SENTINELS
+  v222: AI_FACTORY_2220_RELEASE_SENTINELS,
+  v223: AI_FACTORY_2230_RELEASE_SENTINELS
 });
 export const AI_FACTORY_2181_EXPLORE_SENTINELS = Object.freeze({
   coherenceHeading: '#### Research Coherence Gate (all persisted modes)',
