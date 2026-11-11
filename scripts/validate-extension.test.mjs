@@ -19,8 +19,8 @@ const execFileAsync = promisify(execFile);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
 
-const UPSTREAM_SCHEMA_URL = 'https://raw.githubusercontent.com/lee-to/ai-factory/2.22.0/schemas/extension.schema.json';
-// Reviewed release 2.22.0 binds its exact upstream schema blob; local schemas/extension.schema.json
+const UPSTREAM_SCHEMA_URL = 'https://raw.githubusercontent.com/lee-to/ai-factory/2.23.0/schemas/extension.schema.json';
+// Reviewed release 2.23.0 binds its exact upstream schema blob; local schemas/extension.schema.json
 // must stay byte-identical (issue #290; the historical 2.20.0 blob a82b8a0b… remains a ledger record).
 const UPSTREAM_SCHEMA_BLOB_SHA1 = 'a3d42681f43f644c4f01d2daf80e56a01d1893aa';
 const AIFHUB_SCHEMA_PATH = './schemas/aifhub-extension.schema.json';
@@ -203,12 +203,12 @@ describe('validate-extension.mjs', () => {
     assert.equal(OPENSPEC_NODE_RANGE, openspec.requiresNode);
   });
 
-  it('keeps the local extension schema byte-identical to the reviewed 2.22.0 upstream blob', async () => {
+  it('keeps the local extension schema byte-identical to the reviewed 2.23.0 upstream blob', async () => {
     const schema = await readFile(join(REPO_ROOT, 'schemas/extension.schema.json'));
     assert.equal(
       createHash('sha1').update(`blob ${schema.length}\0`).update(schema).digest('hex'),
       UPSTREAM_SCHEMA_BLOB_SHA1,
-      'local schemas/extension.schema.json must byte-match the pinned upstream 2.22.0 blob'
+      'local schemas/extension.schema.json must byte-match the pinned upstream 2.23.0 blob'
     );
   });
 

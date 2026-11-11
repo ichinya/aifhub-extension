@@ -11,7 +11,7 @@ import { validateJsonAgainstSchema } from './json-schema-subset.mjs';
 const LOG_LEVEL = process.env.LOG_LEVEL || 'INFO';
 const LEVELS = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 };
 
-const UPSTREAM_SCHEMA_URL = 'https://raw.githubusercontent.com/lee-to/ai-factory/2.22.0/schemas/extension.schema.json';
+const UPSTREAM_SCHEMA_URL = 'https://raw.githubusercontent.com/lee-to/ai-factory/2.23.0/schemas/extension.schema.json';
 const UPSTREAM_SCHEMA_FILE = './schemas/extension.schema.json';
 const AIFHUB_METADATA_FILE = 'aifhub-extension.json';
 const AIFHUB_METADATA_SCHEMA = './schemas/aifhub-extension.schema.json';
