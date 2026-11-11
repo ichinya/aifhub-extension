@@ -1300,7 +1300,6 @@ describe('complete OpenSpec workflow documentation contract', () => {
       'npm delivery channel requires Node',
       'packageRequiresNode',
       'resolved upstream in 1.13.1',
-      'resolved upstream in 1.13.1',
       'Exact 1.10.0 Custody and Evidence Boundary',
       'Exact 1.10.0 CLI Matrix',
       '1.10.0 Source Classification',

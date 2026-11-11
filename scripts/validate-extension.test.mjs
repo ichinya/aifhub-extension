@@ -380,8 +380,10 @@ describe('validate-extension.mjs', () => {
 
   it('fails when OpenSpec metadata advances without the runtime reviewed-version diagnostic', async () => {
     const parsed = JSON.parse(validAifhubMetadata());
-    parsed.sources.openspec.version = '1.15.1';
-    parsed.sources.openspec.reviewedStableVersions.push('1.15.1');
+    // Advance past the runner diagnostic with an order-valid ledger entry so the
+    // exit isolates the runner-mismatch property, not a ledger-order violation.
+    parsed.sources.openspec.version = '1.17.1';
+    parsed.sources.openspec.reviewedStableVersions.push('1.17.1');
     await writeValidProject({ metadata: JSON.stringify(parsed) });
 
     const code = await runValidatorExitCode(tmpDir);

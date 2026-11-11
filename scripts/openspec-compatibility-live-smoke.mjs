@@ -91,7 +91,7 @@ const command = path.resolve(packageRoot, '../../.bin', process.platform === 'wi
 assert.ok(existsSync(command), 'Expected the shim installed from the verified local tarball');
 const scratch = mkdtempSync(path.join(tmpdir(), 'openspec-171-smoke-'));
 const env = {
-  ...process.env, OPENSPEC_TELEMETRY: '0', DO_NOT_TRACK: '1', CI: '1', NO_COLOR: '1',
+  ...process.env, OPENSPEC_TELEMETRY: '0', DO_NOT_TRACK: '1', OPENSPEC_NO_UPDATE_CHECK: '1', CI: '1', NO_COLOR: '1',
   XDG_CONFIG_HOME: path.join(scratch, 'config'), XDG_DATA_HOME: path.join(scratch, 'data'),
   XDG_STATE_HOME: path.join(scratch, 'state'), XDG_CACHE_HOME: path.join(scratch, 'cache')
 };

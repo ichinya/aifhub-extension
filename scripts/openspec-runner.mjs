@@ -673,6 +673,7 @@ function createDetectionResult(overrides = {}) {
   // npm-channel engines marker (1.16.0+): diagnostics-only, additive, and derived
   // from the reported CLI version rather than the installed package manifest.
   const packageNodeMarkerApplies = versionSupported && satisfiesGte(version, OPENSPEC_PACKAGE_NODE_SINCE);
+  const packageFloorSemver = OPENSPEC_PACKAGE_NODE_FLOOR.replace(/^>=/, '');
 
   return {
     available: overrides.available ?? false,
@@ -687,7 +688,7 @@ function createDetectionResult(overrides = {}) {
     nodeVersion,
     nodeSupported,
     packageRequiresNode: packageNodeMarkerApplies ? OPENSPEC_PACKAGE_NODE_FLOOR : null,
-    packageNodeSupported: packageNodeMarkerApplies ? satisfiesGte(nodeVersion, OPENSPEC_PACKAGE_NODE_FLOOR) : null,
+    packageNodeSupported: packageNodeMarkerApplies ? satisfiesGte(nodeVersion, packageFloorSemver) : null,
     command: overrides.command ?? 'openspec',
     commandSource: overrides.commandSource ?? 'path',
     reason: overrides.reason ?? null,

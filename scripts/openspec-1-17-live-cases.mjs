@@ -1,8 +1,16 @@
 // Cumulative 1.16.0/1.16.1/1.17.0 strict classes and inherited regressions replayed
-// on exact 1.17.0 after package custody. Class origins are marked inline:
-// scenario-step WARNING and config fail-closed are 1.16.0; unrecognized delta
-// sections ERROR and closed headings are 1.16.1; unspaced headers and inline
-// fences are 1.16.0 parser fixes.
+// on exact 1.17.0 after package custody. Class origins and message bindings are
+// marked inline; every negative expectation below was probed against the exact
+// 1.17.0 CLI (see docs/openspec-1.17.0-audit.md executed matrix):
+// - scenario-step WARNING messages bind "is missing a WHEN/GIVEN step" and
+//   "is missing a THEN step" (1.16.0);
+// - an unrecognized *Requirements-style section that holds a real requirement is
+//   ERROR ("... is under \"## <section>\", which is not a delta section, so it is
+//   ignored") and archive refuses (1.16.1);
+// - prose-only unknown sections keep the 1.14.2 WARNING ("... is not carried into
+//   the main spec by archive") and archive still succeeds;
+// - an unreadable config fails validate closed with an `unparseable_config`
+//   status envelope on stdout (1.16.0) while list carries on.
 import assert from 'node:assert/strict';
 import { readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
@@ -17,13 +25,17 @@ export async function smokeOpenSpec117(context) {
     return result.data.items[0].issues;
   }
   async function strictWarning(root, name, pattern, type = 'change') {
-    // Non-strict stays valid with one WARNING; strict exits 1 through the adapter.
+    // Non-strict stays valid with exactly one WARNING; INFO diagnostics are
+    // allowed alongside (e.g. the skip_specs zero-deltas preflight) and are
+    // asserted separately by the caller when present.
     const issues = validation(root, name, false, 0, type);
-    assert.equal(issues.length, 1, 'Each negative fixture must isolate one WARNING');
-    assert.equal(issues[0].level, 'WARNING');
-    assert.match(issues[0].message, pattern);
+    const warnings = issues.filter(issue => issue.level === 'WARNING');
+    assert.equal(warnings.length, 1, 'Each negative fixture must isolate one WARNING');
+    assert.match(warnings[0].message, pattern);
+    assert.ok(issues.every(issue => issue.level === 'WARNING' || issue.level === 'INFO'), JSON.stringify(issues));
     const failed = await adapter(`1.17 strict WARNING ${name}`, options => validateOpenSpecChange(name, options), root, {}, false);
     assert.equal(failed.exitCode, 1);
+    assert.equal(failed.stderr, '');
     assert.equal(failed.error.code, 'non-zero-exit');
     assert.equal(failed.json, null);
     assert.equal(JSON.parse(failed.stdout).items[0].valid, false);
@@ -41,14 +53,14 @@ export async function smokeOpenSpec117(context) {
   const missingWhen = `### Requirement: Missing When\nThe system SHALL report the missing trigger step.\n\n#### Scenario: Missing When request\n- **THEN** the system reports it\n`;
   put(noWhen, 'openspec/specs/widgets/spec.md', spec(requirement('First')));
   change(noWhen, 'no-when', `## ADDED Requirements\n${missingWhen}`);
-  await strictWarning(noWhen, 'no-when', /a WHEN\/GIVEN step/);
+  await strictWarning(noWhen, 'no-when', /is missing a WHEN\/GIVEN step/);
 
   // 1.16.0 scenario-step WARNING: a scenario without an outcome step.
   const noThen = project('117-no-then');
   const missingThen = `### Requirement: Missing Then\nThe system SHALL report the missing outcome step.\n\n#### Scenario: Missing Then request\n- **WHEN** a request arrives\n`;
   put(noThen, 'openspec/specs/widgets/spec.md', spec(requirement('First')));
   change(noThen, 'no-then', `## ADDED Requirements\n${missingThen}`);
-  await strictWarning(noThen, 'no-then', /a THEN step/);
+  await strictWarning(noThen, 'no-then', /is missing a THEN step/);
 
   // GIVEN closes the WHEN/GIVEN side; GIVEN+THEN is not a scenario-step finding.
   const givenOk = project('117-given-then');
@@ -56,28 +68,32 @@ export async function smokeOpenSpec117(context) {
   put(givenOk, 'openspec/specs/widgets/spec.md', spec(givenScenario));
   invoke(givenOk, ['validate', 'widgets', '--type', 'spec', '--strict', '--json', '--no-interactive']);
 
-  // 1.16.1: unrecognized delta sections are ERROR; validate fails non-strict and archive refuses without mutation.
-  const unrecognized = project('117-unrecognized');
-  put(unrecognized, 'openspec/specs/widgets/spec.md', spec(requirement('First')));
-  change(unrecognized, 'unrecognized', `## Notes\nThis text would be lost.\n\n## ADDED Requirements\n${requirement('Extra')}`);
-  const unrecIssues = validation(unrecognized, 'unrecognized', false, 1);
-  assert.ok(unrecIssues.some((issue) => issue.level === 'ERROR' && /Notes|not carried|recognized/i.test(issue.message)),
-    JSON.stringify(unrecIssues));
-  const beforeUnrec = inventory(unrecognized);
-  await adapter('1.17 unrecognized archive refusal', (options) => archiveOpenSpecChange('unrecognized', options), unrecognized, {}, false);
-  assert.deepEqual(inventory(unrecognized), beforeUnrec);
-
-  // 1.16.1: DEPRECATED is not a recognized delta section; validate fails non-strict,
-  // archive refuses and the inventory stays untouched.
+  // 1.16.1: a real requirement under the unrecognized `## DEPRECATED Requirements`
+  // section is ERROR; validate fails non-strict, archive refuses and the
+  // inventory stays untouched.
   const deprecated = project('117-deprecated');
   put(deprecated, 'openspec/specs/widgets/spec.md', spec(requirement('First')));
-  change(deprecated, 'deprecated', `## DEPRECATED Requirements\n- \`### Requirement: First\`\n`);
+  change(deprecated, 'deprecated', `## DEPRECATED Requirements\n${requirement('First')}\n`);
   const depIssues = validation(deprecated, 'deprecated', false, 1);
-  assert.ok(depIssues.some((issue) => issue.level === 'ERROR' && /DEPRECATED|recognized/i.test(issue.message)),
+  assert.ok(depIssues.some((issue) => issue.level === 'ERROR' && /is under "## DEPRECATED Requirements", which is not a delta section/.test(issue.message)),
     JSON.stringify(depIssues));
   const beforeDeprecated = inventory(deprecated);
   await adapter('1.17 deprecated archive refusal', (options) => archiveOpenSpecChange('deprecated', options), deprecated, {}, false);
   assert.deepEqual(inventory(deprecated), beforeDeprecated);
+
+  // Prose under an unknown section keeps the 1.14.2 WARNING, non-strict stays
+  // valid and archive still succeeds: the two-tier unrecognized semantics.
+  const notesProse = project('117-notes-prose');
+  put(notesProse, 'openspec/specs/widgets/spec.md', spec(requirement('First')));
+  change(notesProse, 'notes-prose', `## Notes\nSome explanatory prose.\n\n## ADDED Requirements\n${requirement('Extra')}`);
+  const proseIssues = validation(notesProse, 'notes-prose', false, 0);
+  const proseWarnings = proseIssues.filter((issue) => issue.level === 'WARNING');
+  assert.equal(proseWarnings.length, 1);
+  assert.match(proseWarnings[0].message, /Section "## Notes" is not carried into the main spec/);
+  await adapter('1.17 notes prose archive succeeds', (options) => archiveOpenSpecChange('notes-prose', options), notesProse);
+  const mergedNotes = readFileSync(path.join(notesProse, 'openspec/specs/widgets/spec.md'), 'utf8');
+  assert.match(mergedNotes, /### Requirement: Extra/);
+  assert.doesNotMatch(mergedNotes, /Some explanatory prose/);
 
   // 1.16.1: closed section headings in a main spec stay valid (parser fix, not a ban).
   const closed = project('117-closed-heading');
@@ -88,23 +104,53 @@ export async function smokeOpenSpec117(context) {
   // 1.16.0: unspaced requirement headers are recognized by the parser fix.
   const unspaced = project('117-unspaced');
   put(unspaced, 'openspec/specs/widgets/spec.md', spec(requirement('First')));
-  change(unspaced, 'unspaced', `## ADDED Requirements\n###Requirement: Unspaced\nThe system SHALL recognize unspaced requirement headers.\n\n#### Scenario: Unspaced request\n- **WHEN** a request arrives\n- **THEN** the system handles it\n`);
+  change(unspaced, 'unspaced', `## ADDED Requirements\n${requirement('Unspaced').replace('### Requirement: Unspaced', '###Requirement: Unspaced')}`);
   const unspacedShow = invoke(unspaced, ['show', 'unspaced', '--type', 'change', '--deltas-only', '--json']).data;
   assert.equal(unspacedShow.deltas.length, 1);
   assert.equal(unspacedShow.deltas[0].requirement.name, 'Unspaced');
   invoke(unspaced, ['validate', 'unspaced', '--strict', '--json']);
 
-  // 1.16.0: inline fences stay invisible to heading/section parsing (positive visibility).
+  // 1.16.0: inline fences stay out of section/requirement parsing. A standalone
+  // triple-backtick inline line before the first requirement is prose, not a
+  // requirement: it warns as not-carried text while the real requirement below
+  // stays visible to show and validation. Inline code inside a requirement body
+  // remains strict-clean.
   const inlineFence = project('117-inline-fence');
-  const fencedBody = `### Requirement: Inline Fence\nThe system SHALL keep inline code such as \`(see \`## Notes\` guidance)\` inside the requirement body.\n\n#### Scenario: Inline Fence request\n- **WHEN** a request arrives\n- **THEN** the body stays intact\n`;
+  const fencedBody = `### Requirement: Fenced\nThe system SHALL keep a standalone fence-marker line out of requirement parsing.\n\n#### Scenario: Fenced request\n- **WHEN** a request arrives\n- **THEN** the body stays intact\n`;
   put(inlineFence, 'openspec/specs/widgets/spec.md', spec(requirement('First')));
-  change(inlineFence, 'inline-fence', `## ADDED Requirements\n${fencedBody}`);
-  invoke(inlineFence, ['validate', 'inline-fence', '--strict', '--json']);
+  change(inlineFence, 'inline-fence', `## ADDED Requirements\n\`\`\`code\`\`\`\n${fencedBody}`);
+  const fenceIssues = validation(inlineFence, 'inline-fence', false, 0);
+  const fenceWarnings = fenceIssues.filter((issue) => issue.level === 'WARNING');
+  assert.equal(fenceWarnings.length, 1);
+  assert.match(fenceWarnings[0].message, /Text before the first requirement in "## ADDED Requirements" is not carried/);
+  const fenceShow = invoke(inlineFence, ['show', 'inline-fence', '--type', 'change', '--deltas-only', '--json']).data;
+  assert.deepEqual(fenceShow.deltas.map((delta) => delta.requirement.name), ['Fenced']);
+  const inlineBody = project('117-inline-body');
+  const bodyCode = `### Requirement: Inline Body\nThe system SHALL keep inline code such as \`(see \`## Notes\` guidance)\` inside the requirement body.\n\n#### Scenario: Inline Body request\n- **WHEN** inline code appears\n- **THEN** the body stays intact\n`;
+  put(inlineBody, 'openspec/specs/widgets/spec.md', spec(requirement('First')));
+  change(inlineBody, 'inline-body', `## ADDED Requirements\n${bodyCode}`);
+  invoke(inlineBody, ['validate', 'inline-body', '--strict', '--json']);
 
-  // 1.16.0: unreadable config.yaml fails validate closed; non-validating commands carry on.
+  // Inherited 1.14.2 portability warnings: prose above the first section and
+  // before the first requirement stay not-carried WARNINGs (1.16.1 two-tier
+  // semantics did not change this class).
+  const portability = project('117-portability');
+  put(portability, 'openspec/specs/widgets/spec.md', spec(requirement('First')));
+  change(portability, 'pre-section', `This text would be lost.\n\n## ADDED Requirements\n${requirement('Extra')}`);
+  await strictWarning(portability, 'pre-section', /Text above the first "## " section is not carried/);
+  change(portability, 'pre-requirement', `## ADDED Requirements\nThis text would be lost.\n\n${requirement('Extra')}`);
+  await strictWarning(portability, 'pre-requirement', /Text before the first requirement in "## ADDED Requirements" is not carried/);
+
+  // 1.16.0: unreadable config.yaml fails validate closed with an
+  // `unparseable_config` status envelope on stdout and empty stderr;
+  // non-validating commands carry on.
   const badConfig = project('117-bad-config');
+  put(badConfig, 'openspec/specs/widgets/spec.md', spec(requirement('First')));
+  invoke(badConfig, ['validate', 'widgets', '--type', 'spec', '--strict', '--json', '--no-interactive']);
   put(badConfig, 'openspec/config.yaml', 'schema: [invalid yaml\n');
-  invoke(badConfig, ['validate', 'widgets', '--type', 'spec', '--json', '--no-interactive'], 1);
+  const broken = invoke(badConfig, ['validate', 'widgets', '--type', 'spec', '--json', '--no-interactive'], 1);
+  assert.equal(broken.data.status[0].code, 'unparseable_config');
+  assert.ok(/Could not parse/.test(broken.data.status[0].message));
   invoke(badConfig, ['list', '--json']);
   put(badConfig, 'openspec/config.yaml', 'schema: spec-driven\n');
   invoke(badConfig, ['validate', 'widgets', '--type', 'spec', '--strict', '--json', '--no-interactive']);
@@ -113,12 +159,15 @@ export async function smokeOpenSpec117(context) {
   const lengths = project('117-lengths');
   const body = n => 'The system SHALL ' + 'x'.repeat(n - 'The system SHALL '.length - 1) + '.';
   const longRequirement = n => `### Requirement: Long\n${body(n)}\n\n#### Scenario: Long request\n- **WHEN** a request arrives\n- **THEN** it is handled\n`;
-  change(lengths, 'lengths', '## ADDED Requirements\n' + longRequirement(501));
+  const lengthBase = change(lengths, 'lengths', '## ADDED Requirements\n' + longRequirement(501));
   await strictWarning(lengths, 'lengths', /Requirement text is very long/);
-  const lengthBase = change(lengths, 'lengths-ok', '## ADDED Requirements\n' + longRequirement(500));
-  assert.deepEqual(validation(lengths, 'lengths-ok', true), []);
+  put(lengths, `${lengthBase}/specs/widgets/spec.md`, '## ADDED Requirements\n' + longRequirement(500));
+  assert.deepEqual(validation(lengths, 'lengths', true), []);
+  // MODIFIED against a missing base spec would only produce an INFO archive
+  // preflight, so the matching main spec is authored first (1.15 slot pattern).
+  put(lengths, 'openspec/specs/widgets/spec.md', spec(longRequirement(501)));
   put(lengths, `${lengthBase}/specs/widgets/spec.md`, '## MODIFIED Requirements\n' + longRequirement(501));
-  assert.deepEqual(validation(lengths, 'lengths-ok', true), []);
+  assert.deepEqual(validation(lengths, 'lengths', true), []);
 
   // Inherited 1.14.2/1.15 strict warning: unknown metadata keys with x- exemptions.
   const metadata = project('117-metadata');
@@ -130,6 +179,10 @@ export async function smokeOpenSpec117(context) {
   put(metadata, `${metadataBase}/.openspec.yaml`, native + 'x-goal: bounded\nx-jiraKey: TEST-1\n');
   const nativeIssues = validation(metadata, 'metadata', true);
   assert.ok(nativeIssues.every((issue) => issue.level === 'INFO'), JSON.stringify(nativeIssues));
+  for (const key of ['X-Tracker', '"x-"', '"x- tracker"']) {
+    put(metadata, `${metadataBase}/.openspec.yaml`, native + `${key}: true\n`);
+    await strictWarning(metadata, 'metadata', /Unrecognized key name\(s\)/);
+  }
 
   // Inherited 1.11 strict Purpose placeholder diagnostics.
   const purposes = project('117-purposes');
@@ -154,16 +207,22 @@ export async function smokeOpenSpec117(context) {
   assert.match(merged, /### Requirement: Second/);
   assert.ok(merged.includes(example.trimEnd()), 'Fenced example blank lines must survive archive');
 
-  // Inherited 1.12: findings report surfaces INFO/WARNING/ERROR and per-item issues.
+  // Inherited 1.12: findings report covers every selected item; a MODIFIED delta
+  // whose target is missing stays a non-blocking INFO (valid, exit 0).
   const findingsRoot = project('117-findings');
   put(findingsRoot, 'openspec/specs/widgets/spec.md', spec(requirement('First')));
   change(findingsRoot, 'findings-loss', `## MODIFIED Requirements\n${requirement('Absent')}`);
   change(findingsRoot, 'findings-ok', `## ADDED Requirements\n${requirement('Extra')}`);
-  const findings = invoke(findingsRoot, ['validate', '--all', '--json', '--no-interactive'], 1).data;
-  assert.ok(Array.isArray(findings.items) && findings.items.length >= 2, 'validate --all reports every selected item');
+  const findings = invoke(findingsRoot, ['validate', '--all', '--json', '--no-interactive']).data;
+  assert.equal(findings.items.length, 2);
   assert.equal(findings.items.find((item) => item.id === 'findings-ok').valid, true);
+  const loss = findings.items.find((item) => item.id === 'findings-loss');
+  assert.equal(loss.valid, true);
+  assert.ok(loss.issues.some((issue) => issue.level === 'INFO' && /Archive would refuse/.test(issue.message)),
+    JSON.stringify(loss.issues));
 
-  // Inherited 1.12: missing base spec is INFO with a strict-pass validation.
+  // Inherited 1.12: missing base spec is INFO with a strict-pass validation and a
+  // refusal archive without mutation.
   const missingRoot = project('117-missing-base');
   change(missingRoot, 'missing-base', `## MODIFIED Requirements\n${requirement('Absent')}`, 'nested/missing');
   const missingShow = invoke(missingRoot, ['show', 'missing-base', '--type', 'change', '--diff', '--json']).data.deltas[0];
