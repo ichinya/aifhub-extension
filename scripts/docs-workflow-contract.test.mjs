@@ -738,10 +738,10 @@ describe('complete OpenSpec workflow documentation contract', () => {
   it('keeps the cumulative 2.20 release contract, schema pin and deferred boundaries', async () => {
     const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
     const manifest = JSON.parse(await readRepoFile('extension.json'));
-    assert.equal(metadata.sources['ai-factory'].version, '2.20.0');
-    assert.equal(metadata.sources['ai-factory'].baselineVersion, '2.20.0');
-    assert.equal(metadata.sources['ai-factory'].lastSync, '2026-10-30');
-    assert.equal(manifest.$schema, 'https://raw.githubusercontent.com/lee-to/ai-factory/2.20.0/schemas/extension.schema.json');
+    assert.equal(metadata.sources['ai-factory'].version, '2.23.0');
+    assert.equal(metadata.sources['ai-factory'].baselineVersion, '2.23.0');
+    assert.equal(metadata.sources['ai-factory'].lastSync, '2026-11-11');
+    assert.equal(manifest.$schema, 'https://raw.githubusercontent.com/lee-to/ai-factory/2.23.0/schemas/extension.schema.json');
     const notes = metadata.sources['ai-factory'].notes;
     for (const text of ['64 commits and 124 changed files', 'c38ff6ffe183ccf39b01774be892fcf64d9169c1',
       'skill-targets.ts', 'skills-migration.ts', 'installer.ts', 'extension-ops.ts', 'injections.ts',
@@ -763,6 +763,109 @@ describe('complete OpenSpec workflow documentation contract', () => {
       assertIncludes(compatibility, text, '2.20 ownership and deferred contract');
   });
 
+  it('documents the AI Factory 2.22 reviewed release contract, sentinel path and closed deferred map', async () => {
+    const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
+    const readme = await readRepoFile('README.md');
+    const usage = await readRepoFile('docs/usage.md');
+    const compatibility = await readRepoFile('docs/openspec-compatibility.md');
+    const docsIndex = await readRepoFile('docs/README.md');
+    const contextPolicy = await readRepoFile('docs/context-loading-policy.md');
+    const changelog = await readRepoFile('CHANGELOG.md');
+
+    // Newest-first: the 2.22 release section must sit above the 2.20 section,
+    // and removing or reordering it must fail this contract.
+    const sectionIndex = compatibility.indexOf('## AI Factory 2.22 Reviewed Release');
+    assert.ok(sectionIndex > -1, 'compatibility must document the 2.22 reviewed release');
+    assert.ok(sectionIndex < compatibility.indexOf('## AI Factory 2.20 Reviewed Release'), '2.22 section must precede 2.20');
+    assert.ok(readme.indexOf('### AI Factory 2.22 Reviewed Release') > -1
+      && readme.indexOf('### AI Factory 2.22 Reviewed Release') < readme.indexOf('### AI Factory 2.20 Reviewed Release'), 'README 2.22 section newest-first');
+    assertIncludes(docsIndex, 'AI Factory 2.22 reviewed baseline', 'docs index 2.22 header');
+    assertIncludes(contextPolicy, 'AI Factory 2.22 Context Boundaries', 'context policy 2.22 header');
+    assertIncludes(changelog, 'Кумулятивная адаптация reviewed baseline AI Factory 2.20.0 → 2.23.0', 'changelog cumulative entry');
+
+    for (const text of [
+      '144 commits and 275 changed files',
+      '4723d0bbc3b2fae0306d9934545fdd2d193c9578',
+      'a3d42681f43f644c4f01d2daf80e56a01d1893aa',
+      'a528cd49b214ae250fc9bda02721e48a8d8fee9a',
+      'skills/aif-implement/references/IMPLEMENT-TASK.md',
+      'selective references (#199)',
+      'instruction manifests (#190)',
+      'tool permissions (#198/#208)',
+      'question contract (#195/#210)',
+      'aif-skills-audit (#188)',
+      'aif-plan-overview', 'aif-quality-setup', 'aif-roadmap-next',
+      '`commands`', '`instructions`', '`completion-hook`', '`worktree-check`'
+    ]) assertIncludes(compatibility, text, '2.22 provenance, sentinel path, closed deferred map and ownership');
+
+    const notes = metadata.sources['ai-factory'].notes;
+    for (const text of [
+      '144 commits and 275 changed files',
+      '4723d0bbc3b2fae0306d9934545fdd2d193c9578',
+      'a3d42681f43f644c4f01d2daf80e56a01d1893aa',
+      'a528cd49b214ae250fc9bda02721e48a8d8fee9a',
+      '7a209115ab4ae283738c43ad243c218e12559356',
+      'references/IMPLEMENT-TASK.md',
+      'Closed deferred map of the 2.20 ledger'
+    ]) assertIncludes(notes, text, '2.22 cumulative ledger');
+
+    assertIncludes(usage, 'skills/aif-implement/references/IMPLEMENT-TASK.md', 'usage v222 sentinel path');
+    assertIncludes(usage, 'v222=2.22.0', 'usage v222 slot');
+    assertIncludes(usage, 'v222-command', 'usage v222 live flags');
+  });
+
+  it('documents the AI Factory 2.23 reviewed release contract, dispatch boundary and v223 slot', async () => {
+    const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
+    const readme = await readRepoFile('README.md');
+    const usage = await readRepoFile('docs/usage.md');
+    const compatibility = await readRepoFile('docs/openspec-compatibility.md');
+    const docsIndex = await readRepoFile('docs/README.md');
+    const contextPolicy = await readRepoFile('docs/context-loading-policy.md');
+
+    // Newest-first: the 2.23 release section must sit above the 2.22 section,
+    // and removing or reordering it must fail this contract.
+    const sectionIndex = compatibility.indexOf('## AI Factory 2.23 Reviewed Release');
+    assert.ok(sectionIndex > -1, 'compatibility must document the 2.23 reviewed release');
+    assert.ok(sectionIndex < compatibility.indexOf('## AI Factory 2.22 Reviewed Release'), '2.23 section must precede 2.22');
+    assert.ok(readme.indexOf('### AI Factory 2.23 Reviewed Release') > -1
+      && readme.indexOf('### AI Factory 2.23 Reviewed Release') < readme.indexOf('### AI Factory 2.22 Reviewed Release'), 'README 2.23 section newest-first');
+    assertIncludes(docsIndex, 'AI Factory 2.23 reviewed baseline', 'docs index 2.23 header');
+    assertIncludes(contextPolicy, 'AI Factory 2.23 Context Boundaries', 'context policy 2.23 header');
+
+    for (const text of [
+      '38190bbc253cf99bf70d612941eb9020e1b3bb3e',
+      'eabdfe9c8015e07ac7334bb9a66c262d94034d08',
+      '8 commits and 46 changed files',
+      'annotated',
+      'a3d42681f43f644c4f01d2daf80e56a01d1893aa',
+      'dispatch',
+      'no-config',
+      'chatgpt',
+      'openrouter'
+    ]) assertIncludes(compatibility, text, '2.23 provenance, dispatch boundary and schema scope');
+
+    assertIncludes(usage, 'v223=2.23.0', 'usage v223 slot');
+    assertIncludes(usage, 'v223-command', 'usage v223 live flags');
+    assertIncludes(readme, '2.23.0', 'README 2.23 baseline');
+    assertIncludes(docsIndex, '2.23', 'docs index 2.23 token');
+    assertIncludes(contextPolicy, '2.23', 'context policy 2.23 token');
+
+    const notes = metadata.sources['ai-factory'].notes;
+    for (const text of [
+      '8 commits and 46 changed files',
+      '38190bbc253cf99bf70d612941eb9020e1b3bb3e',
+      'eabdfe9c8015e07ac7334bb9a66c262d94034d08',
+      'annotated',
+      '7a209115ab4ae283738c43ad243c218e12559356',
+      '69ff94a0862d82290a0da9af379f7cfaf55394ca1f93f8e899699d4f6ef842b0',
+      'no-config',
+      'manual_dispatch',
+      'stays out of scope of the initial 2.22 review',
+      'noncanonical-openspec-config',
+      'provesReleaseOrDeployment: false'
+    ]) assertIncludes(notes, text, '2.23 cumulative ledger');
+  });
+
   it('documents the published AI Factory 2.19.0 release, selectable 2.18.1/2.19.0 executable targets, and ownership boundaries', async () => {
     const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
     const manifest = JSON.parse(await readRepoFile('extension.json'));
@@ -778,9 +881,9 @@ describe('complete OpenSpec workflow documentation contract', () => {
     const combinedDocs = [readme, changelog, usage, compatibility, docsIndex, contextPolicy, mcpDocs, handoff].join('\n');
 
     assert.equal(metadata.compat['ai-factory'], '>=2.11.0 <3.0.0', 'aifhub-extension.json compat.ai-factory');
-    assert.equal(metadata.sources['ai-factory'].version, '2.20.0', 'aifhub-extension.json sources.ai-factory.version');
-    assert.equal(metadata.sources['ai-factory'].baselineVersion, '2.20.0', 'aifhub-extension.json sources.ai-factory.baselineVersion');
-    assert.equal(metadata.sources['ai-factory'].lastSync, '2026-10-30', 'aifhub-extension.json sources.ai-factory.lastSync');
+    assert.equal(metadata.sources['ai-factory'].version, '2.23.0', 'aifhub-extension.json sources.ai-factory.version');
+    assert.equal(metadata.sources['ai-factory'].baselineVersion, '2.23.0', 'aifhub-extension.json sources.ai-factory.baselineVersion');
+    assert.equal(metadata.sources['ai-factory'].lastSync, '2026-11-11', 'aifhub-extension.json sources.ai-factory.lastSync');
     assertIncludes(metadata.sources['ai-factory'].notes, 'published AI Factory 2.19.0 release', 'aifhub-extension.json sources.ai-factory.notes');
     assertIncludes(metadata.sources['ai-factory'].notes, 'e144f95c89de0d0cb6c9b38dbe8c2907b00dc5ce', '2.19 release custody: exact tag commit');
     assertIncludes(metadata.sources['ai-factory'].notes, 'matching the npm ai-factory@2.19.0 gitHead', '2.19 release custody: npm provenance');
@@ -1145,7 +1248,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
     }
     for (const expected of [
       'exact `2.17.0` update-source executors',
-      'one selectable `2.18.1` (`v218`) or `2.19.0` (`v219`) target executor',
+      'one selectable `2.18.1` (`v218`), `2.19.0` (`v219`), `2.20.0` (`v220`), `2.22.0` (`v222`) or `2.23.0` (`v223`) target executor',
       'Exactly one target group is required per run',
       '--v219-*',
       '`2.18.0` remains a separate stable feature boundary',

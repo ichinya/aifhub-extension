@@ -40,7 +40,10 @@ it('AI Factory 2.20 offline core: AIFHub ownership, grouped compose, rollback an
   const schema = await fs.readFile(path.join(upstream, 'schemas/extension.schema.json'));
   assert.equal(createHash('sha1').update(`blob ${schema.length}\0`).update(schema).digest('hex'),
     'a82b8a0b834df2047e71857476f72ed66c6472d7');
-  assert.deepEqual(await fs.readFile(path.join(repo, 'schemas/extension.schema.json')), schema);
+  // Historical 2.20 matrix: only the upstream blob is pinned here. Byte-equality
+  // of the live local schemas/extension.schema.json belongs to the reviewed
+  // 2.22.0 target matrix (ai-factory-2-22-core-contract.test.mjs, issue #290);
+  // the local file now byte-matches the 2.22.0 blob, not this 2.20.0 blob.
   const temp = await fs.mkdtemp(path.join(await fs.realpath(os.tmpdir()), 'aifhub-220-core-'));
   t.after(() => fs.rm(temp, { recursive: true, force: true }));
   const agent = (id, skillsDir, installedSkills) => ({ id, skillsDir, installedSkills, mcp: {} });
