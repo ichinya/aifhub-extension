@@ -147,6 +147,13 @@ workflow:
   # defaults (tag 2.22.0 config-template): fix_mode: ask, fix_patch: true;
   # /aif-fix resolves them through upstream defaults when omitted. Ultra gate
   # AI_FACTORY_ULTRA_MIN_VERSION stays 2.18.0; these keys are out of its scope.
+  #
+  # Upstream 2.23+ optional cross-agent dispatch keys (dispatch / phases /
+  # dispatchAgents) belong to the project .ai-factory.json, not to this YAML
+  # template and not to the extension manifest; upstream-owned and not
+  # declared here (upstream config-template verified unchanged at tag 2.23.0,
+  # zero dispatch keys). Without dispatch configuration /aif-loop keeps
+  # in-process execution.
   # Auto-create missing directories when needed
   auto_create_dirs: true
   

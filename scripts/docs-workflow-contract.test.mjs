@@ -814,6 +814,42 @@ describe('complete OpenSpec workflow documentation contract', () => {
     assertIncludes(usage, 'v222-command', 'usage v222 live flags');
   });
 
+  it('documents the AI Factory 2.23 reviewed release contract, dispatch boundary and v223 slot', async () => {
+    const readme = await readRepoFile('README.md');
+    const usage = await readRepoFile('docs/usage.md');
+    const compatibility = await readRepoFile('docs/openspec-compatibility.md');
+    const docsIndex = await readRepoFile('docs/README.md');
+    const contextPolicy = await readRepoFile('docs/context-loading-policy.md');
+
+    // Newest-first: the 2.23 release section must sit above the 2.22 section,
+    // and removing or reordering it must fail this contract.
+    const sectionIndex = compatibility.indexOf('## AI Factory 2.23 Reviewed Release');
+    assert.ok(sectionIndex > -1, 'compatibility must document the 2.23 reviewed release');
+    assert.ok(sectionIndex < compatibility.indexOf('## AI Factory 2.22 Reviewed Release'), '2.23 section must precede 2.22');
+    assert.ok(readme.indexOf('### AI Factory 2.23 Reviewed Release') > -1
+      && readme.indexOf('### AI Factory 2.23 Reviewed Release') < readme.indexOf('### AI Factory 2.22 Reviewed Release'), 'README 2.23 section newest-first');
+    assertIncludes(docsIndex, 'AI Factory 2.23 reviewed baseline', 'docs index 2.23 header');
+    assertIncludes(contextPolicy, 'AI Factory 2.23 Context Boundaries', 'context policy 2.23 header');
+
+    for (const text of [
+      '38190bbc253cf99bf70d612941eb9020e1b3bb3e',
+      'eabdfe9c8015e07ac7334bb9a66c262d94034d08',
+      '8 commits and 46 changed files',
+      'annotated',
+      'a3d42681f43f644c4f01d2daf80e56a01d1893aa',
+      'dispatch',
+      'no-config',
+      'chatgpt',
+      'openrouter'
+    ]) assertIncludes(compatibility, text, '2.23 provenance, dispatch boundary and schema scope');
+
+    assertIncludes(usage, 'v223=2.23.0', 'usage v223 slot');
+    assertIncludes(usage, 'v223-command', 'usage v223 live flags');
+    assertIncludes(readme, '2.23.0', 'README 2.23 baseline');
+    assertIncludes(docsIndex, '2.23', 'docs index 2.23 token');
+    assertIncludes(contextPolicy, '2.23', 'context policy 2.23 token');
+  });
+
   it('documents the published AI Factory 2.19.0 release, selectable 2.18.1/2.19.0 executable targets, and ownership boundaries', async () => {
     const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
     const manifest = JSON.parse(await readRepoFile('extension.json'));
