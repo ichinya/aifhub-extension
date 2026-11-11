@@ -14,6 +14,7 @@ import {
 import { smokeOpenSpec112 } from './openspec-1-12-live-cases.mjs';
 import { smokeOpenSpec113 } from './openspec-1-13-live-cases.mjs';
 import { smokeOpenSpec115 } from './openspec-1-15-live-cases.mjs';
+import { smokeOpenSpec117 } from './openspec-1-17-live-cases.mjs';
 
 const args = process.argv.slice(2);
 assert.equal(args.length, 2, 'Usage: node scripts/openspec-compatibility-live-smoke.mjs <installed-package-root> <verified-tarball>');
@@ -25,52 +26,64 @@ const pkg = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf
 const pins = {
   '1.11.0': {
     integrity: 'sha512-P9h8H4Snit8I7tHmCopjg3QDwBllIlObxb+/DebvBwhWTj6YEPPYRYkC4n5GqG4PdQnKMA6E1AlEOI9FT4G7FA==',
-    sha1: '0637db769ac89a2120f98f5ce23f05f29e50c193', files: 385
+    sha1: '0637db769ac89a2120f98f5ce23f05f29e50c193', files: 385, node: '>=20.19.0'
   },
   '1.12.0': {
     integrity: 'sha512-oFE2Lj7WVSc87nSibk6qe9HjHIOlxhcPAXbPey44DlLvJzBl5+9BZVrNiozOwv++CQhW+MG0kuP1XLZ/uQrrWw==',
-    sha1: 'c844543999f673cdd72445879b86a4abea4c07ef', files: 389
+    sha1: 'c844543999f673cdd72445879b86a4abea4c07ef', files: 389, node: '>=20.19.0'
   },
   '1.13.0': {
     integrity: 'sha512-1b1VbjELIUHPz8BLnkVxqPu4pAYS6BhfrLcmUIM7Bd0iJXQDvE+e/LBofE1kydegfxmG7R1xCMRXsl5VtZD+0w==',
-    sha1: '5b124e7aafb6b539701a671e1fd015dac6b8bbf0', files: 389
+    sha1: '5b124e7aafb6b539701a671e1fd015dac6b8bbf0', files: 389, node: '>=20.19.0'
   },
   '1.13.1': {
     integrity: 'sha512-UHJSV2n6ohjfRaJLvi526avOohFS/orCjM+7JPgvDzuEJbCCkykKfP2fp3gcsvthDLeWolMRT5JAE08MSPnr8Q==',
-    sha1: '50fcb3d2fa8830a9fcdf036155fca4520d03dff1', files: 401
+    sha1: '50fcb3d2fa8830a9fcdf036155fca4520d03dff1', files: 401, node: '>=20.19.0'
   },
   '1.13.2': {
     integrity: 'sha512-HzBaN9C1/ET+tgm/pxbWQYY4Kf+X9/1MSVEGQ8ZT3g4ZpdHn6v82CHkN+zmt9qv98Ghw0MDpmURasjJD2f90bg==',
-    sha1: 'ae88d3667eff76495e517399b3e0385d9d6af009', files: 403
+    sha1: 'ae88d3667eff76495e517399b3e0385d9d6af009', files: 403, node: '>=20.19.0'
   },
   '1.14.0': {
     integrity: 'sha512-V+zitRK918I6B3EIcYL3gVYoPoPgzknSxE1zL0zUQdbd4NsO5kbrxU5jVceuNNEznD94pbRPCvpCDIa6BeEaPA==',
-    sha1: 'ac2758566048099c1b5626ede3ab568772f8f5f9', files: 413
+    sha1: 'ac2758566048099c1b5626ede3ab568772f8f5f9', files: 413, node: '>=20.19.0'
   },
   '1.14.1': {
     integrity: 'sha512-IU9ggB7UYMDU47S0R59NH2ngJp+CK2X/r1B8+QU2Fm8LLBPFatQRO1Ia7B8nO3FHbTE7xRXAIs9NcuUF8Beeag==',
-    sha1: 'cf4c18ecda23818ae176ae41ba5a3741b18b641d', files: 429
+    sha1: 'cf4c18ecda23818ae176ae41ba5a3741b18b641d', files: 429, node: '>=20.19.0'
   },
   '1.14.2': {
     integrity: 'sha512-GgCphpZD5FHfk6IGjQPkUtz+pfeztWAz2yqODlSGqOzYHRPqfYQkSds1uY783AP0S5Kx0+HiyrISlJ5LqDcsrw==',
-    sha1: 'a3eae80c3e75d048d9d5cede4f395fe5c23ca157', files: 429
+    sha1: 'a3eae80c3e75d048d9d5cede4f395fe5c23ca157', files: 429, node: '>=20.19.0'
   },
   '1.14.3': {
     integrity: 'sha512-ALFW1d5bSm6t27Kmcle93SDFuqUc8fLwy5ZdBfIiNffo0Yk9AEOJxw6xDqBv38eMM7l7TeOZBB/7C08luxYGfg==',
-    sha1: 'bf083ea41e0d2c0dbbef00ca0e4f8ca1fdd84881', files: 431
+    sha1: 'bf083ea41e0d2c0dbbef00ca0e4f8ca1fdd84881', files: 431, node: '>=20.19.0'
   },
   '1.15.0': {
     integrity: 'sha512-lG/EPEiL22bB70yKJhWWSPk1UQGLnwO7Dp+hNc/jUmBwb0qxPLzHCUkXEfkny4iYDOsgnsNQmc39/g9QcvnBnA==',
-    sha1: '5f516375c1a340425677cb997dc8fc74954d2076', files: 441
+    sha1: '5f516375c1a340425677cb997dc8fc74954d2076', files: 441, node: '>=20.19.0'
+  },
+  '1.16.0': {
+    integrity: 'sha512-WQVhZoIR5PoacH/H0qh84VKMcXFbKCIKuAI96arHS3KiKYhJStlRrjUKGxLqLYKLym0j+2hAAY5MZUrPE5qXIA==',
+    sha1: '580efe69fa63b5678ca9b9fc9d94de139df68915', files: 441, node: '>=22.12.0'
+  },
+  '1.16.1': {
+    integrity: 'sha512-Qu2kdUP3oiXK6WzOA1OcEYiTlG3GmLJE37whoGjTEy4vbzuW4o3OwAwYwxSQpJnKHJ/XGySvo+icRiulBCxyzw==',
+    sha1: '47a78c7e1aea583527b372b0ff3a73f2432e3358', files: 441, node: '>=22.12.0'
+  },
+  '1.17.0': {
+    integrity: 'sha512-D9MCbh1WMuJAoSYmtbkR5csHZdhiweuX5RC6+ZxMo9I2F/wq0x2wpFvlyCdo7yV0zenEqVxqmfRmLPd5wuJC7g==',
+    sha1: '7dee0ac8c0a72173b59f22bc9d70c4f7caa7d8b9', files: 449, node: '>=22.12.0'
   }
 }[pkg.version];
 assert.ok(pins, 'Only exact checksum-pinned reviewed packages are accepted');
-assert.ok(['1.11.0', '1.12.0', '1.13.0', '1.15.0'].includes(pkg.version),
-  'Intermediate releases are source custody checkpoints; executable matrices are bound to 1.11/1.12/1.13/1.15 only');
+assert.ok(['1.11.0', '1.12.0', '1.13.0', '1.15.0', '1.17.0'].includes(pkg.version),
+  'Intermediate releases are source custody checkpoints; executable matrices are bound to 1.11/1.12/1.13/1.15/1.17 only');
 assert.equal(integrity, pins.integrity);
 assert.equal(createHash('sha1').update(tarball).digest('hex'), pins.sha1);
 assert.equal(pkg.name, '@fission-ai/openspec');
-assert.equal(pkg.engines.node, '>=20.19.0');
+assert.equal(pkg.engines.node, pins.node);
 assert.equal(pkg.bin.openspec.replace(/^\.\//, ''), 'bin/openspec.js');
 for (const name of ['preinstall', 'install', 'postinstall']) assert.equal(pkg.scripts[name], undefined);
 const bin = path.join(packageRoot, pkg.bin.openspec);
@@ -196,7 +209,7 @@ try {
   // 1.12 reports the missing base as INFO; strict validation still passes.
   const missingValidation = invoke(root, ['validate', 'missing-base', '--type', 'change', '--strict', '--json']).data;
   assert.equal(missingValidation.items[0].valid, true);
-  if (['1.12.0', '1.13.0', '1.15.0'].includes(pkg.version)) {
+  if (['1.12.0', '1.13.0', '1.15.0', '1.17.0'].includes(pkg.version)) {
     assert.ok(missingValidation.items[0].issues.some((issue) => issue.level === 'INFO'
       && issue.path === 'nested/missing/spec.md' && /Archive would refuse/.test(issue.message)));
   } else assert.deepEqual(missingValidation.items[0].issues, []);
@@ -329,11 +342,14 @@ try {
   invoke(agentsRoot, ['update', '--force'], 0, false);
   assert.deepEqual(readFileSync(path.join(agentsRoot, '.agents/skills/openspec-explore/SKILL.md')), sharedSkill);
   assert.equal(readFileSync(path.join(agentsRoot, '.agents/skills/aifhub-sentinel/SKILL.md'), 'utf8'), '# User-owned AIFHub sentinel\n');
-  if (['1.12.0', '1.13.0', '1.15.0'].includes(pkg.version)) {
+  if (['1.12.0', '1.13.0', '1.15.0', '1.17.0'].includes(pkg.version)) {
     await smokeOpenSpec112({ project, put, change, spec, requirement, invoke, inventory, adapter, scratch });
   }
   if (pkg.version === '1.15.0') {
     await smokeOpenSpec115({ project, put, change, spec, requirement, invoke, inventory, adapter, scratch, packageRoot });
+  }
+  if (pkg.version === '1.17.0') {
+    await smokeOpenSpec117({ project, put, change, spec, requirement, invoke, inventory, adapter, scratch, packageRoot });
   }
   if (pkg.version === '1.13.0') {
     await smokeOpenSpec113({ project, put, change, spec, requirement, invoke, inventory, adapter });
