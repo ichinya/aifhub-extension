@@ -62,7 +62,8 @@ describe('OpenSpec 1.12 report and advisory preflight boundary', () => {
     }
     const skill = await readFile(new URL('../skills/aif-analyze/SKILL.md', import.meta.url), 'utf8');
     // reason: #284 bumped the aif-analyze skill file 0.20.0 -> 0.21.0 (contextSelectionOverlay opt-in namespace documentation)
-    assert.match(skill, /^version: 0\.21\.0$/m);
+    // reason: #300 bumped the aif-analyze skill file 0.21.0 -> 0.22.0 (openspec 1.17.0 freshness/npm-engine guidance)
+    assert.match(skill, /^version: 0\.22\.0$/m);
   });
 
   it('documents report scope, advisory preflight and proportional source grounding', async () => {

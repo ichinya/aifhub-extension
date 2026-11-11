@@ -159,6 +159,28 @@ describe('OpenSpec 1.17 cumulative reviewed baseline', () => {
     ]) assert.ok(audit.includes(phrase), phrase);
     assert.equal((audit.match(/^## /gm) ?? []).length, 4);
   });
+
+  it('keeps authoring guidance aligned with the 1.16.x/1.17.0 strict boundaries', async () => {
+    for (const skill of ['aif-plan', 'aif-improve']) {
+      const prompt = await readFile(new URL(`../injections/core/${skill}-plan-folder.md`, import.meta.url), 'utf8');
+      for (const phrase of [
+        '1.14.x–1.17.0',
+        '500 characters',
+        'MODIFIED',
+        'skip_design',
+        'preserve user metadata',
+        'durable requirement/scenario names',
+        'every `#### Scenario:` must author a `- **WHEN**` or `- **GIVEN**` trigger step and a `- **THEN**` outcome step',
+        'ADDED/MODIFIED/REMOVED/RENAMED Requirements plus `## Purpose`',
+        '`openspec/config.yaml` must stay valid YAML',
+        'requirement headers are always authored with a space (`### Requirement:`)',
+        'closed `## Heading ##` forms remain accepted'
+      ]) assert.ok(prompt.includes(phrase), `${skill}: ${phrase}`);
+    }
+    const skill = await readFile(new URL('../skills/aif-analyze/SKILL.md', import.meta.url), 'utf8');
+    assert.match(skill, /^version: 0\.22\.0$/m);
+    assert.ok(skill.includes('When `packageNodeSupported` is `false` (npm channel requires Node `>=22.12.0` from package `1.16.0` onward)'), 'npm-engine advisory bullet');
+  });
 });
 
 after(() => {
