@@ -1264,7 +1264,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
     );
   });
 
-  it('documents the cumulative exact-tagged OpenSpec 1.15.0 baseline, custody and adapter boundary', async () => {
+  it('documents the cumulative exact-tagged OpenSpec 1.15.0 -> 1.17.0 baseline, custody and adapter boundary', async () => {
     const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
     const readme = await readRepoFile('README.md');
     const compatibility = await readRepoFile('docs/openspec-compatibility.md');
@@ -1290,10 +1290,16 @@ describe('complete OpenSpec workflow documentation contract', () => {
       'README.md OpenSpec Compatibility reviewed baseline'
     );
     assertIncludes(docsIndex, 'OpenSpec 1.15.0', 'docs/README.md');
+    assertIncludes(docsIndex, 'OpenSpec 1.17.0', 'docs/README.md');
 
     for (const expected of [
       'OpenSpec 1.15.0 Reviewed Baseline',
+      'OpenSpec 1.17.0 Reviewed Baseline',
       'Exact 1.15.0 Custody and Evidence Boundary',
+      'Exact 1.17.0 Custody and Evidence Boundary',
+      'npm delivery channel requires Node',
+      'packageRequiresNode',
+      'resolved upstream in 1.13.1',
       'resolved upstream in 1.13.1',
       'Exact 1.10.0 Custody and Evidence Boundary',
       'Exact 1.10.0 CLI Matrix',

@@ -1340,6 +1340,7 @@ See [Codex Plan Mode](codex-plan-mode.md) for question-format guidance.
 |---|---|---|
 | OpenSpec CLI missing | `openspec` is not available on `PATH`. | Continue degraded planning or install a compatible CLI before validation/archive-required finalization. |
 | OpenSpec CLI supported but outdated | `/aif-analyze` reports `versionOutdated: true` against `latestReviewedVersion`. | Keep working if needed, then update the user-owned project-local, PATH/global, or explicit installation with its existing package manager and rerun `ai-factory aifhub-mode status --json`. |
+| npm channel needs newer Node | `/aif-analyze` reports `packageRequiresNode: ">=22.12.0"` with `packageNodeSupported: false` (npm channel requires Node `>=22.12.0` since OpenSpec 1.16.0; the marker is derived from the CLI version and does not detect the install channel). | Never recommend a plain npm update on that Node runtime: use Node `>=22.12.0` for the npm channel, the standalone binary channel (its own custody chain, outside the npm matrix), or stay on the compatible npm `1.15.x` line. |
 | Node too old | OpenSpec validate/archive requires Node `>=20.19.0`. | Use Node `>=20.19.0` for OpenSpec commands. |
 | Invalid delta spec | OpenSpec validation failed for `specs/**/spec.md`. | Fix the delta spec and rerun `/aif-verify <change-id>`. |
 | Ambiguous active change | More than one active change can be selected. | Pass `<change-id>` explicitly or update `.ai-factory/state/current.yaml`. |

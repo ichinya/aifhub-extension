@@ -1,4 +1,5 @@
 import { after, describe, it } from 'node:test';
+import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -136,6 +137,27 @@ describe('OpenSpec 1.17 cumulative reviewed baseline', () => {
     assert.equal(legacy.openspecCli.packageRequiresNode, null);
     assert.equal(legacy.openspecCli.packageNodeSupported, null);
     assert.equal(legacy.openspecCli.versionOutdated, true);
+  });
+
+  it('binds the cumulative 1.16.x/1.17.0 custody checkpoints and channel boundary in the audit', async () => {
+    const audit = await readFile(new URL('../docs/openspec-1.17.0-audit.md', import.meta.url), 'utf8');
+    for (const phrase of [
+      '27c0515724decc633818c735ee596481eec78a8b',
+      '0fa4a9705c20ef1c571fe3ded74435733e4b73a1',
+      '579fcac57ae00c2dff38f971b6d88b6f1f098b8a',
+      'sha512-WQVhZoIR5PoacH/H0qh84VKMcXFbKCIKuAI96arHS3KiKYhJStlRrjUKGxLqLYKLym0j+2hAAY5MZUrPE5qXIA==',
+      'sha512-Qu2kdUP3oiXK6WzOA1OcEYiTlG3GmLJE37whoGjTEy4vbzuW4o3OwAwYwxSQpJnKHJ/XGySvo+icRiulBCxyzw==',
+      'sha512-D9MCbh1WMuJAoSYmtbkR5csHZdhiweuX5RC6+ZxMo9I2F/wq0x2wpFvlyCdo7yV0zenEqVxqmfRmLPd5wuJC7g==',
+      '7dee0ac8c0a72173b59f22bc9d70c4f7caa7d8b9',
+      '32 commits, 280 files',
+      'npm delivery channel requires Node',
+      'npm-канал требует Node',
+      '449 installed files',
+      'gitHead',
+      'legacy',
+      'openspec-1-17-live-cases.mjs'
+    ]) assert.ok(audit.includes(phrase), phrase);
+    assert.equal((audit.match(/^## /gm) ?? []).length, 4);
   });
 });
 
