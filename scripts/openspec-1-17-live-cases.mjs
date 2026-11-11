@@ -1,14 +1,17 @@
 // Cumulative 1.16.0/1.16.1/1.17.0 strict classes and inherited regressions replayed
 // on exact 1.17.0 after package custody. Class origins and message bindings are
-// marked inline; every negative expectation below was probed against the exact
-// 1.17.0 CLI (see docs/openspec-1.17.0-audit.md executed matrix):
+// marked inline; the expectations marked "probed" were observed on the exact
+// 1.17.0 CLI in disposable fixtures (see docs/openspec-1.17.0-audit.md executed
+// matrix), while the inherited 1.14.2 portability pair replays a class that was
+// live-verified on the 1.15 slot and stays bound until the full live receipt:
 // - scenario-step WARNING messages bind "is missing a WHEN/GIVEN step" and
-//   "is missing a THEN step" (1.16.0);
+//   "is missing a THEN step" (probed, 1.16.0);
 // - an unrecognized *Requirements-style section that holds a real requirement is
 //   ERROR ("... is under \"## <section>\", which is not a delta section, so it is
-//   ignored") and archive refuses (1.16.1);
+//   ignored") and archive refuses (probed, 1.16.1);
+// - a requirement under a prose-only unknown header is WARNING-ignored (probed);
 // - prose-only unknown sections keep the 1.14.2 WARNING ("... is not carried into
-//   the main spec by archive") and archive still succeeds;
+//   the main spec by archive") and archive still succeeds (probed);
 // - an unreadable config fails validate closed with an `unparseable_config`
 //   status envelope on stdout (1.16.0) while list carries on.
 import assert from 'node:assert/strict';
@@ -95,6 +98,16 @@ export async function smokeOpenSpec117(context) {
   assert.match(mergedNotes, /### Requirement: Extra/);
   assert.doesNotMatch(mergedNotes, /Some explanatory prose/);
 
+  // Third tier of the 1.16.1 semantics: a requirement under a prose-only
+  // unknown header is WARNING-ignored (valid, exit 0) — unlike the
+  // *Requirements-style ERROR tier above (both probed on exact 1.17.0).
+  const ignoredReq = project('117-ignored-req');
+  put(ignoredReq, 'openspec/specs/widgets/spec.md', spec(requirement('First')));
+  change(ignoredReq, 'ignored-req', `## Notes\n${requirement('UnderNotes')}\n\n## ADDED Requirements\n${requirement('Extra')}`);
+  const ignoredIssues = validation(ignoredReq, 'ignored-req', false, 0);
+  assert.ok(ignoredIssues.some((issue) => issue.level === 'WARNING'
+    && /is under "## Notes", which is not a delta section/.test(issue.message)), JSON.stringify(ignoredIssues));
+
   // 1.16.1: closed section headings in a main spec stay valid (parser fix, not a ban).
   const closed = project('117-closed-heading');
   const closedSpec = `# Widgets Specification\n\n## Purpose ##\nDescribe how the audit fixture handles requests and preserves stable specification behavior across compatibility checks.\n\n## Requirements ##\n${requirement('First')}`;
@@ -136,7 +149,12 @@ export async function smokeOpenSpec117(context) {
   // semantics did not change this class).
   const portability = project('117-portability');
   put(portability, 'openspec/specs/widgets/spec.md', spec(requirement('First')));
-  change(portability, 'pre-section', `This text would be lost.\n\n## ADDED Requirements\n${requirement('Extra')}`);
+  // The driver's change() helper prepends "## Purpose" to the delta file; text
+  // placed below that prefix lands inside the Purpose body and is dropped
+  // silently (probed: zero warnings), so the pre-section fixture overwrites the
+  // spec file with the raw delta to keep the text above the first "## " heading.
+  const preSectionBase = change(portability, 'pre-section', 'placeholder delta');
+  put(portability, `${preSectionBase}/specs/widgets/spec.md`, `This text would be lost.\n\n## ADDED Requirements\n${requirement('Extra')}`);
   await strictWarning(portability, 'pre-section', /Text above the first "## " section is not carried/);
   change(portability, 'pre-requirement', `## ADDED Requirements\nThis text would be lost.\n\n${requirement('Extra')}`);
   await strictWarning(portability, 'pre-requirement', /Text before the first requirement in "## ADDED Requirements" is not carried/);
@@ -163,19 +181,27 @@ export async function smokeOpenSpec117(context) {
   await strictWarning(lengths, 'lengths', /Requirement text is very long/);
   put(lengths, `${lengthBase}/specs/widgets/spec.md`, '## ADDED Requirements\n' + longRequirement(500));
   assert.deepEqual(validation(lengths, 'lengths', true), []);
+  put(lengths, `${lengthBase}/specs/widgets/spec.md`, '## ADDED Requirements\n' + longRequirement(499));
+  assert.deepEqual(validation(lengths, 'lengths', true), []);
   // MODIFIED against a missing base spec would only produce an INFO archive
   // preflight, so the matching main spec is authored first (1.15 slot pattern).
   put(lengths, 'openspec/specs/widgets/spec.md', spec(longRequirement(501)));
   put(lengths, `${lengthBase}/specs/widgets/spec.md`, '## MODIFIED Requirements\n' + longRequirement(501));
   assert.deepEqual(validation(lengths, 'lengths', true), []);
+  // The >500 warning class applies to main specs as well (probed on the exact
+  // 1.17.0 CLI in the aggregate run over this corpus).
+  const mainLongIssues = validation(lengths, 'widgets', true, 1, 'spec');
+  const mainLongWarnings = mainLongIssues.filter((issue) => issue.level === 'WARNING');
+  assert.equal(mainLongWarnings.length, 1, JSON.stringify(mainLongIssues));
+  assert.match(mainLongWarnings[0].message, /Requirement text is very long/);
 
   // Inherited 1.14.2/1.15 strict warning: unknown metadata keys with x- exemptions.
   const metadata = project('117-metadata');
   const metadataBase = change(metadata, 'metadata');
   rmSync(path.join(metadata, metadataBase, 'specs'), { recursive: true, force: true });
   const native = 'schema: spec-driven\ncreated: "2026-09-19"\nskip_specs: true\n';
-  put(metadata, `${metadataBase}/.openspec.yaml`, native + 'bogus_key: 1\n');
-  await strictWarning(metadata, 'metadata', /Unrecognized key name\(s\)/);
+  put(metadata, `${metadataBase}/.openspec.yaml`, native + 'bogus_key: 1\nskip_design: true\n');
+  await strictWarning(metadata, 'metadata', /Unrecognized key name\(s\).*bogus_key.*skip_design|Unrecognized key name\(s\).*skip_design.*bogus_key/);
   put(metadata, `${metadataBase}/.openspec.yaml`, native + 'x-goal: bounded\nx-jiraKey: TEST-1\n');
   const nativeIssues = validation(metadata, 'metadata', true);
   assert.ok(nativeIssues.every((issue) => issue.level === 'INFO'), JSON.stringify(nativeIssues));
@@ -207,15 +233,26 @@ export async function smokeOpenSpec117(context) {
   assert.match(merged, /### Requirement: Second/);
   assert.ok(merged.includes(example.trimEnd()), 'Fenced example blank lines must survive archive');
 
-  // Inherited 1.12: findings report covers every selected item; a MODIFIED delta
-  // whose target is missing stays a non-blocking INFO (valid, exit 0).
+  // Inherited 1.12: findings report covers every selected item (specs and
+  // changes together — one main spec plus two changes yield three items,
+  // probed); a MODIFIED delta whose target is missing stays a non-blocking
+  // INFO (valid, exit 0).
   const findingsRoot = project('117-findings');
   put(findingsRoot, 'openspec/specs/widgets/spec.md', spec(requirement('First')));
   change(findingsRoot, 'findings-loss', `## MODIFIED Requirements\n${requirement('Absent')}`);
   change(findingsRoot, 'findings-ok', `## ADDED Requirements\n${requirement('Extra')}`);
   const findings = invoke(findingsRoot, ['validate', '--all', '--json', '--no-interactive']).data;
-  assert.equal(findings.items.length, 2);
+  assert.equal(findings.items.length, 3);
+  assert.deepEqual(
+    findings.items.map((item) => ({ id: item.id, type: item.type })).sort((a, b) => a.id.localeCompare(b.id)),
+    [
+      { id: 'findings-loss', type: 'change' },
+      { id: 'findings-ok', type: 'change' },
+      { id: 'widgets', type: 'spec' }
+    ]
+  );
   assert.equal(findings.items.find((item) => item.id === 'findings-ok').valid, true);
+  assert.equal(findings.items.find((item) => item.id === 'widgets').valid, true);
   const loss = findings.items.find((item) => item.id === 'findings-loss');
   assert.equal(loss.valid, true);
   assert.ok(loss.issues.some((issue) => issue.level === 'INFO' && /Archive would refuse/.test(issue.message)),
