@@ -9,11 +9,12 @@ describe('OpenSpec 1.15 cumulative reviewed baseline', () => {
   it('keeps support and freshness independent across all seven checkpoints and runtime boundaries', async () => {
     assert.equal(OPENSPEC_SUPPORTED_RANGE, '>=1.3.1 <2.0.0');
     assert.equal(OPENSPEC_NODE_RANGE, '>=20.19.0');
-    assert.equal(OPENSPEC_LATEST_REVIEWED_VERSION, '1.15.0');
+    assert.equal(OPENSPEC_LATEST_REVIEWED_VERSION, '1.17.0');
     for (const [version, nodeVersion, supported, outdated] of [
-      ...['1.13.0', '1.13.1', '1.13.2', '1.14.0', '1.14.1', '1.14.2', '1.14.3'].map(v => [v, '20.19.0', true, true]),
-      ['1.15.0', '20.19.0', true, false], ['1.15.1', '20.19.0', true, false],
-      ['1.15.0', '18.20.8', false, false], ['1.15.0', '20.18.0', false, false],
+      ...['1.13.0', '1.13.1', '1.13.2', '1.14.0', '1.14.1', '1.14.2', '1.14.3', '1.15.0', '1.15.1'].map(v => [v, '20.19.0', true, true]),
+      ['1.16.0', '20.19.0', true, true], ['1.16.1', '20.19.0', true, true],
+      ['1.17.0', '20.19.0', true, false], ['1.17.1', '20.19.0', true, false],
+      ['1.15.0', '18.20.8', false, true], ['1.15.0', '20.18.0', false, true],
       ['1.3.0', '20.19.0', false, null], ['2.0.0', '20.19.0', false, null],
       ['1.15.0-beta.1', '20.19.0', false, null]
     ]) {
@@ -27,7 +28,8 @@ describe('OpenSpec 1.15 cumulative reviewed baseline', () => {
   it('binds the seven source checkpoints and executable custody without erasing historical evidence', async () => {
     const metadata = JSON.parse(await repo('aifhub-extension.json')).sources.openspec;
     assert.equal(metadata.version, OPENSPEC_LATEST_REVIEWED_VERSION);
-    assert.deepEqual(metadata.reviewedStableVersions.slice(-7), ['1.13.1', '1.13.2', '1.14.0', '1.14.1', '1.14.2', '1.14.3', '1.15.0']);
+    assert.deepEqual(metadata.reviewedStableVersions.slice(12, 19), ['1.13.1', '1.13.2', '1.14.0', '1.14.1', '1.14.2', '1.14.3', '1.15.0']);
+    assert.deepEqual(metadata.reviewedStableVersions.slice(-3), ['1.16.0', '1.16.1', '1.17.0']);
     const audit = await repo('docs/openspec-1.15.0-audit.md');
     for (const phrase of ['8e0288df12d401b0e183e2f47254d22528c1dffb', '5f516375c1a340425677cb997dc8fc74954d2076',
       'sha512-lG/EPEiL22bB70yKJhWWSPk1UQGLnwO7Dp+hNc/jUmBwb0qxPLzHCUkXEfkny4iYDOsgnsNQmc39/g9QcvnBnA==',

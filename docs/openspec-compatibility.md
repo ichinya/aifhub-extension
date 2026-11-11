@@ -733,7 +733,7 @@ openspec:
   canArchive: boolean
   version: string | null
   supportedRange: ">=1.3.1 <2.0.0"
-  latestReviewedVersion: "1.15.0"
+  latestReviewedVersion: "1.17.0"
   versionOutdated: boolean | null
   requiresNode: ">=20.19.0"
 ```
@@ -744,6 +744,8 @@ The current runner also reports operational detail fields:
 openspec:
   nodeVersion: string
   nodeSupported: boolean
+  packageRequiresNode: ">=22.12.0" | null
+  packageNodeSupported: boolean | null
   versionSupported: boolean
   command: string
   commandSource: "explicit" | "project-local" | "path"
@@ -760,6 +762,8 @@ Commands should treat the stable minimum as the contract and the operational det
 `/aif-analyze` reads the installed-project `openspecCli` result from `ai-factory aifhub-mode status --json`. When a selected CLI is compatible but older than the latest reviewed stable version, bootstrap remains available and the skill emits a non-blocking update recommendation. `versionOutdated` is `null` when the CLI version is missing or unsupported, so freshness never replaces the existing degraded reason.
 
 The recommendation follows the selected user-owned source: update the project dependency for `project-local`, the existing PATH/global installation for `path`, or the caller-owned executable for `explicit`. Do not guess a package manager, and do not install, update, replace, or re-resolve OpenSpec automatically. A supported version equal to or newer than `latestReviewedVersion` does not receive an update or downgrade recommendation.
+
+Since OpenSpec `1.16.0`, the npm delivery channel requires Node `>=22.12.0`. Detection reports this as diagnostics-only `packageRequiresNode` and `packageNodeSupported`, derived from the CLI version rather than from the installed package manifest; the delivery channel itself is not detected (`commandSource` identifies the selected CLI source, not the delivery channel), and the standalone binary does not consume npm engines. When `packageNodeSupported` is `false` on a Node 20-21 host, never recommend a plain npm update to the latest reviewed version there: the bounded recommendations are Node `>=22.12.0` for the npm channel, the standalone binary channel (its own custody chain, outside the npm matrix), or staying on the compatible npm `1.15.x` line. The runner floor stays Node `>=20.19.0` because the runner is an `.mjs` process.
 
 ## Degraded Mode
 

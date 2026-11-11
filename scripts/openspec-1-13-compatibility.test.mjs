@@ -7,11 +7,11 @@ describe('OpenSpec 1.13 compatibility boundary', () => {
   it('keeps the stable range and Node floor while advancing freshness', async () => {
     for (const [version, nodeVersion, supported, outdated] of [
       ['1.12.0', '20.19.0', true, true], ['1.13.0', '20.19.0', true, true],
-      ['1.13.0', '20.18.0', false, true], ['1.13.1', '20.19.0', true, true], ['1.15.0', '20.19.0', true, false],
+      ['1.13.0', '20.18.0', false, true], ['1.13.1', '20.19.0', true, true], ['1.15.0', '20.19.0', true, true],
       ['1.13.0-beta.1', '20.19.0', false, null], ['2.0.0', '20.19.0', false, null]
     ]) {
       const result = await detectOpenSpec({ nodeVersion, executor: async () => ({ exitCode: 0, stdout: version, stderr: '' }) });
-      assert.equal(result.latestReviewedVersion, '1.15.0');
+      assert.equal(result.latestReviewedVersion, '1.17.0');
       assert.equal(result.canValidate, supported);
       assert.equal(result.canArchive, supported);
       assert.equal(result.versionOutdated, outdated);

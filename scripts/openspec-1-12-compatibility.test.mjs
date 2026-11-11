@@ -55,7 +55,7 @@ describe('OpenSpec 1.12 report and advisory preflight boundary', () => {
       ['1.12.0-beta.1', '20.19.0', false, null]
     ]) {
       const result = await detectOpenSpec({ nodeVersion, executor: async () => ({ exitCode: 0, stdout: version, stderr: '' }) });
-      assert.equal(result.latestReviewedVersion, '1.15.0');
+      assert.equal(result.latestReviewedVersion, '1.17.0');
       assert.equal(result.canValidate, supported);
       assert.equal(result.canArchive, supported);
       assert.equal(result.versionOutdated, outdated);
