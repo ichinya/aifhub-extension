@@ -20,8 +20,8 @@
     "toolVersion": { "type": ["string", "null"], "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
     "commandContract": { "oneOf": [{ "type": "null" }, { "type": "object", "additionalProperties": false,
       "required": ["id", "version", "source"], "properties": {
-        "id": { "enum": ["aifhub.hlv-cli", "aifhub.lekalo-cli"] }, "version": { "const": "1.1.0" },
-        "source": { "enum": ["https://github.com/lee-to/hlv/tree/v1.1.0", "https://github.com/ichinya/lekalo/tree/v1.1.0"] }
+        "id": { "enum": ["aifhub.hlv-cli", "aifhub.lekalo-cli"] }, "version": { "enum": ["1.1.0", "1.2.0"] },
+        "source": { "enum": ["https://github.com/lee-to/hlv/tree/v1.1.0", "https://github.com/ichinya/lekalo/tree/v1.1.0", "https://github.com/ichinya/lekalo/tree/v1.2.0"] }
       } }] },
     "provenance": { "type": "object", "additionalProperties": false,
       "required": ["boundary", "source", "policyDigest"], "properties": {
@@ -139,8 +139,11 @@
                   "id": {
                     "const": "aifhub.lekalo-cli"
                   },
+                  "version": {
+                    "const": "1.2.0"
+                  },
                   "source": {
-                    "const": "https://github.com/ichinya/lekalo/tree/v1.1.0"
+                    "const": "https://github.com/ichinya/lekalo/tree/v1.2.0"
                   }
                 }
               }

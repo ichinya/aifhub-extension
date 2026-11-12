@@ -1,5 +1,6 @@
 import { afterEach, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { link, mkdir, mkdtemp, readFile, realpath, rm, symlink, truncate, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -34,6 +35,8 @@ test('Lekalo exact product and full manifest negotiation never conflates product
     assert.equal((await detectLekalo(root, {}, { runProcess: runner({ AIF_TEST_LEKALO_MANIFEST: value }) })).reason, 'capability_contract');
   }
   assert.equal((await detectLekalo(root, {}, { runProcess: runner({ AIF_TEST_LEKALO_VERSION: '1.0.0' }) })).reason, 'tool_version');
+  // Exact-pin fail-closed: the previously pinned 1.1.0 is no longer accepted either.
+  assert.equal((await detectLekalo(root, {}, { runProcess: runner({ AIF_TEST_LEKALO_VERSION: '1.1.0' }) })).reason, 'tool_version');
   assert.equal((await detectLekalo(root, {}, { runProcess: runner({ AIF_TEST_LEKALO_VERSION_SHAPE: '1.1.0' }) })).reason, 'version_shape');
   assert.equal((await detectLekalo(await project(false), {}, { runProcess: () => assert.fail('spawn') })).reason, 'layout_missing');
   assert.equal((await detectLekaloVersion(root, { executable: 'wrapper.cmd' }, { runProcess: () => assert.fail('spawn') })).status, 'configuration_error');
@@ -116,6 +119,10 @@ test('Lekalo init adopt supports dry-run, idempotence and conflict refusal befor
   await writeFile(path.join(rootDir, 'AGENTS.md'), 'original instructions');
   const first = await initializeEnabledTools(options); assert.equal(first.ok, true, JSON.stringify(first)); assert.equal(first.lekalo.state, 'created');
   assert.equal((await initializeEnabledTools(options)).lekalo.state, 'preserved'); assert.equal(calls.filter(call => call.args[0] === 'init').length, 1);
+  // The relative --project selector is valid only while the process cwd is bound to the project root.
+  const initCall = calls.find(call => call.args[0] === 'init');
+  assert.deepEqual(initCall.args, ['init', '--adopt', '--project', '.']);
+  assert.equal(initCall.cwd, rootDir);
   assert.equal(await readFile(path.join(rootDir, 'AGENTS.md'), 'utf8'), 'original instructions');
   const conflict = await project(false); await mkdir(path.join(conflict, 'lekalo')); await writeFile(path.join(conflict, 'lekalo/retained.yaml'), 'original');
   assert.equal((await initializeEnabledTools({ rootDir: conflict, runProcess: () => assert.fail('spawn') })).ok, false);
@@ -129,6 +136,33 @@ test('Lekalo rejects malformed known report and receipt fields before PASS', asy
   const receipt = JSON.parse((await fakeLekalo(['validate', '--no-cache'], { AIF_TEST_LEKALO_RECEIPT: 'error' })).stdout);
   assert.throws(() => normalizeLekaloResult('validate', { ...receipt, validation: { ...receipt.validation, profile: 'strict' } }, 0));
   assert.throws(() => normalizeLekaloResult('validate', { ...receipt, reasonCodes: [] }, 0));
+});
+
+test('Lekalo normalizes the live 1.2.0 doctor panel parity fixture with its actual verdict', async () => {
+  const fixture = JSON.parse(await readFile(new URL('../test/fixtures/validation-providers/lekalo-doctor-live-v1.2.0.json', import.meta.url), 'utf8'));
+  assert.equal(fixture.checks.length, 15);
+  const result = normalizeLekaloResult('doctor', fixture, 0);
+  // The live panel verdict is blocked: assert the actual normalized status, not a fixed pass.
+  assert.equal(result.status, 'fail', JSON.stringify(result));
+  assert.equal(result.reason, 'report_verdict');
+  assert.doesNotMatch(JSON.stringify(result), /private|token=/);
+});
+
+test('Lekalo trace accepts the 1.2.0 _-leading logicalPath and rejects digest drift', () => {
+  // Field grammar from upstream contracts/trace-manifest.schema.v0.2.16.json at tag v1.2.0
+  // ($defs/logicalPath pattern ^[a-z0-9_][a-z0-9._-]*(/[a-z0-9_][a-z0-9._-]*)*$); the schema ships
+  // no examples, so the _-leading value is constructed per that pattern. Verified against the live
+  // 1.2.0 trace export during custody (docs/lekalo-1.2.0-audit.md).
+  const hash = value => `sha256:${createHash('sha256').update(value).digest('hex')}`;
+  const trace = { schemaVersion: 'lekalo/trace-manifest/v0.2.16', identity: 'dev.lekalo.trace-manifest@0.2.16',
+    completeness: 'partial', nodes: [{ nodeId: 'req-1', nodeKind: 'requirement', path: '_fixtures/custody/probe.json' }],
+    relations: [], gaps: [{ gapKind: 'missing-symbol', status: 'candidate', anchorNode: 'req-1' }] };
+  const result = normalizeLekaloResult('trace', { status: 'valid', trace, manifestDigest: hash(JSON.stringify(trace)) }, 0);
+  assert.equal(result.status, 'warn', JSON.stringify(result));
+  assert.equal(result.reason, 'trace_exported');
+  assert.throws(() => normalizeLekaloResult('trace', { status: 'valid',
+    trace: { ...trace, nodes: [{ ...trace.nodes[0], path: '_fixtures/custody/changed.json' }] },
+    manifestDigest: hash(JSON.stringify(trace)) }, 0));
 });
 
 test('Lekalo consumes actual report, impact and context goldens from the reviewed upstream tag', async () => {

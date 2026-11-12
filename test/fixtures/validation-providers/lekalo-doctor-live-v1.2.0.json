@@ -1,0 +1,124 @@
+{
+  "status": "valid",
+  "schemaVersion": "lekalo/doctor/v0.3.2",
+  "identity": "dev.lekalo.doctor@0.3.2",
+  "report": "doctor",
+  "productVersion": "1.2.0",
+  "verdict": "blocked",
+  "revisions": {
+    "git": {
+      "state": "not-a-repository"
+    },
+    "model": {
+      "state": "ok",
+      "version": "0.2.16"
+    },
+    "lock": {
+      "state": "absent"
+    }
+  },
+  "checks": [
+    {
+      "id": "adapters.inventory",
+      "state": "ok",
+      "required": true,
+      "reason": "none-required"
+    },
+    {
+      "id": "adapters.trust",
+      "state": "ok",
+      "required": true,
+      "reason": "clean"
+    },
+    {
+      "id": "artifacts.drift",
+      "state": "unknown",
+      "required": true,
+      "reason": "no-lock",
+      "nextAction": "create-lock"
+    },
+    {
+      "id": "bindings.freshness",
+      "state": "ok",
+      "required": true,
+      "reason": "none-required"
+    },
+    {
+      "id": "cache.health",
+      "state": "ok",
+      "required": false,
+      "reason": "missing"
+    },
+    {
+      "id": "capabilities.profiles",
+      "state": "ok",
+      "required": true,
+      "reason": "none-declared"
+    },
+    {
+      "id": "classification.attachment",
+      "state": "ok",
+      "required": true,
+      "reason": "not-declared"
+    },
+    {
+      "id": "fs.confinement",
+      "state": "ok",
+      "required": true,
+      "reason": "confined"
+    },
+    {
+      "id": "integrations.hlv",
+      "state": "degraded",
+      "required": false,
+      "reason": "not-supplied",
+      "nextAction": "trace-validate"
+    },
+    {
+      "id": "lock.freshness",
+      "state": "degraded",
+      "required": true,
+      "reason": "absent",
+      "nextAction": "create-lock",
+      "diagnostics": [
+        "lock.missing"
+      ]
+    },
+    {
+      "id": "model.references",
+      "state": "ok",
+      "required": true,
+      "reason": "resolved"
+    },
+    {
+      "id": "model.version",
+      "state": "ok",
+      "required": true,
+      "reason": "accepted"
+    },
+    {
+      "id": "platform.limits",
+      "state": "ok",
+      "required": false,
+      "reason": "informational",
+      "notes": [
+        "case-insensitive-filesystem",
+        "symlink-privilege-required",
+        "windows-path-syntax"
+      ]
+    },
+    {
+      "id": "project.root",
+      "state": "ok",
+      "required": true,
+      "reason": "valid"
+    },
+    {
+      "id": "tools.gates",
+      "state": "degraded",
+      "required": true,
+      "reason": "not-a-repository",
+      "nextAction": "init-git"
+    }
+  ]
+}

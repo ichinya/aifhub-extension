@@ -16,7 +16,7 @@ export async function fakeLekalo(args, env = {}, cwd = process.cwd()) {
     stdout: [1, 5].includes(exitCode) ? '' : JSON.stringify(payload),
     stderr: [1, 5].includes(exitCode) ? JSON.stringify(payload) : privateText });
   if (args[0] === '--version') return { outcome: 'completed', exitCode: 0,
-    stdout: env.AIF_TEST_LEKALO_VERSION_SHAPE ?? `lekalo ${env.AIF_TEST_LEKALO_VERSION ?? '1.1.0'}\n`, stderr: '' };
+    stdout: env.AIF_TEST_LEKALO_VERSION_SHAPE ?? `lekalo ${env.AIF_TEST_LEKALO_VERSION ?? '1.2.0'}\n`, stderr: '' };
   if (args[0] === 'provider') {
     const payload = JSON.parse(await readFile(new URL('./lekalo-describe-v0.8.0.json', import.meta.url), 'utf8'));
     if (env.AIF_TEST_LEKALO_MANIFEST === 'identity') payload.manifest.identity = 'dev.lekalo.workflow-provider@9.0.0';
@@ -27,7 +27,7 @@ export async function fakeLekalo(args, env = {}, cwd = process.cwd()) {
   }
   if (args[0] === 'init') {
     if (env.AIF_TEST_LEKALO_INIT === 'refuse') return reply({ status: 'denied', diagnostics: [diagnostic('error')] }, 3);
-    if (args[1] !== '--adopt' || args[2] !== '--project' || args[3] !== cwd) return reply({}, 2);
+    if (args[1] !== '--adopt' || args[2] !== '--project' || args[3] !== '.') return reply({}, 2);
     await mkdir(path.join(cwd, 'lekalo'), { recursive: true });
     await writeFile(path.join(cwd, 'lekalo/project.yaml'), projectYaml, { flag: 'wx' });
     return reply({ status: 'valid' });
@@ -42,7 +42,7 @@ export async function fakeLekalo(args, env = {}, cwd = process.cwd()) {
   if (['status', 'doctor', 'readiness'].includes(args[0])) {
     const verdict = env.AIF_TEST_LEKALO_VERDICT ?? 'ready';
     payload = { status: 'valid', schemaVersion: 'lekalo/doctor/v0.3.2', identity: 'dev.lekalo.doctor@0.3.2',
-      report: args[0], productVersion: '1.1.0', verdict,
+      report: args[0], productVersion: '1.2.0', verdict,
       checks: [{ id: 'project.root', required: true, state: verdict === 'blocked' ? 'blocked' : 'ok' },
         { id: 'integrations.hlv', required: false, state: verdict === 'degraded' ? 'degraded' : 'ok' }] };
     if (args[0] === 'readiness') payload.phase = 'release';
