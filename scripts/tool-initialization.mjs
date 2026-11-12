@@ -94,7 +94,7 @@ function lekaloInitResult(options, state, error = null) {
     operations: ['created', 'would-create', 'preserved'].includes(state)
       ? [{ action: state === 'preserved' ? 'preserve' : state === 'created' ? 'create' : state, target: 'lekalo/project.yaml' }] : [],
     warnings: [], errors: error === null ? [] : [{ code: `lekalo-init-${error}`,
-      message: `Lekalo initialization refused (${error}). Use reviewed CLI 1.1.0 and repair conflicting or incomplete layouts before retrying.` }] };
+      message: `Lekalo initialization refused (${error}). Use reviewed CLI 1.2.0 and repair conflicting or incomplete layouts before retrying.` }] };
 }
 
 async function preflightLekaloInit(rootDir) {
@@ -117,7 +117,7 @@ export async function initializeLekaloProject(options = {}) {
     const detection = await detectLekaloVersion(rootDir, config, options);
     if (detection.status !== 'pass') return lekaloInitResult(options, detection.status, detection.reason);
     const result = await (options.runProcess ?? runProviderProcess)(config.executable ?? 'lekalo',
-      ['init', '--adopt', '--project', rootDir], { cwd: rootDir, timeoutMs: config.timeoutMs,
+      ['init', '--adopt', '--project', '.'], { cwd: rootDir, timeoutMs: config.timeoutMs,
         maxOutputBytes: config.maxOutputBytes, signal: options.signal, env: options.env });
     if (result.outcome !== 'completed' || result.exitCode !== 0) return lekaloInitResult(options, 'failed', 'process_failed');
     if (!await inspectLekaloLayout(rootDir)) return lekaloInitResult(options, 'failed', 'layout_missing_after_init');

@@ -6,8 +6,8 @@ import { runProviderProcess } from './provider-process.mjs';
 import { normalizeSemanticEvidence } from './semantic-provider-contract.mjs';
 
 export const LEKALO_COMMAND_CONTRACT = Object.freeze({
-  id: 'aifhub.lekalo-cli', version: '1.1.0', toolVersion: '1.1.0',
-  source: 'https://github.com/ichinya/lekalo/tree/v1.1.0',
+  id: 'aifhub.lekalo-cli', version: '1.2.0', toolVersion: '1.2.0',
+  source: 'https://github.com/ichinya/lekalo/tree/v1.2.0',
   operations: ['detect', 'status', 'doctor', 'validate', 'readiness', 'trace', 'impact', 'context']
 });
 export const LEKALO_WORKFLOW_CONTRACT = Object.freeze({
@@ -16,9 +16,11 @@ export const LEKALO_WORKFLOW_CONTRACT = Object.freeze({
   manifestDigest: 'sha256:a674f1dd6f5608a28b8f1727bcddae4ad67adceace33e871ebb4334f091315d0',
   maxExportBytes: 33554432
 });
-const CHECKS = ['project.root', 'model.version', 'model.references', 'fs.confinement', 'lock.freshness',
-  'adapters.inventory', 'adapters.trust', 'capabilities.profiles', 'bindings.freshness', 'artifacts.drift',
-  'tools.gates', 'cache.health', 'integrations.hlv', 'platform.limits'];
+// Exact live doctor panel of the reviewed 1.2.0 binary (15 checks, verbatim order).
+// The published lekalo/doctor/v0.3.2 enum still lists 14 checks — upstream schema gap.
+const CHECKS = ['adapters.inventory', 'adapters.trust', 'artifacts.drift', 'bindings.freshness', 'cache.health',
+  'capabilities.profiles', 'classification.attachment', 'fs.confinement', 'integrations.hlv', 'lock.freshness',
+  'model.references', 'model.version', 'platform.limits', 'project.root', 'tools.gates'];
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const count = value => Number.isSafeInteger(value) && value >= 0 && value <= 1000000;
 const ref = value => typeof value === 'string' && /^sha256:[a-f0-9]{64}$/.test(value);
@@ -188,7 +190,7 @@ async function traceArgs(rootDir, options) {
 }
 
 const SEMANTIC_MANIFEST = { contract: { id: 'aifhub.provider', version: '1.0.0' }, kind: 'semantic_model',
-  toolVersion: '1.1.0', operations: ['validate', 'impact', 'context', 'trace'] };
+  toolVersion: '1.2.0', operations: ['validate', 'impact', 'context', 'trace'] };
 function normalizedProcessResult(operation, result) {
   try { return { ...normalizeLekaloResult(operation, result.payload, result.exitCode), streams: result.streams }; }
   catch { return { ...unsupported('result_schema'), streams: result.streams }; }

@@ -1,13 +1,13 @@
 # Validation and semantic model providers
 
-Issue [#136](https://github.com/ichinya/aifhub-extension/issues/136) introduces independent optional tools on top of the AI Factory workflow. Boolean switches select OpenSpec specifications, HLV validation/traceability and the future Lekalo semantic model. Tools default to `false`; discovering a marker never enables or installs a tool.
+Issue [#136](https://github.com/ichinya/aifhub-extension/issues/136) introduces independent optional tools on top of the AI Factory workflow. Boolean switches select OpenSpec specifications, HLV validation/traceability and the Lekalo semantic model. Tools default to `false`; discovering a marker never enables or installs a tool.
 
 | Layer | Canonical ownership |
 | --- | --- |
 | OpenSpec | Requirements, change intent, delta specifications |
 | AI Factory / AIFHub | Execution, runtime state, finalization, derived QA evidence |
 | HLV | HLV contracts, traceability and its validation diagnostics |
-| Lekalo, when a compatible provider is available | Semantic application model |
+| Lekalo | Semantic application model (read-only adapter, exact CLI 1.2.0) |
 | Source and tests | Executable behavior and direct runtime evidence |
 
 Generated rules and provider summaries cannot overwrite canonical artifacts. A conflicting result is a diagnostic to resolve; it never authorizes automatic synchronization. These validation providers are separate from the optional supporting context, skill, and safety providers documented elsewhere. Existing context-provider availability does not become a workflow gate.
@@ -33,7 +33,7 @@ The [tool schema](../schemas/tool-config.schema.json) defines independent boolea
 | `false` | `true` | AI Factory plans/specifications plus HLV contracts and traceability |
 | `true` | `true` | OpenSpec changes/specifications plus HLV contracts and traceability |
 
-AI Factory project context, runtime state and QA evidence remain under `.ai-factory`. HLV uses its existing initialized layout. Lekalo will add its own semantic model layer independently when a compatible provider becomes available; it does not replace OpenSpec or HLV.
+AI Factory project context, runtime state and QA evidence remain under `.ai-factory`. HLV uses its existing initialized layout. Lekalo adds its own read-only semantic model layer independently through the exact CLI 1.2.0 adapter; it does not replace OpenSpec or HLV.
 
 `hlv: true` enables verify/done with required checks. `hlv: false` skips discovery, all HLV commands and new HLV evidence writes, even when `providers.hlv.policy: required` is set. `openspec: false` selects AI Factory artifacts and skips OpenSpec discovery, validation, generated rules and archive operations. Omitted tools are false. Disabling a tool preserves its existing artifacts and evidence; switching flags does not delete or automatically convert them.
 
@@ -57,7 +57,7 @@ aifhub:
       maxOutputBytes: 1048576
 ```
 
-[The configuration schema](../schemas/provider-config.schema.json) describes `aifhub.providers`. HLV defaults to verify/done; the reserved semantic provider defaults to implement/verify/done. Mode switches preserve this namespace. An explicit `executable` must be a quoted absolute native executable path; otherwise the installed `hlv` is resolved by the process environment. Shell/script wrappers are rejected. Project initialization is available through `aifhub-mode init`; binary installation, updates and provider-owned sync remain outside the adapter.
+[The configuration schema](../schemas/provider-config.schema.json) describes `aifhub.providers`. HLV defaults to verify/done; the Lekalo semantic provider defaults to implement/verify/done. Mode switches preserve this namespace. An explicit `executable` must be a quoted absolute native executable path; otherwise the installed `hlv` is resolved by the process environment. Shell/script wrappers are rejected. Project initialization is available through `aifhub-mode init`; binary installation, updates and provider-owned sync remain outside the adapter.
 
 The namespace accepts two-space YAML mappings, scalar values and block lists or JSON-style inline lists. Tool switches must be unquoted `true` or `false`; strings such as `"false"`, numbers and nulls are errors. Duplicate keys, unknown tools/providers, unsupported YAML aliases/flow mappings, malformed policies and invalid limits fail closed. An unreadable configuration is a configuration error, not implicit disablement.
 
@@ -133,9 +133,9 @@ Statuses distinguish `pass`, `warn`, `fail`, `unavailable`, `unsupported`, `infr
 
 Processes use argument arrays with `shell: false`, hidden Windows windows, closed stdin, combined stdout/stderr byte limits, a bounded timeout and cancellation. Cancellation and timeout terminate the process group on POSIX or process tree on Windows. Output/schema failures never count as validation PASS. Evidence paths are contained in the project and reject links, hard links and traversal.
 
-## Lekalo 1.1.0: реализованный read-only адаптер
+## Lekalo 1.2.0: реализованный read-only адаптер
 
-Адаптер принимает только **CLI 1.1.0** (из `lekalo --version`) и exact manifest **dev.lekalo.workflow-provider@0.8.0**, discriminator `lekalo/workflow-provider/v0.8.0`. Manifest productVersion **0.8.0** обозначает поколение контракта. Discovery вне проекта проверяет полный reviewed manifest digest: неизвестные поля, операции, effects и pins дают unsupported. Additive поля operation reports игнорируются. См. [upstream contract](https://github.com/ichinya/lekalo/blob/v1.1.0/docs/provider-contract.md) и [custody audit](lekalo-1.1.0-audit.md).
+Адаптер принимает только **CLI 1.2.0** (из `lekalo --version`) и exact manifest **dev.lekalo.workflow-provider@0.8.0**, discriminator `lekalo/workflow-provider/v0.8.0`. Manifest productVersion **0.8.0** обозначает поколение контракта. Discovery вне проекта проверяет полный reviewed manifest digest: неизвестные поля, операции, effects и pins дают unsupported. Additive поля operation reports игнорируются. См. [upstream contract](https://github.com/ichinya/lekalo/blob/v1.2.0/docs/provider-contract.md) и [custody audit](lekalo-1.2.0-audit.md); историческая версия — [1.1.0 audit](lekalo-1.1.0-audit.md).
 
 | Операция | Prescribed argv после lekalo | Нормализация |
 | --- | --- | --- |
@@ -154,9 +154,9 @@ Trace convention: `.ai-factory/traces/<change-id>/lekalo-trace-manifest.json`. A
 
 Фаза implement запускает impact/context, verify — validate/status/trace, done — validate/readiness/trace. Policy/phases/timeoutMs/maxOutputBytes/executable настраиваются в `aifhub.providers.lekalo`; default phases implement/verify/done, policy required, timeout 30000 ms, output 1 MiB default (override через config.maxOutputBytes), executable — абсолютный нативный файл либо установленный lekalo из PATH. Trace export — исключение: output cap заменяется contract ceiling 32 MiB (валидный манифест больше default-лимита — evidence, не overflow). Required non-success блокирует gate, optional меняет только gate на warn.
 
-Инициализация через `ai-factory aifhub-mode init --json` отдельно вызывает `lekalo init --adopt --project DIR` после exact detection. Existing valid layout сохраняется без запуска CLI; partial/conflicting layout и lock без модели дают refusal. Dry-run не пишет и не запускает процессы. Install prompt не вызывается: AGENTS.md остаётся injection-слоем AI Factory. Drift/generate/sync/trace collect/native gates не реализованы и fail-closed; LPAC и component receipts принадлежат upstream.
+Инициализация через `ai-factory aifhub-mode init --json` отдельно вызывает `lekalo init --adopt --project .` с cwd корня проекта (live CLI отвергает абсолютный `--project` для init — `LEK-STR-024`) после exact detection. Existing valid layout сохраняется без запуска CLI; partial/conflicting layout и lock без модели дают refusal. Dry-run не пишет и не запускает процессы. Install prompt не вызывается: AGENTS.md остаётся injection-слоем AI Factory. Drift/generate/sync/trace collect/native gates не реализованы и fail-closed; LPAC и component receipts принадлежат upstream.
 
-Hermetic [fake-lekalo](../test/fixtures/validation-providers/fake-lekalo.mjs) и [describe golden](../test/fixtures/validation-providers/lekalo-describe-v0.8.0.json) проверяют adapter boundary; [semantic fixture](../test/fixtures/validation-providers/fake-lekalo-capabilities.json) проверяет отдельный AIFHub transport-neutral контракт. Реальный Lekalo binary — NOTRUN.
+Hermetic [fake-lekalo](../test/fixtures/validation-providers/fake-lekalo.mjs) и [describe golden](../test/fixtures/validation-providers/lekalo-describe-v0.8.0.json) проверяют adapter boundary; [semantic fixture](../test/fixtures/validation-providers/fake-lekalo-capabilities.json) проверяет отдельный AIFHub transport-neutral контракт. В таблице выше `DIR` — абсолютный корень проекта, как его передаёт адаптер на read-операциях; live CLI 1.2.0 принимает на них и абсолютную, и относительную форму. Live-прогоны checksum-верифицированного бинарника 1.2.0 — VERIFIED (описание, doctor-панель 15 чеков, validate, init, trace); custody и матрица — [1.2.0 audit](lekalo-1.2.0-audit.md). Goldens с именами `-v1.1.0.json` сохранены как есть и верифицированы content-equal против тега v1.2.0 («fixture captured at 1.1.0, verified content-equal against 1.2.0»); live doctor-панель зафиксирована в [parity-фикстуре](../test/fixtures/validation-providers/lekalo-doctor-live-v1.2.0.json).
 
 See also [Context Providers](context-providers.md), [Skill Providers](skill-providers.md), and [OpenSpec Compatibility](openspec-compatibility.md).
 

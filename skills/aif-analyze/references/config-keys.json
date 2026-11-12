@@ -49,7 +49,7 @@
       "key": "aifhub.tools.lekalo",
       "required": true,
       "since": "0.15.0",
-      "purpose": "Reserved boolean opt-in for Lekalo semantic model artifacts; keep false until a compatible provider exists."
+      "purpose": "Opt-in boolean for the Lekalo semantic model layer; default stays false until you enable the read-only adapter (exact CLI 1.2.0)."
     },
     {
       "key": "aifhub.readability.enabled",

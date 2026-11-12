@@ -29,7 +29,7 @@ AI Factory UX + OpenSpec artifact protocol
 - Supports durable project review guidance at `reviews.policy_file` (`REVIEW.md` at the project root by default), consumed read-only by `/aif-review` and AIFHub review sidecars.
 - Resolves human-readable response language as `language.ui` → current conversation → English only when indeterminate, without using OS locale or changing exact machine-output contracts. See [Usage](docs/usage.md#prompt-language-resolution).
 - Does not install OpenSpec skills or slash commands.
-- Supports composable opt-in HLV validation alongside either artifact protocol, with independent `tools.openspec`, `tools.hlv` and reserved `tools.lekalo` booleans, required checks by default, optional warning policy and revision-bound QA evidence; reserves a separate semantic model contract for future Lekalo integration. See [Validation Providers](docs/validation-providers.md).
+- Supports composable opt-in HLV validation alongside either artifact protocol, with independent `tools.openspec`, `tools.hlv` and `tools.lekalo` booleans, required checks by default, optional warning policy and revision-bound QA evidence; includes a read-only Lekalo semantic model adapter pinned to exact CLI 1.2.0. See [Validation Providers](docs/validation-providers.md).
 
 ## Quick Start
 
