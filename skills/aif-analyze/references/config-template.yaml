@@ -24,7 +24,7 @@ aifhub:
   tools:
     openspec: false
     hlv: false
-    lekalo: false # reserved; upstream provider protocol is not yet supported
+    lekalo: false # opt-in; read-only adapter for exact CLI 1.2.0
   # Optional session read optimization. Preserve existing values and never
   # enable automatically; mode is off | aifhub | sqz.
   contextDedup:
