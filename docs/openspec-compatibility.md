@@ -26,12 +26,24 @@ AI Factory = execution runtime
 
 AI Factory-only workflows follow AI Factory's runtime support. OpenSpec validation/archive follows the OpenSpec CLI runtime requirement.
 
+## OpenSpec 1.17.0 Reviewed Baseline
+
+AIFHub metadata records OpenSpec `1.17.0` as the latest reviewed upstream baseline while keeping the supported stable CLI range `>=1.3.1 <2.0.0` and the runner Node floor `>=20.19.0`. The cumulative review covers 1.16.0, 1.16.1 and 1.17.0 (compare `v1.15.0...v1.17.0`: 32 commits, 280 files); 1.16.0 and 1.16.1 are cumulative source custody checkpoints whose replay fixtures target 1.17.0 (the full live replay run stays NOTRUN until the orchestrator receipt), so the exact npm executable matrix binds 1.17.0 only.
+
+Since OpenSpec 1.16.0 the npm delivery channel requires Node `>=22.12.0` while the runner remains an `.mjs` process on Node `>=20.19.0`; on Node 20-21 hosts the compatible choices are the standalone binary channel (its own custody chain, outside the npm matrix) or staying on the compatible npm `1.15.x` line. Detection reports the npm engines as diagnostics-only `packageRequiresNode`/`packageNodeSupported` derived from the CLI version, without changing `errors[]`, `reason`, capabilities or `versionOutdated`. The marker fields are deliberately not mirrored into advisory warnings or readiness checks — read them directly from the detection result or the mode-status summary; see [the freshness guidance](#version-freshness-in-aif-analyze).
+
+New strict surface in 1.16.x: missing WHEN/GIVEN or THEN scenario steps became per-side WARNINGs under `--strict` (1.16.0), a real requirement under an unrecognized `*Requirements`-style delta section became ERROR so non-strict validate fails and archive refuses while prose-only unknown sections keep the 1.14.2 not-carried WARNING with a succeeding archive (1.16.1), an unreadable `openspec/config.yaml` fails validate closed while other commands warn-and-carry-on (1.16.0), and closed section headings, unspaced requirement headers and inline fences gained parser fixes. See [strict checks guidance](openspec-validation.md#strict-checks-in-openspec-116x) and the [1.17.0 audit](openspec-1.17.0-audit.md). The OpenSpec 2.0 notice that command files `/opsx:*` go away while skills stay is recorded docs-only; the supported-range decision for 2.0.0 remains a future issue.
+
+### Exact 1.17.0 Custody and Evidence Boundary
+
+The [1.17.0 audit](openspec-1.17.0-audit.md) records the three independent Git/npm checkpoints for 1.16.0-1.17.0 (v-style release tags resolve directly to commits; scoped tags resolve elsewhere and are not custody) and the checksum-bound exact npm 1.17.0 CLI matrix: tarball sha1/sha512 verified before executing package code, installed with `--ignore-scripts` outside the checkout, SHA-256 inventory of all 449 installed files identical to the tarball, `openspec --version` = 1.17.0. npm `gitHead` is absent from the packument for all three versions, so the release `target_commitish` is the committed source pin. npm publication trails the GitHub release by ~2-3 minutes for all three releases. `version --check` and telemetry (`OPENSPEC_NO_UPDATE_CHECK`), `openspec update` from 0.12, the openspec.dev installer, zsh completion, store suggestion, Windows PS5.1 fix and safer cleanup remain upstream-owned without repo surfaces. AIFHub runner still requires Node `>=20.19.0` because it is an `.mjs` process; the npm channel floor and the standalone channel boundary are delivery-channel facts recorded in the audit, and the install channel itself is not detected.
+
 ## OpenSpec 1.15.0 Reviewed Baseline
 
-AIFHub metadata records OpenSpec `1.15.0` as the latest reviewed upstream baseline while keeping the supported stable CLI range `>=1.3.1 <2.0.0`.
+AIFHub metadata records OpenSpec `1.15.0` as the previous reviewed upstream baseline while keeping the supported stable CLI range `>=1.3.1 <2.0.0`.
 
 - Baseline `1.3.1` is the first supported and reviewed release.
-- Reviewed stable releases: `1.3.1`, `1.4.0`, `1.4.1`, `1.5.0`, `1.6.0`, `1.7.0`, `1.8.0`, `1.9.0`, `1.10.0`, `1.11.0`, `1.12.0`, `1.13.0`, `1.13.1`, `1.13.2`, `1.14.0`, `1.14.1`, `1.14.2`, `1.14.3`, `1.15.0`.
+- Reviewed stable releases: `1.3.1`, `1.4.0`, `1.4.1`, `1.5.0`, `1.6.0`, `1.7.0`, `1.8.0`, `1.9.0`, `1.10.0`, `1.11.0`, `1.12.0`, `1.13.0`, `1.13.1`, `1.13.2`, `1.14.0`, `1.14.1`, `1.14.2`, `1.14.3`, `1.15.0`, `1.16.0`, `1.16.1`, `1.17.0`.
 - Reviewed prereleases: `1.6.0-beta.1`. A prerelease review does not imply production support; prerelease detection remains unavailable for production capabilities.
 
 | Release | Channel | Adapter result | Checked AIFHub surfaces | Required adaptation |
@@ -56,6 +68,9 @@ AIFHub metadata records OpenSpec `1.15.0` as the latest reviewed upstream baseli
 | `1.14.2` | stable | supported | cumulative source checkpoint; source-reviewed, executable regressions replayed on 1.15.0 | see cumulative 1.15.0 audit |
 | `1.14.3` | stable | supported | cumulative source checkpoint; source-reviewed, executable regressions replayed on 1.15.0 | see cumulative 1.15.0 audit |
 | `1.15.0` | stable | supported reviewed baseline | cumulative source checkpoint; checksum-bound exact npm CLI matrix | see cumulative 1.15.0 audit |
+| `1.16.0` | stable | supported | cumulative source checkpoint; replay fixtures target 1.17.0 (full live run NOTRUN until receipt) | npm engines >=22.12.0 channel split, scenario-step strict WARNING, config fail-closed validate, parser fixes; see cumulative 1.17.0 audit |
+| `1.16.1` | stable | supported | cumulative source checkpoint; replay fixtures target 1.17.0 (full live run NOTRUN until receipt) | unrecognized delta sections ERROR with archive refusal; closed headings recognized; see cumulative 1.17.0 audit |
+| `1.17.0` | stable | supported reviewed baseline | cumulative source checkpoint; checksum-bound exact npm CLI matrix | see cumulative 1.17.0 audit |
 
 ### Exact 1.15.0 Custody and Evidence Boundary
 
@@ -733,7 +748,7 @@ openspec:
   canArchive: boolean
   version: string | null
   supportedRange: ">=1.3.1 <2.0.0"
-  latestReviewedVersion: "1.15.0"
+  latestReviewedVersion: "1.17.0"
   versionOutdated: boolean | null
   requiresNode: ">=20.19.0"
 ```
@@ -744,6 +759,8 @@ The current runner also reports operational detail fields:
 openspec:
   nodeVersion: string
   nodeSupported: boolean
+  packageRequiresNode: ">=22.12.0" | null
+  packageNodeSupported: boolean | null
   versionSupported: boolean
   command: string
   commandSource: "explicit" | "project-local" | "path"
@@ -760,6 +777,8 @@ Commands should treat the stable minimum as the contract and the operational det
 `/aif-analyze` reads the installed-project `openspecCli` result from `ai-factory aifhub-mode status --json`. When a selected CLI is compatible but older than the latest reviewed stable version, bootstrap remains available and the skill emits a non-blocking update recommendation. `versionOutdated` is `null` when the CLI version is missing or unsupported, so freshness never replaces the existing degraded reason.
 
 The recommendation follows the selected user-owned source: update the project dependency for `project-local`, the existing PATH/global installation for `path`, or the caller-owned executable for `explicit`. Do not guess a package manager, and do not install, update, replace, or re-resolve OpenSpec automatically. A supported version equal to or newer than `latestReviewedVersion` does not receive an update or downgrade recommendation.
+
+Since OpenSpec `1.16.0`, the npm delivery channel requires Node `>=22.12.0`. Detection reports this as diagnostics-only `packageRequiresNode` and `packageNodeSupported`, derived from the CLI version rather than from the installed package manifest; the delivery channel itself is not detected (`commandSource` identifies the selected CLI source, not the delivery channel), and the standalone binary does not consume npm engines. When `packageNodeSupported` is `false` on a Node 20-21 host, never recommend a plain npm update to the latest reviewed version there: the bounded recommendations are Node `>=22.12.0` for the npm channel, the standalone binary channel (its own custody chain, outside the npm matrix), or staying on the compatible npm `1.15.x` line. The runner floor stays Node `>=20.19.0` because the runner is an `.mjs` process. The same runtime constraint applies when the marker fields are `null` (an installed CLI `<=1.15.x` never sets them): the npm-channel floor of the TARGET `1.16.0+` release still applies on Node 20-21 hosts, so scope an update recommendation to the bounded choices above instead of a plain npm update.
 
 ## Degraded Mode
 

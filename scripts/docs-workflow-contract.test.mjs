@@ -1264,7 +1264,7 @@ describe('complete OpenSpec workflow documentation contract', () => {
     );
   });
 
-  it('documents the cumulative exact-tagged OpenSpec 1.15.0 baseline, custody and adapter boundary', async () => {
+  it('documents the cumulative exact-tagged OpenSpec 1.15.0 -> 1.17.0 baseline, custody and adapter boundary', async () => {
     const metadata = JSON.parse(await readRepoFile('aifhub-extension.json'));
     const readme = await readRepoFile('README.md');
     const compatibility = await readRepoFile('docs/openspec-compatibility.md');
@@ -1275,12 +1275,12 @@ describe('complete OpenSpec workflow documentation contract', () => {
     const combinedDocs = [readme, compatibility, validation, docsIndex, changelog].join('\n');
     const readmeCompatibility = extractSection(readme, '## OpenSpec Compatibility');
 
-    assert.equal(openspec.version, '1.15.0');
+    assert.equal(openspec.version, '1.17.0');
     assert.equal(openspec.baselineVersion, '1.3.1');
     assert.equal(openspec.supportedRange, '>=1.3.1 <2.0.0');
-    assert.deepEqual(openspec.reviewedStableVersions, ['1.3.1', '1.4.0', '1.4.1', '1.5.0', '1.6.0', '1.7.0', '1.8.0', '1.9.0', '1.10.0', '1.11.0', '1.12.0', '1.13.0', '1.13.1', '1.13.2', '1.14.0', '1.14.1', '1.14.2', '1.14.3', '1.15.0']);
+    assert.deepEqual(openspec.reviewedStableVersions, ['1.3.1', '1.4.0', '1.4.1', '1.5.0', '1.6.0', '1.7.0', '1.8.0', '1.9.0', '1.10.0', '1.11.0', '1.12.0', '1.13.0', '1.13.1', '1.13.2', '1.14.0', '1.14.1', '1.14.2', '1.14.3', '1.15.0', '1.16.0', '1.16.1', '1.17.0']);
     assert.deepEqual(openspec.reviewedPrereleaseVersions, ['1.6.0-beta.1']);
-    assert.equal(openspec.lastSync, '2026-10-30');
+    assert.equal(openspec.lastSync, '2026-11-11');
     assertIncludes(openspec.notes, 'upstream OpenSpec 1.3.1 through 1.15.0', 'aifhub-extension.json');
     assertIncludes(openspec.notes, 'adapter-only', 'aifhub-extension.json');
 
@@ -1290,10 +1290,15 @@ describe('complete OpenSpec workflow documentation contract', () => {
       'README.md OpenSpec Compatibility reviewed baseline'
     );
     assertIncludes(docsIndex, 'OpenSpec 1.15.0', 'docs/README.md');
+    assertIncludes(docsIndex, 'OpenSpec 1.17.0', 'docs/README.md');
 
     for (const expected of [
       'OpenSpec 1.15.0 Reviewed Baseline',
+      'OpenSpec 1.17.0 Reviewed Baseline',
       'Exact 1.15.0 Custody and Evidence Boundary',
+      'Exact 1.17.0 Custody and Evidence Boundary',
+      'npm delivery channel requires Node',
+      'packageRequiresNode',
       'resolved upstream in 1.13.1',
       'Exact 1.10.0 Custody and Evidence Boundary',
       'Exact 1.10.0 CLI Matrix',

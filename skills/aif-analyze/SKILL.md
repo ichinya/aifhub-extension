@@ -2,7 +2,7 @@
 name: aif-analyze
 description: Bootstrap project context. Resolves localization and stack, creates/updates config.yaml, rules/base.md, and REVIEW.md, then checks DESCRIPTION and guides core skill execution.
 allowed-tools: Read Write Edit Glob Grep Bash(mkdir *) Bash(ai-factory aifhub-analyze-config-diff *) Bash(ai-factory aifhub-review-policy *) Bash(ai-factory aifhub-memory-tools *) Bash(ai-factory aifhub-mode status --json) Bash(node --input-type=module -e *openspec-runner.mjs*) Bash(rg --version) Bash(uv --version) Bash(graphify --version) Bash(graphify --help) Bash(codex-agent-mem-policy --help) Bash(codex-agent-mem-smoke --help) Bash(codegraph --version) Bash(codegraph --help) Bash(codegraph status) Bash(ctx7 --version) Bash(npx --no-install ctx7 --help) Bash(openspec init --tools none) Skill AskUserQuestion Questions
-version: 0.21.0
+version: 0.22.0
 author: ichi
 ---
 
@@ -436,10 +436,12 @@ openspec:
   canArchive: boolean
   version: string | null
   supportedRange: ">=1.3.1 <2.0.0"
-  latestReviewedVersion: "1.15.0"
+  latestReviewedVersion: "1.17.0"
   versionOutdated: boolean | null
   requiresNode: ">=20.19.0"
   nodeSupported: boolean
+  packageRequiresNode: ">=22.12.0" | null
+  packageNodeSupported: boolean | null
   versionSupported: boolean
 ```
 
@@ -451,6 +453,8 @@ openspec:
 - Do not guess a package manager. Recommend using the package manager or install method that already owns the selected CLI and rerunning `ai-factory aifhub-mode status --json` afterward.
 - Do not install, update, replace, or re-resolve OpenSpec automatically. Do not invoke `npx`, a package manager, network access, or `openspec update` from this skill.
 - When `versionOutdated: false`, do not recommend a downgrade, including when the supported selected version is newer than `latestReviewedVersion`.
+- When `packageNodeSupported` is `false` (npm channel requires Node `>=22.12.0` from package `1.16.0` onward), never recommend a plain npm update to the latest reviewed version on that Node runtime. Name the bounded choices instead: Node `>=22.12.0` for the npm channel, the standalone binary channel (its own custody chain, outside the npm matrix), or staying on the compatible npm `1.15.x` line. The marker is derived from the CLI version, not from the installed package manifest, and `commandSource` does not identify the delivery channel.
+- Apply the same Node-runtime constraint when the marker fields are `null`: for an installed CLI `<=1.15.x` on Node `20.x`/`21.x` the npm-channel floor of the TARGET release still applies, so a plain npm update to a `1.16.0+` npm release would not run there. Scope the non-blocking update recommendation to the bounded choices above (Node `>=22.12.0` for the npm channel, the standalone binary channel, or staying on the compatible npm `1.15.x` line) instead of the raw package-manager update.
 - When `versionOutdated: null`, do not invent a freshness verdict; follow the missing, unsupported, or version-detection guidance below.
 - If the OpenSpec CLI is missing or unsupported, continue bootstrap with `canValidate: false` and `canArchive: false`.
 - Missing or unsupported OpenSpec CLI is a degraded capability state, not a bootstrap failure.

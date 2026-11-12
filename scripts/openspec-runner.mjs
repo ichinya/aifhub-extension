@@ -6,7 +6,12 @@ import { promisify } from 'node:util';
 
 export const OPENSPEC_SUPPORTED_RANGE = '>=1.3.1 <2.0.0';
 export const OPENSPEC_NODE_RANGE = '>=20.19.0';
-export const OPENSPEC_LATEST_REVIEWED_VERSION = '1.15.0';
+export const OPENSPEC_LATEST_REVIEWED_VERSION = '1.17.0';
+// npm-channel engine floor introduced by upstream OpenSpec 1.16.0. Diagnostics-only:
+// the runner itself keeps the OPENSPEC_NODE_RANGE floor above and this marker is
+// derived from the CLI version, not from the installed package's actual engines.
+export const OPENSPEC_PACKAGE_NODE_FLOOR = '>=22.12.0';
+export const OPENSPEC_PACKAGE_NODE_SINCE = '1.16.0';
 
 const execFileAsync = promisify(execFileCallback);
 const OPENSPEC_MIN_VERSION = '1.3.1';
@@ -665,6 +670,10 @@ function createDetectionResult(overrides = {}) {
     ? compareSemver(version, OPENSPEC_LATEST_REVIEWED_VERSION)
     : null;
   const versionOutdated = reviewedComparison === null ? null : reviewedComparison < 0;
+  // npm-channel engines marker (1.16.0+): diagnostics-only, additive, and derived
+  // from the reported CLI version rather than the installed package manifest.
+  const packageNodeMarkerApplies = versionSupported && satisfiesGte(version, OPENSPEC_PACKAGE_NODE_SINCE);
+  const packageFloorSemver = OPENSPEC_PACKAGE_NODE_FLOOR.replace(/^>=/, '');
 
   return {
     available: overrides.available ?? false,
@@ -678,6 +687,8 @@ function createDetectionResult(overrides = {}) {
     requiresNode: OPENSPEC_NODE_RANGE,
     nodeVersion,
     nodeSupported,
+    packageRequiresNode: packageNodeMarkerApplies ? OPENSPEC_PACKAGE_NODE_FLOOR : null,
+    packageNodeSupported: packageNodeMarkerApplies ? satisfiesGte(nodeVersion, packageFloorSemver) : null,
     command: overrides.command ?? 'openspec',
     commandSource: overrides.commandSource ?? 'path',
     reason: overrides.reason ?? null,

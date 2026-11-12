@@ -2,9 +2,18 @@
 
 # OpenSpec Artifact Validation
 
+## Strict checks in OpenSpec 1.16.x
+
+OpenSpec 1.16.0 and 1.16.1 add four strict classes that the 1.17.0 baseline carries. Exact-1.17.0 behavior is recorded in the [1.17.0 audit](openspec-1.17.0-audit.md); the live fixtures live in `scripts/openspec-1-17-live-cases.mjs`.
+
+- Since 1.16.0, a `#### Scenario:` block without a trigger step warns once for the missing `WHEN`/`GIVEN` side, and a block without an outcome step warns once for the missing `THEN` side; `--strict` exits 1, non-strict stays valid. `GIVEN` satisfies the `WHEN`/`GIVEN` side, so a GIVEN+THEN scenario is not a finding. Author every `#### Scenario:` with a `- **WHEN**`/`- **GIVEN**` trigger and a `- **THEN**` outcome.
+- Since 1.16.1, unrecognized delta sections are two-tier (verified on exact 1.17.0): a real requirement under an unrecognized `*Requirements`-style section is ERROR — non-strict validation exits 1 and archive refuses without mutating the inventory (`## DEPRECATED Requirements` behaves this way; use REMOVED/RENAMED instead), while prose-only unknown sections keep the 1.14.2 not-carried WARNING with a succeeding archive, and a requirement under an arbitrary unknown header is a WARNING-ignored diagnostic. Recognized delta sections remain ADDED/MODIFIED/REMOVED/RENAMED Requirements plus `## Purpose`.
+- Since 1.16.0, an unreadable or unparseable `openspec/config.yaml` fails `validate` closed (exit 1) while other commands warn-and-carry-on. Keep `openspec/config.yaml` valid YAML.
+- Since 1.16.0/1.16.1, parser fixes recognize closed section headings (`## Purpose ##`), unspaced requirement headers (`###Requirement:` stays authoring-forbidden — always a space after `###`), and keep inline fences inside requirement bodies from creating sections or losing text.
+
 ## Strict warnings in OpenSpec 1.14.x
 
-OpenSpec 1.15.0 preserves WARNING-level diagnostics as advisory without `--strict` (exit 0, valid true) and blocking with `--strict` (exit 1, valid false). Do not retry failed strict validation as non-strict to accept a change. Three new classes require author attention:
+OpenSpec 1.15.0+ preserves WARNING-level diagnostics as advisory without `--strict` (exit 0, valid true) and blocking with `--strict` (exit 1, valid false). Do not retry failed strict validation as non-strict to accept a change. Three new classes require author attention:
 
 - Since 1.14.0, unknown top-level `.openspec.yaml` keys warn. Known keys are `schema`, `created`, `goal`, `affected_areas`, `initiative`, `skip_specs`, `retire_capabilities`. Native AIFHub metadata remains recognized. Since 1.14.2, `/^x-\S+$/` keys are exempt, including structured or empty values; `X-Tracker`, `x-`, `x- tracker` are not exempt. `skip_design` is unsupported; preserve user metadata and explain the correction instead of stripping keys. Nested `initiative` keys have their own strict schema.
 - Since 1.14.1, ADDED requirement body text over 500 characters warns; the heading is excluded. Keep normative requirements concise, put examples and edge cases in scenarios. MODIFIED delta requirements are exempt; main-spec long requirements still warn. This is requirement-body length, not Purpose length.
@@ -104,6 +113,8 @@ Before advancing compatibility, inventory the current accepted `openspec/specs/*
 For a new capability, author a meaningful `## Purpose` in its delta before the first sync/archive. Do not rewrite archived changes, suppress the warning, weaken strict validation, or manufacture requirement deltas solely to update an existing Purpose. Re-run aggregate strict validation after remediation. Ordinary prose with an embedded unresolved `TBD` and fenced examples of the generated placeholder are not unwritten Purpose markers.
 
 The [1.11.0 audit](openspec-1.11.0-audit.md) records this checkout's corpus inventory and an exact-CLI fixture proving direct remediation preserves archived evidence.
+
+Remediation outcome in this checkout (2026-11-11, issue #300, exact npm 1.17.0): the bounded authorized-scope remediation replaced all 22 archive-generated Purpose placeholders with meaningful capability descriptions (paths recorded in the active change tasks), verified with the artifact validator's explicit `--allow-base-spec-mutation` run (`base-specs-not-directly-mutated: pass (explicitly allowed)`) and a repeat aggregate strict validation: zero placeholder findings remain. The remaining aggregate strict warnings are the known pre-existing >500-character requirement-body class (18 findings, listed in the [1.17.0 audit](openspec-1.17.0-audit.md)); resolving them is a separate owner decision. The previous adaptation did not perform this correction — the debt dated back to the `sync-ai-factory-2-15-0` archive.
 
 `openspec validate --archived` is advisory-only. It is not invoked by the shared current-change runner, `/aif-verify`, `/aif-done`, package validation scripts, tracked CI, or the release acceptance PASS boolean. If run for an informational historical snapshot, execute it separately and report its exit/count without chaining it into mandatory gates or rewriting historical archives.
 

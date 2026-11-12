@@ -2414,6 +2414,8 @@ function summarizeOpenSpecDetection(detection) {
     version: detection?.version ?? null,
     nodeVersion: detection?.nodeVersion ?? null,
     nodeSupported: detection?.nodeSupported ?? null,
+    packageRequiresNode: detection?.packageRequiresNode ?? null,
+    packageNodeSupported: detection?.packageNodeSupported ?? null,
     versionSupported: detection?.versionSupported ?? null,
     latestReviewedVersion: detection?.latestReviewedVersion ?? null,
     versionOutdated: detection?.versionOutdated ?? null,
