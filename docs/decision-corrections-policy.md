@@ -125,7 +125,14 @@ advisory scan (no enabling config, no assessor) is an honest `not_run`, a
 drifted provenance input or corrupted fixture is `stale` (checked before any
 engine call), ambiguous cases are counted but never scored, drafts are
 skipped, and a stored record whose integrity cannot be proven is reported as
-`invalid_record` instead of silently disappearing from the report. Fixture
+`invalid_record` instead of silently disappearing from the report. The
+replay signature format is versioned: each record carries
+`signature_format_version` at the top level (outside `payload` and its
+digest, so idempotent re-save and lifecycle transitions keep it); отсутствие
+поля читается как версия 1 без мутации загруженной записи, а несовпадение
+версии ожидаемой даёт исход `stale` с сигнатурой `signature-format-version`,
+а не `label_change` — изменение формата сигнатуры никогда не маскируется под
+смену оценки. Fixture
 files carry an input role: role-input files are presented to the replayed
 consumer with its own input flag (a claim-evidence pairs envelope, a
 trace-link test file matching the frozen test path form, a requirement-lint

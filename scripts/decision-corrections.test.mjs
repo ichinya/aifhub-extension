@@ -2355,3 +2355,125 @@ describe('decision-corrections devin PR-review round', () => {
     assert.equal(hasCorrectionsLeak({ note: 'see docs/research.md for details' }), false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Signature format versioning (#297 / R3-3): the replay signature format is
+// versioned at the record level, legacy records read as version 1, a foreign
+// version is stale (never label_change), and lifecycle transitions preserve
+// the version.
+// ---------------------------------------------------------------------------
+
+describe('decision-corrections signature format version', () => {
+  const KNOWN_SIGNATURE = 'run_status=complete; findings=none; diagnostics=none';
+
+  async function readStoredRecord(root, scope, caseId) {
+    const caseFile = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE, scope, 'cases', `${caseId}.json`);
+    return parseStrictJson(await readFile(caseFile, 'utf8')).record;
+  }
+
+  async function rewriteStoredRecord(root, scope, caseId, mutate) {
+    const caseFile = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE, scope, 'cases', `${caseId}.json`);
+    const envelope = parseStrictJson(await readFile(caseFile, 'utf8'));
+    mutate(envelope.record);
+    envelope.record.payload_digest = digest(canonical(envelope.record.payload));
+    envelope.checksum = digest(envelope.record);
+    await writeFile(caseFile, `${JSON.stringify(envelope, null, 2)}\n`);
+    return envelope.record;
+  }
+
+  it('carries signature_format_version = 1 on every new record', async () => {
+    const root = await makeTemp('aif-dc-v1-new-');
+    await seedStoreProject(root);
+    await saveCase(root, baseCaseInput({ case_id: 'v1-new' }));
+    const record = await readStoredRecord(root, 'work', 'v1-new');
+    assert.equal(record.signature_format_version, 1, 'a freshly saved record pins the current signature format version');
+    // The record level is outside the payload: the digest and identity are
+    // untouched by the versioning field.
+    assert.equal(Object.hasOwn(record.payload, 'signature_format_version'), false);
+  });
+
+  it('classifies a foreign signature format version as stale, never label_change', async () => {
+    const root = await makeTemp('aif-dc-v1-foreign-');
+    await seedStoreProject(root);
+    // Labels chosen so the replay WOULD report label_change if the version
+    // gate failed to fire (confirmed, unambiguous, development partition —
+    // the only shape that reaches the pre-engine stale branch).
+    const input = baseCaseInput({
+      case_id: 'v1-foreign',
+      identity: { ...baseCaseInput().identity, subject_revision: 'rev-v1-foreign' },
+      original_assessment: { consumer: 'requirements_semantic_lint', verdict: 'the old verdict', summary: null },
+      expected_label: 'some expected label',
+    });
+    await saveCase(root, input);
+    await confirmCase(root, input);
+    await rewriteStoredRecord(root, 'work', 'v1-foreign', (record) => {
+      record.signature_format_version = 2;
+    });
+    let engineCalls = 0;
+    const spyEngine = async () => { engineCalls += 1; return 0; };
+    const run = await decisionCorrectionsCommand('run', { scope: 'work' }, {
+      rootDir: root, ...STORE_OPTIONS(),
+      replayEngines: { requirements_semantic_lint: spyEngine },
+    });
+    const entry = run.run.cases.find((item) => item.case_id === 'v1-foreign');
+    assert.deepEqual([entry.outcome, entry.signature], ['stale', 'signature-format-version'],
+      'a foreign format version is stale with its own signature, not a label comparison');
+    assert.equal(run.run.counts.development.stale, 1);
+    assert.equal(run.run.counts.development.label_change, 0);
+    assert.equal(engineCalls, 0, 'the engine is never called for a foreign-format record');
+  });
+
+  it('reads a legacy record without the field as version 1 and holds', async () => {
+    const root = await makeTemp('aif-dc-v1-legacy-');
+    await seedStoreProject(root);
+    const input = baseCaseInput({
+      case_id: 'v1-legacy',
+      identity: { ...baseCaseInput().identity, subject_revision: 'rev-v1-legacy' },
+      expected_label: KNOWN_SIGNATURE,
+    });
+    await saveCase(root, input);
+    await confirmCase(root, input);
+    // Strip the field to simulate a pre-versioning stored record; the
+    // checksum rewrite keeps the envelope self-consistent.
+    const stripped = await rewriteStoredRecord(root, 'work', 'v1-legacy', (record) => {
+      delete record.signature_format_version;
+    });
+    assert.equal(Object.hasOwn(stripped, 'signature_format_version'), false);
+    const run = await decisionCorrectionsCommand('run', { scope: 'work' }, { rootDir: root, ...STORE_OPTIONS() });
+    const entry = run.run.cases.find((item) => item.case_id === 'v1-legacy');
+    assert.equal(entry.outcome, 'holds', 'a legacy record replays with its ordinary outcome');
+    assert.equal(run.run.counts.development.stale, 0);
+  });
+
+  it('keeps an idempotent re-save of a legacy record idempotent without adding the field', async () => {
+    const root = await makeTemp('aif-dc-v1-idem-');
+    await seedStoreProject(root);
+    const input = baseCaseInput({ case_id: 'v1-idem', identity: { ...baseCaseInput().identity, subject_revision: 'rev-v1-idem' } });
+    await saveCase(root, input);
+    await confirmCase(root, input);
+    await rewriteStoredRecord(root, 'work', 'v1-idem', (record) => {
+      delete record.signature_format_version;
+    });
+    const again = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
+    assert.equal(again.idempotent, true, 'a legacy record still resolves idempotently');
+    const resaved = await decisionCorrectionsCommand('save', { ...input, payload_digest: again.payload_digest }, { rootDir: root, ...STORE_OPTIONS() });
+    assert.equal(resaved.idempotent, true);
+    assert.equal(resaved.case.status, 'confirmed', 'an idempotent re-save must not demote a confirmed legacy case');
+    const stored = await readStoredRecord(root, 'work', 'v1-idem');
+    assert.equal(Object.hasOwn(stored, 'signature_format_version'), false,
+      'the idempotent branch returns the stored record untouched — it must not backfill the field');
+  });
+
+  it('preserves the signature format version through confirm and lifecycle transitions', async () => {
+    const root = await makeTemp('aif-dc-v1-cycle-');
+    await seedStoreProject(root);
+    const input = baseCaseInput({ case_id: 'v1-cycle', identity: { ...baseCaseInput().identity, subject_revision: 'rev-v1-cycle' } });
+    await saveCase(root, input);
+    await confirmCase(root, input);
+    assert.equal((await readStoredRecord(root, 'work', 'v1-cycle')).signature_format_version, 1, 'confirm keeps the version');
+    await decisionCorrectionsCommand('supersede', { case_id: 'v1-cycle', scope: 'work', reason: 'moved on' }, { rootDir: root, ...STORE_OPTIONS() });
+    const superseded = await readStoredRecord(root, 'work', 'v1-cycle');
+    assert.equal(superseded.signature_format_version, 1, 'lifecycle spread preserves the version');
+    assert.equal(superseded.status, 'superseded');
+  });
+});

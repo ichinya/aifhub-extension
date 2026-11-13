@@ -44,6 +44,15 @@ export const MAX_REPLAY_ARGS = 40;
 export const MAX_RUN_CASES = 200;
 export const MAX_IDENTITY_SOURCE_CHARS = 64 * 1024;
 export const HONESTY_NOTE = 'run проверяет текущую реализацию на fixture, а не provider-качество';
+// Version of the replay-outcome signature FORMAT (which sections the extracted
+// signature carries, e.g. the `codes` section that entered without
+// versioning). Stored at the record level — never inside `payload` — so the
+// payload digest, logical identity, and idempotent re-save matrix stay
+// untouched; lifecycle transitions preserve it through the record spread.
+// Bumping this constant turns every older-format record stale at replay time
+// (`signature-format-version`) instead of misreporting the format change as a
+// label_change.
+export const SIGNATURE_FORMAT_VERSION = 1;
 
 const STATUSES = Object.freeze(['draft', 'confirmed', 'rejected', 'superseded']);
 const PARTITIONS = Object.freeze(['development', 'calibration', 'held_out']);
@@ -892,6 +901,7 @@ export async function saveDecisionCorrection(input, options = {}) {
       }
       const record = {
         schema: DECISION_CORRECTIONS_SCHEMA,
+        signature_format_version: SIGNATURE_FORMAT_VERSION,
         diagnostic_only: true,
         authorizes: [],
         status: 'draft',
@@ -1377,6 +1387,14 @@ export async function runDecisionCorrectionReplay(input, options = {}) {
     }
     for (const file of payload.fixture.files) {
       if (digest(Buffer.from(file.bytes, 'utf8')) !== file.sha256) drifted = 'fixture-digest-mismatch';
+    }
+    // Signature format versioning: the field reads as version 1 when absent
+    // (legacy records), compared here at replay time without mutating the
+    // loaded record. The `signature` outcome slot is single-valued, so a more
+    // specific drift already detected above keeps its honest signature and
+    // this branch stays inert for it.
+    if (drifted === null && (record.signature_format_version ?? 1) !== SIGNATURE_FORMAT_VERSION) {
+      drifted = 'signature-format-version';
     }
     if (drifted !== null) {
       partitionCounts.stale += 1;
