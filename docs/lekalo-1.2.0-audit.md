@@ -41,7 +41,7 @@ Workflow contract не изменился: exact `dev.lekalo.workflow-provider@0
 | `status --json` | VERIFIED | панель 4 чеков, verdict `degraded`, exit 0 |
 | `readiness --phase done --json` | VERIFIED | `report: readiness`, `phase: release`, verdict `blocked`, exit 0 |
 | `validate --no-cache --json` | VERIFIED | `modelVersion 0.2.16`, `profile default`, `profileVersion 0.6.4`, `registryVersion 0.6.4` |
-| `init --adopt --project .` (relative) | VERIFIED | exit 0, создан `lekalo/project.yaml` |
+| `init --adopt --project .` (relative) | VERIFIED | exit 0, создан `lekalo/project.yaml`; содержимое project.yaml (schema_version 0.2.16|8.0, kind: project) live-матрицей не сверялось — при невалидной форме `inspectLekaloLayout` бросает `invalid_existing_layout` (tool-initialization.mjs:88), при отсутствии файла — layout-missing ветка |
 | `init --adopt --project <abs>` (absolute) | VERIFIED | exit 1, `LEK-STR-024 structure.selection-absolute` (security, «Project path policy refusal») — подтверждение: до фикса абсолютная форма давала всегда `process_failed` |
 | `status --project <abs>` / `status --project .` | VERIFIED | обе формы exit 0, `valid` — LEK-STR-024 ограничен init, read-операции принимают абсолютный и относительный путь |
 | `doctor --project <abs>` / `doctor --project .` | VERIFIED | обе формы exit 0, панель 15 чеков |
@@ -62,7 +62,7 @@ Workflow contract не изменился: exact `dev.lekalo.workflow-provider@0
 
 **Divergence 1 — doctor-панель 14/15.** Published enum `lekalo/doctor/v0.3.2` и upstream doctor golden перечисляют 14 чеков (golden: `productVersion 0.2.7`, без `classification.attachment`), тогда как живой бинарник (обе версии ≥1.1.0 по research; live 1.2.0 здесь) отдаёт 15 чеков с `classification.attachment` (в пустом до-adopt проекте — условно отсутствует). Disposition: `CHECKS` адаптера расширен до точной живой панели 15 id в verbatim порядке; отрицательный кейс неизвестного id остаётся fail-closed для id вне панели. Это upstream schema-gap — кандидат в upstream issue (только фиксация здесь, upstream не правился).
 
-**Divergence 2 — init `--project`.** Живой бинарник отвергает абсолютный `--project` для `init --adopt` (`LEK-STR-024`); адаптер передавал абсолютный корень → `process_failed` на живом CLI. Disposition: argv переведён на относительную форму `--project .` при `cwd: rootDir`; тест ассертит и argv, и cwd (относительный селектор валиден только при корректном cwd). Read-операции (`status`/`doctor`/`validate`/`readiness`/`impact`/`context`) сохраняют абсолютный корень — обе формы живым CLI принимаются.
+**Divergence 2 — init `--project`.** Живой бинарник отвергает абсолютный `--project` для `init --adopt` (`LEK-STR-024`); адаптер передавал абсолютный корень → `process_failed` на живом CLI. Disposition: argv переведён на относительную форму `--project .` при `cwd: rootDir`; тест ассертит и argv, и cwd (относительный селектор валиден только при корректном cwd). Read-операции сохраняют абсолютный корень: live-матрица фиксирует обе формы для `status`/`doctor`; для `validate`/`readiness` сохранение argv подтверждено кодом адаптера (lekalo-provider.mjs:277-278), для `impact`/`context` — runSemantic (:219/:226); live-прогон этих форм NOTRUN.
 
 **Обновление поверхностей реестра.** Помимо исходного реестра контракта, по ревью снята та же «reserved/future»-устаревка на `docs/validation-providers.md` (вводный абзац, таблица слоёв, абзац после конфигурации, provider-config абзац) и на `skills/aif-analyze/references/config-keys.json` / `config-template.yaml` — docs-consistency расширение решения `README.md:32` (адаптер существует с #255). Прецедент формулировок — сам контракт (README-пункт).
 
@@ -87,6 +87,6 @@ Workflow contract не изменился: exact `dev.lekalo.workflow-provider@0
 - `npm test` — полный hermetic suite: **2767 tests, 2760 pass, 0 fail, 7 skipped** (прогон после коммита адаптера).
 - `npm run validate`, `npm run provenance:check` — выполнены в этом change (фактические результаты в OpenSpec-задачах change'а и отчёте задачи).
 - Живая матрица — все пункты VERIFIED (таблица выше), единственная исполнявшаяся платформа — x86_64-pc-windows-msvc; исполнение остальных таргетов NOTRUN (checksum VERIFIED).
-- Панели сняты на пустом adopted-проекте; verdict'ы (`blocked`/`degraded`) — свойства песочницы, а не реального проекта. Состав/порядок чеков и формы envelope от этого не зависят.
+- Панели сняты на пустом adopted-проекте; verdict'ы (`blocked`/`degraded`) — свойства песочницы, а не реального проекта. Форма envelope и семантика verdict'ов от состава панели не зависят; сам состав панелей условен (13 до adopt / 15 после adopt — см. live-матрицу).
 - Parity-фикстура 15 чеков — новая фиксация с подлинным v1.2.0-происхождением (live-вывод doctor), нормализация ассертит фактический verdict фикстуры (`fail`), а не фиксированный pass.
 - Исторический [1.1.0 audit](lekalo-1.1.0-audit.md) и ledger-блок 1.1.0 сохранены без изменений.
