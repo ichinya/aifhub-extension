@@ -513,12 +513,84 @@ describe('requirement-lint binding revalidation (AC2)', () => {
     return { root, observation };
   }
 
+  async function previewObservation(prefix, files) {
+    const root = await makeTemp(prefix);
+    await seedProject(root, { files });
+    const outputs = [];
+    assert.equal(await runRequirementLintCommand(['--change', 'work', '--enabled', 'true', '--file', 'docs/req.md', '--json'], {
+      rootDir: root, output: (value) => outputs.push(value),
+    }), 0);
+    return { root, observation: parseStrictJson(outputs.join('')) };
+  }
+
   it('accepts a fresh observation as current', async () => {
     const { root, observation } = await writtenObservation('aif-rl-fresh-', { 'docs/req.md': EN_REQ });
     const verdict = await validateObservationBinding(root, observation);
     assert.equal(verdict.ok, true);
     assert.equal(verdict.stale, false);
     assert.deepEqual(verdict.mismatched, []);
+  });
+
+  it('revalidates honest span digests over raw UTF-8 bytes with CRLF and CR endings', async () => {
+    for (const ending of ['\r\n', '\r']) {
+      const bytes = Buffer.from(`# Кириллица${ending}${EN_REQ.replaceAll('\n', ending)}`, 'utf8');
+      const { root, observation } = await previewObservation('aif-rl-span-endings-', { 'docs/req.md': bytes });
+      const refs = observation.findings.flatMap((finding) => finding.refs).filter((ref) => ref.kind === 'span');
+      assert.ok(refs.length > 0, 'fixture must exercise span revalidation');
+      for (const ref of refs) {
+        assert.equal(ref.span_sha256, `sha256:${digest(bytes.subarray(ref.span.start, ref.span.end))}`);
+      }
+      assert.deepEqual(await validateObservationBinding(root, observation), { ok: true, stale: false, mismatched: [], state: null });
+    }
+  });
+
+  it('marks an edited span digest stale while the document digest stays unchanged', async () => {
+    const { root, observation } = await previewObservation('aif-rl-span-tamper-', { 'docs/req.md': EN_REQ });
+    const finding = observation.findings.find((entry) => entry.refs.some((ref) => ref.kind === 'span'));
+    assert.ok(finding, 'fixture must carry a span ref');
+    const ref = finding.refs.find((entry) => entry.kind === 'span');
+    const documentDigest = ref.document_sha256;
+    ref.span_sha256 = `sha256:${'0'.repeat(64)}`;
+    // Preserve internal dedup consistency to isolate fresh-byte revalidation.
+    finding.dedup_key = digest({ finding_type: finding.finding_type, refs: finding.refs });
+    const verdict = await validateObservationBinding(root, observation);
+    assert.equal(ref.document_sha256, documentDigest);
+    assert.equal(verdict.ok, true, 'span drift is stale, not observation-invalid');
+    assert.equal(verdict.stale, true);
+    assert.equal(verdict.state, 'stale-observation');
+    assert.deepEqual(verdict.mismatched, ['findings']);
+  });
+
+  it('rejects scanned counts above declared counts in every coverage state', async () => {
+    const { root, observation } = await previewObservation('aif-rl-counts-', { 'docs/req.md': EN_REQ });
+    for (const state of ['full', 'partial', 'none']) {
+      const tampered = structuredClone(observation);
+      tampered.coverage.state = state;
+      tampered.coverage.scanned_sources = tampered.coverage.declared_sources + 1;
+      assert.deepEqual(await validateObservationBinding(root, tampered), { ok: false, code: 'observation-invalid' }, state);
+    }
+  });
+
+  it('rejects partial coverage without scanned sources and accepts honest degraded scans', async () => {
+    const { root, observation } = await previewObservation('aif-rl-partial-counts-', { 'docs/req.md': EN_REQ });
+    for (const declared of [0, observation.coverage.declared_sources]) {
+      const tampered = structuredClone(observation);
+      tampered.coverage = { state: 'partial', declared_sources: declared, scanned_sources: 0, missing_sources: [] };
+      assert.deepEqual(await validateObservationBinding(root, tampered), { ok: false, code: 'observation-invalid' });
+    }
+    // Truncation may degrade coverage even when all declared files were read.
+    const truncated = structuredClone(observation);
+    truncated.coverage.state = 'partial';
+    truncated.diagnostics.push({ code: 'findings-truncated', path: 'docs/req.md', detail: 'bounded scan' });
+    assert.equal((await validateObservationBinding(root, truncated)).stale, false);
+
+    const outputs = [];
+    assert.equal(await runRequirementLintCommand(['--change', 'partial', '--enabled', 'true', '--file', 'docs/req.md', '--file', 'docs/absent.md', '--json'], {
+      rootDir: root, output: (value) => outputs.push(value),
+    }), 0);
+    const partial = parseStrictJson(outputs.join(''));
+    assert.equal(partial.coverage.state, 'partial');
+    assert.deepEqual(await validateObservationBinding(root, partial), { ok: true, stale: false, mismatched: [], state: null });
   });
 
   it('invalidates the observation when a requirement is edited, renamed, or the profile changes', async () => {

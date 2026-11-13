@@ -303,6 +303,7 @@
           ]
         },
         "missing_sources": {
+          "description": "Per-pair список отсутствующих источников: каждая запись фиксирует пару claim↔source, поэтому пути могут повторяться.",
           "type": "array",
           "maxItems": 100,
           "items": {
@@ -374,16 +375,19 @@
               ]
             },
             "declared_sources": {
+              "description": "Число объявленных пар claim↔source: declared = structural.pairs.length, а не число уникальных путей.",
               "type": "integer",
               "minimum": 0,
               "maximum": 1000
             },
             "scanned_sources": {
+              "description": "Число проверенных пар claim↔source: scanned = declared − missing_sources.length; размерность совпадает с declared_sources.",
               "type": "integer",
               "minimum": 0,
               "maximum": 1000
             },
             "missing_sources": {
+              "description": "Per-pair список отсутствующих источников: запись соответствует паре claim↔source, повторяющиеся пути сохраняются для подсчёта scanned = declared − missing.",
               "type": "array",
               "maxItems": 100,
               "items": {
