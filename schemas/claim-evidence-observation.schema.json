@@ -303,7 +303,7 @@
           ]
         },
         "missing_sources": {
-          "description": "Per-pair список отсутствующих источников: каждая запись фиксирует пару claim↔source, поэтому пути могут повторяться.",
+          "description": "Дедуплицированный по path список отсутствующих источников в порядке первого появления; одна запись на уникальный путь, число отсутствующих пар несёт semantic.coverage.missing_sources_count.",
           "type": "array",
           "maxItems": 100,
           "items": {
@@ -381,13 +381,13 @@
               "maximum": 1000
             },
             "scanned_sources": {
-              "description": "Число проверенных пар claim↔source: scanned = declared − missing_sources.length; размерность совпадает с declared_sources.",
+              "description": "Число проверенных пар claim↔source: scanned = declared_sources − missing_sources_count; размерность совпадает с declared_sources.",
               "type": "integer",
               "minimum": 0,
               "maximum": 1000
             },
             "missing_sources": {
-              "description": "Per-pair список отсутствующих источников: запись соответствует паре claim↔source, повторяющиеся пути сохраняются для подсчёта scanned = declared − missing.",
+              "description": "Дедуплицированный по path список отсутствующих источников в порядке первого появления; идентичен structural.missing_sources, число отсутствующих пар несёт missing_sources_count.",
               "type": "array",
               "maxItems": 100,
               "items": {
@@ -410,13 +410,20 @@
                   "reason"
                 ]
               }
+            },
+            "missing_sources_count": {
+              "description": "Число отсутствующих пар claim↔source до дедупа и cap: per-pair счётчик, scanned_sources = declared_sources − missing_sources_count; cap 100 применяется только к спискам missing_sources, не к счётчику.",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000
             }
           },
           "required": [
             "state",
             "declared_sources",
             "scanned_sources",
-            "missing_sources"
+            "missing_sources",
+            "missing_sources_count"
           ]
         },
         "assessments": {

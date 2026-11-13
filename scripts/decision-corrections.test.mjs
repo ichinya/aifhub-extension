@@ -376,6 +376,24 @@ describe('decision-corrections closed schema parity', () => {
       [],
       'a claim-evidence producer projection must pass the closed union grammar',
     );
+    // The claim-evidence per-pair missing_sources_count enters the projection
+    // as an OPTIONAL mirror field: a NEW observation projection carrying the
+    // counter is accepted, and a LEGACY projection recorded before the field
+    // existed stays schema-valid (#282/#297).
+    const ceSemanticWithCount = {
+      ...ceSemantic,
+      coverage: { state: 'partial', declared_sources: 4, scanned_sources: 1, missing_sources: [{ path: 'docs/absent.md', reason: 'file-missing' }], missing_sources_count: 3 },
+    };
+    assert.deepEqual(
+      validateJsonAgainstSchema({ schema: 'aifhub.claim_evidence_observation.v1', change_id: 'work', language: 'en', semantic: ceSemanticWithCount }, identitySchema, { rootSchema: CASE_SCHEMA }),
+      [],
+      'a claim-evidence projection with the per-pair counter must pass the mirror',
+    );
+    assert.deepEqual(
+      validateJsonAgainstSchema({ schema: 'aifhub.claim_evidence_observation.v1', change_id: 'work', language: 'en', semantic: ceSemantic }, identitySchema, { rootSchema: CASE_SCHEMA }),
+      [],
+      'a legacy projection without the counter stays schema-valid',
+    );
   });
 });
 

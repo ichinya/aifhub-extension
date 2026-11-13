@@ -743,6 +743,11 @@
                               "reason"
                             ]
                           }
+                        },
+                        "missing_sources_count": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000
                         }
                       },
                       "required": [
