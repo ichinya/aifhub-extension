@@ -642,6 +642,61 @@ async function assertTempAreaIgnored(root, destinationFile, options = {}) {
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// Request-scoped namespace cleanup (two-phase): failures during materialization
+// must not leave artifacts THIS request created. Phase (a) re-acquires the
+// scope write lock — the store's finally released and unlinked the previous
+// acquisition before the catch runs, so re-acquiring is safe and never a
+// deadlock (`state-locked` fails instantly when another same-scope writer is
+// mid-flight) — and under that lock a FRESH readdir proves the namespace
+// holds only what this request may own before the namespace .gitignore is
+// removed (solely when this request's prepareNamespace created it) and the
+// empty leaf directories are removed. Phase (b), after the lock is released
+// again, removes the now-empty scope and namespace directories.
+// Known boundary, documented deliberately: the scope lock serializes
+// same-scope writers only — a concurrent FIRST save of a different scope is
+// not serialized here, so a microscopic window between the re-check and the
+// removal remains (namespace-wide serialization was rejected as a new
+// mechanism outside this change's scope).
+// The re-acquisition materializes `${scopeDir}/write.lock` through the
+// store's parent mkdir even when the failed request never reached its own
+// lock acquisition; that transient artifact is absorbed by the store's
+// finally (close + unlink) and the phase-(b) rmdir — cleanup
+// creates-and-deletes the lock file.
+// Every path is fail-safe toward PRESERVING a foreign ignore file or shared
+// directory: `state-locked`, ENOENT, a composition-invariant mismatch, or
+// any other error skips the removal instead of forcing it.
+// ---------------------------------------------------------------------------
+async function cleanupRequestNamespace(store, rootDir, { scope, namespaceAction, leafDirs }) {
+  const { rmdir, readdir, rm: remove } = await import('node:fs/promises');
+  const scopeDir = `${NAMESPACE_ROOT}/${scope}`;
+  const scopeDirAbsolute = path.join(rootDir, ...scopeDir.split('/'));
+  const namespaceAbsolute = path.join(rootDir, ...NAMESPACE_ROOT.split('/'));
+  try {
+    await store.lock(`${scopeDir}/write.lock`, async () => {
+      const namespaceEntries = await readdir(namespaceAbsolute);
+      const allowedNamespace = namespaceAction === 'create' ? [scope, '.gitignore'] : [scope];
+      if (!namespaceEntries.every((name) => allowedNamespace.includes(name))) return;
+      const scopeEntries = await readdir(scopeDirAbsolute, { withFileTypes: true });
+      for (const entry of scopeEntries) {
+        if (entry.name === 'write.lock') continue;
+        if (!(leafDirs.includes(entry.name) && entry.isDirectory())) return;
+        if ((await readdir(path.join(scopeDirAbsolute, entry.name))).length > 0) return;
+      }
+      if (namespaceAction === 'create' && namespaceEntries.includes('.gitignore')) {
+        await remove(path.join(namespaceAbsolute, '.gitignore'), { force: true }).catch(() => {});
+      }
+      for (const leaf of leafDirs) {
+        await rmdir(path.join(scopeDirAbsolute, leaf)).catch(() => {});
+      }
+    });
+  } catch {
+    // `state-locked` / ENOENT / anything else: leave every artifact in place.
+  }
+  await rmdir(scopeDirAbsolute).catch(() => {});
+  await rmdir(namespaceAbsolute).catch(() => {});
+}
+
 async function assertGuard(guard) {
   if (guard === null) return;
   // Scan the guard payload before refusing on its code: a leaking guard
@@ -919,24 +974,14 @@ export async function saveDecisionCorrection(input, options = {}) {
       return { ok: true, action: 'save', idempotent: false, created: true, case: record };
     });
   } catch (error) {
-    // Cleanup of artifacts THIS request created during materialization: empty
-    // scope directories are removed deepest-first, and the namespace
-    // .gitignore is removed only when OUR prepareNamespace call created it
-    // (action 'create') AND it is the sole remaining namespace entry — so a
-    // pre-existing or concurrently-created ignore file (with whatever rule
-    // scope its owner chose) is never deleted out from under another writer.
-    const { rmdir, readdir } = await import('node:fs/promises');
-    for (const dir of [`${NAMESPACE_ROOT}/${scope}/cases`, `${NAMESPACE_ROOT}/${scope}`]) {
-      await rmdir(path.join(rootDir, ...dir.split('/'))).catch(() => {});
-    }
-    const namespaceAbsolute = path.join(rootDir, ...NAMESPACE_ROOT.split('/'));
-    let remaining = [];
-    try { remaining = await readdir(namespaceAbsolute); } catch { remaining = []; }
-    if (namespaceAction === 'create' && remaining.length === 1 && remaining[0] === '.gitignore') {
-      const { rm: remove } = await import('node:fs/promises');
-      await remove(path.join(namespaceAbsolute, '.gitignore'), { force: true }).catch(() => {});
-      await rmdir(namespaceAbsolute).catch(() => {});
-    }
+    // Cleanup of artifacts THIS request created during materialization, under
+    // the re-acquired scope write lock (see cleanupRequestNamespace): the
+    // namespace .gitignore is removed only when OUR prepareNamespace call
+    // created it (action 'create') AND a fresh readdir proves the namespace
+    // holds nothing else — a pre-existing or concurrently-created ignore
+    // file (with whatever rule scope its owner chose) is never deleted out
+    // from under another writer.
+    await cleanupRequestNamespace(store, rootDir, { scope, namespaceAction, leafDirs: ['cases', 'runs'] });
     throw error;
   }
 }
@@ -1512,22 +1557,33 @@ export async function runDecisionCorrectionReplay(input, options = {}) {
     return { ok: true, action: 'run', preview: true, run: runRecord };
   }
   const runFile = `${scopeDir}/runs/${runRecord.run_id}.json`;
-  await assertGuard(await guardOwnedSurfaces(rootDir, [runFile, `${NAMESPACE_ROOT}/.gitignore`, `${scopeDir}/write.lock`], options));
-  const runNamespace = await prepareNamespace(rootDir);
-  await assertGuard(runNamespace.ok === true ? null : runNamespace);
-  await assertGuard(await assertTempAreaIgnored(rootDir, runFile, options));
-  return store.lock(`${scopeDir}/write.lock`, async () => {
-    // Run-record leaf ownership: a run id collision (however unlikely for a
-    // fresh random id) must never silently overwrite an existing run record.
-    const existingRun = await store.load(runFile).catch((error) => {
-      if (error instanceof WorkflowError) return { invalid: true };
-      throw error;
+  // The write path materializes namespace artifacts exactly like the save
+  // path, so its failures share the same request-scoped cleanup (the save
+  // path previously cleaned up; the run path never did — same fail-safe
+  // semantics, now one helper).
+  let runNamespaceAction = 'preserve';
+  try {
+    await assertGuard(await guardOwnedSurfaces(rootDir, [runFile, `${NAMESPACE_ROOT}/.gitignore`, `${scopeDir}/write.lock`], options));
+    const runNamespace = await prepareNamespace(rootDir);
+    runNamespaceAction = runNamespace.ok ? runNamespace.action : 'preserve';
+    await assertGuard(runNamespace.ok === true ? null : runNamespace);
+    await assertGuard(await assertTempAreaIgnored(rootDir, runFile, options));
+    return await store.lock(`${scopeDir}/write.lock`, async () => {
+      // Run-record leaf ownership: a run id collision (however unlikely for a
+      // fresh random id) must never silently overwrite an existing run record.
+      const existingRun = await store.load(runFile).catch((error) => {
+        if (error instanceof WorkflowError) return { invalid: true };
+        throw error;
+      });
+      requireValue(!existingRun, 'run-record-conflict', true);
+      const persisted = { ...runRecord, written: true };
+      await store.save(runFile, persisted);
+      return { ok: true, action: 'run', preview: false, run: persisted };
     });
-    requireValue(!existingRun, 'run-record-conflict', true);
-    const persisted = { ...runRecord, written: true };
-    await store.save(runFile, persisted);
-    return { ok: true, action: 'run', preview: false, run: persisted };
-  });
+  } catch (error) {
+    await cleanupRequestNamespace(store, rootDir, { scope, namespaceAction: runNamespaceAction, leafDirs: ['cases', 'runs'] });
+    throw error;
+  }
 }
 
 // ---------------------------------------------------------------------------

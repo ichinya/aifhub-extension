@@ -2502,3 +2502,119 @@ describe('decision-corrections signature format version', () => {
     assert.equal(superseded.status, 'superseded');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Two-phase request-scoped namespace cleanup (#297 / R3-1): failures during
+// materialization clean up under the re-acquired scope write lock, every
+// refusal path is fail-safe toward preserving a foreign ignore file, and the
+// run write path shares the same cleanup the save path always had.
+// ---------------------------------------------------------------------------
+
+describe('decision-corrections request-scoped cleanup', () => {
+  const namespaceDir = (root) => path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE);
+
+  it('keeps the request-created .gitignore when the cleanup cannot re-acquire the scope lock', async () => {
+    const root = await makeTemp('aif-dc-cl-lock-');
+    await seedStoreProject(root);
+    // Fresh namespace: this save's prepareNamespace will CREATE the
+    // .gitignore (action 'create'). A second same-scope writer holds the
+    // write lock, so the save fails state-locked and the cleanup's
+    // re-acquisition must fail state-locked too — the fail-safe swallow
+    // leaves every artifact in place.
+    const lockPath = path.join(namespaceDir(root), 'work', 'write.lock');
+    await mkdir(path.dirname(lockPath), { recursive: true });
+    const { open } = await import('node:fs/promises');
+    const handle = await open(lockPath, 'wx');
+    try {
+      await assert.rejects(
+        () => saveCase(root, baseCaseInput({ case_id: 'cl-lock' })),
+        (error) => error?.code === 'state-locked' && error.blocked === true,
+      );
+      assert.equal((await readdirSafe(namespaceDir(root))).includes('.gitignore'), true,
+        'the request-created ignore file survives the state-locked cleanup');
+      assert.ok(await lstatExists(lockPath), 'the concurrent writer’s lock file is never touched');
+    } finally {
+      await handle.close();
+      await rm(lockPath, { force: true });
+    }
+  });
+
+  it('removes the request-created .gitignore under the re-acquired lock when the save fails after creating it', async () => {
+    const root = await makeTemp('aif-dc-cl-inlock-');
+    await seedStoreProject(root);
+    // Fresh namespace: this save's prepareNamespace CREATES the .gitignore,
+    // and a failing git guard on the unpredictable temp probe refuses the
+    // save right afterwards — with no other namespace entries. The catch
+    // cleanup must re-acquire the scope lock, confirm the composition with a
+    // fresh readdir, and remove the .gitignore and the empty directories
+    // (a removal the literal in-lock scheme could never reach, because the
+    // scope lock lives inside the scope directory it would have to remove).
+    const refusingProbeGuard = async (rootDir, relative) => {
+      if (relative.endsWith('.tmp')) return { ok: false, code: 'observation-path-not-ignored', detail: relative };
+      return { ok: true, gitWorktree: false, ignored: true, tracked: false };
+    };
+    const input = baseCaseInput({ case_id: 'cl-inlock' });
+    const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
+    await assert.rejects(
+      () => decisionCorrectionsCommand('save', { ...input, payload_digest: preview.payload_digest }, { rootDir: root, ...STORE_OPTIONS(), gitGuard: refusingProbeGuard }),
+      (error) => error?.code === 'observation-path-not-ignored' && error.blocked === true,
+      'the probe guard refuses the save after prepareNamespace created the .gitignore',
+    );
+    assert.equal(await lstatExists(namespaceDir(root)), false,
+      'the fresh namespace is fully removed: no .gitignore, no empty directories');
+  });
+
+  it('cleans the fresh run namespace after a probe-guard refusal leaves nothing foreign behind', async () => {
+    const root = await makeTemp('aif-dc-cl-run-');
+    await seedStoreProject(root);
+    // The git guard passes every owned surface and refuses only the
+    // unpredictable temp probe — a refusal that fires AFTER prepareNamespace
+    // materialized the namespace .gitignore on a fresh project.
+    const refusingProbeGuard = async (rootDir, relative) => {
+      if (relative.endsWith('.tmp')) return { ok: false, code: 'observation-path-not-ignored', detail: relative };
+      return { ok: true, gitWorktree: false, ignored: true, tracked: false };
+    };
+    await assert.rejects(
+      () => decisionCorrectionsCommand('run', { scope: 'work', write: true }, { rootDir: root, ...STORE_OPTIONS(), gitGuard: refusingProbeGuard }),
+      (error) => error?.code === 'observation-path-not-ignored' && error.blocked === true,
+    );
+    assert.equal(await lstatExists(namespaceDir(root)), false,
+      'the run write path now cleans its own fresh namespace: no .gitignore residue');
+  });
+
+  it('keeps a pre-existing .gitignore when the run write path fails after prepareNamespace preserved it', async () => {
+    const root = await makeTemp('aif-dc-cl-runp-');
+    await seedStoreProject(root);
+    await mkdir(namespaceDir(root), { recursive: true });
+    await writeFile(path.join(namespaceDir(root), '.gitignore'), '*\n!.gitignore\n');
+    const refusingProbeGuard = async (rootDir, relative) => {
+      if (relative.endsWith('.tmp')) return { ok: false, code: 'observation-path-not-ignored', detail: relative };
+      return { ok: true, gitWorktree: false, ignored: true, tracked: false };
+    };
+    await assert.rejects(
+      () => decisionCorrectionsCommand('run', { scope: 'work', write: true }, { rootDir: root, ...STORE_OPTIONS(), gitGuard: refusingProbeGuard }),
+      (error) => error?.code === 'observation-path-not-ignored',
+    );
+    assert.equal((await readFile(path.join(namespaceDir(root), '.gitignore'), 'utf8')), '*\n!.gitignore\n',
+      'a preserved foreign ignore file survives the run-path cleanup byte-exact');
+  });
+
+  it('refuses a run-record conflict without deleting anything around the foreign run leaf', async () => {
+    const root = await makeTemp('aif-dc-cl-runconf-');
+    await seedStoreProject(root);
+    // Pre-occupy the run leaf: the composition invariant sees a non-empty
+    // leaf directory and the cleanup skips entirely (fail-safe), leaving the
+    // request-created .gitignore in place rather than cleaning around
+    // foreign content.
+    const runLeaf = path.join(namespaceDir(root), 'work', 'runs', 'seed.json');
+    await mkdir(path.dirname(runLeaf), { recursive: true });
+    await writeFile(runLeaf, `${JSON.stringify({ checksum: digest({}), record: {} }, null, 2)}\n`);
+    await assert.rejects(
+      () => decisionCorrectionsCommand('run', { scope: 'work', write: true }, { rootDir: root, ...STORE_OPTIONS(), runId: 'seed' }),
+      (error) => error?.code === 'run-record-conflict' && error.blocked === true,
+    );
+    assert.equal((await readdirSafe(namespaceDir(root))).includes('.gitignore'), true,
+      'the ignore file survives: cleanup never works around a non-empty leaf');
+    assert.ok(await lstatExists(runLeaf), 'the foreign run leaf is untouched');
+  });
+});
