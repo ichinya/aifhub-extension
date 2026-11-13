@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { SDD_PROFILE_MODES, selectSddProfile, validateSddPolicy } from './sdd-profiles.mjs';
-import { compileSessionBrief, inspectSessionBrief, parseStrictJson, sessionBriefPaths } from './session-brief.mjs';
+import { compileSessionBrief, inspectSessionBrief, parseStrictJson, runSessionBriefCommand, sessionBriefPaths } from './session-brief.mjs';
 import { buildImplementationContext, writeExecutionTrace } from './openspec-execution-context.mjs';
 
 const roots = [];
@@ -337,6 +337,58 @@ describe('SessionBrief safety and installed CLI contract', () => {
     assert.equal((await compileSessionBrief(options(root))).decision.profile, 'research');
     await put(root, `${base}/proposal.md`, proposal() + '\n## Why\n\nDuplicate\n');
     assert.equal((await compileSessionBrief(options(root))).errors[0].code, 'duplicate_source_section');
+  });
+  it('classifies trailing prose with the addressable code, hint, and zero runtime writes', async () => {
+    for (const [name, tail] of [
+      ['plain prose', 'Пояснение к сигналам.'],
+      ['prose under an H3 subsection', '### Пояснение\n\nТекст.']
+    ]) {
+      const root = await fixture();
+      await put(root, `${base}/proposal.md`, proposal().replace('\n## Non-goals', `\n${tail}\n\n## Non-goals`));
+      const result = await compileSessionBrief(options(root));
+      assert.equal(result.ok, false, name);
+      assert.deepEqual(result.errors, [{ code: 'sdd_inputs_trailing_prose' }], name);
+      assert.deepEqual(result.blocked_reasons, ['sdd_inputs_trailing_prose'], name);
+      assert.equal(result.owner_handoff, 'aif-plan', name);
+      assert.deepEqual(result.hints, ['После JSON fence в `## SDD Profile Inputs` найден поясняющий текст — вынесите пояснение в соседнюю H2-секцию.'], name);
+      assert.equal(await exists(root, '.ai-factory/state'), false, name);
+    }
+  });
+  it('keeps hints empty for failure codes without a static mapping', async () => {
+    const root = await fixture({ ...signals, modules: -1 });
+    const result = await compileSessionBrief(options(root));
+    assert.equal(result.errors[0].code, 'invalid-sdd-inputs');
+    assert.deepEqual(result.hints, []);
+  });
+  it('session-brief CLI carries the hint in text and --json output with exit code 2', async () => {
+    const root = await fixture();
+    await put(root, `${base}/proposal.md`, proposal().replace('\n## Non-goals', '\nПояснение к сигналам.\n\n## Non-goals'));
+    const textStdout = { written: '', write(value) { this.written += value; } };
+    const textExit = await runSessionBriefCommand(['compile', '--change', change], { rootDir: root, stdout: textStdout });
+    assert.equal(textExit, 2);
+    assert.match(textStdout.written, /^SessionBrief: blocked\nsdd_inputs_trailing_prose\n/);
+    assert.match(textStdout.written, /Hint: После JSON fence в `## SDD Profile Inputs` найден поясняющий текст — вынесите пояснение в соседнюю H2-секцию\./);
+    const jsonStdout = { written: '', write(value) { this.written += value; } };
+    const jsonExit = await runSessionBriefCommand(['compile', '--change', change, '--json'], { rootDir: root, stdout: jsonStdout });
+    assert.equal(jsonExit, 2);
+    const parsed = JSON.parse(jsonStdout.written);
+    assert.deepEqual(parsed.errors, [{ code: 'sdd_inputs_trailing_prose' }]);
+    assert.deepEqual(parsed.blocked_reasons, ['sdd_inputs_trailing_prose']);
+    assert.deepEqual(parsed.hints, ['После JSON fence в `## SDD Profile Inputs` найден поясняющий текст — вынесите пояснение в соседнюю H2-секцию.']);
+    assert.equal(parsed.owner_handoff, 'aif-plan');
+  });
+  it('a previously compiled brief keeps blocking implement after sources turn invalid', async () => {
+    const root = await fixture();
+    const compiled = await compileSessionBrief(options(root));
+    assert.equal(compiled.ok, true, JSON.stringify(compiled));
+    const source = await readFile(path.join(root, `${base}/proposal.md`), 'utf8');
+    const mutated = source.replace('\n## Non-goals', '\nПояснение к сигналам.\n\n## Non-goals');
+    await put(root, `${base}/proposal.md`, mutated);
+    const context = await buildImplementationContext(options(root));
+    assert.equal(context.ok, false);
+    assert.equal(context.errors[0].code, 'session-brief-not-current');
+    assert.equal(await exists(root, `.ai-factory/state/${change}/implementation`), false);
+    assert.equal(await readFile(path.join(root, `${base}/proposal.md`), 'utf8'), mutated, 'gate leaves source bytes untouched');
   });
   it('rejects linked source and destination files without changing their targets', async () => {
     for (const destination of [false, true]) {
