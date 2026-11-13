@@ -1686,10 +1686,6 @@ async function collectDeltaSpecPaths(rootDir, changeId) {
       markTruncated('directory-limit');
       break;
     }
-    if (files.length >= MAX_DELTA_SPEC_FILES) {
-      markTruncated('inventory-limit');
-      break;
-    }
     const relative = directories.shift();
     visitedDirectories += 1;
     // Path confinement (SEC): every walked directory must resolve inside the
@@ -2174,13 +2170,18 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
     };
     // The semantic stage gets only the REMAINING command budget, not a fresh
     // full deadline: the deadline bounds the whole command, not its segments.
-    // An exhausted budget stops here — the assessor is never invoked just to
-    // have its result discarded by the final deadline check (S2).
-    if (deadlineExceeded()) {
+    // The remaining budget is measured with a SINGLE clock read — measuring
+    // it separately from an earlier deadline pre-check meant two different
+    // now() reads, so a deadline crossed between them could fall through to a
+    // floor-clamped positive remainder (S2). An exhausted or crossed budget
+    // stops here — the assessor is never invoked just to have its result
+    // discarded by the final deadline check, and the remainder is never
+    // clamped to a positive value.
+    const remainingBudget = (options.deadlineMs ?? DEFAULT_DEADLINE_MS) - (now() - startedAt);
+    if (remainingBudget <= 0) {
       emit(notRunEnvelope(['deadline-exceeded']), parsed.json);
       return 0;
     }
-    const remainingBudget = Math.max(1, (options.deadlineMs ?? DEFAULT_DEADLINE_MS) - (now() - startedAt));
     const semanticOutcome = await runTypedAssessment({
       assessor: typeof options.assessor === 'function' ? options.assessor : null,
       input: assessorInput,

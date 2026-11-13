@@ -2489,6 +2489,60 @@ describe('trace-link-suggestions graph limits', () => {
     assert.equal(value.inputs.length, 100, 'inputs stay within the schema maxItems 150');
   });
 
+  it('reports a complete inventory for exactly 100 specs plus a trailing spec-less directory (S1)', async () => {
+    const root = await makeTemp('aif-tls-speccap3-');
+    const changeId = 'spec-cap-trailing-change';
+    await seedCaseProject(root, changeId, { trace: null, specs: [], tests: [] });
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    const emptyTrace = { schemaVersion: 'lekalo/trace-manifest/v0.2.16', identity: 'dev.lekalo.trace-manifest@0.2.16', completeness: 'full', nodes: [], relations: [], gaps: [] };
+    await writeFile(manifest, JSON.stringify({ trace: emptyTrace, manifestDigest: `sha256:${digest(JSON.stringify(emptyTrace))}` }), 'utf8');
+    // Exactly 100 declared specs in 100 leaf directories, then one trailing
+    // directory holding no spec.md: draining it is bounded work, and the
+    // inventory must stay COMPLETE — the old top-of-loop pre-check fired
+    // inventory-limit on the full counter before the queue drained (S1).
+    for (let index = 0; index < 100; index += 1) {
+      const cap = path.join(root, 'openspec', 'changes', changeId, 'specs', `cap-${String(index).padStart(3, '0')}`, 'spec.md');
+      await mkdir(path.dirname(cap), { recursive: true });
+      await writeFile(cap, `# Delta ${index}\n`, 'utf8');
+    }
+    await mkdir(path.join(root, 'openspec', 'changes', changeId, 'specs', 'trailing-no-spec'), { recursive: true });
+    const { exitCode, value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json']);
+    assert.equal(exitCode, 0);
+    assert.equal(value.structural.scan.coverage, 'full', 'a spec-less trailing directory does not truncate the inventory');
+    assert.deepEqual(value.structural.scan.truncations, []);
+    assert.equal(value.structural.scan.delta_spec_inventory.length, 100);
+    assert.equal(value.inputs.length, 100);
+    assert.equal(value.structural.outcome, 'none');
+  });
+
+  it('stops before the assessor when the budget is exhausted exactly at the semantic remainder read (S2)', async () => {
+    const root = await makeTemp('aif-tls-remainder-');
+    const changeId = 'remainder-change';
+    await seedCaseProject(root, changeId, { trace: 'traces/dev-trace-nm.json', specs: ['specs/spec-en.md', 'specs/spec-ru.md'], tests: [] });
+    // Clock contract: call 1 is startedAt, calls 2-4 are the structural
+    // deadline checks (post-specs, post-tests, post-graph), call 5 is the
+    // semantic stage's single remaining-budget read. The deadline is crossed
+    // exactly at that read — the floor clamp of the previous two-read scheme
+    // would have run the assessor with a fake positive remainder.
+    let calls = 0;
+    const now = () => {
+      calls += 1;
+      return calls <= 4 ? 0 : 10_000;
+    };
+    let assessorCalls = 0;
+    const { exitCode, value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json'], {
+      deadlineMs: 1000,
+      now,
+      assessor: () => { assessorCalls += 1; return { findings: [] }; },
+    });
+    assert.equal(calls >= 5, true, 'the clock reached the semantic remainder read');
+    assert.equal(exitCode, 0);
+    assert.equal(value.state, 'not_run');
+    assert.deepEqual(value.codes, ['deadline-exceeded']);
+    assert.equal(assessorCalls, 0, 'a crossed budget stops the semantic stage before the assessor');
+  });
+
   it('counts duplicate trace nodes once in declared and scanned accounting', async () => {
     const root = await makeTemp('aif-tls-dupsym-');
     const changeId = 'dup-symbol-change';
