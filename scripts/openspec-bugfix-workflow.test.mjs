@@ -13,6 +13,7 @@ import {
   writeExecutionTrace,
   writeFixTrace
 } from './openspec-execution-context.mjs';
+import { compileSessionBrief } from './session-brief.mjs';
 import {
   buildVerificationContext,
   writeVerificationEvidence
@@ -522,5 +523,105 @@ describe('OpenSpec bug-fix workflow alignment', () => {
       usage.includes('/aif-plan full "fix <bug description>"'),
       'docs/usage.md should keep planned bug fixes routed through /aif-plan full.'
     );
+  });
+});
+
+describe('OpenSpec bug-fix workflow: SDD-gated brief chain', () => {
+  const sddSignals = {
+    planning_mode: 'full', behavior_change: false, modules: 1, repositories: 1,
+    public_api: false, data_migration: false, reversible: true, security_sensitive: false,
+    architecture_novelty: false, requirements_clear: true, expected_files: 2
+  };
+  const briefSections = [
+    '',
+    '## Why',
+    '',
+    'The planned bug fix keeps a bounded brief for the redirect fixture.',
+    '',
+    '## What Changes',
+    '',
+    '- Keep the fixture brief inputs fence-only.',
+    '',
+    '## Allowed Change Surface',
+    '',
+    '- openspec/changes/fix-login-redirect/**',
+    '',
+    '## SDD Profile Inputs',
+    '',
+    '```json',
+    JSON.stringify(sddSignals, null, 2),
+    '```',
+    ''
+  ].join('\n');
+
+  it('compiles a fence-only brief after sync and binds the exact digest into both traces', async () => {
+    const rootDir = await createTempRoot();
+    const changeId = 'fix-login-redirect';
+    await createOpenSpecConfig(rootDir);
+    await createBugFixChange(rootDir, changeId);
+    await writeFixture(rootDir, `openspec/changes/${changeId}/proposal.md`, `# Proposal: Login redirect fix\n${briefSections}`);
+
+    const sync = await syncOpenSpecArtifacts({
+      rootDir,
+      changeId,
+      detectOpenSpec: async () => availableCliDetection(),
+      validateOpenSpecChange: async (id) => validationResult(id),
+      getOpenSpecStatus: async (id) => statusResult(id),
+      timestamp: '2026-05-05T04-00-00-000Z'
+    });
+    assert.equal(sync.ok, true, 'Bug-fix SDD smoke sync should pass with injected compatible CLI.');
+
+    const compiled = await compileSessionBrief({ rootDir, changeId });
+    assert.equal(compiled.ok, true, JSON.stringify(compiled));
+    assert.equal(compiled.decision.profile, 'quick');
+
+    const implementation = await buildImplementationContext({
+      rootDir,
+      changeId,
+      detectOpenSpec: async () => missingCliDetection()
+    });
+    assert.equal(implementation.ok, true, JSON.stringify(implementation.errors));
+    assert.equal(implementation.sessionBrief.digest, compiled.digest);
+
+    const trace = await writeExecutionTrace(changeId, {
+      summary: 'Bound the bug-fix SDD smoke implementation context.',
+      sessionBriefDigest: compiled.digest,
+      changedFiles: ['scripts/openspec-bugfix-workflow.test.mjs'],
+      nextStep: `/aif-verify ${changeId}`
+    }, { rootDir, runId: 'sdd-brief-bugfix' });
+    assert.equal(trace.relativePath, `.ai-factory/state/${changeId}/implementation/sdd-brief-bugfix.md`);
+
+    const fix = await buildFixContext({ rootDir, changeId });
+    assert.equal(fix.ok, true, JSON.stringify(fix.errors));
+    const fixTrace = await writeFixTrace(changeId, {
+      summary: 'Bound the bug-fix SDD smoke fix context.',
+      sessionBriefDigest: compiled.digest,
+      changedFiles: ['scripts/openspec-bugfix-workflow.test.mjs']
+    }, { rootDir, runId: 'sdd-fix-bugfix' });
+    assert.match(fixTrace.relativePath, /\.ai-factory\/state\//);
+  });
+
+  it('blocks the bug-fix chain with the addressable trailing prose code before any runtime write', async () => {
+    const rootDir = await createTempRoot();
+    const changeId = 'fix-login-redirect';
+    await createOpenSpecConfig(rootDir);
+    await createBugFixChange(rootDir, changeId);
+    await writeFixture(rootDir, `openspec/changes/${changeId}/proposal.md`,
+      `# Proposal: Login redirect fix\n${briefSections.replace(/```\n$/, '```\n\nПояснение к сигналам.\n')}`);
+
+    const compiled = await compileSessionBrief({ rootDir, changeId });
+    assert.equal(compiled.ok, false);
+    assert.deepEqual(compiled.errors, [{ code: 'sdd_inputs_trailing_prose' }]);
+    assert.ok(compiled.hints.length > 0, JSON.stringify(compiled));
+    assert.equal(await pathExists(rootDir, '.ai-factory/state'), false, 'blocked compile must not create runtime state');
+
+    const implementation = await buildImplementationContext({
+      rootDir,
+      changeId,
+      detectOpenSpec: async () => missingCliDetection()
+    });
+    assert.equal(implementation.ok, false);
+    assert.equal(implementation.errors[0].code, 'session-brief-not-current');
+    assert.equal(await pathExists(rootDir, '.ai-factory/state'), false, 'blocked brief must not reach runtime layout');
   });
 });
