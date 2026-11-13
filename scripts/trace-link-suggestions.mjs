@@ -1177,6 +1177,58 @@ export async function validateObservationBinding(rootDir, observation, options =
   const freshInventory = freshWalk.paths.sort();
   const recordedInventory = Array.isArray(recordedScan.delta_spec_inventory) ? recordedScan.delta_spec_inventory : [];
   if (freshWalk.truncated || freshInventory.join('|') !== recordedInventory.join('|')) mismatched.push('delta_spec_inventory');
+  // Scan-fact provenance (C3): the recorded scan accounting is pinned to the
+  // provable inputs of the fresh data ALREADY read above — validation stays
+  // cheap (no buildGraph, no anchor scan, no assessor). The block runs only
+  // when the fresh trace read OK: a failed custody read already pushed
+  // 'trace' into the mismatched list, so stale is guaranteed there, and
+  // touching freshTrace.trace below without this guard would turn a stale
+  // into an operational failure. A truncated fresh walk likewise already
+  // forced the inventory mismatch (stale is guaranteed) and its counts prove
+  // nothing, so the recomputation is skipped rather than duplicated.
+  if (freshTrace.ok && !freshWalk.truncated) {
+    // Mirror of the writer's declared universe: fresh delta-spec paths plus
+    // unique presented test paths (the recorded inputs minus the fresh
+    // inventory paths) plus unique supported-kind trace symbols.
+    const freshSupportedSymbols = new Set(freshTrace.trace.nodes
+      .map((node) => node?.symbol)
+      .filter((symbol) => typeof symbol === 'string' && kindForSymbol(symbol) !== null));
+    const inventoryPaths = new Set(freshInventory);
+    const presentedTestInputs = new Set(recordedInputs
+      .map((input) => input?.path)
+      .filter((candidate) => typeof candidate === 'string' && !inventoryPaths.has(candidate)));
+    const freshDeclared = freshInventory.length + presentedTestInputs.size + freshSupportedSymbols.size;
+    // Clamp parity: the recorded declared count must equal the fresh value
+    // clamped at the schema maximum, and an actual fresh overflow must carry
+    // the writer's truncation marker — a maximum-valued count without the
+    // marker proves the marker was stripped from an overflowing run (early
+    // invalid verdict, winning over any stale fields accumulated above).
+    const MAX_ACCOUNTED_SOURCES = 100000;
+    const recordedTruncations = Array.isArray(recordedScan.truncations) ? recordedScan.truncations : [];
+    if (freshDeclared > MAX_ACCOUNTED_SOURCES && !recordedTruncations.includes('declared-sources-truncated')) {
+      return { ok: false, code: 'observation-invalid' };
+    }
+    if ((recordedScan.declared_sources ?? null) !== Math.min(freshDeclared, MAX_ACCOUNTED_SOURCES)) {
+      mismatched.push('declared_sources');
+    }
+    // Provable-truncation bound: every supported-kind trace symbol derives a
+    // mandatory semantic_symbol node with no test-anchor search (best-effort
+    // bound — requirement/scenario refs may resolve to null and are
+    // conservatively NOT counted, so the bound undercounts). When the bound
+    // exceeds the node limit, an honest run must have truncated the graph and
+    // degraded coverage, so a recorded full-coverage observation over such a
+    // trace is a provably impossible form, not merely drifted.
+    const nodeLimit = observation.graph_limits?.max_nodes ?? GRAPH_LIMITS.max_nodes;
+    if (freshSupportedSymbols.size > nodeLimit && recordedScan.coverage === 'full') {
+      return { ok: false, code: 'observation-invalid' };
+    }
+    // Full coverage implies every presented input was readable when the
+    // observation was written: a fresh input that now classifies as missing
+    // or malformed would have produced missing_sources and partial coverage.
+    if (recordedScan.coverage === 'full' && freshInputs.some((input) => input.kind !== 'file')) {
+      return { ok: false, code: 'observation-invalid' };
+    }
+  }
   const binding = buildAssessmentBinding(traceLinkSuggestionsBindingObject({
     worktreeIdentity,
     changeId: observation.change_id,

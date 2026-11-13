@@ -1360,12 +1360,12 @@ describe('trace-link-suggestions binding and revalidation', () => {
     tampered.structural.outcome_summary.by_outcome.candidate = 0;
     tampered.structural.outcome_summary.by_outcome.related_only = 0;
     assert.equal((await validateObservationBinding(root, tampered)).code, 'observation-invalid');
-    // Even clearing the truncations leaves a contradiction: none-with-nodes
-    // is now a legitimate shape, but the observation still carries 600
-    // declared sources while a coordinated tamper that also rewrites the
-    // truncations list is a fresh-honest-observation rewrite — the documented
-    // trust boundary (internal inconsistency is caught; a full rewrite with
-    // recomputed facts is indistinguishable from an honest re-run).
+    // The fully coordinated rewrite (truncations cleared too) is caught by
+    // the provenance layer instead: the fresh trace derives 600 mandatory
+    // semantic_symbol nodes — more than the node limit — so an honest run
+    // over this trace MUST have truncated the graph and degraded coverage.
+    // A recorded full-coverage observation over such a trace is a provably
+    // impossible form, not a merely drifted one (C3 provenance pinning).
     const cleared = structuredClone(observation);
     cleared.structural.scan.coverage = 'full';
     cleared.structural.outcome = 'none';
@@ -1373,7 +1373,12 @@ describe('trace-link-suggestions binding and revalidation', () => {
     cleared.structural.outcome_summary.by_outcome.candidate = 0;
     cleared.structural.outcome_summary.by_outcome.related_only = 0;
     const verdict = await validateObservationBinding(root, cleared);
-    assert.equal(verdict.ok, true, 'fully-coordinated rewrites pass the consistency layer by design');
+    assert.equal(verdict.code, 'observation-invalid', 'a full-coverage claim over a trace that provably forces graph truncation is impossible, not drifted');
+    // The documented residual trust boundary: a coordinated rewrite of the
+    // GRAPH ITSELF (nodes/edges recomputed, scan facts honest) while the
+    // trace and inputs stay unchanged is still not provable here — the
+    // provenance layer pins the scan facts to derivable inputs, not the
+    // graph content, which would require a full rescan at revalidation.
     // The partial-trace-completeness ceiling stays enforced regardless:
     // raising coverage on a recorded partial trace breaks the invariant
     // before any comparison runs.
@@ -1382,6 +1387,112 @@ describe('trace-link-suggestions binding and revalidation', () => {
     partialTrace.structural.scan.coverage = 'full';
     partialTrace.structural.outcome = 'none';
     assert.equal((await validateObservationBinding(root, partialTrace)).code, 'observation-invalid');
+  });
+
+  it('marks a tampered declared count stale by recomputing the fresh universe (C3)', async () => {
+    const root = await makeTemp('aif-tls-declared-');
+    const changeId = 'declared-tamper-change';
+    // The ghost test is presented but never shipped: the honest observation
+    // is partial (declared 2, scanned 1), so a rewritten declared count does
+    // not trip the full-coverage shape invariants and the recompute alone
+    // must catch the drift.
+    await seedCaseProject(root, changeId, { trace: null, specs: [], tests: ['test/ghost.spec.mjs'] });
+    const trace = {
+      schemaVersion: 'lekalo/trace-manifest/v0.2.16',
+      identity: 'dev.lekalo.trace-manifest@0.2.16',
+      completeness: 'full',
+      nodes: [{ symbol: 'operation:solo.thing' }],
+      relations: [],
+      gaps: [],
+    };
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    await writeFile(manifest, JSON.stringify({ trace, manifestDigest: `sha256:${digest(JSON.stringify(trace))}` }), 'utf8');
+    const { exitCode } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--test', 'test/ghost.spec.mjs', '--write', '--json']);
+    assert.equal(exitCode, 0);
+    const observation = parseStrictJson(await readFile(path.join(root, traceLinkPaths(changeId).observation), 'utf8'));
+    // Honest universe: 0 inventory paths + 1 presented test + 1 supported symbol.
+    assert.equal(observation.structural.scan.declared_sources, 2);
+    assert.equal(observation.structural.scan.scanned_sources, 1);
+    assert.equal(observation.structural.scan.coverage, 'partial');
+    // A rewritten declared count with an untouched binding cannot pass: the
+    // fresh recompute pins the recorded count to the provable inputs, so the
+    // drift names declared_sources and the observation goes stale — even
+    // though the composite binding digest itself still matches.
+    const tampered = structuredClone(observation);
+    tampered.structural.scan.declared_sources = 3;
+    const verdict = await validateObservationBinding(root, tampered);
+    assert.equal(verdict.ok, true);
+    assert.equal(verdict.stale, true);
+    assert.deepEqual(verdict.mismatched, ['declared_sources']);
+  });
+
+  it('refuses a full-coverage observation whose presented input is unreadable at revalidation (C3)', async () => {
+    const root = await makeTemp('aif-tls-fullmiss-');
+    const changeId = 'full-coverage-missing-change';
+    await seedCaseProject(root, changeId, { trace: null, specs: [], tests: ['test/auth.spec.mjs'] });
+    const trace = {
+      schemaVersion: 'lekalo/trace-manifest/v0.2.16',
+      identity: 'dev.lekalo.trace-manifest@0.2.16',
+      completeness: 'full',
+      nodes: [{ symbol: 'operation:solo.thing' }],
+      relations: [],
+      gaps: [],
+    };
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    await writeFile(manifest, JSON.stringify({ trace, manifestDigest: `sha256:${digest(JSON.stringify(trace))}` }), 'utf8');
+    const { exitCode } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--test', 'test/auth.spec.mjs', '--write', '--json']);
+    assert.equal(exitCode, 0);
+    const observation = parseStrictJson(await readFile(path.join(root, traceLinkPaths(changeId).observation), 'utf8'));
+    assert.equal(observation.structural.scan.coverage, 'full', 'the honest run reads every presented input');
+    // Removing a presented input after the write makes the recorded
+    // full-coverage claim provably unfaithful: an honest run over the current
+    // inputs would produce missing_sources and partial coverage — a provably
+    // impossible form, not a merely drifted count.
+    await rm(path.join(root, 'test', 'auth.spec.mjs'), { force: true });
+    assert.equal((await validateObservationBinding(root, observation)).code, 'observation-invalid');
+  });
+
+  it('refuses a clamp-boundary observation whose truncation marker was stripped (C3, recorded-side tamper)', async () => {
+    const root = await makeTemp('aif-tls-clampparity-');
+    const changeId = 'clamp-parity-change';
+    // Mirrors the C4 fixture: 100000 supported symbols (the trace envelope
+    // limit) plus one delta spec pushes the fresh declared universe to
+    // 100001 — one above the schema maximum — so the honest writer clamps
+    // the counts and records declared-sources-truncated. Fresh-side overflow
+    // is thus exercised at its only constructible boundary; the honest
+    // fresh-side parity itself is covered by the C4 accounting pin.
+    await seedCaseProject(root, changeId, { trace: null, specs: ['specs/spec-en.md'], tests: [] });
+    const nodes = Array.from({ length: 100000 }, (_, index) => ({ symbol: `operation:mass.symbol${index}` }));
+    const trace = {
+      schemaVersion: 'lekalo/trace-manifest/v0.2.16',
+      identity: 'dev.lekalo.trace-manifest@0.2.16',
+      completeness: 'full',
+      nodes,
+      relations: [],
+      gaps: [],
+    };
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    await writeFile(manifest, JSON.stringify({ trace, manifestDigest: `sha256:${digest(JSON.stringify(trace))}` }), 'utf8');
+    const { exitCode } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--write', '--json']);
+    assert.equal(exitCode, 0);
+    const observation = parseStrictJson(await readFile(path.join(root, traceLinkPaths(changeId).observation), 'utf8'));
+    assert.equal(observation.structural.scan.declared_sources, 100000);
+    assert.ok(observation.structural.scan.truncations.includes('declared-sources-truncated'));
+    // Stripping the marker while the fresh universe still overflows the
+    // schema maximum is a provably dishonest form (an honest overflowing run
+    // cannot record the un-marked shape), even though the clamped count
+    // itself still matches the fresh clamp exactly.
+    const tampered = structuredClone(observation);
+    tampered.structural.scan.truncations = tampered.structural.scan.truncations.filter((entry) => entry !== 'declared-sources-truncated');
+    assert.equal((await validateObservationBinding(root, tampered)).code, 'observation-invalid');
+    // Keeping the marker honestly reproduces a non-invalid revalidation.
+    const honest = structuredClone(observation);
+    const verdict = await validateObservationBinding(root, honest);
+    assert.equal(verdict.ok, true);
+    assert.equal(verdict.stale, false, `an honest overflowing observation revalidates clean, got ${JSON.stringify(verdict.mismatched)}`);
   });
 
   it('marks a mid-run swap stale through the freshness probe', async () => {
