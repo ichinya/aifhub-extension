@@ -150,7 +150,8 @@ export function validatePairsEnvelope(value) {
     || !Object.hasOwn(carrier, 'path') || !validateFileForm(carrier.path)) {
     return { ok: false, error: 'invalid carrier' };
   }
-  if (typeof value.checked_scope !== 'string' || value.checked_scope.length < 1 || value.checked_scope.length > 500) {
+  if (typeof value.checked_scope !== 'string' || value.checked_scope.length < 1 || value.checked_scope.length > 500
+    || /[\x00-\x1f]/.test(value.checked_scope)) {
     return { ok: false, error: 'invalid checked_scope' };
   }
   if (!Array.isArray(value.claims) || value.claims.length < 1 || value.claims.length > MAX_CLAIM_PAIRS) {
@@ -793,13 +794,11 @@ export async function validateObservationBinding(rootDir, observation, options =
   // must be the recorded children, and `supported` requires every part to
   // carry a `supports` assessment from a completed, non-abstained stage.
   const partsByParent = new Map();
-  const parentByClaim = new Map();
   for (const pair of recordedPairs) {
     if (pair?.parent_claim_id === null || pair?.parent_claim_id === undefined) continue;
     const bucket = partsByParent.get(pair.parent_claim_id) ?? [];
     bucket.push(pair.claim_id);
     partsByParent.set(pair.parent_claim_id, bucket);
-    parentByClaim.set(pair.claim_id, pair.parent_claim_id);
   }
   const recordedParents = observation.compound?.parents ?? [];
   if (recordedParents.length !== partsByParent.size) return { ok: false, code: 'observation-invalid' };

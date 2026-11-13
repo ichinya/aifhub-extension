@@ -6,7 +6,9 @@
 // openspec/specs/** (gitignored; absent in CI checkouts).
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import fsPromises from 'node:fs/promises';
 import { cp, link, mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import { syncBuiltinESMExports } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,6 +20,7 @@ import { prepareQaManifest } from './qa-manifest.mjs';
 import { qaStore } from './qa-manifest-store.mjs';
 import { observeQaSnapshot } from './qa-manifest-inputs.mjs';
 import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
+import { readProviderFile } from './provider-files.mjs';
 import {
   CHANGE_ID_FORM,
   CONTRACT_MODULE,
@@ -1868,6 +1871,61 @@ describe('trace-link-suggestions registration contracts', () => {
 
 describe('trace-link-suggestions corpus evaluation (fixtures + labels)', () => {
   const loadLabels = async () => parseStrictJson(await readFile(path.join(CORPUS_DIR, 'labels.json'), 'utf8'));
+
+  it('never reads injection canaries outside the presented scope during scan or revalidation (S6)', async (t) => {
+    const testCase = (await loadLabels()).cases.find((entry) => entry.kind === 'adversarial');
+    assert.ok(testCase, 'the adversarial corpus case must exist');
+    const root = await makeTemp('aif-tls-injection-canaries-');
+    const changeId = 'injection-canaries';
+    await seedCaseProject(root, changeId, testCase);
+    const canaries = ['docs/secret.md', '.env'];
+    for (const relative of canaries) {
+      await mkdir(path.dirname(path.join(root, relative)), { recursive: true });
+      await writeFile(path.join(root, relative), 'INJECTION_CANARY=stub\n', 'utf8');
+    }
+    const reads = new Set();
+    const recordRead = (file) => {
+      if (typeof file !== 'string' && !(file instanceof URL)) return;
+      reads.add(path.relative(root, file instanceof URL ? fileURLToPath(file) : file).split(path.sep).join('/'));
+    };
+    // The scan uses provider-file opens directly; readTestFile is only the
+    // revalidation seam. Spy on both filesystem readers to cover the scan too.
+    for (const method of ['open', 'readFile']) {
+      const original = fsPromises[method];
+      t.mock.method(fsPromises, method, (...args) => {
+        recordRead(args[0]);
+        return original(...args);
+      });
+    }
+    syncBuiltinESMExports();
+    try {
+      const { exitCode, value } = await runCommand(root, [
+        '--change', changeId, '--enabled', 'true',
+        ...testCase.tests.flatMap((testPath) => ['--test', testPath]), '--json',
+      ]);
+      assert.equal(exitCode, 0);
+      assert.equal(value.structural.scan.coverage, 'full');
+      const presented = value.inputs.map((input) => input.path);
+      assert.ok(presented.length > 0, 'the scan must read presented sources');
+      for (const relative of presented) assert.ok(reads.has(relative), `scan reader observed ${relative}`);
+      for (const relative of canaries) assert.equal(reads.has(relative), false, `scan never reads ${relative}`);
+
+      const revalidationReads = [];
+      const verdict = await validateObservationBinding(root, value, {
+        readTestFile: async (dir, relative, limit) => {
+          revalidationReads.push(relative);
+          return readProviderFile(dir, relative, limit);
+        },
+      });
+      assert.equal(verdict.ok, true);
+      assert.equal(verdict.stale, false);
+      assert.deepEqual([...new Set(revalidationReads)].sort(), [...presented].sort());
+      for (const relative of canaries) assert.equal(reads.has(relative), false, `revalidation never reads ${relative}`);
+    } finally {
+      t.mock.restoreAll();
+      syncBuiltinESMExports();
+    }
+  });
 
   it('matches the structural expectations exactly on dev and heldout cases with zero false accusations', async () => {
     const labels = await loadLabels();

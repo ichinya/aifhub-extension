@@ -22,6 +22,7 @@ ai-factory aifhub-claim-evidence-check --change <id> [--enabled true|false] (--p
 
 ## Structural stage
 
+- `missing_sources` имеет per-pair семантику: каждая запись фиксирует пару claim↔source, поэтому список может содержать повторяющиеся пути. Счётчики используют ту же размерность: `declared_sources = structural.pairs.length`, `scanned_sources = declared_sources − missing_sources.length`.
 - Fully deterministic over the raw bytes of the presented inputs only: source existence, exact quote spans for `literal_quote` pairs (`Buffer.indexOf` over raw bytes; UTF-8 byte offsets `[start, end)` plus the sha256 of the raw document bytes and of the span bytes), and known-revision metadata.
 - Closed `quote_check` outcomes: `exact_found`; `literal_match_out_of_context` (defined only when a span anchor was presented — the quote bytes exist in the source but outside the presented anchor); `not_found`; `source_unavailable`; `truncated` (over-limit source); `not_applicable` (`paraphrase`/`inference` skip the quote check explicitly). Input spans with an invalid range are refused, never clamped.
 - Known source-revision metadata is a separate dimension (`match | changed | not_declared | unverifiable`) from the semantic stage's freshness probe: a declared revision that no longer matches the current bytes is recorded as `changed` while freshness stays the probe result. `not_declared` is reserved for an omitted revision; a declared revision whose source cannot be read is `unverifiable`, never silently `not_declared`.

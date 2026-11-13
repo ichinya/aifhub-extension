@@ -855,8 +855,17 @@ export async function validateObservationBinding(rootDir, observation, options =
   // Coverage consistency mirrors the writer's assembly rules: an incomplete
   // scan never claims full, an abstention never claims scanned sources.
   const recordedCoverage = observation.coverage ?? {};
+  if (recordedCoverage.scanned_sources > recordedCoverage.declared_sources) {
+    return { ok: false, code: 'observation-invalid' };
+  }
+  // Partial scans read at least one source; equal counts remain possible
+  // when truncation degrades an otherwise fully readable input set.
+  if (recordedCoverage.state === 'partial'
+    && (recordedCoverage.declared_sources === 0 || recordedCoverage.scanned_sources === 0)) {
+    return { ok: false, code: 'observation-invalid' };
+  }
   if (recordedCoverage.state === 'full'
-    && ((recordedCoverage.scanned_sources ?? 0) < (recordedCoverage.declared_sources ?? 0)
+    && (recordedCoverage.scanned_sources !== recordedCoverage.declared_sources
       || (recordedCoverage.missing_sources ?? []).length > 0)) {
     return { ok: false, code: 'observation-invalid' };
   }
@@ -868,14 +877,29 @@ export async function validateObservationBinding(rootDir, observation, options =
   // recorded observation itself): an edited or renamed input must name its
   // field and flip the recomputed binding.
   const freshRecords = [];
+  const freshByPath = new Map();
   for (const input of recordedInputs) {
     const read = await readRequirementDocument(root, input.path, options);
+    freshByPath.set(input.path, read.ok ? read : null);
     freshRecords.push({
       path: input.path,
       sha256: read.ok ? read.sha256 : (read.sha256 ?? null),
       bytes: read.bytes?.length ?? 0,
       kind: read.kind,
     });
+  }
+  // Recompute span digests from the same raw bytes used by the writer.
+  // A changed document is already input drift; a changed span digest in an
+  // otherwise consistent record is findings drift, reported as stale.
+  for (const finding of recordedFindings) {
+    for (const ref of finding.refs) {
+      if (ref.kind !== 'span') continue;
+      const fresh = freshByPath.get(ref.path);
+      if (fresh && fresh.sha256 === inputsByPath.get(ref.path).sha256
+        && ref.span_sha256 !== spanRef(fresh, ref.span.start, ref.span.end).span_sha256) {
+        mismatched.push('findings');
+      }
+    }
   }
   const { profile, inputDigests, profilePart, engine, helper, contract } = await currentRequirementLintContext(root, freshRecords, options);
   for (const digestRecord of inputDigests) {

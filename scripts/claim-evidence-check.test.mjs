@@ -245,6 +245,39 @@ describe('claim-evidence command honesty surfaces', () => {
     await assert.rejects(readdir(path.join(root, '.ai-factory', 'state', 'work')), { code: 'ENOENT' });
   });
 
+  it('rejects checked_scope controls through the same invalid-envelope path as claim_ref', async () => {
+    const root = await makeTemp('aif-ce-scope-controls-');
+    await seedSmokeProject(root);
+    for (const control of ['\n', '\t', '\x00']) {
+      const refusals = [];
+      for (const field of ['checked_scope', 'claim_ref']) {
+        const envelope = pairsEnvelope();
+        if (field === 'checked_scope') envelope.checked_scope = `scope${control}text`;
+        else envelope.claims[0].claim_ref = `scope${control}text`;
+        assert.deepEqual(validatePairsEnvelope(envelope), { ok: false, error: `invalid ${field}` });
+        const outputs = [];
+        const exit = await runClaimEvidenceCheckCommand(['--change', 'work', '--enabled', 'true', '--stdin', '--json'], {
+          rootDir: root, assessor: MUST_NOT_RUN,
+          readStdin: async () => Buffer.from(JSON.stringify(envelope), 'utf8'),
+          output: (value) => outputs.push(value),
+        });
+        assert.equal(exit, 2);
+        const refusal = JSON.parse(outputs.join(''));
+        assert.deepEqual(refusal.codes, [`invalid-envelope:invalid ${field}`]);
+        refusals.push({ ...refusal, codes: ['invalid-envelope:invalid field'] });
+      }
+      assert.deepEqual(refusals[0], refusals[1], 'both fields use the same diagnostic envelope');
+    }
+    const envelope = pairsEnvelope({ checked_scope: 'Проверка docs/spec.md: §1 — scope' });
+    assert.equal(validatePairsEnvelope(envelope).ok, true);
+    const outputs = [];
+    assert.equal(await runClaimEvidenceCheckCommand(['--change', 'work', '--enabled', 'true', '--stdin', '--json'], {
+      rootDir: root, readStdin: async () => Buffer.from(JSON.stringify(envelope), 'utf8'),
+      output: (value) => outputs.push(value),
+    }), 0);
+    assert.equal(JSON.parse(outputs.join('')).structural.checked_scope, envelope.checked_scope);
+  });
+
   it('treats a malformed claimEvidence namespace as disabled with bounded diagnostics', async () => {
     const root = await makeTemp('aif-ce-mal-');
     await seedSmokeProject(root, { config: 'aifhub:\n  claimEvidence:\n    enabled: true\n    enabled: false\n' });
