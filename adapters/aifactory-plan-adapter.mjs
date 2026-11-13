@@ -120,7 +120,7 @@ function classifySddFenceMiss(inputsSection, probe) {
   try { parseStrictJson(match[1]); } catch (error) { return error.sddCode ?? 'invalid_json'; }
   const tail = inputsSection.slice(match[0].length).trim();
   if (!tail) return 'invalid-sdd-inputs';
-  if (/```|~~~/.test(tail)) return 'invalid_json';
+  if (/^(?:```|~~~)/m.test(tail)) return 'invalid_json';
   return 'sdd_inputs_trailing_prose';
 }
 
