@@ -98,6 +98,16 @@ describe('aif-plan OpenSpec-native planning contract', () => {
     assertIncludes(legacy, '.ai-factory/plans/<plan-id>/task.md', 'Legacy section');
   });
 
+  it('keeps the SDD Profile Inputs section fence-only with neighbor-H2 rationale guidance', async () => {
+    const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
+    const openspec = extractSection(injection, 'OpenSpec-native mode');
+
+    assertIncludes(openspec, 'must stay exactly one `json` fence', 'OpenSpec-native section');
+    assertIncludes(openspec, 'no prose before or after it', 'OpenSpec-native section');
+    assertIncludes(openspec, 'separate neighboring H2 section', 'OpenSpec-native section');
+    assertIncludes(openspec, 'a `### ` subsection does not close the H2 section', 'OpenSpec-native section');
+    assertIncludes(openspec, 'sdd_inputs_trailing_prose', 'OpenSpec-native section');
+  });
   it('resolves the explicit ultra profile through the shared version gate before writes', async () => {
     const injection = await readRepoFile('injections/core/aif-plan-plan-folder.md');
     const gate = extractSection(injection, 'Planning profile and AI Factory version gate');

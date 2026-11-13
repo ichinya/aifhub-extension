@@ -18,6 +18,7 @@ import {
   buildImplementationContext,
   writeExecutionTrace
 } from './openspec-execution-context.mjs';
+import { compileSessionBrief } from './session-brief.mjs';
 import {
   buildVerificationContext,
   writeVerificationEvidence
@@ -720,6 +721,100 @@ describe('OpenSpec workflow smoke: add feature', () => {
       assert.equal(finalized.errors[0].code, expectedCode, `Scenario B done gate should report ${expectedCode}.`);
       assert.equal(archiveCalls, 0, `Scenario B done gate must not archive for ${caseName}.`);
     }
+  });
+});
+
+describe('OpenSpec workflow smoke: SDD-gated brief chain', () => {
+  const sddSignals = {
+    planning_mode: 'full', behavior_change: false, modules: 1, repositories: 1,
+    public_api: false, data_migration: false, reversible: true, security_sensitive: false,
+    architecture_novelty: false, requirements_clear: true, expected_files: 2
+  };
+  const briefSections = [
+    '',
+    '## Why',
+    '',
+    'The smoke chain needs a bounded brief for the OAuth fixture.',
+    '',
+    '## What Changes',
+    '',
+    '- Keep the fixture brief inputs fence-only.',
+    '',
+    '## Allowed Change Surface',
+    '',
+    '- openspec/changes/add-oauth-login/**',
+    '',
+    '## SDD Profile Inputs',
+    '',
+    '```json',
+    JSON.stringify(sddSignals, null, 2),
+    '```',
+    ''
+  ].join('\n');
+
+  it('compiles a fence-only brief after sync and binds the exact digest into the trace', async () => {
+    const rootDir = await createTempRoot();
+    const changeId = 'add-oauth-login';
+    await createOpenSpecConfig(rootDir);
+    await createOauthFeatureChange(rootDir, changeId);
+    await writeFixture(rootDir, `openspec/changes/${changeId}/proposal.md`, `# Proposal: Add OAuth Login\n${briefSections}`);
+
+    const sync = await syncOpenSpecArtifacts({
+      rootDir,
+      changeId,
+      detectOpenSpec: async () => availableCliDetection(),
+      validateOpenSpecChange: async (id) => validationResult(id),
+      getOpenSpecStatus: async (id) => statusResult(id),
+      timestamp: '2026-05-05T02-00-00-000Z'
+    });
+    assert.equal(sync.ok, true, 'SDD smoke sync should pass with injected compatible CLI.');
+
+    const compiled = await compileSessionBrief({ rootDir, changeId });
+    assert.equal(compiled.ok, true, JSON.stringify(compiled));
+    assert.equal(compiled.decision.profile, 'quick');
+
+    const implementation = await buildImplementationContext({
+      rootDir,
+      changeId,
+      detectOpenSpec: async () => availableCliDetection(),
+      getOpenSpecInstructions: async () => openspecInstructionsResult(changeId)
+    });
+    assert.equal(implementation.ok, true, JSON.stringify(implementation.errors));
+    assert.equal(implementation.sessionBrief.digest, compiled.digest);
+
+    const trace = await writeExecutionTrace(changeId, {
+      summary: 'Bound the SDD-gated smoke implementation context.',
+      sessionBriefDigest: compiled.digest,
+      changedFiles: ['scripts/openspec-workflow-smoke.test.mjs'],
+      nextStep: `/aif-verify ${changeId}`
+    }, { rootDir, runId: 'sdd-brief-smoke' });
+    assert.equal(trace.relativePath, `.ai-factory/state/${changeId}/implementation/sdd-brief-smoke.md`);
+  });
+
+  it('blocks the chain with the addressable trailing prose code before any runtime write', async () => {
+    const rootDir = await createTempRoot();
+    const changeId = 'add-oauth-login';
+    await createOpenSpecConfig(rootDir);
+    await createOauthFeatureChange(rootDir, changeId);
+    await writeFixture(rootDir, `openspec/changes/${changeId}/proposal.md`,
+      `# Proposal: Add OAuth Login\n${briefSections.replace(/```\n$/, '```\n\nПояснение к сигналам.\n')}`);
+
+    const compiled = await compileSessionBrief({ rootDir, changeId });
+    assert.equal(compiled.ok, false);
+    assert.deepEqual(compiled.errors, [{ code: 'sdd_inputs_trailing_prose' }]);
+    assert.deepEqual(compiled.blocked_reasons, ['sdd_inputs_trailing_prose']);
+    assert.ok(compiled.hints.length > 0, JSON.stringify(compiled));
+    assert.equal(await pathExists(rootDir, '.ai-factory/state'), false, 'blocked compile must not create runtime state');
+
+    const implementation = await buildImplementationContext({
+      rootDir,
+      changeId,
+      detectOpenSpec: async () => availableCliDetection(),
+      getOpenSpecInstructions: async () => openspecInstructionsResult(changeId)
+    });
+    assert.equal(implementation.ok, false);
+    assert.equal(implementation.errors[0].code, 'session-brief-not-current');
+    assert.equal(await pathExists(rootDir, '.ai-factory/state'), false, 'blocked brief must not reach runtime layout');
   });
 });
 

@@ -108,6 +108,22 @@ function declaredRefs(value) {
     return match ? [(match[1] ?? match[2] ?? match[3]).replaceAll('\\', '/')] : [];
   });
 }
+// The section must stay one json fence (closed shape). Byte-spans keep raw
+// CRLF inside the body, so the diagnostic probe is CRLF-compatible and only
+// classifies the failure: it never returns the fence payload as accepted.
+const SDD_STRICT_FENCE = /^```json\r?\n([\s\S]+?)\r?\n```$/;
+const SDD_PROBE_FENCE = /^```json\r?\n([\s\S]+?)\r?\n```(?=\r?\n|$)/;
+
+function classifySddFenceMiss(inputsSection, probe) {
+  const match = probe.exec(inputsSection);
+  if (!match) return 'invalid-sdd-inputs';
+  try { parseStrictJson(match[1]); } catch (error) { return error.sddCode ?? 'invalid_json'; }
+  const tail = inputsSection.slice(match[0].length).trim();
+  if (!tail) return 'invalid-sdd-inputs';
+  if (/^(?:```|~~~)/m.test(tail)) return 'invalid_json';
+  return 'sdd_inputs_trailing_prose';
+}
+
 async function readContext(root, identity, options = {}) {
   const common = { adapter_version: ADAPTER_VERSION, public_mode: identity.mode, entrypoint: identity.entrypoint,
     checklist: identity.checklist ?? null, shape: identity.shape };
@@ -130,9 +146,13 @@ async function readContext(root, identity, options = {}) {
   }
   let inputs = null;
   if (s.sdd) {
-    const match = /^```json\r?\n([\s\S]+?)\r?\n```$/.exec(s.sdd);
-    try { if (!match) throw new Error(); inputs = parseStrictJson(match[1]); }
-    catch (error) { errors.push({ code: error.sddCode ?? 'invalid-sdd-inputs' }); }
+    const strict = SDD_STRICT_FENCE.exec(s.sdd);
+    if (strict) {
+      try { inputs = parseStrictJson(strict[1]); }
+      catch (error) { errors.push({ code: error.sddCode ?? 'invalid-sdd-inputs' }); }
+    } else {
+      errors.push({ code: classifySddFenceMiss(s.sdd, SDD_PROBE_FENCE) });
+    }
   }
   const taskScope = taskScopeSection(texts[identity.checklist], 'In Scope');
   const taskForbidden = taskScopeSection(texts[identity.checklist], 'Out of Scope');

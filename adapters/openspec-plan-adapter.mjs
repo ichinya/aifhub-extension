@@ -93,12 +93,28 @@ function parseTasks(tasksContent, sourcePath) {
   return tasks;
 }
 
+// The section must stay one json fence (closed shape). When the strict
+// full-section match misses, the diagnostic probe only classifies the
+// failure: it never returns the fence payload as accepted input.
+const SDD_STRICT_FENCE = /^```json\n([\s\S]+?)\n```$/s;
+const SDD_PROBE_FENCE = /^```json\n([\s\S]+?)\n```(?=\n|$)/;
+
 function parseSddInputs(proposal) {
   const inputsSection = section(proposal, SDD_SIGNALS_HEADING);
   if (!inputsSection) return null;
-  const match = /^```json\n([\s\S]+?)\n```$/s.exec(inputsSection);
-  if (!match) throw planError('invalid-sdd-inputs');
-  try { return parseStrictJson(match[1]); } catch (error) { throw planError(error.sddCode ?? 'invalid-sdd-inputs'); }
+  const strict = SDD_STRICT_FENCE.exec(inputsSection);
+  if (!strict) throw planError(classifySddFenceMiss(inputsSection, SDD_PROBE_FENCE));
+  try { return parseStrictJson(strict[1]); } catch (error) { throw planError(error.sddCode ?? 'invalid-sdd-inputs'); }
+}
+
+function classifySddFenceMiss(inputsSection, probe) {
+  const match = probe.exec(inputsSection);
+  if (!match) return 'invalid-sdd-inputs';
+  try { parseStrictJson(match[1]); } catch (error) { return error.sddCode ?? 'invalid_json'; }
+  const tail = inputsSection.slice(match[0].length).trim();
+  if (!tail) return 'invalid-sdd-inputs';
+  if (/^(?:```|~~~)/m.test(tail)) return 'invalid_json';
+  return 'sdd_inputs_trailing_prose';
 }
 
 async function readContext(root, identity, options = {}) {

@@ -441,13 +441,20 @@ export function renderSessionBrief(brief) {
 
 function hash(value) { return createHash('sha256').update(value).digest('hex'); }
 function json(value) { return `${JSON.stringify(value, null, 2)}\n`; }
+// Narrow static mapping keyed by errors[].code: the machine hands the plan
+// owner the exact repair route with the failure (no schema change — plan
+// context errors stay {code, path}). Keep values owner-facing, never raw input.
+const SDD_FAILURE_HINTS = {
+  sdd_inputs_trailing_prose: 'После JSON fence в `## SDD Profile Inputs` найден поясняющий текст — вынесите пояснение в соседнюю H2-секцию.'
+};
 function failure(error) {
   const code = error.sddCode ?? error.planResolverCode ?? 'session_brief_io_error';
   const errors = (error.planResolverErrors ?? [{ code }]).map(({ code: value }) => ({ code: typeof value === 'string' && /^[a-z0-9_-]+$/.test(value) ? value : 'plan_context_unresolved' }));
+  const hints = [...new Set(errors.flatMap(({ code: value }) => SDD_FAILURE_HINTS[value] ? [SDD_FAILURE_HINTS[value]] : []))];
   return { ok: false, status: 'blocked', errors, blocked_reasons: [...new Set([
     ...errors.map(({ code }) => code.replaceAll('-', '_')),
     ...(errors.some(({ code }) => /^(?:ultra-|classic-ultra-)/.test(code)) ? ['unsupported_plan_shape'] : [])
-  ])], stale_reasons: [], owner_handoff: 'aif-plan' };
+  ])], hints, stale_reasons: [], owner_handoff: 'aif-plan' };
 }
 
 export async function runSessionBriefCommand(argv = process.argv.slice(2), options = {}) {
@@ -470,7 +477,7 @@ export async function runSessionBriefCommand(argv = process.argv.slice(2), optio
   else result = await inspectSessionBrief({ ...parsed, includeBrief: command === 'show' });
   const exitCode = invalid || result.errors?.length ? 2 : result.ok ? 0 : 1;
   const output = jsonOutput ? json(result) : command === 'show' && result.brief ? renderSessionBrief(result.brief)
-    : `SessionBrief: ${result.status}${result.digest ? ` digest=${result.digest}` : ''}\n${(result.errors ?? []).map((error) => error.code).join('\n')}`;
+    : `SessionBrief: ${result.status}${result.digest ? ` digest=${result.digest}` : ''}\n${(result.errors ?? []).map((error) => error.code).join('\n')}${(result.hints ?? []).map((hint) => `\nHint: ${hint}`).join('')}`;
   (options.stdout ?? process.stdout).write(output.endsWith('\n') ? output : `${output}\n`);
   return exitCode;
 }

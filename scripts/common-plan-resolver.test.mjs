@@ -113,6 +113,52 @@ describe('Common plan resolver', () => {
     await writeFile(proposalPath, proposalText.replace('  "planning_mode": "full",', '  "planning_mode": "full",\n  "planning_mode": "full",'));
     await assert.rejects(resolvePlanContext({ rootDir: root, changeId: change, methodology: 'openspec' }), /duplicate_json_key/);
   });
+  it('classifies SDD fence misses with the addressable trailing prose code (strict channel)', async () => {
+    const signalsJson = JSON.stringify({
+      planning_mode: 'full', behavior_change: true, modules: 1, repositories: 1,
+      public_api: false, data_migration: false, reversible: true, security_sensitive: false,
+      architecture_novelty: false, requirements_clear: true, expected_files: 2
+    }, null, 2);
+    const fence = ['```json', signalsJson, '```'].join('\n');
+    for (const [name, body, expected] of [
+      ['trailing prose in the same H2', `${fence}\n\nПояснение к сигналам.`, /sdd_inputs_trailing_prose/],
+      ['prose under H3 inside the H2 section', `${fence}\n\n### Пояснение\n\nТекст.`, /sdd_inputs_trailing_prose/],
+      ['broken JSON with prose keeps strict priority', '```json\n{ oops }\n```\nПояснение.', /invalid_json/],
+      ['two fences keep invalid_json', `${fence}\n\n\`\`\`json\n{}\n\`\`\`\nХвост.`, /invalid_json/],
+      ['line-start tilde fence keeps invalid_json', `${fence}\n\n~~~json\n{}\n~~~\nХвост.`, /invalid_json/],
+      ['inline code span in prose stays trailing prose', `${fence}\n\nПояснение: используйте \`\`\`json inline для формата.`, /sdd_inputs_trailing_prose/],
+      ['inline tildes in prose stay trailing prose', `${fence}\n\nПояснение: ~~~ внутри строки — не ограда.`, /sdd_inputs_trailing_prose/],
+      ['CRLF inline code span in prose stays trailing prose', ['```json', signalsJson, '```', '', 'Пояснение: используйте ```json inline.'].join('\r\n'), /sdd_inputs_trailing_prose/],
+      ['leading prose keeps the closed shape', `Пояснение перед.\n\n${fence}`, /invalid-sdd-inputs/],
+      ['leading and trailing prose keep the closed shape', `Пояснение перед.\n\n${fence}\n\nПояснение после.`, /invalid-sdd-inputs/],
+      ['fence with a trailing space keeps the closed shape', `\`\`\`json \n${signalsJson}\n\`\`\``, /invalid-sdd-inputs/],
+      ['tilde fence keeps the closed shape', '~~~\n{}\n~~~', /invalid-sdd-inputs/],
+      ['four backticks keep the closed shape', `\`\`\`\`json\n${signalsJson}\n\`\`\`\``, /invalid-sdd-inputs/],
+      ['missing fence keeps the closed shape', 'Просто текст без fence.', /invalid-sdd-inputs/],
+      ['CRLF trailing prose', ['```json', signalsJson, '```', '', 'Пояснение.'].join('\r\n'), /sdd_inputs_trailing_prose/]
+    ]) {
+      const { root, change } = await fixture();
+      await rewriteSddSection(root, change, body);
+      await assert.rejects(resolvePlanContext({ rootDir: root, changeId: change, methodology: 'openspec' }), expected, name);
+    }
+  });
+  it('accepts fence-only SDD sections with rationale in a neighbor H2 and CRLF fences', async () => {
+    const { root, change } = await fixture();
+    const signalsJson = JSON.stringify({
+      planning_mode: 'full', behavior_change: true, modules: 1, repositories: 1,
+      public_api: false, data_migration: false, reversible: true, security_sensitive: false,
+      architecture_novelty: false, requirements_clear: true, expected_files: 2
+    }, null, 2);
+    const fence = ['```json', signalsJson, '```'].join('\n');
+    await rewriteSddSection(root, change, `${fence}\n\n## Rationale\n\nПояснение в соседней H2-секции.`);
+    const context = await resolvePlanContext({ rootDir: root, changeId: change, methodology: 'openspec' });
+    assert.deepEqual(context.errors, []);
+    assert.equal(context.sdd_inputs.expected_files, 2);
+    await rewriteSddSection(root, change, ['```json', signalsJson, '```'].join('\r\n'));
+    const crlf = await resolvePlanContext({ rootDir: root, changeId: change, methodology: 'openspec' });
+    assert.deepEqual(crlf.errors, []);
+    assert.equal(crlf.sdd_inputs.expected_files, 2);
+  });
   it('writes resolved context through the safe provider writer and rejects unsafe output paths', async () => {
     const { root, change } = await fixture();
     const stdout = { written: '', write(value) { this.written += value; } };
@@ -126,6 +172,17 @@ describe('Common plan resolver', () => {
     assert.equal(unsafe, 2);
   });
 });
+
+// Replaces the body of the fixture's `## SDD Profile Inputs` section (up to
+// the next active H2) with the given text, keeping the surrounding sections.
+async function rewriteSddSection(root, change, sectionBody) {
+  const proposalPath = path.join(root, `openspec/changes/${change}/proposal.md`);
+  const text = await readFile(proposalPath, 'utf8');
+  const start = text.indexOf('## SDD Profile Inputs');
+  const end = text.indexOf('## Acceptance Examples');
+  assert.ok(start !== -1 && end > start, 'fixture must keep the SDD section before acceptance examples');
+  await writeFile(proposalPath, `${text.slice(0, start)}## SDD Profile Inputs\n\n${sectionBody}\n\n${text.slice(end)}`);
+}
 
 async function completeNativePair(root, change) {
   const base = path.join(root, '.ai-factory/plans', change);

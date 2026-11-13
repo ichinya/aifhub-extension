@@ -275,6 +275,72 @@ it('fenced headings are examples; duplicate active singular sections fail closed
   assert.ok((await compileSessionBrief(opts(root))).errors.some(e => e.code === 'duplicate_source_section'));
 });
 
+const classicSignalsJson = JSON.stringify({
+  planning_mode: 'full', behavior_change: true, modules: 1, repositories: 1,
+  public_api: false, data_migration: false, reversible: true, security_sensitive: false,
+  architecture_novelty: false, requirements_clear: true, expected_files: 2
+}, null, 2);
+const classicFence = ['```json', classicSignalsJson, '```'].join('\n');
+// The fixture keeps its fence-only `## SDD Profile Inputs` section right
+// before `## Tasks`; this swaps the section body while keeping the neighbor.
+const classicSddSpan = /## SDD Profile Inputs\n[\s\S]*?\n(?=\n## Tasks)/;
+async function rewriteClassicSdd(root, sectionBody) {
+  const source = await text(root, parent);
+  assert.match(source, classicSddSpan, 'fixture must keep the SDD section before tasks');
+  await put(root, parent, source.replace(classicSddSpan, `## SDD Profile Inputs\n${sectionBody}\n`));
+}
+
+it('classifies SDD fence misses in the classic soft channel with full error parity', async () => {
+  for (const [name, body, expected] of [
+    ['trailing prose', `${classicFence}\nПояснение к сигналам.`, 'sdd_inputs_trailing_prose'],
+    ['prose under H3 inside the H2 section', `${classicFence}\n### Пояснение\n\nТекст.`, 'sdd_inputs_trailing_prose'],
+    ['broken JSON keeps strict priority', '```json\n{ oops }\n```', 'invalid_json'],
+    ['broken JSON with prose keeps strict priority', '```json\n{ oops }\n```\nПояснение.', 'invalid_json'],
+    ['two fences at the end', `${classicFence}\n\`\`\`json\n{}\n\`\`\``, 'invalid_json'],
+    ['two fences with a prose tail', `${classicFence}\n\`\`\`json\n{}\n\`\`\`\nХвост.`, 'invalid_json'],
+    ['inline code span in prose stays trailing prose', `${classicFence}\nПояснение: используйте \`\`\`json inline для формата.`, 'sdd_inputs_trailing_prose'],
+    ['inline tildes in prose stay trailing prose', `${classicFence}\nПояснение: ~~~ внутри строки — не ограда.`, 'sdd_inputs_trailing_prose'],
+    ['line-start tilde fence keeps invalid_json', `${classicFence}\n~~~json\n{}\n~~~\nХвост.`, 'invalid_json'],
+    ['leading prose keeps the closed shape', `Пояснение перед.\n\n${classicFence}`, 'invalid-sdd-inputs'],
+    ['fence with a trailing space keeps the closed shape', `\`\`\`json \n${classicSignalsJson}\n\`\`\``, 'invalid-sdd-inputs'],
+    ['tilde fence keeps the closed shape', '~~~\n{}\n~~~', 'invalid-sdd-inputs'],
+    ['four backticks keep the closed shape', `\`\`\`\`json\n${classicSignalsJson}\n\`\`\`\``, 'invalid-sdd-inputs'],
+    ['missing fence keeps the closed shape', 'Просто текст.', 'invalid-sdd-inputs'],
+    ['duplicate keys', '```json\n{"a":1,"a":2}\n```', 'duplicate_json_key'],
+  ]) {
+    const root = await fixture();
+    await rewriteClassicSdd(root, body);
+    const context = await resolvePlanContext(opts(root));
+    assert.deepEqual(context.errors, [{ code: expected }], name);
+  }
+});
+
+it('classic CRLF parity: fence-only accepted, trailing prose classified, rationale accepted', async () => {
+  const root = await fixture();
+  const crlfFence = ['```json', classicSignalsJson, '```'].join('\r\n');
+  await rewriteClassicSdd(root, crlfFence);
+  let context = await resolvePlanContext(opts(root));
+  assert.deepEqual(context.errors, []);
+  assert.equal(context.sdd_inputs.expected_files, 2);
+  await rewriteClassicSdd(root, `${crlfFence}\r\nПояснение.`);
+  context = await resolvePlanContext(opts(root));
+  assert.deepEqual(context.errors, [{ code: 'sdd_inputs_trailing_prose' }]);
+  await rewriteClassicSdd(root, `${crlfFence}\r\n\r\n## Rationale\r\n\r\nПояснение в соседней H2-секции.`);
+  context = await resolvePlanContext(opts(root));
+  assert.deepEqual(context.errors, []);
+  assert.equal(context.sdd_inputs.expected_files, 2);
+});
+
+it('classic compile blocks trailing prose with the addressable code and hint', async () => {
+  const root = await fixture();
+  await rewriteClassicSdd(root, `${classicFence}\nПояснение к сигналам.`);
+  const compiled = await compileSessionBrief(opts(root));
+  assert.equal(compiled.ok, false);
+  assert.deepEqual(compiled.errors, [{ code: 'sdd_inputs_trailing_prose' }]);
+  assert.ok(compiled.blocked_reasons.includes('sdd_inputs_trailing_prose'));
+  assert.ok(compiled.hints.some((hint) => hint.includes('соседнюю H2-секцию')), JSON.stringify(compiled.hints));
+});
+
 for (const [heading, code] of [['Summary', 'missing_intent_or_outcome'], ['Scope', 'missing_allowed_change_surface'], ['Requirements', 'missing_behavior_acceptance_context']]) it(`does not invent missing ${heading}`, async () => {
   const root = await fixture();
   await put(root, parent, (await text(root, parent)).replace(new RegExp(`## ${heading}\\n[\\s\\S]*?(?=## )`), ''));
