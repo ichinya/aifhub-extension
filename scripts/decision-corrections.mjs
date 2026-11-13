@@ -623,14 +623,18 @@ async function prepareNamespace(root) {
 }
 
 // Pre-mutation git guard for the atomic write's transient sibling: the store
-// generates `<dest>.<uuid>.tmp` internally (workflow-state-store.mjs), so the
-// exact name cannot be pre-guarded. `git check-ignore` evaluates ignore rules
-// for non-existent paths, so probing a representative sibling of the same
-// shape proves the whole temp pattern `<dest>.*.tmp` is effectively ignored —
-// including the case where a PRE-EXISTING namespace .gitignore with narrow
-// rules was preserved by ensureRuntimeGitignore and leaves `*.tmp` visible.
+// generates `<dest>.<random-uuid>.tmp` internally (workflow-state-store.mjs),
+// so the exact name cannot be pre-guarded. The probe below carries an
+// unpredictable random name with the SAME structural shape as the real temp
+// file, so any narrow saved rule that matches the probe inevitably matches
+// the real temp pattern too — a crafted `.gitignore` pinning the old
+// deterministic probe name (`*.write-probe.tmp`) no longer passes the guard.
+// The probe is NEVER materialized on disk: `git check-ignore` evaluates
+// ignore rules for non-existent paths, which still covers the case where a
+// PRE-EXISTING namespace .gitignore with narrow rules was preserved by
+// ensureRuntimeGitignore and leaves `*.tmp` siblings visible.
 async function assertTempAreaIgnored(root, destinationFile, options = {}) {
-  const probe = `${destinationFile}.write-probe.tmp`;
+  const probe = `${destinationFile}.${randomUUID()}.tmp`;
   const verdict = await (options.gitGuard ?? verifyObservationIgnored)(root, probe, options);
   if (!verdict.ok || verdict.tracked) {
     return { ok: false, code: verdict.ok ? 'observation-path-tracked' : verdict.code, detail: verdict.detail ?? probe };

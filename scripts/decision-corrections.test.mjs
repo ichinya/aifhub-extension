@@ -2047,6 +2047,31 @@ describe('decision-corrections review round 3', () => {
     assert.equal((await readdirSafe(path.join(namespaceDir, 'work', 'cases'))).some((name) => name.endsWith('.tmp')), false, 'no temp file was ever materialized');
   });
 
+  it('refuses a save when a narrow rule pins the old deterministic probe name', async () => {
+    const root = await makeTemp('aif-dc-r3-probe-');
+    await seedStoreProject(root);
+    await gitInit(root);
+    // A crafted namespace .gitignore matches ONLY the retired deterministic
+    // probe name: the temp-area probe is now an unpredictable random sibling
+    // of the real store temp shape, so this narrow rule cannot match it and
+    // the guard must refuse instead of granting a false pass.
+    const namespaceDir = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE);
+    await mkdir(namespaceDir, { recursive: true });
+    await writeFile(path.join(namespaceDir, '.gitignore'), '*.write-probe.tmp\n!.gitignore\n');
+    const input = baseCaseInput();
+    const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
+    const outputs = [];
+    const exit = await runDecisionCorrectionsCommand(['save', '--json'], {
+      rootDir: root, enabled: true, output: (value) => outputs.push(value),
+      readStdin: async () => Buffer.from(JSON.stringify({ ...input, payload_digest: preview.payload_digest }), 'utf8'),
+    });
+    assert.equal(exit, 1, 'a rule pinning the old probe name must not pass the temp-area guard');
+    assert.equal(JSON.parse(outputs.join('')).code, 'observation-path-not-ignored');
+    const stored = await readdirSafe(path.join(namespaceDir, 'work', 'cases'));
+    assert.equal(stored.some((name) => name.endsWith('.json')), false, 'no case file is written behind the ineffective ignore');
+    assert.equal(stored.some((name) => name.endsWith('.tmp')), false, 'no temp file was ever materialized');
+  });
+
   it('keeps the shared .gitignore when another writer holds the scope lock', async () => {
     const root = await makeTemp('aif-dc-r3-locked-');
     await seedStoreProject(root);
