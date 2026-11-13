@@ -21,6 +21,12 @@ For a new SDD-managed canonical change, `/aif-plan` records reviewed facts once 
 `proposal.md`, alongside its existing source-template sections. Do not alter
 `## Original Request` or invent unknown facts. Omit unknown signal fields or use
 `null`; either produces a `research` decision. Use the actual public planning mode.
+The `## SDD Profile Inputs` section must contain exactly one `json` fence (outer
+whitespace allowed) and no text before or after it; a valid fence followed by
+trailing prose fails closed with the addressable `sdd_inputs_trailing_prose`
+diagnostic in both plan adapters. Put rationale and explanations into a separate
+neighboring H2 section — a `### ` subsection stays inside the H2 section and does
+not rescue trailing text.
 
 ````markdown
 ## SDD Profile Inputs
