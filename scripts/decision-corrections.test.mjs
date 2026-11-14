@@ -6,7 +6,8 @@
 // engine-backed scenarios join the same file as the engine lands.
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
+import { promisify } from 'node:util';
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -19,6 +20,7 @@ import { prepareQaManifest } from './qa-manifest.mjs';
 import { qaStore } from './qa-manifest-store.mjs';
 import { observeQaSnapshot } from './qa-manifest-inputs.mjs';
 import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
+import { verifyObservationIgnored } from './requirement-lint-git-guard.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DECISION_CORRECTIONS_NAMESPACE = 'decision-corrections';
@@ -2041,50 +2043,135 @@ describe('decision-corrections review round 3', () => {
     const root = await makeTemp('aif-dc-r3-narrow-');
     await seedStoreProject(root);
     // The effective-ignore question only exists inside a git worktree: seed
-    // one so verifyObservationIgnored evaluates the real ignore rules.
+    // one so the real verifyObservationIgnored evaluates the real ignore rules.
     await gitInit(root);
-    // A pre-existing namespace .gitignore with narrow rules: ensureRuntime
-    // Gitignore preserves it, so `*.tmp` siblings would NOT be ignored.
+    // Fixture: every OWNED surface is ignored by a targeted rule (case files
+    // via `*.json`, write.lock via `*.lock`, the namespace .gitignore itself
+    // via `.gitignore`), while the temp probes match nothing and stay
+    // visible — the ONLY guard that can refuse here is the temp-probe
+    // branch. The naive `*\n!*.tmp` form does NOT work for this: `*` also
+    // excludes the `work` DIRECTORY, and git cannot re-include a file under
+    // an excluded parent, so every probe would stay ignored and the save
+    // would pass. The previous `*.json\n!.gitignore\n` fixture had the
+    // opposite flaw: the namespace .gitignore itself stayed visible, so the
+    // owned-surface guard refused first and the probe branch was never
+    // reached (a green test for the wrong reason).
     const namespaceDir = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE);
     await mkdir(namespaceDir, { recursive: true });
-    await writeFile(path.join(namespaceDir, '.gitignore'), '*.json\n!.gitignore\n');
-    // The digest echo must be valid so the pre-materialization pass clears
-    // and the probe guard (after prepareNamespace) is the refusing branch.
+    await writeFile(path.join(namespaceDir, '.gitignore'), '*.json\n*.lock\n.gitignore\n');
     const input = baseCaseInput();
     const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
-    const outputs = [];
-    const exit = await runDecisionCorrectionsCommand(['save', '--json'], {
-      rootDir: root, enabled: true, output: (value) => outputs.push(value),
-      readStdin: async () => Buffer.from(JSON.stringify({ ...input, payload_digest: preview.payload_digest }), 'utf8'),
-    });
-    assert.equal(exit, 1, 'the save must refuse when the temp shape is not effectively ignored');
-    assert.equal(JSON.parse(outputs.join('')).code, 'observation-path-not-ignored');
+    const evaluated = [];
+    const recordingGuard = async (rootDir, relative, guardOptions) => {
+      const verdict = await verifyObservationIgnored(rootDir, relative, guardOptions);
+      evaluated.push({ relative, ...verdict });
+      return verdict;
+    };
+    await assert.rejects(
+      () => decisionCorrectionsCommand('save', { ...input, payload_digest: preview.payload_digest }, { rootDir: root, ...STORE_OPTIONS(), gitGuard: recordingGuard }),
+      (error) => error?.code === 'observation-path-not-ignored' && error.blocked === true,
+      'the save must refuse when the temp shape is not effectively ignored',
+    );
+    // Branch reach: the single refusing verdict is a `.tmp` probe, and the
+    // owned namespace .gitignore passed the guard before it — the refusal
+    // came from the temp-probe branch, not the shared owned-surface code.
+    const refused = evaluated.filter((entry) => !entry.ok);
+    assert.equal(refused.length, 1, 'exactly one guard verdict refuses: the first visible probe');
+    assert.match(refused[0].relative, /\.tmp$/, 'the refusal target is a temp probe path');
+    assert.ok(evaluated.some((entry) => entry.ok && entry.relative.endsWith(`${DECISION_CORRECTIONS_NAMESPACE}/.gitignore`)),
+      'the owned namespace .gitignore passed the guard before the probe refused');
     const stored = await readdirSafe(path.join(namespaceDir, 'work', 'cases'));
     assert.deepEqual(stored.filter((name) => name.endsWith('.json')), [], 'no case file is written behind an ineffective ignore');
     assert.equal((await readdirSafe(namespaceDir)).includes('.gitignore'), true, 'the pre-existing ignore file is never deleted');
-    assert.equal((await readdirSafe(path.join(namespaceDir, 'work', 'cases'))).some((name) => name.endsWith('.tmp')), false, 'no temp file was ever materialized');
+    assert.equal(stored.some((name) => name.endsWith('.tmp')), false, 'no temp file was ever materialized');
   });
 
   it('refuses a save when a narrow rule pins the old deterministic probe name', async () => {
     const root = await makeTemp('aif-dc-r3-probe-');
     await seedStoreProject(root);
     await gitInit(root);
-    // A crafted namespace .gitignore matches ONLY the retired deterministic
-    // probe name: the temp-area probe is now an unpredictable random sibling
-    // of the real store temp shape, so this narrow rule cannot match it and
-    // the guard must refuse instead of granting a false pass.
+    // The crafted .gitignore anticipates ONLY the retired deterministic probe
+    // name (`*.write-probe.tmp`) alongside the owned-surface rules: the probe
+    // set carries real store temp shapes with no fixed `write-probe` marker,
+    // so the saved rule matches nothing and the first probe refuses.
     const namespaceDir = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE);
     await mkdir(namespaceDir, { recursive: true });
-    await writeFile(path.join(namespaceDir, '.gitignore'), '*.write-probe.tmp\n!.gitignore\n');
+    await writeFile(path.join(namespaceDir, '.gitignore'), '*.json\n*.lock\n.gitignore\n*.write-probe.tmp\n');
     const input = baseCaseInput();
     const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
-    const outputs = [];
-    const exit = await runDecisionCorrectionsCommand(['save', '--json'], {
-      rootDir: root, enabled: true, output: (value) => outputs.push(value),
-      readStdin: async () => Buffer.from(JSON.stringify({ ...input, payload_digest: preview.payload_digest }), 'utf8'),
-    });
-    assert.equal(exit, 1, 'a rule pinning the old probe name must not pass the temp-area guard');
-    assert.equal(JSON.parse(outputs.join('')).code, 'observation-path-not-ignored');
+    const evaluated = [];
+    const recordingGuard = async (rootDir, relative, guardOptions) => {
+      const verdict = await verifyObservationIgnored(rootDir, relative, guardOptions);
+      evaluated.push({ relative, ...verdict });
+      return verdict;
+    };
+    await assert.rejects(
+      () => decisionCorrectionsCommand('save', { ...input, payload_digest: preview.payload_digest }, { rootDir: root, ...STORE_OPTIONS(), gitGuard: recordingGuard }),
+      (error) => error?.code === 'observation-path-not-ignored' && error.blocked === true,
+      'a rule pinning the old probe name must not pass the temp-area guard',
+    );
+    // Branch reach + probe shape: the refusal came from a `.tmp` probe whose
+    // name the crafted rule does NOT pin — no evaluated path carries the
+    // retired `write-probe` marker at all.
+    const refused = evaluated.filter((entry) => !entry.ok);
+    assert.equal(refused.length, 1, 'exactly one guard verdict refuses: the first visible probe');
+    assert.match(refused[0].relative, /\.tmp$/, 'the refusal target is a temp probe path');
+    assert.equal(evaluated.some((entry) => entry.relative.includes('write-probe')), false,
+      'the guard never probes the retired deterministic name');
+    const stored = await readdirSafe(path.join(namespaceDir, 'work', 'cases'));
+    assert.equal(stored.some((name) => name.endsWith('.json')), false, 'no case file is written behind the ineffective ignore');
+    assert.equal(stored.some((name) => name.endsWith('.tmp')), false, 'no temp file was ever materialized');
+  });
+
+  it('refuses a first-hex-narrow temp rule deterministically on the uncovered probe class', async () => {
+    const root = await makeTemp('aif-dc-r3-firsthex-');
+    await seedStoreProject(root);
+    await gitInit(root);
+    // A crafted rule that ignores only probes whose first UUID hex character
+    // is 0-7 leaves the 8-f half of the probe set visible: the deterministic
+    // 16-probe set (one probe per first hex character) must hit an uncovered
+    // probe deterministically — every 0-7 probe passes (ignored by the rule)
+    // and the `8` probe is the first refusal. This is exactly the narrow
+    // first-hex rule the probe set exists to defeat.
+    const namespaceDir = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE);
+    await mkdir(namespaceDir, { recursive: true });
+    await writeFile(path.join(namespaceDir, '.gitignore'), '*.json\n*.lock\n.gitignore\n*.json.[0-7]*.tmp\n');
+    const input = baseCaseInput();
+    const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
+    const evaluated = [];
+    let gitCalls = 0;
+    const countingExecGit = (file, args, runOptions) => {
+      gitCalls += 1;
+      return promisify(execFile)(file, args, runOptions);
+    };
+    const recordingGuard = async (rootDir, relative, guardOptions) => {
+      const verdict = await verifyObservationIgnored(rootDir, relative, { ...guardOptions, execGit: countingExecGit });
+      evaluated.push({ relative, ...verdict });
+      return verdict;
+    };
+    await assert.rejects(
+      () => decisionCorrectionsCommand('save', { ...input, payload_digest: preview.payload_digest }, { rootDir: root, ...STORE_OPTIONS(), gitGuard: recordingGuard }),
+      (error) => error?.code === 'observation-path-not-ignored' && error.blocked === true,
+      'a first-hex-narrow rule must not pass the 16-probe guard',
+    );
+    const probes = evaluated.filter((entry) => /\.tmp$/.test(entry.relative));
+    const firstHex = (relative) => relative.match(/\.json\.([0-9a-f])/)?.[1];
+    const refusedEntry = evaluated.find((entry) => !entry.ok);
+    assert.equal(firstHex(refusedEntry.relative), '8',
+      'the first uncovered probe class starts at hex 8 — the refusal is deterministic');
+    assert.deepEqual(probes.filter((entry) => entry.ok).map((entry) => firstHex(entry.relative)),
+      ['0', '1', '2', '3', '4', '5', '6', '7'],
+      'every covered probe (first hex 0-7) passed before the uncovered one refused');
+    assert.equal(probes.length, 9, 'the guard stops at the first non-ignored probe: 8 passes + 1 refusal');
+    // Cost measurement for the policy: every probe inside a git worktree runs
+    // the full three-call sequence (rev-parse, ls-files, check-ignore), so the
+    // probe refusal after 8 covered probes costs exactly 27 git calls; a fully
+    // passing 16-probe guard pass costs 48. The counted total here is 36:
+    // 27 probe calls + 9 calls for the three owned surfaces the recording
+    // guard also verifies (3 surfaces x 3 calls). A successful guarded write
+    // with the M3 in-lock re-pass stays documented at ~96 probe calls.
+    assert.equal(gitCalls, 36,
+      '27 probe calls (9 probes x 3) + 9 owned-surface calls (3 surfaces x 3)');
     const stored = await readdirSafe(path.join(namespaceDir, 'work', 'cases'));
     assert.equal(stored.some((name) => name.endsWith('.json')), false, 'no case file is written behind the ineffective ignore');
     assert.equal(stored.some((name) => name.endsWith('.tmp')), false, 'no temp file was ever materialized');

@@ -624,20 +624,35 @@ async function prepareNamespace(root) {
 
 // Pre-mutation git guard for the atomic write's transient sibling: the store
 // generates `<dest>.<random-uuid>.tmp` internally (workflow-state-store.mjs),
-// so the exact name cannot be pre-guarded. The probe below carries an
-// unpredictable random name with the SAME structural shape as the real temp
-// file, so any narrow saved rule that matches the probe inevitably matches
-// the real temp pattern too — a crafted `.gitignore` pinning the old
-// deterministic probe name (`*.write-probe.tmp`) no longer passes the guard.
-// The probe is NEVER materialized on disk: `git check-ignore` evaluates
-// ignore rules for non-existent paths, which still covers the case where a
-// PRE-EXISTING namespace .gitignore with narrow rules was preserved by
-// ensureRuntimeGitignore and leaves `*.tmp` siblings visible.
+// so the exact name cannot be pre-guarded. Instead of one unpredictable
+// probe, the guard evaluates a DETERMINISTIC set of 16 probes covering the
+// ENTIRE first hex character of the UUID space (`0`…`9`, `a`…`f`; the
+// remaining positions are fixed, keeping the real `<8>-<4>-<4>-<4>-<12>.tmp`
+// structural shape). Any saved rule whose match depends on the first hex
+// position — the `[0-7]` / `[8-f]` classes a narrow `.gitignore` can express
+// — is proven against every admissible first character, so a rule keyed to
+// only half of the class (e.g. `*.json.[0-7]*.tmp`) is refused
+// deterministically on the probe whose first character it excludes. The
+// guard refuses on the FIRST non-ignored probe, which also bounds the cost
+// of a refusal. Documented guarantee boundary: the set proves rules that
+// depend on the FIRST hex position only; adversarial rules keyed to other
+// UUID positions are NOT proven by this set (enumerating that space is
+// combinatorial and out of scope for a bounded guard) — this boundary is
+// restated in the policy. The probes are NEVER materialized on disk:
+// `git check-ignore` evaluates ignore rules for non-existent paths, which
+// still covers the case where a PRE-EXISTING namespace .gitignore with
+// narrow rules was preserved by ensureRuntimeGitignore and leaves `*.tmp`
+// siblings visible.
+const TEMP_PROBE_HEX = '0123456789abcdef';
+const TEMP_PROBE_TAIL = 'e45d85-7f6c-4a1b-9c2d-5b8a3f6e1d07';
 async function assertTempAreaIgnored(root, destinationFile, options = {}) {
-  const probe = `${destinationFile}.${randomUUID()}.tmp`;
-  const verdict = await (options.gitGuard ?? verifyObservationIgnored)(root, probe, options);
-  if (!verdict.ok || verdict.tracked) {
-    return { ok: false, code: verdict.ok ? 'observation-path-tracked' : verdict.code, detail: verdict.detail ?? probe };
+  const gitGuard = options.gitGuard ?? verifyObservationIgnored;
+  for (const hex of TEMP_PROBE_HEX) {
+    const probe = `${destinationFile}.${hex}${TEMP_PROBE_TAIL}.tmp`;
+    const verdict = await gitGuard(root, probe, options);
+    if (!verdict.ok || verdict.tracked) {
+      return { ok: false, code: verdict.ok ? 'observation-path-tracked' : verdict.code, detail: verdict.detail ?? probe };
+    }
   }
   return null;
 }

@@ -192,6 +192,28 @@ snapshot projection: writing, overwriting, or deleting cases cannot shift
 the required QA fingerprint, and a declared root inside the namespace fails
 closed with `self-referential-input`.
 
+The temp-area guard zones the atomic write's transient sibling with a
+DETERMINISTIC set of 16 probes covering the entire first hex character of
+the UUID space (`0`…`9`, `a`…`f`; the remaining UUID positions are fixed, so
+every probe keeps the real `<8>-<4>-<4>-<4>-<12>.tmp` store shape). The set
+proves saved `.gitignore` rules whose match depends on the FIRST hex
+position — the `[0-7]` / `[8-f]` classes a narrow rule can express — so a
+rule keyed to only half of a class (e.g. `*.json.[0-7]*.tmp`) is refused
+deterministically on the uncovered probe. Documented guarantee boundary:
+rules keyed to OTHER UUID positions are not proven by this set —
+enumerating that space is combinatorial and out of scope for a bounded
+guard; the probes are never materialized on disk (`git check-ignore`
+evaluates non-existent paths). Cost, measured and pinned by the test suite:
+inside a git worktree every probe runs the full three-call sequence
+(`rev-parse`, `ls-files`, `check-ignore` — `requirement-lint-git-guard.mjs`),
+so a fully passing guard pass costs 48 git calls and the pre-lock pass plus
+the writer's in-lock re-check totals up to 96 on a successful guarded write;
+outside a git worktree the guard short-circuits after one `rev-parse` per
+probe; the guard stops at the first non-ignored probe, so a refusal costs
+three calls per evaluated probe only; the `delete` path checks actually
+existing temp siblings and never runs the probe set, so its cost is
+unchanged.
+
 ## See Also
 
 - [Claim Evidence Policy](claim-evidence-policy.md) — the advisory
