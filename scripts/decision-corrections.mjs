@@ -644,7 +644,14 @@ async function prepareNamespace(root) {
 // narrow rules was preserved by ensureRuntimeGitignore and leaves `*.tmp`
 // siblings visible.
 const TEMP_PROBE_HEX = '0123456789abcdef';
-const TEMP_PROBE_TAIL = 'e45d85-7f6c-4a1b-9c2d-5b8a3f6e1d07';
+// The fixed tail keeps the real UUID group widths (<8>-<4>-<4>-<4>-<12>): the
+// first group is `<hex>` + 7 fixed hex characters = 8. A 7-character first
+// group would let a saved rule keyed to that WIDTH (e.g. `*.json.???????-*.tmp`
+// — seven wildcards before the dash) ignore every probe while leaving the real
+// 8-character temp sibling visible, and group width is a first-position
+// property the set claims to cover, not part of the documented
+// other-positions boundary.
+const TEMP_PROBE_TAIL = 'e45d85f-7f6c-4a1b-9c2d-5b8a3f6e1d07';
 async function assertTempAreaIgnored(root, destinationFile, options = {}) {
   const gitGuard = options.gitGuard ?? verifyObservationIgnored;
   for (const hex of TEMP_PROBE_HEX) {

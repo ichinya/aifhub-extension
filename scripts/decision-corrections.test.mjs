@@ -2177,6 +2177,41 @@ describe('decision-corrections review round 3', () => {
     assert.equal(stored.some((name) => name.endsWith('.tmp')), false, 'no temp file was ever materialized');
   });
 
+  it('keeps every probe at the real store UUID group widths (8/4/4/4/12)', async () => {
+    const root = await makeTemp('aif-dc-r3-widths-');
+    await seedStoreProject(root);
+    // A committed root .gitignore ignoring the runtime state tree: every
+    // owned surface and every probe passes the REAL git guard, so the save
+    // succeeds and both passes (pre-lock and the M3 in-lock re-check) evaluate
+    // the full 16-probe set through verifyObservationIgnored.
+    await writeFile(path.join(root, '.gitignore'), '.ai-factory/state/\n');
+    await gitInit(root);
+    const input = baseCaseInput({ case_id: 'r3-widths' });
+    const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
+    const probePaths = [];
+    const recordingGuard = async (rootDir, relative, guardOptions) => {
+      const verdict = await verifyObservationIgnored(rootDir, relative, guardOptions);
+      if (relative.endsWith('.tmp')) probePaths.push(relative);
+      return verdict;
+    };
+    const saved = await decisionCorrectionsCommand('save', { ...input, payload_digest: preview.payload_digest },
+      { rootDir: root, ...STORE_OPTIONS(), gitGuard: recordingGuard });
+    assert.equal(saved.ok, true, 'the save passes the real guard on a correctly ignored tree');
+    assert.equal(probePaths.length, 32, '16 probes per pass: pre-lock plus the in-lock re-check');
+    const caseFile = `.ai-factory/state/${DECISION_CORRECTIONS_NAMESPACE}/work/cases/r3-widths.json`;
+    const uuidOf = (probe) => probe.slice(caseFile.length + 1, -'.tmp'.length);
+    const firstHexes = new Set();
+    for (const probe of probePaths) {
+      assert.match(uuidOf(probe), /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+        `every probe must carry the real 8/4/4/4/12 UUID group widths, got ${uuidOf(probe)}`);
+      firstHexes.add(uuidOf(probe)[0]);
+    }
+    assert.deepEqual([...firstHexes].sort(), [...'0123456789abcdef'],
+      'the evaluated set covers every first hex character');
+    const stored = await readdirSafe(path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE, 'work', 'cases'));
+    assert.deepEqual(stored.filter((name) => name.endsWith('.tmp')), [], 'no temp file was ever materialized');
+  });
+
   it('keeps the shared .gitignore when another writer holds the scope lock', async () => {
     const root = await makeTemp('aif-dc-r3-locked-');
     await seedStoreProject(root);
