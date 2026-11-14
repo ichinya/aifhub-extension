@@ -1193,6 +1193,14 @@ export async function validateObservationBinding(rootDir, observation, options =
     const freshSupportedSymbols = new Set(freshTrace.trace.nodes
       .map((node) => node?.symbol)
       .filter((symbol) => typeof symbol === 'string' && kindForSymbol(symbol) !== null));
+    // Bound set: only operation/endpoint symbols — the supported kind whose
+    // semantic_symbol node the writer derives unconditionally, with no
+    // test-anchor search and no spec-content resolution. The declared
+    // universe above keeps every supported kind; this bound deliberately
+    // stays conservative.
+    const freshMandatorySymbols = new Set(freshTrace.trace.nodes
+      .map((node) => node?.symbol)
+      .filter((symbol) => typeof symbol === 'string' && kindForSymbol(symbol) === 'semantic_symbol'));
     const inventoryPaths = new Set(freshInventory);
     const presentedTestInputs = new Set(recordedInputs
       .map((input) => input?.path)
@@ -1211,15 +1219,16 @@ export async function validateObservationBinding(rootDir, observation, options =
     if ((recordedScan.declared_sources ?? null) !== Math.min(freshDeclared, MAX_ACCOUNTED_SOURCES)) {
       mismatched.push('declared_sources');
     }
-    // Provable-truncation bound: every supported-kind trace symbol derives a
-    // mandatory semantic_symbol node with no test-anchor search (best-effort
-    // bound — requirement/scenario refs may resolve to null and are
+    // Provable-truncation bound: only operation/endpoint trace symbols are
+    // counted — they always derive a mandatory semantic_symbol node with no
+    // test-anchor search (best-effort bound — requirement/scenario refs may
+    // resolve to {node:null} when spec sources are unreadable and are
     // conservatively NOT counted, so the bound undercounts). When the bound
     // exceeds the node limit, an honest run must have truncated the graph and
     // degraded coverage, so a recorded full-coverage observation over such a
     // trace is a provably impossible form, not merely drifted.
     const nodeLimit = observation.graph_limits?.max_nodes ?? GRAPH_LIMITS.max_nodes;
-    if (freshSupportedSymbols.size > nodeLimit && recordedScan.coverage === 'full') {
+    if (freshMandatorySymbols.size > nodeLimit && recordedScan.coverage === 'full') {
       return { ok: false, code: 'observation-invalid' };
     }
     // Full coverage implies every presented input was readable when the

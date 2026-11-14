@@ -2582,6 +2582,52 @@ describe('decision-corrections request-scoped cleanup', () => {
       'the fresh namespace is fully removed: no .gitignore, no empty directories');
   });
 
+  it('removes the request-created .gitignore when the authoritative in-lock re-check fails after the lock was acquired', async () => {
+    const root = await makeTemp('aif-dc-cl-lockcb-');
+    await seedStoreProject(root);
+    // The design's required in-lock failure scenario: the failure must fire
+    // AFTER the scope lock callback has been entered, so the finally releases
+    // the lock and the two-phase catch cleanup re-acquires it, proves the
+    // fresh composition, and removes the owned .gitignore plus the empty
+    // directories. The digest echo cannot serve here: it is front-run by the
+    // pre-lock validation pass, so a wrong digest is refused before the
+    // namespace is ever created. The evolution link re-check can: the save
+    // validates the linked transaction before materialization and re-checks
+    // it authoritatively inside the lock, which is exactly the state change
+    // the lock exists to serialize. The git guard hook flips the linked
+    // transaction to rolled back at the temp-probe call (the last guard
+    // before lock acquisition), so the pre-lock pass sees an applied link
+    // while the in-lock pass refuses.
+    const proposal = {
+      transaction_id: 'tx-inlock',
+      skill: 'aif-implement',
+      after: '# Updated context for tx-inlock\n',
+      reason: 'repair installed helper context',
+      evidence: ['docs/evidence.md'],
+    };
+    await writeFile(path.join(root, 'docs', 'evidence.md'), 'evidence for the transaction\n');
+    const proposed = await evolutionCommand('propose', proposal, { rootDir: root });
+    await evolutionCommand('apply', { transaction_id: 'tx-inlock', proposal_digest: proposed.proposal_digest }, { rootDir: root });
+    const input = baseCaseInput({ case_id: 'cl-lockcb', evolution: { transaction_id: 'tx-inlock', proposal_digest: proposed.proposal_digest } });
+    const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
+    let rolledBack = false;
+    const raceSwitchGuard = async (rootDir, relative) => {
+      if (!rolledBack && relative.endsWith('.tmp')) {
+        // The authoritative in-lock re-check must see the flipped state.
+        await evolutionCommand('rollback', { transaction_id: 'tx-inlock', proposal_digest: proposed.proposal_digest }, { rootDir: root });
+        rolledBack = true;
+      }
+      return { ok: true, gitWorktree: false, ignored: true, tracked: false };
+    };
+    await assert.rejects(
+      () => decisionCorrectionsCommand('save', { ...input, payload_digest: preview.payload_digest }, { rootDir: root, ...STORE_OPTIONS(), gitGuard: raceSwitchGuard }),
+      (error) => error?.code === 'transaction-not-applied' && error.blocked === true,
+      'the in-lock evolution re-check refuses after the pre-lock pass accepted the applied link',
+    );
+    assert.equal(await lstatExists(namespaceDir(root)), false,
+      'the in-lock failure still cleans the fresh namespace: no .gitignore, no empty directories, no lock residue');
+  });
+
   it('cleans the fresh run namespace after a probe-guard refusal leaves nothing foreign behind', async () => {
     const root = await makeTemp('aif-dc-cl-run-');
     await seedStoreProject(root);
