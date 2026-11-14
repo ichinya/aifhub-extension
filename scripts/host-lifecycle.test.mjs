@@ -767,6 +767,7 @@ test('AC6: release validation is additive; new modules do not import semantic or
     assert.doesNotMatch(source, /from ['"]\.\/execution-state\.mjs|from ['"]\.\/host-delivery\.mjs/); // CLI TLA cycle
   }
   const provenance = await readFile(new URL('execution-provenance.mjs', import.meta.url), 'utf8');
-  assert.doesNotMatch(provenance, /'host-lifecycle(?:-store)?\.mjs'/);
+  // Included in the release 1.8.2 provenance manifest (closes the #231 deferral).
+  assert.match(provenance, /'scripts\/host-lifecycle\.mjs', 'scripts\/host-lifecycle-store\.mjs'/);
   assert.ok((await readdir(new URL('.', import.meta.url))).includes('host-lifecycle.test.mjs'));
 });

@@ -1,6 +1,6 @@
 {
-  "version": "1.8.1",
-  "released_at": "2026-11-05T18:52:16.423Z",
+  "version": "1.8.2",
+  "released_at": "2026-11-14T18:24:33.180Z",
   "files": [
     {
       "path": "scripts/workflow-state-store.mjs",
@@ -33,6 +33,14 @@
     {
       "path": "scripts/no-shell-process.mjs",
       "sha256": "a36678811a1a98bebcccffea97447ad9a330b182112a901ae5f9ae9814365a89"
+    },
+    {
+      "path": "scripts/host-lifecycle.mjs",
+      "sha256": "49da9ad141e976f019359b357126f23b7c18ec9485a0dae37fe7de3b6316c87b"
+    },
+    {
+      "path": "scripts/host-lifecycle-store.mjs",
+      "sha256": "823c4656b060e12b7f0f6c3f2c3d043f32d2f8188c5ded3d5685bba9b917fc60"
     }
   ]
 }
