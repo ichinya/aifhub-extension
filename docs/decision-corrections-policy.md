@@ -187,6 +187,18 @@ lock (save, run, and lifecycle share this request-scoped cleanup; the
 lifecycle cleanup considers only the `cases` leaf removable). The transient
 `write.lock` never survives a refusal: the store's own `finally` releases and
 unlinks it, and the cleanup's re-acquisition creates-and-deletes its own.
+Because a concurrent same-scope request's cleanup can remove the namespace
+`.gitignore` between a writer's pre-lock proof and its lock acquisition, every
+write path re-ensures the ignore state (an idempotent recreate through the
+same `ensureRuntimeGitignore`) and re-checks the temp zone under the scope
+lock, before the first record byte; a failed re-check refuses with the
+existing codes, and a recreated ignore file upgrades that request's cleanup
+action to `create`, so a late failure removes the recreated file instead of
+leaking it out of a `preserve`-scoped cleanup. The residual window is the
+interval between a writer's in-lock re-check and its first record byte —
+serialized for same-scope writers and cleanups by the very lock both sides
+hold; a concurrent first save of a different scope stays outside this
+serialization (documented boundary).
 The `decision-corrections` namespace is a closed runtime namespace in the QA
 snapshot projection: writing, overwriting, or deleting cases cannot shift
 the required QA fingerprint, and a declared root inside the namespace fails

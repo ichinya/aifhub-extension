@@ -2858,3 +2858,148 @@ describe('decision-corrections request-scoped cleanup', () => {
       'the request-created .gitignore and the empty leaf directories are removed; no lock residue');
   });
 });
+
+// ---------------------------------------------------------------------------
+// M3: writer-side in-lock re-ensure/re-check. A same-scope request's
+// catch-cleanup can remove the namespace .gitignore between writer B's
+// pre-lock proof and B's lock acquisition; under the scope lock every writer
+// re-ensures the ignore file and re-checks the temp zone before the first
+// record byte. Seams inject the interleaving deterministically through the
+// DI git guard; no claim is made about live two-process races.
+// ---------------------------------------------------------------------------
+
+describe('decision-corrections in-lock ignore re-ensure', () => {
+  const namespaceDir = (root) => path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE);
+  const namespaceGitignore = (root) => path.join(namespaceDir(root), '.gitignore');
+  // One-shot seam standing in for a concurrent same-scope cleanup: the first
+  // temp-probe call is the last guard before lock acquisition, so deleting
+  // the ignore file there reproduces exactly the artifact state a catch-
+  // cleanup leaves between writer B's pre-lock proof and B's lock phase.
+  const cleanupSeamGuard = (gitignorePath, state) => async (rootDir, relative) => {
+    if (!state.fired && relative.endsWith('.tmp')) {
+      await rm(gitignorePath, { force: true });
+      state.fired = true;
+    }
+    return { ok: true, gitWorktree: false, ignored: true, tracked: false };
+  };
+
+  it('re-ensures the ignore state under the scope lock before the save writes (M3, same-scope prepared-B)', async () => {
+    const root = await makeTemp('aif-dc-m3-prep-');
+    await seedStoreProject(root);
+    const input = baseCaseInput({ case_id: 'm3-prep' });
+    const state = { fired: false };
+    const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
+    const saved = await decisionCorrectionsCommand('save', { ...input, payload_digest: preview.payload_digest },
+      { rootDir: root, ...STORE_OPTIONS(), gitGuard: cleanupSeamGuard(namespaceGitignore(root), state) });
+    assert.equal(saved.ok, true, 'the save succeeds after the in-lock re-ensure restored the ignore file');
+    assert.equal(state.fired, true, 'the seam must have removed the ignore file pre-lock');
+    assert.equal((await readdirSafe(namespaceDir(root))).includes('.gitignore'), true,
+      'the in-lock re-ensure recreated the .gitignore the concurrent cleanup removed');
+    assert.ok(await lstatExists(path.join(namespaceDir(root), 'work', 'cases', 'm3-prep.json')),
+      'the record was written under a restored ignore state');
+  });
+
+  it('removes the recreated .gitignore when the save fails after the in-lock re-ensure created it (M3, recreate leak)', async () => {
+    const root = await makeTemp('aif-dc-m3-leak-');
+    await seedStoreProject(root);
+    // Pre-existing ignore file: the pre-lock prepareNamespace takes action
+    // 'preserve'. The seam deletes the file and rolls back the linked
+    // evolution transaction at the first temp-probe call, so the in-lock
+    // re-ensure recreates the ignore file (upgrading the cleanup action to
+    // 'create') and the authoritative evolution re-check then refuses the
+    // write inside the lock — the catch cleanup must remove the RECREATED
+    // file, not leak it out of a 'preserve'-scoped cleanup. The digest echo
+    // cannot serve as the in-lock failure here: the save pre-pass checks it
+    // before any materialization, so it never reaches the lock.
+    await writeFile(path.join(root, 'docs', 'evidence.md'), 'evidence for the m3 leak transaction\n');
+    const proposed = await evolutionCommand('propose', {
+      transaction_id: 'tx-m3-leak',
+      skill: 'aif-implement',
+      after: '# Updated context for tx-m3-leak\n',
+      reason: 'repair installed helper context',
+      evidence: ['docs/evidence.md'],
+    }, { rootDir: root });
+    await evolutionCommand('apply', { transaction_id: 'tx-m3-leak', proposal_digest: proposed.proposal_digest }, { rootDir: root });
+    const namespaceDirPath = namespaceDir(root);
+    await mkdir(namespaceDirPath, { recursive: true });
+    await writeFile(namespaceGitignore(root), '*\n!.gitignore\n');
+    const input = baseCaseInput({ case_id: 'm3-leak', evolution: { transaction_id: 'tx-m3-leak', proposal_digest: proposed.proposal_digest } });
+    const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
+    const state = { fired: false };
+    const leakSeamGuard = async (rootDir, relative) => {
+      if (!state.fired && relative.endsWith('.tmp')) {
+        await rm(namespaceGitignore(root), { force: true });
+        await evolutionCommand('rollback', { transaction_id: 'tx-m3-leak', proposal_digest: proposed.proposal_digest }, { rootDir: root });
+        state.fired = true;
+      }
+      return { ok: true, gitWorktree: false, ignored: true, tracked: false };
+    };
+    await assert.rejects(
+      () => decisionCorrectionsCommand('save', { ...input, payload_digest: preview.payload_digest },
+        { rootDir: root, ...STORE_OPTIONS(), gitGuard: leakSeamGuard }),
+      (error) => error?.code === 'transaction-not-applied' && error.blocked === true,
+      'the authoritative in-lock evolution re-check refuses the write, after the re-ensure ran',
+    );
+    assert.equal(state.fired, true, 'the seam must have removed the ignore file pre-lock');
+    assert.equal(await lstatExists(namespaceDirPath), false,
+      'the recreated .gitignore is cleaned: the namespaceAction upgrade closed the recreate leak');
+  });
+
+  it('keeps the shared .gitignore when the cleanup finds a foreign scope directory (M3, different-scope boundary)', async () => {
+    const root = await makeTemp('aif-dc-m3-foreign-');
+    await seedStoreProject(root);
+    // The documented cleanup boundary: a first save of a DIFFERENT scope is
+    // not serialized with this scope's lock. The composition invariant stays
+    // the fail-safe backstop: a namespace holding a foreign scope directory
+    // is never cleaned, and the shared ignore file survives.
+    const namespaceDirPath = namespaceDir(root);
+    await mkdir(namespaceDirPath, { recursive: true });
+    await writeFile(namespaceGitignore(root), '*\n!.gitignore\n');
+    await mkdir(path.join(namespaceDirPath, 'beta'), { recursive: true });
+    const refusingProbeGuard = async (rootDir, relative) => {
+      if (relative.endsWith('.tmp')) return { ok: false, code: 'observation-path-not-ignored', detail: relative };
+      return { ok: true, gitWorktree: false, ignored: true, tracked: false };
+    };
+    const input = baseCaseInput({ case_id: 'm3-foreign', scope: 'alpha' });
+    const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
+    await assert.rejects(
+      () => decisionCorrectionsCommand('save', { ...input, payload_digest: preview.payload_digest },
+        { rootDir: root, ...STORE_OPTIONS(), gitGuard: refusingProbeGuard }),
+      (error) => error?.code === 'observation-path-not-ignored' && error.blocked === true,
+    );
+    assert.equal((await readdirSafe(namespaceDirPath)).includes('.gitignore'), true,
+      'the cleanup never removes the ignore file while a foreign scope directory exists');
+    assert.ok(await lstatExists(path.join(namespaceDirPath, 'beta')), 'the foreign scope directory is untouched');
+  });
+
+  it('re-ensures the ignore state on the lifecycle write path (M3)', async () => {
+    const root = await makeTemp('aif-dc-m3-lc-');
+    await seedStoreProject(root);
+    const input = baseCaseInput({ case_id: 'm3-lc' });
+    await saveCase(root, input);
+    const state = { fired: false };
+    const confirmed = await decisionCorrectionsCommand('confirm', {
+      case_id: input.case_id, scope: input.scope, expected_label: input.expected_label,
+      payload_digest: (await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() })).payload_digest,
+    }, { rootDir: root, ...STORE_OPTIONS(), gitGuard: cleanupSeamGuard(namespaceGitignore(root), state) });
+    assert.equal(confirmed.ok, true, 'the lifecycle transition succeeds after the in-lock re-ensure');
+    assert.equal(state.fired, true, 'the seam must have removed the ignore file pre-lock');
+    assert.equal((await readdirSafe(namespaceDir(root))).includes('.gitignore'), true,
+      'the lifecycle writer restored the .gitignore under the lock');
+    assert.equal(confirmed.case.status, 'confirmed', 'the lifecycle transition landed');
+  });
+
+  it('re-ensures the ignore state on the run write path (M3)', async () => {
+    const root = await makeTemp('aif-dc-m3-run-');
+    await seedStoreProject(root);
+    const state = { fired: false };
+    const run = await decisionCorrectionsCommand('run', { scope: 'work', write: true },
+      { rootDir: root, ...STORE_OPTIONS(), runId: 'm3run', gitGuard: cleanupSeamGuard(namespaceGitignore(root), state) });
+    assert.equal(run.ok, true, 'the run write succeeds after the in-lock re-ensure');
+    assert.equal(state.fired, true, 'the seam must have removed the ignore file pre-lock');
+    assert.equal((await readdirSafe(namespaceDir(root))).includes('.gitignore'), true,
+      'the run writer restored the .gitignore under the lock');
+    assert.ok(await lstatExists(path.join(namespaceDir(root), 'work', 'runs', 'm3run.json')),
+      'the run record was written under a restored ignore state');
+  });
+});
