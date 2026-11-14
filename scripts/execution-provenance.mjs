@@ -11,7 +11,8 @@ const LEGACY_HELPER_MODULES = Object.freeze([
   'scripts/execution-task-source.mjs', 'scripts/isolated-execution.mjs',
 ]);
 export const HELPER_MODULES = Object.freeze([...LEGACY_HELPER_MODULES,
-  'scripts/host-delivery.mjs', 'scripts/host-delivery-store.mjs', 'scripts/no-shell-process.mjs']);
+  'scripts/host-delivery.mjs', 'scripts/host-delivery-store.mjs', 'scripts/no-shell-process.mjs',
+  'scripts/host-lifecycle.mjs', 'scripts/host-lifecycle-store.mjs']);
 const OLD_HASHES = [
   'fa61bfab15fe948ce29918117a0510c57b735c83a5b04f472286220275c90759',
   'de007ec332ac5ea6c520063ad20577f1be3650b70a798b413b218b646d588cc6',

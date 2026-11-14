@@ -50,4 +50,4 @@ Classic finalizer остаётся механическим publisher'ом по�
 
 Тест scripts/host-lifecycle.test.mjs выводит counters в diagnostic output. Цель ≥2x относится к служебным fixtures; live model service calls, inference, payment и production host не запускались: **NOTRUN**. Live-пилот требует отдельной парной трассы реального координатора и агрегатора #230; offline ratio не является live acceptance — live acceptance вынесена в #266.
 
-Новые scripts/host-lifecycle.mjs и scripts/host-lifecycle-store.mjs намеренно **не добавлены в HELPER_MODULES** в этом change; регенерация provenance для изменённых helpers уже выполнена, до следующего release отложено только включение новых lifecycle-модулей в манифест. RUN_SCHEMA, receipt enum, batchReceipts, validateTransaction whitelist и contracts не расширяются.
+Scripts/host-lifecycle.mjs и scripts/host-lifecycle-store.mjs включены в HELPER_MODULES и provenance-манифест с release 1.8.2 (закрытие отложенного включения #231 — решение «при следующем release»; пин-тест AC6 перевёрнут на присутствие). RUN_SCHEMA, receipt enum, batchReceipts, validateTransaction whitelist и contracts не расширяются.

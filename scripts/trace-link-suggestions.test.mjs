@@ -1902,7 +1902,7 @@ describe('trace-link-suggestions registration contracts', () => {
     const contract = await readFile(path.join(REPO_ROOT, 'scripts', 'aifhub-command-wrappers-contract.test.mjs'), 'utf8');
     const descriptionMatch = /const DESCRIPTION = '([^']+)'/.exec(wrapper);
     assert.ok(descriptionMatch, 'wrapper must pin DESCRIPTION');
-    assert.equal(manifest.version, '1.8.1', 'the extension version is never bumped by this change');
+    assert.equal(manifest.version, '1.8.2', 'the version stays the release 1.8.2 bump; per-change pins update at releases');
     // reason: per-consumer registration edit — #284 added aifhub-context-selection-overlay (28 -> 29)
     assert.equal(manifest.commands.length, 29, 'one command added on top of #281 (26 -> 27), #283 (27 -> 28), and #284 (28 -> 29)');
     assert.ok(contract.includes("name: 'aifhub-trace-link-suggestions'"));
