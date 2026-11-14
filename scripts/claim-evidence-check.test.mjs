@@ -1270,9 +1270,10 @@ describe('claim-evidence binding revalidation', () => {
     // count/formula consistent. Honest reachability note: an exhaustive case
     // split (witness pairs present → the witness+full rule fires; no witness
     // pair with a positive count → the count-witness rule fires; count below
-    // the list length → the list>count rule fires) proves this shape can
-    // never fire the L2 pin FIRST while the surrounding checks hold — the
-    // L2 pin is documented defense-in-depth, and this fixture pins the
+    // the list length → the list>count rule fires) proves this shape is also
+    // caught by a later rule while the surrounding checks hold — the L2 pin
+    // itself is the first firing check for the shape, but never the ONLY
+    // one; it is documented defense-in-depth, and this fixture pins the
     // INVARIANT (full with a non-empty list is rejected), not the firing
     // line's attribution. The L1a/L1b fixtures above DO isolate their pins:
     // disabling L1a or L1b individually flips exactly its own assert.

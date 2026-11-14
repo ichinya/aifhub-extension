@@ -1306,7 +1306,13 @@ export async function validateObservationBinding(rootDir, observation, options =
     // non-file matches its recorded digest (no drift of its own) and is not
     // explained by any other input's drift — a full-coverage claim over such
     // an input is itself the fabrication and keeps the impossible-form
-    // verdict regardless of which other inputs drifted.
+    // verdict regardless of which other inputs drifted. The `inputs:`-
+    // mismatch disjunct below is belt-and-braces defense-in-depth: fresh
+    // inputs are built from the recorded inputs and the kind is part of the
+    // digest comparison, so a recorded non-file classification with matching
+    // digests already implies no `inputs:<path>` drift and the disjunct is
+    // unreachable by construction — it is kept so the fabrication verdict
+    // cannot be defeated if that construction ever changes.
     if (recordedScan.coverage === 'full' && freshInputs.some((input) => input.kind !== 'file')) {
       const fabricatedNonFile = freshInputs.some((input) => input.kind !== 'file'
         && (recordedInputs.find((candidate) => candidate?.path === input.path)?.kind ?? 'file') !== 'file');

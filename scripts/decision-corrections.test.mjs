@@ -2209,7 +2209,7 @@ describe('decision-corrections review round 3', () => {
     assert.deepEqual([...firstHexes].sort(), [...'0123456789abcdef'],
       'the evaluated set covers every first hex character');
     const stored = await readdirSafe(path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE, 'work', 'cases'));
-    assert.deepEqual(stored.filter((name) => name.endsWith('.tmp')), [], 'no temp file was ever materialized');
+    assert.deepEqual(stored.filter((name) => name.endsWith('.tmp')), [], 'no temp residue remains');
   });
 
   it('keeps the shared .gitignore when another writer holds the scope lock', async () => {

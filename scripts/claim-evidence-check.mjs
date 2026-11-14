@@ -832,18 +832,19 @@ export async function validateObservationBinding(rootDir, observation, options =
   const inputsByPath = new Map(recordedInputs.map((input) => [input?.path, input]));
   const recordedMissing = observation.structural?.missing_sources ?? [];
   // L2 (#310): full coverage implies an empty missing list. Honest
-  // reachability note: with the surrounding checks in force this branch is
-  // SHADOWED — it is never the first firing check, because every
-  // full-with-non-empty-list shape already fires an earlier rule (witness
-  // pairs present → the witness+full rule below; no witness pair with a
-  // positive count → the count-witness rule below; count below the list
-  // length → the list>count rule below — an exhaustive case split over
-  // witness/count combinations). This pin is deliberate defense-in-depth: it
-  // keeps the coverage-vs-list invariant enforceable on its own if any of
-  // those rules is ever reordered, weakened, or removed, and documents the
-  // invariant explicitly. Verdicts are identical with or without it; no test
-  // fixture can isolate its firing, so the suite pins the INVARIANT (full
-  // with a non-empty list is rejected), not this line's attribution.
+  // reachability note: this pin sits at the head of the block, so for its
+  // shape (full coverage with a non-empty missing list) it IS the first
+  // firing check in code order — but it is never the ONLY firing check: an
+  // exhaustive case split over witness/count combinations proves every such
+  // shape is also caught by a later rule (witness pairs present → the
+  // witness+full rule below; no witness pair with a positive count → the
+  // count-witness rule below; count below the list length → the list>count
+  // rule below). This pin is deliberate defense-in-depth: it keeps the
+  // coverage-vs-list invariant enforceable on its own if any of those rules
+  // is ever reordered, weakened, or removed, and documents the invariant
+  // explicitly. Verdicts are identical with or without it; no test fixture
+  // can isolate its firing, so the suite pins the INVARIANT (full with a
+  // non-empty list is rejected), not this line's attribution.
   if (semantic.coverage?.state === 'full' && recordedMissing.length > 0) {
     return { ok: false, code: 'observation-invalid' };
   }
