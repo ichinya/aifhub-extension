@@ -2788,15 +2788,18 @@ describe('trace-link-suggestions graph limits', () => {
     assert.equal(value.structural.outcome, 'none');
   });
 
-  it('stops before the assessor when the budget is exhausted exactly at the semantic remainder read (S2)', async () => {
+  it('stops before the assessor when the budget is exhausted exactly at the semantic remainder read (S2, single-read pin)', async () => {
     const root = await makeTemp('aif-tls-remainder-');
     const changeId = 'remainder-change';
     await seedCaseProject(root, changeId, { trace: 'traces/dev-trace-nm.json', specs: ['specs/spec-en.md', 'specs/spec-ru.md'], tests: [] });
-    // Clock contract: call 1 is startedAt, calls 2-4 are the structural
-    // deadline checks (post-specs, post-tests, post-graph), call 5 is the
-    // semantic stage's single remaining-budget read. The deadline is crossed
-    // exactly at that read — the floor clamp of the previous two-read scheme
-    // would have run the assessor with a fake positive remainder.
+    // Differential clock contract: call 1 is startedAt, calls 2-4 are the
+    // structural deadline checks (post-specs, post-tests, post-graph), call 5
+    // is the semantic stage's single remaining-budget read — and NOTHING
+    // reads the clock after it on this refusal path. The deadline is crossed
+    // exactly at that read, so the exact total of five reads pins the
+    // single-read schedule: an implementation that re-read the clock in the
+    // semantic stage would either decide earlier (fewer reads before the
+    // decision) or show a sixth read after the crossed one.
     let calls = 0;
     const now = () => {
       calls += 1;
@@ -2808,11 +2811,37 @@ describe('trace-link-suggestions graph limits', () => {
       now,
       assessor: () => { assessorCalls += 1; return { findings: [] }; },
     });
-    assert.equal(calls >= 5, true, 'the clock reached the semantic remainder read');
+    assert.equal(calls, 5, `exactly five clock reads: 1 startedAt + 3 structural checks + 1 semantic remainder read, got ${calls}`);
     assert.equal(exitCode, 0);
     assert.equal(value.state, 'not_run');
     assert.deepEqual(value.codes, ['deadline-exceeded']);
     assert.equal(assessorCalls, 0, 'a crossed budget stops the semantic stage before the assessor');
+    // Positive control: the differential stub catches a deliberately two-read
+    // remainder scheme. The control harness re-runs the retired scheduling —
+    // a pre-check followed by a separate remainder read with the old floor
+    // clamp — against a stub whose crossing falls one read LATER (between the
+    // two reads): the pre-check passes, the floor-clamped remainder turns the
+    // crossed budget into a fake positive one, and the assessor runs. That is
+    // exactly the S2 bug the single-read schedule removes, so the stub class
+    // demonstrably separates the two implementations instead of passing both.
+    let controlCalls = 0;
+    const controlNow = () => {
+      controlCalls += 1;
+      return controlCalls <= 5 ? 0 : 10_000;
+    };
+    const runTwoReadRemainder = () => {
+      const startedAt = controlNow(); // call 1: startedAt
+      const deadlineExceeded = () => (controlNow() - startedAt) >= 1000; // calls 2-4: structural checks
+      deadlineExceeded();
+      deadlineExceeded();
+      deadlineExceeded();
+      if (deadlineExceeded()) return 'stopped'; // call 5: pre-check reads 0 — not exceeded
+      const remaining = Math.max(1, 1000 - (controlNow() - startedAt)); // call 6: reads 10_000, clamps to 1
+      return remaining > 0 ? 'assessor' : 'stopped';
+    };
+    assert.equal(runTwoReadRemainder(), 'assessor',
+      'positive control: the differential stub catches the two-read scheme running the assessor on a floor-clamped fake remainder');
+    assert.equal(controlCalls, 6, 'the control consumed both semantic-stage reads');
   });
 
   it('counts duplicate trace nodes once in declared and scanned accounting', async () => {
