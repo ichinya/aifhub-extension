@@ -1266,10 +1266,16 @@ describe('claim-evidence binding revalidation', () => {
     assert.equal((await validateObservationBinding(root, unwitnessedCount)).code, 'observation-invalid',
       'a missing count without an unavailable/truncated witness pair is fabrication (L1b)');
     // L2 — full coverage with a non-empty missing list and no witness pairs:
-    // neither the witness rule nor the existing pair-direction pin can see
-    // this shape alone; the projection lists are kept canonically identical
-    // and the count/formula consistent so only the coverage-vs-list
-    // contradiction remains.
+    // the projection lists are kept canonically identical and the
+    // count/formula consistent. Honest reachability note: an exhaustive case
+    // split (witness pairs present → the witness+full rule fires; no witness
+    // pair with a positive count → the count-witness rule fires; count below
+    // the list length → the list>count rule fires) proves this shape can
+    // never fire the L2 pin FIRST while the surrounding checks hold — the
+    // L2 pin is documented defense-in-depth, and this fixture pins the
+    // INVARIANT (full with a non-empty list is rejected), not the firing
+    // line's attribution. The L1a/L1b fixtures above DO isolate their pins:
+    // disabling L1a or L1b individually flips exactly its own assert.
     const fullWithMissing = structuredClone(observation);
     const ghostMissing = [{ path: 'docs/ghost.md', reason: 'unreadable' }];
     fullWithMissing.structural.missing_sources = ghostMissing;

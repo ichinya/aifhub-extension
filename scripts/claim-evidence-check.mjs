@@ -831,6 +831,22 @@ export async function validateObservationBinding(rootDir, observation, options =
   }
   const inputsByPath = new Map(recordedInputs.map((input) => [input?.path, input]));
   const recordedMissing = observation.structural?.missing_sources ?? [];
+  // L2 (#310): full coverage implies an empty missing list. Honest
+  // reachability note: with the surrounding checks in force this branch is
+  // SHADOWED — it is never the first firing check, because every
+  // full-with-non-empty-list shape already fires an earlier rule (witness
+  // pairs present → the witness+full rule below; no witness pair with a
+  // positive count → the count-witness rule below; count below the list
+  // length → the list>count rule below — an exhaustive case split over
+  // witness/count combinations). This pin is deliberate defense-in-depth: it
+  // keeps the coverage-vs-list invariant enforceable on its own if any of
+  // those rules is ever reordered, weakened, or removed, and documents the
+  // invariant explicitly. Verdicts are identical with or without it; no test
+  // fixture can isolate its firing, so the suite pins the INVARIANT (full
+  // with a non-empty list is rejected), not this line's attribution.
+  if (semantic.coverage?.state === 'full' && recordedMissing.length > 0) {
+    return { ok: false, code: 'observation-invalid' };
+  }
   if (recordedPairs.filter((pair) => pair?.quote_check === 'source_unavailable' || pair?.quote_check === 'truncated').length > 0
     && (recordedMissing.length === 0 || (semantic.coverage?.state === 'full'))) {
     return { ok: false, code: 'observation-invalid' };
@@ -847,7 +863,7 @@ export async function validateObservationBinding(rootDir, observation, options =
     || canonical(recordedMissing) !== canonical(semantic.coverage?.missing_sources ?? null)) {
     return { ok: false, code: 'observation-invalid' };
   }
-  // Read-side coverage pins (#310, L1a/L1b/L2) on the already-read recorded
+  // Read-side coverage pins (#310, L1a/L1b) on the already-read recorded
   // data: the writer derives every count from the pairs array, so a recorded
   // coverage block disagreeing with it is internal fabrication, and binding
   // cannot substitute for these checks (the coverage and missing lists are
@@ -861,15 +877,11 @@ export async function validateObservationBinding(rootDir, observation, options =
   // L1b: a positive per-pair missing counter must be witnessed by at least
   // one pair whose quote_check says the source was unavailable or truncated —
   // the reverse direction (such a pair forces a non-empty missing list) is
-  // already pinned above; this closes the count-without-witness contrapositive.
+  // already pinned above, and the full-with-non-empty-list form is caught by
+  // L2 before this rule; this closes the count-without-witness contrapositive
+  // for a non-full coverage with an empty list.
   if ((coverageMissingCount ?? 0) > 0
     && !recordedPairs.some((pair) => pair?.quote_check === 'source_unavailable' || pair?.quote_check === 'truncated')) {
-    return { ok: false, code: 'observation-invalid' };
-  }
-  // L2: full coverage implies an empty missing list; without this pin the
-  // already-merged checks could not see the fabrication when no pair carries
-  // an unavailable/truncated quote_check (the witness rule above would pass).
-  if (semantic.coverage?.state === 'full' && recordedMissing.length > 0) {
     return { ok: false, code: 'observation-invalid' };
   }
   // Digest records are rebuilt from CURRENT disk bytes (never from the
