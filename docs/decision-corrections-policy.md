@@ -128,11 +128,11 @@ skipped, and a stored record whose integrity cannot be proven is reported as
 `invalid_record` instead of silently disappearing from the report. The
 replay signature format is versioned: each record carries
 `signature_format_version` at the top level (outside `payload` and its
-digest, so idempotent re-save and lifecycle transitions keep it); отсутствие
-поля читается как версия 1 без мутации загруженной записи, а несовпадение
-версии ожидаемой даёт исход `stale` с сигнатурой `signature-format-version`,
-а не `label_change` — изменение формата сигнатуры никогда не маскируется под
-смену оценки. Fixture
+digest, so idempotent re-save and lifecycle transitions keep it); a missing
+field reads as version 1 without mutating the loaded record, and a version
+mismatch yields `stale` with the `signature-format-version` signature rather
+than `label_change` — a signature format change is never masked as a label
+change. Fixture
 files carry an input role: role-input files are presented to the replayed
 consumer with its own input flag (a claim-evidence pairs envelope, a
 trace-link test file matching the frozen test path form, a requirement-lint
