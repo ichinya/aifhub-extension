@@ -1051,6 +1051,45 @@ describe('claim-evidence custody writer guards', () => {
     const content = await readFile(path.join(root, STATE_ROOT, 'work', CLAIM_EVIDENCE_NAMESPACE, 'observation.json'), 'utf8');
     assert.equal(JSON.parse(content).schema, 'aifhub.unrelated.v1', 'foreign leaf must survive a refused rename');
   });
+
+  it('keeps a legacy observation leaf unreplaceable and proves the documented remedy (M1)', async () => {
+    const root = await makeTemp('aif-ce-m1legacy-');
+    await seedSmokeProject(root);
+    const observationPath = path.join(root, STATE_ROOT, 'work', CLAIM_EVIDENCE_NAMESPACE, 'observation.json');
+    const argv = ['--change', 'work', '--pairs', 'pairs.json', '--write', '--json'];
+    // Step 1: an honest write produces a schema-valid observation carrying
+    // the required per-pair counter.
+    assert.equal(await runClaimEvidenceCheckCommand(argv, { rootDir: root, output: () => {} }), 0);
+    const honest = parseStrictJson(await readFile(observationPath, 'utf8'));
+    assert.equal(typeof honest.semantic.coverage.missing_sources_count, 'number');
+    // Step 2: the leaf is rewritten into its pre-required-field legacy form
+    // (ONLY semantic.coverage.missing_sources_count removed). The read-side
+    // shape check refuses it (shape before binding), and the write side keeps
+    // the legacy leaf unreplaceable: observation-leaf-conflict with the
+    // legacy bytes preserved exactly — a plain --write rerun is NOT a remedy.
+    const legacy = structuredClone(honest);
+    delete legacy.semantic.coverage.missing_sources_count;
+    const legacyBytes = `${JSON.stringify(legacy, null, 2)}\n`;
+    await writeFile(observationPath, legacyBytes, 'utf8');
+    assert.equal((await validateObservationBinding(root, legacy)).code, 'observation-invalid',
+      'the legacy shape fails the read-side schema shape check');
+    const writeOutputs = [];
+    assert.equal(await runClaimEvidenceCheckCommand(argv, { rootDir: root, output: (value) => writeOutputs.push(value) }), 1);
+    assert.ok(writeOutputs.join('').includes('observation-leaf-conflict'), 'the rerun must refuse the legacy leaf');
+    assert.equal(await readFile(observationPath, 'utf8'), legacyBytes, 'the legacy leaf bytes are preserved byte-exact');
+    // Step 3 — the documented remedy: delete ONLY the observation leaf (the
+    // namespace and its .gitignore stay) and repeat the original command with
+    // --write: the fresh record is schema-valid with the required field.
+    await rm(observationPath);
+    assert.equal(await runClaimEvidenceCheckCommand(argv, { rootDir: root, output: () => {} }), 0);
+    const rewritten = parseStrictJson(await readFile(observationPath, 'utf8'));
+    const schema = parseStrictJson(await readFile(path.join(REPO_ROOT, 'schemas', 'claim-evidence-observation.schema.json'), 'utf8'));
+    assert.deepEqual(validateJsonAgainstSchema(rewritten, schema), [], 'the fresh record is schema-valid');
+    assert.equal(typeof rewritten.semantic.coverage.missing_sources_count, 'number',
+      'the fresh observation carries the required per-pair counter');
+    assert.equal((await readdir(path.join(root, STATE_ROOT, 'work', CLAIM_EVIDENCE_NAMESPACE))).includes('.gitignore'), true,
+      'the remedy never needs to touch the namespace or its .gitignore');
+  });
 });
 
 // ---------------------------------------------------------------------------
