@@ -1023,29 +1023,47 @@ async function lifecycleCommand(action, input, options) {
     requireValue(existing.payload.partition !== 'held_out', 'held-out-tuning', true);
   }
   await assertGuard(await guardOwnedSurfaces(rootDir, [caseFile, `${NAMESPACE_ROOT}/.gitignore`, lockPath], options));
-  const lifecycleNamespace = await prepareNamespace(rootDir);
-  await assertGuard(lifecycleNamespace.ok === true ? null : lifecycleNamespace);
-  await assertGuard(await assertTempAreaIgnored(rootDir, caseFile, options));
-  return store.lock(lockPath, async () => {
-    const record = await loadCaseRecord(store, rootDir, scope, caseId);
-    // Held-out immunity is enforced before any mutation logic: report-only
-    // partitions never accept outcome-affecting mutations (confirm would
-    // author a held-out outcome; save-revision and lifecycle are the tuning
-    // surfaces). Retention (delete) stays available.
-    requireValue(record.payload.partition !== 'held_out', 'held-out-tuning', true);
-    let next;
-    if (action === 'confirm') {
-      requireValue(input.payload_digest === record.payload_digest, 'payload-mismatch', true);
-      requireValue(input.expected_label === record.payload.expected_label, 'label-mismatch', true);
-      next = lifecycleTransition(record, 'confirmed');
-    } else if (action === 'reject') {
-      next = lifecycleTransition(record, 'rejected', input.reason);
-    } else {
-      next = lifecycleTransition(record, 'superseded', input.reason);
-    }
-    await store.save(caseFile, next);
-    return { ok: true, action, case: next };
-  });
+  // Request-scoped lifecycle materialization mirrors the save path: the
+  // owned-surface guards stay outside the try, namespace preparation and the
+  // temp guard run inside it, and any failure from preparation onwards cleans
+  // the artifacts THIS request created under the re-acquired scope lock.
+  // leafDirs stays conservatively narrow (`cases` only): a lifecycle never
+  // writes into `runs`, so the cleanup must not consider that leaf removable
+  // on this request's behalf. The existing case survives every failure here —
+  // the cleanup removes only empty leaf directories and, solely when this
+  // request's prepareNamespace created it, the namespace .gitignore.
+  let lifecycleNamespaceAction = 'preserve';
+  try {
+    const lifecycleNamespace = await prepareNamespace(rootDir);
+    lifecycleNamespaceAction = lifecycleNamespace.ok ? lifecycleNamespace.action : 'preserve';
+    await assertGuard(lifecycleNamespace.ok === true ? null : lifecycleNamespace);
+    await assertGuard(await assertTempAreaIgnored(rootDir, caseFile, options));
+    return await store.lock(lockPath, async () => {
+      const record = await loadCaseRecord(store, rootDir, scope, caseId);
+      // Held-out immunity is enforced before any mutation logic: report-only
+      // partitions never accept outcome-affecting mutations (confirm would
+      // author a held-out outcome; save-revision and lifecycle are the tuning
+      // surfaces). Retention (delete) stays available.
+      requireValue(record.payload.partition !== 'held_out', 'held-out-tuning', true);
+      let next;
+      if (action === 'confirm') {
+        requireValue(input.payload_digest === record.payload_digest, 'payload-mismatch', true);
+        requireValue(input.expected_label === record.payload.expected_label, 'label-mismatch', true);
+        next = lifecycleTransition(record, 'confirmed');
+      } else if (action === 'reject') {
+        next = lifecycleTransition(record, 'rejected', input.reason);
+      } else {
+        next = lifecycleTransition(record, 'superseded', input.reason);
+      }
+      await store.save(caseFile, next);
+      return { ok: true, action, case: next };
+    });
+  } catch (error) {
+    // The `await` is deliberate: a cleanup rejection must surface through
+    // this request's error channel, never as an unhandled rejection.
+    await cleanupRequestNamespace(store, rootDir, { scope, namespaceAction: lifecycleNamespaceAction, leafDirs: ['cases'] });
+    throw error;
+  }
 }
 
 export async function deleteDecisionCorrection(input, options = {}) {
@@ -1557,13 +1575,16 @@ export async function runDecisionCorrectionReplay(input, options = {}) {
     return { ok: true, action: 'run', preview: true, run: runRecord };
   }
   const runFile = `${scopeDir}/runs/${runRecord.run_id}.json`;
-  // The write path materializes namespace artifacts exactly like the save
-  // path, so its failures share the same request-scoped cleanup (the save
-  // path previously cleaned up; the run path never did — same fail-safe
-  // semantics, now one helper).
+  // Owned-surface guards run OUTSIDE the try, exactly like the save path: an
+  // early git-guard refusal must not reach cleanupRequestNamespace, which
+  // would materialize `write.lock` and the namespace directories around
+  // surfaces that were never verified. The write path materializes namespace
+  // artifacts exactly like the save path, so its later failures share the
+  // same request-scoped cleanup (the save path previously cleaned up; the
+  // run path never did — same fail-safe semantics, now one helper).
+  await assertGuard(await guardOwnedSurfaces(rootDir, [runFile, `${NAMESPACE_ROOT}/.gitignore`, `${scopeDir}/write.lock`], options));
   let runNamespaceAction = 'preserve';
   try {
-    await assertGuard(await guardOwnedSurfaces(rootDir, [runFile, `${NAMESPACE_ROOT}/.gitignore`, `${scopeDir}/write.lock`], options));
     const runNamespace = await prepareNamespace(rootDir);
     runNamespaceAction = runNamespace.ok ? runNamespace.action : 'preserve';
     await assertGuard(runNamespace.ok === true ? null : runNamespace);

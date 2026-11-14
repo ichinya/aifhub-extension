@@ -171,12 +171,22 @@ repeated delete honestly as `deleted: false`.
 
 ## State and isolation
 
-All writes run the full guard set before the first byte lands: file-shadow
-checks, leaf ownership (only a schema-valid case of the same `case_id` may
-be replaced), and `verifyObservationIgnored` over every owned surface —
-case files, run records, the namespace `.gitignore`, and the write lock —
-with tracked paths refusing `observation-path-tracked`, non-ignored paths
-refusing `observation-path-not-ignored`, and git failures failing closed.
+All writes order their guards so that refusal never litters: the owned-surface
+guards run before any materialization — file-shadow checks, leaf ownership
+(only a schema-valid case of the same `case_id` may be replaced), and
+`verifyObservationIgnored` over every owned surface — case files, run
+records, the namespace `.gitignore`, and the write lock — with tracked paths
+refusing `observation-path-tracked`, non-ignored paths refusing
+`observation-path-not-ignored`, and git failures failing closed; a refusal
+at this stage leaves no directories and no lock file behind. Namespace
+materialization (`prepareNamespace`, which may create the namespace
+`.gitignore`) and the temp-area probe run after that preparation but still
+before the lock and the first record byte, and a failure anywhere in that
+window cleans the artifacts the request created under the re-acquired scope
+lock (save, run, and lifecycle share this request-scoped cleanup; the
+lifecycle cleanup considers only the `cases` leaf removable). The transient
+`write.lock` never survives a refusal: the store's own `finally` releases and
+unlinks it, and the cleanup's re-acquisition creates-and-deletes its own.
 The `decision-corrections` namespace is a closed runtime namespace in the QA
 snapshot projection: writing, overwriting, or deleting cases cannot shift
 the required QA fingerprint, and a declared root inside the namespace fails

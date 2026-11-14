@@ -2681,4 +2681,93 @@ describe('decision-corrections request-scoped cleanup', () => {
       'the ignore file survives: cleanup never works around a non-empty leaf');
     assert.ok(await lstatExists(runLeaf), 'the foreign run leaf is untouched');
   });
+
+  it('refuses an owned-surface guard failure in run BEFORE any namespace materialization (M4)', async () => {
+    const root = await makeTemp('aif-dc-cl-rungrd-');
+    await seedStoreProject(root);
+    // The guard refuses the OWNED run leaf — not the unpredictable temp
+    // probe — so the refusal fires at guardOwnedSurfaces, which sits OUTSIDE
+    // the try/catch whose cleanup would materialize write.lock and the
+    // namespace directories. Branch-reach: the guard records what it was
+    // asked about; the refusal target must be the run leaf, no temp probe
+    // may have been evaluated, and nothing on disk may materialize.
+    const visited = [];
+    const refusingOwnedGuard = async (rootDir, relative) => {
+      visited.push(relative);
+      if (relative.includes('/runs/grefuse.json')) return { ok: false, code: 'observation-path-not-ignored', detail: relative };
+      return { ok: true, gitWorktree: false, ignored: true, tracked: false };
+    };
+    await assert.rejects(
+      () => decisionCorrectionsCommand('run', { scope: 'work', write: true }, { rootDir: root, ...STORE_OPTIONS(), gitGuard: refusingOwnedGuard, runId: 'grefuse' }),
+      (error) => error?.code === 'observation-path-not-ignored' && error.blocked === true,
+      'the owned run leaf is refused by the guard itself',
+    );
+    assert.ok(visited.some((relative) => relative.includes('/runs/grefuse.json')),
+      `the refusal must name the owned run leaf, got ${JSON.stringify(visited)}`);
+    assert.equal(visited.some((relative) => relative.endsWith('.tmp')), false,
+      'no temp probe ran: the guard refused before the materialization stage');
+    assert.equal(await lstatExists(namespaceDir(root)), false,
+      'no write.lock, no namespace directories: an early guard refusal materializes nothing');
+  });
+
+  it('keeps the existing case and namespace when a lifecycle failure fires inside the lock (L9)', async () => {
+    const root = await makeTemp('aif-dc-cl-lcpres-');
+    await seedStoreProject(root);
+    const input = baseCaseInput({ case_id: 'cl-lcpres' });
+    const { saved } = await saveCase(root, input);
+    const caseFile = path.join(namespaceDir(root), 'work', 'cases', 'cl-lcpres.json');
+    // A wrong digest echo passes the read-only pre-pass (schema/partition
+    // only) and is refused authoritatively INSIDE the lock: the catch cleanup
+    // runs with action 'preserve', sees the non-empty cases leaf and the
+    // foreign-composition namespace, and preserves everything.
+    await assert.rejects(
+      () => decisionCorrectionsCommand('confirm', {
+        case_id: input.case_id, scope: input.scope, expected_label: input.expected_label, payload_digest: 'b'.repeat(64),
+      }, { rootDir: root, ...STORE_OPTIONS() }),
+      (error) => error?.code === 'payload-mismatch' && error.blocked === true,
+      'the in-lock digest echo check refuses the confirm',
+    );
+    const persisted = parseStrictJson(await readFile(caseFile, 'utf8'));
+    assert.equal(persisted.record.payload_digest, saved.case.payload_digest, 'the case payload digest is untouched');
+    assert.equal(persisted.record.status, 'draft', 'the lifecycle transition never landed');
+    assert.equal((await readdirSafe(namespaceDir(root))).includes('.gitignore'), true,
+      'the pre-existing namespace .gitignore survives the lifecycle cleanup');
+    assert.ok(await lstatExists(caseFile), 'the existing case file survives');
+  });
+
+  it('removes the request-created artifacts when a lifecycle failure fires after preparation (L9)', async () => {
+    const root = await makeTemp('aif-dc-cl-lcvac-');
+    await seedStoreProject(root);
+    const input = baseCaseInput({ case_id: 'cl-lcvac' });
+    await saveCase(root, input);
+    const caseFile = path.join(namespaceDir(root), 'work', 'cases', 'cl-lcvac.json');
+    // Vacuum seam: with the namespace .gitignore removed, THIS lifecycle's
+    // prepareNamespace takes action 'create'; the git guard hook then vacates
+    // the cases leaf at the temp-probe call, so the authoritative in-lock
+    // reload finds nothing and the catch cleanup — re-acquiring the scope
+    // lock with action 'create' — removes the request-created .gitignore and
+    // the empty directories. A real in-lock vacuum without a DI hook would
+    // require racing an external deleter between the pre-pass and the lock;
+    // the hook injects exactly that interleaving deterministically.
+    await rm(path.join(namespaceDir(root), '.gitignore'), { force: true });
+    let vacated = false;
+    const vacuumGuard = async (rootDir, relative) => {
+      if (!vacated && relative.endsWith('.tmp')) {
+        await rm(caseFile, { force: true });
+        vacated = true;
+      }
+      return { ok: true, gitWorktree: false, ignored: true, tracked: false };
+    };
+    const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
+    await assert.rejects(
+      () => decisionCorrectionsCommand('confirm', {
+        case_id: input.case_id, scope: input.scope, expected_label: input.expected_label, payload_digest: preview.payload_digest,
+      }, { rootDir: root, ...STORE_OPTIONS(), gitGuard: vacuumGuard }),
+      (error) => error?.code === 'case-not-found' && error.blocked === true,
+      'the authoritative in-lock reload refuses after the leaf was vacated',
+    );
+    assert.equal(vacated, true, 'the vacuum seam must have fired');
+    assert.equal(await lstatExists(namespaceDir(root)), false,
+      'the request-created .gitignore and the empty leaf directories are removed; no lock residue');
+  });
 });
