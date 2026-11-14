@@ -36,12 +36,15 @@ import {
   TRACE_LINK_NAMESPACE,
   TRACE_LINK_SCHEMA,
   assertStructuralInvariants,
+  currentTraceLinkContext,
+  inputDigestRecords,
   parseRequirementsFromBytes,
   parseTraceLinkArgs,
   parseTraceLinkSuggestionsConfigSubset,
   readTraceLinkSuggestionsConfig,
   runTraceLinkSuggestionsCommand,
   traceLinkPaths,
+  traceLinkSuggestionsBindingObject,
   traceManifestPath,
   tokenize,
   intersects,
@@ -51,6 +54,7 @@ import {
   validateObservationBinding,
   writeTraceLinkObservation,
 } from './trace-link-suggestions.mjs';
+import { assessmentDigest, buildAssessmentBinding } from './typed-assessment.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CORPUS_DIR = path.join(REPO_ROOT, 'test', 'fixtures', 'trace-link-suggestions');
@@ -1427,7 +1431,7 @@ describe('trace-link-suggestions binding and revalidation', () => {
     assert.deepEqual(verdict.mismatched, ['declared_sources']);
   });
 
-  it('refuses a full-coverage observation whose presented input is unreadable at revalidation (C3)', async () => {
+  it('marks a full-coverage observation whose presented input was removed stale with the named input (C3 honest drift)', async () => {
     const root = await makeTemp('aif-tls-fullmiss-');
     const changeId = 'full-coverage-missing-change';
     await seedCaseProject(root, changeId, { trace: null, specs: [], tests: ['test/auth.spec.mjs'] });
@@ -1446,12 +1450,169 @@ describe('trace-link-suggestions binding and revalidation', () => {
     assert.equal(exitCode, 0);
     const observation = parseStrictJson(await readFile(path.join(root, traceLinkPaths(changeId).observation), 'utf8'));
     assert.equal(observation.structural.scan.coverage, 'full', 'the honest run reads every presented input');
-    // Removing a presented input after the write makes the recorded
-    // full-coverage claim provably unfaithful: an honest run over the current
-    // inputs would produce missing_sources and partial coverage — a provably
-    // impossible form, not a merely drifted count.
+    // Removing a presented input after the write is an honest custody drift:
+    // the fresh digest diverges and the recorded full-coverage claim becomes
+    // unfaithful BECAUSE the universe moved — the revalidation names the
+    // drifted input and flips to stale instead of the impossible-form verdict.
     await rm(path.join(root, 'test', 'auth.spec.mjs'), { force: true });
-    assert.equal((await validateObservationBinding(root, observation)).code, 'observation-invalid');
+    const verdict = await validateObservationBinding(root, observation);
+    assert.equal(verdict.ok, true);
+    assert.equal(verdict.stale, true);
+    assert.equal(verdict.state, 'stale-observation');
+    assert.ok(verdict.mismatched.includes('inputs:test/auth.spec.mjs'),
+      `the removed input must be named, got ${JSON.stringify(verdict.mismatched)}`);
+  });
+
+  it('accounts a spec/test collision once: not born stale, fresh revalidation, single input record (M5)', async () => {
+    const root = await makeTemp('aif-tls-collision-');
+    const changeId = 'spec-test-collision-change';
+    await seedCaseProject(root, changeId, { trace: null, specs: ['specs/spec-en.md'], tests: [] });
+    // The collision file lives inside the change's own specs tree AND is
+    // presented as a test path (the tests/ segment satisfies TEST_PATH_FORM),
+    // so pre-fix writers read and accounted it twice.
+    const collisionRel = `openspec/changes/${changeId}/specs/tests/spec.md`;
+    await writeInlineSpec(root, changeId, 'tests', '# Delta for tests\n\nPresented collision file.\n');
+    const trace = {
+      schemaVersion: 'lekalo/trace-manifest/v0.2.16',
+      identity: 'dev.lekalo.trace-manifest@0.2.16',
+      completeness: 'full',
+      nodes: [{ symbol: 'operation:solo.thing' }],
+      relations: [],
+      gaps: [],
+    };
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    await writeFile(manifest, JSON.stringify({ trace, manifestDigest: `sha256:${digest(JSON.stringify(trace))}` }), 'utf8');
+    const { exitCode } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--test', collisionRel, '--write', '--json']);
+    assert.equal(exitCode, 0);
+    const observation = parseStrictJson(await readFile(path.join(root, traceLinkPaths(changeId).observation), 'utf8'));
+    // Single accounting: the collision file counts once, from its specs side.
+    // declared = 2 inventory paths + 0 tests-only + 1 supported symbol;
+    // scanned mirrors it (the operation symbol resolves unconditionally).
+    assert.equal(observation.inputs.filter((input) => input.path === collisionRel).length, 1,
+      'the collision file carries exactly one input record');
+    assert.equal(observation.inputs.length, 2, 'two specs, zero tests-only records');
+    assert.equal(observation.structural.scan.delta_spec_inventory.length, 2);
+    assert.equal(observation.structural.scan.declared_sources, 3);
+    assert.equal(observation.structural.scan.scanned_sources, 3);
+    assert.equal(observation.structural.scan.coverage, 'full');
+    // The writer mirrors the revalidation formula, so a fresh record is born
+    // clean: no drift, no binding flip.
+    const fresh = await validateObservationBinding(root, observation);
+    assert.equal(fresh.ok, true);
+    assert.equal(fresh.stale, false, `a collision-recorded observation revalidates clean, got ${JSON.stringify(fresh.mismatched)}`);
+    // Pre-fix records double-counted the collision: two input records for the
+    // same path, declared/scanned including the test side, and a binding built
+    // over the duplicated digest set. Rebuilt faithfully here with the same
+    // binding primitives; the current engine must keep such a record honestly
+    // stale (the declared divergence is named) — never observation-invalid.
+    const legacy = structuredClone(observation);
+    legacy.inputs.push(structuredClone(legacy.inputs.find((input) => input.path === collisionRel)));
+    legacy.structural.scan.declared_sources += 1;
+    legacy.structural.scan.scanned_sources += 1;
+    const legacyContext = await currentTraceLinkContext(root, legacy.inputs);
+    legacy.binding = buildAssessmentBinding(traceLinkSuggestionsBindingObject({
+      worktreeIdentity: legacy.worktree_identity,
+      changeId: legacy.change_id,
+      trace: { path: legacy.structural.trace.path, sha256: legacy.structural.trace.sha256, bytes: legacy.structural.trace.bytes },
+      validatedExportDigest: legacy.structural.trace.manifest_digest,
+      inputDigests: inputDigestRecords(legacy.inputs),
+      deltaSpecInventory: legacy.structural.scan.delta_spec_inventory,
+      candidatePayloadDigest: assessmentDigest({ nodes: legacy.structural.nodes, edges: legacy.structural.edges }),
+      graphLimits: legacy.graph_limits,
+      rubric: legacy.rubric,
+      relationPolicy: legacy.relation_policy,
+      engine: legacy.engine,
+      helper: legacy.helper,
+      contract: legacy.contract,
+      languageOptions: legacy.language_options,
+      exclusionPolicy: legacy.exclusion_policy,
+    }));
+    const legacyVerdict = await validateObservationBinding(root, legacy);
+    assert.equal(legacyVerdict.ok, true, 'a legacy double-counted record is drifted, not invalid');
+    assert.equal(legacyVerdict.stale, true);
+    assert.ok(legacyVerdict.mismatched.includes('declared_sources'),
+      `the double-counted declared divergence must be named, got ${JSON.stringify(legacyVerdict.mismatched)}`);
+  });
+
+  it('marks an honest trace drift stale when the grown trace pushes the mandatory-symbol bound over the limit (M6)', async () => {
+    const root = await makeTemp('aif-tls-boundrift-');
+    const changeId = 'trace-drift-bound-change';
+    await seedCaseProject(root, changeId, { trace: null, specs: [], tests: [] });
+    const smallTrace = {
+      schemaVersion: 'lekalo/trace-manifest/v0.2.16',
+      identity: 'dev.lekalo.trace-manifest@0.2.16',
+      completeness: 'full',
+      nodes: [{ symbol: 'operation:solo.thing' }],
+      relations: [],
+      gaps: [],
+    };
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    await writeFile(manifest, JSON.stringify({ trace: smallTrace, manifestDigest: `sha256:${digest(JSON.stringify(smallTrace))}` }), 'utf8');
+    const { exitCode } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--write', '--json']);
+    assert.equal(exitCode, 0);
+    const observation = parseStrictJson(await readFile(path.join(root, traceLinkPaths(changeId).observation), 'utf8'));
+    assert.equal(observation.structural.scan.coverage, 'full');
+    // The trace manifest is replaced with a grown one: the custody bytes
+    // drift, and the fresh mandatory-symbol bound (operation symbols, 600)
+    // now exceeds the node limit (500). The recorded full-coverage claim was
+    // honest at write time over the small trace — the drift alone explains
+    // the impossible-looking bound form, so the verdict is stale with the
+    // named trace field, not observation-invalid.
+    const grownTrace = {
+      schemaVersion: 'lekalo/trace-manifest/v0.2.16',
+      identity: 'dev.lekalo.trace-manifest@0.2.16',
+      completeness: 'full',
+      nodes: Array.from({ length: 600 }, (_, index) => ({ symbol: `operation:mass.symbol${index}` })),
+      relations: [],
+      gaps: [],
+    };
+    await writeFile(manifest, JSON.stringify({ trace: grownTrace, manifestDigest: `sha256:${digest(JSON.stringify(grownTrace))}` }), 'utf8');
+    const verdict = await validateObservationBinding(root, observation);
+    assert.equal(verdict.ok, true);
+    assert.equal(verdict.stale, true);
+    assert.ok(verdict.mismatched.includes('trace'),
+      `the drifted trace must be named, got ${JSON.stringify(verdict.mismatched)}`);
+  });
+
+  it('marks an honest inventory drift stale when the grown inventory overflows the declared clamp (M6)', async () => {
+    const root = await makeTemp('aif-tls-invdrift-');
+    const changeId = 'inventory-drift-overflow-change';
+    await seedCaseProject(root, changeId, { trace: null, specs: ['specs/spec-en.md'], tests: [] });
+    // Written universe: 1 spec + 99999 operation symbols = 100000 declared —
+    // exactly at the schema maximum, no truncation marker needed. The graph
+    // truncates at its own limits, so the recorded coverage is partial.
+    const nodes = Array.from({ length: 99999 }, (_, index) => ({ symbol: `operation:mass.symbol${index}` }));
+    const trace = {
+      schemaVersion: 'lekalo/trace-manifest/v0.2.16',
+      identity: 'dev.lekalo.trace-manifest@0.2.16',
+      completeness: 'full',
+      nodes,
+      relations: [],
+      gaps: [],
+    };
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    await writeFile(manifest, JSON.stringify({ trace, manifestDigest: `sha256:${digest(JSON.stringify(trace))}` }), 'utf8');
+    const { exitCode } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--write', '--json']);
+    assert.equal(exitCode, 0);
+    const observation = parseStrictJson(await readFile(path.join(root, traceLinkPaths(changeId).observation), 'utf8'));
+    assert.equal(observation.structural.scan.declared_sources, 100000);
+    assert.equal(observation.structural.scan.truncations.includes('declared-sources-truncated'), false,
+      'the written universe sits exactly at the clamp boundary without overflowing it');
+    // Two delta specs are added afterwards: the fresh inventory drift alone
+    // pushes the recomputed declared universe past the schema maximum. An
+    // overflowing fresh declaration without a marker would be the impossible
+    // form only over an unchanged universe — here the inventory drift is the
+    // named cause, so the verdict is stale, not observation-invalid.
+    await writeInlineSpec(root, changeId, 'drift-a', `# Drift spec A\n\ninventory drift for ${changeId}.\n`);
+    await writeInlineSpec(root, changeId, 'drift-b', `# Drift spec B\n\ninventory drift for ${changeId}.\n`);
+    const verdict = await validateObservationBinding(root, observation);
+    assert.equal(verdict.ok, true);
+    assert.equal(verdict.stale, true);
+    assert.ok(verdict.mismatched.includes('delta_spec_inventory'),
+      `the drifted inventory must be named, got ${JSON.stringify(verdict.mismatched)}`);
   });
 
   it('refuses a clamp-boundary observation whose truncation marker was stripped (C3, recorded-side tamper)', async () => {

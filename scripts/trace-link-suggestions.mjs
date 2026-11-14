@@ -1213,7 +1213,18 @@ export async function validateObservationBinding(rootDir, observation, options =
     // invalid verdict, winning over any stale fields accumulated above).
     const MAX_ACCOUNTED_SOURCES = 100000;
     const recordedTruncations = Array.isArray(recordedScan.truncations) ? recordedScan.truncations : [];
-    if (freshDeclared > MAX_ACCOUNTED_SOURCES && !recordedTruncations.includes('declared-sources-truncated')) {
+    // Drift vs tamper (F3): this early refusal is the marker-tamper pin only
+    // when the fresh universe that feeds the formula is unchanged. The
+    // formula reads freshInventory (delta-spec walk) and freshSupportedSymbols
+    // (fresh trace bytes), so honest drift of `delta_spec_inventory` or
+    // `trace` can move freshDeclared across the maximum on its own — that is
+    // stale, not invalid. Drifted inputs cannot move this formula (the
+    // presented-test universe derives from the recorded inputs), so they do
+    // not excuse an overflowing form here. An empty relevant-drift set keeps
+    // the impossible-form verdict: the marker was stripped from an overflowing
+    // run over the same universe (recorded-side tamper).
+    if (freshDeclared > MAX_ACCOUNTED_SOURCES && !recordedTruncations.includes('declared-sources-truncated')
+      && !mismatched.some((field) => field === 'delta_spec_inventory' || field === 'trace')) {
       return { ok: false, code: 'observation-invalid' };
     }
     if ((recordedScan.declared_sources ?? null) !== Math.min(freshDeclared, MAX_ACCOUNTED_SOURCES)) {
@@ -1228,13 +1239,28 @@ export async function validateObservationBinding(rootDir, observation, options =
     // degraded coverage, so a recorded full-coverage observation over such a
     // trace is a provably impossible form, not merely drifted.
     const nodeLimit = observation.graph_limits?.max_nodes ?? GRAPH_LIMITS.max_nodes;
-    if (freshMandatorySymbols.size > nodeLimit && recordedScan.coverage === 'full') {
+    // Drift vs tamper (F3): the bound formula reads freshMandatorySymbols
+    // from the fresh trace bytes only — honest `trace` drift can push the
+    // bound over the node limit on its own (stale, not invalid). With an
+    // unchanged trace the form stays provably impossible: a recorded
+    // full-coverage claim over a trace that forces graph truncation cannot
+    // be honest (fabrication pin).
+    if (freshMandatorySymbols.size > nodeLimit && recordedScan.coverage === 'full'
+      && !mismatched.includes('trace')) {
       return { ok: false, code: 'observation-invalid' };
     }
     // Full coverage implies every presented input was readable when the
     // observation was written: a fresh input that now classifies as missing
     // or malformed would have produced missing_sources and partial coverage.
-    if (recordedScan.coverage === 'full' && freshInputs.some((input) => input.kind !== 'file')) {
+    // Drift vs tamper (F3): an honest deletion or corruption of a presented
+    // input always carries its `inputs:<path>` mismatch (the fresh digest
+    // diverges from the recorded one), so that fire is stale. A fire with an
+    // empty inputs-drift set means the recorded digests already agreed with
+    // the non-file fresh classification — a recorded full-coverage claim over
+    // an input recorded as missing/malformed is itself the fabrication, and
+    // the impossible-form verdict stays.
+    if (recordedScan.coverage === 'full' && freshInputs.some((input) => input.kind !== 'file')
+      && !mismatched.some((field) => typeof field === 'string' && field.startsWith('inputs:'))) {
       return { ok: false, code: 'observation-invalid' };
     }
   }
@@ -1978,15 +2004,29 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
     // outside the presented scope and are never read; every read is bounded.
     const specCollection = await collectDeltaSpecs(rootDir, changeId, diagnostics);
     const specs = specCollection.specs;
+    // Presented-test paths that are ALSO part of the canonical delta-spec
+    // inventory (e.g. a presented `specs/tests/spec.md` inside the change's
+    // own specs tree) are accounted and read exactly once, from their specs
+    // side: the tests-only list below drives the test reads AND every
+    // accounting surface (declared/scanned sources, input records, missing
+    // sources). This mirrors the revalidation formula, which derives the
+    // presented-test universe as recorded inputs minus inventory paths, so a
+    // collision file can never be born with a double-counted declared count
+    // or duplicate input records. Silent subtraction by design: no new
+    // refusal and no extra serialized role field — origin follows from the
+    // specs side.
+    const inventoryPaths = new Set(specs.map((spec) => spec.path));
+    const testsOnlyPaths = uniqueTestPaths.filter((testPath) => !inventoryPaths.has(testPath));
     if (deadlineExceeded()) {
       emit(notRunEnvelope(['deadline-exceeded']), parsed.json);
       return 0;
     }
     // Test allowlist was fixed from the presented --test inputs before any
     // read (arguments were validated above); each presented path is read
-    // bounded exactly once.
+    // bounded exactly once. Inventory-colliding paths were already read as
+    // specs and are excluded from this loop (single accounting, above).
     const tests = [];
-    for (const testPath of uniqueTestPaths) {
+    for (const testPath of testsOnlyPaths) {
       let bytes = null;
       try {
         bytes = await readProviderFile(rootDir, testPath, DOCUMENT_LIMIT);
@@ -2071,7 +2111,7 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
     let truncations = [...graph.truncations];
     if (specCollection.truncated) truncations.push('delta-spec-inventory-truncated');
     if (missingSourcesCapped) truncations.push('missing-sources-truncated');
-    let declaredSources = specs.length + uniqueTestPaths.length + supportedTraceSymbols.size;
+    let declaredSources = specs.length + testsOnlyPaths.length + supportedTraceSymbols.size;
     let scannedSources = specs.filter((spec) => spec.ok).length
       + tests.filter((test) => test.ok).length
       + graph.resolvedTraceRefs;
