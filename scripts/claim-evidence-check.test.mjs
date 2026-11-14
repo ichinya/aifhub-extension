@@ -471,6 +471,14 @@ describe('claim-evidence structural stage', () => {
     assert.equal(observation.semantic.coverage.state, 'partial');
     assert.equal(observation.semantic.coverage.scanned_sources, 1);
     assert.equal(observation.semantic.coverage.declared_sources, 5, 'declared_sources counts presented pairs, and u5 declares a second pair over the absent source');
+    // Dedup + per-pair counter (#282): u1 and u5 cite the same absent path,
+    // so 4 missing pairs collapse to 3 unique list entries and the count
+    // keeps the pair dimension — scanned = declared − count.
+    assert.equal(observation.semantic.coverage.missing_sources_count, 4);
+    assert.equal(observation.structural.missing_sources.length, 3);
+    assert.equal(observation.semantic.coverage.missing_sources.length, 3);
+    assert.equal(new Set(observation.structural.missing_sources.map((entry) => entry.path)).size, 3, 'the list is deduplicated by path');
+    assert.deepEqual(observation.structural.missing_sources, observation.semantic.coverage.missing_sources, 'both projections carry the identical deduplicated list');
   });
 
   it('counts a carrier that is itself the only source as one scanned input', async () => {
@@ -1582,5 +1590,83 @@ describe('claim-evidence corpus evaluation (fixtures + labels)', () => {
       assert.ok(!String(diagnostic.detail ?? '').includes('attacker.invalid'));
       assert.ok(!String(diagnostic.path ?? '').includes('attacker.invalid'));
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Missing-source accounting (#297 / #282 round 2): dedup by path with a
+// per-pair counter, read-side counter invariants, and the optional
+// fixture-mirror field for legacy identity projections.
+// ---------------------------------------------------------------------------
+
+describe('claim-evidence missing-source accounting', () => {
+  const MISSING_ENVELOPE = pairsEnvelope({ claims: [
+    { claim_id: 'm1', source_ref: { path: 'docs/absent.md' }, relation: 'paraphrase' },
+    { claim_id: 'm2', source_ref: { path: 'docs/absent.md' }, relation: 'inference' },
+    { claim_id: 'm3', source_ref: { path: 'docs/absent.md' }, relation: 'paraphrase' },
+    { claim_id: 'm4', source_ref: { path: 'docs/spec.md' }, relation: 'paraphrase' },
+  ] });
+
+  async function runMissingObservation(root, outputs) {
+    const exit = await runClaimEvidenceCheckCommand(['--change', 'work', '--pairs', 'pairs.json', '--write', '--json'], {
+      rootDir: root, output: (value) => outputs.push(value),
+    });
+    assert.equal(exit, 0);
+    return observationOf(outputs);
+  }
+
+  it('deduplicates several claims on one absent path behind a per-pair counter', async () => {
+    const root = await makeTemp('aif-ce-dedup-');
+    await seedSmokeProject(root);
+    await writeFile(path.join(root, 'pairs.json'), JSON.stringify(MISSING_ENVELOPE), 'utf8');
+    const outputs = [];
+    const observation = await runMissingObservation(root, outputs);
+    // Honest accounting: 4 presented pairs, 3 of them missing on the SAME
+    // path — one deduplicated list entry, per-pair count 3.
+    assert.equal(observation.semantic.coverage.declared_sources, 4);
+    assert.equal(observation.semantic.coverage.scanned_sources, 1);
+    assert.equal(observation.semantic.coverage.missing_sources_count, 3);
+    assert.equal(observation.structural.missing_sources.length, 1);
+    assert.equal(observation.semantic.coverage.missing_sources.length, 1);
+    assert.deepEqual(observation.structural.missing_sources, [{ path: 'docs/absent.md', reason: 'file-missing' }]);
+    assert.deepEqual(observation.structural.missing_sources, observation.semantic.coverage.missing_sources);
+    assert.equal(observation.semantic.coverage.state, 'partial');
+    // The fresh write revalidates clean.
+    const verdict = await validateObservationBinding(root, observation);
+    assert.equal(verdict.ok, true);
+    assert.equal(verdict.stale, false, `fresh observation revalidates clean, got ${JSON.stringify(verdict.mismatched)}`);
+  });
+
+  it('rejects recorded observations that drift the counter invariants', async () => {
+    const root = await makeTemp('aif-ce-count-');
+    await seedSmokeProject(root);
+    await writeFile(path.join(root, 'pairs.json'), JSON.stringify(MISSING_ENVELOPE), 'utf8');
+    const outputs = [];
+    const observation = await runMissingObservation(root, outputs);
+
+    // (a) a duplicated path in the recorded list is not a deduplicated form.
+    const duplicated = structuredClone(observation);
+    duplicated.structural.missing_sources = [...observation.structural.missing_sources, ...observation.structural.missing_sources];
+    duplicated.semantic.coverage.missing_sources = duplicated.structural.missing_sources;
+    duplicated.semantic.coverage.missing_sources_count = 2;
+    duplicated.semantic.coverage.scanned_sources = duplicated.semantic.coverage.declared_sources - 2;
+    assert.equal((await validateObservationBinding(root, duplicated)).code, 'observation-invalid');
+
+    // (b) a list longer than its per-pair count cannot happen honestly.
+    const oversized = structuredClone(observation);
+    oversized.semantic.coverage.missing_sources_count = 0;
+    oversized.semantic.coverage.scanned_sources = oversized.semantic.coverage.declared_sources;
+    assert.equal((await validateObservationBinding(root, oversized)).code, 'observation-invalid');
+
+    // (c) a broken scanned formula (scanned ≠ declared − count) is drift.
+    const formula = structuredClone(observation);
+    formula.semantic.coverage.scanned_sources += 1;
+    assert.equal((await validateObservationBinding(root, formula)).code, 'observation-invalid');
+
+    // (d) divergent projections (the structural list differs from the
+    // coverage list) are a tamper vector, not a consistent observation.
+    const divergent = structuredClone(observation);
+    divergent.structural.missing_sources = [{ path: 'docs/other-absent.md', reason: 'file-missing' }];
+    assert.equal((await validateObservationBinding(root, divergent)).code, 'observation-invalid');
   });
 });

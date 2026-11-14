@@ -7,6 +7,10 @@
     "schema": {
       "const": "aifhub.decision_correction_fixture.v1"
     },
+    "signature_format_version": {
+      "type": "integer",
+      "minimum": 1
+    },
     "diagnostic_only": {
       "const": true
     },
@@ -739,6 +743,11 @@
                               "reason"
                             ]
                           }
+                        },
+                        "missing_sources_count": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000
                         }
                       },
                       "required": [

@@ -17,7 +17,7 @@ import { lstat, mkdir, open, readFile, realpath, rename, unlink } from 'node:fs/
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { digest, portablePath } from './workflow-state-store.mjs';
+import { canonical, digest, portablePath } from './workflow-state-store.mjs';
 import { parseStrictJson } from './json-strict.mjs';
 import { validateJsonAgainstSchema } from './json-schema-subset.mjs';
 import { readProviderFile, safeProviderPath } from './provider-files.mjs';
@@ -44,6 +44,9 @@ export const PARSER_VERSION = 1;
 export const DOCUMENT_LIMIT = 1024 * 1024;
 export const MAX_CLAIM_PAIRS = 50;
 export const MAX_SOURCES = 50;
+// Schema maxItems of the missing_sources lists (both projections): the cap
+// stays on the LIST, never on the per-pair counter.
+export const MAX_MISSING_SOURCE_ENTRIES = 100;
 export const MAX_ENVELOPE_BYTES = 1024 * 1024;
 export const MAX_QUOTE_BYTES = 64 * 1024;
 export const MAX_DIAGNOSTICS = 200;
@@ -832,6 +835,18 @@ export async function validateObservationBinding(rootDir, observation, options =
     && (recordedMissing.length === 0 || (semantic.coverage?.state === 'full'))) {
     return { ok: false, code: 'observation-invalid' };
   }
+  // Per-pair counter invariants (#282): the deduplicated list must have
+  // unique paths, never exceed its per-pair count, satisfy the scanned
+  // formula, and be IDENTICAL in both projections — the counters were never
+  // cross-checked before, so drifted counts or divergent projections could
+  // pass as a consistent observation.
+  const coverageMissingCount = semantic.coverage?.missing_sources_count;
+  if (new Set(recordedMissing.map((entry) => entry?.path)).size !== recordedMissing.length
+    || recordedMissing.length > coverageMissingCount
+    || semantic.coverage?.scanned_sources !== semantic.coverage?.declared_sources - coverageMissingCount
+    || canonical(recordedMissing) !== canonical(semantic.coverage?.missing_sources ?? null)) {
+    return { ok: false, code: 'observation-invalid' };
+  }
   // Digest records are rebuilt from CURRENT disk bytes (never from the
   // recorded observation itself): an edited or renamed input must name its
   // field and flip the recomputed binding.
@@ -1304,6 +1319,27 @@ export async function runClaimEvidenceCheckCommand(argv = process.argv.slice(2),
       structuralPairs.push(checked.record);
       if (checked.missing) missingSources.push(checked.missing);
     }
+    // Missing sources are deduplicated by path with first-occurrence order
+    // (#282): several claims citing the same unavailable source collapse to
+    // one list entry, while the per-pair counter keeps the true number of
+    // missing pairs (pre-dedup, pre-cap) so `scanned = declared − count`
+    // stays pair-exact and the list stays bound to the counter.
+    const missingSourcesCount = missingSources.length;
+    const seenMissingPaths = new Set();
+    const missingSourcesDeduped = [];
+    for (const entry of missingSources) {
+      if (seenMissingPaths.has(entry.path)) continue;
+      seenMissingPaths.add(entry.path);
+      missingSourcesDeduped.push(entry);
+    }
+    // The 100-entry cap applies to the LIST only (schema maxItems), never to
+    // the counter; tripping it records a diagnostic-only truncation marker
+    // (no new schema field) and coverage never upgrades to full. Unreachable
+    // with MAX_CLAIM_PAIRS=50, kept as schema-parity defense.
+    if (missingSourcesDeduped.length > MAX_MISSING_SOURCE_ENTRIES) {
+      diagnostics.push({ code: 'missing-sources-truncated', path: null, detail: `limit=${MAX_MISSING_SOURCE_ENTRIES}` });
+      missingSourcesDeduped.length = MAX_MISSING_SOURCE_ENTRIES;
+    }
 
     const context = await currentClaimEvidenceContext(rootDir, inputs, options);
     const documents = inputs.filter((input) => input.ok).map((input) => ({ text: input.text }));
@@ -1317,8 +1353,9 @@ export async function runClaimEvidenceCheckCommand(argv = process.argv.slice(2),
     const semanticCoverage = {
       state: structuralPairs.length === 0 || scannedSources === 0 ? 'none' : (missingSources.length === 0 ? 'full' : 'partial'),
       declared_sources: structuralPairs.length,
-      scanned_sources: structuralPairs.length - missingSources.length,
-      missing_sources: missingSources,
+      scanned_sources: structuralPairs.length - missingSourcesCount,
+      missing_sources: missingSourcesDeduped,
+      missing_sources_count: missingSourcesCount,
     };
     const envelopeSha256 = digest(envelopeBytes);
     const transportRecord = { mode: transport.mode, envelope_path: transport.mode === 'file' ? transport.envelope_path : null, envelope_sha256: envelopeSha256 };
@@ -1439,7 +1476,7 @@ export async function runClaimEvidenceCheckCommand(argv = process.argv.slice(2),
       checkedScope: envelope.checked_scope,
       carrier: { path: envelope.carrier.path, sha256: inputs.find((input) => input.path === envelope.carrier.path)?.sha256 ?? null, bytes: inputs.find((input) => input.path === envelope.carrier.path)?.bytes ?? 0, kind: inputs.find((input) => input.path === envelope.carrier.path)?.kind ?? 'missing' },
       pairs: structuralPairs,
-      missingSources,
+      missingSources: missingSourcesDeduped,
     };
     const observation = assembleObservation({
       changeId,
