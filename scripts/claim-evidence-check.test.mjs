@@ -1197,6 +1197,53 @@ describe('claim-evidence binding revalidation', () => {
     assert.equal((await validateObservationBinding(root, languageSource)).ok, false, 'tampered language source');
   });
 
+  it('rejects the fabricated coverage contrablocks of the read-side pins (L1a/L1b/L2)', async () => {
+    const { root, observation } = await writtenObservation('aif-ce-pin-');
+    const coverage = observation.semantic.coverage;
+    assert.equal(coverage.declared_sources, observation.structural.pairs.length,
+      'the honest writer derives declared_sources from the pairs array');
+    assert.equal(coverage.state, 'full', 'the honest smoke fixture reads every presented source');
+    assert.equal(coverage.missing_sources_count, 0);
+    // L1a — a fabricated declared number has no honest derivation: the count
+    // must equal the pairs array even when the scanned formula is kept
+    // consistent (declared and scanned moved together).
+    const fabricatedDeclared = structuredClone(observation);
+    fabricatedDeclared.semantic.coverage = {
+      ...coverage,
+      declared_sources: coverage.declared_sources + 1,
+      scanned_sources: coverage.scanned_sources + 1,
+    };
+    assert.equal((await validateObservationBinding(root, fabricatedDeclared)).code, 'observation-invalid',
+      'declared_sources must equal the pairs count (L1a)');
+    // L1b — a positive per-pair missing counter must be witnessed by at
+    // least one unavailable/truncated pair; keeping the scanned formula
+    // consistent isolates the witness pin.
+    const unwitnessedCount = structuredClone(observation);
+    unwitnessedCount.semantic.coverage = {
+      ...coverage,
+      missing_sources_count: 1,
+      scanned_sources: coverage.declared_sources - 1,
+    };
+    assert.equal((await validateObservationBinding(root, unwitnessedCount)).code, 'observation-invalid',
+      'a missing count without an unavailable/truncated witness pair is fabrication (L1b)');
+    // L2 — full coverage with a non-empty missing list and no witness pairs:
+    // neither the witness rule nor the existing pair-direction pin can see
+    // this shape alone; the projection lists are kept canonically identical
+    // and the count/formula consistent so only the coverage-vs-list
+    // contradiction remains.
+    const fullWithMissing = structuredClone(observation);
+    const ghostMissing = [{ path: 'docs/ghost.md', reason: 'unreadable' }];
+    fullWithMissing.structural.missing_sources = ghostMissing;
+    fullWithMissing.semantic.coverage = {
+      ...coverage,
+      missing_sources: ghostMissing,
+      missing_sources_count: 1,
+      scanned_sources: coverage.declared_sources - 1,
+    };
+    assert.equal((await validateObservationBinding(root, fullWithMissing)).code, 'observation-invalid',
+      'full coverage cannot carry a non-empty missing list (L2)');
+  });
+
   it('rejects a hidden compound parent in a compound observation', async () => {
     const root = await makeTemp('aif-ce-hidep-');
     await seedSmokeProject(root, { pairsFile: null });

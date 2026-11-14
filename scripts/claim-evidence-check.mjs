@@ -847,6 +847,31 @@ export async function validateObservationBinding(rootDir, observation, options =
     || canonical(recordedMissing) !== canonical(semantic.coverage?.missing_sources ?? null)) {
     return { ok: false, code: 'observation-invalid' };
   }
+  // Read-side coverage pins (#310, L1a/L1b/L2) on the already-read recorded
+  // data: the writer derives every count from the pairs array, so a recorded
+  // coverage block disagreeing with it is internal fabrication, and binding
+  // cannot substitute for these checks (the coverage and missing lists are
+  // not part of the binding object).
+  // L1a: the declared count IS the pairs count by construction
+  // (declared_sources: structuralPairs.length at write time) — a fabricated
+  // declared number has no honest derivation.
+  if ((semantic.coverage?.declared_sources ?? null) !== recordedPairs.length) {
+    return { ok: false, code: 'observation-invalid' };
+  }
+  // L1b: a positive per-pair missing counter must be witnessed by at least
+  // one pair whose quote_check says the source was unavailable or truncated —
+  // the reverse direction (such a pair forces a non-empty missing list) is
+  // already pinned above; this closes the count-without-witness contrapositive.
+  if ((coverageMissingCount ?? 0) > 0
+    && !recordedPairs.some((pair) => pair?.quote_check === 'source_unavailable' || pair?.quote_check === 'truncated')) {
+    return { ok: false, code: 'observation-invalid' };
+  }
+  // L2: full coverage implies an empty missing list; without this pin the
+  // already-merged checks could not see the fabrication when no pair carries
+  // an unavailable/truncated quote_check (the witness rule above would pass).
+  if (semantic.coverage?.state === 'full' && recordedMissing.length > 0) {
+    return { ok: false, code: 'observation-invalid' };
+  }
   // Digest records are rebuilt from CURRENT disk bytes (never from the
   // recorded observation itself): an edited or renamed input must name its
   // field and flip the recomputed binding.
