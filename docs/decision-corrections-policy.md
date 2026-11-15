@@ -128,11 +128,11 @@ skipped, and a stored record whose integrity cannot be proven is reported as
 `invalid_record` instead of silently disappearing from the report. The
 replay signature format is versioned: each record carries
 `signature_format_version` at the top level (outside `payload` and its
-digest, so idempotent re-save and lifecycle transitions keep it); отсутствие
-поля читается как версия 1 без мутации загруженной записи, а несовпадение
-версии ожидаемой даёт исход `stale` с сигнатурой `signature-format-version`,
-а не `label_change` — изменение формата сигнатуры никогда не маскируется под
-смену оценки. Fixture
+digest, so idempotent re-save and lifecycle transitions keep it); a missing
+field reads as version 1 without mutating the loaded record, and a version
+mismatch yields `stale` with the `signature-format-version` signature rather
+than `label_change` — a signature format change is never masked as a label
+change. Fixture
 files carry an input role: role-input files are presented to the replayed
 consumer with its own input flag (a claim-evidence pairs envelope, a
 trace-link test file matching the frozen test path form, a requirement-lint
@@ -171,16 +171,60 @@ repeated delete honestly as `deleted: false`.
 
 ## State and isolation
 
-All writes run the full guard set before the first byte lands: file-shadow
-checks, leaf ownership (only a schema-valid case of the same `case_id` may
-be replaced), and `verifyObservationIgnored` over every owned surface —
-case files, run records, the namespace `.gitignore`, and the write lock —
-with tracked paths refusing `observation-path-tracked`, non-ignored paths
-refusing `observation-path-not-ignored`, and git failures failing closed.
+All writes order their guards so that refusal never litters: the owned-surface
+guards run before any materialization — file-shadow checks, leaf ownership
+(only a schema-valid case of the same `case_id` may be replaced), and
+`verifyObservationIgnored` over every owned surface — case files, run
+records, the namespace `.gitignore`, and the write lock — with tracked paths
+refusing `observation-path-tracked`, non-ignored paths refusing
+`observation-path-not-ignored`, and git failures failing closed; a refusal
+at this stage leaves no directories and no lock file behind. Namespace
+materialization (`prepareNamespace`, which may create the namespace
+`.gitignore`) and the temp-area probe run after that preparation but still
+before the lock and the first record byte, and a failure anywhere in that
+window cleans the artifacts the request created under the re-acquired scope
+lock (save, run, and lifecycle share this request-scoped cleanup; the
+lifecycle cleanup considers only the `cases` leaf removable). The transient
+`write.lock` never survives a refusal: the store's own `finally` releases and
+unlinks it, and the cleanup's re-acquisition creates-and-deletes its own.
+Because a concurrent same-scope request's cleanup can remove the namespace
+`.gitignore` between a writer's pre-lock proof and its lock acquisition, every
+write path re-ensures the ignore state (an idempotent recreate through the
+same `ensureRuntimeGitignore`) and re-checks the temp zone under the scope
+lock, before the first record byte; a failed re-check refuses with the
+existing codes, and a recreated ignore file upgrades that request's cleanup
+action to `create`, so a late failure removes the recreated file instead of
+leaking it out of a `preserve`-scoped cleanup. The residual window is the
+interval between a writer's in-lock re-check and its first record byte —
+serialized for same-scope writers and cleanups by the very lock both sides
+hold; a concurrent first save of a different scope stays outside this
+serialization (documented boundary).
 The `decision-corrections` namespace is a closed runtime namespace in the QA
 snapshot projection: writing, overwriting, or deleting cases cannot shift
 the required QA fingerprint, and a declared root inside the namespace fails
 closed with `self-referential-input`.
+
+The temp-area guard zones the atomic write's transient sibling with a
+DETERMINISTIC set of 16 probes covering the entire first hex character of
+the UUID space (`0`…`9`, `a`…`f`; the remaining UUID positions are fixed, so
+every probe keeps the real `<8>-<4>-<4>-<4>-<12>.tmp` store shape). The set
+proves saved `.gitignore` rules whose match depends on the FIRST hex
+position — the `[0-7]` / `[8-f]` classes a narrow rule can express — so a
+rule keyed to only half of a class (e.g. `*.json.[0-7]*.tmp`) is refused
+deterministically on the uncovered probe. Documented guarantee boundary:
+rules keyed to OTHER UUID positions are not proven by this set —
+enumerating that space is combinatorial and out of scope for a bounded
+guard; the probes are never materialized on disk (`git check-ignore`
+evaluates non-existent paths). Cost, measured and pinned by the test suite:
+inside a git worktree every probe runs the full three-call sequence
+(`rev-parse`, `ls-files`, `check-ignore` — `requirement-lint-git-guard.mjs`),
+so a fully passing guard pass costs 48 git calls and the pre-lock pass plus
+the writer's in-lock re-check totals up to 96 on a successful guarded write;
+outside a git worktree the guard short-circuits after one `rev-parse` per
+probe; the guard stops at the first non-ignored probe, so a refusal costs
+three calls per evaluated probe only; the `delete` path checks actually
+existing temp siblings and never runs the probe set, so its cost is
+unchanged.
 
 ## See Also
 

@@ -624,20 +624,42 @@ async function prepareNamespace(root) {
 
 // Pre-mutation git guard for the atomic write's transient sibling: the store
 // generates `<dest>.<random-uuid>.tmp` internally (workflow-state-store.mjs),
-// so the exact name cannot be pre-guarded. The probe below carries an
-// unpredictable random name with the SAME structural shape as the real temp
-// file, so any narrow saved rule that matches the probe inevitably matches
-// the real temp pattern too — a crafted `.gitignore` pinning the old
-// deterministic probe name (`*.write-probe.tmp`) no longer passes the guard.
-// The probe is NEVER materialized on disk: `git check-ignore` evaluates
-// ignore rules for non-existent paths, which still covers the case where a
-// PRE-EXISTING namespace .gitignore with narrow rules was preserved by
-// ensureRuntimeGitignore and leaves `*.tmp` siblings visible.
+// so the exact name cannot be pre-guarded. Instead of one unpredictable
+// probe, the guard evaluates a DETERMINISTIC set of 16 probes covering the
+// ENTIRE first hex character of the UUID space (`0`…`9`, `a`…`f`; the
+// remaining positions are fixed, keeping the real `<8>-<4>-<4>-<4>-<12>.tmp`
+// structural shape). Any saved rule whose match depends on the first hex
+// position — the `[0-7]` / `[8-f]` classes a narrow `.gitignore` can express
+// — is proven against every admissible first character, so a rule keyed to
+// only half of the class (e.g. `*.json.[0-7]*.tmp`) is refused
+// deterministically on the probe whose first character it excludes. The
+// guard refuses on the FIRST non-ignored probe, which also bounds the cost
+// of a refusal. Documented guarantee boundary: the set proves rules that
+// depend on the FIRST hex position only; adversarial rules keyed to other
+// UUID positions are NOT proven by this set (enumerating that space is
+// combinatorial and out of scope for a bounded guard) — this boundary is
+// restated in the policy. The probes are NEVER materialized on disk:
+// `git check-ignore` evaluates ignore rules for non-existent paths, which
+// still covers the case where a PRE-EXISTING namespace .gitignore with
+// narrow rules was preserved by ensureRuntimeGitignore and leaves `*.tmp`
+// siblings visible.
+const TEMP_PROBE_HEX = '0123456789abcdef';
+// The fixed tail keeps the real UUID group widths (<8>-<4>-<4>-<4>-<12>): the
+// first group is `<hex>` + 7 fixed hex characters = 8. A 7-character first
+// group would let a saved rule keyed to that WIDTH (e.g. `*.json.???????-*.tmp`
+// — seven wildcards before the dash) ignore every probe while leaving the real
+// 8-character temp sibling visible, and group width is a first-position
+// property the set claims to cover, not part of the documented
+// other-positions boundary.
+const TEMP_PROBE_TAIL = 'e45d85f-7f6c-4a1b-9c2d-5b8a3f6e1d07';
 async function assertTempAreaIgnored(root, destinationFile, options = {}) {
-  const probe = `${destinationFile}.${randomUUID()}.tmp`;
-  const verdict = await (options.gitGuard ?? verifyObservationIgnored)(root, probe, options);
-  if (!verdict.ok || verdict.tracked) {
-    return { ok: false, code: verdict.ok ? 'observation-path-tracked' : verdict.code, detail: verdict.detail ?? probe };
+  const gitGuard = options.gitGuard ?? verifyObservationIgnored;
+  for (const hex of TEMP_PROBE_HEX) {
+    const probe = `${destinationFile}.${hex}${TEMP_PROBE_TAIL}.tmp`;
+    const verdict = await gitGuard(root, probe, options);
+    if (!verdict.ok || verdict.tracked) {
+      return { ok: false, code: verdict.ok ? 'observation-path-tracked' : verdict.code, detail: verdict.detail ?? probe };
+    }
   }
   return null;
 }
@@ -653,11 +675,22 @@ async function assertTempAreaIgnored(root, destinationFile, options = {}) {
 // removed (solely when this request's prepareNamespace created it) and the
 // empty leaf directories are removed. Phase (b), after the lock is released
 // again, removes the now-empty scope and namespace directories.
-// Known boundary, documented deliberately: the scope lock serializes
-// same-scope writers only — a concurrent FIRST save of a different scope is
-// not serialized here, so a microscopic window between the re-check and the
-// removal remains (namespace-wide serialization was rejected as a new
-// mechanism outside this change's scope).
+// Known boundary, documented deliberately at its ACTUAL width: the window
+// this cleanup protects against is the same-scope prepared writer — writer B
+// passes its pre-lock prepareNamespace + temp guard, request A fails and its
+// catch-cleanup removes the .gitignore B's proof was built on, and B then
+// writes through the opened window. Writers now close that window themselves
+// by re-ensuring and re-checking under the scope lock before the first
+// record byte (see the in-lock blocks in the save/lifecycle/run paths),
+// which shrinks the residual interval to "between a writer's in-lock
+// re-check and its first record byte" — that interval is serialized for
+// same-scope writers and cleanups by the very lock both sides hold, so it
+// is not races the cleanup can open. What remains unsynchronized is the
+// pre-existing documented boundary: a concurrent FIRST save of a DIFFERENT
+// scope is not serialized by this scope's lock, so a microscopic window
+// between the re-check and the removal remains on that axis
+// (namespace-wide serialization was rejected as a new mechanism outside
+// this change's scope).
 // The re-acquisition materializes `${scopeDir}/write.lock` through the
 // store's parent mkdir even when the failed request never reached its own
 // lock acquisition; that transient artifact is absorbed by the store's
@@ -934,12 +967,32 @@ export async function saveDecisionCorrection(input, options = {}) {
     // QA `actual_diff` channel the moment the atomic write runs.
     await assertGuard(await assertTempAreaIgnored(rootDir, caseFile, options));
     return await store.lock(lockPath, async () => {
+      // In-lock re-ensure/re-check (M3): the pre-lock proof above can go
+      // stale when a concurrent same-scope request's catch-cleanup removes
+      // the namespace .gitignore between this writer's temp guard and its
+      // lock acquisition. Under the scope lock — which same-scope cleanup
+      // must also re-acquire — the writer authoritatively re-ensures the
+      // ignore file (idempotent recreate) and re-checks the temp zone with
+      // the fresh state, so a prepared same-scope writer can no longer write
+      // through a window opened by another request's cleanup. A failed
+      // re-check refuses with the existing `observation-path-not-ignored`
+      // code (no new codes); a re-ensure throw keeps the wrapped
+      // `runtime-gitignore-failed` shape.
+      const reensured = await prepareNamespace(rootDir);
+      await assertGuard(reensured.ok === true ? null : reensured);
+      // A recreated ignore file upgrades this request's cleanup action to
+      // `create` (never a downgrade): the catch-cleanup must be able to
+      // remove a .gitignore THIS request recreated, or a late failure would
+      // leak the recreated file out of a `preserve`-scoped cleanup.
+      if (reensured.ok && reensured.action === 'create') namespaceAction = 'create';
+      await assertGuard(await assertTempAreaIgnored(rootDir, caseFile, options));
       // Dedup-check and write are serialized by the scope write lock: the
       // idempotent/revision/collision matrix is race-free within this
       // helper's serialization model. Windows case-only collisions (case and
       // scope directory aliases) are refused deterministically before any
       // payload resolution. The atomic write's transient `<dest>.<uuid>.tmp`
-      // shape was proven effectively ignored by the probe guard above.
+      // shape was proven effectively ignored by the probe guards above (the
+      // pre-lock pass and the in-lock re-check).
       await assertNoScopeCollision(store, scope);
       await assertNoCaseCollision(store, scopeDir, `${caseId}.json`);
       const identityMaterial = await normalizeIdentityInput(scope, input.partition, input.identity, store);
@@ -1023,29 +1076,55 @@ async function lifecycleCommand(action, input, options) {
     requireValue(existing.payload.partition !== 'held_out', 'held-out-tuning', true);
   }
   await assertGuard(await guardOwnedSurfaces(rootDir, [caseFile, `${NAMESPACE_ROOT}/.gitignore`, lockPath], options));
-  const lifecycleNamespace = await prepareNamespace(rootDir);
-  await assertGuard(lifecycleNamespace.ok === true ? null : lifecycleNamespace);
-  await assertGuard(await assertTempAreaIgnored(rootDir, caseFile, options));
-  return store.lock(lockPath, async () => {
-    const record = await loadCaseRecord(store, rootDir, scope, caseId);
-    // Held-out immunity is enforced before any mutation logic: report-only
-    // partitions never accept outcome-affecting mutations (confirm would
-    // author a held-out outcome; save-revision and lifecycle are the tuning
-    // surfaces). Retention (delete) stays available.
-    requireValue(record.payload.partition !== 'held_out', 'held-out-tuning', true);
-    let next;
-    if (action === 'confirm') {
-      requireValue(input.payload_digest === record.payload_digest, 'payload-mismatch', true);
-      requireValue(input.expected_label === record.payload.expected_label, 'label-mismatch', true);
-      next = lifecycleTransition(record, 'confirmed');
-    } else if (action === 'reject') {
-      next = lifecycleTransition(record, 'rejected', input.reason);
-    } else {
-      next = lifecycleTransition(record, 'superseded', input.reason);
-    }
-    await store.save(caseFile, next);
-    return { ok: true, action, case: next };
-  });
+  // Request-scoped lifecycle materialization mirrors the save path: the
+  // owned-surface guards stay outside the try, namespace preparation and the
+  // temp guard run inside it, and any failure from preparation onwards cleans
+  // the artifacts THIS request created under the re-acquired scope lock.
+  // leafDirs stays conservatively narrow (`cases` only): a lifecycle never
+  // writes into `runs`, so the cleanup must not consider that leaf removable
+  // on this request's behalf. The existing case survives every failure here —
+  // the cleanup removes only empty leaf directories and, solely when this
+  // request's prepareNamespace created it, the namespace .gitignore.
+  let lifecycleNamespaceAction = 'preserve';
+  try {
+    const lifecycleNamespace = await prepareNamespace(rootDir);
+    lifecycleNamespaceAction = lifecycleNamespace.ok ? lifecycleNamespace.action : 'preserve';
+    await assertGuard(lifecycleNamespace.ok === true ? null : lifecycleNamespace);
+    await assertGuard(await assertTempAreaIgnored(rootDir, caseFile, options));
+    return await store.lock(lockPath, async () => {
+      // In-lock re-ensure/re-check (M3), identical to the save path: the
+      // pre-lock proof must not go stale through a concurrent same-scope
+      // cleanup, and a recreated ignore file upgrades the cleanup action so
+      // a late failure cannot leak the recreated file.
+      const reensured = await prepareNamespace(rootDir);
+      await assertGuard(reensured.ok === true ? null : reensured);
+      if (reensured.ok && reensured.action === 'create') lifecycleNamespaceAction = 'create';
+      await assertGuard(await assertTempAreaIgnored(rootDir, caseFile, options));
+      const record = await loadCaseRecord(store, rootDir, scope, caseId);
+      // Held-out immunity is enforced before any mutation logic: report-only
+      // partitions never accept outcome-affecting mutations (confirm would
+      // author a held-out outcome; save-revision and lifecycle are the tuning
+      // surfaces). Retention (delete) stays available.
+      requireValue(record.payload.partition !== 'held_out', 'held-out-tuning', true);
+      let next;
+      if (action === 'confirm') {
+        requireValue(input.payload_digest === record.payload_digest, 'payload-mismatch', true);
+        requireValue(input.expected_label === record.payload.expected_label, 'label-mismatch', true);
+        next = lifecycleTransition(record, 'confirmed');
+      } else if (action === 'reject') {
+        next = lifecycleTransition(record, 'rejected', input.reason);
+      } else {
+        next = lifecycleTransition(record, 'superseded', input.reason);
+      }
+      await store.save(caseFile, next);
+      return { ok: true, action, case: next };
+    });
+  } catch (error) {
+    // The `await` is deliberate: a cleanup rejection must surface through
+    // this request's error channel, never as an unhandled rejection.
+    await cleanupRequestNamespace(store, rootDir, { scope, namespaceAction: lifecycleNamespaceAction, leafDirs: ['cases'] });
+    throw error;
+  }
 }
 
 export async function deleteDecisionCorrection(input, options = {}) {
@@ -1557,18 +1636,29 @@ export async function runDecisionCorrectionReplay(input, options = {}) {
     return { ok: true, action: 'run', preview: true, run: runRecord };
   }
   const runFile = `${scopeDir}/runs/${runRecord.run_id}.json`;
-  // The write path materializes namespace artifacts exactly like the save
-  // path, so its failures share the same request-scoped cleanup (the save
-  // path previously cleaned up; the run path never did — same fail-safe
-  // semantics, now one helper).
+  // Owned-surface guards run OUTSIDE the try, exactly like the save path: an
+  // early git-guard refusal must not reach cleanupRequestNamespace, which
+  // would materialize `write.lock` and the namespace directories around
+  // surfaces that were never verified. The write path materializes namespace
+  // artifacts exactly like the save path, so its later failures share the
+  // same request-scoped cleanup (the save path previously cleaned up; the
+  // run path never did — same fail-safe semantics, now one helper).
+  await assertGuard(await guardOwnedSurfaces(rootDir, [runFile, `${NAMESPACE_ROOT}/.gitignore`, `${scopeDir}/write.lock`], options));
   let runNamespaceAction = 'preserve';
   try {
-    await assertGuard(await guardOwnedSurfaces(rootDir, [runFile, `${NAMESPACE_ROOT}/.gitignore`, `${scopeDir}/write.lock`], options));
     const runNamespace = await prepareNamespace(rootDir);
     runNamespaceAction = runNamespace.ok ? runNamespace.action : 'preserve';
     await assertGuard(runNamespace.ok === true ? null : runNamespace);
     await assertGuard(await assertTempAreaIgnored(rootDir, runFile, options));
     return await store.lock(`${scopeDir}/write.lock`, async () => {
+      // In-lock re-ensure/re-check (M3), identical to the save path: the
+      // pre-lock proof must not go stale through a concurrent same-scope
+      // cleanup, and a recreated ignore file upgrades the cleanup action so
+      // a late failure cannot leak the recreated file.
+      const reensured = await prepareNamespace(rootDir);
+      await assertGuard(reensured.ok === true ? null : reensured);
+      if (reensured.ok && reensured.action === 'create') runNamespaceAction = 'create';
+      await assertGuard(await assertTempAreaIgnored(rootDir, runFile, options));
       // Run-record leaf ownership: a run id collision (however unlikely for a
       // fresh random id) must never silently overwrite an existing run record.
       const existingRun = await store.load(runFile).catch((error) => {

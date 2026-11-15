@@ -1193,6 +1193,16 @@ export async function validateObservationBinding(rootDir, observation, options =
     const freshSupportedSymbols = new Set(freshTrace.trace.nodes
       .map((node) => node?.symbol)
       .filter((symbol) => typeof symbol === 'string' && kindForSymbol(symbol) !== null));
+    // Bound set seed: operation/endpoint symbols — the supported kind whose
+    // semantic_symbol node the writer derives unconditionally, with no
+    // test-anchor search and no spec-content resolution. Under a recorded
+    // full-coverage claim, provably-resolvable requirement/scenario symbols
+    // are added below (see the bound block). The declared universe above
+    // keeps every supported kind; this bound deliberately stays
+    // conservative — it must never exceed the nodes an honest run derives.
+    const freshMandatorySymbols = new Set(freshTrace.trace.nodes
+      .map((node) => node?.symbol)
+      .filter((symbol) => typeof symbol === 'string' && kindForSymbol(symbol) === 'semantic_symbol'));
     const inventoryPaths = new Set(freshInventory);
     const presentedTestInputs = new Set(recordedInputs
       .map((input) => input?.path)
@@ -1205,28 +1215,111 @@ export async function validateObservationBinding(rootDir, observation, options =
     // invalid verdict, winning over any stale fields accumulated above).
     const MAX_ACCOUNTED_SOURCES = 100000;
     const recordedTruncations = Array.isArray(recordedScan.truncations) ? recordedScan.truncations : [];
-    if (freshDeclared > MAX_ACCOUNTED_SOURCES && !recordedTruncations.includes('declared-sources-truncated')) {
+    // Drift vs tamper (F3): this early refusal is the marker-tamper pin only
+    // when the fresh universe that feeds the formula is unchanged. The
+    // formula reads freshInventory (delta-spec walk) and freshSupportedSymbols
+    // (fresh trace bytes), so honest drift of `delta_spec_inventory` or
+    // `trace` can move freshDeclared across the maximum on its own — that is
+    // stale, not invalid. Drifted inputs cannot move this formula (the
+    // presented-test universe derives from the recorded inputs), so they do
+    // not excuse an overflowing form here. An empty relevant-drift set keeps
+    // the impossible-form verdict: the marker was stripped from an overflowing
+    // run over the same universe (recorded-side tamper).
+    if (freshDeclared > MAX_ACCOUNTED_SOURCES && !recordedTruncations.includes('declared-sources-truncated')
+      && !mismatched.some((field) => field === 'delta_spec_inventory' || field === 'trace')) {
       return { ok: false, code: 'observation-invalid' };
     }
     if ((recordedScan.declared_sources ?? null) !== Math.min(freshDeclared, MAX_ACCOUNTED_SOURCES)) {
       mismatched.push('declared_sources');
     }
-    // Provable-truncation bound: every supported-kind trace symbol derives a
-    // mandatory semantic_symbol node with no test-anchor search (best-effort
-    // bound — requirement/scenario refs may resolve to null and are
-    // conservatively NOT counted, so the bound undercounts). When the bound
-    // exceeds the node limit, an honest run must have truncated the graph and
-    // degraded coverage, so a recorded full-coverage observation over such a
-    // trace is a provably impossible form, not merely drifted.
+    // Provable-truncation bound: a lower bound on the nodes an honest run
+    // over the fresh data MUST derive. operation/endpoint trace symbols
+    // always derive a mandatory semantic_symbol node with no test-anchor
+    // search. requirement/scenario trace symbols derive their node only when
+    // they resolve, so they count only with PROVABLE resolution evidence:
+    // the symbol's key parses out of exactly one readable fresh inventory
+    // spec (parseRequirementsFromBytes over the same bounded bytes the
+    // writer reads). Ambiguity — two or more readable matches — makes an
+    // honest run REFUSE rather than truncate, so ambiguous keys count
+    // nothing; zero matches count nothing too, keeping the bound
+    // conservative. Specs that fail to read contribute nothing. When the
+    // bound exceeds the node limit, an honest run must have truncated the
+    // graph and degraded coverage, so a recorded full-coverage observation
+    // over such a trace is a provably impossible form, not merely drifted —
+    // this catches fabricated full-coverage claims over graphs truncated by
+    // requirement/scenario nodes, which the unconditional operation/endpoint
+    // bound alone cannot see.
     const nodeLimit = observation.graph_limits?.max_nodes ?? GRAPH_LIMITS.max_nodes;
-    if (freshSupportedSymbols.size > nodeLimit && recordedScan.coverage === 'full') {
+    const requirementScenarioSymbols = freshTrace.trace.nodes
+      .map((node) => node?.symbol)
+      .filter((symbol) => typeof symbol === 'string'
+        && (symbol.startsWith('requirement:') || symbol.startsWith('scenario:')));
+    if (recordedScan.coverage === 'full' && requirementScenarioSymbols.length > 0) {
+      // Resolution evidence comes from readable fresh inventory specs whose
+      // bytes match the recorded digests only: a drifted, unreadable, or
+      // absent spec contributes nothing, so honest spec drift can only
+      // UNDER-count the bound (stale keeps priority) and can never fabricate
+      // the impossible-form verdict.
+      const driftedInputPaths = new Set(mismatched
+        .filter((field) => typeof field === 'string' && field.startsWith('inputs:'))
+        .map((field) => field.slice('inputs:'.length)));
+      const titleCounts = new Map();
+      const headingCounts = new Map();
+      for (const specPath of freshInventory) {
+        if (driftedInputPaths.has(specPath)) continue;
+        let bytes = null;
+        try { bytes = await readProviderFile(root, specPath, DOCUMENT_LIMIT); } catch { continue; }
+        if (bytes === null) continue;
+        try {
+          for (const requirement of parseRequirementsFromBytes(bytes, specPath)) {
+            titleCounts.set(requirement.title, (titleCounts.get(requirement.title) ?? 0) + 1);
+            for (const scenario of requirement.scenarios) {
+              headingCounts.set(scenario.heading, (headingCounts.get(scenario.heading) ?? 0) + 1);
+            }
+          }
+        } catch { continue; }
+      }
+      for (const symbol of requirementScenarioSymbols) {
+        const key = symbol.slice(symbol.indexOf(':') + 1);
+        const counts = symbol.startsWith('requirement:') ? titleCounts : headingCounts;
+        if (counts.get(key) === 1) freshMandatorySymbols.add(symbol);
+      }
+    }
+    // Drift vs tamper (F3): the bound formula reads the fresh trace bytes and
+    // the resolution evidence above; honest `trace` or `delta_spec_inventory`
+    // drift can move the bound over the node limit on its own (stale, not
+    // invalid) — drifted or unreadable specs only under-count, so they never
+    // fabricate the verdict. With an unchanged trace and inventory the form
+    // stays provably impossible: a recorded full-coverage claim over a trace
+    // that forces graph truncation cannot be honest (fabrication pin).
+    if (freshMandatorySymbols.size > nodeLimit && recordedScan.coverage === 'full'
+      && !mismatched.includes('trace') && !mismatched.includes('delta_spec_inventory')) {
       return { ok: false, code: 'observation-invalid' };
     }
     // Full coverage implies every presented input was readable when the
     // observation was written: a fresh input that now classifies as missing
     // or malformed would have produced missing_sources and partial coverage.
+    // Drift vs tamper (F3), judged per input: an honest deletion or
+    // corruption of a presented input carries its OWN `inputs:<path>` mismatch
+    // (the fresh digest diverges from the recorded one), so that fire is
+    // stale. A fresh non-file input whose RECORDED classification is already
+    // non-file matches its recorded digest (no drift of its own) and is not
+    // explained by any other input's drift — a full-coverage claim over such
+    // an input is itself the fabrication and keeps the impossible-form
+    // verdict regardless of which other inputs drifted. The `inputs:`-
+    // mismatch disjunct below is belt-and-braces defense-in-depth: fresh
+    // inputs are built from the recorded inputs and the kind is part of the
+    // digest comparison, so a recorded non-file classification with matching
+    // digests already implies no `inputs:<path>` drift and the disjunct is
+    // unreachable by construction — it is kept so the fabrication verdict
+    // cannot be defeated if that construction ever changes.
     if (recordedScan.coverage === 'full' && freshInputs.some((input) => input.kind !== 'file')) {
-      return { ok: false, code: 'observation-invalid' };
+      const fabricatedNonFile = freshInputs.some((input) => input.kind !== 'file'
+        && (recordedInputs.find((candidate) => candidate?.path === input.path)?.kind ?? 'file') !== 'file');
+      if (fabricatedNonFile
+        || !mismatched.some((field) => typeof field === 'string' && field.startsWith('inputs:'))) {
+        return { ok: false, code: 'observation-invalid' };
+      }
     }
   }
   const binding = buildAssessmentBinding(traceLinkSuggestionsBindingObject({
@@ -1969,15 +2062,29 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
     // outside the presented scope and are never read; every read is bounded.
     const specCollection = await collectDeltaSpecs(rootDir, changeId, diagnostics);
     const specs = specCollection.specs;
+    // Presented-test paths that are ALSO part of the canonical delta-spec
+    // inventory (e.g. a presented `specs/tests/spec.md` inside the change's
+    // own specs tree) are accounted and read exactly once, from their specs
+    // side: the tests-only list below drives the test reads AND every
+    // accounting surface (declared/scanned sources, input records, missing
+    // sources). This mirrors the revalidation formula, which derives the
+    // presented-test universe as recorded inputs minus inventory paths, so a
+    // collision file can never be born with a double-counted declared count
+    // or duplicate input records. Silent subtraction by design: no new
+    // refusal and no extra serialized role field — origin follows from the
+    // specs side.
+    const inventoryPaths = new Set(specs.map((spec) => spec.path));
+    const testsOnlyPaths = uniqueTestPaths.filter((testPath) => !inventoryPaths.has(testPath));
     if (deadlineExceeded()) {
       emit(notRunEnvelope(['deadline-exceeded']), parsed.json);
       return 0;
     }
     // Test allowlist was fixed from the presented --test inputs before any
     // read (arguments were validated above); each presented path is read
-    // bounded exactly once.
+    // bounded exactly once. Inventory-colliding paths were already read as
+    // specs and are excluded from this loop (single accounting, above).
     const tests = [];
-    for (const testPath of uniqueTestPaths) {
+    for (const testPath of testsOnlyPaths) {
       let bytes = null;
       try {
         bytes = await readProviderFile(rootDir, testPath, DOCUMENT_LIMIT);
@@ -2062,7 +2169,7 @@ export async function runTraceLinkSuggestionsCommand(argv = process.argv.slice(2
     let truncations = [...graph.truncations];
     if (specCollection.truncated) truncations.push('delta-spec-inventory-truncated');
     if (missingSourcesCapped) truncations.push('missing-sources-truncated');
-    let declaredSources = specs.length + uniqueTestPaths.length + supportedTraceSymbols.size;
+    let declaredSources = specs.length + testsOnlyPaths.length + supportedTraceSymbols.size;
     let scannedSources = specs.filter((spec) => spec.ok).length
       + tests.filter((test) => test.ok).length
       + graph.resolvedTraceRefs;

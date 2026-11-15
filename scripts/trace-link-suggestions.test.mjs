@@ -36,12 +36,15 @@ import {
   TRACE_LINK_NAMESPACE,
   TRACE_LINK_SCHEMA,
   assertStructuralInvariants,
+  currentTraceLinkContext,
+  inputDigestRecords,
   parseRequirementsFromBytes,
   parseTraceLinkArgs,
   parseTraceLinkSuggestionsConfigSubset,
   readTraceLinkSuggestionsConfig,
   runTraceLinkSuggestionsCommand,
   traceLinkPaths,
+  traceLinkSuggestionsBindingObject,
   traceManifestPath,
   tokenize,
   intersects,
@@ -51,6 +54,7 @@ import {
   validateObservationBinding,
   writeTraceLinkObservation,
 } from './trace-link-suggestions.mjs';
+import { assessmentDigest, buildAssessmentBinding } from './typed-assessment.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CORPUS_DIR = path.join(REPO_ROOT, 'test', 'fixtures', 'trace-link-suggestions');
@@ -1427,7 +1431,7 @@ describe('trace-link-suggestions binding and revalidation', () => {
     assert.deepEqual(verdict.mismatched, ['declared_sources']);
   });
 
-  it('refuses a full-coverage observation whose presented input is unreadable at revalidation (C3)', async () => {
+  it('marks a full-coverage observation whose presented input was removed stale with the named input (C3 honest drift)', async () => {
     const root = await makeTemp('aif-tls-fullmiss-');
     const changeId = 'full-coverage-missing-change';
     await seedCaseProject(root, changeId, { trace: null, specs: [], tests: ['test/auth.spec.mjs'] });
@@ -1446,12 +1450,265 @@ describe('trace-link-suggestions binding and revalidation', () => {
     assert.equal(exitCode, 0);
     const observation = parseStrictJson(await readFile(path.join(root, traceLinkPaths(changeId).observation), 'utf8'));
     assert.equal(observation.structural.scan.coverage, 'full', 'the honest run reads every presented input');
-    // Removing a presented input after the write makes the recorded
-    // full-coverage claim provably unfaithful: an honest run over the current
-    // inputs would produce missing_sources and partial coverage — a provably
-    // impossible form, not a merely drifted count.
+    // Removing a presented input after the write is an honest custody drift:
+    // the fresh digest diverges and the recorded full-coverage claim becomes
+    // unfaithful BECAUSE the universe moved — the revalidation names the
+    // drifted input and flips to stale instead of the impossible-form verdict.
     await rm(path.join(root, 'test', 'auth.spec.mjs'), { force: true });
-    assert.equal((await validateObservationBinding(root, observation)).code, 'observation-invalid');
+    const verdict = await validateObservationBinding(root, observation);
+    assert.equal(verdict.ok, true);
+    assert.equal(verdict.stale, true);
+    assert.equal(verdict.state, 'stale-observation');
+    assert.ok(verdict.mismatched.includes('inputs:test/auth.spec.mjs'),
+      `the removed input must be named, got ${JSON.stringify(verdict.mismatched)}`);
+  });
+
+  it('accounts a spec/test collision once: not born stale, fresh revalidation, single input record (M5)', async () => {
+    const root = await makeTemp('aif-tls-collision-');
+    const changeId = 'spec-test-collision-change';
+    await seedCaseProject(root, changeId, { trace: null, specs: ['specs/spec-en.md'], tests: [] });
+    // The collision file lives inside the change's own specs tree AND is
+    // presented as a test path (the tests/ segment satisfies TEST_PATH_FORM),
+    // so pre-fix writers read and accounted it twice.
+    const collisionRel = `openspec/changes/${changeId}/specs/tests/spec.md`;
+    await writeInlineSpec(root, changeId, 'tests', '# Delta for tests\n\nPresented collision file.\n');
+    const trace = {
+      schemaVersion: 'lekalo/trace-manifest/v0.2.16',
+      identity: 'dev.lekalo.trace-manifest@0.2.16',
+      completeness: 'full',
+      nodes: [{ symbol: 'operation:solo.thing' }],
+      relations: [],
+      gaps: [],
+    };
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    await writeFile(manifest, JSON.stringify({ trace, manifestDigest: `sha256:${digest(JSON.stringify(trace))}` }), 'utf8');
+    const { exitCode } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--test', collisionRel, '--write', '--json']);
+    assert.equal(exitCode, 0);
+    const observation = parseStrictJson(await readFile(path.join(root, traceLinkPaths(changeId).observation), 'utf8'));
+    // Single accounting: the collision file counts once, from its specs side.
+    // declared = 2 inventory paths + 0 tests-only + 1 supported symbol;
+    // scanned mirrors it (the operation symbol resolves unconditionally).
+    assert.equal(observation.inputs.filter((input) => input.path === collisionRel).length, 1,
+      'the collision file carries exactly one input record');
+    assert.equal(observation.inputs.length, 2, 'two specs, zero tests-only records');
+    assert.equal(observation.structural.scan.delta_spec_inventory.length, 2);
+    assert.equal(observation.structural.scan.declared_sources, 3);
+    assert.equal(observation.structural.scan.scanned_sources, 3);
+    assert.equal(observation.structural.scan.coverage, 'full');
+    // The writer mirrors the revalidation formula, so a fresh record is born
+    // clean: no drift, no binding flip.
+    const fresh = await validateObservationBinding(root, observation);
+    assert.equal(fresh.ok, true);
+    assert.equal(fresh.stale, false, `a collision-recorded observation revalidates clean, got ${JSON.stringify(fresh.mismatched)}`);
+    // Pre-fix records double-counted the collision: two input records for the
+    // same path, declared/scanned including the test side, and a binding built
+    // over the duplicated digest set. Rebuilt faithfully here with the same
+    // binding primitives; the current engine must keep such a record honestly
+    // stale (the declared divergence is named) — never observation-invalid.
+    const legacy = structuredClone(observation);
+    legacy.inputs.push(structuredClone(legacy.inputs.find((input) => input.path === collisionRel)));
+    legacy.structural.scan.declared_sources += 1;
+    legacy.structural.scan.scanned_sources += 1;
+    const legacyContext = await currentTraceLinkContext(root, legacy.inputs);
+    legacy.binding = buildAssessmentBinding(traceLinkSuggestionsBindingObject({
+      worktreeIdentity: legacy.worktree_identity,
+      changeId: legacy.change_id,
+      trace: { path: legacy.structural.trace.path, sha256: legacy.structural.trace.sha256, bytes: legacy.structural.trace.bytes },
+      validatedExportDigest: legacy.structural.trace.manifest_digest,
+      inputDigests: inputDigestRecords(legacy.inputs),
+      deltaSpecInventory: legacy.structural.scan.delta_spec_inventory,
+      candidatePayloadDigest: assessmentDigest({ nodes: legacy.structural.nodes, edges: legacy.structural.edges }),
+      graphLimits: legacy.graph_limits,
+      rubric: legacy.rubric,
+      relationPolicy: legacy.relation_policy,
+      engine: legacy.engine,
+      helper: legacy.helper,
+      contract: legacy.contract,
+      languageOptions: legacy.language_options,
+      exclusionPolicy: legacy.exclusion_policy,
+    }));
+    const legacyVerdict = await validateObservationBinding(root, legacy);
+    assert.equal(legacyVerdict.ok, true, 'a legacy double-counted record is drifted, not invalid');
+    assert.equal(legacyVerdict.stale, true);
+    assert.ok(legacyVerdict.mismatched.includes('declared_sources'),
+      `the double-counted declared divergence must be named, got ${JSON.stringify(legacyVerdict.mismatched)}`);
+  });
+
+  it('marks an honest trace drift stale when the grown trace pushes the mandatory-symbol bound over the limit (M6)', async () => {
+    const root = await makeTemp('aif-tls-boundrift-');
+    const changeId = 'trace-drift-bound-change';
+    await seedCaseProject(root, changeId, { trace: null, specs: [], tests: [] });
+    const smallTrace = {
+      schemaVersion: 'lekalo/trace-manifest/v0.2.16',
+      identity: 'dev.lekalo.trace-manifest@0.2.16',
+      completeness: 'full',
+      nodes: [{ symbol: 'operation:solo.thing' }],
+      relations: [],
+      gaps: [],
+    };
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    await writeFile(manifest, JSON.stringify({ trace: smallTrace, manifestDigest: `sha256:${digest(JSON.stringify(smallTrace))}` }), 'utf8');
+    const { exitCode } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--write', '--json']);
+    assert.equal(exitCode, 0);
+    const observation = parseStrictJson(await readFile(path.join(root, traceLinkPaths(changeId).observation), 'utf8'));
+    assert.equal(observation.structural.scan.coverage, 'full');
+    // The trace manifest is replaced with a grown one: the custody bytes
+    // drift, and the fresh mandatory-symbol bound (operation symbols, 600)
+    // now exceeds the node limit (500). The recorded full-coverage claim was
+    // honest at write time over the small trace — the drift alone explains
+    // the impossible-looking bound form, so the verdict is stale with the
+    // named trace field, not observation-invalid.
+    const grownTrace = {
+      schemaVersion: 'lekalo/trace-manifest/v0.2.16',
+      identity: 'dev.lekalo.trace-manifest@0.2.16',
+      completeness: 'full',
+      nodes: Array.from({ length: 600 }, (_, index) => ({ symbol: `operation:mass.symbol${index}` })),
+      relations: [],
+      gaps: [],
+    };
+    await writeFile(manifest, JSON.stringify({ trace: grownTrace, manifestDigest: `sha256:${digest(JSON.stringify(grownTrace))}` }), 'utf8');
+    const verdict = await validateObservationBinding(root, observation);
+    assert.equal(verdict.ok, true);
+    assert.equal(verdict.stale, true);
+    assert.ok(verdict.mismatched.includes('trace'),
+      `the drifted trace must be named, got ${JSON.stringify(verdict.mismatched)}`);
+  });
+
+  it('marks an honest inventory drift stale when the grown inventory overflows the declared clamp (M6)', async () => {
+    const root = await makeTemp('aif-tls-invdrift-');
+    const changeId = 'inventory-drift-overflow-change';
+    await seedCaseProject(root, changeId, { trace: null, specs: ['specs/spec-en.md'], tests: [] });
+    // Written universe: 1 spec + 99999 operation symbols = 100000 declared —
+    // exactly at the schema maximum, no truncation marker needed. The graph
+    // truncates at its own limits, so the recorded coverage is partial.
+    const nodes = Array.from({ length: 99999 }, (_, index) => ({ symbol: `operation:mass.symbol${index}` }));
+    const trace = {
+      schemaVersion: 'lekalo/trace-manifest/v0.2.16',
+      identity: 'dev.lekalo.trace-manifest@0.2.16',
+      completeness: 'full',
+      nodes,
+      relations: [],
+      gaps: [],
+    };
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    await writeFile(manifest, JSON.stringify({ trace, manifestDigest: `sha256:${digest(JSON.stringify(trace))}` }), 'utf8');
+    const { exitCode } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--write', '--json']);
+    assert.equal(exitCode, 0);
+    const observation = parseStrictJson(await readFile(path.join(root, traceLinkPaths(changeId).observation), 'utf8'));
+    assert.equal(observation.structural.scan.declared_sources, 100000);
+    assert.equal(observation.structural.scan.truncations.includes('declared-sources-truncated'), false,
+      'the written universe sits exactly at the clamp boundary without overflowing it');
+    // Two delta specs are added afterwards: the fresh inventory drift alone
+    // pushes the recomputed declared universe past the schema maximum. An
+    // overflowing fresh declaration without a marker would be the impossible
+    // form only over an unchanged universe — here the inventory drift is the
+    // named cause, so the verdict is stale, not observation-invalid.
+    await writeInlineSpec(root, changeId, 'drift-a', `# Drift spec A\n\ninventory drift for ${changeId}.\n`);
+    await writeInlineSpec(root, changeId, 'drift-b', `# Drift spec B\n\ninventory drift for ${changeId}.\n`);
+    const verdict = await validateObservationBinding(root, observation);
+    assert.equal(verdict.ok, true);
+    assert.equal(verdict.stale, true);
+    assert.ok(verdict.mismatched.includes('delta_spec_inventory'),
+      `the drifted inventory must be named, got ${JSON.stringify(verdict.mismatched)}`);
+  });
+
+  it('refuses a fabricated full-coverage claim over a graph truncated by requirement nodes (M6 bound)', async () => {
+    const root = await makeTemp('aif-tls-reqbound-');
+    const changeId = 'requirement-bound-change';
+    // One readable delta spec parsing 501 requirements with 501 distinct
+    // scenarios, and a fresh trace referencing all 501 requirement titles:
+    // every trace symbol provably resolves (exactly one readable match), so
+    // an honest run must derive > max_nodes nodes, truncate the graph, and
+    // degrade coverage — a full-coverage claim over this universe is
+    // impossible. The unconditional operation/endpoint bound alone sees ZERO
+    // mandatory nodes here, which is exactly the fabrication window the
+    // requirement/scenario resolution evidence closes.
+    const requirement = (index) => [
+      `### Requirement: Req${String(index).padStart(3, '0')}`,
+      '',
+      'The system MUST stay consistent.',
+      '',
+      `#### Scenario: Scn${String(index).padStart(3, '0')}`,
+      '',
+      '- GIVEN a persisted state',
+      '- WHEN the state changes',
+      '- THEN the change survives restart',
+      '',
+    ].join('\n');
+    const specContent = `# Delta for bulk\n\n## ADDED Requirements\n\n${Array.from({ length: 501 }, (_, i) => requirement(i + 1)).join('\n')}`;
+    await writeInlineSpec(root, changeId, 'bulk', specContent);
+    const trace = {
+      schemaVersion: 'lekalo/trace-manifest/v0.2.16',
+      identity: 'dev.lekalo.trace-manifest@0.2.16',
+      completeness: 'full',
+      nodes: Array.from({ length: 501 }, (_, i) => ({ symbol: `requirement:Req${String(i + 1).padStart(3, '0')}` })),
+      relations: [],
+      gaps: [],
+    };
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    await writeFile(manifest, JSON.stringify({ trace, manifestDigest: `sha256:${digest(JSON.stringify(trace))}` }), 'utf8');
+    const { exitCode } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--write', '--json']);
+    assert.equal(exitCode, 0);
+    const observation = parseStrictJson(await readFile(path.join(root, traceLinkPaths(changeId).observation), 'utf8'));
+    assert.equal(observation.structural.scan.coverage, 'partial', 'the honest run truncates at the node limit');
+    assert.ok(observation.structural.scan.truncations.includes('graph-truncated'), 'the honest run records the truncation');
+    // Scan-fact-only fabrication: coverage raised to full, outcome rewritten
+    // to none, truncations cleared — the graph, the inputs, the trace, and
+    // the binding payload stay untouched. The provable requirement bound
+    // (501 resolvable symbols > 500 node limit) over the unchanged context
+    // makes the form impossible: observation-invalid.
+    const tampered = structuredClone(observation);
+    tampered.structural.scan.coverage = 'full';
+    tampered.structural.outcome = 'none';
+    tampered.structural.scan.truncations = [];
+    tampered.structural.outcome_summary.by_outcome.candidate = 0;
+    tampered.structural.outcome_summary.by_outcome.related_only = 0;
+    const verdict = await validateObservationBinding(root, tampered);
+    assert.equal(verdict.code, 'observation-invalid',
+      'a fabricated full-coverage claim over a requirement-truncated graph is impossible, not drifted');
+  });
+
+  it('keeps a fabricated non-file recorded input invalid even when another input drifted (M6 per-input)', async () => {
+    const root = await makeTemp('aif-tls-twofiles-');
+    const changeId = 'two-file-fabrication-change';
+    await seedCaseProject(root, changeId, { trace: null, specs: [], tests: ['test/auth.spec.mjs', 'test/ru.spec.md'] });
+    const trace = {
+      schemaVersion: 'lekalo/trace-manifest/v0.2.16',
+      identity: 'dev.lekalo.trace-manifest@0.2.16',
+      completeness: 'full',
+      nodes: [{ symbol: 'operation:solo.thing' }],
+      relations: [],
+      gaps: [],
+    };
+    const manifest = path.join(root, traceManifestPath(changeId));
+    await mkdir(path.dirname(manifest), { recursive: true });
+    await writeFile(manifest, JSON.stringify({ trace, manifestDigest: `sha256:${digest(JSON.stringify(trace))}` }), 'utf8');
+    const { exitCode } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--test', 'test/auth.spec.mjs', '--test', 'test/ru.spec.md', '--write', '--json']);
+    assert.equal(exitCode, 0);
+    const observation = parseStrictJson(await readFile(path.join(root, traceLinkPaths(changeId).observation), 'utf8'));
+    assert.equal(observation.structural.scan.coverage, 'full');
+    // Fabrication shape: input A is re-typed as missing in the RECORD while
+    // the file is genuinely absent (its fresh classification matches the
+    // fabricated record, so A itself carries no drift), while readable input
+    // B is edited and names the only inputs:* drift. Drifting B cannot
+    // explain a full-coverage claim over an input recorded as missing — the
+    // per-input fabrication check keeps the impossible-form verdict instead
+    // of demoting it to stale.
+    await rm(path.join(root, 'test', 'auth.spec.mjs'), { force: true });
+    await writeFile(path.join(root, 'test', 'ru.spec.md'), 'edited bytes for the drift witness\n', 'utf8');
+    const fabricated = structuredClone(observation);
+    const inputA = fabricated.inputs.find((input) => input.path === 'test/auth.spec.mjs');
+    assert.equal(inputA.kind, 'file', 'the honest record read input A as a file');
+    inputA.sha256 = null;
+    inputA.bytes = 0;
+    inputA.kind = 'missing';
+    const verdict = await validateObservationBinding(root, fabricated);
+    assert.equal(verdict.code, 'observation-invalid',
+      'a full-coverage claim over an input recorded as missing stays fabrication under other inputs\' drift');
   });
 
   it('refuses a clamp-boundary observation whose truncation marker was stripped (C3, recorded-side tamper)', async () => {
@@ -2627,15 +2884,18 @@ describe('trace-link-suggestions graph limits', () => {
     assert.equal(value.structural.outcome, 'none');
   });
 
-  it('stops before the assessor when the budget is exhausted exactly at the semantic remainder read (S2)', async () => {
+  it('stops before the assessor when the budget is exhausted exactly at the semantic remainder read (S2, single-read pin)', async () => {
     const root = await makeTemp('aif-tls-remainder-');
     const changeId = 'remainder-change';
     await seedCaseProject(root, changeId, { trace: 'traces/dev-trace-nm.json', specs: ['specs/spec-en.md', 'specs/spec-ru.md'], tests: [] });
-    // Clock contract: call 1 is startedAt, calls 2-4 are the structural
-    // deadline checks (post-specs, post-tests, post-graph), call 5 is the
-    // semantic stage's single remaining-budget read. The deadline is crossed
-    // exactly at that read — the floor clamp of the previous two-read scheme
-    // would have run the assessor with a fake positive remainder.
+    // Differential clock contract: call 1 is startedAt, calls 2-4 are the
+    // structural deadline checks (post-specs, post-tests, post-graph), call 5
+    // is the semantic stage's single remaining-budget read — and NOTHING
+    // reads the clock after it on this refusal path. The deadline is crossed
+    // exactly at that read, so the exact total of five reads pins the
+    // single-read schedule: an implementation that re-read the clock in the
+    // semantic stage would either decide earlier (fewer reads before the
+    // decision) or show a sixth read after the crossed one.
     let calls = 0;
     const now = () => {
       calls += 1;
@@ -2647,11 +2907,77 @@ describe('trace-link-suggestions graph limits', () => {
       now,
       assessor: () => { assessorCalls += 1; return { findings: [] }; },
     });
-    assert.equal(calls >= 5, true, 'the clock reached the semantic remainder read');
+    assert.equal(calls, 5, `exactly five clock reads: 1 startedAt + 3 structural checks + 1 semantic remainder read, got ${calls}`);
     assert.equal(exitCode, 0);
     assert.equal(value.state, 'not_run');
     assert.deepEqual(value.codes, ['deadline-exceeded']);
     assert.equal(assessorCalls, 0, 'a crossed budget stops the semantic stage before the assessor');
+    // Positive control: the differential stub catches a deliberately two-read
+    // remainder scheme. The control harness re-runs the retired scheduling —
+    // a pre-check followed by a separate remainder read with the old floor
+    // clamp — against a stub whose crossing falls one read LATER (between the
+    // two reads): the pre-check passes, the floor-clamped remainder turns the
+    // crossed budget into a fake positive one, and the assessor runs. That is
+    // exactly the S2 bug the single-read schedule removes, so the stub class
+    // demonstrably separates the two implementations instead of passing both.
+    let controlCalls = 0;
+    const controlNow = () => {
+      controlCalls += 1;
+      return controlCalls <= 5 ? 0 : 10_000;
+    };
+    const runTwoReadRemainder = () => {
+      const startedAt = controlNow(); // call 1: startedAt
+      const deadlineExceeded = () => (controlNow() - startedAt) >= 1000; // calls 2-4: structural checks
+      deadlineExceeded();
+      deadlineExceeded();
+      deadlineExceeded();
+      if (deadlineExceeded()) return 'stopped'; // call 5: pre-check reads 0 — not exceeded
+      const remaining = Math.max(1, 1000 - (controlNow() - startedAt)); // call 6: reads 10_000, clamps to 1
+      return remaining > 0 ? 'assessor' : 'stopped';
+    };
+    assert.equal(runTwoReadRemainder(), 'assessor',
+      'positive control: the differential stub catches the two-read scheme running the assessor on a floor-clamped fake remainder');
+    assert.equal(controlCalls, 6, 'the control consumed both semantic-stage reads');
+  });
+
+  it('passes the assessor the exact single-read remainder when the budget is not exhausted (S2 regression sensitivity)', async () => {
+    const root = await makeTemp('aif-tls-remaindur-');
+    const changeId = 'remainder-running-change';
+    await seedCaseProject(root, changeId, { trace: 'traces/dev-trace-nm.json', specs: ['specs/spec-en.md', 'specs/spec-ru.md'], tests: [] });
+    // Regression-sensitive half of the S2 pin: with DISTINCT clock values per
+    // read and an UNEXHAUSTED budget, the remaining budget handed to the
+    // assessor is computable exactly for each scheduling shape. Stub reads:
+    // call 1 = 10 (startedAt), calls 2-4 = 20/30/40 (structural checks),
+    // call 5 = 50 (the semantic remainder read of the single-read scheme).
+    // Single-read: remaining = 550 - (50 - 10) = 510. The retired two-read
+    // scheme (`f04273c~1`: a pre-check at call 5, then a separate remainder
+    // read at call 6 = 60 with the floor clamp) would compute
+    // Math.max(1, 550 - (60 - 10)) = 500 — a DIFFERENT assessor deadline,
+    // so this assert fails for the retired implementation and pins the
+    // production schedule, not just the refusal outcome. The step stays small
+    // so the post-scan deadline checks keep their budget (the deadline bounds
+    // the whole command).
+    let calls = 0;
+    const now = () => {
+      calls += 1;
+      return calls * 10;
+    };
+    let assessorCalls = 0;
+    let assessorDeadline = null;
+    const { exitCode, value } = await runCommand(root, ['--change', changeId, '--enabled', 'true', '--json'], {
+      deadlineMs: 550,
+      now,
+      assessor: (_input, context) => {
+        assessorCalls += 1;
+        assessorDeadline = context?.deadlineMs ?? null;
+        return { findings: [] };
+      },
+    });
+    assert.equal(exitCode, 0);
+    assert.equal(value.semantic?.run_status, 'complete', 'an unexhausted budget completes the honest semantic stage normally');
+    assert.equal(assessorCalls, 1, 'the unexhausted budget reaches the assessor');
+    assert.equal(assessorDeadline, 510,
+      `the assessor budget must be the single-read remainder 550 - (50 - 10), got ${assessorDeadline} — the retired two-read scheme (pre-check + floor-clamped second read at call 6) would hand the assessor 500 instead`);
   });
 
   it('counts duplicate trace nodes once in declared and scanned accounting', async () => {

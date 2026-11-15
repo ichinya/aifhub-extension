@@ -6,7 +6,8 @@
 // engine-backed scenarios join the same file as the engine lands.
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
+import { promisify } from 'node:util';
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -19,6 +20,7 @@ import { prepareQaManifest } from './qa-manifest.mjs';
 import { qaStore } from './qa-manifest-store.mjs';
 import { observeQaSnapshot } from './qa-manifest-inputs.mjs';
 import { ensureRuntimeGitignore } from './runtime-gitignore.mjs';
+import { verifyObservationIgnored } from './requirement-lint-git-guard.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DECISION_CORRECTIONS_NAMESPACE = 'decision-corrections';
@@ -2041,53 +2043,173 @@ describe('decision-corrections review round 3', () => {
     const root = await makeTemp('aif-dc-r3-narrow-');
     await seedStoreProject(root);
     // The effective-ignore question only exists inside a git worktree: seed
-    // one so verifyObservationIgnored evaluates the real ignore rules.
+    // one so the real verifyObservationIgnored evaluates the real ignore rules.
     await gitInit(root);
-    // A pre-existing namespace .gitignore with narrow rules: ensureRuntime
-    // Gitignore preserves it, so `*.tmp` siblings would NOT be ignored.
+    // Fixture: every OWNED surface is ignored by a targeted rule (case files
+    // via `*.json`, write.lock via `*.lock`, the namespace .gitignore itself
+    // via `.gitignore`), while the temp probes match nothing and stay
+    // visible — the ONLY guard that can refuse here is the temp-probe
+    // branch. The naive `*\n!*.tmp` form does NOT work for this: `*` also
+    // excludes the `work` DIRECTORY, and git cannot re-include a file under
+    // an excluded parent, so every probe would stay ignored and the save
+    // would pass. The previous `*.json\n!.gitignore\n` fixture had the
+    // opposite flaw: the namespace .gitignore itself stayed visible, so the
+    // owned-surface guard refused first and the probe branch was never
+    // reached (a green test for the wrong reason).
     const namespaceDir = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE);
     await mkdir(namespaceDir, { recursive: true });
-    await writeFile(path.join(namespaceDir, '.gitignore'), '*.json\n!.gitignore\n');
-    // The digest echo must be valid so the pre-materialization pass clears
-    // and the probe guard (after prepareNamespace) is the refusing branch.
+    await writeFile(path.join(namespaceDir, '.gitignore'), '*.json\n*.lock\n.gitignore\n');
     const input = baseCaseInput();
     const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
-    const outputs = [];
-    const exit = await runDecisionCorrectionsCommand(['save', '--json'], {
-      rootDir: root, enabled: true, output: (value) => outputs.push(value),
-      readStdin: async () => Buffer.from(JSON.stringify({ ...input, payload_digest: preview.payload_digest }), 'utf8'),
-    });
-    assert.equal(exit, 1, 'the save must refuse when the temp shape is not effectively ignored');
-    assert.equal(JSON.parse(outputs.join('')).code, 'observation-path-not-ignored');
+    const evaluated = [];
+    const recordingGuard = async (rootDir, relative, guardOptions) => {
+      const verdict = await verifyObservationIgnored(rootDir, relative, guardOptions);
+      evaluated.push({ relative, ...verdict });
+      return verdict;
+    };
+    await assert.rejects(
+      () => decisionCorrectionsCommand('save', { ...input, payload_digest: preview.payload_digest }, { rootDir: root, ...STORE_OPTIONS(), gitGuard: recordingGuard }),
+      (error) => error?.code === 'observation-path-not-ignored' && error.blocked === true,
+      'the save must refuse when the temp shape is not effectively ignored',
+    );
+    // Branch reach: the single refusing verdict is a `.tmp` probe, and the
+    // owned namespace .gitignore passed the guard before it — the refusal
+    // came from the temp-probe branch, not the shared owned-surface code.
+    const refused = evaluated.filter((entry) => !entry.ok);
+    assert.equal(refused.length, 1, 'exactly one guard verdict refuses: the first visible probe');
+    assert.match(refused[0].relative, /\.tmp$/, 'the refusal target is a temp probe path');
+    assert.ok(evaluated.some((entry) => entry.ok && entry.relative.endsWith(`${DECISION_CORRECTIONS_NAMESPACE}/.gitignore`)),
+      'the owned namespace .gitignore passed the guard before the probe refused');
     const stored = await readdirSafe(path.join(namespaceDir, 'work', 'cases'));
     assert.deepEqual(stored.filter((name) => name.endsWith('.json')), [], 'no case file is written behind an ineffective ignore');
     assert.equal((await readdirSafe(namespaceDir)).includes('.gitignore'), true, 'the pre-existing ignore file is never deleted');
-    assert.equal((await readdirSafe(path.join(namespaceDir, 'work', 'cases'))).some((name) => name.endsWith('.tmp')), false, 'no temp file was ever materialized');
+    assert.equal(stored.some((name) => name.endsWith('.tmp')), false, 'no temp file was ever materialized');
   });
 
   it('refuses a save when a narrow rule pins the old deterministic probe name', async () => {
     const root = await makeTemp('aif-dc-r3-probe-');
     await seedStoreProject(root);
     await gitInit(root);
-    // A crafted namespace .gitignore matches ONLY the retired deterministic
-    // probe name: the temp-area probe is now an unpredictable random sibling
-    // of the real store temp shape, so this narrow rule cannot match it and
-    // the guard must refuse instead of granting a false pass.
+    // The crafted .gitignore anticipates ONLY the retired deterministic probe
+    // name (`*.write-probe.tmp`) alongside the owned-surface rules: the probe
+    // set carries real store temp shapes with no fixed `write-probe` marker,
+    // so the saved rule matches nothing and the first probe refuses.
     const namespaceDir = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE);
     await mkdir(namespaceDir, { recursive: true });
-    await writeFile(path.join(namespaceDir, '.gitignore'), '*.write-probe.tmp\n!.gitignore\n');
+    await writeFile(path.join(namespaceDir, '.gitignore'), '*.json\n*.lock\n.gitignore\n*.write-probe.tmp\n');
     const input = baseCaseInput();
     const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
-    const outputs = [];
-    const exit = await runDecisionCorrectionsCommand(['save', '--json'], {
-      rootDir: root, enabled: true, output: (value) => outputs.push(value),
-      readStdin: async () => Buffer.from(JSON.stringify({ ...input, payload_digest: preview.payload_digest }), 'utf8'),
-    });
-    assert.equal(exit, 1, 'a rule pinning the old probe name must not pass the temp-area guard');
-    assert.equal(JSON.parse(outputs.join('')).code, 'observation-path-not-ignored');
+    const evaluated = [];
+    const recordingGuard = async (rootDir, relative, guardOptions) => {
+      const verdict = await verifyObservationIgnored(rootDir, relative, guardOptions);
+      evaluated.push({ relative, ...verdict });
+      return verdict;
+    };
+    await assert.rejects(
+      () => decisionCorrectionsCommand('save', { ...input, payload_digest: preview.payload_digest }, { rootDir: root, ...STORE_OPTIONS(), gitGuard: recordingGuard }),
+      (error) => error?.code === 'observation-path-not-ignored' && error.blocked === true,
+      'a rule pinning the old probe name must not pass the temp-area guard',
+    );
+    // Branch reach + probe shape: the refusal came from a `.tmp` probe whose
+    // name the crafted rule does NOT pin — no evaluated path carries the
+    // retired `write-probe` marker at all.
+    const refused = evaluated.filter((entry) => !entry.ok);
+    assert.equal(refused.length, 1, 'exactly one guard verdict refuses: the first visible probe');
+    assert.match(refused[0].relative, /\.tmp$/, 'the refusal target is a temp probe path');
+    assert.equal(evaluated.some((entry) => entry.relative.includes('write-probe')), false,
+      'the guard never probes the retired deterministic name');
     const stored = await readdirSafe(path.join(namespaceDir, 'work', 'cases'));
     assert.equal(stored.some((name) => name.endsWith('.json')), false, 'no case file is written behind the ineffective ignore');
     assert.equal(stored.some((name) => name.endsWith('.tmp')), false, 'no temp file was ever materialized');
+  });
+
+  it('refuses a first-hex-narrow temp rule deterministically on the uncovered probe class', async () => {
+    const root = await makeTemp('aif-dc-r3-firsthex-');
+    await seedStoreProject(root);
+    await gitInit(root);
+    // A crafted rule that ignores only probes whose first UUID hex character
+    // is 0-7 leaves the 8-f half of the probe set visible: the deterministic
+    // 16-probe set (one probe per first hex character) must hit an uncovered
+    // probe deterministically — every 0-7 probe passes (ignored by the rule)
+    // and the `8` probe is the first refusal. This is exactly the narrow
+    // first-hex rule the probe set exists to defeat.
+    const namespaceDir = path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE);
+    await mkdir(namespaceDir, { recursive: true });
+    await writeFile(path.join(namespaceDir, '.gitignore'), '*.json\n*.lock\n.gitignore\n*.json.[0-7]*.tmp\n');
+    const input = baseCaseInput();
+    const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
+    const evaluated = [];
+    let gitCalls = 0;
+    const countingExecGit = (file, args, runOptions) => {
+      gitCalls += 1;
+      return promisify(execFile)(file, args, runOptions);
+    };
+    const recordingGuard = async (rootDir, relative, guardOptions) => {
+      const verdict = await verifyObservationIgnored(rootDir, relative, { ...guardOptions, execGit: countingExecGit });
+      evaluated.push({ relative, ...verdict });
+      return verdict;
+    };
+    await assert.rejects(
+      () => decisionCorrectionsCommand('save', { ...input, payload_digest: preview.payload_digest }, { rootDir: root, ...STORE_OPTIONS(), gitGuard: recordingGuard }),
+      (error) => error?.code === 'observation-path-not-ignored' && error.blocked === true,
+      'a first-hex-narrow rule must not pass the 16-probe guard',
+    );
+    const probes = evaluated.filter((entry) => /\.tmp$/.test(entry.relative));
+    const firstHex = (relative) => relative.match(/\.json\.([0-9a-f])/)?.[1];
+    const refusedEntry = evaluated.find((entry) => !entry.ok);
+    assert.equal(firstHex(refusedEntry.relative), '8',
+      'the first uncovered probe class starts at hex 8 — the refusal is deterministic');
+    assert.deepEqual(probes.filter((entry) => entry.ok).map((entry) => firstHex(entry.relative)),
+      ['0', '1', '2', '3', '4', '5', '6', '7'],
+      'every covered probe (first hex 0-7) passed before the uncovered one refused');
+    assert.equal(probes.length, 9, 'the guard stops at the first non-ignored probe: 8 passes + 1 refusal');
+    // Cost measurement for the policy: every probe inside a git worktree runs
+    // the full three-call sequence (rev-parse, ls-files, check-ignore), so the
+    // probe refusal after 8 covered probes costs exactly 27 git calls; a fully
+    // passing 16-probe guard pass costs 48. The counted total here is 36:
+    // 27 probe calls + 9 calls for the three owned surfaces the recording
+    // guard also verifies (3 surfaces x 3 calls). A successful guarded write
+    // with the M3 in-lock re-pass stays documented at ~96 probe calls.
+    assert.equal(gitCalls, 36,
+      '27 probe calls (9 probes x 3) + 9 owned-surface calls (3 surfaces x 3)');
+    const stored = await readdirSafe(path.join(namespaceDir, 'work', 'cases'));
+    assert.equal(stored.some((name) => name.endsWith('.json')), false, 'no case file is written behind the ineffective ignore');
+    assert.equal(stored.some((name) => name.endsWith('.tmp')), false, 'no temp file was ever materialized');
+  });
+
+  it('keeps every probe at the real store UUID group widths (8/4/4/4/12)', async () => {
+    const root = await makeTemp('aif-dc-r3-widths-');
+    await seedStoreProject(root);
+    // A committed root .gitignore ignoring the runtime state tree: every
+    // owned surface and every probe passes the REAL git guard, so the save
+    // succeeds and both passes (pre-lock and the M3 in-lock re-check) evaluate
+    // the full 16-probe set through verifyObservationIgnored.
+    await writeFile(path.join(root, '.gitignore'), '.ai-factory/state/\n');
+    await gitInit(root);
+    const input = baseCaseInput({ case_id: 'r3-widths' });
+    const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
+    const probePaths = [];
+    const recordingGuard = async (rootDir, relative, guardOptions) => {
+      const verdict = await verifyObservationIgnored(rootDir, relative, guardOptions);
+      if (relative.endsWith('.tmp')) probePaths.push(relative);
+      return verdict;
+    };
+    const saved = await decisionCorrectionsCommand('save', { ...input, payload_digest: preview.payload_digest },
+      { rootDir: root, ...STORE_OPTIONS(), gitGuard: recordingGuard });
+    assert.equal(saved.ok, true, 'the save passes the real guard on a correctly ignored tree');
+    assert.equal(probePaths.length, 32, '16 probes per pass: pre-lock plus the in-lock re-check');
+    const caseFile = `.ai-factory/state/${DECISION_CORRECTIONS_NAMESPACE}/work/cases/r3-widths.json`;
+    const uuidOf = (probe) => probe.slice(caseFile.length + 1, -'.tmp'.length);
+    const firstHexes = new Set();
+    for (const probe of probePaths) {
+      assert.match(uuidOf(probe), /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+        `every probe must carry the real 8/4/4/4/12 UUID group widths, got ${uuidOf(probe)}`);
+      firstHexes.add(uuidOf(probe)[0]);
+    }
+    assert.deepEqual([...firstHexes].sort(), [...'0123456789abcdef'],
+      'the evaluated set covers every first hex character');
+    const stored = await readdirSafe(path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE, 'work', 'cases'));
+    assert.deepEqual(stored.filter((name) => name.endsWith('.tmp')), [], 'no temp residue remains');
   });
 
   it('keeps the shared .gitignore when another writer holds the scope lock', async () => {
@@ -2582,6 +2704,52 @@ describe('decision-corrections request-scoped cleanup', () => {
       'the fresh namespace is fully removed: no .gitignore, no empty directories');
   });
 
+  it('removes the request-created .gitignore when the authoritative in-lock re-check fails after the lock was acquired', async () => {
+    const root = await makeTemp('aif-dc-cl-lockcb-');
+    await seedStoreProject(root);
+    // The design's required in-lock failure scenario: the failure must fire
+    // AFTER the scope lock callback has been entered, so the finally releases
+    // the lock and the two-phase catch cleanup re-acquires it, proves the
+    // fresh composition, and removes the owned .gitignore plus the empty
+    // directories. The digest echo cannot serve here: it is front-run by the
+    // pre-lock validation pass, so a wrong digest is refused before the
+    // namespace is ever created. The evolution link re-check can: the save
+    // validates the linked transaction before materialization and re-checks
+    // it authoritatively inside the lock, which is exactly the state change
+    // the lock exists to serialize. The git guard hook flips the linked
+    // transaction to rolled back at the temp-probe call (the last guard
+    // before lock acquisition), so the pre-lock pass sees an applied link
+    // while the in-lock pass refuses.
+    const proposal = {
+      transaction_id: 'tx-inlock',
+      skill: 'aif-implement',
+      after: '# Updated context for tx-inlock\n',
+      reason: 'repair installed helper context',
+      evidence: ['docs/evidence.md'],
+    };
+    await writeFile(path.join(root, 'docs', 'evidence.md'), 'evidence for the transaction\n');
+    const proposed = await evolutionCommand('propose', proposal, { rootDir: root });
+    await evolutionCommand('apply', { transaction_id: 'tx-inlock', proposal_digest: proposed.proposal_digest }, { rootDir: root });
+    const input = baseCaseInput({ case_id: 'cl-lockcb', evolution: { transaction_id: 'tx-inlock', proposal_digest: proposed.proposal_digest } });
+    const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
+    let rolledBack = false;
+    const raceSwitchGuard = async (rootDir, relative) => {
+      if (!rolledBack && relative.endsWith('.tmp')) {
+        // The authoritative in-lock re-check must see the flipped state.
+        await evolutionCommand('rollback', { transaction_id: 'tx-inlock', proposal_digest: proposed.proposal_digest }, { rootDir: root });
+        rolledBack = true;
+      }
+      return { ok: true, gitWorktree: false, ignored: true, tracked: false };
+    };
+    await assert.rejects(
+      () => decisionCorrectionsCommand('save', { ...input, payload_digest: preview.payload_digest }, { rootDir: root, ...STORE_OPTIONS(), gitGuard: raceSwitchGuard }),
+      (error) => error?.code === 'transaction-not-applied' && error.blocked === true,
+      'the in-lock evolution re-check refuses after the pre-lock pass accepted the applied link',
+    );
+    assert.equal(await lstatExists(namespaceDir(root)), false,
+      'the in-lock failure still cleans the fresh namespace: no .gitignore, no empty directories, no lock residue');
+  });
+
   it('cleans the fresh run namespace after a probe-guard refusal leaves nothing foreign behind', async () => {
     const root = await makeTemp('aif-dc-cl-run-');
     await seedStoreProject(root);
@@ -2634,5 +2802,239 @@ describe('decision-corrections request-scoped cleanup', () => {
     assert.equal((await readdirSafe(namespaceDir(root))).includes('.gitignore'), true,
       'the ignore file survives: cleanup never works around a non-empty leaf');
     assert.ok(await lstatExists(runLeaf), 'the foreign run leaf is untouched');
+  });
+
+  it('refuses an owned-surface guard failure in run BEFORE any namespace materialization (M4)', async () => {
+    const root = await makeTemp('aif-dc-cl-rungrd-');
+    await seedStoreProject(root);
+    // The guard refuses the OWNED run leaf — not the unpredictable temp
+    // probe — so the refusal fires at guardOwnedSurfaces, which sits OUTSIDE
+    // the try/catch whose cleanup would materialize write.lock and the
+    // namespace directories. Branch-reach: the guard records what it was
+    // asked about; the refusal target must be the run leaf, no temp probe
+    // may have been evaluated, and nothing on disk may materialize.
+    const visited = [];
+    const refusingOwnedGuard = async (rootDir, relative) => {
+      visited.push(relative);
+      if (relative.includes('/runs/grefuse.json')) return { ok: false, code: 'observation-path-not-ignored', detail: relative };
+      return { ok: true, gitWorktree: false, ignored: true, tracked: false };
+    };
+    await assert.rejects(
+      () => decisionCorrectionsCommand('run', { scope: 'work', write: true }, { rootDir: root, ...STORE_OPTIONS(), gitGuard: refusingOwnedGuard, runId: 'grefuse' }),
+      (error) => error?.code === 'observation-path-not-ignored' && error.blocked === true,
+      'the owned run leaf is refused by the guard itself',
+    );
+    assert.ok(visited.some((relative) => relative.includes('/runs/grefuse.json')),
+      `the refusal must name the owned run leaf, got ${JSON.stringify(visited)}`);
+    assert.equal(visited.some((relative) => relative.endsWith('.tmp')), false,
+      'no temp probe ran: the guard refused before the materialization stage');
+    assert.equal(await lstatExists(namespaceDir(root)), false,
+      'no write.lock, no namespace directories: an early guard refusal materializes nothing');
+  });
+
+  it('keeps the existing case and namespace when a lifecycle failure fires inside the lock (L9)', async () => {
+    const root = await makeTemp('aif-dc-cl-lcpres-');
+    await seedStoreProject(root);
+    const input = baseCaseInput({ case_id: 'cl-lcpres' });
+    const { saved } = await saveCase(root, input);
+    const caseFile = path.join(namespaceDir(root), 'work', 'cases', 'cl-lcpres.json');
+    // A wrong digest echo passes the read-only pre-pass (schema/partition
+    // only) and is refused authoritatively INSIDE the lock: the catch cleanup
+    // runs with action 'preserve', sees the non-empty cases leaf and the
+    // foreign-composition namespace, and preserves everything.
+    await assert.rejects(
+      () => decisionCorrectionsCommand('confirm', {
+        case_id: input.case_id, scope: input.scope, expected_label: input.expected_label, payload_digest: 'b'.repeat(64),
+      }, { rootDir: root, ...STORE_OPTIONS() }),
+      (error) => error?.code === 'payload-mismatch' && error.blocked === true,
+      'the in-lock digest echo check refuses the confirm',
+    );
+    const persisted = parseStrictJson(await readFile(caseFile, 'utf8'));
+    assert.equal(persisted.record.payload_digest, saved.case.payload_digest, 'the case payload digest is untouched');
+    assert.equal(persisted.record.status, 'draft', 'the lifecycle transition never landed');
+    assert.equal((await readdirSafe(namespaceDir(root))).includes('.gitignore'), true,
+      'the pre-existing namespace .gitignore survives the lifecycle cleanup');
+    assert.ok(await lstatExists(caseFile), 'the existing case file survives');
+  });
+
+  it('removes the request-created artifacts when a lifecycle failure fires after preparation (L9)', async () => {
+    const root = await makeTemp('aif-dc-cl-lcvac-');
+    await seedStoreProject(root);
+    const input = baseCaseInput({ case_id: 'cl-lcvac' });
+    await saveCase(root, input);
+    const caseFile = path.join(namespaceDir(root), 'work', 'cases', 'cl-lcvac.json');
+    // Vacuum seam: with the namespace .gitignore removed, THIS lifecycle's
+    // prepareNamespace takes action 'create'; the git guard hook then vacates
+    // the cases leaf at the temp-probe call, so the authoritative in-lock
+    // reload finds nothing and the catch cleanup — re-acquiring the scope
+    // lock with action 'create' — removes the request-created .gitignore and
+    // the empty directories. A real in-lock vacuum without a DI hook would
+    // require racing an external deleter between the pre-pass and the lock;
+    // the hook injects exactly that interleaving deterministically.
+    await rm(path.join(namespaceDir(root), '.gitignore'), { force: true });
+    let vacated = false;
+    const vacuumGuard = async (rootDir, relative) => {
+      if (!vacated && relative.endsWith('.tmp')) {
+        await rm(caseFile, { force: true });
+        vacated = true;
+      }
+      return { ok: true, gitWorktree: false, ignored: true, tracked: false };
+    };
+    const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
+    await assert.rejects(
+      () => decisionCorrectionsCommand('confirm', {
+        case_id: input.case_id, scope: input.scope, expected_label: input.expected_label, payload_digest: preview.payload_digest,
+      }, { rootDir: root, ...STORE_OPTIONS(), gitGuard: vacuumGuard }),
+      (error) => error?.code === 'case-not-found' && error.blocked === true,
+      'the authoritative in-lock reload refuses after the leaf was vacated',
+    );
+    assert.equal(vacated, true, 'the vacuum seam must have fired');
+    assert.equal(await lstatExists(namespaceDir(root)), false,
+      'the request-created .gitignore and the empty leaf directories are removed; no lock residue');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// M3: writer-side in-lock re-ensure/re-check. A same-scope request's
+// catch-cleanup can remove the namespace .gitignore between writer B's
+// pre-lock proof and B's lock acquisition; under the scope lock every writer
+// re-ensures the ignore file and re-checks the temp zone before the first
+// record byte. Seams inject the interleaving deterministically through the
+// DI git guard; no claim is made about live two-process races.
+// ---------------------------------------------------------------------------
+
+describe('decision-corrections in-lock ignore re-ensure', () => {
+  const namespaceDir = (root) => path.join(root, '.ai-factory', 'state', DECISION_CORRECTIONS_NAMESPACE);
+  const namespaceGitignore = (root) => path.join(namespaceDir(root), '.gitignore');
+  // One-shot seam standing in for a concurrent same-scope cleanup: the first
+  // temp-probe call is the last guard before lock acquisition, so deleting
+  // the ignore file there reproduces exactly the artifact state a catch-
+  // cleanup leaves between writer B's pre-lock proof and B's lock phase.
+  const cleanupSeamGuard = (gitignorePath, state) => async (rootDir, relative) => {
+    if (!state.fired && relative.endsWith('.tmp')) {
+      await rm(gitignorePath, { force: true });
+      state.fired = true;
+    }
+    return { ok: true, gitWorktree: false, ignored: true, tracked: false };
+  };
+
+  it('re-ensures the ignore state under the scope lock before the save writes (M3, same-scope prepared-B)', async () => {
+    const root = await makeTemp('aif-dc-m3-prep-');
+    await seedStoreProject(root);
+    const input = baseCaseInput({ case_id: 'm3-prep' });
+    const state = { fired: false };
+    const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
+    const saved = await decisionCorrectionsCommand('save', { ...input, payload_digest: preview.payload_digest },
+      { rootDir: root, ...STORE_OPTIONS(), gitGuard: cleanupSeamGuard(namespaceGitignore(root), state) });
+    assert.equal(saved.ok, true, 'the save succeeds after the in-lock re-ensure restored the ignore file');
+    assert.equal(state.fired, true, 'the seam must have removed the ignore file pre-lock');
+    assert.equal((await readdirSafe(namespaceDir(root))).includes('.gitignore'), true,
+      'the in-lock re-ensure recreated the .gitignore the concurrent cleanup removed');
+    assert.ok(await lstatExists(path.join(namespaceDir(root), 'work', 'cases', 'm3-prep.json')),
+      'the record was written under a restored ignore state');
+  });
+
+  it('removes the recreated .gitignore when the save fails after the in-lock re-ensure created it (M3, recreate leak)', async () => {
+    const root = await makeTemp('aif-dc-m3-leak-');
+    await seedStoreProject(root);
+    // Pre-existing ignore file: the pre-lock prepareNamespace takes action
+    // 'preserve'. The seam deletes the file and rolls back the linked
+    // evolution transaction at the first temp-probe call, so the in-lock
+    // re-ensure recreates the ignore file (upgrading the cleanup action to
+    // 'create') and the authoritative evolution re-check then refuses the
+    // write inside the lock — the catch cleanup must remove the RECREATED
+    // file, not leak it out of a 'preserve'-scoped cleanup. The digest echo
+    // cannot serve as the in-lock failure here: the save pre-pass checks it
+    // before any materialization, so it never reaches the lock.
+    await writeFile(path.join(root, 'docs', 'evidence.md'), 'evidence for the m3 leak transaction\n');
+    const proposed = await evolutionCommand('propose', {
+      transaction_id: 'tx-m3-leak',
+      skill: 'aif-implement',
+      after: '# Updated context for tx-m3-leak\n',
+      reason: 'repair installed helper context',
+      evidence: ['docs/evidence.md'],
+    }, { rootDir: root });
+    await evolutionCommand('apply', { transaction_id: 'tx-m3-leak', proposal_digest: proposed.proposal_digest }, { rootDir: root });
+    const namespaceDirPath = namespaceDir(root);
+    await mkdir(namespaceDirPath, { recursive: true });
+    await writeFile(namespaceGitignore(root), '*\n!.gitignore\n');
+    const input = baseCaseInput({ case_id: 'm3-leak', evolution: { transaction_id: 'tx-m3-leak', proposal_digest: proposed.proposal_digest } });
+    const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
+    const state = { fired: false };
+    const leakSeamGuard = async (rootDir, relative) => {
+      if (!state.fired && relative.endsWith('.tmp')) {
+        await rm(namespaceGitignore(root), { force: true });
+        await evolutionCommand('rollback', { transaction_id: 'tx-m3-leak', proposal_digest: proposed.proposal_digest }, { rootDir: root });
+        state.fired = true;
+      }
+      return { ok: true, gitWorktree: false, ignored: true, tracked: false };
+    };
+    await assert.rejects(
+      () => decisionCorrectionsCommand('save', { ...input, payload_digest: preview.payload_digest },
+        { rootDir: root, ...STORE_OPTIONS(), gitGuard: leakSeamGuard }),
+      (error) => error?.code === 'transaction-not-applied' && error.blocked === true,
+      'the authoritative in-lock evolution re-check refuses the write, after the re-ensure ran',
+    );
+    assert.equal(state.fired, true, 'the seam must have removed the ignore file pre-lock');
+    assert.equal(await lstatExists(namespaceDirPath), false,
+      'the recreated .gitignore is cleaned: the namespaceAction upgrade closed the recreate leak');
+  });
+
+  it('keeps the shared .gitignore when the cleanup finds a foreign scope directory (M3, different-scope boundary)', async () => {
+    const root = await makeTemp('aif-dc-m3-foreign-');
+    await seedStoreProject(root);
+    // The documented cleanup boundary: a first save of a DIFFERENT scope is
+    // not serialized with this scope's lock. The composition invariant stays
+    // the fail-safe backstop: a namespace holding a foreign scope directory
+    // is never cleaned, and the shared ignore file survives.
+    const namespaceDirPath = namespaceDir(root);
+    await mkdir(namespaceDirPath, { recursive: true });
+    await writeFile(namespaceGitignore(root), '*\n!.gitignore\n');
+    await mkdir(path.join(namespaceDirPath, 'beta'), { recursive: true });
+    const refusingProbeGuard = async (rootDir, relative) => {
+      if (relative.endsWith('.tmp')) return { ok: false, code: 'observation-path-not-ignored', detail: relative };
+      return { ok: true, gitWorktree: false, ignored: true, tracked: false };
+    };
+    const input = baseCaseInput({ case_id: 'm3-foreign', scope: 'alpha' });
+    const preview = await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() });
+    await assert.rejects(
+      () => decisionCorrectionsCommand('save', { ...input, payload_digest: preview.payload_digest },
+        { rootDir: root, ...STORE_OPTIONS(), gitGuard: refusingProbeGuard }),
+      (error) => error?.code === 'observation-path-not-ignored' && error.blocked === true,
+    );
+    assert.equal((await readdirSafe(namespaceDirPath)).includes('.gitignore'), true,
+      'the cleanup never removes the ignore file while a foreign scope directory exists');
+    assert.ok(await lstatExists(path.join(namespaceDirPath, 'beta')), 'the foreign scope directory is untouched');
+  });
+
+  it('re-ensures the ignore state on the lifecycle write path (M3)', async () => {
+    const root = await makeTemp('aif-dc-m3-lc-');
+    await seedStoreProject(root);
+    const input = baseCaseInput({ case_id: 'm3-lc' });
+    await saveCase(root, input);
+    const state = { fired: false };
+    const confirmed = await decisionCorrectionsCommand('confirm', {
+      case_id: input.case_id, scope: input.scope, expected_label: input.expected_label,
+      payload_digest: (await decisionCorrectionsCommand('preview', input, { rootDir: root, ...STORE_OPTIONS() })).payload_digest,
+    }, { rootDir: root, ...STORE_OPTIONS(), gitGuard: cleanupSeamGuard(namespaceGitignore(root), state) });
+    assert.equal(confirmed.ok, true, 'the lifecycle transition succeeds after the in-lock re-ensure');
+    assert.equal(state.fired, true, 'the seam must have removed the ignore file pre-lock');
+    assert.equal((await readdirSafe(namespaceDir(root))).includes('.gitignore'), true,
+      'the lifecycle writer restored the .gitignore under the lock');
+    assert.equal(confirmed.case.status, 'confirmed', 'the lifecycle transition landed');
+  });
+
+  it('re-ensures the ignore state on the run write path (M3)', async () => {
+    const root = await makeTemp('aif-dc-m3-run-');
+    await seedStoreProject(root);
+    const state = { fired: false };
+    const run = await decisionCorrectionsCommand('run', { scope: 'work', write: true },
+      { rootDir: root, ...STORE_OPTIONS(), runId: 'm3run', gitGuard: cleanupSeamGuard(namespaceGitignore(root), state) });
+    assert.equal(run.ok, true, 'the run write succeeds after the in-lock re-ensure');
+    assert.equal(state.fired, true, 'the seam must have removed the ignore file pre-lock');
+    assert.equal((await readdirSafe(namespaceDir(root))).includes('.gitignore'), true,
+      'the run writer restored the .gitignore under the lock');
+    assert.ok(await lstatExists(path.join(namespaceDir(root), 'work', 'runs', 'm3run.json')),
+      'the run record was written under a restored ignore state');
   });
 });
