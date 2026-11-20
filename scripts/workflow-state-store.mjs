@@ -231,6 +231,7 @@ export async function worktree(store, scopes = [], projections = {}) {
     const links = entries.filter(e => e.mode === '160000');
     requireValue(links.every(e => e.stage === '0'), 'unmerged-submodule');
     return { head, branch, index: digest(stages), repository: digest({ checkout, admin, common, marker }), adminPaths: [admin.path, common.path], links,
+      tracked: store.projectedMissing ? new Set(entries.map(e => e.name)) : null,
       names: namesBytes.toString('utf8').split('\0').filter(Boolean) };
   }
   const modules = Object.create(null), repositories = [], names = new Set(), adminIdentities = new Set();
@@ -242,7 +243,9 @@ export async function worktree(store, scopes = [], projections = {}) {
     const links = new Set(info.links.map(e => e.name));
     for (const name of info.names) {
       if (links.has(name)) continue;
-      names.add(portablePath(prefix ? `${prefix}/${name}` : name));
+      const leaf = portablePath(prefix ? `${prefix}/${name}` : name);
+      if (store.projectedMissing?.(leaf) && !info.tracked.has(name)) continue;
+      names.add(leaf);
       requireValue(names.size <= 20000, 'too-many-files');
     }
     for (const link of info.links) await collect(prefix ? `${prefix}/${link.name}` : link.name, link.oid, depth + 1, [...new Set([...trustedAdmins, ...info.adminPaths])]);
@@ -272,6 +275,24 @@ export async function worktree(store, scopes = [], projections = {}) {
   const { head, branch, index } = repositories[0].info;
   return { head, branch, index, files, ...(Object.keys(modules).length ? { submodules: modules } : {}) };
 }
+export async function isNewGitLeafVisible(store, relative, snapshot) {
+  portablePath(relative);
+  const matches = process.platform === 'win32' ? relative.toLowerCase() : relative;
+  const prefix = Object.keys(snapshot.submodules ?? {}).filter(name => {
+    const candidate = process.platform === 'win32' ? name.toLowerCase() : name;
+    return matches.startsWith(`${candidate}/`);
+  }).sort((a, b) => b.length - a.length)[0];
+  const cwd = prefix ? await store.target(prefix) : store.root;
+  const filename = prefix ? relative.slice(prefix.length + 1) : relative;
+  try {
+    await exec('git', ['check-ignore', '-q', '--', filename], { cwd, windowsHide: true });
+    return false;
+  } catch (error) {
+    if (error.code === 1) return true;
+    throw new WorkflowError('git-unavailable');
+  }
+}
+
 export const sameRevision = (before, after) => before.head === after.head && before.branch === after.branch && before.index === after.index
   && canonical(before.submodules ?? {}) === canonical(after.submodules ?? {});
 export const changedFiles = (before, after) => [...new Set([...Object.keys(before.files), ...Object.keys(after.files)])]

@@ -109,8 +109,7 @@ export function parseExecutionTasks(content, { locations = false } = {}) {
   return tasks;
 }
 
-async function statusProjection(store, filename, id, parent) {
-  const text = await store.textFile(filename);
+export function classicStatusProjection(text, id, parent) {
   requireValue(text !== null, 'missing-classic-plan', true);
   const parsed = parseSimpleYaml(text);
   requireValue(!own(parsed, 'plan_id') || parsed.plan_id === id, 'plan-id-mismatch', true);
@@ -171,7 +170,7 @@ export async function resolveExecutionSource(store, id, role, extraPaths = []) {
     roots.push(`${base}/explore.md`);
     tasks = parseExecutionTasks(await store.textFile(checklist));
     requireValue(canonical(tasks) === canonical(parseExecutionTasks(parent)), 'classic-checklist-mismatch', true);
-    const status = await statusProjection(store, `${base}/status.yaml`, id, parent);
+    const status = classicStatusProjection(await store.textFile(`${base}/status.yaml`), id, parent);
     binding = status.binding; projections[`${base}/status.yaml`] = digest(status.projection);
   }
   roots.push(paths.specs, '.ai-factory/config.yaml', 'AGENTS.md', paths.rules_file, paths.rules,

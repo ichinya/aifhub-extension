@@ -8,11 +8,11 @@ import { deliveryProject } from './fixtures/delivery-project.mjs';
 import { executionProject } from './fixtures/execution-project.mjs';
 import { createFakeHost } from './fixtures/host-delivery.mjs';
 import { createGateResult, renderGateResultBlock } from './aif-gate-result.mjs';
-import { storeFor, digest } from './workflow-state-store.mjs';
+import { storeFor, digest, worktree } from './workflow-state-store.mjs';
 import { deliveryStore, deliveryPaths, validateDeliveryRequest, RECOVERY_ACTION_TYPES, DELIVERY_LIMITS } from './host-delivery-store.mjs';
 import { NEXT_ACTION_TYPES, validateNextAction } from './host-lifecycle.mjs';
-import { parseExecutionTasks } from './execution-task-source.mjs';
-import { lifecyclePaths } from './host-lifecycle-store.mjs';
+import { parseExecutionTasks, resolveExecutionSource } from './execution-task-source.mjs';
+import { lifecyclePaths, lifecycleStore } from './host-lifecycle-store.mjs';
 
 const uuid = n => `cb737dd1-3484-4e53-93dd-${String(n).padStart(12, '0')}`;
 const runInput = { change_id: 'work', run_id: 'run-1', actor: 'parent' };
@@ -55,6 +55,41 @@ async function batch(t, { mode = 'openspec', n = 2, accept = n } = {}) {
   return { ...f, closed, manifest };
 }
 const assertSafe = result => { assert.deepEqual(result.authorizes, []); assert.equal(typeof result.manual_path.wait, 'string'); assert.equal(typeof result.manual_path.release, 'string'); assert.ok(Array.isArray(result.capability_limitations)); validateNextAction(result.next_action); };
+const snapshotFiles = snapshot => Object.fromEntries(Object.entries(snapshot).filter(([name]) => !name.endsWith('/')));
+
+test('AC5: only remaining lifecycle writes that change execution inputs conflict', async t => {
+  const f = await executionProject({ mode: 'classic', plans: 'plans' }); t.after(f.cleanup);
+  const store = await lifecycleStore({ rootDir: f.root });
+  const interrupted = point => lifecycleStore({ rootDir: f.root, failpoint: name => {
+    if (name === point) throw new Error('fixture interruption');
+  } });
+  const prepared = await interrupted('lifecycle-after-journal');
+  const allAfter = await interrupted('lifecycle-before-applied');
+  const publish = (s, kind, id, file, value) => s.publishLifecycle('older', kind, id,
+    { run_id: id }, [[file, value]], { authorizes: [] });
+  await publish(store, 'progress', 'applied', 'src/a.js', 'already done');
+  await assert.rejects(publish(allAfter, 'progress', 'marker-only', 'src/b.js', 'already written'), /fixture interruption/);
+  await assert.rejects(publish(prepared, 'settlement', 'irrelevant', 'outside.txt', 'ignored kind'), /fixture interruption/);
+  await store.write(lifecyclePaths('older', 'release', 'irrelevant').journal, 'opaque release journal');
+  await assert.rejects(publish(prepared, 'finalization', 'projected', 'plans/work/status.yaml', 'status: done\nplan_id: work\n'), /fixture interruption/);
+  await assert.rejects(publish(prepared, 'progress', 'hidden', 'ignored/new.md', 'hidden'), /fixture interruption/);
+  const scope = ['src/a.js'];
+  const source = await resolveExecutionSource(store, 'work', 'implement');
+  const snapshot = await worktree(store, scope, source.projections);
+  assert.equal(await store.findPendingPublication(source, scope, snapshot), null);
+  const explicit = await resolveExecutionSource(store, 'work', 'implement', ['ignored']);
+  assert.deepEqual(await store.findPendingPublication(explicit, scope, snapshot), {
+    kind: 'progress', changeId: 'older', journalId: 'hidden',
+  });
+  await assert.rejects(publish(prepared, 'progress', 'planned', 'new-visible.md', 'new leaf'), /fixture interruption/);
+  const before = await f.snapshot();
+  assert.deepEqual(await store.findPendingPublication(source, scope, snapshot), {
+    kind: 'progress', changeId: 'older', journalId: 'planned',
+  });
+  assert.deepEqual(await f.snapshot(), before);
+  await f.put('new-visible.md', 'third image');
+  await assert.rejects(store.findPendingPublication(source, scope, snapshot), { code: 'lifecycle-file-conflict' });
+});
 
 test('AC1/6: single collect uses one history/transaction scan, no implicit transitions or host reads', async t => {
   const f = await single(t, { pending: true });
@@ -189,23 +224,124 @@ test('AC5: third file image and conflicting journal replay block without applyin
 
 test('AC4/5: prepared progress replay rechecks quiescence against a newer run on an unchecked task', async t => {
   const f = await single(t); await f.close();
+  const finishRun = async (run_id, evidence) => {
+    await f.put(evidence, 'Observed result.');
+    const result = await f.call('result', f.actor(1, { run_id,
+      result: { result_id: 'result-' + run_id, status: 'completed', changed_files: [], checks: [{ name: 'fixture', exit_code: 0 }], evidence: [evidence] } }));
+    await f.call('accept', { change_id: 'work', run_id, actor: 'parent', version: result.version, result_digest: result.result_digest });
+  };
+  await f.call('start', f.start({ run_id: 'previous-worker', task_id: '1.2', scope: ['src/b.js'] }));
+  await finishRun('previous-worker', '.ai-factory/evidence/previous.md');
+  await f.put('.ai-factory/evidence/previous.md', 'Already different before journal preparation.');
   await assert.rejects(f.call('lifecycle-progress', runInput, { failpoint: name => { if (name === 'lifecycle-after-journal') throw new Error('crash'); } }));
   const journal = lifecyclePaths('work', 'progress', 'run-1').journal;
-  assert.equal(JSON.parse(await f.get(journal)).record.state, 'prepared');
+  const prepared = await f.get(journal);
+  assert.equal(JSON.parse(prepared).record.state, 'prepared');
   const checklist = 'openspec/changes/work/tasks.md', before = await f.get(checklist);
-  const late = await f.call('start', f.start({ run_id: 'late-worker', task_id: '1.2', scope: ['src/b.js'] }));
-  assert.equal(late.lifecycle, 'active'); // admission barrier cannot see lifecycle journals (#268)
+  const start = f.start({ run_id: 'late-worker', task_id: '1.2', scope: ['src/b.js'] });
+  // Combine two prepared records that could coexist before the admission guard.
+  await rm(path.join(f.root, journal));
+  await assert.rejects(f.call('start', start, { failpoint: name => { if (name === 'after-journal') throw new Error('old admission interrupted'); } }), /old admission interrupted/);
+  await f.put(journal, prepared);
+  assert.equal((await f.call('lifecycle-progress', runInput)).code, 'lifecycle-not-quiescent');
+  const late = await f.call('start', start);
+  assert.equal(late.lifecycle, 'active'); // exact execution replay finishes the previously admitted operation
   assert.equal((await f.call('lifecycle-progress', runInput)).code, 'lifecycle-not-quiescent');
   assert.equal(await f.get(checklist), before); // checklist byte-identical
-  assert.equal(JSON.parse(await f.get(journal)).record.state, 'prepared'); // retained for recovery
-  await f.put('.ai-factory/evidence/late.md', 'Observed late result.');
-  const result = await f.call('result', f.actor(1, { run_id: 'late-worker',
-    result: { result_id: 'result-late', status: 'completed', changed_files: [], checks: [{ name: 'fixture', exit_code: 0 }], evidence: ['.ai-factory/evidence/late.md'] } }));
-  await f.call('accept', { change_id: 'work', run_id: 'late-worker', actor: 'parent', version: result.version, result_digest: result.result_digest });
+  assert.equal(await f.get(journal), prepared);
+  const lateEvidence = '.ai-factory/evidence/late.md';
+  await finishRun('late-worker', lateEvidence);
+  await f.put(lateEvidence, 'Different after the late run closed.');
+  const blocked = await f.call('lifecycle-progress', runInput);
+  assert.equal(blocked.code, 'lifecycle-source-conflict');
+  assert.doesNotMatch(JSON.stringify(blocked), /Different after the late run closed/);
+  assert.equal(await f.get(checklist), before);
+  assert.equal(await f.get(journal), prepared);
+  await f.put(lateEvidence, 'Observed result.');
   const recovered = await f.call('lifecycle-progress', runInput);
   assert.equal(recovered.ok, true); assert.equal(recovered.recovered, true); assert.equal(recovered.historical, true);
   assert.deepEqual(parseExecutionTasks(await f.get(checklist)).map(task => task.checked), [true, false]);
   assert.equal((await f.call('lifecycle-progress', runInput)).historical, true); // applied replay stays historical
+});
+
+test('AC5: partial classic progress explains its own writes and refuses independent evidence drift', async t => {
+  const f = await single(t, { mode: 'classic' }); await f.close();
+  await assert.rejects(f.call('lifecycle-progress', runInput, { failpoint: name => {
+    if (name === 'lifecycle-after-write-0') throw new Error('fixture interruption');
+  } }), /fixture interruption/);
+  const remaining = `${f.plans}/work/task.md`, journal = lifecyclePaths('work', 'progress', 'run-1').journal;
+  const before = await f.get(remaining), prepared = await f.get(journal);
+  assert.match(await f.get(`${f.plans}/work.md`), /\[x\] 1\.1/);
+  await f.put(f.report, 'Different original evidence.');
+  assert.equal((await f.call('lifecycle-progress', runInput)).code, 'lifecycle-source-conflict');
+  assert.equal(await f.get(remaining), before);
+  assert.equal(await f.get(journal), prepared);
+  await f.put(f.report, body);
+  assert.equal((await f.call('lifecycle-progress', runInput)).recovered, true);
+  assert.match(await f.get(remaining), /\[x\] 1\.1/);
+});
+
+test('AC5: all-after progress only finishes its marker once execution is quiescent', async t => {
+  const f = await single(t); await f.close();
+  await assert.rejects(f.call('lifecycle-progress', runInput, { failpoint: name => {
+    if (name === 'lifecycle-before-applied') throw new Error('fixture interruption');
+  } }), /fixture interruption/);
+  const checklist = 'openspec/changes/work/tasks.md', journal = lifecyclePaths('work', 'progress', 'run-1').journal;
+  const after = await f.get(checklist), prepared = await f.get(journal);
+  await f.put(f.report, 'Evidence drift after all writes.');
+  const start = f.start({ run_id: 'later', task_id: '1.2', scope: ['src/b.js'] });
+  await assert.rejects(f.call('start', start, { failpoint: name => {
+    if (name === 'after-journal') throw new Error('pending execution');
+  } }), /pending execution/);
+  assert.equal((await f.call('lifecycle-progress', runInput)).code, 'lifecycle-not-quiescent');
+  await f.call('start', start);
+  assert.equal((await f.call('lifecycle-progress', runInput)).code, 'lifecycle-not-quiescent');
+  assert.equal(await f.get(journal), prepared);
+  const evidence = '.ai-factory/evidence/stopped.md';
+  await f.put(evidence, 'No fixture worker process was launched.');
+  await f.call('interrupt', { change_id: 'work', run_id: 'later', actor: 'parent', version: 1,
+    recovery_id: 'fixture-stop', reason: 'cancelled', execution_state: 'stopped', evidence: [evidence] });
+  const writes = [];
+  assert.equal((await f.call('lifecycle-progress', runInput, { failpoint: name => writes.push(name) })).recovered, true);
+  assert.deepEqual(writes, ['lifecycle-before-applied', 'lifecycle-after-applied']);
+  assert.equal(await f.get(checklist), after);
+  assert.equal(JSON.parse(await f.get(journal)).record.state, 'applied');
+});
+
+test('AC5: fresh start and batch-start refuse a prepared publication affecting another change', async t => {
+  const f = await executionProject(); t.after(f.cleanup);
+  const file = 'openspec/changes/older/tasks.md';
+  await f.put(file, '- [ ] 1.1 Older task\n');
+  const store = await lifecycleStore({ rootDir: f.root, failpoint: name => {
+    if (name === 'lifecycle-after-journal') throw new Error('fixture interruption');
+  } });
+  await assert.rejects(store.publishLifecycle('older', 'progress', 'older-run', { run_id: 'older-run' },
+    [[file, '- [x] 1.1 Older task\n']], { authorizes: [] }), /fixture interruption/);
+  const evidence = '.ai-factory/evidence/batch-preflight.md';
+  await f.put(evidence, 'Independent scopes for admission fixture.');
+  const before = await f.snapshot();
+  await assert.rejects(f.call('start', f.start()), { code: 'pending-lifecycle-publication' });
+  const { task_id, scope, ...common } = f.start({ run_id: 'batch' });
+  const manifest = scope.concat('src/b.js').map((name, index) => ({ task_id: index ? '1.2' : task_id,
+    files: [name], expected_change: 'Independent fixture change', check: 'fixture', dependencies: [] }));
+  await assert.rejects(f.call('batch-start', { ...common, manifest, preflight_paths: [evidence] }), { code: 'pending-lifecycle-publication' });
+  assert.deepEqual(snapshotFiles(await f.snapshot()), snapshotFiles(before));
+});
+
+test('AC5: fresh start permits a prepared progress publication outside its inputs', async t => {
+  const f = await executionProject({ mode: 'classic' }); t.after(f.cleanup);
+  const store = await lifecycleStore({ rootDir: f.root, failpoint: name => {
+    if (name === 'lifecycle-after-journal') throw new Error('fixture interruption');
+  } });
+  const file = `${f.plans}/older/task.md`, before = '- [ ] 1.1 Older task\n';
+  await f.put(file, before);
+  await assert.rejects(store.publishLifecycle('older', 'progress', 'older-run', { run_id: 'older-run' },
+    [[file, '- [x] 1.1 Older task\n']], { authorizes: [] }), /fixture interruption/);
+  const journal = lifecyclePaths('older', 'progress', 'older-run').journal;
+  const prepared = await f.get(journal);
+  assert.equal((await f.call('start', f.start())).lifecycle, 'active');
+  assert.equal(await f.get(file), before);
+  assert.equal(await f.get(journal), prepared);
 });
 
 test('AC4/5: fresh progress refuses a reserving sibling run before the checklist write', async t => {
@@ -385,6 +521,100 @@ test('AC5/6: classic finalization recovery and configured paths preserve verific
   await assert.rejects(f.call('lifecycle-finalize', input, { failpoint: name => { if (name === 'lifecycle-after-write-0') throw new Error('crash'); } }));
   const recovered = await f.call('lifecycle-finalize', input); assert.equal(recovered.recovered, true);
   assert.equal(await f.get('published/work/spec.md'), input.spec); assert.match(await f.get('plans/work/status.yaml'), /verdict: pass/);
+});
+
+async function addSecondPlan(f, mode) {
+  const tasks = '- [ ] 1.1 Second plan task\n';
+  if (mode === 'openspec') {
+    await f.put('openspec/changes/second/proposal.md', '# Second change\n');
+    await f.put('openspec/changes/second/tasks.md', tasks);
+  } else {
+    await f.put(`${f.plans}/second.md`, '# Second plan\n\n' + tasks);
+    for (const [name, data] of Object.entries({ 'task.md': tasks, 'verify.md': '# Verify\n', 'rules.md': '# Rules\n',
+      'context.md': '# Context\n', 'status.yaml': 'status: planned\nplan_id: second\n' })) await f.put(`${f.plans}/second/${name}`, data);
+  }
+}
+
+for (const mode of ['openspec', 'classic']) test(`AC5: prepared progress replay checks another ${mode} change's actual inputs`, async t => {
+  const f = await single(t, { mode }); await f.close();
+  await addSecondPlan(f, mode);
+  const second = f.start({ change_id: 'second', run_id: 'second-run', scope: ['src/b.js'] });
+  assert.equal((await f.call('start', second)).lifecycle, 'active');
+  await assert.rejects(f.call('lifecycle-progress', runInput, { failpoint: name => {
+    if (name === 'lifecycle-after-journal') throw new Error('prepared progress');
+  } }), /prepared progress/);
+  const journal = lifecyclePaths('work', 'progress', 'run-1').journal;
+  const checklist = mode === 'classic' ? `${f.plans}/work/task.md` : 'openspec/changes/work/tasks.md';
+  const published = await f.get(journal), unchecked = await f.get(checklist);
+  const outcome = await f.call('lifecycle-progress', runInput);
+  if (mode === 'openspec') {
+    assert.equal(outcome.code, 'lifecycle-not-quiescent');
+    assert.equal(await f.get(checklist), unchecked);
+    assert.equal(await f.get(journal), published);
+  } else {
+    assert.equal(outcome.recovered, true);
+    assert.match(await f.get(checklist), /\[x\] 1\.1/);
+    assert.equal((await f.call('resume', { change_id: 'second', run_id: 'second-run' })).resumable, true);
+  }
+});
+
+async function prepareClassicArchiveFixture(t, plans = 'plans') {
+  const f = await executionProject({ mode: 'classic', plans }); t.after(f.cleanup);
+  const base = `${f.plans}/work`;
+  for (const name of [`${base}.md`, `${base}/task.md`]) await f.put(name, (await f.get(name)).replaceAll('[ ]', '[x]'));
+  await f.put(`${base}/status.yaml`, 'status: verified\nplan_id: work\nverification:\n  verdict: pass\n');
+  return f;
+}
+
+test('AC5: prepared classic finalization refuses replay over a run using shared specs', async t => {
+  const f = await prepareClassicArchiveFixture(t);
+  await addSecondPlan(f, 'classic');
+  assert.equal((await f.call('start', f.start({ change_id: 'second', scope: ['src/b.js'] }))).lifecycle, 'active');
+  const input = { change_id: 'work', actor: 'parent', spec: '# Spec\n' };
+  await assert.rejects(f.call('lifecycle-finalize', input, { failpoint: name => {
+    if (name === 'lifecycle-after-journal') throw new Error('prepared archive');
+  } }), /prepared archive/);
+  const before = await f.snapshot();
+  assert.equal((await f.call('lifecycle-finalize', input)).code, 'lifecycle-not-quiescent');
+  assert.deepEqual(await f.snapshot(), before);
+});
+
+test('AC5: new publication refuses files shared with an older prepared lifecycle journal', async t => {
+  const f = await prepareClassicArchiveFixture(t);
+  const store = await lifecycleStore({ rootDir: f.root, failpoint: name => {
+    if (name === 'lifecycle-after-journal') throw new Error('prepared archive');
+  } });
+  await assert.rejects(store.publishLifecycle('older', 'finalization', 'finalize', {},
+    [['.ai-factory/specs/index.yaml', 'specs:\n  - id: older\n']], { authorizes: [] }), /prepared archive/);
+  // Destination is shared even when this plan has never had an execution run.
+  const before = await f.snapshot();
+  assert.equal((await f.call('lifecycle-finalize', { change_id: 'work', actor: 'parent', spec: '# Spec\n' })).code, 'pending-lifecycle-publication');
+  assert.deepEqual(snapshotFiles(await f.snapshot()), snapshotFiles(before));
+});
+
+for (const plans of ['plans', '.ai-factory/plans']) test(`AC5: partial finalization checks plan membership under ${plans} and refuses an unbound legacy replay`, async t => {
+  const f = await prepareClassicArchiveFixture(t, plans);
+  await f.put('.ai-factory/config.yaml', (await f.get('.ai-factory/config.yaml')) + '  specs: published\n');
+  const input = { change_id: 'work', actor: 'parent', spec: '# Reviewed spec\n' };
+  await assert.rejects(f.call('lifecycle-finalize', input, { failpoint: name => {
+    if (name === 'lifecycle-after-write-0') throw new Error('partial archive');
+  } }), /partial archive/);
+  const journal = lifecyclePaths('work', 'finalization', 'finalize').journal;
+  const prepared = await f.get(journal), late = `${f.plans}/work/late.md`;
+  await f.put(late, 'New plan leaf outside the recorded archive.');
+  const snapshot = await f.snapshot();
+  assert.equal((await f.call('lifecycle-finalize', input)).code, 'lifecycle-source-conflict');
+  assert.deepEqual(await f.snapshot(), snapshot);
+  await rm(path.join(f.root, late));
+  const record = JSON.parse(prepared).record;
+  delete record.recovery;
+  const store = await storeFor(f.root); await store.save(journal, record);
+  const oldSnapshot = await f.snapshot();
+  assert.equal((await f.call('lifecycle-finalize', input)).code, 'lifecycle-source-conflict');
+  assert.deepEqual(await f.snapshot(), oldSnapshot);
+  await f.put(journal, prepared);
+  assert.equal((await f.call('lifecycle-finalize', input)).recovered, true);
+  assert.equal(await f.get('published/work/spec.md'), input.spec);
 });
 
 test('AC6: finalizer destination guards reject case aliases and canonical/evidence roots', async t => {
@@ -612,9 +842,16 @@ test('AC5/6: prepared finalizer rechecks quiescence before recovery', async t =>
   await f.put(`${f.plans}/work/status.yaml`, 'status: verified\nplan_id: work\nverification:\n  verdict: pass\n');
   const input = { change_id: 'work', actor: 'parent', spec: '# Spec' };
   await assert.rejects(f.call('lifecycle-finalize', input, { failpoint: name => { if (name === 'lifecycle-after-journal') throw new Error('crash'); } }));
-  await f.call('start', f.start({ run_id: 'late-worker', role: 'fix', context_paths: ['.ai-factory/evidence/preflight.md'] }));
+  const journal = lifecyclePaths('work', 'finalization', 'finalize').journal, before = await f.get(journal);
+  const late = f.start({ run_id: 'late-worker', role: 'fix', context_paths: ['.ai-factory/evidence/preflight.md'] });
+  await assert.rejects(f.call('start', late), { code: 'pending-lifecycle-publication' });
+  // Recreate the prior-version state with an execution run already admitted.
+  await rm(path.join(f.root, journal));
+  await f.call('start', late);
+  await f.put(journal, before);
   assert.equal((await f.call('lifecycle-finalize', input)).code, 'lifecycle-not-quiescent');
   assert.match(await f.get(`${f.plans}/work/status.yaml`), /^status: verified$/m);
+  assert.equal(await f.get(journal), before);
 });
 
 test('AC5: prepared finalizer rejects changed source before archive publication', async t => {

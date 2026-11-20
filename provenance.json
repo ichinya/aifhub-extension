@@ -1,14 +1,14 @@
 {
   "version": "1.8.2",
-  "released_at": "2026-11-14T18:24:33.180Z",
+  "released_at": "2026-11-19T16:37:41.436Z",
   "files": [
     {
       "path": "scripts/workflow-state-store.mjs",
-      "sha256": "cefc1ac98d924508763a0430b3e97b99ed800e99f1d87467f3901af96156e6cb"
+      "sha256": "166ccb314892c21c25da6d2e05933dc7dee91097689fe7a02dfd074377444990"
     },
     {
       "path": "scripts/execution-state.mjs",
-      "sha256": "c66448b418c9a18a9a0aea13d3a71eaf2bcccb50396dfea1918f9b2e7527dd04"
+      "sha256": "8c1768f07f4a1eec4f5619dc9c8bf5965378a553b2562d1194b8fbd699dea959"
     },
     {
       "path": "scripts/execution-records.mjs",
@@ -16,11 +16,11 @@
     },
     {
       "path": "scripts/execution-task-source.mjs",
-      "sha256": "8bce49420e92ffba201dd308ce9c50be360f30da3dc4456abbfd8c685aa4525e"
+      "sha256": "784434d95e8c577c76f9d38f3eed7140e61aca1c17bf6e6225bdd7fce9a26aa0"
     },
     {
       "path": "scripts/isolated-execution.mjs",
-      "sha256": "964c54a83bf6d9f507ad800a125af36c870b054fb0f13949080bf5a1d3b6c6da"
+      "sha256": "635f06b474aaadc94b3162c8ab4641adf519d61d5837835db659eaab380b551e"
     },
     {
       "path": "scripts/host-delivery.mjs",
@@ -36,11 +36,11 @@
     },
     {
       "path": "scripts/host-lifecycle.mjs",
-      "sha256": "49da9ad141e976f019359b357126f23b7c18ec9485a0dae37fe7de3b6316c87b"
+      "sha256": "3c064bcb7b73ca1300a2bb48d2e45e80522e319b0af256196c6c1ea531f883d6"
     },
     {
       "path": "scripts/host-lifecycle-store.mjs",
-      "sha256": "823c4656b060e12b7f0f6c3f2c3d043f32d2f8188c5ded3d5685bba9b917fc60"
+      "sha256": "85240c214d187c77c238a48e88da1efbd1b535b5241cd4cacb3f72fb2a180b96"
     }
   ]
 }

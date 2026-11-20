@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { executionProject } from './fixtures/execution-project.mjs';
 import { executionCommand } from './execution-state.mjs';
 import { storeFor } from './workflow-state-store.mjs';
+import { lifecycleStore } from './host-lifecycle-store.mjs';
 
 const exec = promisify(execFile);
 const trace = name => `.ai-factory/state/work/implementation/${name}.md`;
@@ -79,6 +80,20 @@ test('preflight rejects a junction alias before ordinary runs can be created', a
   await assert.rejects(p.call('preflight', input), { code: 'invalid-isolation-binding' });
   assert.deepEqual(await readdir(path.join(p.workers[0].root, '.ai-factory'), { recursive: true }), before);
   assert.equal(await p.get('outside.txt'), 'pre-existing dirty data\n');
+});
+
+test('isolation-start refuses a prepared lifecycle publication affecting its local checkout', async t => {
+  const file = 'openspec/changes/older/tasks.md';
+  const p = await project(t, { initial: { [file]: '- [ ] 1.1 Older task\n' } });
+  const store = await lifecycleStore({ rootDir: p.root, failpoint: name => {
+    if (name === 'lifecycle-after-journal') throw new Error('fixture interruption');
+  } });
+  await assert.rejects(store.publishLifecycle('older', 'progress', 'old', { run_id: 'old' },
+    [[file, '- [x] 1.1 Older task\n']], { authorizes: [] }), /fixture interruption/);
+  const before = await p.snapshot();
+  await assert.rejects(p.call('start', p.start), { code: 'pending-lifecycle-publication' });
+  await assert.rejects(p.inspect(), { code: 'missing-isolation-group' });
+  assert.deepEqual(await p.snapshot(), before);
 });
 
 for (const mode of ['openspec', 'classic']) test(`isolated ${mode} workers integrate in reverse order; only closed fresh group authorizes its accepted set`, async t => {
