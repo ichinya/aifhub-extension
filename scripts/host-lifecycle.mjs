@@ -1,10 +1,12 @@
 // One bounded mechanical step per command. No semantic verdicts or owner receipts.
-import { canonical, digest, fields, identifier, requireValue, boundedText, WorkflowError } from './workflow-state-store.mjs';
-import { history, pendingTransactions, reserves, folderFor } from './execution-transactions.mjs';
+import { canonical, digest, fields, identifier, requireValue, boundedText, worktree, WorkflowError } from './workflow-state-store.mjs';
+import { catalogue, history, pendingTransactions, reserves, folderFor } from './execution-transactions.mjs';
 import { executionId, parseExecutionTasks, resolveExecutionSource } from './execution-task-source.mjs';
 import { deliveryPaths, projection, requestUuid, RECOVERY_ACTION_TYPES, validateFrozenBody, bindingFor, bounded, validCapabilities, DELIVERY_LIMITS } from './host-delivery-store.mjs';
-import { lifecycleStore, lifecycleLock, lifecyclePaths, validateSettlement, SETTLEMENT_SCHEMA, RELEASE_SCHEMA, LIFECYCLE_LIMITS } from './host-lifecycle-store.mjs';
+import { lifecycleStore, lifecycleLock, lifecyclePaths, publicationAffects, publicationRecovery, publicationRunKey,
+  validateSettlement, SETTLEMENT_SCHEMA, RELEASE_SCHEMA, LIFECYCLE_LIMITS } from './host-lifecycle-store.mjs';
 import { parseProjectConfig, parseSimpleYaml } from './aif-artifact-sync.mjs';
+import { isolationState } from './isolated-execution-records.mjs';
 
 export const NEXT_ACTION_TYPES = Object.freeze(['lifecycle-collect', 'batch-accept', 'batch-close', 'delivery-recover',
   'lifecycle-settle', 'lifecycle-release', 'lifecycle-progress', 'lifecycle-finalize', 'interrupt', 'stop-confirm', 'manual']);
@@ -32,9 +34,60 @@ async function scans(s, change, counters) {
   counters.transaction_scans++; const pending = await pendingTransactions(s);
   counters.history_scans++; const h = await history(s, change); return { pending, h };
 }
-async function closedFresh(s, run) {
+async function closedFresh(s, run, freshness = s.freshness) {
   requireValue(run.lifecycle === 'closed' && (run.kind === 'batch' ? !!run.closure : run.status === 'accepted'), 'lifecycle-closed-run-required', true);
-  return s.freshness(s, run);
+  return freshness(s, run);
+}
+
+async function requireReplaySource(check) {
+  try { return await check(); }
+  catch (error) {
+    if (!(error instanceof WorkflowError)) throw error;
+    throw new WorkflowError('lifecycle-source-conflict', true);
+  }
+}
+
+async function checkReplayRuns(s, projected, journal, remaining, origin) {
+  const previous = journal.recovery?.runs ?? {};
+  for (const run of await catalogue(s)) {
+    if (origin && publicationRunKey(run) === publicationRunKey(origin)) continue;
+    const reserved = reserves(run);
+    if (!reserved && previous[publicationRunKey(run)] === digest(run)) continue;
+    let source;
+    try { source = await resolveExecutionSource(projected, run.change_id, run.role, run.context_paths ?? []); }
+    catch (error) {
+      if (!(error instanceof WorkflowError)) throw error;
+      throw new WorkflowError(reserved ? 'lifecycle-not-quiescent' : 'lifecycle-source-conflict', true);
+    }
+    requireValue(!source.delegated, 'lifecycle-source-conflict', true);
+    // Active reservations still use the context they were admitted with.
+    const inputs = { ...source, context: { sources: { ...run.context.sources, ...source.context.sources } } };
+    if (!await publicationAffects(projected, inputs, run.scope, run.checkpoint.worktree, remaining)) continue;
+    requireValue(!reserved, 'lifecycle-not-quiescent', true);
+    requireValue(source.namespace_digest === run.source?.namespace_digest, 'lifecycle-source-conflict', true);
+    await requireReplaySource(async () => {
+      if (projected.projectedMissing) {
+        try { await s.freshness(s, run); return; }
+        catch (error) { if (!(error instanceof WorkflowError)) throw error; }
+      }
+      await s.freshness(projected, run);
+    });
+  }
+  const { isolationGroups } = await import('./isolated-execution.mjs');
+  for (const group of await isolationGroups(s)) {
+    const state = isolationState(group);
+    if (['closed', 'abandoned'].includes(state.phase)) continue;
+    const { input } = group.start;
+    const source = await requireReplaySource(() => resolveExecutionSource(projected, input.change_id, 'implement', input.context_paths ?? []));
+    requireValue(!source.delegated, 'lifecycle-source-conflict', true);
+    const files = input.assignments.flatMap(assignment => assignment.files);
+    requireValue(!await publicationAffects(projected, source, files, state.expected, remaining), 'lifecycle-not-quiescent', true);
+  }
+}
+
+async function checkPublicationAdmission(store, source, scope, snapshot, writes) {
+  const outputs = writes.map(([filename]) => filename);
+  requireValue(!await store.findPendingPublication(source, scope, snapshot, outputs), 'pending-lifecycle-publication', true);
 }
 function requestBinding(r, run) {
   requireValue(r.slot.change_id === run.change_id && r.slot.run_id === run.run_id, 'delivery-identity-conflict', true);
@@ -210,14 +263,21 @@ async function progress(input, s, options, counters) {
   const { pending, h } = await scans(s, input.change_id, counters), run = findRun(h, input.run_id); owner(run, input);
   const old = await s.loadJournal(input.change_id, 'progress', input.run_id, input);
   if (old) {
-    // Admission cannot see lifecycle journals, so a prepared progress journal may race
-    // a newer run on an unchecked task; recheck quiescence before finishing the write (#268).
     if (old.state === 'prepared') requireValue(!pending.length && !h.runs.some(reserves), 'lifecycle-not-quiescent', true);
-    return s.applyJournal(old, 'progress', true);
+    return s.applyJournal(old, 'progress', true, async ({ remaining, projected }) => {
+      await checkReplayRuns(s, projected, old, remaining, run);
+      await requireReplaySource(async () => {
+        const snapshot = await closedFresh(projected, run, s.freshness);
+        if (old.recovery) requireValue(old.recovery.origin_digest === digest(run)
+          && old.recovery.source_digest === run.source.namespace_digest && old.recovery.context_digest === run.context.digest
+          && old.recovery.worktree_digest === digest(snapshot), 'lifecycle-source-conflict', true);
+      });
+    });
   }
   // The fresh path races the same admission window as the prepared replay above: a
   // sibling run on an unchecked task must not be invalidated by the checklist write.
-  requireValue(!pending.length && !h.runs.some(reserves), 'lifecycle-not-quiescent', true); await closedFresh(s, run);
+  requireValue(!pending.length && !h.runs.some(reserves), 'lifecycle-not-quiescent', true);
+  const snapshot = await closedFresh(s, run);
   const source = await resolveExecutionSource(s, input.change_id, run.role, run.context_paths), accepted = acceptedSet(run);
   const paths = source.namespace.kind === 'ai-factory-classic' ? [source.namespace.entrypoint, source.namespace.checklist] : [source.namespace.checklist];
   const writes = [];
@@ -226,8 +286,10 @@ async function progress(input, s, options, counters) {
     writes.push([path, checkedText(text, accepted)]);
   }
   if (writes.length === 2) requireValue(same(parseExecutionTasks(writes[0][1]), parseExecutionTasks(writes[1][1])), 'classic-checklist-mismatch', true);
+  await checkPublicationAdmission(s, source, run.scope, snapshot, writes);
+  const recovery = publicationRecovery(source, snapshot, await catalogue(s), run);
   return s.publishLifecycle(input.change_id, 'progress', input.run_id, input, writes,
-    { ok: true, state: 'progress-applied', accepted, next_action: next('lifecycle-finalize', 'Finalization remains owned by /aif-done.'), authorizes: [] });
+    { ok: true, state: 'progress-applied', accepted, next_action: next('lifecycle-finalize', 'Finalization remains owned by /aif-done.'), authorizes: [] }, [], recovery);
 }
 
 async function release(input, s, options, counters) {
@@ -286,7 +348,27 @@ async function finalize(input, s, options, counters) {
     const { pending, h } = await scans(s, input.change_id, counters);
     requireValue(!pending.length && !h.runs.some(reserves), 'lifecycle-not-quiescent', true);
     requireValue(h.runs.every(r => r.owner === input.actor), 'actor-mismatch', true);
-    return s.applyJournal(old, 'finalization', true);
+    return s.applyJournal(old, 'finalization', true, async ({ remaining, projected }) => {
+      await checkReplayRuns(s, projected, old, remaining);
+      await requireReplaySource(async () => {
+        const binding = old.recovery;
+        requireValue(binding, 'lifecycle-source-conflict', true);
+        const source = await resolveExecutionSource(projected, input.change_id, 'implement');
+        requireValue(!source.delegated && source.kind === 'ai-factory-classic' && source.namespace_digest === binding.source_digest
+          && source.context.digest === binding.context_digest, 'lifecycle-source-conflict', true);
+        const base = source.namespace.checklist.slice(0, -'/task.md'.length);
+        // Guards already verify the recorded leaves. Check for new leaves even outside the Git snapshot.
+        const expected = old.guards.map(guard => guard.path).filter(path => path.startsWith(`${base}/`)).sort();
+        const actual = Object.keys(await projected.inventory(base, { namesOnly: true })).filter(path => path !== `${base}/status.yaml`).sort();
+        const matches = same(actual, expected);
+        if ((process.env.AIFHUB_LOG_LEVEL ?? process.env.LOG_LEVEL)?.toLowerCase() === 'debug') {
+          console.error('[FIX:268] finalization %s archive inventory: %s', input.change_id, matches ? 'compatible' : 'lifecycle-source-conflict');
+        }
+        requireValue(matches, 'lifecycle-source-conflict', true);
+        const snapshot = await worktree(projected, [], source.projections);
+        requireValue(digest(snapshot) === binding.worktree_digest, 'lifecycle-source-conflict', true);
+      });
+    });
   }
   const config = parseProjectConfig(await s.textFile('.ai-factory/config.yaml') ?? ''), specs = config.paths.specs ?? '.ai-factory/specs';
   // Non-scalar configured paths must fail with a typed code, not a raw TypeError.
@@ -415,8 +497,11 @@ async function finalize(input, s, options, counters) {
   const checkStatus = parseSimpleYaml(after);
   requireValue(checkStatus.plan_id === parsed.plan_id && same(checkStatus.source_binding, parsed.source_binding), 'invalid-source-binding', true);
   add(statusPath, budget(Buffer.from(after)));
+  const snapshot = await worktree(s, [], source.projections);
+  await checkPublicationAdmission(s, source, [], snapshot, writes);
+  const recovery = publicationRecovery(source, snapshot, await catalogue(s));
   return s.publishLifecycle(input.change_id, 'finalization', id, input, writes,
-    { ok: true, state: 'finalized', archive, authority: '/aif-done', next_action: null, authorizes: [] }, guards);
+    { ok: true, state: 'finalized', archive, authority: '/aif-done', next_action: null, authorizes: [] }, guards, recovery);
 }
 
 export async function lifecycleCommand(action, input, options = {}) {

@@ -119,6 +119,12 @@ Only the current completed result can transition to `accepted`, closing that sin
 
 `accepted` means the parent accepted the worker report. It does not write QA, grant approval, or imply `/aif-done`. Existing [Handoff validation](handoff-validation-profile.md), `/aif-verify`, coverage, rules, and done ownership stay authoritative.
 
+### Prepared lifecycle publications
+
+Fresh `start`, `batch-start`, and local `isolation-start` check remaining writes in prepared `progress` and classic `finalize` journals under the checkout lock. A write that changes a pinned input returns `pending-lifecycle-publication` before any run, reservation, or execution journal is published. The exact retry of an existing prepared execution transaction still completes its recorded admission. A later lifecycle retry checks its reservation and inputs before any remaining writes.
+
+For available recovery paths, stable refusal codes, and compatibility with journals written by older helpers, see [Host lifecycle recovery](host-lifecycle.md#допуск-и-повтор-progress-и-finalize).
+
 ## No-progress guard for fixes
 
 Fix attempts use single-task runs. `attempt-check` reports failed/interrupted counts and whether this run has a pending attempt. It always reports `post_edit_fingerprint_checked: false`: the next edit is not pre-approved. `attempt-begin` independently checks the post-edit fingerprint and both limits. At most one v2 attempt may remain pending.

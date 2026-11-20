@@ -5,6 +5,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import { assertAuxiliaryPaths, resolveExecutionSource, selectExecutionTask, validateExecutionScope } from './execution-task-source.mjs';
 import { catalogue, history, names, pendingTransactions, reserves } from './execution-transactions.mjs';
+import { lifecycleStore } from './host-lifecycle-store.mjs';
 import { digest, requireValue, sameRevision, storeFor, worktree, WorkflowError } from './workflow-state-store.mjs';
 import { applyImages, eventKey, imageHash, ISOLATION_SCHEMA, isolationFolder, isolationInput, isolationState, same } from './isolated-execution-records.mjs';
 
@@ -254,6 +255,8 @@ export async function isolatedExecutionCommand(action, input, options = {}, exec
       const record = { schema: ISOLATION_SCHEMA, start: { input: structuredClone(input), identity: rootIdentity, source: sourceRecord(source), context: source.context, baseline, bindings, preflight: await reference(store, input.preflight_paths) }, events: [] };
       for (const assignment of input.assignments) await workerRecord(record, assignment, execute, true);
       await fresh(store, record, isolationState(record));
+      const lifecycle = await lifecycleStore({ rootDir: store.root });
+      requireValue(!await lifecycle.findPendingPublication(source, files, baseline), 'pending-lifecycle-publication', true);
       return view(record, await save(store, record));
     }
     requireValue(existing, 'missing-isolation-group');

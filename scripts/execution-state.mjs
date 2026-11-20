@@ -206,6 +206,9 @@ export async function executionCommand(action,input,options={}) {
       if(action==='batch-start')for(const item of input.manifest)selectExecutionTask(finalSource,item.task_id,input.role,preflight.extra);
       else selectExecutionTask(finalSource,input.task_id,input.role,preflight.extra);
       await validateExecutionScope(store,preflight.scope,finalSource,action==='batch-start');
+      const { lifecycleStore } = await import('./host-lifecycle-store.mjs');
+      const lifecycle = await lifecycleStore({ rootDir: store.root });
+      requireValue(!await lifecycle.findPendingPublication(finalSource, preflight.scope, snapshot), 'pending-lifecycle-publication', true);
       run={schema:RUN_SCHEMA,kind:action==='start'?'single':'batch',change_id:change,run_id:id,task_id:input.task_id??null,
         owner:input.owner,worker:input.worker,role:input.role,scope:preflight.scope,context_paths:preflight.extra,
         version:1,status:'started',lifecycle:'active',execution_state:'running',source:sourceRecord(selected),context:selected.context,
