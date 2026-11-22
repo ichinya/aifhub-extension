@@ -68,6 +68,24 @@ Classic finalizer остаётся механическим publisher'ом по�
 
 Канонические пары: single wait+settle; batch 2–5 seal/results/accept/close/progress/finalize; k pending deliveries × m rounds; interrupt/stop-confirm/re-dispatch. Начальные inputs и fake-host сценарии одинаковы, common producer/parent transitions не считаются экономией. Публикуются два baseline: per-item (inspect/delivery-inspect и resume на каждый item) и group-boundary (одно наблюдение на batch); требование ≥2x относится к per-item baseline, group-boundary ratio публикуется как честная нижняя граница. Candidate выполняет grouped шаги. Единица — выполненный helper call как offline proxy model-issued service call. Host read trace сравнивается отдельно: grouping сокращает вызовы координатора, а не необходимые host reads.
 
-Тест scripts/host-lifecycle.test.mjs выводит counters в diagnostic output. Цель ≥2x относится к служебным fixtures; live model service calls, inference, payment и production host не запускались: **NOTRUN**. Live-пилот требует отдельной парной трассы реального координатора и агрегатора #230; offline ratio не является live acceptance — live acceptance вынесена в #266.
+Offline-тест `scripts/host-lifecycle.test.mjs` выводит счётчики в диагностике. Цель ≥2× относится к его поэлементному baseline. Для пилота #266 служебные вызовы измерены отдельно по трассам координатора и хоста.
+
+### Изолированный пилот #266
+
+22 ноября 2026 года координатор BB Codex повторно провёл шесть пар на Windows с Node 24.13.0 и `startIsolatedDeliveryHost()`. Внутри каждой пары исходная ревизия тестового проекта, входы и критерии приёмки совпадали. Для каждой ветки использовали отдельный checkout и отдельное пространство имён хоста. Пилот измерял служебные вызовы и IPC хоста в заранее зафиксированных интервалах.
+
+| Сценарий | `service_calls` baseline / candidate | `host_reads` baseline / candidate | `host_releases` baseline / candidate | Отношение вызовов |
+| --- | ---: | ---: | ---: | ---: |
+| Single wait + settle | 6 / 6 | 3 / 3 | 0 / 0 | 1,00× |
+| Batch 2, seal → finalize | 17 / 14 | 0 / 0 | 0 / 0 | 1,21× |
+| Batch 5, seal → finalize | 29 / 20 | 0 / 0 | 0 / 0 | 1,45× |
+| 2 pending × 3 раунда | 12 / 3 | 6 / 6 | 0 / 0 | 4,00× |
+| 5 pending × 3 раунда | 30 / 3 | 15 / 15 | 0 / 0 | 10,00× |
+| Interrupt → stop-confirm → re-dispatch | 5 / 4 | 1 / 1 | 0 / 0 | 1,25× |
+
+- В single обе ветки сохранили исходные байты после явного recovery и зафиксировали одинаковое решение владельца. При опросе число чтений хоста сохранилось.
+- В batch baseline наблюдал каждого участника отдельными `inspect` и `resume`. После закрытия пакета обе ветки сверили принятые задачи, обновили чекбоксы и прошли `verify`, `review`, `rules` и `security` на одном снимке в пределах ветки. Артефакты каждого gate привязаны к `run_id` и хешу снимка до публикации. Принятые задачи, чекбоксы и файлы classic-архивов совпали.
+- В interrupt дочерний процесс выполнил назначение и передал результат, который координатор сверил с сохранённым `result_digest`. Координатор наблюдал выход того же `ChildProcess` и связал PID, назначение и `run_id` в свидетельстве для `stop-confirm`. Обе ветки удерживали резерв до подтверждения и затем допустили новый run. Полные IPC-трассы зафиксировали ноль попыток release во всех окнах измерения.
+- 24 снимка #230 сохранены до очистки стендов в `.ai-factory/state/266-live-host-lifecycle-pilot/pilot/pilot-fix-266-mwrireai/corrected/`. Снимки содержат `run_id`, `outcome` и `notes` в соответствующих записях и квитанциях коллектора. Независимый пересчёт воспроизвёл таблицу. Закрытая схема `aifhub.runner_metrics.v1` сохранилась вместе с метками неизвестных значений, в том числе токенов и стоимости. Коллектор в изолированном checkout сообщил версию `unknown`. Исходник коллектора сверяли по SHA-256.
 
 Scripts/host-lifecycle.mjs и scripts/host-lifecycle-store.mjs включены в HELPER_MODULES и provenance-манифест с release 1.8.2 (закрытие отложенного включения #231 — решение «при следующем release»; пин-тест AC6 перевёрнут на присутствие). RUN_SCHEMA, receipt enum, batchReceipts, validateTransaction whitelist и contracts не расширяются.
