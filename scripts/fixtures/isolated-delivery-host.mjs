@@ -7,7 +7,6 @@ import { canonical, digest, requireValue, WorkflowError } from '../workflow-stat
 if (!process.connected) throw new Error('isolated delivery host requires IPC');
 
 const root = process.argv[2];
-const requestPath = path.join(root, 'request.json');
 const tracePath = path.join(root, 'trace.jsonl');
 const capabilities = {
   idempotent_create: true, read_by_request_id: true, fetch_response: true,
@@ -19,24 +18,27 @@ const capabilities = {
 };
 const { scope_digest: namespace, continuity_token: epoch } = capabilities.idempotency;
 const continuityHash = digest(epoch);
-let storedDigest = null;
+const storedDigests = new Map();
 let sequence = 0;
 let hold = false;
 let delayedReply = null;
 
-async function loadRequest() {
-  if (storedDigest === null) return null;
+async function loadRequest(uuid) {
+  const storedDigest = storedDigests.get(uuid);
+  if (storedDigest === undefined) return null;
+  const requestPath = path.join(root, `request-${uuid}.json`);
   const bytes = await readFile(requestPath).catch(() => null);
   requireValue(bytes !== null && digest(bytes) === storedDigest, 'host-continuity-unproven');
   return JSON.parse(bytes.toString('utf8'));
 }
 
 async function storeRequest(record) {
-  const next = path.join(root, 'request.next.json');
+  const requestPath = path.join(root, `request-${record.request_uuid}.json`);
+  const next = `${requestPath}.next`;
   const bytes = Buffer.from(JSON.stringify(record));
   await writeFile(next, bytes, { flag: 'wx' });
   await rename(next, requestPath);
-  storedDigest = digest(bytes);
+  storedDigests.set(record.request_uuid, digest(bytes));
 }
 
 function observation(record) {
@@ -84,9 +86,9 @@ async function execute(call, context) {
     context.run_id = input.binding.run_id;
     context.body_sha256 = bodyHash;
     const signature = canonical({ identity: input.identity, binding: input.binding, target: input.target, body_sha256: bodyHash });
-    const saved = await loadRequest();
+    const saved = await loadRequest(context.request_uuid);
     if (saved !== null) {
-      if (saved.request_uuid !== context.request_uuid || saved.signature !== signature) return { state: 'conflict' };
+      if (saved.signature !== signature) return { state: 'conflict' };
       recordProof(context, saved);
       context.outcome = 'replayed';
       return observation(saved);
@@ -104,8 +106,8 @@ async function execute(call, context) {
   requireValue(['readRequest', 'fetchResponse', 'complete'].includes(operation), 'host-invalid-operation');
   context.request_uuid = requestUuid(params?.request_uuid);
   requireValue(params.namespace_digest === namespace, 'host-namespace-mismatch');
-  const saved = await loadRequest();
-  if (saved?.request_uuid !== context.request_uuid) {
+  const saved = await loadRequest(context.request_uuid);
+  if (saved === null) {
     if (operation === 'readRequest') {
       return { state: 'not_found', namespace_digest: namespace, continuity_token: epoch, deduplication_retained: true };
     }

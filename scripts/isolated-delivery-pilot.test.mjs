@@ -96,13 +96,43 @@ test('IPC timeout discards the late reply and never repeats create on its own', 
   assert.equal(exit.code, 0);
 });
 
+test('IPC host keeps two and five pending requests in one namespace without mixing their state', async t => {
+  const host = await startHost(t);
+  const { client } = host;
+  const capabilities = await client.capabilities();
+  const requests = Array.from({ length: 5 }, () => preparedRequest(capabilities));
+  const pending = await Promise.all(requests.map(request => client.createRequest(request)));
+  assert.deepEqual(pending.map(row => row.state), Array(5).fill('pending'));
+  assert.ok(pending.every(row => row.namespace_digest === capabilities.idempotency.scope_digest &&
+    row.continuity_token === capabilities.idempotency.continuity_token));
+
+  const queries = requests.map(request => queryFor(request, capabilities));
+  for (const count of [2, 5]) {
+    for (let round = 0; round < 3; round++) {
+      const states = await Promise.all(queries.slice(0, count).map(query => client.readRequest(query)));
+      assert.deepEqual(states.map(row => row.state), Array(count).fill('pending'));
+    }
+  }
+
+  const completed = await Promise.all([host.complete(queries[0]), host.complete(queries[4])]);
+  assert.notEqual(completed[0].completion_id, completed[1].completion_id);
+  assert.equal((await client.createRequest(requests[0])).completion_id, completed[0].completion_id);
+  const changed = { ...requests[4], target: { kind: 'completion', locator: 'conflicting-worker' } };
+  changed.serialized_input = deliveryTransportInput(changed, capabilities).stdin;
+  assert.equal((await client.createRequest(changed)).state, 'conflict');
+  assert.deepEqual(await client.readRequest(queries[4]), completed[1]);
+  assert.deepEqual((await client.fetchResponse(queries[0])).body, requests[0].body);
+  assert.equal(await client.fetchResponse(queries[1]), null);
+  assert.equal((await host.close()).exit.code, 0);
+});
+
 test('lost host custody and IPC disconnect reject observation', async t => {
   const host = await startHost(t);
   const capabilities = await host.client.capabilities();
   const request = preparedRequest(capabilities);
   const query = queryFor(request, capabilities);
   await host.client.createRequest(request);
-  await unlink(path.join(host.root, 'request.json'));
+  await unlink(path.join(host.root, `request-${request.request_uuid}.json`));
   await assert.rejects(host.client.readRequest(query), /host-continuity-unproven/);
   await host.holdNextReply();
   const read = assert.rejects(host.client.readRequest(query), /host-ipc-disconnected/);
