@@ -61,9 +61,9 @@ const CHECKS = Object.freeze([
 ]);
 const SUGGESTION_PRIORITY = Object.freeze([
   'generated_rules',
+  'verify_gate',
   'rules_gate',
   'coverage',
-  'verify_gate',
   'artifact_contract',
   'openspec_validate',
   'openspec_status',
@@ -781,11 +781,7 @@ async function inspectVerifyGate(changeId, options) {
     });
   }
 
-  if (/\b(Code verification:\s*PENDING|Code verification:\s*BLOCKED)\b/i.test(verifyContent) || /\b(Verdict:\s*FAIL|OpenSpec validation:\s*FAIL|\/aif-verify:\s*FAIL)\b/i.test(verifyContent)) {
-    return verifyGateFailure(changeId, evidence, 'verification-ambiguous', 'Verification evidence is ambiguous; rerun /aif-verify before finalizing.');
-  }
-
-  if (!hasFinalPassSignal(verifyContent)) {
+  if (/\bCode verification:\s*(PENDING|BLOCKED)\b/i.test(verifyContent) || /\b(Verdict|Code verification|OpenSpec validation|\/aif-verify):\s*FAIL\b/i.test(verifyContent)) {
     return verifyGateFailure(changeId, evidence, 'verification-ambiguous', 'Verification evidence is ambiguous; rerun /aif-verify before finalizing.');
   }
 
@@ -1069,10 +1065,6 @@ function normalizeCommandResult(result) {
       message: normalizeOutput(result?.stderr) || normalizeOutput(result?.stdout) || 'OpenSpec command failed.'
     })
   };
-}
-
-function hasFinalPassSignal(content = '') {
-  return /\b(Verdict:\s*PASS|\/aif-verify:\s*PASS|Code verification:\s*PASS)\b/i.test(content);
 }
 
 function resolveQaPath(rootDir, changeId, options = {}) {

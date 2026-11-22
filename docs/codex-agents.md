@@ -137,7 +137,7 @@ Verifier writes QA evidence under `.ai-factory/qa/<change-id>/`.
 - a pre-archive failure leaves the roadmap unchanged
 - a post-archive roadmap update failure preserves truthful archive evidence, does not roll back archive, and returns `/aif-roadmap check`
 - GitHub open/closed/merged state remains separate and is reconciled later by `/aif-roadmap check`
-- recommends `/aif-mode sync`
+- reports the generated-rules refresh and recommends `/aif-mode sync --all` only on refresh failure
 - recommends `/aif-commit`
 - does not create commits or PRs automatically
 - for marked legacy ultra, writes no final evidence or archive state and returns only the current receipt-derived `/aif-verify <entrypoint>` or `/aif-archive <entrypoint>` handoff

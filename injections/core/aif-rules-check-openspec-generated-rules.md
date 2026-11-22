@@ -80,7 +80,7 @@ Next-step routing is one-way with terminal states and wins over any upstream nex
 - When this gate fails or generated rules are missing, stale, or invalid, follow the regeneration route above (`/aif-mode sync --change <change-id>`, then rerun `/aif-rules-check`); do not suggest `/aif-verify` as remediation for a failing rules gate.
 - Do not suggest rerunning this gate after it has already passed for the current change state.
 
-Determine whether `/aif-verify <change-id>` has already passed by reading the final `aif-gate-result` block in `.ai-factory/qa/<change-id>/verify.md`: treat verification as already passed only when that receipt records `"status": "pass"` and has not been invalidated by later canonical artifact changes for the current change state; with no such current passing receipt, verification has not already passed.
+Determine whether `/aif-verify <change-id>` has already passed using the current final `aif-gate-result` block in `.ai-factory/qa/<change-id>/verify.md`. A valid completed `pass` or `warn` counts as already verified if the receipt is current for the change. Reject stale evidence and reports with a pending, blocked, or failed code or validation result. A completed warning receipt does not require another verify run.
 
 ### Legacy AI Factory-only mode
 

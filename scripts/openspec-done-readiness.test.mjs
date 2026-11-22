@@ -575,6 +575,17 @@ describe('OpenSpec done readiness gate', () => {
     const rootDir = await createTempRoot();
     await createOpenSpecChange(rootDir);
 
+    const missingVerification = await buildOpenSpecDoneReadiness({
+      rootDir,
+      changeId: 'add-oauth',
+      ...passingOptions({
+        readLatestVerificationEvidence: async () => ({ verify: { exists: false } }),
+        readOpenSpecRulesGateEvidence: async () => missingRulesGateEvidence(),
+        readOpenSpecCoverageMatrix: async () => coverageEvidence({ status: 'fail' })
+      })
+    });
+    assert.equal(missingVerification.suggested_next.command, '/aif-verify add-oauth');
+
     const rulesAndCoverage = await buildOpenSpecDoneReadiness({
       rootDir,
       changeId: 'add-oauth',

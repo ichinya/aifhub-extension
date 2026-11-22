@@ -19,6 +19,7 @@ import {
   detectOpenSpec as defaultDetectOpenSpec,
   getOpenSpecStatus as defaultGetOpenSpecStatus
 } from './openspec-runner.mjs';
+import { inventoryOpenSpecChanges, reconcileOpenSpecGeneratedRules } from './openspec-rules-compiler.mjs';
 import {
   readLatestVerificationEvidence as defaultReadLatestVerificationEvidence
 } from './openspec-verification-context.mjs';
@@ -212,6 +213,9 @@ export function projectDoneFinalizerResult(result) {
           reason: roadmap.reason
         }
     },
+    generated_rules: ['current', 'failed'].includes(result?.generatedRulesRefresh)
+      ? result.generatedRulesRefresh
+      : 'skipped',
     summary_files: normalizePublicPaths(result?.summaryFiles),
     commit_message: boundedPublicText(result?.commitMessage ?? '', 300),
     warnings: normalizePublicDiagnostics(result?.warnings),
@@ -339,13 +343,21 @@ export async function finalizeOpenSpecChange(options = {}) {
   const roadmap = archive.archived
     ? await updateRoadmapAfterArchive(context, { ...options, rootDir })
     : createSkippedRoadmapOutcome('archive-not-performed');
+  const generatedRulesRefresh = archive.archived
+    ? await refreshGeneratedRulesAfterArchive({ rootDir, detectOpenSpec: options.detectOpenSpec })
+    : 'skipped';
   const finalizedResult = {
     ...baseResult,
-    status: roadmap.status === 'handoff' ? 'WARN' : baseResult.status,
+    status: roadmap.status === 'handoff' || generatedRulesRefresh === 'failed' ? 'WARN' : baseResult.status,
     roadmap,
+    generatedRulesRefresh,
     warnings: dedupeDiagnostics([
       ...baseResult.warnings,
-      ...roadmapOutcomeWarnings(roadmap)
+      ...roadmapOutcomeWarnings(roadmap),
+      ...(generatedRulesRefresh === 'failed' ? [{
+        code: 'post-archive-generated-rules-refresh-failed',
+        message: 'Archive succeeded. Retry the generated rules refresh with /aif-mode sync --all.'
+      }] : [])
     ])
   };
 
@@ -360,6 +372,22 @@ export async function finalizeOpenSpecChange(options = {}) {
     ...finalizedResult,
     summaryFiles: summary.files
   };
+}
+
+async function refreshGeneratedRulesAfterArchive(options) {
+  try {
+    const inventory = await inventoryOpenSpecChanges(options);
+    if (!inventory.ok) return 'failed';
+
+    const result = await reconcileOpenSpecGeneratedRules({
+      ...options,
+      activeChangeIds: inventory.changeIds,
+      selectedChangeIds: inventory.changeIds
+    });
+    return result.ok ? 'current' : 'failed';
+  } catch {
+    return 'failed';
+  }
 }
 
 export async function buildDoneContext(options = {}) {
@@ -620,7 +648,7 @@ export async function assertVerificationPassed(changeId, options = {}) {
     });
   }
 
-  if (/\b(Code verification:\s*PENDING|Code verification:\s*BLOCKED)\b/i.test(verifyContent)) {
+  if (/\bCode verification:\s*(PENDING|BLOCKED)\b/i.test(verifyContent)) {
     return createVerificationFailure({
       changeId: normalized.changeId,
       code: 'verification-ambiguous',
@@ -629,20 +657,11 @@ export async function assertVerificationPassed(changeId, options = {}) {
     });
   }
 
-  if (/\b(Verdict:\s*FAIL|OpenSpec validation:\s*FAIL|\/aif-verify:\s*FAIL)\b/i.test(verifyContent)) {
+  if (/\b(Verdict|Code verification|OpenSpec validation|\/aif-verify):\s*FAIL\b/i.test(verifyContent)) {
     return createVerificationFailure({
       changeId: normalized.changeId,
       code: 'verification-not-passed',
       message: 'Refusing to archive because verification did not pass.',
-      evidence
-    });
-  }
-
-  if (!hasFinalPassSignal(verifyContent)) {
-    return createVerificationFailure({
-      changeId: normalized.changeId,
-      code: 'verification-ambiguous',
-      message: 'Verification evidence is ambiguous; rerun /aif-verify before finalizing.',
       evidence
     });
   }
@@ -1188,6 +1207,11 @@ export function summarizeDoneResult(result, options = {}) {
 
   if (readinessStatus !== null) {
     lines.push(`Done readiness: ${boundedPublicText(readinessStatus, 40)}`);
+  }
+
+  if (result?.generatedRulesRefresh && result.generatedRulesRefresh !== 'skipped') {
+    lines.push(`Generated rules after archive: ${result.generatedRulesRefresh}`);
+    if (result.generatedRulesRefresh === 'failed') lines.push('Suggested next: /aif-mode sync --all');
   }
 
   if (command.command !== null) {
@@ -1763,12 +1787,6 @@ function getVerificationGate(evidence, verifyContent) {
   };
 }
 
-function hasFinalPassSignal(content) {
-  return /\bVerdict:\s*PASS(?:-with-notes)?\b/i.test(content)
-    || /\b\/aif-verify:\s*PASS\b/i.test(content)
-    || /\bCode verification:\s*PASS\b/i.test(content);
-}
-
 async function detectOpenSpecCapability(options, rootDir) {
   const detectOpenSpec = options.detectOpenSpec ?? defaultDetectOpenSpec;
 
@@ -2075,6 +2093,8 @@ function renderDoneMarkdown(changeId, summary) {
     '',
     `Archived: ${archive.archived ? 'yes' : 'no'}`,
     `Skip specs: ${archive.skipSpecs ? 'yes' : 'no'}`,
+    `Generated rules after archive: ${summary.generatedRulesRefresh ?? 'skipped'}`,
+    ...(summary.generatedRulesRefresh === 'failed' ? ['Suggested next: /aif-mode sync --all'] : []),
     '',
     '## Roadmap lifecycle',
     '',

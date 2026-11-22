@@ -1,7 +1,7 @@
 // openspec-done-finalizer.test.mjs - tests for OpenSpec done/finalization runtime
 import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { access, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -595,6 +595,7 @@ describe('OpenSpec done finalizer command', () => {
       'working_tree',
       'archive',
       'roadmap',
+      'generated_rules',
       'summary_files',
       'commit_message',
       'warnings',
@@ -1267,6 +1268,59 @@ describe('OpenSpec done finalizer API', () => {
       '.ai-factory/qa/add-oauth/done.md',
       '.ai-factory/state/add-oauth/final-summary.md'
     ]);
+  });
+
+  it('archives a completed warn receipt and refreshes derived rules without a separate sync', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+    await createOpenSpecChange(rootDir, 'sibling');
+    await createRuntimeEvidence(rootDir);
+    const result = await finalizeOpenSpecChange(passingFinalizerOptions(rootDir, {
+      readLatestVerificationEvidence: async () => verificationEvidence({
+        content: [
+          '# Verification completed with notes',
+          renderGateResultBlock(createGateResult({ gate: 'verify', status: 'warn' }))
+        ].join('\n\n')
+      }),
+      archiveOpenSpecChange: async () => {
+        const archive = path.join(rootDir, 'openspec', 'changes', 'archive');
+        await mkdir(archive);
+        await rename(path.join(rootDir, 'openspec', 'changes', 'add-oauth'), path.join(archive, 'add-oauth'));
+        return archiveResult();
+      }
+    }));
+
+    assert.equal(result.ok, true);
+    assert.equal(result.archive.archived, true);
+    assert.equal(result.readiness.checks.verify_gate, 'warn');
+    assert.equal(projectDoneFinalizerResult(result).generated_rules, 'current');
+    const generated = path.join(rootDir, '.ai-factory', 'rules', 'generated');
+    const index = await readJson(path.join(generated, 'index.json'));
+    assert.deepEqual(index.changes.map(({ change_id }) => change_id), ['sibling']);
+    assert.equal(await pathExists(path.join(generated, 'openspec-change-add-oauth.md')), false);
+    assert.equal(await pathExists(path.join(generated, 'openspec-change-sibling.md')), true);
+    assert.doesNotMatch(summarizeDoneResult(result), /\/aif-mode sync/);
+  });
+
+  it('reports a failed rules refresh separately from an already successful archive', async () => {
+    const rootDir = await createTempRoot();
+    await createOpenSpecChange(rootDir);
+    await createRuntimeEvidence(rootDir);
+    const result = await finalizeOpenSpecChange(passingFinalizerOptions(rootDir, {
+      archiveOpenSpecChange: async () => {
+        const generated = path.join(rootDir, '.ai-factory', 'rules', 'generated');
+        await rename(generated, `${generated}-backup`);
+        await writeFile(generated, 'not a directory');
+        return archiveResult();
+      }
+    }));
+
+    assert.equal(result.ok, true);
+    assert.equal(result.status, 'WARN');
+    assert.equal(result.archive.archived, true);
+    assert.equal(projectDoneFinalizerResult(result).generated_rules, 'failed');
+    assert.match(summarizeDoneResult(result), /Suggested next: \/aif-mode sync --all/);
+    assert.equal(await pathExists(path.join(rootDir, '.ai-factory', 'qa', 'add-oauth', 'done.md')), true);
   });
 
   it('refuses to archive when the OpenSpec artifact contract fails', async () => {

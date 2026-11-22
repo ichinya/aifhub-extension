@@ -2,7 +2,7 @@
 name: aif-done
 description: Finalize a verified OpenSpec-native change or legacy AI Factory-only plan, prepare commit/PR summaries, and drive evidence-backed follow-ups.
 argument-hint: "[change-id|plan-id] [--skip-specs] [--record-dirty-state]"
-allowed-tools: Read Write Edit Glob Grep Bash(ai-factory aifhub-done-finalizer *) Bash(ai-factory aifhub-providers *) Bash(git status *) Bash(git branch --show-current) Bash(git diff *) Bash(git log *) Bash(git ls-files *) Bash(git rev-parse *) Bash(gh --version)
+allowed-tools: Read Write Edit Glob Grep Bash(ai-factory aifhub-done-finalizer *) Bash(ai-factory aifhub-done-readiness *) Bash(ai-factory aifhub-write-gate-evidence *) Bash(ai-factory aifhub-providers *) Bash(git status *) Bash(git branch --show-current) Bash(git diff *) Bash(git log *) Bash(git ls-files *) Bash(git rev-parse *) Bash(gh --version)
 version: 1.5.0
 author: ichi
 ---
@@ -32,6 +32,7 @@ Before any non-ultra provider run, evidence check, finalization, governance foll
 
 Before resolving an active change, reading policy/QA/canonical artifacts, checking readiness, archiving, writing evidence, updating the managed roadmap block or drafting output, read `skills/aif-done/references/openspec-finalization.md` and the shared finalization contract.
 Use only `ai-factory aifhub-done-finalizer --change <change-id> --json` after PASS/PASS-with-notes and current policy-accepted evidence. The finalizer always runs readiness before archive; refuse unverified changes and show exact `suggested_next.command` and `suggested_next.reason` on blockers.
+When required rules evidence is missing, stale, or invalid after completed verification, resolve it in this invocation if the rules audit and writer are available. Use `ai-factory aifhub-done-readiness --change <change-id> --no-write --json` to confirm that the only blocking check is `rules_gate`, and include `--record-dirty-state` only if already authorized. Use the scoped read-only audit and evidence write in `injections/core/aif-verify-plan-folder.md` under Required rules evidence. If the recorded result passes done policy, continue to the finalizer in the same invocation. Reuse the verified implementation evidence. If the audit, persistence or another readiness check blocks archive, report the actual blocker.
 Support `--skip-specs` for docs/tooling only and `--record-dirty-state` for explicit dirty-state recording. Never bypass readiness, manually move changes, or mutate base specs. `/aif-verify` does not archive.
 
 ## Legacy AI Factory-only mode
@@ -61,7 +62,7 @@ For `classic-pair` or `classic-folder-only`, before active-plan fallback, compan
 - Do not run `/aif-evolve` inside finalization. Optional proposals need durable evidence; separately authorized evolution keeps owner handoff and exact proposal_digest binding.
 - Keep runtime under `.ai-factory/state/<change-id>/` and QA/final evidence under `.ai-factory/qa/<change-id>/`; never write runtime-only output in canonical changes.
 - Local finalization cannot claim GitHub issue closure or PR merge. After archive, update only the managed `OpenSpec Change Lifecycle` block; failure returns `/aif-roadmap check` without rolling archive back.
-- Report verification/readiness, dirty state, archive result, canonical artifacts, effective policy, evidence paths, commit/PR drafts and exact next owner handoffs. After success recommend `/aif-mode sync` and `/aif-commit`.
+- Report verification/readiness, dirty state, archive result, canonical artifacts, effective policy, evidence paths, the post-archive generated rules result, commit/PR drafts and exact next owner handoffs. Recommend `/aif-mode sync --all` only if the generated rules refresh failed. After success recommend `/aif-commit`.
 
 ## Readiness and archive ownership
 

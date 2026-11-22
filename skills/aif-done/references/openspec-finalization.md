@@ -76,7 +76,7 @@ Normal output must report:
 - final evidence under `.ai-factory/qa/<change-id>/`;
 - final summaries under `.ai-factory/state/<change-id>/`;
 - commit/PR summary draft;
-- compact evolution proposals and next steps: `/aif-mode sync`, `/aif-commit`, and an exact `/aif-evolve` owner handoff for separately requested or policy-required evolution.
+- post-archive generated rules result, compact evolution proposals, `/aif-commit`, and an exact `/aif-evolve` owner handoff for separately requested or policy-required evolution.
 
 ### Roadmap Lifecycle Co-Ownership
 
@@ -91,7 +91,7 @@ Normal output must report:
 
 After successful finalization:
 
-1. Recommend `/aif-mode sync` to refresh derived artifacts after archive.
+1. Report the automatic generated-rules refresh. Preserve archive success if refresh fails and recommend `/aif-mode sync --all` only for that failure.
 2. Recommend `/aif-commit` as the next AI Factory command.
 3. Present compact evolution proposals when durable learning evidence exists; optional learning does not start inside finalization. Separately requested or policy-required evolution follows the owner boundary below.
 4. Do not create commits automatically.

@@ -93,13 +93,13 @@ Do not write runtime-only files into `openspec/changes/<change-id>/`.
 
 ### Output
 
-Report selected `change-id`, effective policy summary, verification status, coverage matrix status, rules gate status, dirty working tree state, QA evidence path, `.ai-factory/qa/<change-id>/` final evidence path, `.ai-factory/state/<change-id>/` final summary path, canonical artifacts inspected, generated rules state, archive result, bounded OpenSpec command/source, `--skip-specs` state, commit draft, PR draft, compact evolution proposals, and next steps: `/aif-mode sync`, `/aif-commit`, and any exact `/aif-evolve` owner handoff for separately requested or policy-required evolution.
+Report selected `change-id`, effective policy summary, verification status, coverage matrix status, rules gate status, dirty working tree state, QA evidence path, `.ai-factory/qa/<change-id>/` final evidence path, `.ai-factory/state/<change-id>/` final summary path, canonical artifacts inspected, post-archive generated rules state, archive result, bounded OpenSpec command/source, `--skip-specs` state, commit draft, PR draft, compact evolution proposals, and next steps including `/aif-commit` and any exact `/aif-evolve` owner handoff for separately requested or policy-required evolution.
 
 Command exit codes are `0` for successful or policy-accepted warning finalization, `1` for a resolved blocking failure, and `2` for invalid arguments, unresolved or ambiguous scope, or an unexpected command failure.
 
 After successful finalization:
 
-1. Recommend `/aif-mode sync` to refresh derived artifacts after archive.
+1. Report the automatic generated-rules refresh. Preserve archive success if refresh fails and recommend `/aif-mode sync --all` only for that failure.
 2. Recommend `/aif-commit` as the next AI Factory command.
 3. Present compact evolution proposals when durable learning evidence exists; do not start optional learning. Separately requested or policy-required evolution follows its owner workflow or an exact handoff.
 4. Do not create commits automatically.

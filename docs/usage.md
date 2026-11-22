@@ -60,7 +60,6 @@ verification:
 finalization:
   /aif-mode doctor --change <change-id>             # recommended before archive
   /aif-done <change-id>                             # required after passing verify
-  /aif-mode sync                                    # recommended after archive
   /aif-commit                                       # recommended AI Factory commit gate
   /aif-evolve                                       # optional, separately authorized learning step
 ```
@@ -412,7 +411,7 @@ When switching away from a custom legacy `paths.plans` root with unresolved work
 
 `/aif-mode sync --change <change-id>` is recommended after `/aif-plan full` or `/aif-improve` and whenever canonical specs or tasks changed during implementation or fixes. It ensures OpenSpec skeleton paths, compiles `.ai-factory/rules/generated/openspec-base.md`, `.ai-factory/rules/generated/openspec-change-<change-id>.md`, `.ai-factory/rules/generated/openspec-merged-<change-id>.md`, `.ai-factory/rules/generated/openspec-rules-trace-<change-id>.json`, and `.ai-factory/rules/generated/index.json`, requests OpenSpec validation/status when the CLI is available and `validateOnSync` is enabled, detects legacy plans in OpenSpec mode, and writes a sync report under `.ai-factory/state/mode-switches/`.
 
-`/aif-mode sync` without `--change` is recommended after `/aif-done`. After archive, there may be no active change. Sync still refreshes `.ai-factory/rules/generated/openspec-base.md` and `.ai-factory/rules/generated/index.json` from `openspec/specs/**`, skips change-specific generated rules and change validation when no active changes exist, and writes a sync report. OpenSpec skills are not installed.
+After archive, `/aif-done` refreshes base generated rules and the active-change overlays through the shared compiler. It also removes generated entries for archived changes. If the refresh fails, the archive stays in place and `/aif-done` reports `/aif-mode sync --all` as recovery. A manual sync with no active changes refreshes the base rules and index without validating a change.
 
 `/aif-mode sync --all` is a maintenance sweep. It refreshes generated rules for active changes and validates selected changes that contain `openspec/changes/<change-id>/specs/**/spec.md` delta specs or declare native `skip_specs: true` in `openspec/changes/<change-id>/.openspec.yaml`. It reports older unmarked no-delta changes as `no-delta-specs` warnings. Invalid native markers are validated fail-closed instead of being silently skipped. `/aif-verify <change-id>` remains the stricter verification gate for a specific change.
 
@@ -868,7 +867,7 @@ After implementation, optional read-only gates are available before final verifi
 
 The authoritative final verification remains `/aif-verify <change-id>`.
 
-Next-step routing between the gates and verification is one-way with terminal states: when `/aif-verify <change-id>` passes, the suggested next step is `/aif-done <change-id>` — a rerun of `/aif-rules-check` or `/aif-verify` is not suggested after a passing verification; when verification fails, the route is `/aif-fix <change-id>` — except when the blocking failure is missing, stale, or invalid durable rules gate evidence, where the recovery step is rerunning `/aif-rules-check <change-id>` and persisting its final gate block through `ai-factory aifhub-write-gate-evidence`. A passing `/aif-rules-check` suggests `/aif-verify <change-id>` only when verification has not already passed for the current change state; a failing `/aif-rules-check` routes to `/aif-mode sync --change <change-id>` and a rerun, never to `/aif-verify`. A passing gate keeps `suggested_next` `null` when `status` is `pass` in its `aif-gate-result` block; terminal and forward routing is prose guidance only, never encoded in the machine-readable field.
+Next-step routing between the gates and verification is one-way with terminal states. After `/aif-verify <change-id>` passes and policy-required rules evidence is recorded, the next step is `/aif-done <change-id>`. Implementation findings route to `/aif-fix <change-id>`. If the verifier cannot obtain required rules evidence, it reports the scoped blocker and its recovery. A standalone passing `/aif-rules-check` suggests `/aif-verify <change-id>` only when verification has yet to pass for the current change state. Missing or stale generated rules route to `/aif-mode sync --change <change-id>`. A passing gate keeps `suggested_next` `null` when `status` is `pass` in its `aif-gate-result` block; terminal and forward routing is prose guidance only.
 
 ### `/aif-rules-check`
 
@@ -889,7 +888,7 @@ Writes:
 
 `/aif-rules-check` is optional after implementation or fixes and useful for strict/high-risk changes. In OpenSpec-native mode it uses generated rules first, loads trace JSON when present, returns a final `aif-gate-result` with `gate: "rules"`, and does not regenerate generated rules.
 
-When `requireRulesPassForDone` is true, save the final `/aif-rules-check` output, or at least its final `aif-gate-result` block, to `.ai-factory/qa/<change-id>/rules.md`. Generated rules freshness and rules gate pass are separate signals.
+When verify or done policy requires current rules evidence, `/aif-verify` obtains the scoped audit and saves its final result to `.ai-factory/qa/<change-id>/rules.md`. If rules evidence is the only blocker for an already verified change, `/aif-done` can obtain and save it during finalization. A standalone `/aif-rules-check` is read-only. Use the writer below when persisting a standalone audit or recovering outside the owning skill. Generated rules freshness and rules gate pass are separate signals.
 
 ```bash
 ai-factory aifhub-write-gate-evidence \
@@ -1063,7 +1062,7 @@ For a linked change, `/aif-done` reads the pre-archive canonical `## Roadmap Lin
 
 Next steps after `/aif-done`:
 
-1. Run `/aif-mode sync` to refresh derived artifacts after OpenSpec archive.
+1. Check the generated-rules refresh result reported by `/aif-done`. Run `/aif-mode sync --all` if it failed.
 2. Run `/aif-commit` to commit implementation, OpenSpec archive/spec changes, QA evidence, and final summaries.
 3. Present compact evolution proposals backed by existing durable learning evidence without starting optional learning; optional evolution never blocks verified finalization. `/aif-done` never runs evolution as part of finalization and does not dispatch an evolution intake worker or write skill-context/rules/patch cursors for optional proposals. Explicit user-requested evolution or an applicable mandatory project policy uses a separately authorized owner workflow, or an exact `/aif-evolve @.ai-factory/qa/<change-id>` handoff when execution is unavailable.
 
@@ -1304,7 +1303,7 @@ Refresh derived artifacts without changing mode:
 /aif-mode doctor
 ```
 
-Use `/aif-mode sync --change <change-id>` before implementation and after refinement. Use `/aif-mode sync` after `/aif-done` to refresh base generated rules from accepted specs after archive.
+Use `/aif-mode sync --change <change-id>` before implementation and after refinement when generated rules need a refresh. `/aif-done` refreshes generated rules after archive.
 
 ## Recommended Codex App Flow
 
