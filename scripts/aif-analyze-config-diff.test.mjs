@@ -1,7 +1,7 @@
 // aif-analyze-config-diff.test.mjs - tests for the analyze config required-keys diff
 import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -243,6 +243,57 @@ describe('analyze config required-keys diff', () => {
     );
     assert.match(result.obsolete[0].purpose, /mode enum/);
     assert.equal(result.up_to_date, true, 'deprecated keys alone do not break up_to_date');
+  });
+
+  it('reports a preview for an otherwise up-to-date project config with the obsolete marker', async () => {
+    const rootDir = await createTempRoot();
+    const { version } = await readAnalyzeSkillVersion();
+    const raw = renderConfigForMode('', 'openspec', { analyzeSkillVersion: version })
+      .replace(/^aifhub:/m, 'aifhub:\n  artifactProtocol: openspec');
+    const config = await writeFixture(rootDir, '.ai-factory/config.yaml', raw);
+    const result = await buildAnalyzeConfigDiff({ rootDir });
+    assert.equal(result.up_to_date, true);
+    assert.ok(result.obsolete.some(({ key }) => key === 'aifhub.artifactProtocol'));
+    assert.equal(result.migration.status, 'ready');
+    assert.equal(result.migration.preview_command, 'ai-factory aifhub-mode migrate-config');
+    assert.equal(result.migration.revision_sha256, undefined);
+    assert.equal(await readFile(config, 'utf8'), raw);
+  });
+
+  it('still reports missing keys but defers tools backfill when legacy migration is blocked', async () => {
+    const rootDir = await createTempRoot();
+    const raw = COMPLETE_CONFIG + 'paths: # declaration\n  plans: custom/plans\n';
+    const config = await writeFixture(rootDir, '.ai-factory/config.yaml', raw);
+    const manifestUrl = await createManifestFixture(rootDir, [...BASE_MANIFEST, {
+      key: 'aifhub.tools.openspec', required: true
+    }]);
+    const analyzeSkillUrl = await createSkillFixture(rootDir, '0.11.0');
+    const result = await buildAnalyzeConfigDiff({ rootDir, manifestUrl, analyzeSkillUrl });
+    assert.deepEqual(result.missing.map(({ key }) => key), ['aifhub.tools.openspec']);
+    assert.deepEqual(result.migration, {
+      migration: 'artifact-protocol-to-tools-v1',
+      status: 'blocked',
+      code: 'invalid-paths',
+      defer_tools_backfill: true
+    });
+    assert.equal(await readFile(config, 'utf8'), raw);
+  });
+
+  it('keeps an alternate config in the ordinary report without a migration handoff', async () => {
+    const rootDir = await createTempRoot();
+    const main = await writeFixture(rootDir, '.ai-factory/config.yaml', COMPLETE_CONFIG);
+    const configPath = await writeFixture(rootDir, 'alternate.yaml', COMPLETE_CONFIG);
+    const manifestUrl = await createManifestFixture(rootDir, BASE_MANIFEST);
+    const analyzeSkillUrl = await createSkillFixture(rootDir, '0.11.0');
+    const command = await runAnalyzeConfigDiffCommand(['--config', configPath, '--json'], {
+      rootDir, manifestUrl, analyzeSkillUrl
+    });
+    const result = JSON.parse(command.stdout);
+    assert.equal(result.up_to_date, true);
+    assert.equal(result.version_drift, false);
+    assert.equal(result.migration, undefined);
+    assert.equal(await readFile(main, 'utf8'), COMPLETE_CONFIG);
+    assert.equal(await readFile(configPath, 'utf8'), COMPLETE_CONFIG);
   });
 
   it('fails closed when the config is missing', async () => {

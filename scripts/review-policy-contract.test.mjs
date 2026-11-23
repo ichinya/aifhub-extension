@@ -6,7 +6,8 @@ import path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { renderConfigForMode } from './aif-artifact-sync.mjs';
+import { readAnalyzeSkillVersion, renderConfigForMode } from './aif-artifact-sync.mjs';
+import { compareStableAiFactoryVersions } from './ai-factory-version-resolver.mjs';
 import {
   inspectReviewPolicy,
   loadReviewPolicy,
@@ -86,13 +87,11 @@ describe('durable project review policy', () => {
     const skill = await readRepoFile('skills/aif-analyze/SKILL.md');
     const configTemplate = await readRepoFile('skills/aif-analyze/references/config-template.yaml');
     const configKeys = JSON.parse(await readRepoFile('skills/aif-analyze/references/config-keys.json'));
+    const skillVersion = await readAnalyzeSkillVersion();
+    assert.ok(skillVersion.ok, skillVersion.error?.message);
+    assert.ok(compareStableAiFactoryVersions(skillVersion.version, '0.22.0') >= 0, 'aif-analyze requires a stable version at or above 0.22.0');
 
     for (const expected of [
-      // reason: claim-evidence opt-in registration bumped aif-analyze 0.17.0 -> 0.19.0 (claimEvidence namespace documentation, #282; the in-flight #281 tail's 0.18.0 bump was never committed, so main carries 0.17.0)
-      // reason: trace-link-suggestions opt-in registration bumped aif-analyze 0.19.0 -> 0.20.0 (traceLinkSuggestions namespace documentation, #283)
-      // reason: context-selection-overlay opt-in registration bumped aif-analyze 0.20.0 -> 0.21.0 (contextSelectionOverlay namespace documentation, #284)
-      // reason: openspec 1.17.0 freshness/npm-engine guidance bumped aif-analyze 0.21.0 -> 0.22.0 (latestReviewedVersion 1.17.0, packageRequiresNode/packageNodeSupported advisory, #300)
-      'version: 0.22.0',
       '### Step 3.3: Project Review Policy',
       '`reviews.policy_file`',
       'use `REVIEW.md` when the key is missing or empty',

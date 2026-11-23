@@ -4,6 +4,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseToolConfig } from './tool-config.mjs';
+import { migrateConfig } from './aifhub-config-migration.mjs';
 
 import {
   flattenConfigKeyPaths,
@@ -12,6 +13,7 @@ import {
 } from './aif-artifact-sync.mjs';
 
 const DEFAULT_CONFIG_PATH = path.join('.ai-factory', 'config.yaml');
+const MIGRATION_PREVIEW_COMMAND = 'ai-factory aifhub-mode migrate-config';
 const USAGE = 'Usage: node scripts/aif-analyze-config-diff.mjs [--config <path>] [--manifest <path>] [--skill <path>] [--json]';
 
 function invalidArgs(message) {
@@ -109,9 +111,10 @@ export async function buildAnalyzeConfigDiff(options = {}) {
   const errors = [];
 
   let configRaw = null;
+  let selection;
   try {
     configRaw = await readFile(configPath, 'utf8');
-    parseToolConfig(configRaw);
+    selection = parseToolConfig(configRaw);
   } catch (err) {
     if (err?.code === 'ENOENT') {
       errors.push({
@@ -138,6 +141,20 @@ export async function buildAnalyzeConfigDiff(options = {}) {
     errors.push(skill.error);
   }
 
+  let migration;
+  if (options.configPath === undefined) {
+    const preview = await migrateConfig({ rootDir });
+    migration = {
+      migration: preview.migration,
+      status: preview.status,
+      code: preview.code,
+      defer_tools_backfill: selection?.explicit === false && preview.status !== 'noop'
+        && /^[ \t]+artifactProtocol\s*:/m.test(configRaw ?? '')
+    };
+    if (preview.status === 'ready') migration.preview_command = MIGRATION_PREVIEW_COMMAND;
+  }
+  const migrationReport = migration ? { migration } : {};
+
   if (errors.length > 0 || configRaw === null || !manifest.ok || !skill.ok) {
     return {
       ok: false,
@@ -147,6 +164,7 @@ export async function buildAnalyzeConfigDiff(options = {}) {
       missing: null,
       obsolete: null,
       up_to_date: false,
+      ...migrationReport,
       warnings,
       errors
     };
@@ -154,7 +172,7 @@ export async function buildAnalyzeConfigDiff(options = {}) {
 
   const flat = flattenConfigKeyPaths(parseSimpleYaml(configRaw));
   const entries = manifest.keys;
-  const artifactProtocol = parseToolConfig(configRaw).mode;
+  const artifactProtocol = selection.mode;
   const missing = entries
     .filter((entry) => (
       entry?.required === true
@@ -185,14 +203,22 @@ export async function buildAnalyzeConfigDiff(options = {}) {
     missing,
     obsolete,
     up_to_date: missing.length === 0 && !versionDrift,
+    ...migrationReport,
     warnings,
     errors: []
   };
 }
 
 function renderDiffSummary(result) {
+  const migration = result.migration;
+  const migrationLines = [];
+  if (migration && migration.status !== 'noop') {
+    migrationLines.push('Config migration: ' + migration.status + ' (' + migration.code + ')');
+    if (migration.preview_command) migrationLines.push('Preview: ' + migration.preview_command);
+    migrationLines.push('');
+  }
   if (!result.ok) {
-    const lines = ['Analyze config diff: FAILED', ''];
+    const lines = ['Analyze config diff: FAILED', '', ...migrationLines];
     for (const error of result.errors) {
       lines.push(`ERROR [${error.code}] ${error.message}`);
     }
@@ -201,6 +227,7 @@ function renderDiffSummary(result) {
 
   const lines = [
     'Analyze config diff:',
+    ...migrationLines,
     `Skill version: ${result.skill_version}`,
     `Config analyze.skill_version: ${result.config_analyze_version ?? '(missing)'}`,
     `Version drift: ${result.version_drift ? 'yes' : 'no'}`,

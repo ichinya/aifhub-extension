@@ -512,11 +512,37 @@ The config records the aif-analyze skill version that last bootstrapped or updat
 ai-factory aifhub-analyze-config-diff --json
 ```
 
-The command is read-only, compares `.ai-factory/config.yaml` against the extension-local `skills/aif-analyze/references/config-keys.json` manifest and the installed skill's frontmatter version, and reports `missing` keys with their purpose text, deprecated keys still present (`obsolete`), `version_drift`, and `up_to_date`. Manifest entries with `modes` apply only to the effective artifact mode derived from `aifhub.tools.openspec`, so OpenSpec-only paths do not create false drift in legacy `ai-factory` mode. Unknown user-owned keys are never reported. A config that is up to date takes the fast path and skips re-analysis; missing keys are presented to the user with their purposes before being written.
+The command compares `.ai-factory/config.yaml` with the extension-local `skills/aif-analyze/references/config-keys.json` manifest and the installed skill's frontmatter version. Its read-only report includes `missing` keys with their purpose text, `obsolete` keys, `version_drift`, and `up_to_date`. Mode-specific entries use the effective artifact mode. User-owned keys stay outside the manifest check.
+
+Analyze reports the separate `migration` result before the `up_to_date` fast path. When the legacy marker is the only tool selector, Analyze leaves `aifhub.tools.*` to the explicit migration, including when preview is blocked. Other eligible missing settings still follow the usual Analyze workflow.
 
 In OpenSpec-native mode, `/aif-analyze` also compares the selected compatible CLI with AIFHub's latest reviewed stable version. An older supported CLI remains usable for validation/archive capabilities, but the handoff recommends a user-owned update and identifies whether the selected source is `project-local`, `path`, or `explicit`. The skill never guesses a package manager, installs or updates OpenSpec, or recommends downgrading a supported version that is already equal to or newer than the reviewed baseline.
 
 Shared protocol-neutral settings such as `utilities.context_tools.enabled`, `utilities.graphify.enabled`, and `utilities.codegraph.enabled` may appear in either profile. They record optional tooling preferences and do not make that tool an AIFHub dependency. Optional memory/context tool recommendations are resolved from local installed metadata with `ai-factory aifhub-memory-tools recommend --from-project --json`; runtime tool selection uses `ai-factory aifhub-memory-tools select --from-project --command <skill> --json`. Missing metadata is degraded context and leaves `rg` as the baseline.
+
+### Config migration
+
+From the root of an existing AIFHub project, request a read-only preview.
+
+```bash
+ai-factory aifhub-mode migrate-config --json
+```
+
+- `ready` lists the affected keys and paths and returns `revision_sha256`.
+- `noop` means the config has no legacy marker to migrate.
+- `blocked` includes a bounded reason. Resolve the conflict or unsupported configuration before requesting a fresh preview.
+
+Keep a private copy of the original `.ai-factory/config.yaml` before applying. Pause other writers while applying. Replace `<revision_sha256>` below with the token from the preview for this project.
+
+```bash
+ai-factory aifhub-mode migrate-config --apply <revision_sha256> --json
+```
+
+Apply preserves the effective OpenSpec mode, HLV and Lekalo selections, and artifact paths. It updates only `.ai-factory/config.yaml` and returns `applied`. Stale revisions require a fresh preview. Preview, refusal, and `noop` preserve the original config bytes and the SessionBrief inputs.
+
+After applying, check the active SessionBrief with `ai-factory aifhub-session-brief status --change <change-id> --json`. If the config change made it stale, refresh it through the current change's workflow before using it. To roll back, restore your saved config with other writers paused and recheck the brief again.
+
+Install and refresh extension skills through the upstream AI Factory CLI. Config migration runs only on explicit apply. Project-local rules such as `.ai-factory/rules/base.md` belong to the project's Analyze workflow. In the AIFHub extension source, `npm run validate` checks artifact boundaries and documentation links, and `npm test` exercises the migration and skill delivery contracts.
 
 ### `/aif-architecture`
 

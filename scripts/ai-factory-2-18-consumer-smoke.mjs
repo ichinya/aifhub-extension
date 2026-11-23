@@ -24,6 +24,7 @@ import {
 } from './ai-factory-version-resolver.mjs';
 import { classifyLegacyPlanShape } from './legacy-plan-migration.mjs';
 import { validatePromptReferences } from './prompt-reference-graph.mjs';
+import { parseToolConfig } from './tool-config.mjs';
 
 export const SMOKE_SCHEMA_VERSION = 1;
 export const EXPECTED_AI_FACTORY_VERSIONS = Object.freeze({
@@ -578,7 +579,13 @@ async function assertCanonicalOpenSpecConfig(projectDir, flow) {
   const configPath = path.join(projectDir, '.ai-factory', 'config.yaml');
   assertContract(await exists(configPath), flow, 'missing-aif-config');
   const config = await readFile(configPath, 'utf8');
-  assertContract(countOccurrences(config, 'artifactProtocol: openspec') === 1, flow, 'noncanonical-openspec-config');
+  let selection;
+  try {
+    selection = parseToolConfig(config);
+  } catch {
+    assertContract(false, flow, 'noncanonical-openspec-config');
+  }
+  assertContract(selection.explicit && selection.tools.openspec, flow, 'noncanonical-openspec-config');
   return { digest: sha256(config), markerCount: 1 };
 }
 

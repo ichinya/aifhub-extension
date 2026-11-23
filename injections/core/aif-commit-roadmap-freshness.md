@@ -1,6 +1,6 @@
 ## AIFHub Commit Roadmap Freshness Gate
 
-Read [tool selection and artifact ownership](../../skills/shared/TOOLS.md) before choosing artifact paths or lifecycle instructions.
+Before choosing artifact paths or lifecycle instructions, read `.ai-factory/extensions/aifhub-extension/skills/shared/TOOLS.md` from the consumer project root. When working directly in a verified AIFHub source checkout, read `skills/shared/TOOLS.md` from that checkout's extension root.
 
 Apply this extension guidance before the base `aif-commit` instructions. When any rule below conflicts with the upstream body, this block only wins for AIFHub roadmap/GitHub freshness boundaries; it does not override upstream commit ownership or `## Commit Plan` grouping.
 

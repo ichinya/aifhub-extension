@@ -10,6 +10,7 @@ import {
   LEGACY_ULTRA_AGENT_CONTRACTS,
   validateAgentInstructionContract
 } from './agent-instruction-contract.mjs';
+import { compareStableAiFactoryVersions } from './ai-factory-version-resolver.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
@@ -563,6 +564,32 @@ function assertRepowiseOptionalContextGuidance(source, label) {
 }
 
 describe('OpenSpec-native prompt asset contract', () => {
+  it('resolves shared tools from the installed extension for every injected target', async () => {
+    const manifest = JSON.parse(await readRepoFile('extension.json'));
+    await readRepoFile('skills/shared/TOOLS.md');
+    for (const { file, target } of manifest.injections) {
+      const source = await readRepoFile(file);
+      if (target === 'aif-implement') {
+        assertIncludes(source, 'skills/shared/TOOLS.md', target);
+        assertIncludes(source, 'installed as `.ai-factory/extensions/aifhub-extension/`', target);
+      } else {
+        assertIncludes(source, '.ai-factory/extensions/aifhub-extension/skills/shared/TOOLS.md', target);
+        assertIncludes(source, 'verified AIFHub source checkout', target);
+      }
+      assertNotIncludes(source, '../../skills/shared/TOOLS.md', target);
+    }
+  });
+
+  it('handles analyze migration before the fast path and defers legacy tools backfill', async () => {
+    const source = await readRepoFile('skills/aif-analyze/SKILL.md');
+    const diagnostic = source.indexOf('Handle the `migration` diagnostic');
+    const fastPath = source.indexOf('When the diff reports `up_to_date: true`');
+    assert.ok(diagnostic >= 0 && diagnostic < fastPath);
+    assertIncludes(source, 'ai-factory aifhub-mode migrate-config', 'analyze migration preview');
+    assert.match(source, /defer_tools_backfill.*aifhub\.tools\.\*.*including when migration is blocked/);
+    assertNotIncludes(source, 'Migrate a legacy marker to boolean switches', 'analyze migration ownership');
+  });
+
   it('keeps archived-wide validation out of mandatory verify and done prompt paths', async () => {
     for (const relativePath of [...VERIFY_PROMPT_ASSETS, ...DONE_PROMPT_ASSETS]) {
       const source = await readRepoFile(relativePath);
@@ -2148,10 +2175,12 @@ describe('OpenSpec-native prompt asset contract', () => {
 
     for (const [relativePath, doneInvocation] of assets) {
       const asset = await readRepoFile(relativePath);
+      const frontmatter = asset.split(/^---\s*$/m)[1] ?? '';
+      const version = /^  version: "([^"]+)"\s*$/m.exec(frontmatter)?.[1];
+      assert.ok(version, relativePath + ' must declare a skill version');
+      assert.ok(compareStableAiFactoryVersions(version, '1.3.1') >= 0, relativePath + ' requires a stable version at or above 1.3.1');
 
       for (const expected of [
-        // reason: aif-mode 1.3.0 -> 1.3.1 — HLV 1.1.0 instruction fix (patch increment)
-        'version: "1.3.1"',
         'Generated cleanup is confined',
         'openspec-change-<safe-id>.md',
         'openspec-merged-<safe-id>.md',

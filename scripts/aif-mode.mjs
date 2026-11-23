@@ -11,8 +11,9 @@ import {
   switchToOpenSpecMode,
   syncArtifacts
 } from './aif-artifact-sync.mjs';
+import { migrateConfig } from './aifhub-config-migration.mjs';
 
-const COMMANDS = new Set(['status', 'init', 'openspec', 'ai-factory', 'sync', 'doctor']);
+const COMMANDS = new Set(['status', 'init', 'openspec', 'ai-factory', 'sync', 'doctor', 'migrate-config']);
 
 export async function runModeCommand(argv, options = {}) {
   const parsed = parseArgs(argv);
@@ -21,6 +22,15 @@ export async function runModeCommand(argv, options = {}) {
       exitCode: 2,
       stdout: '',
       stderr: `${parsed.error}\n`
+    };
+  }
+
+  if (parsed.command === 'migrate-config') {
+    const result = await migrateConfig({ ...options, revision: parsed.revision });
+    return {
+      exitCode: result.ok ? 0 : 1,
+      stdout: (parsed.json ? JSON.stringify(result, null, 2) : renderMigration(result)) + '\n',
+      stderr: ''
     };
   }
 
@@ -70,6 +80,8 @@ export function parseArgs(argv) {
   if (!COMMANDS.has(command)) {
     return invalid(`Usage: node scripts/aif-mode.mjs ${[...COMMANDS].join('|')} [--dry-run] [--all] [--change <id>] [--legacy-source <dir>] [--yes] [--export-openspec] [--json]`);
   }
+
+  if (command === 'migrate-config') return parseMigrationArgs(args);
 
   const result = {
     ok: true,
@@ -172,6 +184,32 @@ export function parseArgs(argv) {
   }
 
   return result;
+}
+
+function parseMigrationArgs(args) {
+  const parsed = { ok: true, command: 'migrate-config', json: false, revision: undefined };
+  for (let index = 0; index < args.length; index += 1) {
+    if (args[index] === '--json' && !parsed.json) {
+      parsed.json = true;
+    } else if (args[index] === '--apply' && parsed.revision === undefined) {
+      const revision = args[index + 1];
+      if (!/^[a-f0-9]{64}$/.test(revision ?? '')) return invalid('--apply requires a valid preview revision.');
+      parsed.revision = revision;
+      index += 1;
+    } else {
+      return invalid('migrate-config accepts only --apply <preview-revision> and --json.');
+    }
+  }
+  return parsed;
+}
+
+function renderMigration(result) {
+  const lines = [result.migration + ': ' + result.status + ' (' + result.code + ')'];
+  if (result.changed_keys) lines.push('Changed keys: ' + result.changed_keys.join(', '));
+  if (result.paths) lines.push('Paths: ' + result.paths.plans + ', ' + result.paths.specs);
+  if (result.revision_sha256) lines.push('Revision: ' + result.revision_sha256);
+  if (result.code === 'stale-preview') lines.push('Run ai-factory aifhub-mode migrate-config for a fresh preview.');
+  return lines.join('\n');
 }
 
 export function renderHuman(command, result) {

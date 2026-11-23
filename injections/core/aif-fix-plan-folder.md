@@ -1,6 +1,6 @@
 ## AIFHub Fix OpenSpec-native Override
 
-Read [tool selection and artifact ownership](../../skills/shared/TOOLS.md) before choosing artifact paths or lifecycle instructions.
+Before choosing artifact paths or lifecycle instructions, read `.ai-factory/extensions/aifhub-extension/skills/shared/TOOLS.md` from the consumer project root. When working directly in a verified AIFHub source checkout, read `skills/shared/TOOLS.md` from that checkout's extension root.
 
 Apply this block before the upstream `aif-fix` body. When any rule below conflicts with the base skill text, this block wins.
 

@@ -1,12 +1,12 @@
 ---
 name: aif-mode
 description: Configures the optional OpenSpec tool while preserving independent HLV and Lekalo choices, synchronizes selected artifacts, checks configuration drift, and reports migration/export actions.
-argument-hint: "[status|init|openspec|ai-factory|sync|doctor] [--dry-run] [--all] [--change <id>] [--yes]"
+argument-hint: "[status|init|openspec|ai-factory|sync|doctor] [mode flags] | migrate-config [--apply <revision>] [--json]"
 disable-model-invocation: true
 allowed-tools: Read Write Grep Glob Bash(ai-factory aifhub-mode *) Bash(ai-factory aifhub-migrate-legacy-plans *) Bash(npm run validate) Bash(npm test)
 metadata:
   author: aifhub-extension
-  version: "1.3.1"
+  version: "1.4.0"
   category: workflow
 ---
 
@@ -26,6 +26,7 @@ ai-factory aifhub-mode openspec
 ai-factory aifhub-mode ai-factory
 ai-factory aifhub-mode sync
 ai-factory aifhub-mode doctor
+ai-factory aifhub-mode migrate-config
 ```
 
 Use `--dry-run` before any switching or sync command when reviewing planned writes. Use `--json` when another tool needs structured output.
@@ -55,6 +56,14 @@ Use runtime-specific public invocations when instructing the user: selected `cod
 ### `status`
 
 Read-only. Reports current mode, config marker, OpenSpec CLI capability, OpenSpec change count, legacy plan count, generated rules state, and active change resolution.
+
+### `migrate-config`
+
+Preview the replacement of `aifhub.artifactProtocol` with the current tool configuration. Run `ai-factory aifhub-mode migrate-config --json` for the status, affected keys and paths, and `revision_sha256` when ready. For `blocked`, report the bounded code. `noop` means there is no marker to migrate.
+
+For explicitly authorized apply, save a private copy, pause other config writes, and pass the preview token for the current project to `ai-factory aifhub-mode migrate-config --apply <revision_sha256> --json`. If the revision is stale, report the reason and obtain a fresh preview before another apply. This subcommand accepts only `--apply` and `--json`.
+
+The only apply target is `.ai-factory/config.yaml`. Preview, refusal, and `noop` preserve its bytes. After `applied`, direct the current change owner to recheck the active SessionBrief with `ai-factory aifhub-session-brief status --change <change-id> --json`. To roll back, restore the saved config and recheck the brief. Tool selection, artifact paths, and provider flags stay the same. Analyze and extension updates leave application of this migration to the user.
 
 ### `openspec`
 

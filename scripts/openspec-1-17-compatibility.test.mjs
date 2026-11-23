@@ -12,7 +12,8 @@ import {
   OPENSPEC_PACKAGE_NODE_FLOOR,
   OPENSPEC_PACKAGE_NODE_SINCE
 } from './openspec-runner.mjs';
-import { getModeStatus } from './aif-artifact-sync.mjs';
+import { getModeStatus, readAnalyzeSkillVersion } from './aif-artifact-sync.mjs';
+import { compareStableAiFactoryVersions } from './ai-factory-version-resolver.mjs';
 
 const tempRoots = [];
 async function createTempRoot() {
@@ -178,7 +179,9 @@ describe('OpenSpec 1.17 cumulative reviewed baseline', () => {
       ]) assert.ok(prompt.includes(phrase), `${skill}: ${phrase}`);
     }
     const skill = await readFile(new URL('../skills/aif-analyze/SKILL.md', import.meta.url), 'utf8');
-    assert.match(skill, /^version: 0\.22\.0$/m);
+    const skillVersion = await readAnalyzeSkillVersion();
+    assert.ok(skillVersion.ok, skillVersion.error?.message);
+    assert.ok(compareStableAiFactoryVersions(skillVersion.version, '0.22.0') >= 0, 'aif-analyze requires a stable version at or above 0.22.0');
     assert.ok(skill.includes('When `packageNodeSupported` is `false` (npm channel requires Node `>=22.12.0` from package `1.16.0` onward)'), 'npm-engine advisory bullet');
   });
 });

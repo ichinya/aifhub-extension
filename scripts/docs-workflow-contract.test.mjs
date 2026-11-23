@@ -60,6 +60,23 @@ function extractSection(markdown, heading) {
 }
 
 describe('complete OpenSpec workflow documentation contract', () => {
+  it('documents ordinary updates and the explicit config migration workflow', async () => {
+    const quickStart = extractSection(await readRepoFile('README.md'), '## Quick Start');
+    assertIncludes(quickStart, 'ai-factory extension add', 'Quick Start installation');
+    assertIncludes(quickStart, 'ai-factory update', 'Quick Start update');
+    assertNotIncludes(quickStart, '--force', 'ordinary Quick Start workflow');
+    const usage = extractSection(await readRepoFile('docs/usage.md'), '### Config migration');
+    const mode = extractSection(await readRepoFile('skills/aif-mode/SKILL.md'), '### `migrate-config`');
+    for (const doc of [usage, mode]) {
+      assertOrder(doc, [
+        'aifhub-mode migrate-config --json',
+        'aifhub-mode migrate-config --apply <revision_sha256> --json',
+        'SessionBrief',
+        'roll back'
+      ], 'config migration workflow');
+    }
+  });
+
   it('documents the complete quick-start tail in README.md in workflow order', async () => {
     const readme = await readRepoFile('README.md');
     const quickStart = extractSection(readme, '## Quick Start');
@@ -1660,8 +1677,8 @@ describe('complete OpenSpec workflow documentation contract', () => {
     assertIncludes(contextPolicy, 'raw paths found in `index.json`', 'docs/context-loading-policy.md index boundary');
     assertNotIncludes(contextPolicy, 'Files in that directory are safe to delete', 'docs/context-loading-policy.md broad cleanup wording');
 
-    // reason: aif-mode 1.3.0 -> 1.3.1 — HLV 1.1.0 instruction fix (patch increment per rules/skills.md)
-    assertIncludes(canonicalSkill, 'version: "1.3.1"', 'skills/aif-mode/SKILL.md version');
+    // Issue #199 adds an explicitly authorized config migration subcommand.
+    assertIncludes(canonicalSkill, 'version: "1.4.0"', 'skills/aif-mode/SKILL.md version');
     assertIncludes(canonicalSkill, 'openspec-change-<safe-id>.md', 'skills/aif-mode/SKILL.md cleanup boundary');
     assertIncludes(canonicalSkill, 'normal bounded failure report', 'skills/aif-mode/SKILL.md failure-report exception');
     assertIncludes(canonicalSkill, 'selected `codex-app` runtime uses `$aif-mode`', 'skills/aif-mode/SKILL.md Codex invocation guidance');

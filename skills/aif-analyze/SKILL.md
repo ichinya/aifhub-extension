@@ -2,7 +2,7 @@
 name: aif-analyze
 description: Bootstrap project context. Resolves localization and stack, creates/updates config.yaml, rules/base.md, and REVIEW.md, then checks DESCRIPTION and guides core skill execution.
 allowed-tools: Read Write Edit Glob Grep Bash(mkdir *) Bash(ai-factory aifhub-analyze-config-diff *) Bash(ai-factory aifhub-review-policy *) Bash(ai-factory aifhub-memory-tools *) Bash(ai-factory aifhub-mode status --json) Bash(node --input-type=module -e *openspec-runner.mjs*) Bash(rg --version) Bash(uv --version) Bash(graphify --version) Bash(graphify --help) Bash(codex-agent-mem-policy --help) Bash(codex-agent-mem-smoke --help) Bash(codegraph --version) Bash(codegraph --help) Bash(codegraph status) Bash(ctx7 --version) Bash(npx --no-install ctx7 --help) Bash(openspec init --tools none) Skill AskUserQuestion Questions
-version: 0.22.0
+version: 0.23.0
 author: ichi
 ---
 
@@ -227,7 +227,7 @@ Resolve the bootstrap/config mode before creating directories:
 
 - Use `openspec-native` mode when the user explicitly asks for `openspec-native`, `OpenSpec-native`, or OpenSpec artifact protocol bootstrap.
 - Use `openspec-native` mode when an existing `.ai-factory/config.yaml` has `aifhub.tools.openspec: true`.
-- Preserve the effective AI Factory artifact mode when OpenSpec is disabled. When the entire `aifhub.tools` mapping is absent, resolve the legacy marker as described in the shared tool contract before migrating settings.
+- Preserve the effective AI Factory artifact mode when OpenSpec is disabled. When the entire `aifhub.tools` mapping is absent, resolve the legacy marker as described in the shared tool contract before patching other settings.
 - If `.ai-factory/config.yaml` is missing and no artifact protocol was explicitly requested, ask one artifact protocol question before writing config or creating mode-specific directories.
   - Ask whether to enable OpenSpec (`openspec: true`) or leave it disabled (`openspec: false`). AI Factory remains active in both cases. Preserve independently requested HLV and Lekalo choices.
   - Codex Default mode: ask a short plain-text artifact protocol question; do not use `question(...)`, `questionnaire(...)`, or `request_user_input`.
@@ -244,10 +244,12 @@ Resolve the bootstrap/config mode before creating directories:
 - If config.yaml is missing, create it with v1 schema only after bootstrap mode is resolved.
 - If config.yaml exists, preserve existing values and add missing fields.
 - Before patching an existing config, run the deterministic required-keys diff instead of LLM-based key comparison: `ai-factory aifhub-analyze-config-diff --json`. The command is read-only and compares the config against `skills/aif-analyze/references/config-keys.json` plus this skill's frontmatter version.
-- When the diff reports `missing` entries or `version_drift`, present each missing key to the user with its manifest `purpose` text before writing it, then apply the additions through the structural patch below. When the diff reports `up_to_date: true`, take the fast path: skip config re-analysis and re-patching entirely.
+- Handle the `migration` diagnostic before the `up_to_date` fast path. For `ready`, show `ai-factory aifhub-mode migrate-config` as the read-only preview handoff. For `blocked`, report its bounded `code`. Applying the migration belongs to the separately authorized mode command.
+- For an existing legacy-only config, `migration.defer_tools_backfill` defers all `aifhub.tools.*` additions, including when migration is blocked. Preserve the legacy marker and effective mode. Proceed with other eligible additions only when the config diff succeeded.
+- When the diff reports `missing` entries or `version_drift`, present each missing key to the user with its manifest `purpose` text before writing eligible additions through the structural patch below. When the diff reports `up_to_date: true`, take the fast path: skip config re-analysis and re-patching entirely.
 - After a successful config create/update, ensure the config records `analyze.skill_version` equal to this skill's frontmatter `version`. The config patcher preserves an existing value; update it explicitly when the skill version changed.
 - Treat an existing config update as a structural patch, not a full-file re-render. Preserve upstream/core fields such as `config_version`, `language`, `workflow`, `rules`, and `agent_profile`, plus unknown user-authored top-level and nested fields. Change only keys owned by the selected AIFHub bootstrap profile.
-- Keep AIFHub-owned profile keys explicit and namespaced under `aifhub`, including `aifhub.tools.openspec`, `aifhub.tools.hlv`, `aifhub.tools.lekalo` and the selected `aifhub.openspec.*` policy keys. Do not infer ownership of unrelated or unknown fields from their location. Migrate a legacy marker to boolean switches without changing effective tool choices.
+- Keep AIFHub-owned profile keys explicit and namespaced under `aifhub`, including `aifhub.tools.openspec`, `aifhub.tools.hlv`, `aifhub.tools.lekalo` and the selected `aifhub.openspec.*` policy keys. Apply the deferred-tools rule above to every structural patch of an existing config. Do not infer ownership of unrelated or unknown fields from their location.
 - On a fresh config created with AI Factory 2.19 compatibility, include the upstream default `warmup.paths: []`. Treat `warmup.paths` as user-owned after creation: preserve existing path entries and comments without interpreting them through structural mode patches, and do not backfill the section into an existing config when it is absent. This contract does not preserve the config's original EOL style or the top-level position of the `warmup` block.
 - Do not introduce `research_bundles_dir` or any equivalent config key. Derive the ultra research bundle root at runtime as `<parent(paths.research)>/research/`, preserving the configured `paths.research` file.
 - Config diagnostics may report only sorted changed and preserved key paths plus bounded counts. Never include config values, environment data, credentials, tokens, raw provider output, or private absolute paths.

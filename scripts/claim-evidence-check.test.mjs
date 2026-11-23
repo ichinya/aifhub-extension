@@ -12,6 +12,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { readAnalyzeSkillVersion } from './aif-artifact-sync.mjs';
+import { compareStableAiFactoryVersions } from './ai-factory-version-resolver.mjs';
 import { canonical, digest } from './workflow-state-store.mjs';
 import { parseStrictJson } from './json-strict.mjs';
 import { validateJsonAgainstSchema } from './json-schema-subset.mjs';
@@ -1527,14 +1529,10 @@ describe('claim-evidence registration contracts', () => {
     assert.equal(improve.includes('aifhub-claim-evidence-check'), false);
   });
 
-  it('pins the skill-file version contract at 0.22.0 in both contract tests', async () => {
-    const skill = await readFile(path.join(REPO_ROOT, 'skills', 'aif-analyze', 'SKILL.md'), 'utf8');
-    assert.match(skill, /^version: 0\.22\.0$/m);
-    const reviewPolicy = await readFile(path.join(REPO_ROOT, 'scripts', 'review-policy-contract.test.mjs'), 'utf8');
-    assert.ok(reviewPolicy.includes("'version: 0.22.0'"), 'review-policy pin must target 0.22.0');
-    assert.ok(reviewPolicy.includes('#282'), 'review-policy pin must carry its own #282 reason comment');
-    const compat = await readFile(path.join(REPO_ROOT, 'scripts', 'openspec-1-12-compatibility.test.mjs'), 'utf8');
-    assert.match(compat, /version: 0\\\.22\\\.0/);
+  it('requires a stable analyze skill version at or above the reviewed baseline', async () => {
+    const skillVersion = await readAnalyzeSkillVersion();
+    assert.ok(skillVersion.ok, skillVersion.error?.message);
+    assert.ok(compareStableAiFactoryVersions(skillVersion.version, '0.22.0') >= 0, 'aif-analyze requires a stable version at or above 0.22.0');
   });
 
   it('registers the optional managed key and keeps the required-keys diff clean', async () => {

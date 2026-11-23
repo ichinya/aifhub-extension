@@ -33,13 +33,13 @@ AI Factory UX + OpenSpec artifact protocol
 
 ## Quick Start
 
-Install the extension:
+From an AI Factory project, install AIFHub through the upstream CLI.
 
 ```bash
 ai-factory extension add https://github.com/ichinya/aifhub-extension.git
-ai-factory update --force
-ai-factory extension update aifhub-extension --force
 ```
+
+For an existing installation, run `ai-factory update` from the project root to refresh the managed skills and extensions.
 
 Bootstrap project context:
 
@@ -54,6 +54,8 @@ Inspect or switch artifact mode:
 /aif-mode openspec
 /aif-mode sync
 ```
+
+For a config that still uses `aifhub.artifactProtocol`, preview the format migration with `ai-factory aifhub-mode migrate-config`. Apply only the revision returned for the current project. [Preview, apply, and rollback](docs/usage.md#config-migration)
 
 Confirm or request OpenSpec-native mode when bootstrapping a v1 OpenSpec workflow. Enable optional tools in the config:
 

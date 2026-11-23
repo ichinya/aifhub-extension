@@ -13,6 +13,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { readAnalyzeSkillVersion, renderConfigForMode } from './aif-artifact-sync.mjs';
+import { compareStableAiFactoryVersions } from './ai-factory-version-resolver.mjs';
 import { canonical, digest } from './workflow-state-store.mjs';
 import { parseStrictJson } from './json-strict.mjs';
 import { validateJsonAgainstSchema } from './json-schema-subset.mjs';
@@ -2181,16 +2183,11 @@ describe('trace-link-suggestions registration contracts', () => {
     assert.ok(template.includes('#   enabled: false'));
     const skill = await readFile(path.join(REPO_ROOT, 'skills', 'aif-analyze', 'SKILL.md'), 'utf8');
     assert.ok(skill.includes('Preserve existing `aifhub.traceLinkSuggestions.enabled` values and never enable the trace link suggestions automatically.'));
-    assert.match(skill, /^version: 0\.22\.0$/m);
-
-    const reviewPolicy = await readFile(path.join(REPO_ROOT, 'scripts', 'review-policy-contract.test.mjs'), 'utf8');
-    assert.ok(reviewPolicy.includes("'version: 0.22.0'"), 'review-policy pin must target 0.22.0');
-    assert.ok(reviewPolicy.includes('#283'), 'review-policy pin must carry its own #283 reason comment');
-    const compat = await readFile(path.join(REPO_ROOT, 'scripts', 'openspec-1-12-compatibility.test.mjs'), 'utf8');
-    assert.match(compat, /version: 0\\\.22\\\.0/);
+    const skillVersion = await readAnalyzeSkillVersion();
+    assert.ok(skillVersion.ok, skillVersion.error?.message);
+    assert.ok(compareStableAiFactoryVersions(skillVersion.version, '0.22.0') >= 0, 'aif-analyze requires a stable version at or above 0.22.0');
 
     const { buildAnalyzeConfigDiff } = await import('./aif-analyze-config-diff.mjs');
-    const { renderConfigForMode } = await import('./aif-artifact-sync.mjs');
     const root = await makeTemp('aif-tls-diff-');
     const rendered = renderConfigForMode('', 'openspec', { analyzeSkillVersion: '0.11.0' });
     const lines = rendered.split('\n');

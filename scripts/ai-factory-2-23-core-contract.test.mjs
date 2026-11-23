@@ -107,19 +107,27 @@ it('AI Factory 2.23 offline core: AIFHub ownership, grouped compose, rollback, m
     assert.equal(explore.split('Run the Research Coherence Gate, then the Bundle Integrity Gate').length - 1, 1);
   });
 
-  await t.test('actual grouped targets compose AIFHub markers exactly once and preserve rendered base', async () => {
+  await t.test('Codex and Copilot compose AIFHub markers once and preserve rendered base', async t => {
     const project = await create('shared');
     await fs.mkdir(path.join(project, '.agents'));
     const names = [...new Set(manifest.injections.map(i => i.target))];
     assert.equal(names.length, 13);
-    const config = { version: '2.23.0', agents: [agent('codex', '.agents/skills', names),
-      agent('codex-app', '.agents/skills', names)], extensions: [] };
+    const runtimes = [agent('codex', '.agents/skills', names), agent('copilot', '.github/skills', names)];
+    const config = { version: '2.23.0', agents: [runtimes[0],
+      agent('codex-app', '.agents/skills', names), runtimes[1]], extensions: [] };
     const groups = await targets.resolveSkillTargets(project, config.agents, { select: false });
-    assert.equal(groups.length, 1);
-    assert.equal(groups[0].targets.length, 2);
+    assert.equal(groups.length, 2);
+    assert.equal(groups.find(group => group.skillsDir === '.agents/skills').targets.length, 2);
+    assert.equal(groups.find(group => group.skillsDir === '.github/skills').targets.length, 1);
     await ops.installSkillsForAllAgents(project, config.agents, names);
-    const base = new Map(await Promise.all(names.map(async name => [name,
-      await fs.readFile(path.join(project, '.agents/skills', name, 'SKILL.md'))])));
+    const skillFile = (runtime, name) => path.join(project, runtime.skillsDir, name, 'SKILL.md');
+    const base = new Map();
+    for (const runtime of runtimes) {
+      for (const name of names) {
+        const file = skillFile(runtime, name);
+        base.set(file, await fs.readFile(file));
+      }
+    }
     const extensionDir = path.join(project, '.ai-factory/extensions', manifest.name);
     await fs.mkdir(extensionDir, { recursive: true });
     for (const relative of ['extension.json', 'skills', 'injections'])
@@ -133,21 +141,31 @@ it('AI Factory 2.23 offline core: AIFHub ownership, grouped compose, rollback, m
     }
     await ops.assertNoAgentFileConflicts(project, config, manifest);
     ops.assertNoConfiguredRuntimeOrphans(config, ops.getManifestRuntimeIds(manifest), manifest.name, 'update');
+    const installedRoot = '.ai-factory/extensions/' + manifest.name;
+    const installedTools = installedRoot + '/skills/shared/TOOLS.md';
+    const toolsBytes = await fs.readFile(path.join(repo, 'skills/shared/TOOLS.md'));
     // Repeat compose mirrors init/global-update/targeted-update reapplication.
     for (let pass = 0; pass < 3; pass += 1) {
-      assert.equal(await ops.composeInstalledExtensionSkills(project, config), manifest.injections.length);
-      for (const injection of manifest.injections) {
-        const content = await fs.readFile(path.join(project, '.agents/skills', injection.target, 'SKILL.md'));
-        const text = content.toString('utf8');
-        for (const edge of ['start', 'end']) {
-          const marker = `<!-- aif-ext:${manifest.name}:${injection.target}:${injection.position}:${edge} -->`;
-          assert.equal(text.split(marker).length - 1, 1, `${pass}/${injection.target}/${edge}`);
+      assert.equal(await ops.composeInstalledExtensionSkills(project, config), manifest.injections.length * runtimes.length);
+      for (const runtime of runtimes) {
+        for (const { target, position } of manifest.injections) {
+          const file = skillFile(runtime, target);
+          const text = await fs.readFile(file, 'utf8');
+          const label = runtime.id + '/' + target + '/pass-' + (pass + 1);
+          const start = '<!-- aif-ext:' + manifest.name + ':' + target + ':' + position + ':start -->';
+          const end = start.replace(':start -->', ':end -->');
+          assert.equal(text.split(start).length - 1, 1, label + ' start marker');
+          assert.equal(text.split(end).length - 1, 1, label + ' end marker');
+          const block = text.slice(text.indexOf(start), text.indexOf(end));
+          if (target === 'aif-implement') {
+            assert.ok(block.includes('skills/shared/TOOLS.md') && block.includes('installed as `' + installedRoot + '/'), label);
+          } else {
+            assert.ok(block.includes(installedTools), label + ' installed tools path');
+          }
+          assert.deepEqual(await fs.readFile(path.join(project, installedTools)), toolsBytes, label);
+          assert.deepEqual(Buffer.from(stripInjection(text, manifest.name, target, position)), base.get(file), label);
         }
-        const original = base.get(injection.target);
-        // Upstream inserts prepend after frontmatter; remove exactly its known
-        // marker block and require byte equality with the rendered baseline
-        // (no normalization).
-        assert.ok(Buffer.from(stripInjection(text, manifest.name, injection.target, injection.position)).equals(original), injection.target);
+        t.diagnostic(runtime.id + ' pass ' + (pass + 1) + ': ' + names.join(', '));
       }
     }
     // Strip scans skillsDir + workflows/rules, never the entire runtime configDir.

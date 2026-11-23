@@ -392,7 +392,7 @@ async function fakeOpenSpecMode(projectDir) {
   const withoutAifhub = current.replace(/\naifhub:\n(?:  .*\n)*/g, '\n');
   await writeFile(
     configPath,
-    `${withoutAifhub.trimEnd()}\naifhub:\n  artifactProtocol: openspec\n  openspec:\n    installSkills: false\n`,
+    `${withoutAifhub.trimEnd()}\naifhub:\n  tools:\n    openspec: true\n    hlv: false\n    lekalo: false\n  openspec:\n    installSkills: false\n`,
     'utf8'
   );
 }

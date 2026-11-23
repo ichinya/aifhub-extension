@@ -2,6 +2,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { archiveOpenSpecChange, detectOpenSpec, runOpenSpec, validateOpenSpecChange } from './openspec-runner.mjs';
+import { readAnalyzeSkillVersion } from './aif-artifact-sync.mjs';
+import { compareStableAiFactoryVersions } from './ai-factory-version-resolver.mjs';
 
 describe('OpenSpec 1.12 report and advisory preflight boundary', () => {
   it('keeps full per-change argv and INFO without changing upstream validity', async () => {
@@ -60,10 +62,9 @@ describe('OpenSpec 1.12 report and advisory preflight boundary', () => {
       assert.equal(result.canArchive, supported);
       assert.equal(result.versionOutdated, outdated);
     }
-    const skill = await readFile(new URL('../skills/aif-analyze/SKILL.md', import.meta.url), 'utf8');
-    // reason: #284 bumped the aif-analyze skill file 0.20.0 -> 0.21.0 (contextSelectionOverlay opt-in namespace documentation)
-    // reason: #300 bumped the aif-analyze skill file 0.21.0 -> 0.22.0 (openspec 1.17.0 freshness/npm-engine guidance)
-    assert.match(skill, /^version: 0\.22\.0$/m);
+    const skillVersion = await readAnalyzeSkillVersion();
+    assert.ok(skillVersion.ok, skillVersion.error?.message);
+    assert.ok(compareStableAiFactoryVersions(skillVersion.version, '0.22.0') >= 0, 'aif-analyze requires a stable version at or above 0.22.0');
   });
 
   it('documents report scope, advisory preflight and proportional source grounding', async () => {

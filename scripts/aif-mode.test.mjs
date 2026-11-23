@@ -85,6 +85,38 @@ describe('parseArgs', () => {
   });
 });
 
+describe('migrate-config', () => {
+  const config = '.ai-factory/config.yaml';
+
+  it('previews without writing, applies the current revision once, and then returns noop', async () => {
+    const rootDir = await createTempRoot();
+    const raw = 'aifhub:\n  artifactProtocol: openspec # Keep this comment\ncustom: private-sentinel\n';
+    await writeFixture(rootDir, config, raw);
+
+    const preview = await runModeCommand(['migrate-config', '--json'], { rootDir });
+    assert.equal(preview.exitCode, 0);
+    const proposal = JSON.parse(preview.stdout);
+    assert.equal(proposal.status, 'ready');
+    assert.match(proposal.revision_sha256, /^[a-f0-9]{64}$/);
+    assert.equal(await readFixture(rootDir, config), raw);
+    assert.doesNotMatch(preview.stdout, /private-sentinel|Keep this comment/);
+
+    const apply = ['migrate-config', '--apply', proposal.revision_sha256, '--json'];
+    assert.equal(JSON.parse((await runModeCommand(apply, { rootDir })).stdout).status, 'applied');
+    assert.match(await readFixture(rootDir, config), /  # Keep this comment\n  tools:\n    openspec: true/);
+    assert.equal(JSON.parse((await runModeCommand(apply, { rootDir })).stdout).code, 'stale-preview');
+    assert.equal(JSON.parse((await runModeCommand(['migrate-config', '--json'], { rootDir })).stdout).status, 'noop');
+  });
+
+  it('rejects unrelated flags and invalid tokens without echoing them', async () => {
+    for (const args of [['--yes'], ['--apply'], ['--apply', 'private-sentinel'], ['--json', '--json']]) {
+      const result = await runModeCommand(['migrate-config', ...args]);
+      assert.equal(result.exitCode, 2);
+      assert.doesNotMatch(result.stderr, /private-sentinel/);
+    }
+  });
+});
+
 describe('runModeCommand', () => {
   it('prints status in OpenSpec mode', async () => {
     const rootDir = await createTempRoot();

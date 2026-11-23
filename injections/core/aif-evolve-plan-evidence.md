@@ -1,6 +1,6 @@
 ## AIFHub Plan-Aware Evolution Override
 
-Read [tool selection and artifact ownership](../../skills/shared/TOOLS.md) before choosing artifact paths or lifecycle instructions.
+Before choosing artifact paths or lifecycle instructions, read `.ai-factory/extensions/aifhub-extension/skills/shared/TOOLS.md` from the consumer project root. When working directly in a verified AIFHub source checkout, read `skills/shared/TOOLS.md` from that checkout's extension root.
 
 Apply this block before the upstream `aif-evolve` body. When this injected guidance conflicts with older patch-only assumptions in the base skill, this block wins.
 
