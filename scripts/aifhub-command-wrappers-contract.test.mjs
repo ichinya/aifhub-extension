@@ -44,7 +44,7 @@ const WRAPPER_COMMANDS = [
   },
   {
     name: 'aifhub-session-brief',
-    description: 'Compile, inspect, or show a source-bound AIFHub SessionBrief.',
+    description: 'Compile, prepare, inspect, or show a source-bound AIFHub SessionBrief.',
     module: './commands/aifhub-session-brief.mjs',
     script: 'session-brief.mjs',
     args: ['compile', '--change', 'add-oauth', '--json']

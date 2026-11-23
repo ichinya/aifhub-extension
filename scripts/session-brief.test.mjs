@@ -8,7 +8,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { SDD_PROFILE_MODES, selectSddProfile, validateSddPolicy } from './sdd-profiles.mjs';
-import { compileSessionBrief, inspectSessionBrief, parseStrictJson, runSessionBriefCommand, sessionBriefPaths } from './session-brief.mjs';
+import { resolvePlanContext } from './common-plan-resolver.mjs';
+import { executionCommand } from './execution-state.mjs';
+import { compileSessionBrief, inspectSessionBrief, prepareSessionBrief, parseStrictJson, runSessionBriefCommand, sessionBriefPaths } from './session-brief.mjs';
 import { buildImplementationContext, writeExecutionTrace } from './openspec-execution-context.mjs';
 
 const roots = [];
@@ -113,6 +115,42 @@ describe('SDD planning depth and gate separation', () => {
 });
 
 describe('SessionBrief compiler and exact revision custody', () => {
+  it('prepares missing and superseded briefs without masking research or invalid runtime artifacts', async () => {
+    const root = await fixture();
+    const { stdout } = await run(process.execPath, [script, 'prepare', '--change', change, '--json'], { cwd: root });
+    const first = JSON.parse(stdout);
+    assert.equal(first.status, 'valid');
+    assert.equal(first.written, true);
+    await put(root, `${base}/tasks.md`, '- [ ] 1.1 Refined task; verify focused regression.\n');
+    const refreshed = await prepareSessionBrief(options(root));
+    assert.equal(refreshed.status, 'valid');
+    assert.notEqual(refreshed.digest, first.digest);
+    await put(root, paths.json, 'null');
+    assert.ok((await prepareSessionBrief(options(root))).stale_reasons.includes('invalid_brief'));
+    assert.equal(await readFile(path.join(root, paths.json), 'utf8'), 'null');
+    await put(root, `${base}/proposal.md`, proposal({ ...signals, modules: null }));
+    assert.deepEqual((await prepareSessionBrief(options(root))).blocked_reasons, ['research_required']);
+    assert.equal(await readFile(path.join(root, paths.json), 'utf8'), 'null');
+  });
+
+  it('keeps a superseded brief while it is bound to a reserved execution', async () => {
+    const root = await fixture();
+    await put(root, '.gitignore', '.ai-factory/\n');
+    const git = (...args) => run('git', args, { cwd: root, windowsHide: true });
+    await git('init', '-q');
+    await git('add', '.');
+    await git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'fixture');
+    await prepareSessionBrief(options(root));
+    const original = await readFile(path.join(root, paths.json), 'utf8');
+    await executionCommand('start', {
+      change_id: change, run_id: 'active', task_id: '1.1', role: 'implement',
+      owner: 'parent', worker: 'worker', scope: [], context_paths: [paths.json]
+    }, { rootDir: root });
+    await put(root, `${base}/tasks.md`, '- [ ] 1.1 Refined task; verify focused regression.\n');
+    const blocked = await prepareSessionBrief(options(root));
+    assert.deepEqual(blocked.blocked_reasons, ['execution_context_in_use']);
+    assert.equal(await readFile(path.join(root, paths.json), 'utf8'), original);
+  });
   it('accepts new-style tool configs where tools.openspec replaces legacy artifactProtocol', async () => {
     for (const config of [
       'aifhub:\n  tools:\n    openspec: true\n',
@@ -205,14 +243,38 @@ describe('SessionBrief compiler and exact revision custody', () => {
     assert.equal(result.decision.required_artifacts.includes('delta_specs'), false);
   });
   it('blocks unresolved questions and missing facts with a research handoff', async () => {
-    const root = await fixture({ ...signals, public_api: null });
-    let result = await compileSessionBrief(options(root));
-    assert.equal(result.decision.profile, 'research');
-    assert.equal(result.owner_handoff, 'aif-explore');
+    const root = await fixture();
+    const question = '\n## Open Questions\n\nWho owns the integration?\n';
+    await put(root, `${base}/proposal.md`, proposal({ ...signals, modules: null, expected_files: null }) + question);
+    const compiled = await compileSessionBrief(options(root));
+    assert.equal(compiled.decision.profile, 'research');
+    assert.equal(compiled.owner_handoff, 'aif-explore');
+    assert.deepEqual(compiled.blocked_reasons, ['research_required']);
+    assert.deepEqual(compiled.research_blockers, {
+      missing_inputs: ['modules', 'expected_files'], requirements_unclear: false, has_open_questions: true
+    });
+    assert.deepEqual((await inspectSessionBrief(options(root))).research_blockers, compiled.research_blockers);
     assert.equal(await exists(root, paths.json), false);
-    await put(root, `${base}/proposal.md`, `${proposal()}\n## Open Questions\n\nWho owns the integration?\n`);
-    result = await compileSessionBrief(options(root));
-    assert.equal(result.decision.profile, 'research');
+    let output = '';
+    const code = await runSessionBriefCommand(['status', '--change', change], {
+      rootDir: root, stdout: { write: text => { output += text; } }
+    });
+    assert.equal(code, 1);
+    assert.match(output, /Missing SDD Profile Inputs: modules, expected_files/);
+    assert.match(output, /Unresolved questions in Open Questions/);
+    assert.doesNotMatch(output, /Who owns the integration/);
+
+    await put(root, `${base}/proposal.md`, proposal() + question);
+    const status = await inspectSessionBrief(options(root));
+    assert.equal(status.decision.profile, 'research');
+    assert.deepEqual(status.research_blockers, {
+      missing_inputs: [], requirements_unclear: false, has_open_questions: true
+    });
+    assert.equal((await resolvePlanContext(options(root))).sdd_profile, 'research');
+
+    await put(root, `${base}/proposal.md`, proposal());
+    assert.equal((await compileSessionBrief(options(root))).status, 'valid');
+    assert.equal((await inspectSessionBrief(options(root))).research_blockers, undefined);
   });
   it('detects changed, added, and deleted canonical and policy inputs without status writes', async () => {
     for (const mutation of ['tasks', 'added_spec', 'base_spec', 'policy', 'rules', 'metadata']) {

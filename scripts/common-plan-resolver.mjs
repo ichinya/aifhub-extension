@@ -160,7 +160,10 @@ async function normalizePlanContext(raw, identity, changeId, methodology) {
     try {
       const inputs = validateSddInputs(raw.sdd_inputs);
       const policy = validateSddPolicy(raw.sdd_policy ?? {});
-      const selection = selectSddProfile(inputs, policy, { supportsUltra: raw.public_mode === 'ultra', methodology });
+      const selection = selectSddProfile(inputs, policy, {
+        supportsUltra: raw.public_mode === 'ultra', methodology,
+        hasOpenQuestions: defaults.requirements.open_questions.length > 0
+      });
       defaults.sdd_profile = selection.profile;
       defaults.recommended_planning_mode = selection.recommended_planning_mode;
     } catch (error) {

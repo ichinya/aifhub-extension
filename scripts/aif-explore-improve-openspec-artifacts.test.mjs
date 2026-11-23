@@ -596,11 +596,8 @@ describe('aif-explore and aif-improve OpenSpec-native contracts', () => {
       '`design.md` for C4 impact, ADR candidates, dependency notes, integration points, alternatives, and risks',
       '`tasks.md` for an executable checklist',
       '`specs/**/spec.md` for behavior deltas',
-      'blocker',
-      'warn',
-      'info',
-      'when useful',
-      'without requiring classification in trivial changes',
+      'For SDD-managed changes, reserve `## Open Questions` for unresolved blockers.',
+      'Record advisory findings under the relevant risks or assumptions instead.',
       'Patch only affected sections',
       'avoid whole-file regeneration unless structurally unusable'
     ]) {

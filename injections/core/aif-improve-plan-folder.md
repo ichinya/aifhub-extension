@@ -96,7 +96,7 @@ For OpenSpec 1.14.x–1.17.0 strict validation, keep ADDED requirement body text
 
 For a new capability, refine its delta's `## Purpose` into a meaningful description before first sync/archive. An existing main spec's Purpose is not replaced by a delta's Purpose: if strict validation reports a placeholder, record the affected accepted-spec path and bounded direct remediation instead of manufacturing a requirement delta. Do not rewrite archived changes to clear historical placeholders.
 
-Classify open questions as `blocker`, `warn`, or `info` when useful, without requiring classification in trivial changes or forcing a specific table format.
+For SDD-managed changes, reserve `## Open Questions` for unresolved blockers. Record advisory findings under the relevant risks or assumptions instead. The compiler treats a nonempty `## Open Questions` as blocking even when its entries carry advisory labels.
 
 Also flag as task-quality findings: missing or incorrect requirement citations, unresolved source conflicts, a missing `## Requirements Reconciliation` section when the reconciliation signals apply, and missing verification of a supported behavior combination or a representative real repository artifact. Respect the plan's testing setting: add a test only when testing is enabled, otherwise add a runnable/manual verification step.
 
@@ -174,6 +174,8 @@ Validation and runtime state:
 - Validation should correspond to `openspec validate <change-id> --type change --strict --json --no-interactive --no-color`.
 - Missing or unsupported OpenSpec CLI is degraded validation unless the effective policy has `requireCliForImprove: true`; when required, treat the missing CLI as a refinement blocker and do not report the change as validation-ready.
 - Summarize effective policy, validation success, failure, degraded status, or policy-blocked status in the normal response.
+- For SDD-managed changes, reconcile `## SDD Profile Inputs` and active `## Open Questions` with the evidence used for refinement. Update reviewed facts and remove questions only after their answers are grounded. Record checks with a known target and explicit stop conditions in the tasks that own them. Keep unresolved prerequisites that prevent starting any task in `## Open Questions`.
+- After applying the authorized canonical edits, run the read-only `ai-factory aifhub-session-brief status --change <change-id> --json`. Report `research_blockers`, other `blocked_reasons`, and the owner handoff if blocked. For a missing or stale brief, report the pending sync or compile step as applicable. An OpenSpec validation pass alone is not an implementation-ready handoff.
 - Runtime state notes may be written only under `.ai-factory/state/<change-id>/`.
 - QA evidence belongs under `.ai-factory/qa/<change-id>/` and should not be written into canonical OpenSpec change artifacts.
 - Prefer `ensureRuntimeLayout(changeId)` when runtime directories are needed.

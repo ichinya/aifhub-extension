@@ -13,7 +13,7 @@ import { resolvePlanContext, resolvePlanTarget } from './common-plan-resolver.mj
 import { buildCompositionBaseline, compositionStore, prepareCompositionAttempt } from './instruction-composition.mjs';
 import { parseStrictJson } from './json-strict.mjs';
 import {
-  SDD_POLICY_PATH, selectSddProfile, sddError, validateSddPolicy
+  SDD_POLICY_PATH, missingSddInputs, selectSddProfile, sddError, validateSddPolicy
 } from './sdd-profiles.mjs';
 
 const COMPILER = 'aifhub.session_brief.compiler.v1';
@@ -69,7 +69,14 @@ export async function inspectSessionBrief(options = {}) {
     if (!stored || !decision || !markdown) staleReasons.push('missing_runtime_artifact');
     let previous = null;
     if (stored) {
-      try { previous = parseStrictJson(stored.content); } catch { staleReasons.push('invalid_brief'); }
+      try {
+        previous = parseStrictJson(stored.content);
+        const { digest, ...payload } = previous;
+        if (payload.schema !== 'aifhub.session_brief.v1' || digest !== hash(json(payload))) throw sddError('invalid_brief');
+      } catch {
+        previous = null;
+        staleReasons.push('invalid_brief');
+      }
       if (previous && json(previous.sources) !== json(snapshot.brief.sources)) staleReasons.push('source_revision_changed');
       if (previous && json(previous) !== json(snapshot.brief)) staleReasons.push('brief_revision_mismatch');
     }
@@ -82,6 +89,36 @@ export async function inspectSessionBrief(options = {}) {
       ...(staleReasons.length === 0 && options.includeBrief ? { brief: snapshot.brief } : {})
     };
   } catch (error) { return failure(error); }
+}
+
+function canPrepareBrief({ status, stale_reasons: reasons }) {
+  return status === 'missing' || (status === 'stale' && !reasons.includes('invalid_brief') &&
+    (reasons.includes('source_revision_changed') || reasons.includes('missing_runtime_artifact')));
+}
+
+export async function prepareSessionBrief(options = {}) {
+  const status = await inspectSessionBrief(options);
+  if (!canPrepareBrief(status)) return status;
+
+  const scoped = { ...options, changeId: status.change_id };
+  try {
+    const { executionCommand } = await import('./execution-state.mjs');
+    const { storeFor } = await import('./workflow-state-store.mjs');
+    const store = await storeFor(scoped.rootDir);
+    return await store.lock('.ai-factory/state/execution-write.lock', async () => {
+      const current = await inspectSessionBrief(scoped);
+      if (!canPrepareBrief(current)) return current;
+      const history = await executionCommand('inspect', { change_id: scoped.changeId }, scoped);
+      if (history.reserved > 0 || history.pending_transactions.length > 0) {
+        return { ...current, blocked_reasons: ['execution_context_in_use'] };
+      }
+      const compiled = await compileSessionBrief(scoped);
+      if (!compiled.ok) return compiled;
+      return { ...await inspectSessionBrief(scoped), written: compiled.written };
+    });
+  } catch (error) {
+    return failure(sddError(error.code === 'state-locked' ? 'execution_context_in_use' : 'execution_context_preparation_failed'));
+  }
 }
 
 export async function assertSessionBriefBinding(changeId, digest, options = {}) {
@@ -226,7 +263,13 @@ async function buildSnapshot(options, explicitCompile) {
     ? await resolveAiFactoryVersion({ rootDir: root }) : { supportsUltra: false };
   const design = files.get(`${base}/${methodology === 'openspec' ? 'design' : 'context'}.md`);
   const openQuestions = planContext.requirements.open_questions;
-  const selection = selectSddProfile(inputs && openQuestions.length ? { ...inputs, requirements_clear: false } : inputs, policy, { ...version, methodology });
+  const hasOpenQuestions = openQuestions.length > 0;
+  const selection = selectSddProfile(inputs, policy, { ...version, methodology, hasOpenQuestions });
+  const researchBlockers = selection.profile === 'research' && {
+    missing_inputs: missingSddInputs(inputs),
+    requirements_unclear: inputs?.requirements_clear === false,
+    has_open_questions: hasOpenQuestions
+  };
   if (methodology === 'aifactory' && planContext.public_mode === 'fast') {
     selection.implementation_allowed = false;
     selection.blocked_reason = inputs?.planning_mode && inputs.planning_mode !== 'fast' ? 'planning_mode_mismatch' : 'upstream_fast_handoff';
@@ -312,7 +355,7 @@ async function buildSnapshot(options, explicitCompile) {
     decision.implementation_allowed = false;
     decision.blocked_reason = 'canonical_context_incomplete';
   }
-  return { root, changeId, paths, decision, brief, blocked, sources };
+  return { root, changeId, paths, decision, brief, blocked, sources, researchBlockers };
 }
 
 function summarize(snapshot) {
@@ -321,6 +364,7 @@ function summarize(snapshot) {
     paths: snapshot.paths, decision: snapshot.decision, digest: snapshot.brief?.digest ?? null,
     sources: snapshot.sources, stale_reasons: [],
     blocked_reasons: snapshot.blocked.length ? snapshot.blocked : snapshot.decision.blocked_reason ? [snapshot.decision.blocked_reason] : [],
+    ...(snapshot.researchBlockers ? { research_blockers: snapshot.researchBlockers } : {}),
     owner_handoff: snapshot.ownerHandoff ?? (snapshot.decision.profile === 'research' ? 'aif-explore' : snapshot.brief ? null : 'aif-plan')
   };
 }
@@ -461,7 +505,7 @@ export async function runSessionBriefCommand(argv = process.argv.slice(2), optio
   const [command, ...args] = argv;
   const parsed = { ...options };
   let jsonOutput = false;
-  let invalid = !['compile', 'status', 'show'].includes(command);
+  let invalid = !['compile', 'prepare', 'status', 'show'].includes(command);
   const seen = new Set();
   for (let i = 0; i < args.length; i++) {
     const flag = args[i];
@@ -474,14 +518,24 @@ export async function runSessionBriefCommand(argv = process.argv.slice(2), optio
   let result;
   if (invalid) result = failure(sddError('invalid_arguments'));
   else if (command === 'compile') result = await compileSessionBrief(parsed);
+  else if (command === 'prepare') result = await prepareSessionBrief(parsed);
   else result = await inspectSessionBrief({ ...parsed, includeBrief: command === 'show' });
   const exitCode = invalid || result.errors?.length ? 2 : result.ok ? 0 : 1;
+  const research = result.research_blockers;
+  const diagnostics = [
+    ...(result.errors ?? []).map(error => error.code),
+    ...(research?.missing_inputs.length ? [`Missing SDD Profile Inputs: ${research.missing_inputs.join(', ')}`] : []),
+    ...(research?.requirements_unclear ? ['SDD Profile Inputs: requirements_clear is false'] : []),
+    ...(research?.has_open_questions ? ['Unresolved questions in Open Questions'] : []),
+    ...(result.hints ?? []).map(hint => `Hint: ${hint}`)
+  ];
   const output = jsonOutput ? json(result) : command === 'show' && result.brief ? renderSessionBrief(result.brief)
-    : `SessionBrief: ${result.status}${result.digest ? ` digest=${result.digest}` : ''}\n${(result.errors ?? []).map((error) => error.code).join('\n')}${(result.hints ?? []).map((hint) => `\nHint: ${hint}`).join('')}`;
+    : [`SessionBrief: ${result.status}${result.digest ? ` digest=${result.digest}` : ''}`, ...diagnostics].join('\n');
   (options.stdout ?? process.stdout).write(output.endsWith('\n') ? output : `${output}\n`);
   return exitCode;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  process.exitCode = await runSessionBriefCommand();
+  // Preparation may load the execution graph, which imports this module.
+  runSessionBriefCommand().then(exitCode => { process.exitCode = exitCode; });
 }

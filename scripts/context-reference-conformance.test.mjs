@@ -1393,7 +1393,9 @@ describe('selective reference loading conformance', { concurrency: false }, () =
 
   for (const [mutation, reason] of [
     ['missing runtime', 'missing_runtime_artifact'], ['invalid JSON', 'invalid_brief'],
-    ['brief field', 'brief_revision_mismatch'], ['decision', 'profile_decision_mismatch'],
+    ['brief field with original digest', 'invalid_brief'],
+    ['brief field with recomputed digest', 'brief_revision_mismatch'],
+    ['decision', 'profile_decision_mismatch'],
     ['markdown', 'markdown_mismatch'], ['canonical blocker', 'current_sources_block_implementation']
   ]) {
     it(`stored context drift ${mutation}: exposes ${reason} without status writes`, async () => {
@@ -1401,8 +1403,15 @@ describe('selective reference loading conformance', { concurrency: false }, () =
       const first = await compile(f);
       if (mutation === 'missing runtime') await fs.unlink(path.join(f.root, first.paths.markdown));
       else if (mutation === 'invalid JSON') await put(f.root, first.paths.json, '{invalid\n');
-      else if (mutation === 'brief field') await put(f.root, first.paths.json, json({ ...first.brief, intent: 'Forged intent' }));
-      else if (mutation === 'decision') await put(f.root, first.paths.decision, '{}\n');
+      else if (mutation === 'brief field with original digest') {
+        await put(f.root, first.paths.json, json({ ...first.brief, intent: 'Different intent' }));
+      } else if (mutation === 'brief field with recomputed digest') {
+        const { digest: originalDigest, ...payload } = first.brief;
+        const changed = { ...payload, intent: 'Different intent' };
+        const digest = hash(json(changed));
+        assert.notEqual(digest, originalDigest);
+        await put(f.root, first.paths.json, json({ ...changed, digest }));
+      } else if (mutation === 'decision') await put(f.root, first.paths.decision, '{}\n');
       else if (mutation === 'markdown') await put(f.root, first.paths.markdown, '# Forged markdown\n');
       else await fs.unlink(path.join(f.root, f.base, 'tasks.md'));
       const before = await snapshot(f.root);
@@ -1411,6 +1420,7 @@ describe('selective reference loading conformance', { concurrency: false }, () =
       assert.equal(status.status, mutation === 'canonical blocker' ? 'blocked' : 'stale');
       // reason: adapter-validation-before-parsing preserves stored artifacts.
       if (mutation === 'canonical blocker') assert.deepEqual(status.errors, [{ code: 'missing_tasks' }]);
+      else if (mutation.startsWith('brief field with ')) assert.deepEqual(status.stale_reasons, [reason]);
       else assert.ok(status.stale_reasons.includes(reason), JSON.stringify(status));
       assert.deepEqual(await snapshot(f.root), before);
     });

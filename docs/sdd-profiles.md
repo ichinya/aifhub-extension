@@ -144,6 +144,12 @@ change resolver applies; unresolved or ambiguous selection performs no writes.
 For research/direct or missing canonical content it may write the decision and
 return a blocking owner handoff; it does not invent or repair canonical artifacts.
 `status` and `show` are read-only. `show` exposes brief content only when current.
+OpenSpec implementation uses `aifhub-session-brief prepare --change <change-id> --json` after checking generated rules. It reuses a valid brief, refreshes missing or superseded derived artifacts, and verifies the result. Research blockers, invalid briefs and changes with reserved execution retain their respective refusal paths.
+For `research_required`, `research_blockers` reports missing input keys,
+whether `requirements_clear` is false, and whether open questions remain.
+Check these reasons before handing a new or refined plan to implementation.
+Keep qualification outcomes with known inputs and stop conditions in the tasks
+that measure them. Open questions that prevent work from starting remain a block.
 
 ## Fresh-context AI review
 

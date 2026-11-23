@@ -4,7 +4,7 @@ import { normalizeWrapperArgs, runInstalledScript } from './run-installed-script
 export function register(program) {
   program
     .command('aifhub-session-brief')
-    .description('Compile, inspect, or show a source-bound AIFHub SessionBrief.')
+    .description('Compile, prepare, inspect, or show a source-bound AIFHub SessionBrief.')
     .allowUnknownOption(true)
     .allowExcessArguments(true)
     .argument('[args...]')

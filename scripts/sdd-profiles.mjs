@@ -62,6 +62,10 @@ export function validateSddInputs(input) {
   return input;
 }
 
+export function missingSddInputs(input) {
+  return ['planning_mode', ...SIGNAL_KEYS].filter(key => input?.[key] == null);
+}
+
 export function selectSddProfile(input, policyInput = {}, options = {}) {
   const signals = validateSddInputs(input);
   const policy = validateSddPolicy(policyInput);
@@ -73,9 +77,9 @@ export function selectSddProfile(input, policyInput = {}, options = {}) {
   if (signals?.public_api) riskSignals.push('public_api');
   if (signals?.reversible === false) riskSignals.push('irreversible');
   let profile;
-  if (!signals || SIGNAL_KEYS.some((key) => signals[key] === null || signals[key] === undefined)) {
+  if (missingSddInputs(signals).length) {
     profile = 'research'; reasons.push('missing_information');
-  } else if (!signals.requirements_clear) {
+  } else if (!signals.requirements_clear || options.hasOpenQuestions) {
     profile = 'research'; reasons.push('unclear_requirements');
   } else if (signals.architecture_novelty) {
     profile = 'tracer'; reasons.push('architecture_uncertainty');
