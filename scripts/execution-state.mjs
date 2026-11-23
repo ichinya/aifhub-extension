@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
 import { helperCliMain, helperDiagnostics } from './execution-provenance.mjs';
 
 // Defer all replaceable runtime dependencies until after read-only diagnostics dispatch.
@@ -124,6 +125,25 @@ function resultEnvelope(run,task,payload,snapshot,evidence) {
 }
 function transactionId(action,input) { return digest(`${action}:${input.run_id??''}:${input.recovery_id??input.upgrade_id??''}`).slice(0,64); }
 
+async function assertInstalledReaderCanReadEvidenceOnlyRun(store, run) {
+  if (run.scope.length > 0) return;
+  const installed = '.ai-factory/extensions/aifhub-extension';
+  if (await store.readLeaf(`${installed}/extension.json`) === null) return;
+
+  const readerPath = `${installed}/scripts/execution-records.mjs`;
+  const readerUrl = pathToFileURL(await store.target(readerPath)).href;
+  if (readerUrl === new URL('./execution-records.mjs', import.meta.url).href) return;
+  try {
+    requireValue(await store.readLeaf(readerPath) !== null);
+    const { validateRun: validateInstalledRun } = await import(readerUrl);
+    // A source-tree writer must not publish a run the installed CLI cannot
+    // read during its next project-wide transaction scan.
+    validateInstalledRun(structuredClone(run));
+  } catch {
+    requireValue(false, 'incompatible-installed-execution-reader', true);
+  }
+}
+
 /** Local cooperative bookkeeping. Actor labels are correlation, not authentication. */
 export async function executionCommand(action,input,options={}) {
   if (action === 'diagnostics') {
@@ -147,6 +167,7 @@ export async function executionCommand(action,input,options={}) {
   const starting=['start','batch-start'].includes(action), readOnly=['inspect','resume','attempt-check'].includes(action);
   // Prepared admission is historical intent; worker resume still checks freshness.
   const prepared=starting?await readTransaction(store,folder,transactionId(action,input)):null;
+  const mayUseEmptyScope = action === 'start' && input.role === 'implement';
   let preflight, preflightTiming=null;
   if(starting && prepared?.state!=='prepared') {
     // Setup segment 1 (#270): fresh preflight before any lock. A prepared
@@ -162,7 +183,7 @@ export async function executionCommand(action,input,options={}) {
       for(const item of input.manifest) { selectExecutionTask(source,item.task_id,input.role,extra); await validateExecutionScope(store,item.files,source,true); }
       scope=input.manifest.flatMap(item=>item.files).sort();
       requireValue(stringList(input.preflight_paths).length>0,'missing-preflight'); preflightRefs=await refs(store,input.preflight_paths);
-    } else { identifier(input.task_id); selectExecutionTask(source,input.task_id,input.role,extra); scope=await validateExecutionScope(store,input.scope,source); }
+    } else { identifier(input.task_id); selectExecutionTask(source,input.task_id,input.role,extra); scope=await validateExecutionScope(store,input.scope,source,false,mayUseEmptyScope); }
     preflight={source,scope,extra,refs:preflightRefs};
     preflightTiming={started_at:startedAt,ended_at:now(),elapsed_ms:measuredMs(start)};
   }
@@ -197,15 +218,18 @@ export async function executionCommand(action,input,options={}) {
       if(h.source)requireValue(same(h.source.source,sourceRecord(preflight.source)),'state-source-collision',true);
       const all=await catalogue(store); requireValue(all.length<1000,'execution-catalogue-full',true);
       requireValue(!all.some(r=>reserves(r) && r.scope.some(a=>preflight.scope.some(b=>overlap(a,b)))),'scope-reserved',true);
+      const taskIds = action==='batch-start' ? input.manifest.map(item=>item.task_id) : [input.task_id];
+      requireValue(!h.runs.some(r=>reserves(r) && (!r.scope.length || !preflight.scope.length) &&
+        taskIds.some(id=>r.task_id===id || Object.hasOwn(r.items ?? {},id))),'task-reserved',true);
       const selected=preflight.source;
-      await validateExecutionScope(store,preflight.scope,selected,action==='batch-start');
+      await validateExecutionScope(store,preflight.scope,selected,action==='batch-start',mayUseEmptyScope);
       if(preflight.refs)requireValue(same(await refs(store,input.preflight_paths),preflight.refs),'stale-preflight',true);
       const snapshot=await worktree(store,preflight.scope,selected.projections), timestamp=now();
       const finalSource=await resolveExecutionSource(store,change,input.role,preflight.extra);
       requireValue(!finalSource.delegated && finalSource.context.digest===selected.context.digest && finalSource.namespace_digest===selected.namespace_digest,'stale-admission',true);
       if(action==='batch-start')for(const item of input.manifest)selectExecutionTask(finalSource,item.task_id,input.role,preflight.extra);
       else selectExecutionTask(finalSource,input.task_id,input.role,preflight.extra);
-      await validateExecutionScope(store,preflight.scope,finalSource,action==='batch-start');
+      await validateExecutionScope(store,preflight.scope,finalSource,action==='batch-start',mayUseEmptyScope);
       const { lifecycleStore } = await import('./host-lifecycle-store.mjs');
       const lifecycle = await lifecycleStore({ rootDir: store.root });
       requireValue(!await lifecycle.findPendingPublication(finalSource, preflight.scope, snapshot), 'pending-lifecycle-publication', true);
@@ -225,7 +249,9 @@ export async function executionCommand(action,input,options={}) {
         elapsed_ms:preflightTiming.elapsed_ms+admission.elapsed_ms,complete:true,
         segments:{preflight:preflightTiming,admission}},stamps:[]};
       stamp(run,action);
-      validateRun(run); const writes=[];
+      validateRun(run);
+      await assertInstalledReaderCanReadEvidenceOnlyRun(store, run);
+      const writes=[];
       if(!h.source)writes.push([`${folder}/source.json`,{schema:SOURCE_SCHEMA,source:run.source}]);
       if(!h.ledger)writes.push([`${folder}/fix-attempts.json`,{schema:LEDGER_SCHEMA,attempts:[],aliases:[]}]);
       writes.push([filename,run]); return publish(store,folder,txId,action,input,writes,view(run),options);

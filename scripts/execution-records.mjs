@@ -217,7 +217,8 @@ export function validateRun(run, {predecessors=[]}={}) {
   if(!legacy && run.timings!==undefined)timingsBlock(run.timings);
   executionId(run.change_id); identifier(run.run_id); if(run.task_id!==null || legacy) identifier(run.task_id);
   identifier(run.owner); identifier(run.worker); enumeration(run.role,['implement','fix']);
-  requireValue(stringList(run.scope).length>0,'invalid-state'); run.scope.forEach(portablePath); assertAuxiliaryPaths(run.context_paths);
+  requireValue(stringList(run.scope).length>0 || (!legacy && !run.legacy && run.kind==='single' && run.role==='implement'),'invalid-state');
+  run.scope.forEach(portablePath); assertAuxiliaryPaths(run.context_paths);
   integer(run.version); enumeration(run.status,['started','completed','failed','blocked','cancelled','timed_out','accepted']);
   compositionDigest(run.instruction_composition_digest); compositionStatus(run.instruction_composition_status);
   contextRecord(run.context); snapshot(run.initial_worktree);

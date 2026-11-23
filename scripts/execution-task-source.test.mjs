@@ -9,6 +9,62 @@ const projects = [];
 afterEach(async () => { for (const project of projects.splice(0)) await project.cleanup(); });
 const project = async options => { const p = await executionProject(options); projects.push(p); return p; };
 
+test('a single implement task can record evidence without granting file writes', async () => {
+  const p = await project();
+  const evidence = '.ai-factory/state/work/pilot/qualification.json';
+  await assert.rejects(p.call('start', p.start({ scope: [evidence] })), error => error.code === 'protected-scope');
+  await assert.rejects(p.call('start', p.start({ scope: [], role: 'fix' })));
+  assert.equal((await p.call('start', p.start({ scope: [] }))).lifecycle, 'active');
+  await assert.rejects(p.call('start', p.start({ run_id: 'duplicate' })), error => error.code === 'task-reserved');
+  await p.put('src/a.js', 'unauthorized\n');
+  await assert.rejects(p.call('checkpoint', p.actor(1, {
+    progress: { completed_steps: [], next_step: 'Record observation' }
+  })), error => error.code === 'outside-scope');
+  await p.put('src/a.js', 'initial a\n');
+  await p.put(evidence, '{"source":"qualification"}\n');
+  const run = await p.call('result', p.actor(1, { result: {
+    result_id: 'qualification', status: 'completed', changed_files: [],
+    checks: [{ name: 'qualification', exit_code: 0 }], evidence: [evidence], summary: 'Observed qualification'
+  } }));
+  const accepted = await p.call('accept', p.actor(run.version, { actor: 'parent', result_digest: run.result.digest }));
+  assert.equal(accepted.status, 'accepted');
+});
+
+test('an older installed reader blocks evidence-only publication from a different runtime', async () => {
+  const p = await project();
+  const installed = '.ai-factory/extensions/aifhub-extension';
+  await p.put(`${installed}/extension.json`, '{"name":"aifhub-extension","version":"1.8.3"}\n');
+  await p.put(`${installed}/scripts/execution-records.mjs`, [
+    'export function validateRun(run) {',
+    '  if (run.scope.length === 0) throw new Error("invalid-state");',
+    '}'
+  ].join('\n'));
+  const files = async () => Object.fromEntries(Object.entries(await p.snapshot()).filter(([name]) => !name.endsWith('/')));
+  const before = await files();
+  await assert.rejects(p.call('start', p.start({ scope: [] })), {
+    code: 'incompatible-installed-execution-reader',
+    blocked: true
+  });
+  assert.deepEqual(await files(), before);
+  assert.equal((await p.call('start', p.start())).status, 'started');
+});
+
+test('an applied evidence-only journal remains readable during admission of another change', async () => {
+  const p = await project();
+  const otherChange = 'next-change';
+  await p.put(`openspec/changes/${otherChange}/proposal.md`, '# Next change\n');
+  await p.put(`openspec/changes/${otherChange}/tasks.md`, '- [ ] 1.1 Write a file\n');
+  await p.call('start', p.start({ scope: [] }));
+  const before = await p.snapshot();
+  const result = await p.call('start', p.start({ change_id: otherChange, run_id: 'next-run' }));
+  assert.equal(result.status, 'started');
+  assert.deepEqual(result.scope, ['src/a.js']);
+  const after = await p.snapshot();
+  for (const [file, bytes] of Object.entries(before).filter(([file]) => file.startsWith('.ai-factory/state/work/execution/'))) {
+    assert.equal(after[file], bytes, file);
+  }
+});
+
 // Defect: a retained OpenSpec directory overrides a disabled tool and starts work.
 test('disabled OpenSpec cannot be used as an execution source or create state', async () => {
   const p = await project();

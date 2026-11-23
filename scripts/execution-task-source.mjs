@@ -191,8 +191,8 @@ export function selectExecutionTask(source, id, role, contextPaths) {
   return task;
 }
 
-export async function validateExecutionScope(store, paths, source, exact = false) {
-  requireValue(stringList(paths).length > 0);
+export async function validateExecutionScope(store, paths, source, exact = false, allowEmpty = false) {
+  requireValue(stringList(paths).length > 0 || allowEmpty);
   for (const value of paths) {
     const p = portablePath(value).toLowerCase();
     requireValue(!p.split('/').includes('.git'), 'protected-scope');
