@@ -195,7 +195,7 @@ const entries = Array.from({ length: 8 }, (_, i) => 'entry ' + (i + 1) + ' ' + '
 
 async function workspace(t, lines) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'aifhub-pi-read-'));
-  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(() => rm(root, { recursive: true, force: true, maxRetries: 3 }));
   await writeFile(path.join(root, 'notes.txt'), lines.join('\n'));
   await writeFile(path.join(root, 'compress'), "process.stdin.pipe(process.stdout);");
   return root;

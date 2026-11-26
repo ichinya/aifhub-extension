@@ -9,6 +9,7 @@ import { execFile } from 'node:child_process';
 import { lstat, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import { runGuardGit } from './git-guard-command.mjs';
 import { pathToFileURL } from 'node:url';
 import { canonical, digest, fields, identifier, portablePath, storeFor, requireValue, WorkflowError } from './workflow-state-store.mjs';
 import { executionId } from './execution-task-source.mjs';
@@ -159,8 +160,8 @@ function gitEnv() {
 async function gitInWorkTree(root) {
   let verdict;
   try {
-    verdict = await exec('git', ['rev-parse', '--is-inside-work-tree'],
-      { cwd: root, env: gitEnv(), windowsHide: true, maxBuffer: 64 * 1024, timeout: 10000 });
+    verdict = await runGuardGit(exec, ['rev-parse', '--is-inside-work-tree'],
+      { cwd: root, env: gitEnv(), maxBuffer: 64 * 1024 });
   } catch (error) {
     if (error?.code !== 128) throw error;
     // Exit 128 has two very different meanings: an honest "no repository
@@ -183,14 +184,14 @@ async function defaultTrackedCheck(root, output) {
   if (!await gitInWorkTree(root)) return false;
   // Inside a repository the check is authoritative and fail-closed: a failing
   // git call propagates so the guard rejects instead of assuming "untracked".
-  const { stdout } = await exec('git', ['ls-files', '--cached', '-z', '--', output],
-    { cwd: root, env: gitEnv(), windowsHide: true, maxBuffer: 1024 * 1024, timeout: 10000 });
+  const { stdout } = await runGuardGit(exec, ['ls-files', '--cached', '-z', '--', output],
+    { cwd: root, env: gitEnv(), maxBuffer: 1024 * 1024 });
   return stdout.split('\0').some((entry) => entry.length > 0);
 }
 
 async function outputActuallyIgnored(root, output) {
-  const outcome = await exec('git', ['check-ignore', '-q', '--', output],
-    { cwd: root, env: gitEnv(), windowsHide: true, maxBuffer: 64 * 1024, timeout: 10000 })
+  const outcome = await runGuardGit(exec, ['check-ignore', '-q', '--', output],
+    { cwd: root, env: gitEnv(), maxBuffer: 64 * 1024 })
     .then(() => true, (error) => {
       if (error.code === 1) return false; // git's own verdict: not ignored
       throw error; // git failed: cannot verify the destination is safe

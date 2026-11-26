@@ -236,7 +236,9 @@ test('qualification cleans host and Git directories after confirmed exit with a 
   `], {
     env: { ...process.env, TEMP: temp, TMP: temp, TMPDIR: temp,
       GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: path.join(temp, 'unused.gitconfig'), GIT_TERMINAL_PROMPT: '0' },
-    timeout: 30_000, windowsHide: true
+    // This watchdog covers two sequential Git/host lifecycles, including cleanup
+    // under parallel suite load. The host client bounds each IPC call and exit.
+    timeout: 120_000, windowsHide: true
   });
   const { injections, outcome, arms } = JSON.parse(stdout);
   assert.equal(injections, 2);

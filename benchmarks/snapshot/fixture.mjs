@@ -58,11 +58,21 @@ export async function restore(root, entries) {
   await checkedRoot(root);
   // root is a verified, owned mkdtemp descendant; do not delete its admin directories.
   const keep = new Set(entries.map(e => e.name));
+  const debug = process.env.LOG_LEVEL === 'debug';
   async function prune(relative = '') {
     for (const item of await fs.readdir(path.join(root, relative), { withFileTypes: true })) {
       const name = relative ? `${relative}/${item.name}` : item.name, full = path.join(root, name);
-      if (!keep.has(name) || item.isSymbolicLink()) await fs.rm(full, { recursive: true, force: true });
-      else if (item.isDirectory()) await prune(name);
+      if (!keep.has(name) || item.isSymbolicLink()) {
+        if (debug) console.error('[FIX:186] pruning fixture entry', name);
+        try {
+          // Windows can report ENOTEMPTY between enumeration and rmdir.
+          await fs.rm(full, { recursive: true, force: true, maxRetries: 3 });
+        } catch (error) {
+          if (debug) console.error('[FIX:186] fixture prune failed', name, error.code);
+          throw error;
+        }
+        if (debug) console.error('[FIX:186] pruned fixture entry', name);
+      } else if (item.isDirectory()) await prune(name);
     }
   }
   await prune();
