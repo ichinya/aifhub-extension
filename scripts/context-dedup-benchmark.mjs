@@ -142,6 +142,7 @@ export async function runBenchmark(options = {}) {
     const policy = await readContextDedupPolicy({ rootDir: workspace });
     const steps = [];
     const lastContentByPath = new Map();
+    const deliveredByPath = new Map();
 
     for (const [index, read] of trace.reads.entries()) {
       await materialize(workspace, read.path, read.content);
@@ -154,6 +155,7 @@ export async function runBenchmark(options = {}) {
         sessionId,
         read,
         policy,
+        replayAvailable: deliveredByPath.get(read.path) === read.content,
         externalCommand,
         externalProtocol: options.externalProtocol ?? 'sqz-text',
         externalTimeoutMs: options.externalTimeoutMs,
@@ -163,6 +165,8 @@ export async function runBenchmark(options = {}) {
       const emittedBytes = Buffer.byteLength(step.emitted, 'utf8');
       const fullBytes = Buffer.byteLength(read.content, 'utf8');
       const servedFullContent = step.emitted === read.content;
+
+      if (mode === 'variant-a' && servedFullContent) deliveredByPath.set(read.path, step.emitted);
 
       steps.push({
         index,
@@ -273,6 +277,7 @@ async function runStep(mode, context) {
       content: context.read.content,
       rootDir: context.workspace,
       sessionId: context.sessionId,
+      replayAvailable: context.replayAvailable,
       policy: context.policy
     });
 

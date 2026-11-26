@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 // context-dedup.mjs - optional session-scoped read deduplication service
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, open, readFile, readdir, realpath, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
-import { StringDecoder } from 'node:string_decoder';
 import { pathToFileURL } from 'node:url';
 import { ensureRuntimeGitignores } from './runtime-gitignore.mjs';
 
@@ -37,8 +36,7 @@ const PURGE_LOCK_ATTEMPTS = Math.ceil((SQZ_TIMEOUT_MS + 5_000) / LOCK_RETRY_MS);
 const PURGE_REMOVE_MAX_RETRIES = 5;
 const PURGE_REMOVE_RETRY_MS = 20;
 const RETRYABLE_PURGE_REMOVE_CODES = new Set(['EBUSY', 'EMFILE', 'ENFILE', 'ENOTEMPTY', 'EPERM']);
-const SQZ_REFERENCE_PATTERN = /^§ref:[0-9a-f]{8,64}§\s*$/iu;
-const SQZ_DELTA_PATTERN = /^§delta:[0-9a-f]{8,64}§(?:\r?\n|$)/iu;
+const SQZ_STATEFUL_HEADER = /^\s*§(?:ref|delta):/iu;
 const UNSAFE_YAML_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 const PROCESS_LEDGER_TRANSACTIONS = new Map();
 
@@ -293,6 +291,13 @@ export async function recordRead(options = {}) {
     const existing = ledger.entries[relativePath] ?? null;
     const now = new Date().toISOString();
     const force = options.force === true;
+    // A saved digest proves file identity. Only the same reader lifetime,
+    // project and mode can reuse its previous delivery. Old entries miss this key.
+    const deliveryContext = hashContent(JSON.stringify([PROCESS_SESSION_ID, rootDir, sessionId, policy.mode]));
+    const sameDigest = existing?.digest === digest && !force;
+    const replayAvailable = options.replayAvailable === true;
+    const canReplay = sameDigest && replayAvailable
+      && existing.deliveryContext === deliveryContext;
 
     if (policy.mode === 'sqz') {
       return await recordSqzRead({
@@ -304,6 +309,8 @@ export async function recordRead(options = {}) {
         ledger,
         warnings,
         existing,
+        deliveryContext,
+        canReplay,
         now,
         force,
         relativePath,
@@ -313,18 +320,18 @@ export async function recordRead(options = {}) {
       });
     }
 
-    const sameDigest = Boolean(existing) && existing.digest === digest && !force;
     const entry = {
       digest,
+      deliveryContext,
       bytes,
       firstSeenAt: existing?.firstSeenAt ?? now,
       lastSeenAt: now,
       readCount: (existing?.readCount ?? 0) + 1,
       revisions: existing ? existing.revisions + (existing.digest === digest ? 0 : 1) : 1
     };
-    const replay = sameDigest ? formatReplay(relativePath, digest) : null;
+    const replay = canReplay ? formatReplay(relativePath, digest) : null;
     const replayBytes = replay ? Buffer.byteLength(replay.text, 'utf8') : 0;
-    const deduplicated = sameDigest && replayBytes < bytes;
+    const deduplicated = canReplay && replayBytes < bytes;
     const netSavedBytes = deduplicated ? bytes - replayBytes : 0;
 
     ledger.totals.reads += 1;
@@ -387,7 +394,7 @@ export async function recordRead(options = {}) {
       };
     }
 
-    if (sameDigest) {
+    if (canReplay) {
       debugFix(options, 'replay-not-beneficial', {
         path: relativePath,
         inputBytes: bytes,
@@ -409,10 +416,13 @@ export async function recordRead(options = {}) {
       };
     }
 
+    const changed = Boolean(existing) && !sameDigest;
+    let reason = 'First read of this path in this session.';
+    if (force) reason = 'Forced full read.';
+    else if (changed) reason = 'Content changed since the previous read in this session.';
+    else if (existing) reason = 'Previous delivery is unconfirmed in this context; serving full content.';
     return {
-      ...decision(existing ? 'changed' : 'full', existing
-        ? 'Content changed since the previous read in this session.'
-        : 'First read of this path in this session.', {
+      ...decision(changed ? 'changed' : 'full', reason, {
         relativePath,
         digest,
         bytes,
@@ -463,6 +473,8 @@ async function recordSqzRead(context) {
     ledger,
     warnings,
     existing,
+    deliveryContext,
+    canReplay,
     now,
     force,
     relativePath,
@@ -478,10 +490,9 @@ async function recordSqzRead(context) {
     bytes,
     warning: null
   };
-  const sameDigest = Boolean(existing) && existing.digest === digest && !force;
-  const replay = sameDigest ? formatReplay(relativePath, digest, { provider: 'sqz' }) : null;
+  const replay = canReplay ? formatReplay(relativePath, digest, { provider: 'sqz' }) : null;
   const replayBytes = replay ? Buffer.byteLength(replay.text, 'utf8') : 0;
-  const useSessionReplay = sameDigest && replayBytes < bytes;
+  const useSessionReplay = canReplay && replayBytes < bytes;
 
   if (useSessionReplay) {
     outcome = {
@@ -491,7 +502,9 @@ async function recordSqzRead(context) {
       bytes: replayBytes,
       warning: null
     };
-  } else if (!force) {
+  } else if (bytes > SQZ_MAX_INPUT_BYTES && !force) {
+    outcome = classifySqzResult({ ok: false, code: 'input-limit' }, content);
+  } else if (!force && !existing && warnings.length === 0) {
     const sqzHome = assertInsideDedupDir(
       path.join(path.dirname(ledgerPath), 'sqz'),
       rootDir,
@@ -532,6 +545,7 @@ async function recordSqzRead(context) {
       : outcome.kind;
   const entry = {
     digest,
+    deliveryContext,
     bytes,
     firstSeenAt: existing?.firstSeenAt ?? now,
     lastSeenAt: now,
@@ -585,7 +599,7 @@ async function recordSqzRead(context) {
   return {
     ...decision(
       decisionKind,
-      sqzDecisionReason(decisionKind, force, outcome),
+      sqzDecisionReason(decisionKind, force, outcome, Boolean(existing) || warnings.length > 0),
       {
         relativePath,
         digest,
@@ -607,9 +621,10 @@ async function recordSqzRead(context) {
   };
 }
 
-function sqzDecisionReason(kind, force, outcome) {
+function sqzDecisionReason(kind, force, outcome, needsOriginal) {
   if (force) return 'Forced full read bypassed SQZ.';
   if (!outcome.ok) return 'SQZ was unavailable or failed; serving full content.';
+  if (kind === 'full' && needsOriginal) return 'Serving the complete current revision.';
   if (kind === 'full') return 'SQZ output did not reduce the model-visible payload; serving full content.';
   if (kind === 'deduplicated') return 'AIFHub recognized identical content already served through SQZ in this session.';
   return 'SQZ returned a shorter compressed payload.';
@@ -618,17 +633,19 @@ function sqzDecisionReason(kind, force, outcome) {
 function classifySqzResult(result, originalContent) {
   const originalBytes = Buffer.byteLength(originalContent, 'utf8');
   if (!result?.ok) {
+    const warningCodes = {
+      timeout: 'context-dedup-sqz-timeout',
+      'output-limit': 'context-dedup-sqz-output-limit',
+      'input-limit': 'context-dedup-sqz-input-limit',
+      'invalid-utf8': 'context-dedup-sqz-invalid-output'
+    };
     return {
       ok: false,
       kind: 'full',
       content: originalContent,
       bytes: originalBytes,
       warning: {
-        code: result?.code === 'timeout'
-          ? 'context-dedup-sqz-timeout'
-          : result?.code === 'output-limit'
-            ? 'context-dedup-sqz-output-limit'
-            : 'context-dedup-sqz-unavailable',
+        code: Object.hasOwn(warningCodes, result?.code) ? warningCodes[result.code] : 'context-dedup-sqz-unavailable',
         severity: 'warning',
         message: 'SQZ could not produce a bounded response; full content was served.'
       }
@@ -651,7 +668,7 @@ function classifySqzResult(result, originalContent) {
     };
   }
 
-  if (SQZ_REFERENCE_PATTERN.test(output) || SQZ_DELTA_PATTERN.test(output)) {
+  if (SQZ_STATEFUL_HEADER.test(output)) {
     return {
       ok: false,
       kind: 'full',
@@ -679,6 +696,9 @@ export async function runSqzCompression(options = {}) {
     ? options.command.trim()
     : 'sqz';
   const content = String(options.content ?? '');
+  if (Buffer.byteLength(content, 'utf8') > SQZ_MAX_INPUT_BYTES) {
+    return { ok: false, code: 'input-limit', stdout: '' };
+  }
   const maxOutputBytes = options.maxOutputBytes ?? SQZ_MAX_OUTPUT_BYTES;
   const timeoutMs = options.timeoutMs ?? SQZ_TIMEOUT_MS;
   const env = buildSqzEnv(options.env ?? process.env, options.homeDir);
@@ -691,6 +711,7 @@ export async function runSqzCompression(options = {}) {
         cwd: options.cwd ?? process.cwd(),
         env,
         shell: false,
+        detached: process.platform !== 'win32',
         windowsHide: true,
         stdio: ['pipe', 'pipe', 'pipe']
       });
@@ -699,44 +720,67 @@ export async function runSqzCompression(options = {}) {
       return;
     }
 
-    let stdout = '';
-    let stdoutBytes = 0;
-    const stdoutDecoder = new StringDecoder('utf8');
-    let settled = false;
-    const finish = (result) => {
-      if (settled) return;
-      settled = true;
+    const stdout = [];
+    let outputBytes = 0;
+    let stopping = false;
+    const closed = new Promise(done => child.once('close', done));
+    const stop = async code => {
+      if (stopping) return;
+      stopping = true;
       clearTimeout(timer);
-      resolve(result);
+      await stopSqzProcessTree(child);
+      let reapTimer;
+      await Promise.race([closed, new Promise(done => { reapTimer = setTimeout(done, 1000); })]);
+      clearTimeout(reapTimer);
+      child.stdin.destroy();
+      child.stdout.destroy();
+      child.stderr.destroy();
+      resolve({ ok: false, code, stdout: '' });
     };
-    const timer = setTimeout(() => {
-      child.kill('SIGTERM');
-      finish({ ok: false, code: 'timeout', stdout: '' });
-    }, timeoutMs);
-
-    child.stdout.on('data', (chunk) => {
-      stdoutBytes += chunk.length;
-      if (stdoutBytes > maxOutputBytes) {
-        child.kill('SIGTERM');
-        finish({ ok: false, code: 'output-limit', stdout: '' });
-        return;
-      }
-      stdout += stdoutDecoder.write(chunk);
+    const timer = setTimeout(() => stop('timeout'), timeoutMs);
+    const collect = (chunk, keep) => {
+      if (stopping) return;
+      outputBytes += chunk.length;
+      if (outputBytes > maxOutputBytes) void stop('output-limit');
+      else if (keep) stdout.push(chunk);
+    };
+    child.stdout.on('data', chunk => collect(chunk, true));
+    child.stderr.on('data', chunk => collect(chunk, false));
+    child.once('error', () => {
+      clearTimeout(timer);
+      if (!stopping) resolve({ ok: false, code: 'spawn-error', stdout: '' });
     });
-    child.stderr.on('data', () => {});
-    child.on('error', () => finish({ ok: false, code: 'spawn-error', stdout: '' }));
-    child.on('close', (code) => {
-      if (settled) return;
-      const decodedStdout = code === 0 ? `${stdout}${stdoutDecoder.end()}` : '';
-      finish({
-        ok: code === 0,
-        code: code === 0 ? 'ok' : 'exit-error',
-        stdout: decodedStdout
-      });
+    closed.then(code => {
+      clearTimeout(timer);
+      if (stopping) return;
+      if (code !== 0) return resolve({ ok: false, code: 'exit-error', stdout: '' });
+      try {
+        const decoded = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(Buffer.concat(stdout));
+        resolve({ ok: true, code: 'ok', stdout: decoded });
+      } catch {
+        resolve({ ok: false, code: 'invalid-utf8', stdout: '' });
+      }
     });
     child.stdin.on('error', () => {});
     child.stdin.end(content);
   });
+}
+
+async function stopSqzProcessTree(child) {
+  if (child.pid && process.platform !== 'win32') {
+    try {
+      process.kill(-child.pid, 'SIGKILL'); // The SQZ child owns this process group.
+      return;
+    } catch { /* The group may already have exited. */ }
+  } else if (child.pid && child.exitCode === null && child.signalCode === null) {
+    const taskkill = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'taskkill.exe');
+    const stopped = await new Promise(done => {
+      execFile(taskkill, ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, timeout: 3000, env: buildSqzEnv(process.env) },
+        error => done(!error));
+    });
+    if (stopped) return;
+  }
+  try { child.kill('SIGKILL'); } catch { /* The direct child may have exited during cleanup. */ }
 }
 
 function buildSqzEnv(baseEnv, homeDir) {
@@ -827,7 +871,7 @@ function decision(kind, reason, { relativePath, digest, bytes, content }) {
 function formatReplay(relativePath, digest, options = {}) {
   const shortDigest = digest.startsWith('sha256:') ? digest.slice(0, 23) : digest.slice(0, 16);
   const contextDescription = options.provider === 'sqz'
-    ? 'was already provided as a self-contained compressed payload in this session'
+    ? 'was already provided as a self-contained payload in this session'
     : 'was already provided in this session';
   return {
     text: `[aifhub-context-dedup] ${relativePath} ${contextDescription} (${shortDigest}, unchanged); reuse that earlier session context. Use force=true for a full read.`,

@@ -21,9 +21,10 @@ import {
   truncateHead,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { access, constants, readFile, writeFile } from "node:fs/promises";
-import { recordRead, resolveContextDedupPolicy } from "../../scripts/context-dedup.mjs";
+import { readFile, writeFile } from "node:fs/promises";
+import { hashContent, isProtectedReadPath, readContextDedupPolicy, recordRead, resolveCanonicalTarget, resolveContextDedupPolicy } from "../../scripts/context-dedup.mjs";
 
 const IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"]);
 
@@ -46,13 +47,20 @@ function benchConfig() {
 }
 
 function buildPolicy(config) {
-  // Plain object lands in extractContextDedupConfig because every key is a
-  // known policy key; protected patterns fall back to the built-in defaults.
+  // The benchmark owns the arm, compression threshold, and executable.
   return resolveContextDedupPolicy({
     mode: config.mode,
     minBytes: config.minBytes,
     sqz: { command: config.sqzCommand }
   });
+}
+
+async function projectReadPolicy(root, benchmarkPolicy) {
+  const file = await resolveCanonicalTarget(root, ".ai-factory/config.yaml");
+  const project = await readContextDedupPolicy({ rootDir: root, configPath: file.absolutePath });
+  // A project can move its evidence directories. The benchmark still owns its original state directory.
+  const protectedPatterns = new Set([...benchmarkPolicy.protectedPatterns, ...project.protectedPatterns]);
+  return { ...benchmarkPolicy, protectedPatterns: [...protectedPatterns] };
 }
 
 // Faithful replication of the built-in read tool output for text files:
@@ -67,7 +75,7 @@ function formatReadOutput(rawContent, hasOffset, hasLimit, offset, limit) {
   const startLineDisplay = startLine + 1;
 
   if (hasOffset && startLine >= allLines.length) {
-    throw new Error(`Offset ${offset} is beyond end of file (${allLines.length} lines total)`);
+    throw new RangeError(`Offset ${offset} is beyond end of file (${allLines.length} lines total)`);
   }
 
   let selectedContent;
@@ -107,11 +115,33 @@ function formatReadOutput(rawContent, hasOffset, hasLimit, offset, limit) {
   return { outputText, details };
 }
 
+// A session ID and a disk entry survive context edits. Check the actual text
+// still present in Pi's model-visible projection before serving a reference.
+function hasVisibleDelivery(ctx, key) {
+  try {
+    const messages = ctx.sessionManager?.buildSessionProjection?.()?.messages;
+    return Array.isArray(messages) && messages.some(message => {
+      const proof = message.details?.dedup?.delivery;
+      return message.role === "toolResult" && message.toolName === "read" && !message.isError
+        && proof?.key === key && message.content?.length === 1 && message.content[0].type === "text"
+        && hashContent(message.content[0].text) === proof.digest;
+    });
+  } catch {
+    return false;
+  }
+}
+
 export default function (pi) {
   const config = benchConfig();
   const policy = buildPolicy(config);
+  let policyRoot;
+  let projectPolicy;
+  let protectedPatternCount = policy.protectedPatterns.length;
   const reads = [];
+  const history = new Map();
   let sessionId = null;
+  const sessionIds = new Set();
+  let recipient = randomUUID();
 
   pi.registerTool({
     name: "read",
@@ -120,6 +150,7 @@ export default function (pi) {
     parameters: Type.Object({
       path: Type.String({ description: "Path to the file to read (relative or absolute)" }),
       offset: Type.Optional(Type.Number({ description: "Line number to start reading from (1-indexed)" })),
+      force: Type.Optional(Type.Boolean({ description: "Return the original file text" })),
       limit: Type.Optional(Type.Number({ description: "Maximum number of lines to read" })),
     }),
     promptGuidelines: [
@@ -136,12 +167,18 @@ export default function (pi) {
       }
       const extension = path.extname(rawPath).toLowerCase();
 
-      // Images and unreadable files follow the built-in path untouched.
-      if (IMAGE_EXTENSIONS.has(extension)) {
-        try {
-          const absolute = path.isAbsolute(rawPath) ? rawPath : path.resolve(ctx.cwd, rawPath);
-          await access(absolute, constants.R_OK);
-          const buffer = await readFile(absolute);
+      let target;
+      try {
+        target = await resolveCanonicalTarget(ctx.cwd, rawPath);
+      } catch {
+        return {
+          content: [{ type: "text", text: "Error reading file: path unavailable within the project root" }],
+          details: { error: true },
+        };
+      }
+      try {
+        if (IMAGE_EXTENSIONS.has(extension)) {
+          const buffer = await readFile(target.absolutePath);
           return {
             content: [{
               type: "text",
@@ -149,60 +186,83 @@ export default function (pi) {
             }],
             details: { image: true },
           };
-        } catch (error) {
-          return {
-            content: [{ type: "text", text: `Error reading file: ${error.message}` }],
-            details: { error: true },
-          };
         }
-      }
+        const rawContent = await readFile(target.absolutePath, "utf8");
 
-      try {
-        const absolutePath = path.isAbsolute(rawPath) ? path.resolve(rawPath) : path.resolve(ctx.cwd, rawPath);
-        const rawContent = await readFile(absolutePath, "utf8");
-
-        let servedContent = rawContent;
+        const hasOffset = params.offset !== undefined;
+        const hasLimit = params.limit !== undefined;
+        const original = formatReadOutput(rawContent, hasOffset, hasLimit, params.offset, params.limit);
+        let visible = original;
+        let servedLines = rawContent.split("\n").length;
         let record = null;
-        if (config.mode !== "off") {
+        let decision = "passthrough";
+        let delivery;
+        if (policyRoot !== ctx.cwd) {
+          policyRoot = ctx.cwd;
+          projectPolicy = projectReadPolicy(ctx.cwd, policy);
+        }
+        const effectivePolicy = await projectPolicy;
+        protectedPatternCount = effectivePolicy.protectedPatterns.length;
+        const digest = hashContent(rawContent);
+        const view = JSON.stringify([params.offset ?? 1, params.limit ?? null]);
+        const prior = history.get(target.absolutePath);
+        const sameContext = prior?.recipient === recipient;
+        const sameRevision = prior?.digest === digest && sameContext;
+        const repeated = sameRevision && prior.views.has(view);
+        let payloadClass = "firstRead";
+        if (isProtectedReadPath(target.relativePath, effectivePolicy)) payloadClass = "protected";
+        else if (prior && !sameContext) payloadClass = "freshSession";
+        else if (prior && !sameRevision) payloadClass = "changed";
+        else if (repeated) payloadClass = "exactRepeat";
+        if (config.mode !== "off" && !hasOffset && !hasLimit && !original.details.truncation) {
           const stateDir = `.ai-factory/state/context-dedup-bench/${config.runId}`;
+          const key = hashContent(JSON.stringify([recipient, sessionId, target.absolutePath, digest]));
           const result = await recordRead({
-            filePath: absolutePath,
+            filePath: target.relativePath,
             content: rawContent,
             rootDir: ctx.cwd,
-            policy,
+            policy: effectivePolicy,
             stateDir,
             sessionId: sessionId ?? config.runId,
+            force: params.force === true,
+            replayAvailable: hasVisibleDelivery(ctx, key),
             sqzTimeoutMs: 15000,
           });
           record = result;
-          if (typeof result.content === "string") {
-            servedContent = result.content;
-          } else if (result.replay && typeof result.replay.text === "string") {
-            servedContent = result.replay.text;
+          decision = result.decision;
+          const candidate = result.content ?? result.replay?.text ?? rawContent;
+          if (candidate !== rawContent) {
+            const formatted = formatReadOutput(candidate, false, false);
+            if (formatted.details.truncation) {
+              decision = "full";
+            } else {
+              visible = formatted;
+              servedLines = candidate.split("\n").length;
+            }
+          }
+          if (decision !== "deduplicated") {
+            delivery = { key, digest: hashContent(visible.outputText) };
           }
         }
 
-        const { outputText, details } = formatReadOutput(
-          servedContent,
-          params.offset !== undefined,
-          params.limit !== undefined,
-          params.offset,
-          params.limit
-        );
+        const { outputText, details } = visible;
+        const observedBytes = Buffer.byteLength(original.outputText, "utf8");
+        const servedBytes = Buffer.byteLength(outputText, "utf8");
+        const savedBytes = observedBytes - servedBytes;
 
+        const views = sameRevision ? prior.views : new Set();
+        views.add(view);
+        history.set(target.absolutePath, { digest, recipient, views });
         reads.push({
-          path: record?.path ?? rawPath,
+          payloadClass, repeated,
+          path: target.relativePath,
           mode: config.mode,
-          decision: record?.decision ?? "passthrough",
+          decision,
           provider: record?.provider ?? null,
           providerOutcome: record?.providerOutcome ?? null,
-          observedBytes: record?.bytes ?? Buffer.byteLength(rawContent, "utf8"),
-          servedBytes: record
-            ? (record.decision === "deduplicated"
-              ? (record.replayBytes ?? 0)
-              : (record.outputBytes ?? record.bytes ?? 0))
-            : Buffer.byteLength(servedContent, "utf8"),
-          savedBytes: record?.savedBytes ?? 0,
+          observedBytes,
+          servedBytes,
+          savedBytes,
           warnings: record?.warnings?.map((w) => w.code) ?? [],
         });
 
@@ -210,15 +270,16 @@ export default function (pi) {
           content: [{ type: "text", text: outputText }],
           details: {
             ...details,
-            lines: servedContent.split("\n").length,
+            lines: servedLines,
             dedup: record
-              ? { decision: record.decision, savedBytes: record.savedBytes ?? 0 }
+              ? { decision, savedBytes, delivery }
               : undefined,
           },
         };
       } catch (error) {
+        const reason = error.code ?? (error instanceof RangeError ? error.message : "read unavailable");
         return {
-          content: [{ type: "text", text: `Error reading file: ${error.message}` }],
+          content: [{ type: "text", text: `Error reading file: ${reason}` }],
           details: { error: true },
         };
       }
@@ -226,11 +287,16 @@ export default function (pi) {
   });
 
   pi.on("session_start", async (_event, ctx) => {
+    policyRoot = undefined;
+    projectPolicy = undefined;
+    protectedPatternCount = policy.protectedPatterns.length;
+    recipient = randomUUID();
     try {
       sessionId = ctx.sessionManager.getSessionId() ?? config.runId;
     } catch {
       sessionId = config.runId;
     }
+    sessionIds.add(sessionId);
   });
 
   pi.on("session_shutdown", async () => {
@@ -240,6 +306,12 @@ export default function (pi) {
         acc.servedBytes += r.servedBytes;
         acc.savedBytes += r.savedBytes;
         acc.readCalls += 1;
+        if (r.repeated) acc.repeatReads += 1;
+        const bucket = acc.payloadByClass[r.payloadClass];
+        bucket.reads++;
+        bucket.inputBytes += r.observedBytes;
+        bucket.outputBytes += r.servedBytes;
+        bucket.savedBytes += r.savedBytes;
         if (r.decision === "deduplicated") acc.dedupHits += 1;
         if (r.decision === "compressed") acc.compressedReads += 1;
         if (r.decision === "protected") acc.protectedReads += 1;
@@ -250,6 +322,9 @@ export default function (pi) {
       },
       {
         readCalls: 0,
+        repeatReads: 0,
+        payloadByClass: Object.fromEntries(["firstRead", "exactRepeat", "changed", "protected", "freshSession"].map(name =>
+          [name, { reads: 0, inputBytes: 0, outputBytes: 0, savedBytes: 0 }])),
         dedupHits: 0,
         compressedReads: 0,
         protectedReads: 0,
@@ -263,12 +338,14 @@ export default function (pi) {
     );
     const payload = {
       runId: config.runId,
+      attempt: 1,
       mode: config.mode,
       sessionId,
+      sessionIds: [...sessionIds],
       policy: {
         minBytes: policy.minBytes,
         maxEntries: policy.maxEntries,
-        protectedPatterns: policy.protectedPatterns.length,
+        protectedPatterns: protectedPatternCount,
       },
       totals,
       reads,

@@ -1,7 +1,8 @@
 // aifhub-mcp-contract.test.mjs - tests for the AIFHub MCP manifest and runtime guidance contract
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, open, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
@@ -178,6 +179,9 @@ describe('AIFHub MCP extension contract', () => {
       const first = await scopedCall('read_file_deduplicated', { path: 'notes.md' });
       assert.equal(first.result.content[0].text, content);
 
+      const unconfirmed = await scopedCall('read_file_deduplicated', { path: 'notes.md' });
+      assert.equal(unconfirmed.result.content[0].text, content);
+      options.replayAvailable = true;
       const second = await scopedCall('read_file_deduplicated', { path: 'notes.md' });
       assert.match(second.result.content[0].text, /already provided in this session/);
       assert.doesNotMatch(second.result.content[0].text, /ai-factory .*--file/);
@@ -251,6 +255,7 @@ describe('AIFHub MCP extension contract', () => {
       );
 
       const first = await call('notes.md');
+      options.replayAvailable = true;
       const second = await call('notes.md');
       const protectedRead = await call('openspec/specs/auth/spec.md');
       const status = await handleMcpMessage(
@@ -265,7 +270,7 @@ describe('AIFHub MCP extension contract', () => {
       const statusPayload = JSON.parse(status.result.content[0].text);
 
       assert.equal(first.result.content[0].text, 'compact\n');
-      assert.match(second.result.content[0].text, /self-contained compressed payload/);
+      assert.match(second.result.content[0].text, /self-contained payload/);
       assert.equal(protectedRead.result.content[0].text, content);
       assert.equal(calls, 1);
       assert.equal(statusPayload.mode, 'sqz');
@@ -508,5 +513,106 @@ describe('AIFHub MCP extension contract', () => {
         `MCP docs must include ${label}`
       );
     }
+  });
+});
+
+describe('MCP read delivery', () => {
+  it('preserves protected fixture bytes without consulting SQZ and isolates recipient output', async t => {
+    const { handleMcpMessage } = await import('./aifhub-mcp-server.mjs');
+    const fixture = await mkdtemp(path.join(os.tmpdir(), 'aifhub-mcp-protection-'));
+    t.after(() => rm(fixture, { recursive: true, force: true }));
+    const marker = randomUUID();
+    const original = Buffer.from('Проверка Δ\r\n' + marker + ' sample'.repeat(65) + '\r\n');
+    const roots = [path.join(fixture, 'first'), path.join(fixture, 'second')];
+    const targets = ['openspec/specs/demo/spec.md', 'openspec/changes/demo/tasks.md',
+      '.ai-factory/qa/demo/verify.md', '.ai-factory/state/demo/done-readiness.json', '.ai-factory/rules/generated/demo.md',
+      'reports/coverage.json', 'reports/done-readiness.json', 'reports/aif-gate-result.json',
+      'custom/specs/demo/spec.md', 'custom/qa/demo/evidence.md', 'custom/plans/demo/plan.md',
+      'custom/state/demo/trace.md', 'custom/rules/demo.md', 'mixed-case/Coverage.JSON'];
+    const other = Buffer.from('independent fixture\r\n');
+    for (const root of roots) {
+      await mkdir(path.join(root, '.ai-factory'), { recursive: true });
+      await writeFile(path.join(root, '.ai-factory/config.yaml'),
+        'aifhub:\n  contextDedup:\n    mode: sqz\n    minBytes: 1\n' +
+        'paths:\n  plans: custom/plans\n  specs: custom/specs\n  qa: custom/qa\n  state: custom/state\n  generated_rules: custom/rules\n');
+      for (const target of targets) {
+        await mkdir(path.dirname(path.join(root, target)), { recursive: true });
+        await writeFile(path.join(root, target), root === roots[0] ? original : other);
+      }
+      await symlink(path.join(root, 'custom/qa'), path.join(root, 'allowed-alias'),
+        process.platform === 'win32' ? 'junction' : 'dir');
+    }
+    targets.push('allowed-alias/demo/evidence.md');
+    if (process.platform === 'win32') targets.push('CUSTOM/SPECS/demo/spec.md');
+    let starts = 0;
+    const opened = [];
+    const call = async (cwd, target) => handleMcpMessage({ jsonrpc: '2.0', id: 1, method: 'tools/call',
+      params: { name: 'read_file_deduplicated', arguments: { path: target } } }, {
+      cwd, mcpSessionId: 'fixture-recipient',
+      openFile: (file, ...args) => { opened.push(file); return open(file, ...args); },
+      sqzRunner: async () => { starts++; return { ok: true, stdout: 'short' }; }
+    });
+    for (const target of targets) {
+      for (const root of roots) {
+        const { result } = await call(root, target);
+        assert.ok(!result.isError && Buffer.from(result.content[0].text).equals(root === roots[0] ? original : other), target);
+        assert.ok(!JSON.stringify(result.content.slice(1)).includes(marker));
+      }
+    }
+    assert.equal(starts, 0);
+    assert.ok(opened.length >= 2 * targets.length);
+    opened.length = 0;
+    const denied = await call(roots[0], path.join(fixture, 'unallocated.txt'));
+    assert.equal(denied.result.isError, true);
+    assert.equal(opened.length, 0);
+    assert.ok(!JSON.stringify(denied).includes(marker));
+  });
+
+  it('keeps a read self-contained for callers without a bound recipient', async t => {
+    const { handleMcpMessage } = await import('./aifhub-mcp-server.mjs');
+    const root = await mkdtemp(path.join(os.tmpdir(), 'aifhub-mcp-reader-'));
+    t.after(() => rm(root, { recursive: true, force: true }));
+    await mkdir(path.join(root, '.ai-factory'));
+    await writeFile(path.join(root, '.ai-factory', 'config.yaml'),
+      'aifhub:\n  contextDedup:\n    mode: aifhub\n    minBytes: 1\n');
+    const text = 'sample A: 320 ms\n'.repeat(40);
+    await writeFile(path.join(root, 'notes.md'), text);
+    const request = { jsonrpc: '2.0', id: 1, method: 'tools/call',
+      params: { name: 'read_file_deduplicated', arguments: { path: 'notes.md' } } };
+    for (let reader = 0; reader < 2; reader++) {
+      const reply = await handleMcpMessage(request, { cwd: root });
+      assert.equal(reply.result.isError, undefined);
+      assert.equal(reply.result.content[0].text, text);
+    }
+  });
+
+  it('delivers the revised file and forced original within a bound SQZ session', async t => {
+    const { handleMcpMessage } = await import('./aifhub-mcp-server.mjs');
+    const root = await mkdtemp(path.join(os.tmpdir(), 'aifhub-mcp-revision-'));
+    t.after(() => rm(root, { recursive: true, force: true }));
+    await mkdir(path.join(root, '.ai-factory'));
+    await writeFile(path.join(root, '.ai-factory', 'config.yaml'),
+      'aifhub:\n  contextDedup:\n    mode: sqz\n    minBytes: 1\n');
+    let starts = 0;
+    const options = { cwd: root, mcpSessionId: 'recipient', sqzRunner: async ({ content }) => {
+      starts++;
+      return { ok: true, stdout: content.split('\n')[0] };
+    } };
+    const read = async args => {
+      const response = await handleMcpMessage({ jsonrpc: '2.0', id: 1, method: 'tools/call',
+        params: { name: 'read_file_deduplicated', arguments: { path: 'notes.md', ...args } } }, options);
+      assert.equal(response.result.isError, undefined);
+      return response.result.content[0].text;
+    };
+    const padding = '\n' + 'notes\n'.repeat(75);
+    await writeFile(path.join(root, 'notes.md'), 'interval 320 ms' + padding);
+    assert.equal(await read(), 'interval 320 ms');
+    options.replayAvailable = true;
+    assert.match(await read(), /same session|this session/);
+    assert.equal(starts, 1);
+    await writeFile(path.join(root, 'notes.md'), 'interval 32 ms' + padding);
+    assert.equal(await read(), 'interval 32 ms' + padding);
+    assert.equal(await read({ force: true }), 'interval 32 ms' + padding);
+    assert.equal(starts, 1);
   });
 });
