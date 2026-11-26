@@ -9,6 +9,8 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import { cellKey, pairedComparisons } from "../../docs/memory-tools-research/context-dedup-ai-tester/summarize-matrix.mjs";
+
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 
 function parseArgs(argv) {
@@ -16,6 +18,7 @@ function parseArgs(argv) {
   // argv is already sliced to flags-only (process.argv.slice(2)).
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === "--out") result.out.push(path.resolve(argv[++i]));
+    else if (argv[i] === "--json") result.json = true;
     else if (argv[i] === "--title") result.title = argv[++i];
     else throw new Error(`Unknown argument: ${argv[i]}`);
   }
@@ -23,87 +26,142 @@ function parseArgs(argv) {
   return result;
 }
 
-const fmt = (n) => (Number.isFinite(Number(n)) ? Number(n).toLocaleString("en-US") : "n/a");
-const pct = (saved, observed) => (observed > 0 ? `${((saved / observed) * 100).toFixed(1)}%` : "n/a");
+function outcome(r) {
+  if (r.skipped) return 'NOT_RUN';
+  if (r.error || r.pi?.timedOut || r.pi?.signal || (Number.isInteger(r.pi?.exitCode) && r.pi.exitCode !== 0)) return 'ERROR';
+  if (r.quality?.pass === false) return 'FAIL';
+  return r.pi?.exitCode === 0 && r.quality?.pass === true ? 'PASS' : 'INCOMPLETE';
+}
+
+function profileLabel(id, model) {
+  return [id, model?.provider, model?.model, model?.thinking].map(v => v ?? 'unknown').join(' / ');
+}
+
+function taskRow(r, identity) {
+  const u = r.usage ?? {}, m = r.readMetrics ?? {};
+  const numeric = value => Number.isFinite(value) && value >= 0 ? value : null;
+  const cost = u.costAvailable === false ? null : numeric(u.cost);
+  const elapsed = Date.parse(r.pi?.finishedAt) - Date.parse(r.pi?.startedAt);
+  return {...identity, attempt: r.attempt ?? 1, runId: r.runId,
+    status: outcome(r), qualityPass: r.quality?.pass ?? null, exitCode: r.pi?.exitCode ?? null,
+    errorTurns: numeric(r.errorTurns),
+    usageUnavailable: u.unavailable ?? null, usagePartial: u.partial ?? null,
+    initialTreeSha256: r.initialTreeSha256 ?? null, requireInitialTree: Boolean(r.snapshot),
+    turns: numeric(r.turns), inputTokens: numeric(u.input), outputTokens: numeric(u.output),
+    cacheReadTokens: numeric(u.cacheRead), cacheWriteTokens: numeric(u.cacheWrite),
+    reportedCostUsd: cost, costUsd: numeric(u.billedUsd), estimatedCostUsd: numeric(u.estimatedUsd),
+    costSource: u.costSource ?? (cost === null ? null : 'Pi session usage.cost.total'),
+    latencyMs: numeric(r.latencyMs) ?? numeric(elapsed),
+    readCalls: numeric(m.readCalls), repeatReads: numeric(m.repeatReads), toolCalls: numeric(r.toolCalls),
+    inputBytes: numeric(m.observedBytes), outputBytes: numeric(m.servedBytes),
+    savedBytes: Number.isFinite(m.observedBytes) && Number.isFinite(m.servedBytes) ? m.observedBytes - m.servedBytes : null,
+    payloadByClass: m.payloadByClass ?? null, warnings: numeric(m.warnedReads),
+    sessionId: r.sessionId ?? null, limitation: r.readMetricsUnavailable ?? r.skipped ?? null };
+}
+
+const arms = ['off', 'aifhub', 'sqz'];
+async function collect(directories) {
+  const rows = [], expected = new Map(), inferredPlans = [], unboundAttempts = [];
+  for (const [index, dir] of directories.entries()) {
+    let manifest;
+    try { manifest = JSON.parse(await readFile(path.join(dir, 'manifest.json'), 'utf8')); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+    const byRun = new Map();
+    const attempts = new Map();
+    const matched = new Set();
+    if (manifest) {
+      const seen = new Set();
+      for (const e of manifest.expectedCells) {
+        const identity = {...e, profile:profileLabel(e.profile, manifest.profile)};
+        const key = cellKey(identity);
+        if (byRun.has(e.runId) || seen.has(key)) throw new Error('Duplicate planned Pi cell.');
+        byRun.set(e.runId, identity);
+        seen.add(key);
+        expected.set(key, identity);
+      }
+      for (const binding of manifest.attempts ?? []) {
+        if (typeof binding.file !== 'string' || path.basename(binding.file) !== binding.file ||
+            !Number.isSafeInteger(binding.attempt) || binding.attempt < 1 || attempts.has(binding.file) ||
+            !byRun.has(binding.cellRunId ?? binding.runId)) throw new Error('Invalid Pi attempt binding.');
+        attempts.set(binding.file, binding);
+      }
+    } else inferredPlans.push(index + 1);
+
+    const results = path.join(dir, 'results');
+    let names;
+    try { names = await readdir(results); } catch (error) {
+      if (error.code !== 'ENOENT' || !manifest) throw error;
+      names = [];
+    }
+    const files = names.filter(f => f.endsWith('.json')).sort();
+    for (const file of files) {
+      const r = JSON.parse(await readFile(path.join(results,file), 'utf8'));
+      const identity = {project:r.project, caseId:r.task, repeat:r.repeat ?? 1, arm:r.arm,
+        snapshot:r.snapshot ?? 'legacy-input-' + (index + 1), platform:r.platform ?? 'unknown',
+        profile:profileLabel(r.profile, r.model)};
+      const row = taskRow(r, identity);
+      if (manifest) {
+        const binding = attempts.get(file);
+        const plan = byRun.get(binding?.cellRunId ?? r.runId);
+        if (!plan || cellKey(plan) !== cellKey(identity) || (attempts.size && !binding) ||
+            (binding && (binding.runId !== r.runId || (r.attempt != null && r.attempt !== binding.attempt)))) {
+          unboundAttempts.push({...row, limitation:'result conflicts with manifest'});
+          continue;
+        }
+        if (binding) { row.attempt = binding.attempt; matched.add(file); }
+      } else {
+        for (const arm of arms) {
+          const cell = {...identity, arm};
+          expected.set(cellKey(cell),cell);
+        }
+      }
+      rows.push(row);
+    }
+    for (const [file, binding] of attempts) {
+      if (!matched.has(file)) rows.push({...byRun.get(binding.cellRunId ?? binding.runId), attempt: binding.attempt, status:'MISSING'});
+    }
+  }
+  return {rows, unboundAttempts, inferredPlans, pairedTrials:pairedComparisons(rows, [...expected.values()], arms)};
+}
+
+const fmt = v => v == null ? 'n/a' : String(v).replaceAll('|','\\|').replace(/[\r\n]+/g, ' ');
+function table(lines, headings, rows) {
+  lines.push('| ' + headings.join(' | ') + ' |', '|' + headings.map(() => '---').join('|') + '|');
+  for (const values of rows) lines.push('| ' + values.map(fmt).join(' | ') + ' |');
+  lines.push('');
+}
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
-  const records = [];
-  for (const resultsRoot of options.out) {
-    const resultsDir = path.join(resultsRoot, "results");
-    const names = (await readdir(resultsDir)).filter((n) => n.endsWith(".json"));
-    for (const name of names) {
-      records.push(JSON.parse(await readFile(path.join(resultsDir, name), "utf8")));
+  const summary = await collect(options.out);
+  if (options.json) { process.stdout.write(JSON.stringify(summary, null, 2) + '\n'); return; }
+  const lines = ['# ' + options.title, '',
+    'Usage columns contain the reported counters. Cached tokens are shown separately. Monetary amounts are USD.',
+    'Session cost is the value reported by Pi. Billed amounts and estimates have separate columns.', ''];
+  if (summary.unboundAttempts.length) lines.push('Unbound attempt records: ' + summary.unboundAttempts.length + '. Their known costs are listed under unboundAttempts in JSON.', '');
+  if (summary.inferredPlans.length) lines.push('Inputs without a manifest use observed repeat IDs; completely absent repeats are unknown.', '');
+  table(lines, ['project','task','arm','status','profile','repeat','attempt','answer','exit','turns','input tok','output tok','cache read','cache write','latency ms','tool calls','reads','repeat reads','observed B','served B','net B','session cost','billed','estimate','cost source'],
+    summary.rows.map(r=>[r.project,r.caseId.replace(/^(research|exec)-/,'$1:'),r.arm,r.status,r.profile,r.repeat,r.attempt,r.qualityPass,r.exitCode,r.turns,r.inputTokens,r.outputTokens,r.cacheReadTokens,r.cacheWriteTokens,r.latencyMs,r.toolCalls,r.readCalls,r.repeatReads,r.inputBytes,r.outputBytes,r.savedBytes,r.reportedCostUsd,r.costUsd,r.estimatedCostUsd,r.costSource]));
+  lines.push('## Paired task deltas (off minus variant)', '');
+  for (const g of summary.pairedTrials) {
+    lines.push([g.snapshot,g.platform,g.profile,g.project,g.caseId].map(fmt).join(' · '), '',
+      'Successful triples: ' + g.successfulTriples + '/' + g.expectedTriples + '. Retries: ' + g.retries + '.', '');
+    table(lines, ['repeat','arm','cell status','attempts'],g.cells.map(c=>[c.repeat,c.arm,c.status,c.attempts]));
+    const classes = [];
+    for (const arm of arms) {
+      const cells = g.cells.filter(c => c.arm === arm);
+      for (const name of Object.keys(cells[0]?.payloadByClass ?? {})) {
+        const known = cells.map(c => c.payloadByClass[name]).filter(b => Number.isFinite(b.savedBytes));
+        if (known.length) classes.push([arm, name, known.length + '/' + cells.length,
+          ...['reads','inputBytes','outputBytes','savedBytes'].map(k => known.reduce((n,b) => n + b[k], 0))]);
+      }
     }
+    if (classes.length) table(lines, ['arm','read class','measured/planned cells','reads','observed B','served B','net B'], classes);
+    if (g.excludedTriples.length) lines.push('Triples excluded for unverified initial files: ' + g.excludedTriples.map(t => t.repeat).join(', ') + '.', '');
+    table(lines, ['arm','metric','usable/planned','median','min','max'],Object.entries(g.comparisons).flatMap(([arm,fields])=>
+      Object.entries(fields).map(([metric,s])=>[arm,metric,s.count+'/'+s.denominator,s.median,s.min,s.max])));
   }
-  records.sort((a, b) => `${a.project}-${a.task}-${a.arm}`.localeCompare(`${b.project}-${b.task}-${b.arm}`));
-
-  const lines = [];
-  lines.push(`# ${options.title}`);
-  lines.push("");
-  lines.push("Agent: pi (print mode) · model `la/ornith-1.5-35b-a3b` @ omniroute · thinking low.");
-  lines.push("Bytes = model-visible payload measured by the dedup `read` override; tokens = measured provider usage from session files. Cost: provider reports no per-token price for this model, so cost is not computable (`unavailable`).");
-  lines.push("");
-  lines.push("## Per-cell results");
-  lines.push("");
-  lines.push("| project | task | arm | quality | turns | in tok | out tok | reads | obs B | served B | saved B | saved % | warnings |");
-  lines.push("|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
-  for (const r of records) {
-    const q = r.quality ? (r.quality.pass ? "PASS" : "FAIL") : (r.error ? "ERROR" : "n/a");
-    const u = r.usage ?? {};
-    const m = r.readMetrics ?? {};
-    lines.push([
-      r.projectLabel ?? r.project,
-      r.task.replace(/^(research|exec)-/, "$1:"),
-      r.arm,
-      q,
-      r.turns ?? "n/a",
-      u.input !== undefined ? fmt(u.input) : "n/a",
-      u.output !== undefined ? fmt(u.output) : "n/a",
-      m.readCalls ?? "n/a",
-      m.observedBytes !== undefined ? fmt(m.observedBytes) : "n/a",
-      m.servedBytes !== undefined ? fmt(m.servedBytes) : "n/a",
-      m.savedBytes !== undefined ? fmt(m.savedBytes) : "n/a",
-      m.savedBytes !== undefined ? pct(m.savedBytes, m.observedBytes ?? 0) : "n/a",
-      m.warnedReads ?? "n/a",
-    ].join("|").replace(/^/, "| ").concat(" |"));
-  }
-
-  lines.push("");
-  lines.push("## Aggregates by project × arm (mean over cells)");
-  lines.push("");
-  lines.push("| project | arm | cells | quality pass | mean in tok | mean out tok | mean saved % |");
-  lines.push("|---|---|---:|---:|---:|---:|---:|");
-  const groups = new Map();
-  for (const r of records) {
-    const key = `${r.projectLabel ?? r.project}|${r.arm}`;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(r);
-  }
-  const mean = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : NaN);
-  for (const [key, rs] of [...groups.entries()].sort()) {
-    const [project, arm] = key.split("|");
-    const tok = rs.map((r) => (r.usage?.input ?? 0) + (r.usage?.output ?? 0));
-    const savedPct = rs.map((r) => {
-      const m = r.readMetrics;
-      return m && m.observedBytes > 0 ? (m.savedBytes / m.observedBytes) * 100 : 0;
-    });
-    lines.push(`| ${project} | ${arm} | ${rs.length} | ${rs.filter((r) => r.quality?.pass).length}/${rs.length} | ${fmt(mean(tok))} | ${mean(savedPct).toFixed(1)}% |`);
-  }
-
-  lines.push("");
-  lines.push("## Verdict inputs");
-  lines.push("");
-  const cellTag = (r) => `${r.projectLabel ?? r.project}·${r.task}·${r.arm}`;
-  const failed = records.filter((r) => r.quality && !r.quality.pass);
-  lines.push(`- FAILED cells: ${failed.length === 0 ? "none" : failed.map((r) => `\`${cellTag(r)}\``).join(", ")}`);
-  const errored = records.filter((r) => r.error);
-  lines.push(`- ERRORED cells: ${errored.length === 0 ? "none" : errored.map((r) => `\`${cellTag(r)}\``).join(", ")}`);
-  const warned = records.filter((r) => (r.readMetrics?.warnedReads ?? 0) > 0);
-  lines.push(`- Cells with dedup warnings: ${warned.length === 0 ? "none" : warned.map((r) => `\`${r.runId}\`(${r.readMetrics.warnedReads})`).join(", ")}`);
-  lines.push("- Repetitions: see `--repeats`; single-run cells are noisy trajectories, compare arms only via aggregates.");
-
-  process.stdout.write(`${lines.join("\n")}\n`);
+  process.stdout.write(lines.join('\n') + '\n');
 }
 
 main().catch((e) => {

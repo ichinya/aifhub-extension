@@ -2,7 +2,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -13,6 +15,43 @@ function collect() {
   const chunks = [];
   return { write: (value) => chunks.push(value), text: () => chunks.join('') };
 }
+
+describe('issue 186 generator contracts', () => {
+  it('enumerates three distinct dry cells per arm for one Pi task', async t => {
+    const matrix = new URL('../benchmarks/pi-sqz-matrix/', import.meta.url);
+    const catalog = JSON.parse(await readFile(new URL('scenarios.json', matrix), 'utf8'));
+    const [project] = catalog.projects;
+    const task = project.tasks.find(entry => entry.kind === 'research');
+    const out = await mkdtemp(path.join(os.tmpdir(), 'sqz-dry-cells-'));
+    t.after(() => rm(out, { recursive: true, force: true, maxRetries: 3 }));
+    execFileSync(process.execPath, [fileURLToPath(new URL('run-matrix.mjs', matrix)), '--dry-run',
+      '--projects', project.id, '--tasks', task.id, '--arms', 'off,aifhub,sqz', '--repeats', '3', '--out', out],
+    { encoding: 'utf8', timeout: 15000 });
+
+    const cells = [];
+    for (const file of readdirSync(path.join(out, 'results'))) {
+      cells.push(JSON.parse(await readFile(path.join(out, 'results', file), 'utf8')));
+    }
+    assert.deepEqual(cells.map(r => r.arm + '/' + r.repeat).sort(),
+      ['aifhub/1', 'aifhub/2', 'aifhub/3', 'off/1', 'off/2', 'off/3', 'sqz/1', 'sqz/2', 'sqz/3']);
+    assert.equal(new Set(cells.map(r => r.runId)).size, 9);
+    assert.ok(cells.every(r => r.project === project.id && r.task === task.id && r.skipped === 'dry-run'));
+    assert.ok(cells.every(r => r.model.model === catalog.model.model && r.model.provider === catalog.model.provider));
+  });
+
+  it('rejects an incorrect AI Tester binary pin before creating the output snapshot', async t => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'sqz-generator-pin-'));
+    t.after(() => rm(root, { recursive: true, force: true, maxRetries: 3 }));
+    const binary = path.join(root, 'synthetic.bin');
+    const output = path.join(root, 'snapshot');
+    await writeFile(binary, 'inert fixture, never executed');
+    const generator = fileURLToPath(new URL('../docs/memory-tools-research/context-dedup-ai-tester/generate-matrix.mjs', import.meta.url));
+    assert.throws(() => execFileSync(process.execPath, [generator, '--sqz-exe', binary, '--output', output],
+      { encoding: 'utf8', timeout: 15000, stdio: 'pipe' }), error =>
+      error.status === 1 && /SHA-256 mismatch/i.test(error.stderr));
+    assert.deepEqual(readdirSync(root), ['synthetic.bin']);
+  });
+});
 
 describe('context dedup benchmark', () => {
   it('exposes the three comparison modes', () => {

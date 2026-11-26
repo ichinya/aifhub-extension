@@ -1,10 +1,134 @@
-import { describe, it } from 'node:test';
+import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { register, syncBuiltinESMExports } from 'node:module';
 import fs, { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import os from 'node:os';
+
+describe('issue 186 Pi task accounting', () => {
+  let root, records, report, terminal;
+  before(async () => {
+    root = await mkdtemp(path.join(os.tmpdir(), 'sqz-pi-accounting-'));
+    const matrix = new URL('../benchmarks/pi-sqz-matrix/', import.meta.url);
+    const runner = path.join(root, 'run-matrix.mjs');
+    await fs.copyFile(new URL('run-matrix.mjs', matrix), runner);
+    const cwd = path.join(root, 'project');
+    await mkdir(cwd);
+    const model = { provider: 'fixture-provider', model: 'fixture-alpha', thinking: 'low' };
+    await writeFile(path.join(root, 'scenarios.json'), JSON.stringify({ model, projects: [{
+      id: 'fixture', label: 'fixture', path: cwd, tasks: [{ id: 'research-sample', kind: 'research',
+        prompt: 'fixture', assertions: ['known answer'] }]
+    }] }));
+
+    // Substitute the optional Pi executable. The runner reads actual session files, checks the answer,
+    // and observes the exit code of the subprocess. No model or installed provider is required.
+    const bin = path.join(root, 'npm/node_modules/@earendil-works/pi-coding-agent/dist/bundle');
+    await mkdir(bin, { recursive: true });
+    await writeFile(path.join(bin, 'cli.js'), [
+      "const fs = require('node:fs'), path = require('node:path');",
+      "const dir = process.argv[process.argv.indexOf('--session-dir') + 1], arm = process.env.SQZ_BENCH_MODE;",
+      "function session(name, usage) {",
+      "  const header = {type:'session', version:3, id:name, cwd:process.cwd()};",
+      "  const messages = usage.map(u => ({type:'message', message:{role:'assistant', stopReason:u.stopReason ?? 'stop', content:[{type:'text',text:'known answer'}], usage:u}}));",
+      "  fs.writeFileSync(path.join(dir,name+'.jsonl'), [header,...messages].map(entry => JSON.stringify(entry)).join('\\n')+'\\n');",
+      "}",
+      "const first = {input:7, output:2, cacheRead:0, cost:{total:0.125}};",
+      "const second = arm === 'aifhub' ? {input:11, cacheRead:0} : {input:11, output:3, cacheRead:0, cost:{total:0.25}};",
+      "if (process.argv.at(-1) === 'terminal-fixture') {",
+      "  session('aborted', [{stopReason:'aborted',input:0,output:0,cost:{total:0}}]); process.exit(0);",
+      "}",
+      "const interrupted = {stopReason:'error', input:0, output:0, cacheRead:0, cost:{total:0}};",
+      "session('first', arm === 'aifhub' ? [first,interrupted,second] : [first,second]);",
+      "if (arm === 'sqz') {",
+      "  session('unbound', [{input:9001, output:84, cost:{total:9}}]);",
+      "  fs.utimesSync(path.join(dir,'first.jsonl'), 1000, 1000);",
+      "}",
+      "if (arm === 'off') process.exitCode = 7;"
+    ].join('\n'));
+    const out = path.join(root, 'observed');
+    const fixtureEnv = { APPDATA: root, USERPROFILE: root, HOME: root, TEMP: root, TMP: root, TMPDIR: root };
+    if (process.env.SystemRoot) fixtureEnv.SystemRoot = process.env.SystemRoot;
+    execFileSync(process.execPath, [runner, '--out', out], {
+      env: fixtureEnv, encoding: 'utf8', timeout: 20000, stdio: 'pipe'
+    });
+    const terminalOut = path.join(root, 'terminal');
+    const catalogFile = path.join(root, 'scenarios.json');
+    const catalog = JSON.parse(await readFile(catalogFile, 'utf8'));
+    catalog.projects[0].tasks[0].prompt = 'terminal-fixture';
+    await writeFile(catalogFile, JSON.stringify(catalog));
+    execFileSync(process.execPath, [runner, '--out', terminalOut, '--arms', 'off'], { env: fixtureEnv, timeout: 20000, stdio: 'pipe' });
+    const dir = path.join(terminalOut, 'results');
+    terminal = JSON.parse(await readFile(path.join(dir, (await fs.readdir(dir))[0]), 'utf8'));
+    const results = path.join(out, 'results');
+    records = {};
+    for (const name of await fs.readdir(results)) {
+      const row = JSON.parse(await readFile(path.join(results, name), 'utf8'));
+      records[row.arm] = row;
+    }
+    // An independent historical-format row for a second profile at the same project / task / arm.
+    const secondOut = path.join(root, 'second-profile');
+    await mkdir(path.join(secondOut, 'results'), { recursive: true });
+    await writeFile(path.join(secondOut, 'results/control.json'), JSON.stringify({
+      project: 'fixture', task: 'research-sample', arm: 'off', repeat: 1, runId: 'beta-off-1',
+      model: { provider: 'other-provider', model: 'fixture-beta', thinking: 'high' },
+      quality: { pass: true }, pi: { exitCode: 0 }, turns: 1,
+      usage: { input: 22, output: 1, cacheRead: 0, cost: 0.5, costAvailable: true }
+    }));
+    report = execFileSync(process.execPath, [fileURLToPath(new URL('summarize.mjs', matrix)),
+      '--out', out, '--out', secondOut], { encoding: 'utf8', timeout: 10000 });
+  });
+  after(async () => { if (root) await rm(root, { recursive: true, force: true, maxRetries: 3 }); });
+
+  it('counts usage from both turns of an unsuccessful invocation, including reported cost and measured zero', () => {
+    const r = records.off;
+    assert.equal(r.pi.exitCode, 7);
+    assert.equal(r.turns, 2);
+    assert.deepEqual([r.usage.input, r.usage.output, r.usage.cacheRead, r.usage.cost, r.usage.costAvailable],
+      [18, 5, 0, 0.375, true]);
+  });
+
+  it('preserves a recovered answer and reports only known subtotals after a provider error', () => {
+    const u = records.aifhub.usage;
+    assert.deepEqual([records.aifhub.quality.pass, records.aifhub.errorTurns, u.input, u.cacheRead], [true, 1, null, null]);
+    assert.deepEqual(u.partial.input, { known: 18, observedTurns: 2, totalTurns: 3 });
+    assert.equal(u.partial.cacheRead.known, 0);
+    assert.equal(u.partial.cost.known, 0.125);
+    assert.ok(u.output == null || u.output === 'unavailable', '2 known output tokens are only a subtotal');
+    assert.equal(u.costAvailable, false, 'one priced turn cannot establish the total cost');
+  });
+
+  it('retains a terminal provider abort even when the process exits zero and the answer matches', () => {
+    assert.deepEqual([terminal.pi.exitCode, terminal.quality.pass, terminal.error, terminal.errorTurns],
+      [0, true, 'terminal-provider-error', 1]);
+    assert.equal(terminal.usage.cost, null);
+    assert.deepEqual(terminal.usage.partial, {});
+  });
+
+  it('does not attribute the latest of two unbound session files to the cell', () => {
+    const u = records.sqz.usage;
+    assert.ok(u.input == null || u.input === 'unavailable', 'neither 18 nor 9001 is a verified input total');
+    assert.ok(u.unavailable || u.reason || u.available === false, 'ambiguous session ownership needs an explicit limitation');
+  });
+
+  it('excludes a nonzero runner exit from successful cells even when the answer matched', () => {
+    const rows = report.split(/\r?\n/).filter(line => line.startsWith('|') && line.includes('research:sample'));
+    const off = rows.filter(line => line.split('|').some(value => value.trim() === 'off'));
+    assert.equal(off.length, 2, 'both profiles must retain their observed off cell');
+    assert.equal(off.filter(line => /\|\s*PASS\s*\|/.test(line)).length, 1);
+    assert.equal(off.filter(line => /\|\s*(ERROR|FAIL)\s*\|/.test(line)).length, 1);
+  });
+
+  it('reports both observed model profiles and the known monetary costs of their cells', () => {
+    for (const label of ['fixture-alpha', 'fixture-beta', 'fixture-provider', 'other-provider']) {
+      assert.ok(report.includes(label), 'missing observed profile label: ' + label);
+    }
+    assert.match(report, /0\.375\b/);
+    assert.match(report, /0\.50*\b/);
+  });
+});
 
 // Load the shipped extension. Only its two optional Pi dependencies are supplied
 // by the test host. A four-line display limit makes a continuation deterministic.
