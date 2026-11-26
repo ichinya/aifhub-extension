@@ -218,6 +218,7 @@ async function parseSession(sessionDir, cwd, profile) {
   const errorTurns = messages.filter(interrupted).length;
   const totals = {}, partial = {};
   const fields = {input:u => u.input ?? u.inputTokens, output:u => u.output ?? u.outputTokens,
+    totalTokens:u => u.totalTokens,
     cacheRead:u => u.cacheRead ?? u.cacheReadTokens, cacheWrite:u => u.cacheWrite ?? u.cacheWriteTokens,
     cost:u => u.cost?.total, billedUsd:u => u.billedUsd, estimatedUsd:u => u.usdEstimate};
   for (const [field, get] of Object.entries(fields)) {

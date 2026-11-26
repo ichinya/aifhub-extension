@@ -47,7 +47,7 @@ function taskRow(r, identity) {
     errorTurns: numeric(r.errorTurns),
     usageUnavailable: u.unavailable ?? null, usagePartial: u.partial ?? null,
     initialTreeSha256: r.initialTreeSha256 ?? null, requireInitialTree: Boolean(r.snapshot),
-    turns: numeric(r.turns), inputTokens: numeric(u.input), outputTokens: numeric(u.output),
+    turns: numeric(r.turns), inputTokens: numeric(u.input), outputTokens: numeric(u.output), totalTokens: numeric(u.totalTokens),
     cacheReadTokens: numeric(u.cacheRead), cacheWriteTokens: numeric(u.cacheWrite),
     reportedCostUsd: cost, costUsd: numeric(u.billedUsd), estimatedCostUsd: numeric(u.estimatedUsd),
     costSource: u.costSource ?? (cost === null ? null : 'Pi session usage.cost.total'),
@@ -140,8 +140,8 @@ async function main() {
     'Session cost is the value reported by Pi. Billed amounts and estimates have separate columns.', ''];
   if (summary.unboundAttempts.length) lines.push('Unbound attempt records: ' + summary.unboundAttempts.length + '. Their known costs are listed under unboundAttempts in JSON.', '');
   if (summary.inferredPlans.length) lines.push('Inputs without a manifest use observed repeat IDs; completely absent repeats are unknown.', '');
-  table(lines, ['project','task','arm','status','profile','repeat','attempt','answer','exit','turns','input tok','output tok','cache read','cache write','latency ms','tool calls','reads','repeat reads','observed B','served B','net B','session cost','billed','estimate','cost source'],
-    summary.rows.map(r=>[r.project,r.caseId.replace(/^(research|exec)-/,'$1:'),r.arm,r.status,r.profile,r.repeat,r.attempt,r.qualityPass,r.exitCode,r.turns,r.inputTokens,r.outputTokens,r.cacheReadTokens,r.cacheWriteTokens,r.latencyMs,r.toolCalls,r.readCalls,r.repeatReads,r.inputBytes,r.outputBytes,r.savedBytes,r.reportedCostUsd,r.costUsd,r.estimatedCostUsd,r.costSource]));
+  table(lines, ['project','task','arm','status','profile','repeat','attempt','answer','exit','turns','input tok','output tok','total tok','cache read','cache write','latency ms','tool calls','reads','repeat reads','observed B','served B','net B','session cost','billed','estimate','cost source'],
+    summary.rows.map(r=>[r.project,r.caseId.replace(/^(research|exec)-/,'$1:'),r.arm,r.status,r.profile,r.repeat,r.attempt,r.qualityPass,r.exitCode,r.turns,r.inputTokens,r.outputTokens,r.totalTokens,r.cacheReadTokens,r.cacheWriteTokens,r.latencyMs,r.toolCalls,r.readCalls,r.repeatReads,r.inputBytes,r.outputBytes,r.savedBytes,r.reportedCostUsd,r.costUsd,r.estimatedCostUsd,r.costSource]));
   lines.push('## Paired task deltas (off minus variant)', '');
   for (const g of summary.pairedTrials) {
     lines.push([g.snapshot,g.platform,g.profile,g.project,g.caseId].map(fmt).join(' · '), '',

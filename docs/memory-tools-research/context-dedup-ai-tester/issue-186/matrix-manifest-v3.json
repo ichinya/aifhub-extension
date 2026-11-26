@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "snapshot": "issue-186-full-task-v3",
+  "aifhubBaseRevision": "0b30a66581861ece23a625e3738aab4176cb7ded",
+  "repeats": 3,
+  "profiles": {
+    "aiTester": [
+      {
+        "id": "codex-luna-low",
+        "runtime": "codex",
+        "model": "gpt-5.6-luna",
+        "reasoning": "low"
+      }
+    ],
+    "pi": [
+      {
+        "id": "pi-ornith-low",
+        "provider": "omniroute",
+        "model": "la/ornith-1.5-35b-a3b",
+        "thinking": "low"
+      }
+    ]
+  },
+  "sqz": {
+    "repository": "https://github.com/ojuschugh1/sqz",
+    "version": "1.3.0",
+    "sourceCommit": "d024b6b6bec152dfa7a63e2316054b1bb33a8110",
+    "archiveSha256": "8243989670198FC0251404A330D843224D896FC6AAB1DE8233D73A0C1AA04158",
+    "binarySha256": {
+      "win32": "0C21ADFA0C67B6EB61EDD2B8B87C836AC2757A58D0D68D93376606E6CC75E76B",
+      "linux": null
+    }
+  },
+  "runners": {
+    "aiTester": {
+      "repository": "lee-to/ai-tester",
+      "revision": "98dd5afb3fe9b9b7593d21dc93bcbc6d98c2cca9"
+    },
+    "pi": {
+      "version": "1.6.0",
+      "entrySha256": "e79626f2dd6f94aa45d30f3fa63cd84319a6eefcd150b353cfaf274366926774"
+    }
+  },
+  "aiTesterCases": [
+    "repeat-source",
+    "changed-source",
+    "protected-openspec",
+    "fresh-session-preseeded-cache",
+    "short-config"
+  ],
+  "piTasks": [
+    {
+      "project": "idshka",
+      "task": "research-issuer-domain"
+    },
+    {
+      "project": "idshka",
+      "task": "exec-issuer-constant",
+      "preconditions": [
+        {
+          "type": "grep",
+          "file": "app/Domain/Issuer/ValueObjects/CanonicalIssuer.php",
+          "pattern": "in_array\\(\\$scheme, \\['http', 'https'\\]"
+        }
+      ]
+    },
+    {
+      "project": "secret-santa",
+      "task": "exec-participant-length",
+      "preconditions": [
+        {
+          "type": "grep",
+          "file": "backend/app/models/participant.py",
+          "pattern": "display_name.*String\\(255\\)"
+        }
+      ],
+      "expectedBenefit": "low",
+      "reason": "Single target file below the default 2048-byte threshold in the inspected source."
+    }
+  ],
+  "files": {
+    "scripts/context-dedup.mjs": "969c27b24f5acd89d195e972d30be276f3c5a9c04938693dc1b087ffc61eb3b0",
+    "scripts/runtime-gitignore.mjs": "05b6410faa79d8e51a921dd271203928565244af851c13cafc1fd4608a2c7369",
+    "scripts/provider-files.mjs": "a0d3b698f0f77a52024bd445d4db6ef34eb5ebfbe149eb4d9459d8da752cbf84",
+    "scripts/provider-process.mjs": "95574e55350ea8802d9e8166b42f5d57c08268dd3986725f6215d058cdec5890",
+    "docs/memory-tools-research/context-dedup-ai-tester/generate-matrix.mjs": "49e7543df4ba01887406f508ba9f350cb9f20e8cf3b7255d9aca7410742e889b",
+    "benchmarks/pi-sqz-matrix/run-matrix.mjs": "16c13932f0c278effc49432415a7861a772bf0d64b90634a399d3be0b878be6f",
+    "benchmarks/pi-sqz-matrix/scenarios.json": "ef1a1558c6290a7bd83efeaf7ece66c61ba9bebb927efde3a267628bb955983f",
+    "benchmarks/pi-sqz-matrix/dedup-read.mjs": "b242385c95381c36f47208f4ef1d3082ddf7c414ed3786fa8c55a3a119c167ab"
+  }
+}

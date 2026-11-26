@@ -469,7 +469,7 @@ it('accepts the current issue 186 manifest in both harnesses and preserves the m
   const suite = new URL('../docs/memory-tools-research/context-dedup-ai-tester/', import.meta.url);
   const { readMatrixManifest } = await import(new URL('generate-matrix.mjs', suite));
   const issue = new URL('issue-186/', suite);
-  const current = new URL('matrix-manifest-v2.json', issue);
+  const current = new URL('matrix-manifest-v3.json', issue);
   const historical = JSON.parse(await readFile(new URL('matrix-manifest.json', issue), 'utf8'));
   const observations = JSON.parse(await readFile(
     new URL('snapshots/2026-11-25-windows-sqz-1.3.0/observations.json', issue), 'utf8'));
@@ -477,7 +477,7 @@ it('accepts the current issue 186 manifest in both harnesses and preserves the m
   assert.deepEqual(historical.files, observations.pins.runtimeFiles);
   for (const harness of ['aiTester', 'pi']) {
     const { manifest } = await readMatrixManifest(current, harness);
-    assert.equal(manifest.snapshot, 'issue-186-full-task-v2');
+    assert.equal(manifest.snapshot, 'issue-186-full-task-v3');
     assert.notEqual(manifest.snapshot, historical.snapshot);
   }
 });

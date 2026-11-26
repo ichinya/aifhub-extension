@@ -332,6 +332,12 @@ const shortCase = {
   assertions: [['timeout', 'TIMEOUT_S\\s*[=:]\\s*9\\b'], ['retries', 'RETRIES\\s*[=:]\\s*0\\b']]
 };
 
+export function snapshotScenarioName({ snapshot, platform, profile, caseId, repeat, arm }) {
+  const identity = JSON.stringify([snapshot, platform, profile, caseId, repeat, arm]);
+  const fingerprint = createHash('sha256').update(identity).digest('hex').slice(0, 24);
+  return ['context-dedup', profile, caseId, 'r' + repeat, arm, fingerprint].join('-');
+}
+
 async function generateSnapshot(args) {
   const { manifest, profile } = await readMatrixManifest(args.manifest, 'aiTester', args.profile, args.sqzExe);
   const definitions = new Map([...cases, shortCase].map(testCase => [testCase.id, testCase]));
@@ -349,10 +355,10 @@ async function generateSnapshot(args) {
     const testCase = definitions.get(caseId);
     for (let repeat = 1; repeat <= manifest.repeats; repeat++) {
       for (const arm of arms) {
-        const scenario = ['context-dedup', profile.id, testCase.id, 'r' + repeat, arm].join('-');
+        const identity = { snapshot: manifest.snapshot, platform: process.platform, profile: profile.id, caseId, repeat, arm };
+        const scenario = snapshotScenarioName(identity);
         const fixture = 'fixtures/' + scenario;
-        const cell = { snapshot: manifest.snapshot, platform: process.platform, profile: profile.id, caseId: testCase.id,
-          repeat, arm, scenario, fixture };
+        const cell = { ...identity, scenario, fixture };
         if (testCase.setup) Object.assign(cell, { ledgerSetup: arm === 'baseline' ? 'not-applicable' : 'prime command before model session', providerCache: 'unverified' });
         const root = path.join(output, fixture);
         for (const [relative, bytes] of Object.entries(inputs)) {

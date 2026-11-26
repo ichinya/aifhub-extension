@@ -4,6 +4,7 @@ import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
+import { snapshotScenarioName } from './generate-matrix.mjs';
 
 const ARMS = ['baseline', 'aifhub', 'sqz'];
 const PAYLOAD_CLASSES = ['firstRead', 'exactRepeat', 'changed', 'protected', 'freshSession'];
@@ -168,7 +169,7 @@ export function buildRows(entries, runsRoot) {
       inputBytes: measurements.length ? totals.inputBytes : null,
       outputBytes: measurements.length ? totals.outputBytes : null,
       savedBytes: measurements.length ? totals.savedBytes : null,
-      inputTokens: measurement(cost.inputTokens), outputTokens: measurement(cost.outputTokens),
+      inputTokens: measurement(cost.inputTokens), outputTokens: measurement(cost.outputTokens), totalTokens: measurement(cost.totalTokens),
       cacheReadTokens: measurement(cost.cacheReadTokens), cacheWriteTokens: measurement(cost.cacheCreationTokens),
       reportedCostUsd: measurement(cost.totalUsd), costUsd: measurement(cost.billedUsd),
       estimatedCostUsd: measurement(cost.usdEstimate), costSource: cost.source ?? null,
@@ -233,7 +234,7 @@ function comparisonForArm(rows, arm, options = {}) {
 
 // Keep attempts, cell completion and metric availability separate. A failed attempt
 // can have a perfectly valid bill, and an accepted triple can lack one metric.
-const taskMetrics = ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens',
+const taskMetrics = ['inputTokens', 'outputTokens', 'totalTokens', 'cacheReadTokens', 'cacheWriteTokens',
   'latencyMs', 'readCalls', 'repeatReads', 'toolCalls', 'inputBytes', 'outputBytes', 'savedBytes',
   'costUsd', 'reportedCostUsd', 'estimatedCostUsd'];
 
@@ -254,7 +255,7 @@ function total(rows, field) {
 }
 
 const partialUsageFields = {
-  inputTokens: 'input', outputTokens: 'output', cacheReadTokens: 'cacheRead',
+  inputTokens: 'input', outputTokens: 'output', totalTokens: 'totalTokens', cacheReadTokens: 'cacheRead',
   cacheWriteTokens: 'cacheWrite', costUsd: 'billedUsd', reportedCostUsd: 'cost', estimatedCostUsd: 'estimatedUsd'
 };
 
@@ -332,7 +333,7 @@ export function pairedComparisons(rows, expectedCells, arms = ARMS) {
         continue;
       }
       result.successfulTriples++;
-      if (successfulRows.some(row => row.protocolVerified === false)) {
+      if ([...success.values()].some(attempts => attempts.at(-1).protocolVerified === false)) {
         result.excludedTriples.push({ repeat, reason: 'required tool protocol unconfirmed' });
         continue;
       }
@@ -427,7 +428,13 @@ export async function main() {
       const cell = bound ? planned.get(cellKey(bound)) : scenarios.get(name);
       if (!name && !bound) continue;
       if (!bound && (bindings.size || !cell)) { unbound(trace, 'no manifest binding'); continue; }
+      if (!bound && name !== snapshotScenarioName(cell)) {
+        unbound(trace, 'legacy scenario requires an explicit attempt binding');
+        continue;
+      }
       if (name !== (cell.scenario ?? 'context-dedup-' + cell.caseId + '-' + cell.arm) ||
+          (trace.snapshot != null && trace.snapshot !== cell.snapshot) ||
+          (trace.platform != null && trace.platform !== cell.platform) ||
           (bound && trace.runner?.attempt != null && trace.runner.attempt !== bound.attempt) ||
           (manifest.profile?.model && trace.runner?.model && trace.runner.model !== manifest.profile.model) ||
           (manifest.profile?.reasoning && trace.runner?.reasoning && trace.runner.reasoning !== manifest.profile.reasoning)) {

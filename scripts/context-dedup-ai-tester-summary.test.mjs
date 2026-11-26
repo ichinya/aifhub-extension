@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
 
+import { snapshotScenarioName } from '../docs/memory-tools-research/context-dedup-ai-tester/generate-matrix.mjs';
 import {
   buildRows,
   buildSummary,
@@ -107,9 +108,10 @@ describe('issue 186 AI Tester accounting', () => {
 
   it('keeps measured zero separate from missing token usage', () => {
     const zero = traceEntry(cell('alpha', 1, 'sqz'), { inputTokens: 0, outputTokens: 0 });
+    zero.trace.cost.totalTokens = 0;
     const unknown = traceEntry(cell('alpha', 2, 'sqz'), { inputTokens: 21 });
     delete unknown.trace.cost.outputTokens;
-    assert.deepEqual(buildRows([zero, unknown], 'runs').map(r => [r.inputTokens, r.outputTokens]), [[0, 0], [21, null]]);
+    assert.deepEqual(buildRows([zero, unknown], 'runs').map(r => [r.inputTokens, r.outputTokens, r.totalTokens]), [[0, 0, 0], [21, null, null]]);
   });
 
   it('retains measured costs when the runner exits unsuccessfully despite a correct answer', () => {
@@ -178,6 +180,47 @@ describe('issue 186 AI Tester accounting', () => {
     assert.equal(selected.reduce((sum, r) => sum + r.inputTokens, 0), 80, 'failed attempt (5) and retry (75) were both billed');
   });
 
+  it('isolates snapshot and platform traces and requires explicit bindings for legacy names', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'sqz-trace-identity-'));
+    temporaryDirectories.push(root);
+    const runs = path.join(root, 'runs');
+    await mkdir(runs);
+    const key = cell('alpha', 1, 'sqz');
+    const current = snapshotScenarioName(key);
+    const legacy = 'context-dedup-alpha-short-config-r1-sqz';
+    const scenarios = {
+      current, previous: snapshotScenarioName({ ...key, snapshot: 'previous' }),
+      foreign: snapshotScenarioName({ ...key, platform: 'win32' }), legacy
+    };
+    for (const [file, name] of Object.entries(scenarios)) {
+      const { trace } = traceEntry(key);
+      trace.scenario.name = name;
+      await writeFile(path.join(runs, file + '.json'), JSON.stringify(trace));
+    }
+    const cli = fileURLToPath(new URL('../docs/memory-tools-research/context-dedup-ai-tester/summarize-matrix.mjs', import.meta.url));
+    async function summarize(outputName, scenario, attempts) {
+      const manifest = path.join(root, 'manifest.json');
+      const output = path.join(root, outputName);
+      await writeFile(manifest, JSON.stringify({ expectedCells: [{ ...key, scenario }], attempts }));
+      execFileSync(process.execPath, [cli, '--manifest', manifest, '--runs', runs, '--output', output], { timeout: 10000 });
+      return JSON.parse(await readFile(path.join(output, 'matrix-summary.json'), 'utf8'));
+    }
+    const scoped = await summarize('scoped', current);
+    assert.deepEqual([scoped.rows.length, scoped.unboundTraceCount], [1, 3]);
+    const ambiguous = await summarize('ambiguous', legacy);
+    assert.equal(ambiguous.rows.length, 0);
+    assert.ok(ambiguous.unboundAttempts.some(a => a.reason === 'legacy scenario requires an explicit attempt binding'));
+    const attempts = [{ ...key, attempt: 1, file: 'legacy.json' }];
+    const bound = await summarize('bound', legacy, attempts);
+    assert.deepEqual([bound.rows[0].status, bound.unboundTraceCount], ['PASS', 3]);
+    const file = path.join(runs, 'legacy.json');
+    const trace = JSON.parse(await readFile(file, 'utf8'));
+    await writeFile(file, JSON.stringify({ ...trace, snapshot: 'previous' }));
+    const conflict = await summarize('conflict', legacy, attempts);
+    assert.equal(conflict.rows[0].status, 'MISSING');
+    assert.ok(conflict.unboundAttempts.some(a => a.reason === 'trace conflicts with manifest'));
+  });
+
   it('compares matched triples per profile and accounts for retries, missing cells, duplicates and failures', () => {
     const expectedCells = [];
     const entries = [];
@@ -192,6 +235,8 @@ describe('issue 186 AI Tester accounting', () => {
     // Signed baseline-minus-SQZ input deltas are 110-80, 50-70, 200-190.
     addRepeat('alpha', 1, [110, 95, 5]);
     entries.at(-1).trace.scoring.overallPass = false;
+    entries.at(-1).trace.turns = []; // The billed first attempt stopped before the required read.
+    delete entries.at(-1).trace.cost.outputTokens;
     entries.push(traceEntry(cell('alpha', 1, 'sqz'), { inputTokens: 75, attempt: 2 }));
     addRepeat('alpha', 2, [50, 55, 70]);
     addRepeat('alpha', 3, [200, 195, 190]);
@@ -215,6 +260,8 @@ describe('issue 186 AI Tester accounting', () => {
     assert.deepEqual([alpha.expectedTriples, alpha.successfulTriples], [6, 3]);
     assert.deepEqual([alpha.missingCells, alpha.duplicateCells, alpha.failedCells, alpha.retries], [1, 1, 1, 1]);
     assert.equal(alpha.failedAttemptInputTokens, 18); // 5 on retry + 13 on the unsuccessful cell
+    assert.equal(alpha.comparableTriples, 3);
+    assert.equal(alpha.comparisons.sqz.outputTokens.count, 2, 'the retry cannot supply missing usage for its first attempt');
     const stats = group => {
       const { count, median, min, max } = group.comparisons.sqz.inputTokens;
       return [count, median, min, max];

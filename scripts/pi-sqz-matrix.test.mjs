@@ -9,7 +9,7 @@ import path from 'node:path';
 import os from 'node:os';
 
 describe('issue 186 Pi task accounting', () => {
-  let root, records, report, terminal;
+  let root, records, report, terminal, summary;
   before(async () => {
     root = await mkdtemp(path.join(os.tmpdir(), 'sqz-pi-accounting-'));
     const matrix = new URL('../benchmarks/pi-sqz-matrix/', import.meta.url);
@@ -35,10 +35,10 @@ describe('issue 186 Pi task accounting', () => {
       "  const messages = usage.map(u => ({type:'message', message:{role:'assistant', stopReason:u.stopReason ?? 'stop', content:[{type:'text',text:'known answer'}], usage:u}}));",
       "  fs.writeFileSync(path.join(dir,name+'.jsonl'), [header,...messages].map(entry => JSON.stringify(entry)).join('\\n')+'\\n');",
       "}",
-      "const first = {input:7, output:2, cacheRead:0, cost:{total:0.125}};",
-      "const second = arm === 'aifhub' ? {input:11, cacheRead:0} : {input:11, output:3, cacheRead:0, cost:{total:0.25}};",
+      "const first = {input:7, output:2, cacheRead:0, cacheWrite:4, totalTokens:13, cost:{total:0.125}};",
+      "const second = arm === 'aifhub' ? {input:11, cacheRead:0} : {input:11, output:3, cacheRead:0, cacheWrite:5, totalTokens:19, cost:{total:0.25}};",
       "if (process.argv.at(-1) === 'terminal-fixture') {",
-      "  session('aborted', [{stopReason:'aborted',input:0,output:0,cost:{total:0}}]); process.exit(0);",
+      "  session('aborted', [{stopReason:'aborted',input:0,output:0,totalTokens:0,cost:{total:0}}]); process.exit(0);",
       "}",
       "const interrupted = {stopReason:'error', input:0, output:0, cacheRead:0, cost:{total:0}};",
       "session('first', arm === 'aifhub' ? [first,interrupted,second] : [first,second]);",
@@ -77,8 +77,16 @@ describe('issue 186 Pi task accounting', () => {
       quality: { pass: true }, pi: { exitCode: 0 }, turns: 1,
       usage: { input: 22, output: 1, cacheRead: 0, cost: 0.5, costAvailable: true }
     }));
-    report = execFileSync(process.execPath, [fileURLToPath(new URL('summarize.mjs', matrix)),
-      '--out', out, '--out', secondOut], { encoding: 'utf8', timeout: 10000 });
+    for (const [arm, totalTokens] of Object.entries({ off: 8205, aifhub: 0, sqz: 12119 })) {
+      await writeFile(path.join(secondOut, 'results', arm + '.json'), JSON.stringify({
+        project: 'fixture', task: 'research-paired', arm, repeat: 1, runId: 'paired-' + arm,
+        model, quality: { pass: true }, pi: { exitCode: 0 }, usage: { totalTokens }
+      }));
+    }
+    const args = [fileURLToPath(new URL('summarize.mjs', matrix)), '--out', out, '--out', secondOut];
+    const options = { encoding: 'utf8', timeout: 10000 };
+    report = execFileSync(process.execPath, args, options);
+    summary = JSON.parse(execFileSync(process.execPath, [...args, '--json'], options));
   });
   after(async () => { if (root) await rm(root, { recursive: true, force: true, maxRetries: 3 }); });
 
@@ -88,12 +96,22 @@ describe('issue 186 Pi task accounting', () => {
     assert.equal(r.turns, 2);
     assert.deepEqual([r.usage.input, r.usage.output, r.usage.cacheRead, r.usage.cost, r.usage.costAvailable],
       [18, 5, 0, 0.375, true]);
+    assert.equal(r.usage.totalTokens, 32);
+    assert.equal(summary.rows.find(row => row.runId === r.runId).totalTokens, 32);
+    assert.equal(summary.rows.find(row => row.runId === 'beta-off-1').totalTokens, null);
+    assert.equal(summary.rows.find(row => row.runId === 'paired-aifhub').totalTokens, 0);
+    const delta = summary.pairedTrials.find(group => group.caseId === 'research-paired').comparisons.sqz.totalTokens;
+    assert.deepEqual([delta.count, delta.median], [1, -3914]);
+    assert.match(report, /\| input tok \| output tok \| total tok \|/);
+    assert.match(report, /\| sqz \| totalTokens \| 1\/1 \| -3914 \|/);
   });
 
   it('preserves a recovered answer and reports only known subtotals after a provider error', () => {
     const u = records.aifhub.usage;
     assert.deepEqual([records.aifhub.quality.pass, records.aifhub.errorTurns, u.input, u.cacheRead], [true, 1, null, null]);
     assert.deepEqual(u.partial.input, { known: 18, observedTurns: 2, totalTurns: 3 });
+    assert.equal(u.totalTokens, null);
+    assert.deepEqual(u.partial.totalTokens, { known: 13, observedTurns: 1, totalTurns: 3 });
     assert.equal(u.partial.cacheRead.known, 0);
     assert.equal(u.partial.cost.known, 0.125);
     assert.ok(u.output == null || u.output === 'unavailable', '2 known output tokens are only a subtotal');
@@ -104,6 +122,7 @@ describe('issue 186 Pi task accounting', () => {
     assert.deepEqual([terminal.pi.exitCode, terminal.quality.pass, terminal.error, terminal.errorTurns],
       [0, true, 'terminal-provider-error', 1]);
     assert.equal(terminal.usage.cost, null);
+    assert.equal(terminal.usage.totalTokens, null);
     assert.deepEqual(terminal.usage.partial, {});
   });
 
@@ -324,10 +343,20 @@ describe('registered Pi read delivery', () => {
       const lines = entries.slice(1, 4);
       const root = await workspace(t, lines);
       const first = await openTool(root, 'aifhub');
-      assert.equal(await first.read(), lines.join('\n'));
+      const reply = await first.execute({});
+      assert.equal(reply.content[0].text, lines.join('\n'));
+      const delivered = { role: 'toolResult', toolName: 'read', content: reply.content, details: reply.details };
+      first.messages.push(delivered);
+      assert.equal((await first.execute({})).details.dedup.decision, 'deduplicated');
       let recipient = first;
-      if (transition === 'resume' || transition === 'handoff') recipient = await openTool(root, 'aifhub');
-      else await first.event(transition);
+      if (transition === 'resume' || transition === 'handoff') {
+        recipient = await openTool(root, 'aifhub');
+        recipient.messages.push(delivered); // A restored transcript still belongs to the previous recipient.
+      } else {
+        // Pi exposes the compacted or newly selected branch through buildSessionProjection.
+        first.messages.splice(0, 1, { role: 'assistant', content: [{ type: 'text', text: 'summary without the file' }] });
+        await first.event(transition);
+      }
       assert.equal(await recipient.read(), lines.join('\n'));
     });
   }
