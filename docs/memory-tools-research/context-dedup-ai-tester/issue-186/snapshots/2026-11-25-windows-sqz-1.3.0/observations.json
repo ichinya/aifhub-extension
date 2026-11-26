@@ -1,0 +1,6162 @@
+{
+  "schemaVersion": 1,
+  "snapshot": "2026-11-25-windows-sqz-1.3.0",
+  "pins": {
+    "sqzVersion": "1.3.0",
+    "sqzCommit": "d024b6b6bec152dfa7a63e2316054b1bb33a8110",
+    "sqzWindowsBinary": "0C21ADFA0C67B6EB61EDD2B8B87C836AC2757A58D0D68D93376606E6CC75E76B",
+    "sqzLinuxPreflight": "2517f9c62489a184d6f4ba3c50663dbe58e71c57ed9e9e9c6a6bfddcb01386b1",
+    "aifhubRevision": "0b30a66581861ece23a625e3738aab4176cb7ded",
+    "runtimeFiles": {
+      "scripts/context-dedup.mjs": "19ea5c9ea332c9667e04f9f773ee28fbf07874c682474de49dd8b661215b5a12",
+      "scripts/runtime-gitignore.mjs": "05b6410faa79d8e51a921dd271203928565244af851c13cafc1fd4608a2c7369",
+      "scripts/provider-files.mjs": "a0d3b698f0f77a52024bd445d4db6ef34eb5ebfbe149eb4d9459d8da752cbf84",
+      "scripts/provider-process.mjs": "95574e55350ea8802d9e8166b42f5d57c08268dd3986725f6215d058cdec5890",
+      "docs/memory-tools-research/context-dedup-ai-tester/generate-matrix.mjs": "c814f1aa59500258c1be98f3b94250b35a04758718eb94b1ec3bfe0e6b180be4",
+      "benchmarks/pi-sqz-matrix/run-matrix.mjs": "63a6a1662e5048859faef27924cff0a19b4abc98cabaad0c5bdb69401ad1d860",
+      "benchmarks/pi-sqz-matrix/scenarios.json": "ef1a1558c6290a7bd83efeaf7ece66c61ba9bebb927efde3a267628bb955983f",
+      "benchmarks/pi-sqz-matrix/dedup-read.mjs": "80833868e4ead4c43fabd463984d816627b632aeed78ff03d95180a807be8b38"
+    },
+    "aiTesterRevision": "98dd5afb3fe9b9b7593d21dc93bcbc6d98c2cca9",
+    "aiTesterBinary": "5cc8b5c3030382746429ee21a03644bb41af4a346fa3d0dc77516c5fb8aee0ab",
+    "codexVersion": "0.172.0",
+    "codexBinary": "3f42b12274b353ecb3ec555e6c8d0a43f6c6cb29c3a546179bc12dee4855deb6",
+    "piVersion": "1.6.0",
+    "piEntry": "e79626f2dd6f94aa45d30f3fa63cd84319a6eefcd150b353cfaf274366926774",
+    "nativeManifest": "ec6af46892fea2fae911350bad8922e7ffdd882805a8366eceea849a3ae8b50a",
+    "piManifest": "435e2d77a3c634dd6eccea59c7e42c5803b3848d3d933b5c10fbb1c083ef113d",
+    "fixtures": {
+      "src/repeat-target.ts": "81a66041853ef1a70ed465dab359636599f2768e75db098620d472b92583c267",
+      "src/change-target.txt": "6c3b9c59e1c879ecbd7c6c65d1266d07f2f40cba88d27255a00e398107d9c21b",
+      "src/session-target.txt": "cabbfc33285196a2e5b4625cb2fe6963c715151397fffa2b2cf5c155ab874d41",
+      "openspec/specs/orders/spec.md": "5d22284b0dcfef7b0853ebc56d8b762115c98c47700f67dbcfb8d12ec5d4b193",
+      "src/policy.txt": "3bba7429173c4f57238b5f23e57c9a92f0cc8d3df711523bf996b910b0301e78"
+    },
+    "piRuntimeFiles": {
+      "scripts/context-dedup.mjs": "19ea5c9ea332c9667e04f9f773ee28fbf07874c682474de49dd8b661215b5a12",
+      "scripts/runtime-gitignore.mjs": "05b6410faa79d8e51a921dd271203928565244af851c13cafc1fd4608a2c7369",
+      "scripts/provider-files.mjs": "a0d3b698f0f77a52024bd445d4db6ef34eb5ebfbe149eb4d9459d8da752cbf84",
+      "scripts/provider-process.mjs": "95574e55350ea8802d9e8166b42f5d57c08268dd3986725f6215d058cdec5890",
+      "docs/memory-tools-research/context-dedup-ai-tester/generate-matrix.mjs": "c814f1aa59500258c1be98f3b94250b35a04758718eb94b1ec3bfe0e6b180be4",
+      "benchmarks/pi-sqz-matrix/run-matrix.mjs": "63a6a1662e5048859faef27924cff0a19b4abc98cabaad0c5bdb69401ad1d860",
+      "benchmarks/pi-sqz-matrix/scenarios.json": "ef1a1558c6290a7bd83efeaf7ece66c61ba9bebb927efde3a267628bb955983f",
+      "benchmarks/pi-sqz-matrix/dedup-read.mjs": "80833868e4ead4c43fabd463984d816627b632aeed78ff03d95180a807be8b38"
+    },
+    "piInitialTrees": {
+      "project-a-research": "da378ea90c855c37c73a2234151644b705ba7fc6dc1b5bde88f9738166789d46",
+      "project-a-edit": "da378ea90c855c37c73a2234151644b705ba7fc6dc1b5bde88f9738166789d46",
+      "project-b-edit": "4c9adc093588a393d56e410e11261fd920ed62f70a07bb557c333f66db6eb5be"
+    }
+  },
+  "profiles": [
+    {
+      "id": "ai-tester-codex-full",
+      "platform": "win32",
+      "model": "gpt-6.1-terra",
+      "reasoning": "low",
+      "cases": [
+        "repeat-source",
+        "changed-source",
+        "protected-openspec",
+        "fresh-session-preseeded-cache",
+        "short-config"
+      ],
+      "repeats": 3,
+      "rows": [
+        {
+          "caseId": "repeat-source",
+          "repeat": 1,
+          "arm": "off",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 88845,
+            "outputTokens": 148,
+            "cacheReadTokens": 69248,
+            "cacheWriteTokens": 0,
+            "totalTokens": 88993,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 2,
+            "elapsedMs": 21726,
+            "readCalls": 2,
+            "inputBytes": 28684,
+            "outputBytes": 28684,
+            "netBytes": 0,
+            "readResultTextBytes": 28886,
+            "repeatReads": 1
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              14342,
+              14342
+            ],
+            "exactRepeat": [
+              1,
+              14342,
+              14342
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 54081,
+            "outputTokens": 139,
+            "cacheReadTokens": 37248,
+            "cacheWriteTokens": 0,
+            "totalTokens": 54220,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 2,
+            "elapsedMs": 13777,
+            "readCalls": 2,
+            "inputBytes": 28684,
+            "outputBytes": 28684,
+            "netBytes": 0,
+            "readResultTextBytes": 28882,
+            "repeatReads": 1
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              14342,
+              14342
+            ],
+            "exactRepeat": [
+              1,
+              14342,
+              14342
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 54071,
+            "outputTokens": 133,
+            "cacheReadTokens": 46592,
+            "cacheWriteTokens": 0,
+            "totalTokens": 54204,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 2,
+            "elapsedMs": 14743,
+            "readCalls": 2,
+            "inputBytes": 28684,
+            "outputBytes": 28684,
+            "netBytes": 0,
+            "readResultTextBytes": 28876,
+            "repeatReads": 1
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              14342,
+              14342
+            ],
+            "exactRepeat": [
+              1,
+              14342,
+              14342
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 2,
+          "arm": "off",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 54075,
+            "outputTokens": 135,
+            "cacheReadTokens": 46592,
+            "cacheWriteTokens": 0,
+            "totalTokens": 54210,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 2,
+            "elapsedMs": 16147,
+            "readCalls": 2,
+            "inputBytes": 28684,
+            "outputBytes": 28684,
+            "netBytes": 0,
+            "readResultTextBytes": 28886,
+            "repeatReads": 1
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              14342,
+              14342
+            ],
+            "exactRepeat": [
+              1,
+              14342,
+              14342
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 54082,
+            "outputTokens": 136,
+            "cacheReadTokens": 37248,
+            "cacheWriteTokens": 0,
+            "totalTokens": 54218,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 2,
+            "elapsedMs": 13077,
+            "readCalls": 2,
+            "inputBytes": 28684,
+            "outputBytes": 28684,
+            "netBytes": 0,
+            "readResultTextBytes": 28882,
+            "repeatReads": 1
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              14342,
+              14342
+            ],
+            "exactRepeat": [
+              1,
+              14342,
+              14342
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 59195,
+            "outputTokens": 135,
+            "cacheReadTokens": 51584,
+            "cacheWriteTokens": 0,
+            "totalTokens": 59330,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 2,
+            "elapsedMs": 17226,
+            "readCalls": 2,
+            "inputBytes": 28684,
+            "outputBytes": 28684,
+            "netBytes": 0,
+            "readResultTextBytes": 28876,
+            "repeatReads": 1
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              14342,
+              14342
+            ],
+            "exactRepeat": [
+              1,
+              14342,
+              14342
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 3,
+          "arm": "off",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 54070,
+            "outputTokens": 134,
+            "cacheReadTokens": 46464,
+            "cacheWriteTokens": 0,
+            "totalTokens": 54204,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 2,
+            "elapsedMs": 13972,
+            "readCalls": 2,
+            "inputBytes": 28684,
+            "outputBytes": 28684,
+            "netBytes": 0,
+            "readResultTextBytes": 28886,
+            "repeatReads": 1
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              14342,
+              14342
+            ],
+            "exactRepeat": [
+              1,
+              14342,
+              14342
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 59199,
+            "outputTokens": 135,
+            "cacheReadTokens": 51584,
+            "cacheWriteTokens": 0,
+            "totalTokens": 59334,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 2,
+            "elapsedMs": 14497,
+            "readCalls": 2,
+            "inputBytes": 28684,
+            "outputBytes": 28684,
+            "netBytes": 0,
+            "readResultTextBytes": 28882,
+            "repeatReads": 1
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              14342,
+              14342
+            ],
+            "exactRepeat": [
+              1,
+              14342,
+              14342
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 54077,
+            "outputTokens": 135,
+            "cacheReadTokens": 46592,
+            "cacheWriteTokens": 0,
+            "totalTokens": 54212,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 2,
+            "elapsedMs": 19159,
+            "readCalls": 2,
+            "inputBytes": 28684,
+            "outputBytes": 28684,
+            "netBytes": 0,
+            "readResultTextBytes": 28876,
+            "repeatReads": 1
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              14342,
+              14342
+            ],
+            "exactRepeat": [
+              1,
+              14342,
+              14342
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 1,
+          "arm": "off",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 113930,
+            "outputTokens": 175,
+            "cacheReadTokens": 86656,
+            "cacheWriteTokens": 0,
+            "totalTokens": 114105,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 3,
+            "elapsedMs": 28952,
+            "readCalls": 2,
+            "inputBytes": 33346,
+            "outputBytes": 33346,
+            "netBytes": 0,
+            "readResultTextBytes": 33548,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              16673,
+              16673
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              1,
+              16673,
+              16673
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "PASS",
+          "protocolVerified": false,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 80843,
+            "outputTokens": 253,
+            "cacheReadTokens": 57984,
+            "cacheWriteTokens": 0,
+            "totalTokens": 81096,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 2,
+            "elapsedMs": 22313,
+            "readCalls": 3,
+            "inputBytes": 50019,
+            "outputBytes": 50019,
+            "netBytes": 0,
+            "readResultTextBytes": 50335,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              16673,
+              16673
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              2,
+              33346,
+              33346
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 107691,
+            "outputTokens": 172,
+            "cacheReadTokens": 77440,
+            "cacheWriteTokens": 0,
+            "totalTokens": 107863,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 3,
+            "elapsedMs": 24363,
+            "readCalls": 2,
+            "inputBytes": 33346,
+            "outputBytes": 33346,
+            "netBytes": 0,
+            "readResultTextBytes": 33538,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              16673,
+              16673
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              1,
+              16673,
+              16673
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 2,
+          "arm": "off",
+          "status": "FAIL",
+          "reason": "updated-file-facts-missing",
+          "protocolVerified": false,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 50955,
+            "outputTokens": 239,
+            "cacheReadTokens": 29824,
+            "cacheWriteTokens": 0,
+            "totalTokens": 51194,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 1,
+            "elapsedMs": 18647,
+            "readCalls": 2,
+            "inputBytes": 33346,
+            "outputBytes": 33346,
+            "netBytes": 0,
+            "readResultTextBytes": 33564,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              16673,
+              16673
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              1,
+              16673,
+              16673
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "PASS",
+          "protocolVerified": false,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 79474,
+            "outputTokens": 201,
+            "cacheReadTokens": 72704,
+            "cacheWriteTokens": 0,
+            "totalTokens": 79675,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 2,
+            "elapsedMs": 17180,
+            "readCalls": 3,
+            "inputBytes": 50019,
+            "outputBytes": 50019,
+            "netBytes": 0,
+            "readResultTextBytes": 50335,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              16673,
+              16673
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              2,
+              33346,
+              33346
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 105704,
+            "outputTokens": 173,
+            "cacheReadTokens": 98816,
+            "cacheWriteTokens": 0,
+            "totalTokens": 105877,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 3,
+            "elapsedMs": 19159,
+            "readCalls": 2,
+            "inputBytes": 33346,
+            "outputBytes": 33346,
+            "netBytes": 0,
+            "readResultTextBytes": 33538,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              16673,
+              16673
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              1,
+              16673,
+              16673
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 3,
+          "arm": "off",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 113982,
+            "outputTokens": 177,
+            "cacheReadTokens": 95872,
+            "cacheWriteTokens": 0,
+            "totalTokens": 114159,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 3,
+            "elapsedMs": 18681,
+            "readCalls": 2,
+            "inputBytes": 33346,
+            "outputBytes": 33346,
+            "netBytes": 0,
+            "readResultTextBytes": 33548,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              16673,
+              16673
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              1,
+              16673,
+              16673
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 108017,
+            "outputTokens": 153,
+            "cacheReadTokens": 91008,
+            "cacheWriteTokens": 0,
+            "totalTokens": 108170,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 3,
+            "elapsedMs": 19910,
+            "readCalls": 2,
+            "inputBytes": 33346,
+            "outputBytes": 33346,
+            "netBytes": 0,
+            "readResultTextBytes": 33547,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              16673,
+              16673
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              1,
+              16673,
+              16673
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 105677,
+            "outputTokens": 170,
+            "cacheReadTokens": 98816,
+            "cacheWriteTokens": 0,
+            "totalTokens": 105847,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 3,
+            "elapsedMs": 19107,
+            "readCalls": 2,
+            "inputBytes": 33346,
+            "outputBytes": 33346,
+            "netBytes": 0,
+            "readResultTextBytes": 33538,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              16673,
+              16673
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              1,
+              16673,
+              16673
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 1,
+          "arm": "off",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 53852,
+            "outputTokens": 134,
+            "cacheReadTokens": 45312,
+            "cacheWriteTokens": 0,
+            "totalTokens": 53986,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 2,
+            "elapsedMs": 12816,
+            "readCalls": 2,
+            "inputBytes": 29178,
+            "outputBytes": 29178,
+            "netBytes": 0,
+            "readResultTextBytes": 29380,
+            "repeatReads": 1
+          },
+          "readClasses": {
+            "firstRead": [
+              0,
+              0,
+              0
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              2,
+              29178,
+              29178
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 80862,
+            "outputTokens": 142,
+            "cacheReadTokens": 73472,
+            "cacheWriteTokens": 0,
+            "totalTokens": 81004,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 2,
+            "elapsedMs": 15977,
+            "readCalls": 2,
+            "inputBytes": 29178,
+            "outputBytes": 29178,
+            "netBytes": 0,
+            "readResultTextBytes": 29386,
+            "repeatReads": 1
+          },
+          "readClasses": {
+            "firstRead": [
+              0,
+              0,
+              0
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              2,
+              29178,
+              29178
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 53938,
+            "outputTokens": 135,
+            "cacheReadTokens": 37248,
+            "cacheWriteTokens": 0,
+            "totalTokens": 54073,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 2,
+            "elapsedMs": 16201,
+            "readCalls": 2,
+            "inputBytes": 29178,
+            "outputBytes": 29178,
+            "netBytes": 0,
+            "readResultTextBytes": 29380,
+            "repeatReads": 1
+          },
+          "readClasses": {
+            "firstRead": [
+              0,
+              0,
+              0
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              2,
+              29178,
+              29178
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 2,
+          "arm": "off",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 53851,
+            "outputTokens": 133,
+            "cacheReadTokens": 46592,
+            "cacheWriteTokens": 0,
+            "totalTokens": 53984,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 2,
+            "elapsedMs": 12676,
+            "readCalls": 2,
+            "inputBytes": 29178,
+            "outputBytes": 29178,
+            "netBytes": 0,
+            "readResultTextBytes": 29380,
+            "repeatReads": 1
+          },
+          "readClasses": {
+            "firstRead": [
+              0,
+              0,
+              0
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              2,
+              29178,
+              29178
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 53854,
+            "outputTokens": 135,
+            "cacheReadTokens": 46592,
+            "cacheWriteTokens": 0,
+            "totalTokens": 53989,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 2,
+            "elapsedMs": 18659,
+            "readCalls": 2,
+            "inputBytes": 29178,
+            "outputBytes": 29178,
+            "netBytes": 0,
+            "readResultTextBytes": 29386,
+            "repeatReads": 1
+          },
+          "readClasses": {
+            "firstRead": [
+              0,
+              0,
+              0
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              2,
+              29178,
+              29178
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 80856,
+            "outputTokens": 144,
+            "cacheReadTokens": 73472,
+            "cacheWriteTokens": 0,
+            "totalTokens": 81000,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 2,
+            "elapsedMs": 16905,
+            "readCalls": 2,
+            "inputBytes": 29178,
+            "outputBytes": 29178,
+            "netBytes": 0,
+            "readResultTextBytes": 29380,
+            "repeatReads": 1
+          },
+          "readClasses": {
+            "firstRead": [
+              0,
+              0,
+              0
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              2,
+              29178,
+              29178
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 3,
+          "arm": "off",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 53853,
+            "outputTokens": 132,
+            "cacheReadTokens": 45312,
+            "cacheWriteTokens": 0,
+            "totalTokens": 53985,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 2,
+            "elapsedMs": 14660,
+            "readCalls": 2,
+            "inputBytes": 29178,
+            "outputBytes": 29178,
+            "netBytes": 0,
+            "readResultTextBytes": 29380,
+            "repeatReads": 1
+          },
+          "readClasses": {
+            "firstRead": [
+              0,
+              0,
+              0
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              2,
+              29178,
+              29178
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 80862,
+            "outputTokens": 144,
+            "cacheReadTokens": 59904,
+            "cacheWriteTokens": 0,
+            "totalTokens": 81006,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 2,
+            "elapsedMs": 15761,
+            "readCalls": 2,
+            "inputBytes": 29178,
+            "outputBytes": 29178,
+            "netBytes": 0,
+            "readResultTextBytes": 29386,
+            "repeatReads": 1
+          },
+          "readClasses": {
+            "firstRead": [
+              0,
+              0,
+              0
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              2,
+              29178,
+              29178
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 80860,
+            "outputTokens": 144,
+            "cacheReadTokens": 73472,
+            "cacheWriteTokens": 0,
+            "totalTokens": 81004,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 2,
+            "elapsedMs": 16634,
+            "readCalls": 2,
+            "inputBytes": 29178,
+            "outputBytes": 29178,
+            "netBytes": 0,
+            "readResultTextBytes": 29380,
+            "repeatReads": 1
+          },
+          "readClasses": {
+            "firstRead": [
+              0,
+              0,
+              0
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              2,
+              29178,
+              29178
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 1,
+          "arm": "off",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 56010,
+            "outputTokens": 86,
+            "cacheReadTokens": 39680,
+            "cacheWriteTokens": 0,
+            "totalTokens": 56096,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 1,
+            "elapsedMs": 18481,
+            "readCalls": 1,
+            "inputBytes": 14052,
+            "outputBytes": 14052,
+            "netBytes": 0,
+            "readResultTextBytes": 14153,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              0,
+              0,
+              0
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              1,
+              14052,
+              14052
+            ]
+          },
+          "setupRetries": 1,
+          "setupStatus": "ERROR",
+          "setupStage": "before-model",
+          "setupElapsedMs": null
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 56002,
+            "outputTokens": 85,
+            "cacheReadTokens": 51456,
+            "cacheWriteTokens": 0,
+            "totalTokens": 56087,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 1,
+            "elapsedMs": 14453,
+            "readCalls": 1,
+            "inputBytes": 14052,
+            "outputBytes": 14052,
+            "netBytes": 0,
+            "readResultTextBytes": 14151,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              0,
+              0,
+              0
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              1,
+              14052,
+              14052
+            ]
+          }
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 50325,
+            "outputTokens": 86,
+            "cacheReadTokens": 46464,
+            "cacheWriteTokens": 0,
+            "totalTokens": 50411,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 1,
+            "elapsedMs": 15904,
+            "readCalls": 1,
+            "inputBytes": 14052,
+            "outputBytes": 8163,
+            "netBytes": 5889,
+            "readResultTextBytes": 8267,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              0,
+              0,
+              0
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              1,
+              14052,
+              8163
+            ]
+          }
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 2,
+          "arm": "off",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 50899,
+            "outputTokens": 85,
+            "cacheReadTokens": 45312,
+            "cacheWriteTokens": 0,
+            "totalTokens": 50984,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 1,
+            "elapsedMs": 12697,
+            "readCalls": 1,
+            "inputBytes": 14052,
+            "outputBytes": 14052,
+            "netBytes": 0,
+            "readResultTextBytes": 14153,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              0,
+              0,
+              0
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              1,
+              14052,
+              14052
+            ]
+          }
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 50900,
+            "outputTokens": 85,
+            "cacheReadTokens": 30976,
+            "cacheWriteTokens": 0,
+            "totalTokens": 50985,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 1,
+            "elapsedMs": 12405,
+            "readCalls": 1,
+            "inputBytes": 14052,
+            "outputBytes": 14052,
+            "netBytes": 0,
+            "readResultTextBytes": 14151,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              0,
+              0,
+              0
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              1,
+              14052,
+              14052
+            ]
+          }
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 50159,
+            "outputTokens": 85,
+            "cacheReadTokens": 45312,
+            "cacheWriteTokens": 0,
+            "totalTokens": 50244,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 1,
+            "elapsedMs": 13999,
+            "readCalls": 1,
+            "inputBytes": 14052,
+            "outputBytes": 7867,
+            "netBytes": 6185,
+            "readResultTextBytes": 7971,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              0,
+              0,
+              0
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              1,
+              14052,
+              7867
+            ]
+          }
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 3,
+          "arm": "off",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 50901,
+            "outputTokens": 85,
+            "cacheReadTokens": 37120,
+            "cacheWriteTokens": 0,
+            "totalTokens": 50986,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 1,
+            "elapsedMs": 13692,
+            "readCalls": 1,
+            "inputBytes": 14052,
+            "outputBytes": 14052,
+            "netBytes": 0,
+            "readResultTextBytes": 14153,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              0,
+              0,
+              0
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              1,
+              14052,
+              14052
+            ]
+          }
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 50891,
+            "outputTokens": 84,
+            "cacheReadTokens": 45312,
+            "cacheWriteTokens": 0,
+            "totalTokens": 50975,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 1,
+            "elapsedMs": 12407,
+            "readCalls": 1,
+            "inputBytes": 14052,
+            "outputBytes": 14052,
+            "netBytes": 0,
+            "readResultTextBytes": 14151,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              0,
+              0,
+              0
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              1,
+              14052,
+              14052
+            ]
+          }
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 50312,
+            "outputTokens": 85,
+            "cacheReadTokens": 46464,
+            "cacheWriteTokens": 0,
+            "totalTokens": 50397,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 1,
+            "elapsedMs": 13382,
+            "readCalls": 1,
+            "inputBytes": 14052,
+            "outputBytes": 8755,
+            "netBytes": 5297,
+            "readResultTextBytes": 8859,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              0,
+              0,
+              0
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              1,
+              14052,
+              8755
+            ]
+          }
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 1,
+          "arm": "off",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 48208,
+            "outputTokens": 73,
+            "cacheReadTokens": 30976,
+            "cacheWriteTokens": 0,
+            "totalTokens": 48281,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 1,
+            "elapsedMs": 12055,
+            "readCalls": 1,
+            "inputBytes": 22,
+            "outputBytes": 22,
+            "netBytes": 0,
+            "readResultTextBytes": 117,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              22,
+              22
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 53073,
+            "outputTokens": 73,
+            "cacheReadTokens": 51456,
+            "cacheWriteTokens": 0,
+            "totalTokens": 53146,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 1,
+            "elapsedMs": 16328,
+            "readCalls": 1,
+            "inputBytes": 22,
+            "outputBytes": 22,
+            "netBytes": 0,
+            "readResultTextBytes": 126,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              22,
+              22
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 47959,
+            "outputTokens": 73,
+            "cacheReadTokens": 46464,
+            "cacheWriteTokens": 0,
+            "totalTokens": 48032,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 1,
+            "elapsedMs": 13531,
+            "readCalls": 1,
+            "inputBytes": 22,
+            "outputBytes": 22,
+            "netBytes": 0,
+            "readResultTextBytes": 123,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              22,
+              22
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 2,
+          "arm": "off",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 47964,
+            "outputTokens": 73,
+            "cacheReadTokens": 45312,
+            "cacheWriteTokens": 0,
+            "totalTokens": 48037,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 1,
+            "elapsedMs": 12551,
+            "readCalls": 1,
+            "inputBytes": 22,
+            "outputBytes": 22,
+            "netBytes": 0,
+            "readResultTextBytes": 117,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              22,
+              22
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 47961,
+            "outputTokens": 75,
+            "cacheReadTokens": 46336,
+            "cacheWriteTokens": 0,
+            "totalTokens": 48036,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 1,
+            "elapsedMs": 11990,
+            "readCalls": 1,
+            "inputBytes": 22,
+            "outputBytes": 22,
+            "netBytes": 0,
+            "readResultTextBytes": 126,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              22,
+              22
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 47968,
+            "outputTokens": 74,
+            "cacheReadTokens": 45312,
+            "cacheWriteTokens": 0,
+            "totalTokens": 48042,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 1,
+            "elapsedMs": 12761,
+            "readCalls": 1,
+            "inputBytes": 22,
+            "outputBytes": 22,
+            "netBytes": 0,
+            "readResultTextBytes": 123,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              22,
+              22
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 3,
+          "arm": "off",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 47965,
+            "outputTokens": 74,
+            "cacheReadTokens": 45312,
+            "cacheWriteTokens": 0,
+            "totalTokens": 48039,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 1,
+            "elapsedMs": 12805,
+            "readCalls": 1,
+            "inputBytes": 22,
+            "outputBytes": 22,
+            "netBytes": 0,
+            "readResultTextBytes": 117,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              22,
+              22
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 47955,
+            "outputTokens": 73,
+            "cacheReadTokens": 45312,
+            "cacheWriteTokens": 0,
+            "totalTokens": 48028,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 1,
+            "elapsedMs": 12970,
+            "readCalls": 1,
+            "inputBytes": 22,
+            "outputBytes": 22,
+            "netBytes": 0,
+            "readResultTextBytes": 126,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              22,
+              22
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 47952,
+            "outputTokens": 74,
+            "cacheReadTokens": 45312,
+            "cacheWriteTokens": 0,
+            "totalTokens": 48026,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 1,
+            "elapsedMs": 16987,
+            "readCalls": 1,
+            "inputBytes": 22,
+            "outputBytes": 22,
+            "netBytes": 0,
+            "readResultTextBytes": 123,
+            "repeatReads": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              22,
+              22
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "pi-openai-api",
+      "platform": "win32",
+      "model": "gpt-6-luna",
+      "reasoning": "low",
+      "cases": [
+        "project-a-research",
+        "project-a-edit",
+        "project-b-edit"
+      ],
+      "repeats": 3,
+      "rows": [
+        {
+          "caseId": "project-a-research",
+          "repeat": 1,
+          "arm": "off",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "errorTurns": 0,
+          "metrics": {
+            "totalTokens": 9288,
+            "inputTokens": 9,
+            "outputTokens": 550,
+            "cacheReadTokens": 3449,
+            "cacheWriteTokens": 5280,
+            "reportedUsd": 0.00097039,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 8622,
+            "turns": 3,
+            "toolCalls": 6,
+            "readCalls": 5,
+            "repeatReads": 0,
+            "inputBytes": 13401,
+            "outputBytes": 13401,
+            "netBytes": 0,
+            "readResultTextBytes": 13401
+          },
+          "readClasses": {
+            "firstRead": [
+              5,
+              13401,
+              13401
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-a-research",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "errorTurns": 0,
+          "metrics": {
+            "totalTokens": 7688,
+            "inputTokens": 9,
+            "outputTokens": 494,
+            "cacheReadTokens": 3632,
+            "cacheWriteTokens": 3553,
+            "reportedUsd": 0.000728345,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 6895,
+            "turns": 3,
+            "toolCalls": 5,
+            "readCalls": 3,
+            "repeatReads": 0,
+            "inputBytes": 5446,
+            "outputBytes": 5446,
+            "netBytes": 0,
+            "readResultTextBytes": 5446
+          },
+          "readClasses": {
+            "firstRead": [
+              3,
+              5446,
+              5446
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-a-research",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": false,
+          "errorTurns": 2,
+          "metrics": {
+            "totalTokens": null,
+            "inputTokens": 15,
+            "outputTokens": 679,
+            "cacheReadTokens": 10561,
+            "cacheWriteTokens": 4115,
+            "reportedUsd": 0.0009609849999999999,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 18161,
+            "turns": 7,
+            "toolCalls": 11,
+            "readCalls": 8,
+            "repeatReads": 0,
+            "inputBytes": 6127,
+            "outputBytes": 5159,
+            "netBytes": 968,
+            "readResultTextBytes": 5159
+          },
+          "readClasses": {
+            "firstRead": [
+              8,
+              6127,
+              5159
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-a-research",
+          "repeat": 2,
+          "arm": "off",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "errorTurns": 0,
+          "metrics": {
+            "totalTokens": 8205,
+            "inputTokens": 9,
+            "outputTokens": 465,
+            "cacheReadTokens": 3904,
+            "cacheWriteTokens": 3827,
+            "reportedUsd": 0.0007508150000000001,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 5820,
+            "turns": 3,
+            "toolCalls": 5,
+            "readCalls": 3,
+            "repeatReads": 0,
+            "inputBytes": 5446,
+            "outputBytes": 5446,
+            "netBytes": 0,
+            "readResultTextBytes": 5446
+          },
+          "readClasses": {
+            "firstRead": [
+              3,
+              5446,
+              5446
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-a-research",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "errorTurns": 0,
+          "metrics": {
+            "totalTokens": 21314,
+            "inputTokens": 12,
+            "outputTokens": 779,
+            "cacheReadTokens": 7269,
+            "cacheWriteTokens": 13254,
+            "reportedUsd": 0.00212014,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 10524,
+            "turns": 4,
+            "toolCalls": 13,
+            "readCalls": 11,
+            "repeatReads": 0,
+            "inputBytes": 49551,
+            "outputBytes": 49551,
+            "netBytes": 0,
+            "readResultTextBytes": 49551
+          },
+          "readClasses": {
+            "firstRead": [
+              11,
+              49551,
+              49551
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-a-research",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "errorTurns": 0,
+          "metrics": {
+            "totalTokens": 12119,
+            "inputTokens": 12,
+            "outputTokens": 588,
+            "cacheReadTokens": 7537,
+            "cacheWriteTokens": 3982,
+            "reportedUsd": 0.0008683199999999999,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 9582,
+            "turns": 4,
+            "toolCalls": 7,
+            "readCalls": 5,
+            "repeatReads": 0,
+            "inputBytes": 6534,
+            "outputBytes": 5566,
+            "netBytes": 968,
+            "readResultTextBytes": 5566
+          },
+          "readClasses": {
+            "firstRead": [
+              5,
+              6534,
+              5566
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-a-research",
+          "repeat": 3,
+          "arm": "off",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": false,
+          "errorTurns": 1,
+          "metrics": {
+            "totalTokens": null,
+            "inputTokens": 12,
+            "outputTokens": 610,
+            "cacheReadTokens": 7338,
+            "cacheWriteTokens": 7854,
+            "reportedUsd": 0.00136133,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 12776,
+            "turns": 5,
+            "toolCalls": 7,
+            "readCalls": 5,
+            "repeatReads": 0,
+            "inputBytes": 23931,
+            "outputBytes": 23931,
+            "netBytes": 0,
+            "readResultTextBytes": 23931
+          },
+          "readClasses": {
+            "firstRead": [
+              5,
+              23931,
+              23931
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-a-research",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "errorTurns": 0,
+          "metrics": {
+            "totalTokens": 12537,
+            "inputTokens": 12,
+            "outputTokens": 560,
+            "cacheReadTokens": 7737,
+            "cacheWriteTokens": 4228,
+            "reportedUsd": 0.00088707,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 9370,
+            "turns": 4,
+            "toolCalls": 6,
+            "readCalls": 4,
+            "repeatReads": 1,
+            "inputBytes": 7258,
+            "outputBytes": 7258,
+            "netBytes": 0,
+            "readResultTextBytes": 7258
+          },
+          "readClasses": {
+            "firstRead": [
+              3,
+              5446,
+              5446
+            ],
+            "exactRepeat": [
+              1,
+              1812,
+              1812
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-a-research",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "ERROR",
+          "reason": "transport",
+          "protocolVerified": false,
+          "usageComplete": false,
+          "errorTurns": 4,
+          "metrics": {
+            "totalTokens": null,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "reportedUsd": 0,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 17251,
+            "turns": 4,
+            "toolCalls": 0,
+            "readCalls": 0,
+            "repeatReads": 0,
+            "inputBytes": 0,
+            "outputBytes": 0,
+            "netBytes": 0,
+            "readResultTextBytes": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              0,
+              0,
+              0
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 1,
+          "arm": "off",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": false,
+          "errorTurns": 2,
+          "metrics": {
+            "totalTokens": null,
+            "inputTokens": 9,
+            "outputTokens": 213,
+            "cacheReadTokens": 3185,
+            "cacheWriteTokens": 2096,
+            "reportedUsd": 0.00040124999999999997,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 11260,
+            "turns": 5,
+            "toolCalls": 2,
+            "readCalls": 1,
+            "repeatReads": 0,
+            "inputBytes": 3112,
+            "outputBytes": 3112,
+            "netBytes": 0,
+            "readResultTextBytes": 3112
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              3112,
+              3112
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "ERROR",
+          "reason": "transport",
+          "protocolVerified": false,
+          "usageComplete": false,
+          "errorTurns": 4,
+          "metrics": {
+            "totalTokens": null,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "reportedUsd": 0,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 16196,
+            "turns": 4,
+            "toolCalls": 0,
+            "readCalls": 0,
+            "repeatReads": 0,
+            "inputBytes": 0,
+            "outputBytes": 0,
+            "netBytes": 0,
+            "readResultTextBytes": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              0,
+              0,
+              0
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "errorTurns": 0,
+          "metrics": {
+            "totalTokens": 7637,
+            "inputTokens": 12,
+            "outputTokens": 265,
+            "cacheReadTokens": 5094,
+            "cacheWriteTokens": 2266,
+            "reportedUsd": 0.00046788999999999994,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 9840,
+            "turns": 4,
+            "toolCalls": 3,
+            "readCalls": 2,
+            "repeatReads": 0,
+            "inputBytes": 4537,
+            "outputBytes": 3569,
+            "netBytes": 968,
+            "readResultTextBytes": 3569
+          },
+          "readClasses": {
+            "firstRead": [
+              2,
+              4537,
+              3569
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 2,
+          "arm": "off",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": false,
+          "errorTurns": 1,
+          "metrics": {
+            "totalTokens": null,
+            "inputTokens": 9,
+            "outputTokens": 216,
+            "cacheReadTokens": 3185,
+            "cacheWriteTokens": 2096,
+            "reportedUsd": 0.00040275,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 6588,
+            "turns": 4,
+            "toolCalls": 2,
+            "readCalls": 1,
+            "repeatReads": 0,
+            "inputBytes": 3112,
+            "outputBytes": 3112,
+            "netBytes": 0,
+            "readResultTextBytes": 3112
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              3112,
+              3112
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": false,
+          "errorTurns": 1,
+          "metrics": {
+            "totalTokens": null,
+            "inputTokens": 9,
+            "outputTokens": 214,
+            "cacheReadTokens": 3189,
+            "cacheWriteTokens": 2098,
+            "reportedUsd": 0.00040204,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 6758,
+            "turns": 4,
+            "toolCalls": 2,
+            "readCalls": 1,
+            "repeatReads": 0,
+            "inputBytes": 3112,
+            "outputBytes": 3112,
+            "netBytes": 0,
+            "readResultTextBytes": 3112
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              3112,
+              3112
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "errorTurns": 0,
+          "metrics": {
+            "totalTokens": 7386,
+            "inputTokens": 12,
+            "outputTokens": 238,
+            "cacheReadTokens": 4985,
+            "cacheWriteTokens": 2151,
+            "reportedUsd": 0.000438925,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 6730,
+            "turns": 4,
+            "toolCalls": 3,
+            "readCalls": 2,
+            "repeatReads": 0,
+            "inputBytes": 4120,
+            "outputBytes": 3152,
+            "netBytes": 968,
+            "readResultTextBytes": 3152
+          },
+          "readClasses": {
+            "firstRead": [
+              2,
+              4120,
+              3152
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 3,
+          "arm": "off",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": false,
+          "errorTurns": 1,
+          "metrics": {
+            "totalTokens": null,
+            "inputTokens": 9,
+            "outputTokens": 213,
+            "cacheReadTokens": 3185,
+            "cacheWriteTokens": 2096,
+            "reportedUsd": 0.00040124999999999997,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 6373,
+            "turns": 4,
+            "toolCalls": 2,
+            "readCalls": 1,
+            "repeatReads": 0,
+            "inputBytes": 3112,
+            "outputBytes": 3112,
+            "netBytes": 0,
+            "readResultTextBytes": 3112
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              3112,
+              3112
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": false,
+          "errorTurns": 3,
+          "metrics": {
+            "totalTokens": null,
+            "inputTokens": 9,
+            "outputTokens": 214,
+            "cacheReadTokens": 3189,
+            "cacheWriteTokens": 2098,
+            "reportedUsd": 0.00040204,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 21233,
+            "turns": 6,
+            "toolCalls": 2,
+            "readCalls": 1,
+            "repeatReads": 0,
+            "inputBytes": 3112,
+            "outputBytes": 3112,
+            "netBytes": 0,
+            "readResultTextBytes": 3112
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              3112,
+              3112
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": false,
+          "errorTurns": 2,
+          "metrics": {
+            "totalTokens": null,
+            "inputTokens": 15,
+            "outputTokens": 336,
+            "cacheReadTokens": 6978,
+            "cacheWriteTokens": 2218,
+            "reportedUsd": 0.0005165300000000001,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 14129,
+            "turns": 7,
+            "toolCalls": 4,
+            "readCalls": 2,
+            "repeatReads": 0,
+            "inputBytes": 3901,
+            "outputBytes": 2933,
+            "netBytes": 968,
+            "readResultTextBytes": 2933
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              3112,
+              2144
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              1,
+              789,
+              789
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 1,
+          "arm": "off",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "errorTurns": 0,
+          "metrics": {
+            "totalTokens": 4884,
+            "inputTokens": 9,
+            "outputTokens": 122,
+            "cacheReadTokens": 2941,
+            "cacheWriteTokens": 1812,
+            "reportedUsd": 0.00031780999999999997,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 4270,
+            "turns": 3,
+            "toolCalls": 2,
+            "readCalls": 1,
+            "repeatReads": 0,
+            "inputBytes": 1977,
+            "outputBytes": 1977,
+            "netBytes": 0,
+            "readResultTextBytes": 1977
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              1977,
+              1977
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": false,
+          "errorTurns": 1,
+          "metrics": {
+            "totalTokens": null,
+            "inputTokens": 9,
+            "outputTokens": 128,
+            "cacheReadTokens": 2945,
+            "cacheWriteTokens": 1814,
+            "reportedUsd": 0.0003211,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 6199,
+            "turns": 4,
+            "toolCalls": 2,
+            "readCalls": 1,
+            "repeatReads": 0,
+            "inputBytes": 1977,
+            "outputBytes": 1977,
+            "netBytes": 0,
+            "readResultTextBytes": 1977
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              1977,
+              1977
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": false,
+          "errorTurns": 2,
+          "metrics": {
+            "totalTokens": null,
+            "inputTokens": 9,
+            "outputTokens": 128,
+            "cacheReadTokens": 2945,
+            "cacheWriteTokens": 1814,
+            "reportedUsd": 0.0003211,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 10360,
+            "turns": 5,
+            "toolCalls": 2,
+            "readCalls": 1,
+            "repeatReads": 0,
+            "inputBytes": 1977,
+            "outputBytes": 1977,
+            "netBytes": 0,
+            "readResultTextBytes": 1977
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              1977,
+              1977
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 2,
+          "arm": "off",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": false,
+          "errorTurns": 3,
+          "metrics": {
+            "totalTokens": null,
+            "inputTokens": 9,
+            "outputTokens": 128,
+            "cacheReadTokens": 2941,
+            "cacheWriteTokens": 1812,
+            "reportedUsd": 0.00032081,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 21660,
+            "turns": 6,
+            "toolCalls": 2,
+            "readCalls": 1,
+            "repeatReads": 0,
+            "inputBytes": 1977,
+            "outputBytes": 1977,
+            "netBytes": 0,
+            "readResultTextBytes": 1977
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              1977,
+              1977
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "errorTurns": 0,
+          "metrics": {
+            "totalTokens": 4896,
+            "inputTokens": 9,
+            "outputTokens": 128,
+            "cacheReadTokens": 2945,
+            "cacheWriteTokens": 1814,
+            "reportedUsd": 0.0003211,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 5635,
+            "turns": 3,
+            "toolCalls": 2,
+            "readCalls": 1,
+            "repeatReads": 0,
+            "inputBytes": 1977,
+            "outputBytes": 1977,
+            "netBytes": 0,
+            "readResultTextBytes": 1977
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              1977,
+              1977
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "errorTurns": 0,
+          "metrics": {
+            "totalTokens": 4896,
+            "inputTokens": 9,
+            "outputTokens": 128,
+            "cacheReadTokens": 2945,
+            "cacheWriteTokens": 1814,
+            "reportedUsd": 0.0003211,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 5818,
+            "turns": 3,
+            "toolCalls": 2,
+            "readCalls": 1,
+            "repeatReads": 0,
+            "inputBytes": 1977,
+            "outputBytes": 1977,
+            "netBytes": 0,
+            "readResultTextBytes": 1977
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              1977,
+              1977
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 3,
+          "arm": "off",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "errorTurns": 0,
+          "metrics": {
+            "totalTokens": 4884,
+            "inputTokens": 9,
+            "outputTokens": 122,
+            "cacheReadTokens": 2941,
+            "cacheWriteTokens": 1812,
+            "reportedUsd": 0.00031780999999999997,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 4725,
+            "turns": 3,
+            "toolCalls": 2,
+            "readCalls": 1,
+            "repeatReads": 0,
+            "inputBytes": 1977,
+            "outputBytes": 1977,
+            "netBytes": 0,
+            "readResultTextBytes": 1977
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              1977,
+              1977
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "PASS",
+          "protocolVerified": true,
+          "usageComplete": true,
+          "errorTurns": 0,
+          "metrics": {
+            "totalTokens": 4896,
+            "inputTokens": 9,
+            "outputTokens": 128,
+            "cacheReadTokens": 2945,
+            "cacheWriteTokens": 1814,
+            "reportedUsd": 0.0003211,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 4682,
+            "turns": 3,
+            "toolCalls": 2,
+            "readCalls": 1,
+            "repeatReads": 0,
+            "inputBytes": 1977,
+            "outputBytes": 1977,
+            "netBytes": 0,
+            "readResultTextBytes": 1977
+          },
+          "readClasses": {
+            "firstRead": [
+              1,
+              1977,
+              1977
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "ERROR",
+          "reason": "transport",
+          "protocolVerified": false,
+          "usageComplete": false,
+          "errorTurns": 4,
+          "metrics": {
+            "totalTokens": null,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "reportedUsd": 0,
+            "estimatedUsd": null,
+            "billedUsd": null,
+            "elapsedMs": 16201,
+            "turns": 4,
+            "toolCalls": 0,
+            "readCalls": 0,
+            "repeatReads": 0,
+            "inputBytes": 0,
+            "outputBytes": 0,
+            "netBytes": 0,
+            "readResultTextBytes": 0
+          },
+          "readClasses": {
+            "firstRead": [
+              0,
+              0,
+              0
+            ],
+            "exactRepeat": [
+              0,
+              0,
+              0
+            ],
+            "changed": [
+              0,
+              0,
+              0
+            ],
+            "protected": [
+              0,
+              0,
+              0
+            ],
+            "freshSession": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "codex-luna-low",
+      "platform": "win32",
+      "model": "gpt-5.6-luna",
+      "reasoning": "low",
+      "cases": [
+        "repeat-source",
+        "changed-source",
+        "protected-openspec",
+        "fresh-session-preseeded-cache",
+        "short-config"
+      ],
+      "repeats": 3,
+      "rows": [
+        {
+          "caseId": "repeat-source",
+          "repeat": 1,
+          "arm": "off",
+          "status": "FAIL",
+          "reason": "answer_assertions_failed_without_observed_read",
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 56729,
+            "outputTokens": 739,
+            "cacheReadTokens": 47488,
+            "cacheWriteTokens": 0,
+            "totalTokens": 57468,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 0,
+            "elapsedMs": 29555,
+            "readCalls": null,
+            "inputBytes": null,
+            "outputBytes": null,
+            "netBytes": null,
+            "repeatReads": null
+          }
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "FAIL",
+          "reason": "answer_assertions_failed_without_observed_read",
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 58570,
+            "outputTokens": 408,
+            "cacheReadTokens": 48768,
+            "cacheWriteTokens": 0,
+            "totalTokens": 58978,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 0,
+            "elapsedMs": 20277,
+            "readCalls": null,
+            "inputBytes": null,
+            "outputBytes": null,
+            "netBytes": null,
+            "repeatReads": null
+          }
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "stopped_after_two_controls_reported_execution_policy"
+        }
+      ]
+    },
+    {
+      "id": "pi-ornith-low",
+      "platform": "win32",
+      "model": "la/ornith-1.5-35b-a3b",
+      "reasoning": "low",
+      "cases": [
+        "project-a-research",
+        "project-a-edit",
+        "project-b-edit"
+      ],
+      "repeats": 3,
+      "rows": [
+        {
+          "caseId": "project-a-research",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-a-research",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-a-research",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-a-research",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-a-research",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-a-research",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-a-research",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-a-research",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-a-research",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "pinned_pi_provider_model_unavailable"
+        }
+      ]
+    },
+    {
+      "id": "codex-luna-low",
+      "platform": "linux",
+      "model": "gpt-5.6-luna",
+      "reasoning": "low",
+      "cases": [
+        "repeat-source",
+        "changed-source",
+        "protected-openspec",
+        "fresh-session-preseeded-cache",
+        "short-config"
+      ],
+      "repeats": 3,
+      "rows": [
+        {
+          "caseId": "repeat-source",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "native_codex_unavailable"
+        }
+      ]
+    },
+    {
+      "id": "pi-ornith-low",
+      "platform": "linux",
+      "model": "la/ornith-1.5-35b-a3b",
+      "reasoning": "low",
+      "cases": [
+        "project-a-research",
+        "project-a-edit",
+        "project-b-edit"
+      ],
+      "repeats": 3,
+      "rows": [
+        {
+          "caseId": "project-a-research",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-a-research",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-a-research",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-a-research",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-a-research",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-a-research",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-a-research",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-a-research",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-a-research",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-a-edit",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        },
+        {
+          "caseId": "project-b-edit",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "native_pi_model_registry_absent"
+        }
+      ]
+    },
+    {
+      "id": "codex-6-luna-read-control",
+      "platform": "win32",
+      "model": "gpt-6-luna",
+      "reasoning": "low",
+      "cases": [
+        "repeat-source",
+        "changed-source",
+        "protected-openspec",
+        "fresh-session-preseeded-cache",
+        "short-config"
+      ],
+      "repeats": 3,
+      "rows": [
+        {
+          "caseId": "repeat-source",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 1,
+          "arm": "off",
+          "status": "FAIL",
+          "reason": "fixture-read-unconfirmed",
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 44305,
+            "outputTokens": 100,
+            "cacheReadTokens": 29056,
+            "cacheWriteTokens": 0,
+            "totalTokens": 44405,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 0,
+            "elapsedMs": 13164,
+            "readCalls": null,
+            "inputBytes": null,
+            "outputBytes": null,
+            "netBytes": null,
+            "repeatReads": null
+          }
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 2,
+          "arm": "off",
+          "status": "FAIL",
+          "reason": "fixture-read-unconfirmed",
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 42779,
+            "outputTokens": 99,
+            "cacheReadTokens": 21120,
+            "cacheWriteTokens": 0,
+            "totalTokens": 42878,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 0,
+            "elapsedMs": 12140,
+            "readCalls": null,
+            "inputBytes": null,
+            "outputBytes": null,
+            "netBytes": null,
+            "repeatReads": null
+          }
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        }
+      ]
+    },
+    {
+      "id": "codex-terra-read-only",
+      "platform": "win32",
+      "model": "gpt-6.1-terra",
+      "reasoning": "low",
+      "cases": [
+        "repeat-source",
+        "changed-source",
+        "protected-openspec",
+        "fresh-session-preseeded-cache",
+        "short-config"
+      ],
+      "repeats": 3,
+      "rows": [
+        {
+          "caseId": "repeat-source",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 1,
+          "arm": "off",
+          "status": "FAIL",
+          "reason": "fixture-read-unconfirmed",
+          "usageComplete": true,
+          "metrics": {
+            "inputTokens": 48184,
+            "outputTokens": 93,
+            "cacheReadTokens": 31104,
+            "cacheWriteTokens": 0,
+            "totalTokens": 48277,
+            "reportedUsd": null,
+            "estimatedUsd": 0,
+            "billedUsd": null,
+            "turns": 1,
+            "toolCalls": 0,
+            "elapsedMs": 13739,
+            "readCalls": null,
+            "inputBytes": null,
+            "outputBytes": null,
+            "netBytes": null,
+            "repeatReads": null
+          }
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        }
+      ]
+    },
+    {
+      "id": "native-codex-api",
+      "platform": "win32",
+      "model": "gpt-6-luna",
+      "reasoning": "low",
+      "cases": [
+        "repeat-source",
+        "changed-source",
+        "protected-openspec",
+        "fresh-session-preseeded-cache",
+        "short-config"
+      ],
+      "repeats": 3,
+      "rows": [
+        {
+          "caseId": "repeat-source",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "repeat-source",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "changed-source",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "protected-openspec",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 1,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 1,
+          "arm": "off",
+          "status": "ERROR",
+          "reason": "model-request-refused"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 1,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 1,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 2,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 2,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 2,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 3,
+          "arm": "off",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 3,
+          "arm": "aifhub",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        },
+        {
+          "caseId": "short-config",
+          "repeat": 3,
+          "arm": "sqz",
+          "status": "NOT_RUN",
+          "reason": "control-stopped"
+        }
+      ]
+    }
+  ]
+}

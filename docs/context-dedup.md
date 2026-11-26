@@ -32,19 +32,20 @@ Concurrent процессы используют session-exclusive ledger locks 
 | Условие | `decision` | Результат |
 |---|---|---|
 | `mode: "off"` | `disabled` | полный content |
-| `mode: aifhub` и одинаковый повтор | `deduplicated` | AIFHub replay, только если он короче content |
-| `mode: sqz` и shorter output | `compressed` | self-contained stateless output внешнего `sqz`; exact repeat ссылается на этот ранее отданный compressed session context |
+| `mode: aifhub`, первое чтение или неподтверждённая прежняя выдача | `full` | актуальный исходный текст |
+| `mode: sqz`, подходящее чтение, результат сжатия короче | `compressed` | самодостаточный текст из `sqz compress --no-cache` |
 | `mode: sqz`, utility отсутствует/ошиблась | `full` | полный content + sanitized warning |
 | protected path | `protected` | полный content |
 | меньше `minBytes` | `below-threshold` | полный content |
 | `maxEntries: 0` | `full` | полный content без ledger entry |
-| первое чтение | `full` | полный content |
-| digest совпал и replay короче content | `deduplicated` | компактный replay без content |
-| digest совпал, но replay не даёт net savings | `full` | полный content |
-| digest изменился или `force` | `changed` | полный content |
+| Тот же получатель ещё видит самодостаточный ответ на полное чтение той же ревизии, маркер короче | `deduplicated` | ссылка на уже показанный текст |
+| Ревизия изменилась | `changed` в AIFHub при наличии прежней записи, `full` в SQZ | полный текст новой ревизии |
+| Принудительное чтение (`force`) | зависит от режима и предшествующей записи | исходный текст, без запуска SQZ |
 | ledger unavailable | `full` | полный content + warning |
 
 Replay содержит path, короткий digest, reuse guidance, structured `forceRead: {path, force: true}` и инструкцию повторить тот же read с `force: true`; executable shell command с repo-controlled path не формируется. Полный SHA-256 остаётся в structured `digest`.
+
+После перезапуска процесса, смены проекта или получателя, а также при потере подтверждения доставки читателю нужен самодостаточный ответ. Совпадения session ID и digest в ledger для ссылки недостаточно. В адаптере Pi чтение с `offset` или `limit` и продолжение усечённого вывода получают обычный запрошенный диапазон. Защищённые данные читаются с обычными границами API. [Адаптер Pi](../benchmarks/pi-sqz-matrix/dedup-read.mjs)
 
 ## Protected Artifacts
 
@@ -85,7 +86,7 @@ aifhub:
 
 Само изменение config **не устанавливает** binary. AIFHub не скачивает `sqz`, не запускает `sqz init`, не ставит hooks, не регистрирует MCP и не меняет agent config. Установите проверенный executable отдельно и укажите его через `sqz.command` либо обеспечьте доступность команды `sqz` в `PATH`.
 
-Runtime запускает fixed `sqz compress --no-cache` без shell, с bounded timeout/output и allowlisted environment: только ключи поиска executable/platform temp/locale плюс session-owned `HOME`, `USERPROFILE`, `XDG_*` и `SQZ_HOME`. Неизвестные, credential, cloud, proxy и runtime variables дочернему процессу не передаются. SQZ cache references отключены, потому что v1.3.0 на Windows определяет `~/.sqz` через platform home API и environment-only redirect не гарантирует изоляцию. Exact same-session repeat обслуживает AIFHub ledger без второго вызова SQZ. Ошибка spawn/exit/timeout/output-limit или неожиданный `§ref`/`§delta` fail-open возвращает полный content; raw stderr модели не отдаётся. Сторонний CLI всё ещё может вести user-owned statistics под `~/.sqz`; AIFHub их не очищает.
+Runtime запускает фиксированную команду `sqz compress --no-cache` без shell, проверяет лимит входа (1 МиБ в UTF-8) до запуска, ограничивает время и объём вывода. При повреждении ledger читатель получает исходный текст, а следующее чтение использует восстановленную запись. Дочерний процесс получает разрешённые переменные для поиска executable, временных файлов и локали, а также отдельные `HOME`, `USERPROFILE`, `XDG_*` и `SQZ_HOME`. В Windows SQZ v1.3.0 находит `~/.sqz` через platform home API, поэтому одного изменения окружения недостаточно для изоляции кэша. Подтверждённый точный повтор AIFHub может обслужить коротким маркером без второго вызова SQZ. При ошибке запуска, ненулевом коде выхода, таймауте, превышении лимита, некорректном UTF-8 или неожиданном `§ref`/`§delta` читатель получает исходный текст. Диагностика скрывает сырой stderr. Пользовательская статистика SQZ под `~/.sqz` управляется отдельно.
 
 ## CLI
 
@@ -97,13 +98,13 @@ ai-factory aifhub-context-dedup purge --session <id>
 ai-factory aifhub-context-dedup purge --all
 ```
 
-Cross-process CLI/hook dedup должен передавать stable host session через `--session` или `AIFHUB_SESSION_ID`; process fallback намеренно не переживает новый процесс.
+Для общей статистики CLI и hooks передают стабильный идентификатор через `--session` или `AIFHUB_SESSION_ID`. Новый процесс с тем же идентификатором может открыть ledger, но заново выдаёт самодостаточный текст.
 
 Status использует net model-visible accounting:
 
 - `mode` — effective `off`, `aifhub` или `sqz`;
 - `observedBytes` — полный объём всех подходящих чтений до любой оптимизации (включая SQZ compression), то есть no-optimization baseline;
-- `servedBytes` — реально выданный полный content или replay;
+- `servedBytes` — объём текста, который получил читатель (оригинал, сжатый текст или маркер повтора);
 - `savedBytes = observedBytes - servedBytes` относительно этого no-optimization baseline;
 - `savedPercent = savedBytes / observedBytes`.
 
@@ -119,7 +120,9 @@ Debug diagnostics opt-in: `AIFHUB_CONTEXT_DEDUP_DEBUG=1` пишет bounded line
 | `aifhub.context_dedup_status` | Public totals без internal session id и ledger path. |
 | `aifhub.context_dedup_purge` | Dry-run по умолчанию; `confirm: true` удаляет только current MCP session. |
 
-Policy diagnostics/warnings идут отдельным MCP text block, поэтому первый content block остаётся byte-exact.
+Policy diagnostics и предупреждения идут отдельным текстовым блоком MCP. При защищённом или принудительном чтении первый блок содержит точный исходный текст.
+
+Сервер MCP через stdio не видит, когда клиент сбросил контекст. На этом входе каждый ответ самодостаточен, даже при повторном чтении в одном соединении.
 
 ## Benchmark И AI Tester
 
@@ -134,7 +137,7 @@ node scripts/context-dedup-benchmark.mjs \
 
 Harness всегда создаёт owned temporary workspace, проверяет trace containment, ограничивает external timeout/output и использует isolated HOME/XDG/SQZ paths. Compression, delta и reference считаются отдельно; только reference является dedup hit.
 
-AI Tester matrix на `gpt-5.6-luna`, reasoning `low`: baseline `4/4`, AIFHub `4/4` и безопасный SQZ runtime `4/4`. На сопоставимом exact-repeat payload оба enabled mode сохранили `98.74%`, потому что repeat обслуживает один AIFHub ledger; SQZ raw aggregate `48.62%` дополнительно включает stateless first-read/changed-content compression. Исторический stateful run `r3` (`3/4`) сохранён как regression evidence. Подробности: [sqz benchmark results](memory-tools-research/sqz-benchmark-results.md).
+В историческом AI Tester r4 (`gpt-5.6-luna / low`, Windows, по одному запуску четырёх сценариев на режим) AIFHub и SQZ сократили выдачу второго чтения на 98,74% в одном случае точного повтора. В новом профиле #186 (`gpt-6.1-terra / low`, Windows, full access) три повторных чтения в режиме SQZ дали суммарно 43 026 байт до и после обработки. Для выбора режима по расходу токенов используйте парные результаты полных задач Pi. [Контрольные сценарии](memory-tools-research/sqz-benchmark-results.md) · [Снимок и воспроизведение #186](memory-tools-research/context-dedup-ai-tester/issue-186/coverage.md#воспроизведение)
 
 ## Границы
 

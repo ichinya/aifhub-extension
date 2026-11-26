@@ -1469,7 +1469,7 @@ test('stage-2 non-interference: a populated ledger leaves the workspace byte-ide
   const observable = (acc) => { delete acc['.ai-factory/state/' + f.id + '/runner-metrics.json']; return acc; };
   const before = observable(await walk('.ai-factory'));
   const result = await f.collect(['--include-qa']);
-  assert.equal(result.outcome, 'collected');
+  assert.equal(result.outcome, 'collected', result.errors.map(({ code }) => code).join(', '));
   const after = observable(await walk('.ai-factory'));
   assert.deepEqual(after, before, 'the collector never mutates state, including the ledger');
 });

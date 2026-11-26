@@ -41,7 +41,10 @@ const CORPUS_DIR = path.join(REPO_ROOT, 'test', 'fixtures', 'claim-evidence');
 const roots = [];
 
 afterEach(async () => {
-  for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true });
+  for (const root of roots.splice(0)) {
+    // A late directory entry on Windows can make the first rmdir return ENOTEMPTY.
+    await rm(root, { recursive: true, force: true, maxRetries: 3 });
+  }
 });
 
 async function makeTemp(prefix) {

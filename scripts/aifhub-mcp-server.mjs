@@ -413,6 +413,7 @@ async function readFileDeduplicated(args, options = {}) {
     content,
     policy,
     sessionId: options.mcpSessionId ?? DEFAULT_MCP_SESSION_ID,
+    replayAvailable: Boolean(options.mcpSessionId) && options.replayAvailable === true,
     force: args.force === true,
     rootDir,
     sqzRunner: options.sqzRunner,
@@ -580,6 +581,8 @@ export async function startMcpServer({
 
     const response = await handleMcpMessage(message, {
       mcpSessionId,
+      // The stdio connection owns its ledger but cannot observe client context resets.
+      replayAvailable: false,
       cwd: resolvedProjectRoot,
       env,
       runner

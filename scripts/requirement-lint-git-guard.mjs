@@ -9,11 +9,12 @@
 // the first write, not filtered afterwards.
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { runGuardGit } from './git-guard-command.mjs';
 
 const exec = promisify(execFile);
 
 async function git(rootDir, args, run) {
-  const value = await run('git', args, { cwd: rootDir, windowsHide: true, timeout: 10000, maxBuffer: 262144 });
+  const value = await runGuardGit(run, args, { cwd: rootDir, maxBuffer: 262144 });
   return String(value.stdout ?? value ?? '');
 }
 
@@ -45,8 +46,7 @@ export async function verifyObservationIgnored(rootDir, relative, options = {}) 
   if (tracked) return { ok: false, code: 'observation-path-tracked', detail: relative };
   let ignored;
   try {
-    await run('git', ['check-ignore', '-q', '--', relative],
-      { cwd: rootDir, windowsHide: true, timeout: 10000, maxBuffer: 65536 });
+    await runGuardGit(run, ['check-ignore', '-q', '--', relative], { cwd: rootDir, maxBuffer: 65536 });
     ignored = true; // exit 0: git's own verdict — path is ignored
   } catch (error) {
     if (error?.code === 1) ignored = false; // git's own verdict: not ignored

@@ -1,0 +1,5283 @@
+{
+  "schemaVersion": 1,
+  "snapshot": "2026-11-25-windows-sqz-1.3.0",
+  "profiles": [
+    {
+      "id": "ai-tester-codex-full",
+      "platform": "win32",
+      "planned": 45,
+      "attempted": 45,
+      "outcomes": {
+        "PASS": 44,
+        "FAIL": 1,
+        "ERROR": 0,
+        "BLOCKED": 0,
+        "NOT_RUN": 0
+      },
+      "setupRetries": 1,
+      "failedSpend": {
+        "inputTokens": {
+          "reportedAttempts": 1,
+          "completeAttempts": 1,
+          "reportedSubtotal": 50955,
+          "total": 50955
+        },
+        "outputTokens": {
+          "reportedAttempts": 1,
+          "completeAttempts": 1,
+          "reportedSubtotal": 239,
+          "total": 239
+        },
+        "cacheReadTokens": {
+          "reportedAttempts": 1,
+          "completeAttempts": 1,
+          "reportedSubtotal": 29824,
+          "total": 29824
+        },
+        "cacheWriteTokens": {
+          "reportedAttempts": 1,
+          "completeAttempts": 1,
+          "reportedSubtotal": 0,
+          "total": 0
+        },
+        "totalTokens": {
+          "reportedAttempts": 1,
+          "completeAttempts": 1,
+          "reportedSubtotal": 51194,
+          "total": 51194
+        },
+        "reportedUsd": {
+          "reportedAttempts": 0,
+          "completeAttempts": 0,
+          "reportedSubtotal": null,
+          "total": null
+        },
+        "estimatedUsd": {
+          "reportedAttempts": 1,
+          "completeAttempts": 1,
+          "reportedSubtotal": 0,
+          "total": 0
+        },
+        "billedUsd": {
+          "reportedAttempts": 0,
+          "completeAttempts": 0,
+          "reportedSubtotal": null,
+          "total": null
+        }
+      },
+      "byCase": [
+        {
+          "caseId": "repeat-source",
+          "plannedTriples": 3,
+          "successful": [
+            1,
+            2,
+            3
+          ],
+          "comparable": [
+            1,
+            2,
+            3
+          ],
+          "excluded": [],
+          "comparisons": {
+            "aifhub": {
+              "inputTokens": {
+                "n": 3,
+                "median": -7,
+                "min": -5129,
+                "max": 34764
+              },
+              "outputTokens": {
+                "n": 3,
+                "median": -1,
+                "min": -1,
+                "max": 9
+              },
+              "cacheReadTokens": {
+                "n": 3,
+                "median": 9344,
+                "min": -5120,
+                "max": 32000
+              },
+              "cacheWriteTokens": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "totalTokens": {
+                "n": 3,
+                "median": -8,
+                "min": -5130,
+                "max": 34773
+              },
+              "reportedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "estimatedUsd": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "billedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "turns": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "toolCalls": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readCalls": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "repeatReads": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "elapsedMs": {
+                "n": 3,
+                "median": 3070,
+                "min": -525,
+                "max": 7949
+              },
+              "inputBytes": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "outputBytes": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "netBytes": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readResultTextBytes": {
+                "n": 3,
+                "median": 4,
+                "min": 4,
+                "max": 4
+              }
+            },
+            "sqz": {
+              "inputTokens": {
+                "n": 3,
+                "median": -7,
+                "min": -5120,
+                "max": 34774
+              },
+              "outputTokens": {
+                "n": 3,
+                "median": 0,
+                "min": -1,
+                "max": 15
+              },
+              "cacheReadTokens": {
+                "n": 3,
+                "median": -128,
+                "min": -4992,
+                "max": 22656
+              },
+              "cacheWriteTokens": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "totalTokens": {
+                "n": 3,
+                "median": -8,
+                "min": -5120,
+                "max": 34789
+              },
+              "reportedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "estimatedUsd": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "billedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "turns": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "toolCalls": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readCalls": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "repeatReads": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "elapsedMs": {
+                "n": 3,
+                "median": -1079,
+                "min": -5187,
+                "max": 6983
+              },
+              "inputBytes": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "outputBytes": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "netBytes": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readResultTextBytes": {
+                "n": 3,
+                "median": 10,
+                "min": 10,
+                "max": 10
+              }
+            }
+          },
+          "readClasses": {
+            "off": {
+              "measuredCells": 3,
+              "plannedCells": 3,
+              "sums": {
+                "firstRead": {
+                  "reads": 3,
+                  "inputBytes": 43026,
+                  "outputBytes": 43026,
+                  "netBytes": 0
+                },
+                "exactRepeat": {
+                  "reads": 3,
+                  "inputBytes": 43026,
+                  "outputBytes": 43026,
+                  "netBytes": 0
+                },
+                "changed": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "protected": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "freshSession": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                }
+              }
+            },
+            "aifhub": {
+              "measuredCells": 3,
+              "plannedCells": 3,
+              "sums": {
+                "firstRead": {
+                  "reads": 3,
+                  "inputBytes": 43026,
+                  "outputBytes": 43026,
+                  "netBytes": 0
+                },
+                "exactRepeat": {
+                  "reads": 3,
+                  "inputBytes": 43026,
+                  "outputBytes": 43026,
+                  "netBytes": 0
+                },
+                "changed": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "protected": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "freshSession": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                }
+              }
+            },
+            "sqz": {
+              "measuredCells": 3,
+              "plannedCells": 3,
+              "sums": {
+                "firstRead": {
+                  "reads": 3,
+                  "inputBytes": 43026,
+                  "outputBytes": 43026,
+                  "netBytes": 0
+                },
+                "exactRepeat": {
+                  "reads": 3,
+                  "inputBytes": 43026,
+                  "outputBytes": 43026,
+                  "netBytes": 0
+                },
+                "changed": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "protected": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "freshSession": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                }
+              }
+            }
+          }
+        },
+        {
+          "caseId": "changed-source",
+          "plannedTriples": 3,
+          "successful": [
+            1,
+            3
+          ],
+          "comparable": [
+            3
+          ],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "protocol",
+              "arms": [
+                "aifhub"
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "FAIL"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {
+            "aifhub": {
+              "inputTokens": {
+                "n": 1,
+                "median": 5965,
+                "min": 5965,
+                "max": 5965
+              },
+              "outputTokens": {
+                "n": 1,
+                "median": 24,
+                "min": 24,
+                "max": 24
+              },
+              "cacheReadTokens": {
+                "n": 1,
+                "median": 4864,
+                "min": 4864,
+                "max": 4864
+              },
+              "cacheWriteTokens": {
+                "n": 1,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "totalTokens": {
+                "n": 1,
+                "median": 5989,
+                "min": 5989,
+                "max": 5989
+              },
+              "reportedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "estimatedUsd": {
+                "n": 1,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "billedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "turns": {
+                "n": 1,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "toolCalls": {
+                "n": 1,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readCalls": {
+                "n": 1,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "repeatReads": {
+                "n": 1,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "elapsedMs": {
+                "n": 1,
+                "median": -1229,
+                "min": -1229,
+                "max": -1229
+              },
+              "inputBytes": {
+                "n": 1,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "outputBytes": {
+                "n": 1,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "netBytes": {
+                "n": 1,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readResultTextBytes": {
+                "n": 1,
+                "median": 1,
+                "min": 1,
+                "max": 1
+              }
+            },
+            "sqz": {
+              "inputTokens": {
+                "n": 1,
+                "median": 8305,
+                "min": 8305,
+                "max": 8305
+              },
+              "outputTokens": {
+                "n": 1,
+                "median": 7,
+                "min": 7,
+                "max": 7
+              },
+              "cacheReadTokens": {
+                "n": 1,
+                "median": -2944,
+                "min": -2944,
+                "max": -2944
+              },
+              "cacheWriteTokens": {
+                "n": 1,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "totalTokens": {
+                "n": 1,
+                "median": 8312,
+                "min": 8312,
+                "max": 8312
+              },
+              "reportedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "estimatedUsd": {
+                "n": 1,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "billedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "turns": {
+                "n": 1,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "toolCalls": {
+                "n": 1,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readCalls": {
+                "n": 1,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "repeatReads": {
+                "n": 1,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "elapsedMs": {
+                "n": 1,
+                "median": -426,
+                "min": -426,
+                "max": -426
+              },
+              "inputBytes": {
+                "n": 1,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "outputBytes": {
+                "n": 1,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "netBytes": {
+                "n": 1,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readResultTextBytes": {
+                "n": 1,
+                "median": 10,
+                "min": 10,
+                "max": 10
+              }
+            }
+          },
+          "readClasses": {
+            "off": {
+              "measuredCells": 3,
+              "plannedCells": 3,
+              "sums": {
+                "firstRead": {
+                  "reads": 3,
+                  "inputBytes": 50019,
+                  "outputBytes": 50019,
+                  "netBytes": 0
+                },
+                "exactRepeat": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "changed": {
+                  "reads": 3,
+                  "inputBytes": 50019,
+                  "outputBytes": 50019,
+                  "netBytes": 0
+                },
+                "protected": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "freshSession": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                }
+              }
+            },
+            "aifhub": {
+              "measuredCells": 3,
+              "plannedCells": 3,
+              "sums": {
+                "firstRead": {
+                  "reads": 3,
+                  "inputBytes": 50019,
+                  "outputBytes": 50019,
+                  "netBytes": 0
+                },
+                "exactRepeat": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "changed": {
+                  "reads": 5,
+                  "inputBytes": 83365,
+                  "outputBytes": 83365,
+                  "netBytes": 0
+                },
+                "protected": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "freshSession": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                }
+              }
+            },
+            "sqz": {
+              "measuredCells": 3,
+              "plannedCells": 3,
+              "sums": {
+                "firstRead": {
+                  "reads": 3,
+                  "inputBytes": 50019,
+                  "outputBytes": 50019,
+                  "netBytes": 0
+                },
+                "exactRepeat": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "changed": {
+                  "reads": 3,
+                  "inputBytes": 50019,
+                  "outputBytes": 50019,
+                  "netBytes": 0
+                },
+                "protected": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "freshSession": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                }
+              }
+            }
+          }
+        },
+        {
+          "caseId": "protected-openspec",
+          "plannedTriples": 3,
+          "successful": [
+            1,
+            2,
+            3
+          ],
+          "comparable": [
+            1,
+            2,
+            3
+          ],
+          "excluded": [],
+          "comparisons": {
+            "aifhub": {
+              "inputTokens": {
+                "n": 3,
+                "median": -27009,
+                "min": -27010,
+                "max": -3
+              },
+              "outputTokens": {
+                "n": 3,
+                "median": -8,
+                "min": -12,
+                "max": -2
+              },
+              "cacheReadTokens": {
+                "n": 3,
+                "median": -14592,
+                "min": -28160,
+                "max": 0
+              },
+              "cacheWriteTokens": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "totalTokens": {
+                "n": 3,
+                "median": -27018,
+                "min": -27021,
+                "max": -5
+              },
+              "reportedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "estimatedUsd": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "billedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "turns": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "toolCalls": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readCalls": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "repeatReads": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "elapsedMs": {
+                "n": 3,
+                "median": -3161,
+                "min": -5983,
+                "max": -1101
+              },
+              "inputBytes": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "outputBytes": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "netBytes": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readResultTextBytes": {
+                "n": 3,
+                "median": -6,
+                "min": -6,
+                "max": -6
+              }
+            },
+            "sqz": {
+              "inputTokens": {
+                "n": 3,
+                "median": -27005,
+                "min": -27007,
+                "max": -86
+              },
+              "outputTokens": {
+                "n": 3,
+                "median": -11,
+                "min": -12,
+                "max": -1
+              },
+              "cacheReadTokens": {
+                "n": 3,
+                "median": -26880,
+                "min": -28160,
+                "max": 8064
+              },
+              "cacheWriteTokens": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "totalTokens": {
+                "n": 3,
+                "median": -27016,
+                "min": -27019,
+                "max": -87
+              },
+              "reportedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "estimatedUsd": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "billedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "turns": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "toolCalls": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readCalls": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "repeatReads": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "elapsedMs": {
+                "n": 3,
+                "median": -3385,
+                "min": -4229,
+                "max": -1974
+              },
+              "inputBytes": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "outputBytes": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "netBytes": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readResultTextBytes": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              }
+            }
+          },
+          "readClasses": {
+            "off": {
+              "measuredCells": 3,
+              "plannedCells": 3,
+              "sums": {
+                "firstRead": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "exactRepeat": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "changed": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "protected": {
+                  "reads": 6,
+                  "inputBytes": 87534,
+                  "outputBytes": 87534,
+                  "netBytes": 0
+                },
+                "freshSession": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                }
+              }
+            },
+            "aifhub": {
+              "measuredCells": 3,
+              "plannedCells": 3,
+              "sums": {
+                "firstRead": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "exactRepeat": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "changed": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "protected": {
+                  "reads": 6,
+                  "inputBytes": 87534,
+                  "outputBytes": 87534,
+                  "netBytes": 0
+                },
+                "freshSession": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                }
+              }
+            },
+            "sqz": {
+              "measuredCells": 3,
+              "plannedCells": 3,
+              "sums": {
+                "firstRead": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "exactRepeat": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "changed": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "protected": {
+                  "reads": 6,
+                  "inputBytes": 87534,
+                  "outputBytes": 87534,
+                  "netBytes": 0
+                },
+                "freshSession": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                }
+              }
+            }
+          }
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "plannedTriples": 3,
+          "successful": [
+            1,
+            2,
+            3
+          ],
+          "comparable": [
+            1,
+            2,
+            3
+          ],
+          "excluded": [],
+          "comparisons": {
+            "aifhub": {
+              "inputTokens": {
+                "n": 3,
+                "median": 8,
+                "min": -1,
+                "max": 10
+              },
+              "outputTokens": {
+                "n": 3,
+                "median": 1,
+                "min": 0,
+                "max": 1
+              },
+              "cacheReadTokens": {
+                "n": 3,
+                "median": -8192,
+                "min": -11776,
+                "max": 14336
+              },
+              "cacheWriteTokens": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "totalTokens": {
+                "n": 3,
+                "median": 9,
+                "min": -1,
+                "max": 11
+              },
+              "reportedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "estimatedUsd": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "billedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "turns": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "toolCalls": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readCalls": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "repeatReads": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "elapsedMs": {
+                "n": 2,
+                "median": 788.5,
+                "min": 292,
+                "max": 1285
+              },
+              "inputBytes": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "outputBytes": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "netBytes": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readResultTextBytes": {
+                "n": 3,
+                "median": 2,
+                "min": 2,
+                "max": 2
+              }
+            },
+            "sqz": {
+              "inputTokens": {
+                "n": 3,
+                "median": 740,
+                "min": 589,
+                "max": 5685
+              },
+              "outputTokens": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "cacheReadTokens": {
+                "n": 3,
+                "median": -6784,
+                "min": -9344,
+                "max": 0
+              },
+              "cacheWriteTokens": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "totalTokens": {
+                "n": 3,
+                "median": 740,
+                "min": 589,
+                "max": 5685
+              },
+              "reportedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "estimatedUsd": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "billedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "turns": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "toolCalls": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readCalls": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "repeatReads": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "elapsedMs": {
+                "n": 2,
+                "median": -496,
+                "min": -1302,
+                "max": 310
+              },
+              "inputBytes": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "outputBytes": {
+                "n": 3,
+                "median": 5889,
+                "min": 5297,
+                "max": 6185
+              },
+              "netBytes": {
+                "n": 3,
+                "median": -5889,
+                "min": -6185,
+                "max": -5297
+              },
+              "readResultTextBytes": {
+                "n": 3,
+                "median": 5886,
+                "min": 5294,
+                "max": 6182
+              }
+            }
+          },
+          "readClasses": {
+            "off": {
+              "measuredCells": 3,
+              "plannedCells": 3,
+              "sums": {
+                "firstRead": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "exactRepeat": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "changed": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "protected": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "freshSession": {
+                  "reads": 3,
+                  "inputBytes": 42156,
+                  "outputBytes": 42156,
+                  "netBytes": 0
+                }
+              }
+            },
+            "aifhub": {
+              "measuredCells": 3,
+              "plannedCells": 3,
+              "sums": {
+                "firstRead": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "exactRepeat": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "changed": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "protected": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "freshSession": {
+                  "reads": 3,
+                  "inputBytes": 42156,
+                  "outputBytes": 42156,
+                  "netBytes": 0
+                }
+              }
+            },
+            "sqz": {
+              "measuredCells": 3,
+              "plannedCells": 3,
+              "sums": {
+                "firstRead": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "exactRepeat": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "changed": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "protected": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "freshSession": {
+                  "reads": 3,
+                  "inputBytes": 42156,
+                  "outputBytes": 24785,
+                  "netBytes": 17371
+                }
+              }
+            }
+          }
+        },
+        {
+          "caseId": "short-config",
+          "plannedTriples": 3,
+          "successful": [
+            1,
+            2,
+            3
+          ],
+          "comparable": [
+            1,
+            2,
+            3
+          ],
+          "excluded": [],
+          "comparisons": {
+            "aifhub": {
+              "inputTokens": {
+                "n": 3,
+                "median": 3,
+                "min": -4865,
+                "max": 10
+              },
+              "outputTokens": {
+                "n": 3,
+                "median": 0,
+                "min": -2,
+                "max": 1
+              },
+              "cacheReadTokens": {
+                "n": 3,
+                "median": -1024,
+                "min": -20480,
+                "max": 0
+              },
+              "cacheWriteTokens": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "totalTokens": {
+                "n": 3,
+                "median": 1,
+                "min": -4865,
+                "max": 11
+              },
+              "reportedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "estimatedUsd": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "billedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "turns": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "toolCalls": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readCalls": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "repeatReads": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "elapsedMs": {
+                "n": 3,
+                "median": -165,
+                "min": -4273,
+                "max": 561
+              },
+              "inputBytes": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "outputBytes": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "netBytes": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readResultTextBytes": {
+                "n": 3,
+                "median": -9,
+                "min": -9,
+                "max": -9
+              }
+            },
+            "sqz": {
+              "inputTokens": {
+                "n": 3,
+                "median": 13,
+                "min": -4,
+                "max": 249
+              },
+              "outputTokens": {
+                "n": 3,
+                "median": 0,
+                "min": -1,
+                "max": 0
+              },
+              "cacheReadTokens": {
+                "n": 3,
+                "median": 0,
+                "min": -15488,
+                "max": 0
+              },
+              "cacheWriteTokens": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "totalTokens": {
+                "n": 3,
+                "median": 13,
+                "min": -5,
+                "max": 249
+              },
+              "reportedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "estimatedUsd": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "billedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "turns": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "toolCalls": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readCalls": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "repeatReads": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "elapsedMs": {
+                "n": 3,
+                "median": -1476,
+                "min": -4182,
+                "max": -210
+              },
+              "inputBytes": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "outputBytes": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "netBytes": {
+                "n": 3,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readResultTextBytes": {
+                "n": 3,
+                "median": -6,
+                "min": -6,
+                "max": -6
+              }
+            }
+          },
+          "readClasses": {
+            "off": {
+              "measuredCells": 3,
+              "plannedCells": 3,
+              "sums": {
+                "firstRead": {
+                  "reads": 3,
+                  "inputBytes": 66,
+                  "outputBytes": 66,
+                  "netBytes": 0
+                },
+                "exactRepeat": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "changed": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "protected": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "freshSession": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                }
+              }
+            },
+            "aifhub": {
+              "measuredCells": 3,
+              "plannedCells": 3,
+              "sums": {
+                "firstRead": {
+                  "reads": 3,
+                  "inputBytes": 66,
+                  "outputBytes": 66,
+                  "netBytes": 0
+                },
+                "exactRepeat": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "changed": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "protected": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "freshSession": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                }
+              }
+            },
+            "sqz": {
+              "measuredCells": 3,
+              "plannedCells": 3,
+              "sums": {
+                "firstRead": {
+                  "reads": 3,
+                  "inputBytes": 66,
+                  "outputBytes": 66,
+                  "netBytes": 0
+                },
+                "exactRepeat": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "changed": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "protected": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "freshSession": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "pi-openai-api",
+      "platform": "win32",
+      "planned": 27,
+      "attempted": 27,
+      "outcomes": {
+        "PASS": 24,
+        "FAIL": 0,
+        "ERROR": 3,
+        "BLOCKED": 0,
+        "NOT_RUN": 0
+      },
+      "setupRetries": 0,
+      "failedSpend": {
+        "inputTokens": {
+          "reportedAttempts": 3,
+          "completeAttempts": 0,
+          "reportedSubtotal": 0,
+          "total": null
+        },
+        "outputTokens": {
+          "reportedAttempts": 3,
+          "completeAttempts": 0,
+          "reportedSubtotal": 0,
+          "total": null
+        },
+        "cacheReadTokens": {
+          "reportedAttempts": 3,
+          "completeAttempts": 0,
+          "reportedSubtotal": 0,
+          "total": null
+        },
+        "cacheWriteTokens": {
+          "reportedAttempts": 3,
+          "completeAttempts": 0,
+          "reportedSubtotal": 0,
+          "total": null
+        },
+        "totalTokens": {
+          "reportedAttempts": 0,
+          "completeAttempts": 0,
+          "reportedSubtotal": null,
+          "total": null
+        },
+        "reportedUsd": {
+          "reportedAttempts": 3,
+          "completeAttempts": 0,
+          "reportedSubtotal": 0,
+          "total": null
+        },
+        "estimatedUsd": {
+          "reportedAttempts": 0,
+          "completeAttempts": 0,
+          "reportedSubtotal": null,
+          "total": null
+        },
+        "billedUsd": {
+          "reportedAttempts": 0,
+          "completeAttempts": 0,
+          "reportedSubtotal": null,
+          "total": null
+        }
+      },
+      "byCase": [
+        {
+          "caseId": "project-a-research",
+          "plannedTriples": 3,
+          "successful": [
+            1,
+            2
+          ],
+          "comparable": [
+            1,
+            2
+          ],
+          "excluded": [
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "sqz",
+                  "ERROR"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {
+            "aifhub": {
+              "inputTokens": {
+                "n": 2,
+                "median": -1.5,
+                "min": -3,
+                "max": 0
+              },
+              "outputTokens": {
+                "n": 2,
+                "median": -129,
+                "min": -314,
+                "max": 56
+              },
+              "cacheReadTokens": {
+                "n": 2,
+                "median": -1774,
+                "min": -3365,
+                "max": -183
+              },
+              "cacheWriteTokens": {
+                "n": 2,
+                "median": -3850,
+                "min": -9427,
+                "max": 1727
+              },
+              "totalTokens": {
+                "n": 2,
+                "median": -5754.5,
+                "min": -13109,
+                "max": 1600
+              },
+              "reportedUsd": {
+                "n": 2,
+                "median": -0.0005636399999999999,
+                "min": -0.0013693249999999998,
+                "max": 0.00024204499999999998
+              },
+              "estimatedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "billedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "turns": {
+                "n": 2,
+                "median": -0.5,
+                "min": -1,
+                "max": 0
+              },
+              "toolCalls": {
+                "n": 2,
+                "median": -3.5,
+                "min": -8,
+                "max": 1
+              },
+              "readCalls": {
+                "n": 2,
+                "median": -3,
+                "min": -8,
+                "max": 2
+              },
+              "repeatReads": {
+                "n": 2,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "elapsedMs": {
+                "n": 2,
+                "median": -1488.5,
+                "min": -4704,
+                "max": 1727
+              },
+              "inputBytes": {
+                "n": 2,
+                "median": -18075,
+                "min": -44105,
+                "max": 7955
+              },
+              "outputBytes": {
+                "n": 2,
+                "median": -18075,
+                "min": -44105,
+                "max": 7955
+              },
+              "netBytes": {
+                "n": 2,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readResultTextBytes": {
+                "n": 2,
+                "median": -18075,
+                "min": -44105,
+                "max": 7955
+              }
+            },
+            "sqz": {
+              "inputTokens": {
+                "n": 1,
+                "median": -3,
+                "min": -3,
+                "max": -3
+              },
+              "outputTokens": {
+                "n": 1,
+                "median": -123,
+                "min": -123,
+                "max": -123
+              },
+              "cacheReadTokens": {
+                "n": 1,
+                "median": -3633,
+                "min": -3633,
+                "max": -3633
+              },
+              "cacheWriteTokens": {
+                "n": 1,
+                "median": -155,
+                "min": -155,
+                "max": -155
+              },
+              "totalTokens": {
+                "n": 1,
+                "median": -3914,
+                "min": -3914,
+                "max": -3914
+              },
+              "reportedUsd": {
+                "n": 1,
+                "median": -0.00011750499999999984,
+                "min": -0.00011750499999999984,
+                "max": -0.00011750499999999984
+              },
+              "estimatedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "billedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "turns": {
+                "n": 2,
+                "median": -2.5,
+                "min": -4,
+                "max": -1
+              },
+              "toolCalls": {
+                "n": 2,
+                "median": -3.5,
+                "min": -5,
+                "max": -2
+              },
+              "readCalls": {
+                "n": 2,
+                "median": -2.5,
+                "min": -3,
+                "max": -2
+              },
+              "repeatReads": {
+                "n": 2,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "elapsedMs": {
+                "n": 2,
+                "median": -6650.5,
+                "min": -9539,
+                "max": -3762
+              },
+              "inputBytes": {
+                "n": 2,
+                "median": 3093,
+                "min": -1088,
+                "max": 7274
+              },
+              "outputBytes": {
+                "n": 2,
+                "median": 4061,
+                "min": -120,
+                "max": 8242
+              },
+              "netBytes": {
+                "n": 2,
+                "median": -968,
+                "min": -968,
+                "max": -968
+              },
+              "readResultTextBytes": {
+                "n": 2,
+                "median": 4061,
+                "min": -120,
+                "max": 8242
+              }
+            }
+          },
+          "readClasses": {
+            "off": {
+              "measuredCells": 3,
+              "plannedCells": 3,
+              "sums": {
+                "firstRead": {
+                  "reads": 13,
+                  "inputBytes": 42778,
+                  "outputBytes": 42778,
+                  "netBytes": 0
+                },
+                "exactRepeat": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "changed": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "protected": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "freshSession": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                }
+              }
+            },
+            "aifhub": {
+              "measuredCells": 3,
+              "plannedCells": 3,
+              "sums": {
+                "firstRead": {
+                  "reads": 17,
+                  "inputBytes": 60443,
+                  "outputBytes": 60443,
+                  "netBytes": 0
+                },
+                "exactRepeat": {
+                  "reads": 1,
+                  "inputBytes": 1812,
+                  "outputBytes": 1812,
+                  "netBytes": 0
+                },
+                "changed": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "protected": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "freshSession": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                }
+              }
+            },
+            "sqz": {
+              "measuredCells": 3,
+              "plannedCells": 3,
+              "sums": {
+                "firstRead": {
+                  "reads": 13,
+                  "inputBytes": 12661,
+                  "outputBytes": 10725,
+                  "netBytes": 1936
+                },
+                "exactRepeat": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "changed": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "protected": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "freshSession": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                }
+              }
+            }
+          }
+        },
+        {
+          "caseId": "project-a-edit",
+          "plannedTriples": 3,
+          "successful": [
+            2,
+            3
+          ],
+          "comparable": [
+            2,
+            3
+          ],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "aifhub",
+                  "ERROR"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {
+            "aifhub": {
+              "inputTokens": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "outputTokens": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "cacheReadTokens": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "cacheWriteTokens": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "totalTokens": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "reportedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "estimatedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "billedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "turns": {
+                "n": 2,
+                "median": -1,
+                "min": -2,
+                "max": 0
+              },
+              "toolCalls": {
+                "n": 2,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readCalls": {
+                "n": 2,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "repeatReads": {
+                "n": 2,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "elapsedMs": {
+                "n": 2,
+                "median": -7515,
+                "min": -14860,
+                "max": -170
+              },
+              "inputBytes": {
+                "n": 2,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "outputBytes": {
+                "n": 2,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "netBytes": {
+                "n": 2,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readResultTextBytes": {
+                "n": 2,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              }
+            },
+            "sqz": {
+              "inputTokens": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "outputTokens": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "cacheReadTokens": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "cacheWriteTokens": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "totalTokens": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "reportedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "estimatedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "billedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "turns": {
+                "n": 2,
+                "median": -1.5,
+                "min": -3,
+                "max": 0
+              },
+              "toolCalls": {
+                "n": 2,
+                "median": -1.5,
+                "min": -2,
+                "max": -1
+              },
+              "readCalls": {
+                "n": 2,
+                "median": -1,
+                "min": -1,
+                "max": -1
+              },
+              "repeatReads": {
+                "n": 2,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "elapsedMs": {
+                "n": 2,
+                "median": -3949,
+                "min": -7756,
+                "max": -142
+              },
+              "inputBytes": {
+                "n": 2,
+                "median": -898.5,
+                "min": -1008,
+                "max": -789
+              },
+              "outputBytes": {
+                "n": 2,
+                "median": 69.5,
+                "min": -40,
+                "max": 179
+              },
+              "netBytes": {
+                "n": 2,
+                "median": -968,
+                "min": -968,
+                "max": -968
+              },
+              "readResultTextBytes": {
+                "n": 2,
+                "median": 69.5,
+                "min": -40,
+                "max": 179
+              }
+            }
+          },
+          "readClasses": {
+            "off": {
+              "measuredCells": 3,
+              "plannedCells": 3,
+              "sums": {
+                "firstRead": {
+                  "reads": 3,
+                  "inputBytes": 9336,
+                  "outputBytes": 9336,
+                  "netBytes": 0
+                },
+                "exactRepeat": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "changed": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "protected": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "freshSession": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                }
+              }
+            },
+            "aifhub": {
+              "measuredCells": 3,
+              "plannedCells": 3,
+              "sums": {
+                "firstRead": {
+                  "reads": 2,
+                  "inputBytes": 6224,
+                  "outputBytes": 6224,
+                  "netBytes": 0
+                },
+                "exactRepeat": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "changed": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "protected": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "freshSession": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                }
+              }
+            },
+            "sqz": {
+              "measuredCells": 3,
+              "plannedCells": 3,
+              "sums": {
+                "firstRead": {
+                  "reads": 5,
+                  "inputBytes": 11769,
+                  "outputBytes": 8865,
+                  "netBytes": 2904
+                },
+                "exactRepeat": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "changed": {
+                  "reads": 1,
+                  "inputBytes": 789,
+                  "outputBytes": 789,
+                  "netBytes": 0
+                },
+                "protected": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "freshSession": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                }
+              }
+            }
+          }
+        },
+        {
+          "caseId": "project-b-edit",
+          "plannedTriples": 3,
+          "successful": [
+            1,
+            2
+          ],
+          "comparable": [
+            1,
+            2
+          ],
+          "excluded": [
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "sqz",
+                  "ERROR"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {
+            "aifhub": {
+              "inputTokens": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "outputTokens": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "cacheReadTokens": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "cacheWriteTokens": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "totalTokens": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "reportedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "estimatedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "billedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "turns": {
+                "n": 2,
+                "median": 1,
+                "min": -1,
+                "max": 3
+              },
+              "toolCalls": {
+                "n": 2,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readCalls": {
+                "n": 2,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "repeatReads": {
+                "n": 2,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "elapsedMs": {
+                "n": 2,
+                "median": 7048,
+                "min": -1929,
+                "max": 16025
+              },
+              "inputBytes": {
+                "n": 2,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "outputBytes": {
+                "n": 2,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "netBytes": {
+                "n": 2,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readResultTextBytes": {
+                "n": 2,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              }
+            },
+            "sqz": {
+              "inputTokens": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "outputTokens": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "cacheReadTokens": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "cacheWriteTokens": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "totalTokens": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "reportedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "estimatedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "billedUsd": {
+                "n": 0,
+                "median": null,
+                "min": null,
+                "max": null
+              },
+              "turns": {
+                "n": 2,
+                "median": 0.5,
+                "min": -2,
+                "max": 3
+              },
+              "toolCalls": {
+                "n": 2,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readCalls": {
+                "n": 2,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "repeatReads": {
+                "n": 2,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "elapsedMs": {
+                "n": 2,
+                "median": 4876,
+                "min": -6090,
+                "max": 15842
+              },
+              "inputBytes": {
+                "n": 2,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "outputBytes": {
+                "n": 2,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "netBytes": {
+                "n": 2,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              },
+              "readResultTextBytes": {
+                "n": 2,
+                "median": 0,
+                "min": 0,
+                "max": 0
+              }
+            }
+          },
+          "readClasses": {
+            "off": {
+              "measuredCells": 3,
+              "plannedCells": 3,
+              "sums": {
+                "firstRead": {
+                  "reads": 3,
+                  "inputBytes": 5931,
+                  "outputBytes": 5931,
+                  "netBytes": 0
+                },
+                "exactRepeat": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "changed": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "protected": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "freshSession": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                }
+              }
+            },
+            "aifhub": {
+              "measuredCells": 3,
+              "plannedCells": 3,
+              "sums": {
+                "firstRead": {
+                  "reads": 3,
+                  "inputBytes": 5931,
+                  "outputBytes": 5931,
+                  "netBytes": 0
+                },
+                "exactRepeat": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "changed": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "protected": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "freshSession": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                }
+              }
+            },
+            "sqz": {
+              "measuredCells": 3,
+              "plannedCells": 3,
+              "sums": {
+                "firstRead": {
+                  "reads": 2,
+                  "inputBytes": 3954,
+                  "outputBytes": 3954,
+                  "netBytes": 0
+                },
+                "exactRepeat": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "changed": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "protected": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                },
+                "freshSession": {
+                  "reads": 0,
+                  "inputBytes": 0,
+                  "outputBytes": 0,
+                  "netBytes": 0
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "codex-luna-low",
+      "platform": "win32",
+      "planned": 45,
+      "attempted": 2,
+      "outcomes": {
+        "PASS": 0,
+        "FAIL": 2,
+        "ERROR": 0,
+        "BLOCKED": 0,
+        "NOT_RUN": 43
+      },
+      "setupRetries": 0,
+      "failedSpend": {
+        "inputTokens": {
+          "reportedAttempts": 2,
+          "completeAttempts": 2,
+          "reportedSubtotal": 115299,
+          "total": 115299
+        },
+        "outputTokens": {
+          "reportedAttempts": 2,
+          "completeAttempts": 2,
+          "reportedSubtotal": 1147,
+          "total": 1147
+        },
+        "cacheReadTokens": {
+          "reportedAttempts": 2,
+          "completeAttempts": 2,
+          "reportedSubtotal": 96256,
+          "total": 96256
+        },
+        "cacheWriteTokens": {
+          "reportedAttempts": 2,
+          "completeAttempts": 2,
+          "reportedSubtotal": 0,
+          "total": 0
+        },
+        "totalTokens": {
+          "reportedAttempts": 2,
+          "completeAttempts": 2,
+          "reportedSubtotal": 116446,
+          "total": 116446
+        },
+        "reportedUsd": {
+          "reportedAttempts": 0,
+          "completeAttempts": 0,
+          "reportedSubtotal": null,
+          "total": null
+        },
+        "estimatedUsd": {
+          "reportedAttempts": 2,
+          "completeAttempts": 2,
+          "reportedSubtotal": 0,
+          "total": 0
+        },
+        "billedUsd": {
+          "reportedAttempts": 0,
+          "completeAttempts": 0,
+          "reportedSubtotal": null,
+          "total": null
+        }
+      },
+      "byCase": [
+        {
+          "caseId": "repeat-source",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "FAIL"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        },
+        {
+          "caseId": "changed-source",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        },
+        {
+          "caseId": "protected-openspec",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        },
+        {
+          "caseId": "short-config",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "FAIL"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "pi-ornith-low",
+      "platform": "win32",
+      "planned": 27,
+      "attempted": 0,
+      "outcomes": {
+        "PASS": 0,
+        "FAIL": 0,
+        "ERROR": 0,
+        "BLOCKED": 0,
+        "NOT_RUN": 27
+      },
+      "setupRetries": 0,
+      "failedSpend": null,
+      "byCase": [
+        {
+          "caseId": "project-a-research",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        },
+        {
+          "caseId": "project-a-edit",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        },
+        {
+          "caseId": "project-b-edit",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "codex-luna-low",
+      "platform": "linux",
+      "planned": 45,
+      "attempted": 0,
+      "outcomes": {
+        "PASS": 0,
+        "FAIL": 0,
+        "ERROR": 0,
+        "BLOCKED": 0,
+        "NOT_RUN": 45
+      },
+      "setupRetries": 0,
+      "failedSpend": null,
+      "byCase": [
+        {
+          "caseId": "repeat-source",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        },
+        {
+          "caseId": "changed-source",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        },
+        {
+          "caseId": "protected-openspec",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        },
+        {
+          "caseId": "short-config",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "pi-ornith-low",
+      "platform": "linux",
+      "planned": 27,
+      "attempted": 0,
+      "outcomes": {
+        "PASS": 0,
+        "FAIL": 0,
+        "ERROR": 0,
+        "BLOCKED": 0,
+        "NOT_RUN": 27
+      },
+      "setupRetries": 0,
+      "failedSpend": null,
+      "byCase": [
+        {
+          "caseId": "project-a-research",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        },
+        {
+          "caseId": "project-a-edit",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        },
+        {
+          "caseId": "project-b-edit",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "codex-6-luna-read-control",
+      "platform": "win32",
+      "planned": 45,
+      "attempted": 2,
+      "outcomes": {
+        "PASS": 0,
+        "FAIL": 2,
+        "ERROR": 0,
+        "BLOCKED": 0,
+        "NOT_RUN": 43
+      },
+      "setupRetries": 0,
+      "failedSpend": {
+        "inputTokens": {
+          "reportedAttempts": 2,
+          "completeAttempts": 2,
+          "reportedSubtotal": 87084,
+          "total": 87084
+        },
+        "outputTokens": {
+          "reportedAttempts": 2,
+          "completeAttempts": 2,
+          "reportedSubtotal": 199,
+          "total": 199
+        },
+        "cacheReadTokens": {
+          "reportedAttempts": 2,
+          "completeAttempts": 2,
+          "reportedSubtotal": 50176,
+          "total": 50176
+        },
+        "cacheWriteTokens": {
+          "reportedAttempts": 2,
+          "completeAttempts": 2,
+          "reportedSubtotal": 0,
+          "total": 0
+        },
+        "totalTokens": {
+          "reportedAttempts": 2,
+          "completeAttempts": 2,
+          "reportedSubtotal": 87283,
+          "total": 87283
+        },
+        "reportedUsd": {
+          "reportedAttempts": 0,
+          "completeAttempts": 0,
+          "reportedSubtotal": null,
+          "total": null
+        },
+        "estimatedUsd": {
+          "reportedAttempts": 2,
+          "completeAttempts": 2,
+          "reportedSubtotal": 0,
+          "total": 0
+        },
+        "billedUsd": {
+          "reportedAttempts": 0,
+          "completeAttempts": 0,
+          "reportedSubtotal": null,
+          "total": null
+        }
+      },
+      "byCase": [
+        {
+          "caseId": "repeat-source",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        },
+        {
+          "caseId": "changed-source",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        },
+        {
+          "caseId": "protected-openspec",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        },
+        {
+          "caseId": "short-config",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "FAIL"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "FAIL"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "codex-terra-read-only",
+      "platform": "win32",
+      "planned": 45,
+      "attempted": 1,
+      "outcomes": {
+        "PASS": 0,
+        "FAIL": 1,
+        "ERROR": 0,
+        "BLOCKED": 0,
+        "NOT_RUN": 44
+      },
+      "setupRetries": 0,
+      "failedSpend": {
+        "inputTokens": {
+          "reportedAttempts": 1,
+          "completeAttempts": 1,
+          "reportedSubtotal": 48184,
+          "total": 48184
+        },
+        "outputTokens": {
+          "reportedAttempts": 1,
+          "completeAttempts": 1,
+          "reportedSubtotal": 93,
+          "total": 93
+        },
+        "cacheReadTokens": {
+          "reportedAttempts": 1,
+          "completeAttempts": 1,
+          "reportedSubtotal": 31104,
+          "total": 31104
+        },
+        "cacheWriteTokens": {
+          "reportedAttempts": 1,
+          "completeAttempts": 1,
+          "reportedSubtotal": 0,
+          "total": 0
+        },
+        "totalTokens": {
+          "reportedAttempts": 1,
+          "completeAttempts": 1,
+          "reportedSubtotal": 48277,
+          "total": 48277
+        },
+        "reportedUsd": {
+          "reportedAttempts": 0,
+          "completeAttempts": 0,
+          "reportedSubtotal": null,
+          "total": null
+        },
+        "estimatedUsd": {
+          "reportedAttempts": 1,
+          "completeAttempts": 1,
+          "reportedSubtotal": 0,
+          "total": 0
+        },
+        "billedUsd": {
+          "reportedAttempts": 0,
+          "completeAttempts": 0,
+          "reportedSubtotal": null,
+          "total": null
+        }
+      },
+      "byCase": [
+        {
+          "caseId": "repeat-source",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        },
+        {
+          "caseId": "changed-source",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        },
+        {
+          "caseId": "protected-openspec",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        },
+        {
+          "caseId": "short-config",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "FAIL"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "native-codex-api",
+      "platform": "win32",
+      "planned": 45,
+      "attempted": 1,
+      "outcomes": {
+        "PASS": 0,
+        "FAIL": 0,
+        "ERROR": 1,
+        "BLOCKED": 0,
+        "NOT_RUN": 44
+      },
+      "setupRetries": 0,
+      "failedSpend": {
+        "inputTokens": {
+          "reportedAttempts": 0,
+          "completeAttempts": 0,
+          "reportedSubtotal": null,
+          "total": null
+        },
+        "outputTokens": {
+          "reportedAttempts": 0,
+          "completeAttempts": 0,
+          "reportedSubtotal": null,
+          "total": null
+        },
+        "cacheReadTokens": {
+          "reportedAttempts": 0,
+          "completeAttempts": 0,
+          "reportedSubtotal": null,
+          "total": null
+        },
+        "cacheWriteTokens": {
+          "reportedAttempts": 0,
+          "completeAttempts": 0,
+          "reportedSubtotal": null,
+          "total": null
+        },
+        "totalTokens": {
+          "reportedAttempts": 0,
+          "completeAttempts": 0,
+          "reportedSubtotal": null,
+          "total": null
+        },
+        "reportedUsd": {
+          "reportedAttempts": 0,
+          "completeAttempts": 0,
+          "reportedSubtotal": null,
+          "total": null
+        },
+        "estimatedUsd": {
+          "reportedAttempts": 0,
+          "completeAttempts": 0,
+          "reportedSubtotal": null,
+          "total": null
+        },
+        "billedUsd": {
+          "reportedAttempts": 0,
+          "completeAttempts": 0,
+          "reportedSubtotal": null,
+          "total": null
+        }
+      },
+      "byCase": [
+        {
+          "caseId": "repeat-source",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        },
+        {
+          "caseId": "changed-source",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        },
+        {
+          "caseId": "protected-openspec",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        },
+        {
+          "caseId": "fresh-session-preseeded-cache",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        },
+        {
+          "caseId": "short-config",
+          "plannedTriples": 3,
+          "successful": [],
+          "comparable": [],
+          "excluded": [
+            {
+              "repeat": 1,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "ERROR"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 2,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            },
+            {
+              "repeat": 3,
+              "reason": "outcome",
+              "arms": [
+                [
+                  "off",
+                  "NOT_RUN"
+                ],
+                [
+                  "aifhub",
+                  "NOT_RUN"
+                ],
+                [
+                  "sqz",
+                  "NOT_RUN"
+                ]
+              ]
+            }
+          ],
+          "comparisons": {},
+          "readClasses": {
+            "off": null,
+            "aifhub": null,
+            "sqz": null
+          }
+        }
+      ]
+    }
+  ]
+}

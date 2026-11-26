@@ -62,7 +62,19 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 const roots = [];
 
 afterEach(async () => {
-  for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true });
+  const debug = process.env.LOG_LEVEL === 'debug';
+  for (const root of roots.splice(0)) {
+    const fixture = path.basename(root);
+    if (debug) console.error('[FIX:186] Removing overlay fixture', fixture);
+    try {
+      // A late directory entry on Windows can make the first rmdir return ENOTEMPTY.
+      await rm(root, { recursive: true, force: true, maxRetries: 3 });
+    } catch (error) {
+      if (debug) console.error('[FIX:186] Overlay fixture cleanup failed', fixture, error.code);
+      throw error;
+    }
+    if (debug) console.error('[FIX:186] Removed overlay fixture', fixture);
+  }
 });
 
 async function makeTemp(prefix) {

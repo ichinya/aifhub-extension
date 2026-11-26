@@ -1,15 +1,12 @@
+[Исследования инструментов](README.md) · [Далее: результаты AI Tester](sqz-benchmark-results.md)
+
 # sqz
 
 Репозиторий: [ojuschugh1/sqz](https://github.com/ojuschugh1/sqz)
 
 Проверенная версия: `1.3.0`, tag commit `d024b6b6bec152dfa7a63e2316054b1bb33a8110`, Elastic License 2.0.
 
-Результаты замеров: [sqz-benchmark-results.md](sqz-benchmark-results.md).
-
-Live-матрица с агентом pi (байты против токенов, рекомендации по профилям репозиториев, включая Laravel и мультирепо):
-[sqz-pi-live-matrix.md](sqz-pi-live-matrix.md).
-
-Этот документ описывает variant B для issue #133: baseline без dedup, собственный [Session Context Dedup](../context-dedup.md) и optional user-owned `sqz`.
+В AIFHub режим `sqz` обрабатывает подходящие текстовые чтения локальным исполняемым файлом. AI Tester проверяет выдачу при чтении, а Pi измеряет расход на полную задачу. [Контракт чтения](../context-dedup.md) · [Сценарии AI Tester](sqz-benchmark-results.md) · [Полные задачи Pi](sqz-pi-live-matrix.md)
 
 ## Проверенный Контракт
 
@@ -31,7 +28,7 @@ Live-матрица с агентом pi (байты против токенов
 - Проверенный `sqz-isolated-adapter.exe` SHA-256: `36318B6299026A3CFCF8D0E2D76EFF9FE7060889C72E0FA9B735F7C2918E0607`
 - Source/tag checkout: `d024b6b6bec152dfa7a63e2316054b1bb33a8110`
 
-Текущая runtime matrix не скачивала binary во время model turn и не запускала
+Историческая runtime matrix #133 не скачивала binary во время model turn и не запускала
 `sqz init`: она использовала pre-staged официальный `sqz.exe` через реальный
 `aifhub.contextDedup.mode: sqz`. Adapter относится только к историческому
 authored/engine benchmark и использовал fixture-local SQLite store. Сетевой
@@ -64,13 +61,11 @@ v1.3.0 вычисляет home через platform API: `fresh-session-preseeded
 - отдельным full-read path для canonical/protected artifacts;
 - понятным reset/purge lifecycle.
 
-Runtime integration не запускает `sqz init`. Она вызывает fixed
-`sqz compress --no-cache` без shell, поэтому SQZ не может вернуть cache
-reference; exact same-session repeat обслуживает AIFHub ledger. Неожиданный
-`§ref`/`§delta`, отсутствующий executable, non-zero exit, timeout/output limit
-или отсутствие положительной model-visible экономии приводят к fail-open с
-исходным content. Сторонний CLI всё ещё может вести user-owned statistics под
-`~/.sqz`; AIFHub не заявляет ownership и не очищает их.
+Runtime вызывает `sqz compress --no-cache` без shell. Первое чтение и чтение новой ревизии могут получить самодостаточный сжатый текст. Точный повтор может получить ссылку AIFHub, если получатель ещё видит прежнюю выдачу и маркер короче исходника. При ошибке процесса, неожиданном `§ref`/`§delta` или отсутствии выигрыша по байтам возвращается оригинал. Для protected и принудительного чтения SQZ не запускается. Статистика стороннего CLI под `~/.sqz` остаётся под управлением пользователя.
 
-Текущий безопасный результат matrix — `4/4`; исторический `r3` с provider
-cache сохранён как `3/4` regression evidence.
+В историческом профиле AI Tester `gpt-5.6-luna / low` на Windows прошли четыре из четырёх сценариев SQZ в r4 и три из четырёх в r3. Каждый сценарий выполнялся один раз на режим. В #186 эталоном также служил SQZ 1.3.0. Раздел `pins` снимка содержит SHA-256 бинарника, реализации AIFHub, runners и входов. Проверка бинарника Linux отмечена отдельно от живых запусков на Windows. [Закреплённые входы #186](context-dedup-ai-tester/issue-186/snapshots/2026-11-25-windows-sqz-1.3.0/observations.json) · [Пересчёт без запуска модели](context-dedup-ai-tester/issue-186/coverage.md#воспроизведение)
+
+## См. также
+
+- [Настройка режимов и принудительное чтение](../context-dedup.md)
+- [Расход на полную задачу в Pi](sqz-pi-live-matrix.md)

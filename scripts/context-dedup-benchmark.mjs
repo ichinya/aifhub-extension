@@ -8,9 +8,14 @@ import process from 'node:process';
 import { StringDecoder } from 'node:string_decoder';
 import { pathToFileURL } from 'node:url';
 
-import { isProtectedReadPath, readContextDedupPolicy, recordRead } from './context-dedup.mjs';
+import { SQZ_MAX_INPUT_BYTES, isProtectedReadPath, readContextDedupPolicy, recordRead } from './context-dedup.mjs';
 
 export const BENCHMARK_MODES = ['baseline', 'variant-a', 'external'];
+
+const READ_BOUNDARIES = { baseline: 'raw-trace', 'variant-a': 'recordRead:aifhub', external: 'external-adapter' };
+const EXTERNAL_ERROR_FALLBACKS = new Set([
+  'external-error', 'external-input-limit', 'external-timeout', 'external-output-limit', 'external-unparsable', 'external-empty-output'
+]);
 
 const BYTES_PER_TOKEN_ESTIMATE = 4;
 const DEFAULT_EXTERNAL_TIMEOUT_MS = 30_000;
@@ -137,6 +142,7 @@ export async function runBenchmark(options = {}) {
     const policy = await readContextDedupPolicy({ rootDir: workspace });
     const steps = [];
     const lastContentByPath = new Map();
+    const deliveredByPath = new Map();
 
     for (const [index, read] of trace.reads.entries()) {
       await materialize(workspace, read.path, read.content);
@@ -149,6 +155,7 @@ export async function runBenchmark(options = {}) {
         sessionId,
         read,
         policy,
+        replayAvailable: deliveredByPath.get(read.path) === read.content,
         externalCommand,
         externalProtocol: options.externalProtocol ?? 'sqz-text',
         externalTimeoutMs: options.externalTimeoutMs,
@@ -158,6 +165,8 @@ export async function runBenchmark(options = {}) {
       const emittedBytes = Buffer.byteLength(step.emitted, 'utf8');
       const fullBytes = Buffer.byteLength(read.content, 'utf8');
       const servedFullContent = step.emitted === read.content;
+
+      if (mode === 'variant-a' && servedFullContent) deliveredByPath.set(read.path, step.emitted);
 
       steps.push({
         index,
@@ -214,6 +223,8 @@ function summarize(mode, trace, steps, externalCommand) {
 
   return {
     mode,
+    readBoundary: READ_BOUNDARIES[mode],
+    externalErrorFallbackReads: steps.filter(step => EXTERNAL_ERROR_FALLBACKS.has(step.decision)).length,
     trace: trace.name,
     externalCommand,
     reads: steps.length,
@@ -266,6 +277,7 @@ async function runStep(mode, context) {
       content: context.read.content,
       rootDir: context.workspace,
       sessionId: context.sessionId,
+      replayAvailable: context.replayAvailable,
       policy: context.policy
     });
 
@@ -300,6 +312,9 @@ async function runExternalStep(context) {
       }
     })
     : context.read.content;
+  if (Buffer.byteLength(payload, 'utf8') > SQZ_MAX_INPUT_BYTES) {
+    return { emitted: context.read.content, decision: 'external-input-limit', deliveryKind: 'full' };
+  }
   const { stdout, code, timedOut, outputLimited } = await runCommand(context.externalCommand, payload, {
     cwd: context.workspace,
     env: isolatedExternalEnv(context.workspace, context.env),
@@ -313,10 +328,13 @@ async function runExternalStep(context) {
   if (outputLimited) {
     return { emitted: context.read.content, decision: 'external-output-limit', deliveryKind: 'full' };
   }
-  if (code !== 0 || !stdout.trim()) {
+  if (code !== 0) {
+    return { emitted: context.read.content, decision: 'external-error', deliveryKind: 'full' };
+  }
+  if (!stdout.trim()) {
     return {
       emitted: context.read.content,
-      decision: code === 0 ? 'external-passthrough' : 'external-error',
+      decision: protocol === 'hook-json' ? 'external-passthrough' : 'external-empty-output',
       deliveryKind: 'full'
     };
   }
@@ -344,6 +362,14 @@ async function runExternalStep(context) {
     return { emitted: updated, decision: 'external-delta', deliveryKind: 'delta' };
   }
 
+  const outputBytes = Buffer.byteLength(updated);
+  const inputBytes = Buffer.byteLength(context.read.content);
+  if (outputBytes > inputBytes) {
+    return { emitted: updated, decision: 'external-expanded', deliveryKind: 'expanded' };
+  }
+  if (outputBytes === inputBytes) {
+    return { emitted: updated, decision: 'external-transformed', deliveryKind: 'transformed' };
+  }
   return { emitted: updated, decision: 'external-compressed', deliveryKind: 'compressed' };
 }
 
@@ -440,6 +466,7 @@ function runCommand(command, input, options) {
       outputLimited: false
     }));
 
+    child.stdin.on('error', () => {});
     child.stdin.end(input);
   });
 }
@@ -548,11 +575,11 @@ function withoutSteps(result) {
 }
 
 function renderTable(results) {
-  const lines = ['| mode | reads | emitted bytes | saved bytes | saved % | exact-repeat saved % | est. saved tokens | changed safe | protected served |', '|---|---|---|---|---|---|---|---|---|'];
+  const lines = ['| mode | read boundary | reads | external error fallbacks | emitted bytes | saved bytes | saved % | exact-repeat saved % | est. saved tokens | changed safe | protected served |', '|---|---|---|---|---|---|---|---|---|---|---|'];
 
   for (const result of results) {
     lines.push(
-      `| ${result.mode} | ${result.reads} | ${result.emittedBytes} | ${result.savedBytes} | ${result.savedPercent} | ${result.payloadByClass.exactRepeat.savedPercent} | ${result.estimatedSavedTokens} | ${result.correctness.changedContentNeverReferenced ? 'yes' : 'NO'} | ${result.correctness.protectedArtifactsAlwaysServed ? 'yes' : 'NO'} |`
+      `| ${result.mode} | ${result.readBoundary} | ${result.reads} | ${result.externalErrorFallbackReads} | ${result.emittedBytes} | ${result.savedBytes} | ${result.savedPercent} | ${result.payloadByClass.exactRepeat.savedPercent} | ${result.estimatedSavedTokens} | ${result.correctness.changedContentNeverReferenced ? 'yes' : 'NO'} | ${result.correctness.protectedArtifactsAlwaysServed ? 'yes' : 'NO'} |`
     );
   }
 

@@ -1,9 +1,12 @@
 // context-dedup.test.mjs - tests for the optional session read dedup service
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { EventEmitter } from 'node:events';
+import { EventEmitter, once } from 'node:events';
+import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
+import { createServer } from 'node:net';
 import path from 'node:path';
 import { PassThrough } from 'node:stream';
 
@@ -262,6 +265,154 @@ aifhub:
 });
 
 describe('recordRead decisions', () => {
+  const source = 'original π\r\n' + 'sample '.repeat(15);
+  const failures = [
+    ['missing executable', null, 'unavailable'],
+    ['nonzero exit', "process.stdout.write('short'); process.exitCode = 7;", 'unavailable'],
+    ['stdout over budget', "process.stdout.write('a'.repeat(65));", 'output-limit'],
+    ['stderr over budget', "process.stdout.write('ok'); process.stderr.write('b'.repeat(65));", 'output-limit'],
+    ['combined output over budget', "process.stdout.write('a'.repeat(32)); process.stderr.write('b'.repeat(33));", 'output-limit'],
+    ['malformed stdout', 'process.stdout.write(Buffer.from([0xc3, 0x28]));', 'invalid-output'],
+    ['incomplete final character', 'process.stdout.write(Buffer.from([0x61, 0xe2, 0x82]));', 'invalid-output'],
+    ['stateful reference', "process.stdout.write('§ref:12345678§');", 'stateful-output'],
+    ['stateful delta', "process.stdout.write('§delta:12345678§\\r\\npatch');", 'stateful-output'],
+    ['unrecognized reference header', "process.stdout.write('§ref:unknown§');", 'stateful-output'],
+    ['no byte savings', 'process.stdout.write("x".repeat(' + Buffer.byteLength(source) + '));', null]
+  ];
+  for (const [label, worker, warning] of failures) {
+    it('SQZ process contract: ' + label + ' returns the original with zero savings', async () => {
+      await writeProjectFile('notes.txt', source);
+      if (worker) await writeProjectFile('compress', worker);
+      const command = worker ? process.execPath : path.join(rootDir, 'absent-tool');
+      const policy = resolveContextDedupPolicy({ mode: 'sqz', minBytes: 1, sqz: { command } });
+      const options = { rootDir, sessionId: 'probe', policy };
+      const result = await recordRead({ ...options, filePath: 'notes.txt', sqzMaxOutputBytes: warning ? 64 : 512 });
+      const bytes = Buffer.byteLength(source);
+      assert.equal(result.content, source);
+      assert.equal(result.decision, 'full');
+      assert.equal(result.savedBytes, 0);
+      assert.deepEqual(result.warnings.map(w => w.code), warning ? ['context-dedup-sqz-' + warning] : []);
+      const stats = await summarizeSession(options);
+      assert.deepEqual([stats.reads, stats.dedupHits, stats.observedBytes, stats.servedBytes, stats.savedBytes], [1, 0, bytes, bytes, 0]);
+    });
+  }
+
+  it('SQZ process contract: fixed argv and exact byte budget preserve valid UTF-8 including a BOM', async () => {
+    const compact = '\uFEFFfact=15\uFFFD';
+    await writeProjectFile('compress', [
+      "if (JSON.stringify(process.argv.slice(2)) !== JSON.stringify(['--no-cache'])) process.exit(9);",
+      "process.stderr.write('12');",
+      'process.stdout.write(' + JSON.stringify(compact) + ');'
+    ].join('\n'));
+    const reply = await runSqzCompression({ command: process.execPath, cwd: rootDir, content: source,
+      maxOutputBytes: Buffer.byteLength(compact) + 2 });
+    assert.deepEqual(reply, { ok: true, code: 'ok', stdout: compact });
+  });
+
+  it('SQZ process contract: timeout stops the owned descendant and leaves the neighbouring process usable', async () => {
+    let peer, descendantClosed, peerError;
+    let ready = '';
+    const server = createServer(socket => {
+      peer = socket;
+      descendantClosed = new Promise(done => socket.once('close', done));
+      socket.on('error', error => { peerError = error.code; });
+      socket.on('data', chunk => { ready += chunk; });
+    });
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    const control = spawn(process.execPath, ['-e', 'process.stdin.pipe(process.stdout)'], {
+      cwd: rootDir, windowsHide: true, stdio: ['pipe', 'pipe', 'ignore']
+    });
+    const controlClosed = once(control, 'close');
+    let controlOutput = '';
+    control.stdout.on('data', chunk => { controlOutput += chunk; });
+    // Only the descendant holds this connection. Ending the peer also releases a failed fixture.
+    await writeProjectFile('descendant.cjs', [
+      "const socket = require('node:net').connect(" + server.address().port + ", '127.0.0.1');",
+      "socket.on('connect', () => socket.write('ready'));",
+      "socket.on('error', () => {});",
+      "setTimeout(() => socket.destroy(), 20000).unref();"
+    ].join('\n'));
+    await writeProjectFile('compress',
+      "require('node:child_process').spawn(process.execPath, ['descendant.cjs'], {stdio:'ignore', windowsHide:true});");
+    let deadline;
+    try {
+      await writeProjectFile('notes.txt', source);
+      const policy = resolveContextDedupPolicy({ mode: 'sqz', minBytes: 1, sqz: { command: process.execPath } });
+      const options = { rootDir, policy, sessionId: 'tree' };
+      const result = await recordRead({ ...options, filePath: 'notes.txt', sqzTimeoutMs: 3500 });
+      assert.equal(ready, 'ready', 'descendant must have started');
+      assert.equal(result.content, source);
+      assert.equal(result.savedBytes, 0);
+      assert.deepEqual(result.warnings.map(w => w.code), ['context-dedup-sqz-timeout']);
+      const stats = await summarizeSession(options);
+      assert.deepEqual([stats.dedupHits, stats.observedBytes, stats.servedBytes, stats.savedBytes],
+        [0, Buffer.byteLength(source), Buffer.byteLength(source), 0]);
+      await Promise.race([descendantClosed, new Promise((_, reject) => {
+        deadline = setTimeout(() => reject(new Error('owned descendant still connected')), 2000);
+      })]);
+      // Windows may deliver a connection reset before close when the owner is terminated.
+      assert.ok(peerError === undefined || peerError === 'ECONNRESET');
+      control.stdin.end('still usable');
+      const [exitCode] = await controlClosed;
+      assert.equal(exitCode, 0);
+      assert.equal(controlOutput, 'still usable');
+    } finally {
+      clearTimeout(deadline);
+      peer?.end();
+      server.close();
+      control.stdin.end();
+      await Promise.all([descendantClosed, controlClosed]);
+    }
+  });
+
+  it('protects ordinary trace names under the default or configured state root', async () => {
+    const original = Buffer.from('Проверка\r\n' + 'neutral trace '.repeat(30));
+    let starts = 0;
+    for (const state of ['.ai-factory/state', 'custom/state']) {
+      const config = 'aifhub:\n  contextDedup:\n    mode: sqz\n    minBytes: 1\n';
+      await writeProjectFile('.ai-factory/config.yaml', state === 'custom/state' ? config + 'paths:\n  state: custom/state\n' : config);
+      const filePath = state + '/demo/trace.json';
+      await writeProjectFile(filePath, original);
+      const result = await recordRead({ rootDir, filePath, sessionId: 'protected-state',
+        sqzRunner: async () => { starts++; return { ok: true, stdout: 'compact' }; } });
+      assert.equal(result.decision, 'protected');
+      assert.ok(Buffer.from(result.content).equals(original));
+    }
+    assert.equal(starts, 0);
+  });
+
+  it('isolates the SQZ child from caller history and removes source text from failure diagnostics', async () => {
+    const marker = randomUUID();
+    const content = body(marker, 20);
+    const callerHome = path.join(rootDir, 'fixture-home');
+    const history = await writeProjectFile('fixture-home/history.jsonl', '{"event":"initial"}\n');
+    await writeProjectFile('notes.txt', content);
+    // The child only reports the invocation contract. It never opens a user profile.
+    await writeProjectFile('compress', [
+      "const fs = require('node:fs'), path = require('node:path');",
+      "const input = fs.readFileSync(0, 'utf8');",
+      "const localHome = path.relative(process.cwd(), process.env.SQZ_HOME);",
+      "const isolated = !!localHome && !localHome.startsWith('..') && !path.isAbsolute(localHome);",
+      "fs.writeFileSync('child.json', JSON.stringify({ isolated, args: process.argv.slice(2),",
+      "  sameHome: process.env.HOME === process.env.SQZ_HOME, received: Buffer.byteLength(input) }));",
+      "process.stderr.write(input); process.exitCode = 1;"
+    ].join('\n'));
+    const policy = resolveContextDedupPolicy({ mode: 'sqz', minBytes: 1, sqz: { command: process.execPath } });
+    const options = { rootDir, policy, filePath: 'notes.txt', sessionId: 'child-fixture',
+      env: { ...process.env, HOME: callerHome, SQZ_HOME: callerHome, USERPROFILE: callerHome } };
+    const response = await recordRead(options);
+    assert.ok(response.content === content);
+    assert.ok(response.warnings.length > 0);
+    const invocation = JSON.parse(await readFile(path.join(rootDir, 'child.json'), 'utf8'));
+    assert.deepEqual(invocation, { isolated: true, args: ['--no-cache'], sameHome: true, received: Buffer.byteLength(content) });
+    assert.equal(await readFile(history, 'utf8'), '{"event":"initial"}\n');
+    assert.deepEqual(await readdir(callerHome), ['history.jsonl']);
+    const summary = await summarizeSession(options);
+    const ledger = await readFile(resolveLedgerPath(options.sessionId, options), 'utf8');
+    assert.ok(![ledger, JSON.stringify(response.warnings), JSON.stringify(summary)].some(text => text.includes(marker)));
+  });
+
   it('returns full content on the first read and deduplicates the identical second read', async () => {
     const policy = await enabledPolicy();
     const content = body('session');
@@ -273,7 +424,7 @@ describe('recordRead decisions', () => {
     assert.equal(first.content, content);
     assert.equal(first.savedBytes, 0);
 
-    const second = await recordRead({ filePath: 'src/session.ts', content, rootDir, policy, sessionId: 's1' });
+    const second = await recordRead({ replayAvailable: true, filePath: 'src/session.ts', content, rootDir, policy, sessionId: 's1' });
     assert.equal(second.decision, 'deduplicated');
     assert.equal(second.content, null);
     assert.equal(second.readCount, 2);
@@ -287,13 +438,51 @@ describe('recordRead decisions', () => {
     assert.ok(replayBytes <= 220, `replay must stay compact; received ${replayBytes} bytes`);
   });
 
+  it('returns the original on unconfirmed repeats, revised files and unreadable SQZ ledgers', async () => {
+    const policy = resolveContextDedupPolicy({ mode: 'sqz', minBytes: 1 });
+    const opts = { rootDir, policy, sessionId: 'visible', filePath: 'notes.md' };
+    let calls = 0;
+    opts.sqzRunner = async () => { calls++; return { ok: true, stdout: 'brief' }; };
+    const original = body('first');
+    assert.equal((await recordRead({ ...opts, content: original })).content, 'brief');
+    for (const proof of [undefined, false, 'true']) {
+      assert.equal((await recordRead({ ...opts, replayAvailable: proof, content: original })).content, original);
+    }
+    const revised = body('second');
+    assert.equal((await recordRead({ ...opts, content: revised, replayAvailable: true })).content, revised);
+    await writeFile(resolveLedgerPath(opts.sessionId, opts), '{');
+    const recovered = await recordRead({ ...opts, content: revised });
+    assert.equal(recovered.content, revised);
+    assert.equal(recovered.savedBytes, 0);
+    assert.ok(recovered.warnings.some(w => w.code === 'context-dedup-ledger-unreadable'));
+    assert.equal(calls, 1);
+    assert.equal((await recordRead({ ...opts, content: revised, replayAvailable: true })).decision, 'deduplicated');
+  });
+
+  it('bounds SQZ input in UTF-8 bytes before starting a runner', async () => {
+    const opts = { rootDir, sessionId: 'bounds', policy: resolveContextDedupPolicy({ mode: 'sqz', minBytes: 1 }) };
+    const atLimit = 'é'.repeat(512 * 1024);
+    let calls = 0;
+    const sqzRunner = async () => { calls++; return { ok: true, stdout: 'brief' }; };
+    assert.equal((await recordRead({ ...opts, filePath: 'fit.txt', content: atLimit, sqzRunner })).content, 'brief');
+    const content = atLimit + 'x';
+    const skipped = await recordRead({ ...opts, filePath: 'large.txt', content, sqzRunner });
+    assert.equal(skipped.content, content);
+    assert.equal(skipped.savedBytes, 0);
+    assert.equal(skipped.warnings[0].code, 'context-dedup-sqz-input-limit');
+    assert.equal(calls, 1);
+    const result = await runSqzCompression({ content, spawnFn() { calls++; } });
+    assert.equal(result.code, 'input-limit');
+    assert.equal(calls, 1);
+  });
+
   it('serves full content when a replay would not reduce the model-visible payload', async () => {
     const policy = await enabledPolicy();
     const content = 'small-but-above-configured-threshold'.repeat(3);
     await writeProjectFile('src/small.txt', content);
 
     const first = await recordRead({ filePath: 'src/small.txt', content, rootDir, policy, sessionId: 'small' });
-    const second = await recordRead({ filePath: 'src/small.txt', content, rootDir, policy, sessionId: 'small' });
+    const second = await recordRead({ replayAvailable: true, filePath: 'src/small.txt', content, rootDir, policy, sessionId: 'small' });
     const summary = await summarizeSession({ rootDir, policy, sessionId: 'small' });
 
     assert.equal(first.decision, 'full');
@@ -330,7 +519,7 @@ describe('recordRead decisions', () => {
     await writeProjectFile('src/session.ts', first);
 
     await recordRead({ filePath: 'src/session.ts', content: first, rootDir, policy, sessionId: 'estimate' });
-    await recordRead({ filePath: 'src/session.ts', content: first, rootDir, policy, sessionId: 'estimate' });
+    await recordRead({ replayAvailable: true, filePath: 'src/session.ts', content: first, rootDir, policy, sessionId: 'estimate' });
 
     const ledgerPath = resolveLedgerPath('estimate', { rootDir, policy });
     const persisted = JSON.parse(await readFile(ledgerPath, 'utf8'));
@@ -549,6 +738,7 @@ describe('recordRead decisions', () => {
       sqzRunner
     });
     const second = await recordRead({
+      replayAvailable: true,
       filePath: 'src/session.ts',
       content,
       rootDir,
@@ -563,7 +753,7 @@ describe('recordRead decisions', () => {
     assert.equal(second.decision, 'deduplicated');
     assert.equal(second.providerOutcome, 'reference');
     assert.equal(second.content, null);
-    assert.match(second.replay.text, /self-contained compressed payload/);
+    assert.match(second.replay.text, /self-contained payload/);
     assert.doesNotMatch(second.replay.text, /was already provided in this session/);
     assert.equal(summary.mode, 'sqz');
     assert.equal(summary.reads, 2);
@@ -895,7 +1085,7 @@ describe('session summary and purge', () => {
     const content = body('summary');
 
     await recordRead({ filePath: 'src/session.ts', content, rootDir, policy, sessionId: 's1' });
-    const repeated = await recordRead({ filePath: 'src/session.ts', content, rootDir, policy, sessionId: 's1' });
+    const repeated = await recordRead({ replayAvailable: true, filePath: 'src/session.ts', content, rootDir, policy, sessionId: 's1' });
 
     const summary = await summarizeSession({ rootDir, sessionId: 's1' });
     const bytes = Buffer.byteLength(content, 'utf8');
@@ -917,7 +1107,7 @@ describe('session summary and purge', () => {
     const changed = body('summary-v2');
 
     await recordRead({ filePath: 'src/session.ts', content: first, rootDir, policy, sessionId: 's1' });
-    const repeated = await recordRead({ filePath: 'src/session.ts', content: first, rootDir, policy, sessionId: 's1' });
+    const repeated = await recordRead({ replayAvailable: true, filePath: 'src/session.ts', content: first, rootDir, policy, sessionId: 's1' });
     await recordRead({ filePath: 'src/session.ts', content: changed, rootDir, policy, sessionId: 's1' });
 
     const summary = await summarizeSession({ rootDir, policy, sessionId: 's1' });
@@ -943,6 +1133,7 @@ describe('session summary and purge', () => {
       logger
     });
     await recordRead({
+      replayAvailable: true,
       filePath: 'src/large.ts',
       content: large,
       rootDir,
@@ -962,6 +1153,7 @@ describe('session summary and purge', () => {
       logger
     });
     await recordRead({
+      replayAvailable: true,
       filePath: 'src/tiny.ts',
       content: tiny,
       rootDir,
@@ -1207,9 +1399,9 @@ describe('session summary and purge', () => {
         result.warnings.some((warning) => warning.code === 'context-dedup-ledger-unwritable')).length
     }, {
       reads: concurrentReads,
-      dedupHits: concurrentReads - 1,
-      fullReads: 1,
-      deduplicatedReads: concurrentReads - 1,
+      dedupHits: 0,
+      fullReads: concurrentReads,
+      deduplicatedReads: 0,
       unwritableWarnings: 0
     });
   });
@@ -1227,7 +1419,7 @@ describe('session summary and purge', () => {
 });
 
 describe('cli', () => {
-  it('returns replay text on a repeated check and json summaries on demand', async () => {
+  it('returns full text on an unconfirmed CLI repeat and JSON summaries on demand', async () => {
     await enabledPolicy();
     const content = body('cli');
     await writeProjectFile('src/session.ts', content);
@@ -1239,11 +1431,11 @@ describe('cli', () => {
 
     const second = collect();
     assert.equal(await main(['check', '--file', 'src/session.ts', ...baseArgs], { stdout: second, stderr: collect() }), 0);
-    assert.match(second.text(), /already provided in this session/);
+    assert.equal(second.text().trimEnd(), content.trimEnd());
 
     const status = collect();
     assert.equal(await main(['status', ...baseArgs, '--json'], { stdout: status, stderr: collect() }), 0);
-    assert.equal(JSON.parse(status.text()).dedupHits, 1);
+    assert.equal(JSON.parse(status.text()).dedupHits, 0);
 
     const purge = collect();
     assert.equal(await main(['purge', ...baseArgs, '--json'], { stdout: purge, stderr: collect() }), 0);
@@ -1254,5 +1446,205 @@ describe('cli', () => {
     const stderr = collect();
     assert.equal(await main(['check', '--root', rootDir], { stdout: collect(), stderr }), 1);
     assert.match(stderr.text(), /--file/);
+  });
+});
+
+function containsOrderedFactLines(content, facts) {
+  const lines = content.split(/\r?\n/);
+  let nextLine = 0;
+  for (const fact of facts) {
+    const found = lines.indexOf(fact, nextLine);
+    if (found === -1) return false;
+    nextLine = found + 1;
+  }
+  return true;
+}
+
+describe('issue 186 content fidelity', () => {
+  it('delivers the exact bytes and ordered facts of each revision read from disk', async () => {
+    const fixtureUrl = new URL('../docs/memory-tools-research/context-dedup-ai-tester/issue-186/fixtures/fidelity.json', import.meta.url);
+    const cases = JSON.parse(await readFile(fixtureUrl, 'utf8'));
+    assert.deepEqual(cases.map(item => path.extname(item.path)).sort(),
+      ['.diff', '.go', '.json', '.log', '.md', '.php', '.sql', '.stderr', '.stdout', '.ts', '.yaml']);
+    const policy = { ...await enabledPolicy(), minBytes: 1 };
+    for (const { path: filePath, revisions } of cases) {
+      assert.ok(revisions.length > 0, filePath);
+      let previous;
+      for (const { text, facts } of revisions) {
+        await writeProjectFile(filePath, text);
+        const result = await recordRead({ filePath, rootDir, policy, sessionId: 'fidelity' });
+        assert.equal(result.decision, previous ? 'changed' : 'full', filePath);
+        assert.equal(result.content, text, filePath);
+        assert.ok(facts.length > 0 && containsOrderedFactLines(result.content, facts), filePath);
+        if (previous) {
+          assert.equal(containsOrderedFactLines(previous.content, facts), false, filePath);
+          assert.equal(containsOrderedFactLines(result.content, previous.facts), false, filePath);
+        }
+        previous = { content: result.content, facts };
+      }
+    }
+  });
+});
+
+describe('issue 186 production read boundary', () => {
+  it('observes the command, outcome and delivered text at each cold read', async () => {
+    // Running Node as the configured executable makes "compress" the script
+    // and "--no-cache" its argument on both Windows and Linux.
+    await writeProjectFile('compress', [
+      "const fs = require('node:fs');",
+      "const input = fs.readFileSync(0, 'utf8');",
+      "fs.appendFileSync('calls.jsonl', JSON.stringify({ args: process.argv.slice(2), bytes: Buffer.byteLength(input) }) + '\\n');",
+      "switch (fs.readFileSync('behavior', 'utf8')) {",
+      "  case 'compact': process.stdout.write(input.slice(input.indexOf('\\n') + 1)); break;",
+      "  case 'expand': process.stdout.write(input + 'extra'); break;",
+      "  case 'fail': process.stdout.write('partial'); process.exitCode = 9; break;",
+      "  default: process.exitCode = 2;",
+      "}"
+    ].join('\n'));
+    await writeProjectFile('calls.jsonl', '');
+    const corpus = JSON.parse(await readFile(new URL(
+      '../docs/memory-tools-research/context-dedup-ai-tester/issue-186/fixtures/fidelity.json', import.meta.url
+    ), 'utf8'));
+    const { text, facts } = corpus.find(item => item.path === 'reports/check.stderr').revisions[0];
+    const original = 'Synthetic test runner banner\n' + text;
+    const filePath = 'reports/check.stderr';
+    await writeProjectFile(filePath, original);
+
+    for (const [mode, behavior, decision] of [
+      ['off', 'compact', 'disabled'],
+      ['aifhub', 'compact', 'full'],
+      ['sqz', 'compact', 'compressed'],
+      ['sqz', 'expand', 'full'],
+      ['sqz', 'fail', 'full']
+    ]) {
+      await writeProjectFile('behavior', behavior);
+      await writeProjectFile('calls.jsonl', '');
+      const policy = resolveContextDedupPolicy('aifhub:\n  contextDedup:\n    mode: ' + mode + '\n    minBytes: 1\n');
+      policy.sqz.command = process.execPath;
+      const result = await recordRead({ rootDir, policy, filePath, sessionId: mode + '-' + behavior });
+      const calls = (await readFile(path.join(rootDir, 'calls.jsonl'), 'utf8')).trim();
+      const expected = decision === 'compressed' ? text : original;
+      assert.deepEqual(calls ? calls.split('\n').map(line => JSON.parse(line)) : [],
+        mode === 'sqz' ? [{ args: ['--no-cache'], bytes: Buffer.byteLength(original) }] : []);
+      assert.equal(result.decision, decision);
+      assert.equal(result.content, expected);
+      assert.ok(containsOrderedFactLines(result.content, facts));
+      assert.equal(result.savedBytes, Buffer.byteLength(original) - Buffer.byteLength(expected));
+      if (mode === 'sqz') {
+        assert.equal(result.providerOutcome, decision);
+        assert.equal(result.outputBytes, Buffer.byteLength(expected));
+        assert.deepEqual(result.warnings.map(item => item.code), behavior === 'fail' ? ['context-dedup-sqz-unavailable'] : []);
+      }
+    }
+  });
+
+  it('checks delivered facts against the pinned Windows SQZ 1.3.0 executable', {
+    skip: process.platform !== 'win32' || !process.env.AIFHUB_TEST_SQZ_WINDOWS_EXE
+      ? 'Requires the pinned Windows executable via AIFHUB_TEST_SQZ_WINDOWS_EXE' : false
+  }, async () => {
+    const base = new URL('../docs/memory-tools-research/context-dedup-ai-tester/', import.meta.url);
+    const { sqz: pin } = JSON.parse(await readFile(new URL('matrix-catalog.json', base), 'utf8'));
+    const binary = path.resolve(process.env.AIFHUB_TEST_SQZ_WINDOWS_EXE);
+    const { createHash } = await import('node:crypto');
+    assert.equal(pin.version, '1.3.0');
+    assert.equal(createHash('sha256').update(await readFile(binary)).digest('hex'), pin.officialBinarySha256.toLowerCase());
+
+    const cases = JSON.parse(await readFile(new URL('issue-186/fixtures/fidelity.json', base), 'utf8'));
+    const policy = resolveContextDedupPolicy('aifhub:\n  contextDedup:\n    mode: sqz\n    minBytes: 1\n');
+    policy.sqz.command = binary;
+    let compressed = 0;
+    for (const { path: filePath, revisions } of cases) {
+      for (const { text, facts } of revisions) {
+        await writeProjectFile(filePath, text);
+        const calls = [];
+        const result = await recordRead({
+          rootDir, filePath, policy, sessionId: hashContent(text),
+          sqzRunner: async options => {
+            const reply = await runSqzCompression(options);
+            calls.push(reply);
+            return reply;
+          }
+        });
+        assert.equal(calls.length, 1, filePath);
+        const [reply] = calls;
+        assert.equal(reply.code, 'ok', filePath);
+        assert.deepEqual(result.warnings, [], filePath);
+        if (result.decision === 'compressed') {
+          compressed++;
+          assert.equal(result.content, reply.stdout, filePath);
+          assert.ok(Buffer.byteLength(result.content) < Buffer.byteLength(text), filePath);
+          if (filePath.endsWith('.json')) {
+            // The pinned CLI may prefix a compact JSON object with "TOON:".
+            const expected = JSON.parse('{\n' + facts.join('\n') + '\n}');
+            assert.deepEqual(JSON.parse(result.content.replace(/^TOON:/, '')), expected, filePath);
+          } else {
+            assert.ok(containsOrderedFactLines(result.content, facts), filePath);
+          }
+        } else {
+          assert.equal(result.decision, 'full', filePath);
+          assert.equal(result.content, text, filePath);
+        }
+        assert.equal(result.savedBytes, Buffer.byteLength(text) - Buffer.byteLength(result.content));
+      }
+    }
+    assert.ok(compressed > 0, 'the pinned binary must exercise an actual compressed delivery');
+  });
+});
+
+describe('delivery after a context transition', () => {
+  for (const mode of ['aifhub', 'sqz']) {
+    it(mode + ' serves original text for a legacy ledger entry without delivery evidence', async () => {
+      const policy = resolveContextDedupPolicy({ mode, minBytes: 1 });
+      const content = body('legacy source fact');
+      const opts = { rootDir, policy, sessionId: 'legacy', filePath: 'notes.txt', content,
+        sqzRunner: async () => ({ ok: true, stdout: content }) };
+      await recordRead(opts);
+      const ledger = (await loadLedger(opts)).ledger;
+      const entry = ledger.entries['notes.txt'];
+      ledger.entries['notes.txt'] = Object.fromEntries(
+        ['digest', 'bytes', 'readCount', 'revisions', 'firstSeenAt', 'lastSeenAt'].map(key => [key, entry[key]])
+      );
+      await saveLedger(ledger, opts);
+      assert.equal((await recordRead(opts)).content, content);
+    });
+  }
+
+  it('returns current facts to a restarted reader reusing the session id', async () => {
+    const policy = await enabledPolicy();
+    const content = body('restart fact');
+    const filePath = 'notes.txt';
+    await writeProjectFile(filePath, content);
+    await recordRead({ rootDir, policy, sessionId: 'resumed', filePath });
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const program = [
+      'import {recordRead} from ' + JSON.stringify(new URL('./context-dedup.mjs', import.meta.url).href) + ';',
+      'const r = await recordRead({rootDir:process.argv[1],sessionId:"resumed",filePath:"notes.txt"});',
+      'process.stdout.write(r.content ?? r.replay.text);'
+    ].join('\n');
+    const { stdout } = await promisify(execFile)(process.execPath, ['--input-type=module', '-e', program, rootDir]);
+    assert.equal(stdout, content);
+  });
+
+  it('serves a fresh SQZ session with a prefilled test cache and skips the process on a confirmed repeat', async () => {
+    const policy = resolveContextDedupPolicy({ mode: 'sqz', minBytes: 1, sqz: { command: process.execPath } });
+    const sessionId = 'fresh', filePath = 'notes.txt';
+    const cache = path.join(path.dirname(resolveLedgerPath(sessionId, { rootDir, policy })), 'sqz', 'cached.txt');
+    await mkdir(path.dirname(cache), { recursive: true });
+    await writeFile(cache, 'prior test value');
+    assert.equal(await readFile(cache, 'utf8'), 'prior test value');
+    await writeProjectFile('compress', [
+      "const fs = require('node:fs'), path = require('node:path');",
+      "const cached = fs.readFileSync(path.join(process.env.SQZ_HOME,'cached.txt'),'utf8');",
+      "fs.appendFileSync('calls.txt','called\\n');",
+      "process.stdout.write(process.argv.includes('--no-cache') ? fs.readFileSync(0) : cached);"
+    ].join('\n'));
+    const content = body('current test value');
+    await writeProjectFile(filePath, content);
+    const opts = { rootDir, policy, filePath, sessionId };
+    assert.equal((await recordRead(opts)).content, content);
+    assert.equal((await recordRead({ ...opts, replayAvailable: true })).decision, 'deduplicated');
+    assert.equal((await recordRead({ ...opts, force: true })).content, content);
+    assert.equal(await readFile(path.join(rootDir, 'calls.txt'), 'utf8'), 'called\n');
   });
 });

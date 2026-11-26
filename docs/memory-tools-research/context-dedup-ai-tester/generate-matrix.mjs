@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Materialize the exact 3-arm x 4-case issue #133 AI Tester matrix.
 import { createHash } from 'node:crypto';
-import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const authoredRoot = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(authoredRoot, '..', '..', '..');
@@ -14,6 +14,9 @@ function parseArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     if (argv[index] === '--output') result.output = argv[++index];
     else if (argv[index] === '--sqz-exe') result.sqzExe = argv[++index];
+    else if (argv[index] === '--manifest') result.manifest = argv[++index];
+    else if (argv[index] === '--profile') result.profile = argv[++index];
+    else throw new Error('Unknown generator option.');
   }
   return result;
 }
@@ -28,13 +31,11 @@ async function requireNewOutput(output) {
   if (resolved === root || resolved === repoRoot || resolved === authoredRoot) {
     throw new Error('Refusing unsafe --output path.');
   }
-  try {
-    await stat(resolved);
-    throw new Error(`Output already exists; choose a new directory: ${resolved}`);
-  } catch (error) {
-    if (error?.code !== 'ENOENT') throw error;
+  await mkdir(path.dirname(resolved), { recursive: true });
+  try { await mkdir(resolved); } catch (error) {
+    if (error.code === 'EEXIST') throw new Error('Output already exists; choose a new directory.');
+    throw error;
   }
-  await mkdir(resolved, { recursive: true });
   return resolved;
 }
 
@@ -166,9 +167,9 @@ const fixtureFiles = {
   ].join('\n')
 };
 
-function readWrapper(arm) {
+function readWrapper(arm, current = false) {
   return `#!/usr/bin/env node
-import { readFile } from 'node:fs/promises';
+import { readFile, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -181,7 +182,11 @@ const absolutePath = path.resolve(projectRoot, requestedPath);
 if (absolutePath !== projectRoot && !absolutePath.startsWith(projectRoot + path.sep)) {
   throw new Error('Target must stay inside the project fixture.');
 }
-const content = await readFile(absolutePath, 'utf8');
+const actualPath = await realpath(absolutePath);
+const actualRoot = await realpath(projectRoot);
+const relative = path.relative(actualRoot, actualPath);
+if (path.isAbsolute(relative) || relative === '..' || relative.startsWith('..' + path.sep)) throw new Error('Target outside fixture.');
+const content = await readFile(actualPath, 'utf8');
 let output = content;
 let decision = 'full';
 
@@ -226,13 +231,14 @@ if ('${arm}' === 'sqz') {
   output = result.content ?? result.replay?.text ?? '';
 }
 
-if (!prime) process.stdout.write(output.endsWith('\\n') ? output : output + '\\n');
+const delivered = ${current ? 'output' : "output.endsWith('\\n') ? output : output + '\\n'"};
+if (!prime) process.stdout.write(delivered);
 process.stderr.write(
   '[dedup-metric] arm=${arm} phase=' + (prime ? 'prime' : 'read')
     + ' decision=' + decision
     + ' inputBytes=' + Buffer.byteLength(content)
-    + ' outputBytes=' + Buffer.byteLength(output)
-    + ' savedBytes=' + Math.max(0, Buffer.byteLength(content) - Buffer.byteLength(output))
+    + ' outputBytes=' + Buffer.byteLength(${current ? 'delivered' : 'output'})
+    + ' savedBytes=' + ${current ? '(Buffer.byteLength(content) - Buffer.byteLength(delivered))' : 'Math.max(0, Buffer.byteLength(content) - Buffer.byteLength(output))'}
     + '\\n'
 );
 `;
@@ -253,21 +259,21 @@ await writeFile(target, after, 'utf8');
 process.stdout.write('fixture_mutated\\n');
 `;
 
-function scenarioYaml(testCase, arm) {
+function scenarioYaml(testCase, arm, cell, profile) {
   const lines = [
-    `scenario: context-dedup-${testCase.id}-${arm}`,
-    `description: ${JSON.stringify(`issue=133 arm=${arm} case=${testCase.id} sqz=1.3.0 model=gpt-5.6-luna reasoning=low`)}`,
+    'scenario: ' + (cell?.scenario ?? `context-dedup-${testCase.id}-${arm}`),
+    `description: ${JSON.stringify(cell ? cell.scenario : `issue=133 arm=${arm} case=${testCase.id} sqz=1.3.0 model=gpt-5.6-luna reasoning=low`)}`,
     'system_prompt_file: "../system-prompt.md"',
     'user_prompt: |',
     ...testCase.commands.map((line) => `  ${line}`),
     'runner:',
-    '  runtime: codex',
-    '  model: gpt-5.6-luna',
-    '  reasoning: low',
-    '  permission_mode: bypassPermissions',
+    '  runtime: ' + (profile?.runtime ?? 'codex'),
+    '  model: ' + (profile?.model ?? 'gpt-5.6-luna'),
+    '  reasoning: ' + (profile?.reasoning ?? 'low'),
+    ...(cell ? [] : ['  permission_mode: bypassPermissions']),
     'fixtures:',
     '  copy_trees:',
-    `    - from: "../fixtures/${arm}"`,
+    '    - from: ' + JSON.stringify('../' + (cell?.fixture ?? 'fixtures/' + arm)),
     '      to: project'
   ];
   if (testCase.setup) lines.push('  setup_commands:', `    - ${JSON.stringify(testCase.setup)}`);
@@ -288,11 +294,111 @@ function scenarioYaml(testCase, arm) {
   return `${lines.join('\n')}\n`;
 }
 
+const runtimeModules = ['context-dedup.mjs', 'runtime-gitignore.mjs', 'provider-files.mjs', 'provider-process.mjs'];
+const manifestReader = 'docs/memory-tools-research/context-dedup-ai-tester/generate-matrix.mjs';
+const harnessFiles = {
+  aiTester: [manifestReader],
+  pi: [manifestReader, 'benchmarks/pi-sqz-matrix/run-matrix.mjs', 'benchmarks/pi-sqz-matrix/scenarios.json', 'benchmarks/pi-sqz-matrix/dedup-read.mjs']
+};
+
+export async function readMatrixManifest(file, harness, requestedProfile, binary) {
+  const manifest = JSON.parse(await readFile(file, 'utf8'));
+  if (manifest.schemaVersion !== 1 || !/^[a-z0-9][a-z0-9-]*$/.test(manifest.snapshot ?? '') ||
+      !Number.isSafeInteger(manifest.repeats) || manifest.repeats < 3) throw new Error('Invalid snapshot or repeat count.');
+  const profiles = manifest.profiles[harness];
+  const profile = profiles.find(p => p.id === (requestedProfile ?? profiles[0]?.id));
+  if (!profile || !/^[a-z0-9][a-z0-9-]*$/.test(profile.id) ||
+      !['model', ...(harness === 'pi' ? ['provider', 'thinking'] : ['runtime', 'reasoning'])].every(k =>
+        typeof profile[k] === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$/.test(profile[k]))) {
+    throw new Error('Unknown or invalid benchmark profile.');
+  }
+  for (const relative of [...runtimeModules.map(name => 'scripts/' + name), ...harnessFiles[harness]]) {
+    if (await sha256(path.join(repoRoot, relative)) !== manifest.files[relative]?.toUpperCase()) {
+      throw new Error('SHA-256 mismatch for ' + relative);
+    }
+  }
+  if (binary) {
+    const expected = manifest.sqz.binarySha256[process.platform];
+    if (!expected) throw new Error('No verified SQZ binary pin for ' + process.platform);
+    if (await sha256(binary) !== expected.toUpperCase()) throw new Error('SQZ binary SHA-256 mismatch.');
+  }
+  return { manifest, profile };
+}
+
+const shortCase = {
+  id: 'short-config',
+  commands: ['Run this exact command once: node project/scripts/read-context.mjs src/policy.txt',
+    'Report the precise TIMEOUT_S and RETRIES, and end with evaluation_complete.'],
+  assertions: [['timeout', 'TIMEOUT_S\\s*[=:]\\s*9\\b'], ['retries', 'RETRIES\\s*[=:]\\s*0\\b']]
+};
+
+export function snapshotScenarioName({ snapshot, platform, profile, caseId, repeat, arm }) {
+  const identity = JSON.stringify([snapshot, platform, profile, caseId, repeat, arm]);
+  const fingerprint = createHash('sha256').update(identity).digest('hex').slice(0, 24);
+  return ['context-dedup', profile, caseId, 'r' + repeat, arm, fingerprint].join('-');
+}
+
+async function generateSnapshot(args) {
+  const { manifest, profile } = await readMatrixManifest(args.manifest, 'aiTester', args.profile, args.sqzExe);
+  const definitions = new Map([...cases, shortCase].map(testCase => [testCase.id, testCase]));
+  if (!Array.isArray(manifest.aiTesterCases) || !manifest.aiTesterCases.length ||
+      new Set(manifest.aiTesterCases).size !== manifest.aiTesterCases.length ||
+      manifest.aiTesterCases.some(id => !definitions.has(id))) throw new Error('Invalid AI Tester case selection.');
+  const output = await requireNewOutput(args.output);
+  await mkdir(path.join(output, 'scenarios'));
+  await writeFile(path.join(output, 'system-prompt.md'), 'Inspect the provided fixture through the requested commands only. Report exact observed values.\n');
+  await writeFile(path.join(output, '.ai-tester.yaml'), 'version: 1\nruns_dir: ./runs\ndefaults:\n  runtime: ' + profile.runtime +
+    '\n  model: ' + profile.model + '\n  reasoning: ' + profile.reasoning + '\n');
+  const inputs = { ...fixtureFiles, 'src/policy.txt': 'TIMEOUT_S=9\nRETRIES=0\n' };
+  const expectedCells = [];
+  for (const caseId of manifest.aiTesterCases) {
+    const testCase = definitions.get(caseId);
+    for (let repeat = 1; repeat <= manifest.repeats; repeat++) {
+      for (const arm of arms) {
+        const identity = { snapshot: manifest.snapshot, platform: process.platform, profile: profile.id, caseId, repeat, arm };
+        const scenario = snapshotScenarioName(identity);
+        const fixture = 'fixtures/' + scenario;
+        const cell = { ...identity, scenario, fixture };
+        if (testCase.setup) Object.assign(cell, { ledgerSetup: arm === 'baseline' ? 'not-applicable' : 'prime command before model session', providerCache: 'unverified' });
+        const root = path.join(output, fixture);
+        for (const [relative, bytes] of Object.entries(inputs)) {
+          await mkdir(path.dirname(path.join(root, relative)), { recursive: true });
+          await writeFile(path.join(root, relative), bytes);
+        }
+        const scripts = path.join(root, 'scripts');
+        await mkdir(scripts);
+        await writeFile(path.join(scripts, 'read-context.mjs'), readWrapper(arm, true));
+        await writeFile(path.join(scripts, 'mutate-change.mjs'), mutateScript);
+        if (arm !== 'baseline') for (const name of runtimeModules) {
+          const dest = path.join(scripts, name);
+          await copyFile(path.join(repoRoot, 'scripts', name), dest);
+          if (await sha256(dest) !== manifest.files['scripts/' + name].toUpperCase()) throw new Error('Copied runtime SHA-256 mismatch.');
+        }
+        if (arm === 'sqz') {
+          await mkdir(path.join(root, 'bin'));
+          const dest = path.join(root, 'bin', 'sqz.exe');
+          await copyFile(args.sqzExe, dest);
+          if (await sha256(dest) !== manifest.sqz.binarySha256[process.platform].toUpperCase()) throw new Error('Copied binary SHA-256 mismatch.');
+        }
+        const yaml = path.join(output, 'scenarios', scenario + '.yaml');
+        await writeFile(yaml, scenarioYaml(testCase, arm, cell, profile));
+        expectedCells.push({ ...cell, scenarioSha256: await sha256(yaml) });
+      }
+    }
+  }
+  const fixtureHashes = Object.fromEntries(Object.entries(inputs).map(([name, data]) =>
+    [name, createHash('sha256').update(data).digest('hex')]));
+  await writeFile(path.join(output, 'manifest.json'), JSON.stringify({ ...manifest, harness: 'aiTester',
+    platform: process.platform, profile, fixtureHashes, expectedCells }, null, 2) + '\n', { flag: 'wx' });
+  process.stdout.write('Generated ' + expectedCells.length + ' cells for ' + profile.id + '\n');
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args.output || !args.sqzExe) {
     throw new Error('Usage: generate-matrix.mjs --output <new-dir> --sqz-exe <file>');
   }
+  if (args.manifest) return generateSnapshot(args);
   const catalog = JSON.parse(await readFile(path.join(authoredRoot, 'matrix-catalog.json'), 'utf8'));
   if (await sha256(args.sqzExe) !== catalog.sqz.officialBinarySha256) {
     throw new Error('Official sqz.exe SHA-256 mismatch.');
@@ -368,7 +474,7 @@ async function main() {
   process.stdout.write(`Generated ${cases.length * arms.length} scenarios under ${output}\n`);
 }
 
-main().catch((error) => {
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) main().catch((error) => {
   process.stderr.write(`${error?.message ?? error}\n`);
   process.exitCode = 1;
 });

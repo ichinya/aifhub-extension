@@ -1,4 +1,5 @@
-import { readdir } from 'node:fs/promises';
+import { lstat, readdir } from 'node:fs/promises';
+import { setTimeout as delay } from 'node:timers/promises';
 import { canonical, digest, fields, identifier, requireValue } from './workflow-state-store.mjs';
 import { executionId } from './execution-task-source.mjs';
 import { decode, envelope, hash, LEDGER_SCHEMA, RUN_SCHEMA, TX_SCHEMA, matchesLegacyPredecessor, validateLedger, validateRun, validateSource } from './execution-records.mjs';
@@ -69,9 +70,46 @@ function journalPredecessors(transactions,folder) {
   }
   return [...found.values()];
 }
+// Windows can briefly create a <JOURNAL>.JSON.tmp sibling while a real journal exists.
+async function journalEntries(store, directory) {
+  const entries = await names(store, directory);
+  if (process.platform !== 'win32') return entries;
+  const unexpected = entries.filter(entry => !entry.isFile() || !entry.name.endsWith('.json'));
+  if (unexpected.length !== 1) return entries;
+  const [sidecar] = unexpected;
+  if (!sidecar.isFile() || !/^[0-9A-F]{64}\.JSON\.tmp$/.test(sidecar.name)) return entries;
+  const canonicalName = sidecar.name.slice(0, -4).toLowerCase();
+  if (!entries.some(entry => entry.name === canonicalName && entry.isFile())) return entries;
+
+  const debug = process.env.LOG_LEVEL === 'debug';
+  if (debug) console.error('[FIX:186] waiting for temporary Windows journal entry');
+  const filename = await store.target(`${directory}/${sidecar.name}`);
+  // The observed create/delete pairs finished within one second. A persistent entry is invalid.
+  const deadline = performance.now() + 1000;
+  while (await lstat(filename).then(() => true, error => {
+    if (error.code === 'ENOENT') return false;
+    throw error;
+  })) {
+    const remaining = deadline - performance.now();
+    if (remaining <= 0) {
+      if (debug) console.error('[FIX:186] temporary journal entry persisted');
+      return entries;
+    }
+    await delay(Math.min(20, remaining));
+  }
+
+  const current = await names(store, directory);
+  const expected = entries.filter(entry => entry !== sidecar);
+  const stable = current.length === expected.length &&
+    current.every((entry, index) => entry.isFile() && entry.name === expected[index].name);
+  if (debug) console.error('[FIX:186] temporary journal entry disappeared; catalogue stable:', stable);
+  requireValue(stable, 'invalid-transaction');
+  return current;
+}
+
 async function journalHistory(store,folder) {
   const transactions=[];
-  for(const file of await names(store,`${folder}/transactions`)) {
+  for(const file of await journalEntries(store,`${folder}/transactions`)) {
     requireValue(file.isFile() && file.name.endsWith('.json'),'invalid-transaction');
     const id=identifier(file.name.slice(0,-5)),tx=await store.load(`${folder}/transactions/${file.name}`);
     requireValue(tx?.id===id,'invalid-transaction');transactions.push(tx);
