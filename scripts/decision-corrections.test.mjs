@@ -27,7 +27,22 @@ const DECISION_CORRECTIONS_NAMESPACE = 'decision-corrections';
 const roots = [];
 
 afterEach(async () => {
-  for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true });
+  const failures = [];
+  const debug = process.env.LOG_LEVEL === 'debug';
+  for (const root of roots.splice(0)) {
+    const fixture = path.basename(root);
+    if (debug) console.error('[FIX:186] Removing decision-corrections fixture', fixture);
+    try {
+      // A late entry on Windows can leave the directory nonempty on the first removal.
+      await rm(root, { recursive: true, force: true, maxRetries: 3 });
+      if (debug) console.error('[FIX:186] Removed decision-corrections fixture', fixture);
+    } catch (error) {
+      if (debug) console.error('[FIX:186] Fixture cleanup failed', fixture, error.code);
+      failures.push(error);
+    }
+  }
+  if (failures.length === 1) throw failures[0];
+  if (failures.length > 1) throw new AggregateError(failures, 'Could not remove decision-corrections fixtures');
 });
 
 async function makeTemp(prefix) {

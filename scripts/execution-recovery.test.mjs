@@ -2,6 +2,8 @@ import { afterEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
+import { setTimeout as delay } from 'node:timers/promises';
+import { readTransaction } from './execution-transactions.mjs';
 import { readdir, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -308,4 +310,50 @@ test('state correspondence rejects a legacy proof journal that has no matching s
   await (await storeFor(p.root)).save(`${folder}/transactions/${journal}`,tx);const before=await p.snapshot();
   await assert.rejects(p.call('inspect',{change_id:p.id,run_id:'legacy'}),e=>e.code==='invalid-transaction');
   await assert.rejects(p.call('start',p.start()),e=>e.code==='invalid-transaction');assert.deepEqual(await p.snapshot(),before);
+});
+
+test('Windows journal reads survive a vanishing sidecar and still reject persistent or unknown entries', {skip:process.platform !== 'win32'}, async () => {
+  const p = await project();
+  await p.call('start', p.start());
+  const store = await storeFor(p.root);
+  const folder = '.ai-factory/state/work/execution';
+  const directory = folder + '/transactions';
+  const [name] = await readdir(path.join(p.root, directory));
+  assert.match(name, /^[0-9a-f]{64}\.json$/);
+  const id = name.slice(0, -5);
+  const sidecar = directory + '/' + name.toUpperCase() + '.tmp';
+  const filename = path.join(p.root, sidecar);
+  await p.put(sidecar, '');
+  let removal;
+  // Schedule deletion only after the real directory enumeration has seen the entry.
+  const observedStore = {...store, target: async (...args) => {
+    const target = await store.target(...args);
+    if (args[0] === sidecar && !removal) removal = delay(25).then(() => rm(filename));
+    return target;
+  }};
+  try {
+    assert.equal((await readTransaction(observedStore, folder, id)).state, 'applied');
+  } finally {
+    await removal;
+  }
+  assert.ok(removal);
+  await p.put(sidecar, '');
+  await assert.rejects(readTransaction(store, folder, id), {code:'invalid-transaction'});
+  await rename(filename, path.join(p.root, directory, 'unknown.tmp'));
+  await assert.rejects(readTransaction(store, folder, id), {code:'invalid-transaction'});
+  await rm(path.join(p.root, directory, 'unknown.tmp'));
+  await p.put(sidecar, '');
+  let removedJournal = false;
+  const changingStore = {...store, target: async (...args) => {
+    const target = await store.target(...args);
+    if (args[0] === sidecar && !removedJournal) {
+      removedJournal = true;
+      await rm(path.join(p.root, directory, name));
+      await rm(filename);
+    }
+    return target;
+  }};
+  await assert.rejects(readTransaction(changingStore, folder, id), {code:'invalid-transaction'});
+  assert.ok(removedJournal);
+
 });
