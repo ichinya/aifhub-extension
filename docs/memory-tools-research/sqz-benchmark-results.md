@@ -1,11 +1,40 @@
+[Контракт SQZ](sqz.md) · [Исследования инструментов](README.md) · [Далее: полные задачи Pi](sqz-pi-live-matrix.md)
+
 # Результаты AI Tester: baseline / AIFHub / sqz
 
-Evidence для issue #133. Описание `sqz` и policy boundary — в [sqz.md](sqz.md), собственный сервис — в [Session Context Dedup](../context-dedup.md).
+AI Tester проверяет небольшие задачи с заранее известными ответами. Сначала приведён снимок #186, затем исходные результаты #133. Расход на исследование и редактирование проектов измерен отдельно в Pi. [Полные задачи Pi](sqz-pi-live-matrix.md) · [Контракт SQZ](sqz.md)
 
-## Runtime Matrix
+## Контрольные задачи #186
+
+Windows, нативный Codex CLI 0.172.0, `gpt-6.1-terra / low`, full access, SQZ 1.3.0. На каждый из пяти сценариев запланированы три независимых повтора в режимах baseline (`off`), AIFHub и SQZ. Выполнены все 45 запусков. Проверку ответа прошли 44. В таблице тройка означает один повтор со всеми тремя режимами.
+
+| Сценарий | Все три ответа верны / план | Тройки с подтверждённой последовательностью команд / план |
+| --- | ---: | ---: |
+| Повторное чтение | 3/3 | 3/3 |
+| Изменение файла | 2/3 | 1/3 |
+| Защищённая спецификация | 3/3 | 3/3 |
+| Новая сессия с подготовленным локальным кэшем | 3/3 | 3/3 |
+| Короткая конфигурация | 3/3 | 3/3 |
+| **Всего** | **14/15** | **13/15** |
+
+Во втором повторе после изменения файла baseline пропустил новые значения. В первом повторе AIFHub дал правильный ответ с неполной последовательностью команд. При подготовке новой сессии одна попытка остановилась до обращения к модели. Повтор с коротким временным путём прошёл. Для этого сценария заполнение внешнего кэша провайдера не подтверждено. [Наблюдения по режимам и повторам](context-dedup-ai-tester/issue-186/snapshots/2026-11-25-windows-sqz-1.3.0/observations.json)
+
+Для трёх повторных чтений в режиме SQZ суммарный объём выдачи составил 43 026 из 43 026 исходных байт. Для трёх чтений в новой сессии тот же режим выдал 24 785 из 42 156 байт. Эти величины описывают текст чтений. Расход всей задачи учитывается отдельно по данным модели. [Агрегат по классам чтений](context-dedup-ai-tester/issue-186/snapshots/2026-11-25-windows-sqz-1.3.0/aggregate.json)
+
+### Как воспроизвести снимок #186
+
+Из корня репозитория выполните команду с Node.js 22 или новее. Выберите свободное имя выходного файла. Для пересчёта используются опубликованные числовые наблюдения, доступ к модели и установка SQZ не требуются.
+
+```sh
+node docs/memory-tools-research/context-dedup-ai-tester/issue-186/rebuild-snapshot.mjs docs/memory-tools-research/context-dedup-ai-tester/issue-186/snapshots/2026-11-25-windows-sqz-1.3.0/observations.json aggregate-rebuilt.json
+```
+
+Сравните результат побайтово с `aggregate.json` этого снимка. В `observations.json` раздел `pins` фиксирует ревизии, SHA-256 бинарников, manifest, исходных файлов и фикстур. В агрегате `successful` перечисляет повторы с тремя верными ответами, `comparable` — повторы, вошедшие в сравнение. Для каждой метрики `n` показывает число пар с доступными значениями. [Описание измерений и ограничений](context-dedup-ai-tester/issue-186/coverage.md)
+
+## Историческая матрица #133 (r4)
 
 - Date: `2026-07-26`
-- Runner repository: `C:\projects\ai-tester`
+- Runner repository: `lee-to/ai-tester`
 - Runner commit: `98dd5afb3fe9b9b7593d21dc93bcbc6d98c2cca9`
 - Model: `gpt-5.6-luna`
 - Reasoning: `low`
@@ -34,6 +63,8 @@ Evidence для issue #133. Описание `sqz` и policy boundary — в [sq
 Это mixed/unadjusted view, не рейтинг алгоритмов dedup. Savings — model-visible payload delta, а не billing token count. `sqz` savings смешивают stateless first-read/changed-content compression и exact-repeat AIFHub replay; protected artifacts остаются полными.
 
 ## Payload Classes
+
+Для каждого режима r4 в классе первого чтения и в классе protected измерено по два чтения. В остальных трёх классах измерено по одному чтению на режим.
 
 | class | input bytes | AIFHub saved | AIFHub % | sqz saved | sqz % | сравнимость |
 |---|---:|---:|---:|---:|---:|---|
@@ -72,35 +103,32 @@ Delta/reference provider output в текущем runtime запрещён `--no
 
 Исторический `r3` до `--no-cache` оставлен отдельным regression snapshot:
 
-- expected: `CROSS_SESSION_SECRET=violet-cedar-927`, `OWNER=agent-session-beta`;
-- actual: оба значения `unresolved`, row FAIL;
-- причина: Windows CLI использовал persistent user cache и вернул новой model session только `§ref:cabbfc33285196a2§`;
-- текущий `r4`: оба точных значения восстановлены, row PASS.
+- В профиле Windows `gpt-5.6-luna / low` одна новая сессия должна была извлечь два точных значения из фикстуры.
+- В r3 модель получила только ссылку из постоянного кэша Windows CLI и не восстановила ни одного значения. В r4 тот же сценарий вернул оба значения.
 
-## Offline Harness
+## Воспроизведение исторической матрицы
 
-Точный generator 12 сценариев и fixture tree хранится рядом с authored smoke-сценариями:
+Для r4 использовались 12 сценариев. Генератор без `--manifest` ожидает исходники, совпадающие по SHA-256 с историческим каталогом. Команды ниже описывают этот стенд. Для снимка #186 используйте команду пересчёта выше. [Каталог r4](context-dedup-ai-tester/matrix-catalog.json)
 
 ```powershell
 node docs/memory-tools-research/context-dedup-ai-tester/generate-matrix.mjs `
-  --output .ai-factory/state/context-dedup-issue-133/ai-tester/<new-snapshot> `
-  --sqz-exe C:\path\to\verified\sqz.exe
+  --output $newSnapshotDir `
+  --sqz-exe $verifiedSqzExe
 ```
 
 Generator проверяет официальный binary SHA-256 и source pins до копирования,
 требует новый output directory и сохраняет собственные
-generator/summarizer/runtime copies. Затем матрицу можно выполнить из
-`C:\projects\ai-tester` через `cargo run -- run --dir <scenarios>`.
+generator/summarizer/runtime copies. Для PowerShell задайте `$newSnapshotDir` как путь нового каталога и `$verifiedSqzExe` как путь к проверенному бинарнику. Для запуска требуется AI Tester указанной выше ревизии и сгенерированный каталог сценариев.
 Исторический source adapter сохранён в
 [`context-dedup-ai-tester/sqz-adapter`](context-dedup-ai-tester/sqz-adapter),
 но текущая runtime matrix его не использует.
-После запуска `summarize-matrix.mjs` собирает последние 12 traces без сохранения model final output:
+Для исторического пересчёта задайте `$runsDir` как каталог исходных трасс и `$startIso` как время начала прогона в ISO 8601. В `$newSummaryDir` ещё не должно быть файла `matrix-summary.json`.
 
 ```powershell
 node docs/memory-tools-research/context-dedup-ai-tester/summarize-matrix.mjs `
-  --runs C:\projects\ai-tester\runs `
-  --output .ai-factory/state/context-dedup-issue-133/ai-tester/<new-snapshot> `
-  --since <run-start-iso>
+  --runs $runsDir `
+  --output $newSummaryDir `
+  --since $startIso
 ```
 
 Summarizer требует ровно 12 traces, не сохраняет model final output, строит disjoint payload classes/adjusted views и отказывается перезаписывать существующий `matrix-summary.json`.
@@ -134,11 +162,11 @@ Harness:
 - использует isolated HOME/XDG/SQZ paths и не наследует credential env по умолчанию;
 - fail-open возвращает полный content при error, timeout или output limit.
 
-## Вывод
+## Вывод для r4
 
-Все arms прошли `4/4`. AIFHub сохранил `13.45%` raw aggregate за счёт exact
-same-session replay. SQZ mode сохранил `48.62%`: те же `98.74%` на exact repeat
-плюс stateless first-read/changed-content compression, без compression
-protected artifacts и без cross-session references. `aifhub` остаётся
-dependency-free recommended default opt-in; `sqz` — более агрессивный optional
-user-owned mode с отдельной установкой, лицензией и user-state caveat.
+На Windows в профиле r4 `gpt-5.6-luna / low` каждый режим прошёл четыре из четырёх сценариев. В сумме AIFHub сократил объём выдачи на 13,45%, SQZ — на 48,62%. В SQZ в результат вошли сжатие первого и изменённого чтений и выдача маркера при точном повторе. Защищённые артефакты в этом прогоне выдавались полностью.
+
+## См. также
+
+- [Настройка режимов и границы повторного чтения](../context-dedup.md)
+- [Инвентарь проверок и результаты #186](context-dedup-ai-tester/issue-186/coverage.md)
