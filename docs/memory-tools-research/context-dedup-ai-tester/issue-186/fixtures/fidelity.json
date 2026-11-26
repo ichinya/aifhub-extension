@@ -1,0 +1,213 @@
+[
+  {
+    "path": "guides/intervals.md",
+    "revisions": [
+      {
+        "text": "# Интервалы / Intervals\nОкно β-17: 250 мс.\nОкно β-71: 250 с.\nРежим «наблюдение» не изменяет файл.\n",
+        "facts": [
+          "Окно β-17: 250 мс.",
+          "Окно β-71: 250 с.",
+          "Режим «наблюдение» не изменяет файл."
+        ]
+      },
+      {
+        "text": "# Интервалы / Intervals\nОкно β-17: 250 с.\nОкно β-71: 250 с.\nРежим «наблюдение» не изменяет файл.\n",
+        "facts": [
+          "Окно β-17: 250 с.",
+          "Окно β-71: 250 с.",
+          "Режим «наблюдение» не изменяет файл."
+        ]
+      },
+      {
+        "text": "# Интервалы / Intervals\nОкно β-17: 250 с.\nОкно β-71: 250 с.\nРежим «наблюдение» изменяет файл.\n",
+        "facts": [
+          "Окно β-17: 250 с.",
+          "Окно β-71: 250 с.",
+          "Режим «наблюдение» изменяет файл."
+        ]
+      }
+    ]
+  },
+  {
+    "path": "src/samples.ts",
+    "revisions": [
+      {
+        "text": "// Public signatures, API v2.4.1\r\nexport function readSample(id: number): string;\r\nexport function readSamples(ids: number[]): string[];\r\n",
+        "facts": [
+          "// Public signatures, API v2.4.1",
+          "export function readSample(id: number): string;",
+          "export function readSamples(ids: number[]): string[];"
+        ]
+      },
+      {
+        "text": "// Public signatures, API v2.4.1\r\nexport function readSample(id: string): string;\r\nexport function readSamples(ids: number[]): string[];\r\n",
+        "facts": [
+          "// Public signatures, API v2.4.1",
+          "export function readSample(id: string): string;",
+          "export function readSamples(ids: number[]): string[];"
+        ]
+      }
+    ]
+  },
+  {
+    "path": "src/samples.go",
+    "revisions": [
+      {
+        "text": "package samples\n\nfunc Ready(count int) bool {\n\treturn count >= 12\n}\n",
+        "facts": [
+          "func Ready(count int) bool {",
+          "\treturn count >= 12"
+        ]
+      },
+      {
+        "text": "package samples\n\nfunc Ready(count int) bool {\n\treturn count > 12\n}\n",
+        "facts": [
+          "func Ready(count int) bool {",
+          "\treturn count > 12"
+        ]
+      }
+    ]
+  },
+  {
+    "path": "src/samples.php",
+    "revisions": [
+      {
+        "text": "<?php\nfunction sampleLabel(bool $ready): string {\n    return $ready ? \"принят\" : \"не принят\";\n}\n",
+        "facts": [
+          "function sampleLabel(bool $ready): string {",
+          "    return $ready ? \"принят\" : \"не принят\";"
+        ]
+      }
+    ]
+  },
+  {
+    "path": "config/stations.json",
+    "revisions": [
+      {
+        "text": "{\n  \"station-017\": \"v2.4.1\",\n  \"station-071\": \"v2.1.4\"\n}\n",
+        "facts": [
+          "  \"station-017\": \"v2.4.1\",",
+          "  \"station-071\": \"v2.1.4\""
+        ]
+      },
+      {
+        "text": "{\n  \"station-017\": \"v2.4.2\",\n  \"station-071\": \"v2.1.4\"\n}\n",
+        "facts": [
+          "  \"station-017\": \"v2.4.2\",",
+          "  \"station-071\": \"v2.1.4\""
+        ]
+      }
+    ]
+  },
+  {
+    "path": "config/source.yaml",
+    "revisions": [
+      {
+        "text": "dataset:\r\n  path: data/échantillons/温度.csv\r\n  unit: µm\r\n  enabled: false\r\n",
+        "facts": [
+          "  path: data/échantillons/温度.csv",
+          "  unit: µm",
+          "  enabled: false"
+        ]
+      },
+      {
+        "text": "dataset:\r\n  path: data/échantillon/温度.csv\r\n  unit: µm\r\n  enabled: false\r\n",
+        "facts": [
+          "  path: data/échantillon/温度.csv",
+          "  unit: µm",
+          "  enabled: false"
+        ]
+      }
+    ]
+  },
+  {
+    "path": "sql/samples.sql",
+    "revisions": [
+      {
+        "text": "SELECT station_id, reading\nFROM samples\nWHERE reading IS NOT NULL\n  AND reading < 0;\n",
+        "facts": [
+          "WHERE reading IS NOT NULL",
+          "  AND reading < 0;"
+        ]
+      }
+    ]
+  },
+  {
+    "path": "changes/limits.diff",
+    "revisions": [
+      {
+        "text": "--- a/src/limits.ts\n+++ b/src/limits.ts\n@@ -1 +1 @@\n-export const maxMs = 150;\n+export const maxMs = 105;\n",
+        "facts": [
+          "--- a/src/limits.ts",
+          "+++ b/src/limits.ts",
+          "-export const maxMs = 150;",
+          "+export const maxMs = 105;"
+        ]
+      }
+    ]
+  },
+  {
+    "path": "reports/check.stdout",
+    "revisions": [
+      {
+        "text": "suite=intervals\r\nok 1 - reads station-071\r\nnot ok 2 - rounds station-017\r\npassed=1 failed=1\r\n",
+        "facts": [
+          "ok 1 - reads station-071",
+          "not ok 2 - rounds station-017",
+          "passed=1 failed=1"
+        ]
+      }
+    ]
+  },
+  {
+    "path": "reports/check.stderr",
+    "revisions": [
+      {
+        "text": "AssertionError [E_INTERVAL_017]: expected 250 ms, received 205 ms\n    at checkInterval (src/interval.ts:41:7)\n    at checkBatch (tests/batch.ts:14:2)\nCause: row 71 has unit s, expected ms\n",
+        "facts": [
+          "AssertionError [E_INTERVAL_017]: expected 250 ms, received 205 ms",
+          "    at checkInterval (src/interval.ts:41:7)",
+          "    at checkBatch (tests/batch.ts:14:2)",
+          "Cause: row 71 has unit s, expected ms"
+        ]
+      },
+      {
+        "text": "AssertionError [E_INTERVAL_071]: expected 250 ms, received 205 ms\n    at checkInterval (src/interval.ts:41:7)\n    at checkBatch (tests/batch.ts:14:2)\nCause: row 71 has unit s, expected ms\n",
+        "facts": [
+          "AssertionError [E_INTERVAL_071]: expected 250 ms, received 205 ms",
+          "    at checkInterval (src/interval.ts:41:7)",
+          "    at checkBatch (tests/batch.ts:14:2)",
+          "Cause: row 71 has unit s, expected ms"
+        ]
+      },
+      {
+        "text": "AssertionError [E_INTERVAL_071]: expected 250 ms, received 205 ms\n    at checkInterval (src/interval.ts:41:7)\n    at checkBatch (tests/batch.ts:14:2)\nCause: row 17 has unit s, expected ms\n",
+        "facts": [
+          "AssertionError [E_INTERVAL_071]: expected 250 ms, received 205 ms",
+          "    at checkInterval (src/interval.ts:41:7)",
+          "    at checkBatch (tests/batch.ts:14:2)",
+          "Cause: row 17 has unit s, expected ms"
+        ]
+      }
+    ]
+  },
+  {
+    "path": "logs/sequence.log",
+    "revisions": [
+      {
+        "text": "batch=4 begin\nstation=017 event=checked\nstation=071 event=queued\nbatch=4 end\n",
+        "facts": [
+          "station=017 event=checked",
+          "station=071 event=queued"
+        ]
+      },
+      {
+        "text": "batch=4 begin\nstation=071 event=queued\nstation=017 event=checked\nbatch=4 end\n",
+        "facts": [
+          "station=071 event=queued",
+          "station=017 event=checked"
+        ]
+      }
+    ]
+  }
+]

@@ -116,6 +116,18 @@ describe('context dedup benchmark', () => {
     );
   });
 
+  it('keeps oversized external text and hook inputs full without starting an adapter', async () => {
+    const content = 'é'.repeat(512 * 1024);
+    for (const [protocol, text] of [['sqz-text', content + '!'], ['hook-json', content]]) {
+      const trace = { files: [{ path: 'input.md', revisions: [text] }], reads: [{ path: 'input.md' }] };
+      const result = await runBenchmark({ mode: 'external', trace, externalProtocol: protocol,
+        externalCommand: process.execPath, externalArgs: ['-e', 'process.exit(1)'] });
+      assert.equal(result.steps[0].decision, 'external-input-limit');
+      assert.equal(result.steps[0].servedFullContent, true);
+      assert.equal(result.savedBytes, 0);
+    }
+  });
+
   it('falls back to full content when the external command is unusable', async () => {
     const result = await runBenchmark({ mode: 'external', externalCommand: 'aifhub-nonexistent-dedup-binary' });
 
@@ -353,5 +365,63 @@ describe('context dedup benchmark', () => {
     const stderr = collect();
     assert.equal(await main(['--mode', 'turbo'], { stdout: collect(), stderr }), 1);
     assert.match(stderr.text(), /Unknown mode/);
+  });
+});
+
+describe('issue 186 byte fixtures', () => {
+  it('measures full baseline bytes and exercises both sides of the 2048-byte replay threshold', async () => {
+    const { byteInputs } = await import('../docs/memory-tools-research/context-dedup-ai-tester/issue-186/fixtures/byte-inputs.mjs');
+    const trace = {
+      name: 'utf8-byte-boundaries',
+      files: byteInputs.map(({ path, text }) => ({ path, revisions: [text] })),
+      reads: byteInputs.flatMap(({ path }) => [{ path }, { path }])
+    };
+    const baseline = await runBenchmark({ mode: 'baseline', trace });
+    const replay = await runBenchmark({ mode: 'variant-a', trace });
+
+    for (const [index, input] of byteInputs.entries()) {
+      const [first, repeat] = replay.steps.slice(index * 2, index * 2 + 2);
+      for (const step of baseline.steps.slice(index * 2, index * 2 + 2)) {
+        assert.equal(step.path, input.path);
+        assert.equal(step.emittedBytes, input.bytes, input.path);
+        assert.equal(step.servedFullContent, true, input.path);
+      }
+      const below = input.bytes < 2048;
+      assert.equal(first.emittedBytes, input.bytes, input.path);
+      assert.equal(first.servedFullContent, true, input.path);
+      assert.equal(first.decision, below ? 'below-threshold' : 'full', input.path);
+      assert.equal(repeat.decision, below ? 'below-threshold' : 'deduplicated', input.path);
+      assert.equal(repeat.servedFullContent, below, input.path);
+    }
+  });
+});
+
+describe('issue 186 benchmark measurement boundaries', () => {
+  it('identifies each measured read path and counts only fallback after an adapter error', async () => {
+    const trace = {
+      files: [{ path: 'sample.txt', revisions: ['unchanged', 'expanded', 'failed', 'quiet', 'equal'] }],
+      reads: [0, 1, 2, 3, 4].map(revision => ({ path: 'sample.txt', revision }))
+    };
+    const source = [
+      "const input = require('node:fs').readFileSync(0, 'utf8');",
+      "if (input === 'failed') process.exitCode = 3;",
+      "else if (input === 'expanded') process.stdout.write(input + '!');",
+      "else if (input === 'equal') process.stdout.write('other');",
+      "else if (input !== 'quiet') process.stdout.write(input);"
+    ].join('\n');
+    for (const [mode, boundary] of [
+      ['baseline', 'raw-trace'], ['variant-a', 'recordRead:aifhub'], ['external', 'external-adapter']
+    ]) {
+      const result = await runBenchmark({ mode, trace, externalCommand: [process.execPath, '-e', source] });
+      assert.equal(result.readBoundary, boundary);
+      assert.equal(result.externalErrorFallbackReads, mode === 'external' ? 2 : 0);
+      if (mode === 'external') {
+        assert.deepEqual(result.steps.map(step => step.decision), [
+          'external-full', 'external-expanded', 'external-error', 'external-empty-output', 'external-transformed'
+        ]);
+        assert.deepEqual(result.steps.map(step => step.emittedBytes), [9, 9, 6, 5, 5]);
+        assert.equal(result.compressionReads, 0);
+      }
+    }
   });
 });

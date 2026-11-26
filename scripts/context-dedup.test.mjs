@@ -1256,3 +1256,145 @@ describe('cli', () => {
     assert.match(stderr.text(), /--file/);
   });
 });
+
+function containsOrderedFactLines(content, facts) {
+  const lines = content.split(/\r?\n/);
+  let nextLine = 0;
+  for (const fact of facts) {
+    const found = lines.indexOf(fact, nextLine);
+    if (found === -1) return false;
+    nextLine = found + 1;
+  }
+  return true;
+}
+
+describe('issue 186 content fidelity', () => {
+  it('delivers the exact bytes and ordered facts of each revision read from disk', async () => {
+    const fixtureUrl = new URL('../docs/memory-tools-research/context-dedup-ai-tester/issue-186/fixtures/fidelity.json', import.meta.url);
+    const cases = JSON.parse(await readFile(fixtureUrl, 'utf8'));
+    assert.deepEqual(cases.map(item => path.extname(item.path)).sort(),
+      ['.diff', '.go', '.json', '.log', '.md', '.php', '.sql', '.stderr', '.stdout', '.ts', '.yaml']);
+    const policy = { ...await enabledPolicy(), minBytes: 1 };
+    for (const { path: filePath, revisions } of cases) {
+      assert.ok(revisions.length > 0, filePath);
+      let previous;
+      for (const { text, facts } of revisions) {
+        await writeProjectFile(filePath, text);
+        const result = await recordRead({ filePath, rootDir, policy, sessionId: 'fidelity' });
+        assert.equal(result.decision, previous ? 'changed' : 'full', filePath);
+        assert.equal(result.content, text, filePath);
+        assert.ok(facts.length > 0 && containsOrderedFactLines(result.content, facts), filePath);
+        if (previous) {
+          assert.equal(containsOrderedFactLines(previous.content, facts), false, filePath);
+          assert.equal(containsOrderedFactLines(result.content, previous.facts), false, filePath);
+        }
+        previous = { content: result.content, facts };
+      }
+    }
+  });
+});
+
+describe('issue 186 production read boundary', () => {
+  it('observes the command, outcome and delivered text at each cold read', async () => {
+    // Running Node as the configured executable makes "compress" the script
+    // and "--no-cache" its argument on both Windows and Linux.
+    await writeProjectFile('compress', [
+      "const fs = require('node:fs');",
+      "const input = fs.readFileSync(0, 'utf8');",
+      "fs.appendFileSync('calls.jsonl', JSON.stringify({ args: process.argv.slice(2), bytes: Buffer.byteLength(input) }) + '\\n');",
+      "switch (fs.readFileSync('behavior', 'utf8')) {",
+      "  case 'compact': process.stdout.write(input.slice(input.indexOf('\\n') + 1)); break;",
+      "  case 'expand': process.stdout.write(input + 'extra'); break;",
+      "  case 'fail': process.stdout.write('partial'); process.exitCode = 9; break;",
+      "  default: process.exitCode = 2;",
+      "}"
+    ].join('\n'));
+    await writeProjectFile('calls.jsonl', '');
+    const corpus = JSON.parse(await readFile(new URL(
+      '../docs/memory-tools-research/context-dedup-ai-tester/issue-186/fixtures/fidelity.json', import.meta.url
+    ), 'utf8'));
+    const { text, facts } = corpus.find(item => item.path === 'reports/check.stderr').revisions[0];
+    const original = 'Synthetic test runner banner\n' + text;
+    const filePath = 'reports/check.stderr';
+    await writeProjectFile(filePath, original);
+
+    for (const [mode, behavior, decision] of [
+      ['off', 'compact', 'disabled'],
+      ['aifhub', 'compact', 'full'],
+      ['sqz', 'compact', 'compressed'],
+      ['sqz', 'expand', 'full'],
+      ['sqz', 'fail', 'full']
+    ]) {
+      await writeProjectFile('behavior', behavior);
+      await writeProjectFile('calls.jsonl', '');
+      const policy = resolveContextDedupPolicy('aifhub:\n  contextDedup:\n    mode: ' + mode + '\n    minBytes: 1\n');
+      policy.sqz.command = process.execPath;
+      const result = await recordRead({ rootDir, policy, filePath, sessionId: mode + '-' + behavior });
+      const calls = (await readFile(path.join(rootDir, 'calls.jsonl'), 'utf8')).trim();
+      const expected = decision === 'compressed' ? text : original;
+      assert.deepEqual(calls ? calls.split('\n').map(line => JSON.parse(line)) : [],
+        mode === 'sqz' ? [{ args: ['--no-cache'], bytes: Buffer.byteLength(original) }] : []);
+      assert.equal(result.decision, decision);
+      assert.equal(result.content, expected);
+      assert.ok(containsOrderedFactLines(result.content, facts));
+      assert.equal(result.savedBytes, Buffer.byteLength(original) - Buffer.byteLength(expected));
+      if (mode === 'sqz') {
+        assert.equal(result.providerOutcome, decision);
+        assert.equal(result.outputBytes, Buffer.byteLength(expected));
+        assert.deepEqual(result.warnings.map(item => item.code), behavior === 'fail' ? ['context-dedup-sqz-unavailable'] : []);
+      }
+    }
+  });
+
+  it('checks delivered facts against the pinned Windows SQZ 1.3.0 executable', {
+    skip: process.platform !== 'win32' || !process.env.AIFHUB_TEST_SQZ_WINDOWS_EXE
+      ? 'Requires the pinned Windows executable via AIFHUB_TEST_SQZ_WINDOWS_EXE' : false
+  }, async () => {
+    const base = new URL('../docs/memory-tools-research/context-dedup-ai-tester/', import.meta.url);
+    const { sqz: pin } = JSON.parse(await readFile(new URL('matrix-catalog.json', base), 'utf8'));
+    const binary = path.resolve(process.env.AIFHUB_TEST_SQZ_WINDOWS_EXE);
+    const { createHash } = await import('node:crypto');
+    assert.equal(pin.version, '1.3.0');
+    assert.equal(createHash('sha256').update(await readFile(binary)).digest('hex'), pin.officialBinarySha256.toLowerCase());
+
+    const cases = JSON.parse(await readFile(new URL('issue-186/fixtures/fidelity.json', base), 'utf8'));
+    const policy = resolveContextDedupPolicy('aifhub:\n  contextDedup:\n    mode: sqz\n    minBytes: 1\n');
+    policy.sqz.command = binary;
+    let compressed = 0;
+    for (const { path: filePath, revisions } of cases) {
+      for (const { text, facts } of revisions) {
+        await writeProjectFile(filePath, text);
+        const calls = [];
+        const result = await recordRead({
+          rootDir, filePath, policy, sessionId: hashContent(text),
+          sqzRunner: async options => {
+            const reply = await runSqzCompression(options);
+            calls.push(reply);
+            return reply;
+          }
+        });
+        assert.equal(calls.length, 1, filePath);
+        const [reply] = calls;
+        assert.equal(reply.code, 'ok', filePath);
+        assert.deepEqual(result.warnings, [], filePath);
+        if (result.decision === 'compressed') {
+          compressed++;
+          assert.equal(result.content, reply.stdout, filePath);
+          assert.ok(Buffer.byteLength(result.content) < Buffer.byteLength(text), filePath);
+          if (filePath.endsWith('.json')) {
+            // The pinned CLI may prefix a compact JSON object with "TOON:".
+            const expected = JSON.parse('{\n' + facts.join('\n') + '\n}');
+            assert.deepEqual(JSON.parse(result.content.replace(/^TOON:/, '')), expected, filePath);
+          } else {
+            assert.ok(containsOrderedFactLines(result.content, facts), filePath);
+          }
+        } else {
+          assert.equal(result.decision, 'full', filePath);
+          assert.equal(result.content, text, filePath);
+        }
+        assert.equal(result.savedBytes, Buffer.byteLength(text) - Buffer.byteLength(result.content));
+      }
+    }
+    assert.ok(compressed > 0, 'the pinned binary must exercise an actual compressed delivery');
+  });
+});
