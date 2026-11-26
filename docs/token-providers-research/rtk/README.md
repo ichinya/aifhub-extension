@@ -15,6 +15,57 @@ aggregate tokens. All candidate attempts exercised RTK. Diagnostics required raw
 recovery and cost 10.5% more tokens; removing the largest baseline pair reduced
 aggregate savings to 7.9%. The bounded result does not clear the privacy blockers.
 
+## RTK v1.2.1 follow-up
+
+On 2026-11-26, the follow-up tested the official [v1.2.1 Linux x86-64
+binary](https://github.com/rtk-ai/rtk/releases/tag/v1.2.1) in Debian under WSL2.
+The release archive matched the published SHA-256. The runs used a disposable
+filesystem and an isolated network namespace with no network access. The
+[results JSON](v1.2.1-results.json) records the pins, the measured byte counts,
+exit codes and checks. The earlier model-assisted runs used v0.48.0.
+
+The command matrix used the same snapshots and inputs for direct execution,
+RTK and the `rtk proxy` comparisons. It covered clean and changed worktrees,
+short and long patches, successful suites and 12 controlled failing cases per
+runner. The byte counts include stdout and stderr.
+
+| Project and runner | Successful suite, direct → RTK | Failing cases with expected values visible after filtering |
+| --- | --- | ---: |
+| [AIFHub Extension](https://github.com/ichinya/aifhub-extension/commit/1a277ae16093cc37ad40e4d530a4bcf34393f21f), Node.js via `npm test` | 8,837 → 8,465 bytes (−4.2%). Both runs passed all 34 selected tests. | 12/12 |
+| [Click 8.2.1](https://github.com/pallets/click/commit/fd183b2ced1cb5857784fe7fb22f4982f671f098), `pytest` | 260 → 28 bytes with `-q` (−89.2%) and 16,325 → 28 bytes with `-v` (−99.8%). | 10/12 |
+| [Google UUID v1.6.0](https://github.com/google/uuid/commit/0f11ee6918f41a04c201eceeadf612a377bc7fbc), `go test` | 14,192 → 34 bytes with `-v` (−99.8%) and 35 → 34 bytes at normal verbosity. | 12/12 |
+
+- **Test output.** Exit codes matched in all comparisons. Through `rtk proxy`,
+  all three failure outputs matched direct execution after timing fields were
+  normalized. `rtk rewrite` proposed wrapping the tested pytest and Go commands.
+  The study invoked RTK explicitly for `npm test`. A separate AIFHub run with
+  five test files passed 150 of 151 tests in both modes. The single skip
+  required the pinned Windows SQZ executable.
+- **Git.** Each of the three historical patches shrank by a different amount
+  (95.7%, 43.7% and 2.4% in table order). On the controlled 220-line patch,
+  filtering showed 99 added lines in each project. Through `rtk proxy`, all
+  tested patches matched direct Git byte for byte. The short status kept both
+  changed paths, and the tested `git log --stat` output matched direct Git.
+- **Protected evidence.** Direct reads, `rtk read` and `rtk proxy cat` matched
+  byte for byte on four synthetic files, including fenced gate JSON and CRLF
+  JSON. The practical AIFHub run also matched two committed fixtures, an
+  OpenSpec spec and `coverage.json`. Use direct reads for protected evidence.
+- **Local persistence.** The native Claude hook left an excluded synthetic
+  command unchanged and stored its argument in `tracking.db` with
+  `tracking.enabled = false`. The proxy control also stored its argument, and
+  `rtk gain --history` displayed six characters of it. Default recovery wrote
+  the test output marker to two decoded `recall.db` records. The tested legacy
+  `[tee] mode = "never"` and explicit `[retriever] mode = "disabled"` settings
+  suppressed recovery records. Command tracking is separate.
+
+The decision stays `reject_defer`. Before reconsidering integration, retest
+local persistence on a pinned successor and verify hook behavior in the intended
+host and delegated workers. A paired OpenSpec trial should then measure full
+model usage, review findings, diagnostics, gates and fix cycles, including raw
+rereads. The v1.2.1 runs measured command output bytes. Full-cycle model usage,
+native Windows behavior and delegated-worker behavior remain unverified for
+v1.2.1. See [the updated proposal](https://github.com/ichinya/aifhub-extension/issues/138).
+
 ## Custody and method
 
 Evaluated on 2026-09-05 against AIFHub base

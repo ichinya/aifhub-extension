@@ -8,17 +8,39 @@ evidence: deterministic filters can remove assertions, patches and historical fa
 
 ## RTK decision
 
-[`rtk-ai/rtk`](https://github.com/rtk-ai/rtk) **v0.48.0** is `reject_defer` for an
-AIFHub recommendation or automatic integration. Explicit, user-owned use is
-recommended for the proven scopes listed below and discouraged elsewhere. This
-is not a claim of universal safety or a security PASS.
+The AIFHub decision for [RTK](https://github.com/rtk-ai/rtk) is **`reject_defer`**
+for broad recommendation or automatic integration. The v1.2.1 follow-up confirmed
+that an excluded Claude hook command can still reach SQLite with tracking disabled
+and that filtered pytest output can omit failing cases. Explicit, user-owned
+overview use remains useful where the evidence supports it. See the
+[v1.2.1 follow-up](token-providers-research/rtk/README.md#rtk-v121-follow-up).
 
-The [pinned evaluation](token-providers-research/rtk/README.md) found useful output
-reduction, but failed exact diagnostic and local persistence checks. In particular,
-excluded commands can still be logged by the Claude hook, and the documented
-tracking-disable setting did not prevent command storage in this release. The
-proposed short configuration in issue #138 also fails to parse on this version.
-No AIFHub lifecycle token benefit, review parity or subagent compatibility is claimed.
+## When to use RTK
+
+Keep direct commands as the default. Invoke RTK explicitly for an overview when
+the command has non-sensitive input and output and produces enough detail to
+make filtering useful. Choose the route based on what the task needs to recover.
+
+| Situation | Recommended route | Why |
+| --- | --- | --- |
+| First look at a large diff | Run `rtk git diff` to locate areas of interest. Use direct `git diff -- <path>` for review findings. | The AIFHub PR output shrank by 95.7%. In a controlled patch, RTK showed 99 of 220 added lines. |
+| Quick pass/fail check with a verbose test runner | Use RTK manually when the exit code or a compact summary is sufficient. If the run fails, use the direct runner for diagnosis. | Verbose pytest and Go output shrank by about 99.8% in the successful runs. Exit codes matched in all three projects. |
+| Routine status, small diffs and already-quiet tests | Use the tool's native output, such as `git status --short` or `go test` without `-v`. | The short status and the normal-verbosity Go run each saved one byte. AIFHub's selected `npm test` suite saved 4.2%. |
+| Full review, `/aif-verify`, `/aif-fix` and exact OpenSpec or gate evidence | Use direct commands from the first read. | Filtered pytest output omitted details for two of the 12 controlled failures. Complete patches, assertions and tracebacks support the final findings. |
+| Sensitive command arguments, paths or output | Use a session with RTK hooks disabled and run the tool directly. | The Claude hook stored an excluded command argument in SQLite even with tracking disabled. An explicit `rtk proxy` invocation also stored its argument. |
+
+These numbers are command-output bytes from the pinned v1.2.1 runs. Count any
+direct rereads when evaluating a workflow. Full-cycle model token savings
+remain unverified for this release. See the
+[test matrix and privacy probe](token-providers-research/rtk/README.md#rtk-v121-follow-up).
+
+## Earlier evidence from v0.48.0
+
+The [v0.48.0 evaluation](token-providers-research/rtk/README.md#custody-and-method)
+found useful output reduction alongside failures in exact diagnostics and local
+persistence. The short configuration originally proposed in issue #138 also
+failed to parse on v0.48.0. AIFHub lifecycle token savings, review parity and
+subagent compatibility remain unverified.
 
 The subsequent [ai-tester/Pi experiment](token-providers-research/rtk/ai-tester-ab.md)
 used the requested Ornith model on three project snapshots. Baseline passed
@@ -54,11 +76,9 @@ installs anything.
 
 > Use RTK to answer “what is happening?”; use raw commands to answer “show all evidence without loss.”
 
-## Proven benefits and when to enable (user-owned)
+### Observed benefits and limitations
 
-The bounded evidence above does support real, repeatable benefits for explicit
-user-owned sessions. Based on all three ai-tester series and the pinned probe,
-RTK v0.48.0 is worth enabling for:
+The v0.48.0 ai-tester series and probe measured benefits in these settings:
 
 - **Overview and search on large repositories.** `rg`, `git log`, `git status`,
   `git diff --stat` in the cross-project matrix saved 24–58% tokens with quality
@@ -73,10 +93,10 @@ RTK v0.48.0 is worth enabling for:
 - **Reading protected validation artifacts.** Compressed `rtk read` preserved
   `aif-gate-result`, `coverage.json`, `done-readiness.json` and OpenSpec
   markdown byte-exact in 12/12 matrix runs (and 5/5 probe reads). They remain
-  on the raw-path list for the full contract, but an overview read is safe.
-- **Filtered views of history and diffs** (`rtk proxy git diff`,
-  `rtk proxy git log --stat -n 50`) as the “what is happening?” pass before
-  any raw evidence pass.
+  on the direct-read list when used as evidence.
+- **History and diff overview.** Use filtered output for the initial pass.
+  `rtk proxy git diff` and `rtk proxy git log --stat -n 50` are examples of
+  the full-output path for non-sensitive arguments.
 
 Do not enable it for:
 
@@ -91,7 +111,7 @@ Do not enable it for:
   (RTK's pytest filter dropped case names and tracebacks in the probe);
 - **sensitive sessions** — see the storage blockers below; the matrix privacy
   result does not overturn the probe's findings about excluded-command logging
-  and ineffective `[tracking]` settings in v0.48.0.
+  and ineffective `[tracking]` settings in v0.48.0 and v1.2.1.
 
 ## Evidence must have a raw path
 
@@ -145,10 +165,10 @@ raw, and an independently configured user hook must preserve that behavior.
 AIFHub never installs RTK or runs its setup commands. Users independently review,
 pin, install, update and remove it using [upstream installation
 documentation](https://github.com/rtk-ai/rtk/blob/fde0a8f185945556f51718de0f4c430bb62b3df6/docs/guide/getting-started/installation.md).
-Always-on RTK use in sensitive sessions is not recommended for v0.48.0, even with
-the exclusions below. Use a separate session without the RTK hook for those commands.
+Use a separate session without the RTK hook for sensitive commands on both tested
+versions, including when hook exclusions are configured.
 
-For a non-sensitive experiment, this is a **complete, tested shape** for the relevant
+For a non-sensitive v0.48.0 experiment, this is a **complete, tested shape** for the relevant
 tables in user-owned RTK `config.toml`. Manually merge the fields with the existing
 configuration; do not overwrite unrelated settings. On the tested Linux host the
 file is `$XDG_CONFIG_HOME/rtk/config.toml`, defaulting to `~/.config/rtk/config.toml`.
@@ -183,6 +203,12 @@ recovery files. `enabled = false` is essential. `RTK_TEE=0` is an additional tes
 environment override. `RTK_TELEMETRY_DISABLED=1` disables telemetry regardless of
 consent; telemetry is otherwise opt-in and disabled by default in this release.
 
+For v1.2.1, the probe used `[retriever]` with `mode = "disabled"` to disable
+recovery storage. The legacy `[tee] mode = "never"` form also suppressed
+recovery in the tested configuration without a `[retriever]` table. Default
+recovery stored pytest output in `recall.db`. These settings control output
+recovery. Command tracking is a separate path.
+
 Exclusions apply to rewriting, not to observation, redaction or permission checks.
 Do not infer coverage for aliases, absolute executable paths, wrappers, nested
 shells, compound commands, or a different host from a simple top-level probe.
@@ -201,19 +227,20 @@ paths and output require the same care as explicit password arguments.
 
 RTK can persist full `original_cmd`, `rtk_cmd`, project paths and hook command text
 in SQLite. Our probe observed both proxy arguments and excluded Claude hook
-arguments with a valid `[tracking] enabled = false` configuration. Treat that
-setting as ineffective for these tested paths in v0.48.0. A raw-output bypass is
-not a privacy bypass.
+arguments with a valid `[tracking] enabled = false` configuration in v0.48.0
+and v1.2.1. Treat that setting as ineffective for those tested paths. Use a
+session without RTK for sensitive arguments or output.
 
-Failure tee normally keeps up to 20 files of up to 1 MiB each; these are rotation
-limits, not a time-based deletion guarantee. The tested default data location on
-Linux is `~/.local/share/rtk/`, with `history.db` and `tee/`; `RTK_DB_PATH`,
-`RTK_TEE_DIR`, XDG variables and configuration can change it. Optional hook audit
-logs are another store. Hook uninstall removes integration files, not necessarily
+The v0.48.0 failure tee rotates files by count and size. It normally keeps up to
+20 files of up to 1 MiB each. These limits give no deletion deadline. The tested
+default data location on Linux is `~/.local/share/rtk/`, with `history.db` and
+`tee/`. `RTK_DB_PATH`, `RTK_TEE_DIR`, XDG variables and configuration can
+change it. Optional hook audit logs are another store. Hook uninstall removes integration files, not necessarily
 these stores. Users own retention and cleanup: stop RTK activity, identify the
-actual configured database/log locations, remove their RTK database and any SQLite
-sidecars, tee files and audit logs, and check backups/sync copies. Rotation or
-uninstall is not proof that a previously exposed credential has disappeared.
+actual configured database/log locations, remove their RTK tracking and recovery
+databases, SQLite sidecars, tee files and audit logs, and check backups/sync
+copies. Verify removal of previously exposed data separately from rotation or
+uninstall.
 
 `rtk gain --history` exposed a synthetic argument fragment in the probe. Other
 history, project, parse-failure or discovery views can include command text and
@@ -233,17 +260,17 @@ block plan, implement, review, verify, security, done, archive or commit gates.
 Missing or incompatible RTK is a normal supported state. Protected files and gate
 output must never be rewritten or compressed in place.
 
-The evaluated Hermes installer writes `plugins/rtk-rewrite/__init__.py`,
+The v0.48.0 Hermes installer writes `plugins/rtk-rewrite/__init__.py`,
 `plugin.yaml` and `config.yaml` under `HERMES_HOME` (default `~/.hermes`), enabling
 `rtk-rewrite` in `plugins.enabled`. Its adapter mutates `terminal` tool commands
 through `rtk rewrite`. Fixture install/reinstall/uninstall preserved the unrelated
 Hermes plugin and model setting.
 
-Codex `rtk init -g --codex` writes `RTK.md` and edits `AGENTS.md` under `CODEX_HOME`
-(default `~/.codex`); project mode writes them in the project. This is instruction
-injection, not a programmatic Bash hook. The fixture's Codex `config.toml` was
-unchanged. Claude's native installer uses a Bash `PreToolUse` hook and can also
-write awareness instructions. These are user-owned surfaces even when their names
+On v0.48.0, Codex `rtk init -g --codex` writes `RTK.md` and edits `AGENTS.md`
+under `CODEX_HOME` (default `~/.codex`). Project mode writes them in the project.
+The Codex setup tested here uses those instruction files, and the fixture's
+`config.toml` was unchanged. Claude's native installer uses a Bash `PreToolUse`
+hook and can also write awareness instructions. These are user-owned surfaces even when their names
 do not overlap AIFHub's managed agent files.
 
 Hook inheritance for `aifhub-implement-worker`, `aifhub-verifier` and other delegated

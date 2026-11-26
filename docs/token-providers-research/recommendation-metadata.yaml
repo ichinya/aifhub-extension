@@ -1,11 +1,12 @@
 schema: aifhub.token_providers.recommendation.v1
-updated: "2026-09-14"
+updated: "2026-11-26"
 purpose: >
   Machine-readable decision and usage metadata for token providers (issue #138).
   Durable research metadata only: it is not consumed by the extension runtime,
   never gates plan/implement/verify/review/done/archive/commit, never installs,
   configures or prefers a tool, and never becomes provider selection metadata.
-  Full phase-by-stack data lives in token-providers-research/rtk/cross-project-ab-results.json.
+  The v0.48.0 phase-by-stack data lives in token-providers-research/rtk/cross-project-ab-results.json.
+  The v1.2.1 command and privacy follow-up lives in token-providers-research/rtk/v1.2.1-results.json.
 default_policy:
   install_policy: explicit_user_opt_in_only
   never_auto_install: true
@@ -27,9 +28,9 @@ providers:
   rtk:
     decision: reject_defer
     decision_scope: >
-      AIFHub integration/recommendation remains rejected-deferred. Explicit
-      user-owned use is recommended for the proven scopes below and
-      discouraged for the listed anti-scopes.
+      AIFHub automatic integration and broad recommendation remain deferred.
+      Direct commands are the default. Users may call RTK explicitly for
+      non-sensitive overviews within the guidance below.
     pinned_version: "0.48.0"
     source_commit: fde0a8f185945556f51718de0f4c430bb62b3df6
     license: Apache-2.0
@@ -56,6 +57,36 @@ providers:
         runs: 60
         outcome: "baseline 23/30 pairs vs RTK 18/30; tokens +0.9% aggregate"
         privacy_postcheck: "clean in all primary sensitive runs; sensitive command never rewritten"
+      v1_2_1_follow_up:
+        version: "1.2.1"
+        source_commit: d0f0399a5ff8cd1d81325a033f0b2d8864d665f6
+        path: docs/token-providers-research/rtk/README.md
+        results: docs/token-providers-research/rtk/v1.2.1-results.json
+        projects: [aifhub-extension, click, google-uuid]
+        metric: command_output_bytes
+        outcome: reject_defer
+        blockers:
+          - excluded Claude hook and proxy arguments still reach tracking SQLite with tracking disabled
+          - filtered pytest output preserved expected values for only 10 of 12 controlled failures
+          - filtered Git output showed only 99 of 220 added lines in each controlled large patch
+        unverified: [full_model_lifecycle, native_windows, delegated_worker_hooks]
+    usage_guidance:
+      version: "1.2.1"
+      evidence: v1_2_1_follow_up
+      default: raw_commands
+      explicit_overview_only:
+        - large_diff_triage
+        - verbose_test_pass_fail_checks
+      prefer_direct:
+        - short_git_status
+        - small_diffs
+        - quiet_test_output
+      require_direct:
+        - complete_patch_review
+        - verification_and_fix_diagnostics
+        - protected_openspec_and_gate_evidence
+      require_rtk_free_session:
+        - sensitive_command_arguments_paths_or_output
     proven_benefits:
       - scope: overview_and_search_on_large_repositories
         commands: ["rg", "git log", "git status", "git diff --stat"]
@@ -85,7 +116,7 @@ providers:
       verification_and_fix_runners:
         reason: "pytest filter dropped case names and tracebacks; use raw runners"
       sensitive_sessions:
-        reason: "v0.48.0 storage blockers (excluded-command logging, ineffective tracking.enabled) remain"
+        reason: "Excluded-command logging and ineffective tracking.enabled were observed in v0.48.0 and v1.2.1"
     boundaries:
       - never install, bundle, auto-configure or repair hooks
       - never treat availability or savings as a gate

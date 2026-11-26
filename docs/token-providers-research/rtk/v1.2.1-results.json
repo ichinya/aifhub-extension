@@ -1,0 +1,844 @@
+{
+  "schema": "aifhub.rtk_follow_up.v1",
+  "date": "2026-11-26",
+  "decision": "reject_defer",
+  "rtk": {
+    "version": "1.2.1",
+    "sourceCommit": "d0f0399a5ff8cd1d81325a033f0b2d8864d665f6",
+    "releaseArchive": "rtk-x86_64-unknown-linux-musl.tar.gz",
+    "archiveSha256": "75f64525711be935657a6b228d929c24bd9d1ab7d640ea374a8b913e5b5bac05",
+    "binarySha256": "d3233a9ed06dfd95835db9cfa395a06ae7cea115a913201c041cb4cffb4cc1e1"
+  },
+  "environment": "Debian x86_64 WSL2, bubblewrap, no network",
+  "versions": {
+    "node": "v22.23.5",
+    "npm": "10.9.9",
+    "go": "go version go1.24.4 linux/amd64",
+    "pytest": "pytest 8.4.2",
+    "git": "git version 2.47.3"
+  },
+  "metric": "Combined stdout and stderr bytes",
+  "sourceReportSha256": {
+    "privacy": "8375d71c802998287022f352d5605d1ebd18d9c839ae8e2c0fd38000e4e540c6",
+    "practical": "79110a8b571c73e7d20ec985da7dba4a0bb0ee5b39bbb0a8f6ae06a315738d77",
+    "multiProject": "ab34db0169f9951d02d34c7742b18ae1d67af4b18a675516b5af5687413db711"
+  },
+  "privacy": {
+    "configProfiles": [
+      {
+        "profile": "legacy_tee_never",
+        "config_loaded": true,
+        "recovery_records": 0,
+        "output_marker_in_decoded_recovery_entries": 0,
+        "tee_files": 0
+      },
+      {
+        "profile": "default_recovery",
+        "config_loaded": true,
+        "recovery_records": 2,
+        "output_marker_in_decoded_recovery_entries": 2,
+        "tee_files": 0
+      },
+      {
+        "profile": "tracking_and_recovery_disabled",
+        "config_loaded": true,
+        "recovery_records": 0,
+        "output_marker_in_decoded_recovery_entries": 0,
+        "tee_files": 0
+      }
+    ],
+    "tracking_disabled_controls": {
+      "hook_left_excluded_command_raw": true,
+      "overview_control_rewrote": true,
+      "hook_argument_in_tracking_hook_decisions": true,
+      "proxy_argument_in_tracking_commands": true,
+      "hook_argument_fragment_in_gain_history": false,
+      "proxy_argument_prefix_chars_in_gain_history": 6
+    },
+    "protected_reads": [
+      {
+        "file": "openspec/specs/evidence/spec.md",
+        "bytes": 3529,
+        "rtk_read_byte_exact": true,
+        "proxy_cat_byte_exact": true,
+        "file_unchanged": true
+      },
+      {
+        "file": ".ai-factory/qa/probe/coverage.json",
+        "bytes": 54,
+        "rtk_read_byte_exact": true,
+        "proxy_cat_byte_exact": true,
+        "file_unchanged": true
+      },
+      {
+        "file": ".ai-factory/qa/probe/done-readiness.json",
+        "bytes": 35,
+        "rtk_read_byte_exact": true,
+        "proxy_cat_byte_exact": true,
+        "file_unchanged": true
+      },
+      {
+        "file": ".ai-factory/rules/generated/probe/trace.json",
+        "bytes": 39,
+        "rtk_read_byte_exact": true,
+        "proxy_cat_byte_exact": true,
+        "file_unchanged": true
+      }
+    ]
+  },
+  "aifhubPractical": {
+    "head": "1a277ae16093cc37ad40e4d530a4bcf34393f21f",
+    "base": "0b30a66581861ece23a625e3738aab4176cb7ded",
+    "protected_evidence": [
+      {
+        "path": "test/fixtures/openspec-valid-change/openspec/specs/auth/spec.md",
+        "disk_unchanged": true,
+        "raw": {
+          "bytes": 117,
+          "exit": 0
+        },
+        "rtk": {
+          "bytes": 117,
+          "exit": 0
+        },
+        "proxy": {
+          "bytes": 117,
+          "exit": 0
+        },
+        "rtk_byte_exact": true,
+        "proxy_byte_exact": true
+      },
+      {
+        "path": "test/fixtures/openspec-valid-change/.ai-factory/qa/fixture-change/coverage.json",
+        "disk_unchanged": true,
+        "raw": {
+          "bytes": 385,
+          "exit": 0
+        },
+        "rtk": {
+          "bytes": 385,
+          "exit": 0
+        },
+        "proxy": {
+          "bytes": 385,
+          "exit": 0
+        },
+        "rtk_byte_exact": true,
+        "proxy_byte_exact": true
+      }
+    ],
+    "focused_suite": {
+      "raw": {
+        "tests": 151,
+        "pass": 150,
+        "fail": 0,
+        "skipped": 1
+      },
+      "rtk": {
+        "tests": 151,
+        "pass": 150,
+        "fail": 0,
+        "skipped": 1
+      },
+      "skipped_case": "Pinned Windows SQZ executable"
+    }
+  },
+  "projects": {
+    "aifhub-extension": {
+      "repository": "https://github.com/ichinya/aifhub-extension",
+      "ref": "1a277ae16093cc37ad40e4d530a4bcf34393f21f",
+      "older": "0b30a66581861ece23a625e3738aab4176cb7ded",
+      "git": {
+        "status_clean": {
+          "raw": {
+            "exit": 0,
+            "bytes": 0
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 0
+          },
+          "proxy": {
+            "exit": 0,
+            "bytes": 0
+          },
+          "rtk_exact": true,
+          "proxy_exact": true
+        },
+        "status_dirty_small": {
+          "raw": {
+            "exit": 0,
+            "bytes": 42
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 41
+          },
+          "proxy": {
+            "exit": 0,
+            "bytes": 42
+          },
+          "rtk_exact": false,
+          "proxy_exact": true,
+          "known_paths_reported": 2,
+          "expected_paths": 2
+        },
+        "patch_small": {
+          "raw": {
+            "exit": 0,
+            "bytes": 574
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 556
+          },
+          "proxy": {
+            "exit": 0,
+            "bytes": 574
+          },
+          "rtk_exact": false,
+          "proxy_exact": true,
+          "known_lines_reported": {
+            "raw": 1,
+            "rtk": 1,
+            "proxy": 1
+          },
+          "expected_lines": 1
+        },
+        "status_dirty_large": {
+          "raw": {
+            "exit": 0,
+            "bytes": 42
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 41
+          },
+          "proxy": {
+            "exit": 0,
+            "bytes": 42
+          },
+          "rtk_exact": false,
+          "proxy_exact": true,
+          "known_paths_reported": 2,
+          "expected_paths": 2
+        },
+        "patch_large": {
+          "raw": {
+            "exit": 0,
+            "bytes": 10650
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 5203
+          },
+          "proxy": {
+            "exit": 0,
+            "bytes": 10650
+          },
+          "rtk_exact": false,
+          "proxy_exact": true,
+          "known_lines_reported": {
+            "raw": 220,
+            "rtk": 99,
+            "proxy": 220
+          },
+          "expected_lines": 220
+        },
+        "historical_patch": {
+          "raw": {
+            "exit": 0,
+            "bytes": 627441
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 26673
+          },
+          "proxy": {
+            "exit": 0,
+            "bytes": 627441
+          },
+          "rtk_exact": false,
+          "proxy_exact": true,
+          "visible_hunk_headers": {
+            "raw": 143,
+            "rtk": 18,
+            "proxy": 143
+          }
+        },
+        "historical_log_stat": {
+          "raw": {
+            "exit": 0,
+            "bytes": 11605
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 11605
+          },
+          "proxy": {
+            "exit": 0,
+            "bytes": 11605
+          },
+          "rtk_exact": true,
+          "proxy_exact": true
+        }
+      },
+      "tests": {
+        "passing": {
+          "command": [
+            "npm",
+            "test"
+          ],
+          "raw": {
+            "exit": 0,
+            "bytes": 8837,
+            "tap_counts": {
+              "tests": 34,
+              "pass": 34,
+              "fail": 0,
+              "skipped": 0
+            }
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 8465,
+            "tap_counts": {
+              "tests": 34,
+              "pass": 34,
+              "fail": 0,
+              "skipped": 0
+            }
+          },
+          "rtk_exact": false
+        },
+        "failing": {
+          "command": [
+            "npm",
+            "test"
+          ],
+          "raw": {
+            "exit": 1,
+            "bytes": 11010
+          },
+          "rtk": {
+            "exit": 1,
+            "bytes": 10819
+          },
+          "proxy": {
+            "exit": 1,
+            "bytes": 11011
+          },
+          "rtk_exact": false,
+          "proxy_exact": false,
+          "diagnostic_markers": {
+            "raw": {
+              "case_ids": 12,
+              "expected_values": 12,
+              "source_callsite": true
+            },
+            "rtk": {
+              "case_ids": 12,
+              "expected_values": 12,
+              "source_callsite": true
+            },
+            "proxy": {
+              "case_ids": 12,
+              "expected_values": 12,
+              "source_callsite": true
+            }
+          },
+          "proxy_diagnostics_match_excluding_timings": true,
+          "rtk_diagnostics_match_excluding_timings": false
+        },
+        "rewrite": [
+          {
+            "command": "",
+            "exit": 1
+          },
+          {
+            "command": "",
+            "exit": 1
+          }
+        ]
+      }
+    },
+    "click": {
+      "repository": "https://github.com/pallets/click",
+      "ref": "fd183b2ced1cb5857784fe7fb22f4982f671f098",
+      "older": "HEAD~8",
+      "git": {
+        "status_clean": {
+          "raw": {
+            "exit": 0,
+            "bytes": 0
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 0
+          },
+          "proxy": {
+            "exit": 0,
+            "bytes": 0
+          },
+          "rtk_exact": true,
+          "proxy_exact": true
+        },
+        "status_dirty_small": {
+          "raw": {
+            "exit": 0,
+            "bytes": 42
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 41
+          },
+          "proxy": {
+            "exit": 0,
+            "bytes": 42
+          },
+          "rtk_exact": false,
+          "proxy_exact": true,
+          "known_paths_reported": 2,
+          "expected_paths": 2
+        },
+        "patch_small": {
+          "raw": {
+            "exit": 0,
+            "bytes": 328
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 310
+          },
+          "proxy": {
+            "exit": 0,
+            "bytes": 328
+          },
+          "rtk_exact": false,
+          "proxy_exact": true,
+          "known_lines_reported": {
+            "raw": 1,
+            "rtk": 1,
+            "proxy": 1
+          },
+          "expected_lines": 1
+        },
+        "status_dirty_large": {
+          "raw": {
+            "exit": 0,
+            "bytes": 42
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 41
+          },
+          "proxy": {
+            "exit": 0,
+            "bytes": 42
+          },
+          "rtk_exact": false,
+          "proxy_exact": true,
+          "known_paths_reported": 2,
+          "expected_paths": 2
+        },
+        "patch_large": {
+          "raw": {
+            "exit": 0,
+            "bytes": 10404
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 4957
+          },
+          "proxy": {
+            "exit": 0,
+            "bytes": 10404
+          },
+          "rtk_exact": false,
+          "proxy_exact": true,
+          "known_lines_reported": {
+            "raw": 220,
+            "rtk": 99,
+            "proxy": 220
+          },
+          "expected_lines": 220
+        },
+        "historical_patch": {
+          "raw": {
+            "exit": 0,
+            "bytes": 38648
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 21748
+          },
+          "proxy": {
+            "exit": 0,
+            "bytes": 38648
+          },
+          "rtk_exact": false,
+          "proxy_exact": true,
+          "visible_hunk_headers": {
+            "raw": 42,
+            "rtk": 19,
+            "proxy": 42
+          }
+        },
+        "historical_log_stat": {
+          "raw": {
+            "exit": 0,
+            "bytes": 3525
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 3525
+          },
+          "proxy": {
+            "exit": 0,
+            "bytes": 3525
+          },
+          "rtk_exact": true,
+          "proxy_exact": true
+        }
+      },
+      "tests": {
+        "passing": {
+          "command": [
+            "pytest",
+            "-q",
+            "--color=no",
+            "-p",
+            "no:cacheprovider",
+            "tests/test_options.py",
+            "tests/test_arguments.py"
+          ],
+          "raw": {
+            "exit": 0,
+            "bytes": 260,
+            "passed": 186
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 28
+          },
+          "rtk_exact": false
+        },
+        "failing": {
+          "command": [
+            "pytest",
+            "-q",
+            "--tb=long",
+            "--color=no",
+            "-p",
+            "no:cacheprovider",
+            "test_rtk_matrix.py"
+          ],
+          "raw": {
+            "exit": 1,
+            "bytes": 6947
+          },
+          "rtk": {
+            "exit": 1,
+            "bytes": 2411
+          },
+          "proxy": {
+            "exit": 1,
+            "bytes": 6947
+          },
+          "rtk_exact": false,
+          "proxy_exact": false,
+          "diagnostic_markers": {
+            "raw": {
+              "case_ids": 12,
+              "expected_values": 12,
+              "source_callsite": true
+            },
+            "rtk": {
+              "case_ids": 10,
+              "expected_values": 10,
+              "source_callsite": true
+            },
+            "proxy": {
+              "case_ids": 12,
+              "expected_values": 12,
+              "source_callsite": true
+            }
+          },
+          "proxy_diagnostics_match_excluding_timings": true,
+          "rtk_diagnostics_match_excluding_timings": false
+        },
+        "passing_verbose": {
+          "command": [
+            "pytest",
+            "-v",
+            "--color=no",
+            "-p",
+            "no:cacheprovider",
+            "tests/test_options.py",
+            "tests/test_arguments.py"
+          ],
+          "raw": {
+            "exit": 0,
+            "bytes": 16325
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 28
+          },
+          "rtk_exact": false
+        },
+        "rewrite": [
+          {
+            "command": "rtk pytest -q --color=no -p no:cacheprovider tests/test_options.py tests/test_arguments.py",
+            "exit": 3
+          },
+          {
+            "command": "rtk pytest -q --tb=long --color=no -p no:cacheprovider test_rtk_matrix.py",
+            "exit": 3
+          }
+        ]
+      }
+    },
+    "google-uuid": {
+      "repository": "https://github.com/google/uuid",
+      "ref": "0f11ee6918f41a04c201eceeadf612a377bc7fbc",
+      "older": "HEAD~8",
+      "git": {
+        "status_clean": {
+          "raw": {
+            "exit": 0,
+            "bytes": 0
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 0
+          },
+          "proxy": {
+            "exit": 0,
+            "bytes": 0
+          },
+          "rtk_exact": true,
+          "proxy_exact": true
+        },
+        "status_dirty_small": {
+          "raw": {
+            "exit": 0,
+            "bytes": 42
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 41
+          },
+          "proxy": {
+            "exit": 0,
+            "bytes": 42
+          },
+          "rtk_exact": false,
+          "proxy_exact": true,
+          "known_paths_reported": 2,
+          "expected_paths": 2
+        },
+        "patch_small": {
+          "raw": {
+            "exit": 0,
+            "bytes": 371
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 353
+          },
+          "proxy": {
+            "exit": 0,
+            "bytes": 371
+          },
+          "rtk_exact": false,
+          "proxy_exact": true,
+          "known_lines_reported": {
+            "raw": 1,
+            "rtk": 1,
+            "proxy": 1
+          },
+          "expected_lines": 1
+        },
+        "status_dirty_large": {
+          "raw": {
+            "exit": 0,
+            "bytes": 42
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 41
+          },
+          "proxy": {
+            "exit": 0,
+            "bytes": 42
+          },
+          "rtk_exact": false,
+          "proxy_exact": true,
+          "known_paths_reported": 2,
+          "expected_paths": 2
+        },
+        "patch_large": {
+          "raw": {
+            "exit": 0,
+            "bytes": 10447
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 5000
+          },
+          "proxy": {
+            "exit": 0,
+            "bytes": 10447
+          },
+          "rtk_exact": false,
+          "proxy_exact": true,
+          "known_lines_reported": {
+            "raw": 220,
+            "rtk": 99,
+            "proxy": 220
+          },
+          "expected_lines": 220
+        },
+        "historical_patch": {
+          "raw": {
+            "exit": 0,
+            "bytes": 10056
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 9818
+          },
+          "proxy": {
+            "exit": 0,
+            "bytes": 10056
+          },
+          "rtk_exact": false,
+          "proxy_exact": true,
+          "visible_hunk_headers": {
+            "raw": 14,
+            "rtk": 14,
+            "proxy": 14
+          }
+        },
+        "historical_log_stat": {
+          "raw": {
+            "exit": 0,
+            "bytes": 5224
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 5224
+          },
+          "proxy": {
+            "exit": 0,
+            "bytes": 5224
+          },
+          "rtk_exact": true,
+          "proxy_exact": true
+        }
+      },
+      "tests": {
+        "passing": {
+          "command": [
+            "go",
+            "test",
+            "-v",
+            "-count=1",
+            "-skip",
+            "^TestRtkMatrix$",
+            "./..."
+          ],
+          "raw": {
+            "exit": 0,
+            "bytes": 14192,
+            "top_level_tests": 43
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 34
+          },
+          "rtk_exact": false
+        },
+        "failing": {
+          "command": [
+            "go",
+            "test",
+            "-v",
+            "-count=1",
+            "-run",
+            "^TestRtkMatrix$",
+            "./..."
+          ],
+          "raw": {
+            "exit": 1,
+            "bytes": 1937
+          },
+          "rtk": {
+            "exit": 1,
+            "bytes": 1330
+          },
+          "proxy": {
+            "exit": 1,
+            "bytes": 1937
+          },
+          "rtk_exact": false,
+          "proxy_exact": false,
+          "diagnostic_markers": {
+            "raw": {
+              "case_ids": 12,
+              "expected_values": 12,
+              "source_callsite": true
+            },
+            "rtk": {
+              "case_ids": 12,
+              "expected_values": 12,
+              "source_callsite": true
+            },
+            "proxy": {
+              "case_ids": 12,
+              "expected_values": 12,
+              "source_callsite": true
+            }
+          },
+          "proxy_diagnostics_match_excluding_timings": true,
+          "rtk_diagnostics_match_excluding_timings": false
+        },
+        "passing_quiet": {
+          "command": [
+            "go",
+            "test",
+            "-count=1",
+            "-skip",
+            "^TestRtkMatrix$",
+            "./..."
+          ],
+          "raw": {
+            "exit": 0,
+            "bytes": 35
+          },
+          "rtk": {
+            "exit": 0,
+            "bytes": 34
+          },
+          "rtk_exact": false
+        },
+        "rewrite": [
+          {
+            "command": "rtk go test -v -count=1 -skip ^TestRtkMatrix$ ./...",
+            "exit": 3
+          },
+          {
+            "command": "rtk go test -v -count=1 -run ^TestRtkMatrix$ ./...",
+            "exit": 3
+          }
+        ]
+      }
+    }
+  },
+  "unverified": [
+    "full_model_lifecycle",
+    "native_windows",
+    "delegated_worker_hooks"
+  ]
+}
