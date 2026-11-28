@@ -118,7 +118,7 @@ Run this command from the consumer project root with an active local change ID a
 ai-factory aifhub-plan-context task --change add-oauth-login --task 2.1 --json
 ```
 
-The command returns the original `tasks.md` section, including its checkboxes and line endings. It reports the selected task's line and checked state, the context revision, and separate references for project rules and trace-verified generated rules. An OpenSpec change without SDD uses the canonical context with `context.status: disabled`.
+The command returns the original `tasks.md` section, including its checkboxes and line endings. It reports the selected task's line and checked state, the context revision, and separate references for project rules and trace-verified generated rules. An OpenSpec change without SDD uses the canonical context with `context.status: disabled`, including existing base specs that match the change's delta specs. Project rules resolve an explicit `rules.base` first and otherwise look for `base.md` under `paths.rules` (default `.ai-factory/rules`).
 
 | Exit code | Meaning |
 |---|---|

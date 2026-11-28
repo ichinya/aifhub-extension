@@ -168,6 +168,31 @@ describe('Common plan resolver', () => {
     assert.deepEqual(stale.result.rules.project, []);
   });
 
+  it('uses base.md in the effective rules directory with or without a SessionBrief', async () => {
+    const content = '# Base rules\n';
+    for (const custom of [false, true]) {
+      const { root, change } = await fixture({ sdd: custom });
+      const rulesDir = custom ? 'policy' : '.ai-factory/rules';
+      const rulePath = `${rulesDir}/base.md`;
+      await mkdir(path.join(root, rulesDir));
+      await writeFile(path.join(root, rulePath), content);
+      if (custom) {
+        const config = path.join(root, '.ai-factory/config.yaml');
+        await writeFile(config, `${await readFile(config, 'utf8')}paths:\n  rules: ${rulesDir}\n`);
+        await mkdir(path.join(root, '.ai-factory/rules'));
+        await writeFile(path.join(root, '.ai-factory/rules/base.md'), '# Unselected default\n');
+        assert.equal((await compileSessionBrief({ rootDir: root, changeId: change })).status, 'valid');
+      }
+
+      const result = await taskCall(root, ['--change', change, '--task', '1.1', '--json']);
+      assert.equal(result.exitCode, 0);
+      assert.equal(result.result.context.status, custom ? 'valid' : 'disabled');
+      assert.deepEqual(result.result.rules.project, [{
+        path: rulePath, sha256: digest(Buffer.from(content)), fidelity: 'full'
+      }]);
+    }
+  });
+
   it('distinguishes unopted, missing, stale and blocked context without returning a stale digest', async () => {
     const { root, change } = await fixture();
     const call = () => taskCall(root, ['--change', change, '--task', '1.1', '--json']);

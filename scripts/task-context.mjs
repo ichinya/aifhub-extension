@@ -6,7 +6,7 @@ import { parseSimpleYaml } from './aif-artifact-sync.mjs';
 import { collectGeneratedRules } from './openspec-execution-context.mjs';
 import { inspectOpenSpecGeneratedRules, inventoryOpenSpecChanges } from './openspec-rules-compiler.mjs';
 import { digest, readProviderFile, safeProviderPath } from './provider-files.mjs';
-import { inspectSessionBrief } from './session-brief.mjs';
+import { inspectSessionBrief, openSpecProjectRulePaths } from './session-brief.mjs';
 import { parseToolConfig } from './tool-config.mjs';
 
 const DEFAULT_LIMIT = 4 * 1024 * 1024;
@@ -101,7 +101,7 @@ async function inspectTaskContext(rootDir, selection, readSource) {
   }
   const basis = brief ?? { ...plan.requirements, change_surface: plan.change_surface };
   const refs = brief?.context_manifest.filter(ref => !ref.path.startsWith(`${GENERATED_PATH}/`))
-    ?? plan.documents.map(({ path, sha256 }) => ({ path, sha256, fidelity: 'full' }));
+    ?? await canonicalFallbackRefs(rootDir, plan, readSource);
   return {
     context: {
       ...briefStatus(inspected), ...(brief ? { digest: brief.digest } : {}),
@@ -111,6 +111,18 @@ async function inspectTaskContext(rootDir, selection, readSource) {
     rules: { project: projectRefs, generated },
     ...(generated.status !== 'verified' ? { owner_handoff: modeHandoff } : {})
   };
+}
+
+async function canonicalFallbackRefs(rootDir, plan, readSource) {
+  const refs = plan.documents.map(({ path, sha256 }) => ({ path, sha256, fidelity: 'full' }));
+  const deltaRoot = `openspec/changes/${plan.change_id}/specs/`;
+  for (const document of plan.documents) {
+    if (!document.path.startsWith(deltaRoot) || path.posix.basename(document.path) !== 'spec.md') continue;
+    const file = `openspec/specs/${document.path.slice(deltaRoot.length)}`;
+    const bytes = await readSource(rootDir, file, DEFAULT_LIMIT);
+    if (bytes) refs.push({ path: file, sha256: digest(bytes), fidelity: 'full' });
+  }
+  return refs;
 }
 
 function briefStatus(inspected) {
@@ -142,7 +154,7 @@ function blockedContext(reasons, ownerHandoff) {
 }
 
 async function projectRuleReferences(rootDir, project, readSource) {
-  const paths = new Set([project.paths?.rules_file ?? '.ai-factory/RULES.md', project.rules?.base, project.rules?.skills]);
+  const paths = new Set(openSpecProjectRulePaths(project));
   const refs = [];
   for (const file of paths) {
     if (!file) continue;

@@ -498,6 +498,8 @@ describe('AIFHub installed command wrappers', () => {
     const wrapper = 'aifhub-plan-context';
     const extensionDir = await copyRealWrapperLayout(root, wrapper);
     await cp(path.join(REPO_ROOT, 'test/fixtures/openspec-valid-change/openspec'), path.join(root, 'openspec'), { recursive: true });
+    await mkdir(path.join(root, 'openspec/specs/unrelated'), { recursive: true });
+    await writeFile(path.join(root, 'openspec/specs/unrelated/spec.md'), '# Unrelated capability\n');
     await writeFile(path.join(root, '.ai-factory/config.yaml'), 'aifhub:\n  tools:\n    openspec: true\n');
     assert.equal(await pathExists(path.join(root, 'scripts')), false);
     const args = ['task', '--change', 'fixture-change', '--task', '1.1'];
@@ -509,6 +511,11 @@ describe('AIFHub installed command wrappers', () => {
     assert.equal(output.task_id, '1.1');
     assert.deepEqual(output.task, { line: 3, checked: true });
     assert.equal(output.section.markdown, await readFile(path.join(root, 'openspec/changes/fixture-change/tasks.md'), 'utf8'));
+    assert.equal(output.context.status, 'disabled');
+    assert.equal(output.rules.generated.status, 'missing');
+    assert.deepEqual(output.context.refs.map(ref => ref.path).filter(file => file.startsWith('openspec/specs/')), [
+      'openspec/specs/auth/spec.md'
+    ]);
     const invalid = await runWrapperHarness(root, extensionDir, wrapper, [...args, '--output', 'out.json', '--json']);
     assert.equal(invalid.exitCode, 2);
     assert.deepEqual(JSON.parse(invalid.stdout), { ok: false, error: 'invalid_task_arguments' });
