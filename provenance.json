@@ -16,7 +16,7 @@
     },
     {
       "path": "scripts/execution-task-source.mjs",
-      "sha256": "a39d330ac13fe6efd10a87a55c495022df16f5137db6011f9eadabc9b8e0b6d7"
+      "sha256": "f068681b63707a51edb58abe8f3c3d6466db90f5564ef0274e1099a3adc1813d"
     },
     {
       "path": "scripts/isolated-execution.mjs",

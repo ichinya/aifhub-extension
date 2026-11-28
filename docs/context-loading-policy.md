@@ -110,6 +110,24 @@ Generated rules and generated trace metadata are derived guidance only. If gener
 
 Runner output from OpenSpec CLI commands is runtime guidance or evidence. It does not replace the canonical filesystem artifacts under `openspec/`.
 
+### Read the context of one OpenSpec task
+
+Run this command from the consumer project root with an active local change ID and the exact task ID from its checklist. Omit `--json` for text output.
+
+```bash
+ai-factory aifhub-plan-context task --change add-oauth-login --task 2.1 --json
+```
+
+The command returns the original `tasks.md` section, including its checkboxes and line endings. It reports the selected task's line and checked state, the context revision, and separate references for project rules and trace-verified generated rules. An OpenSpec change without SDD uses the canonical context with `context.status: disabled`, including existing base specs that match the change's delta specs. Project rules resolve an explicit `rules.base` first and otherwise look for `base.md` under `paths.rules` (default `.ai-factory/rules`).
+
+| Exit code | Meaning |
+|---|---|
+| `0` | The requested section was read with a valid SessionBrief or the canonical fallback for a change without SDD. Check `rules.generated.status` for any generated-rules diagnostic. |
+| `1` | The task was identified and the current context needs attention. The response gives the reason and `owner_handoff`, omitting obsolete context and its digest. |
+| `2` | Arguments, change selection, task selection, or reading failed. Argument errors for `task` use `invalid_task_arguments`. |
+
+The command is read-only. Follow `owner_handoff` to address a stale brief or regenerate rules. In `$aif-implement`, the selected task is read after the existing context checks and before assignment. For the exact valid invocation above, exit `2` with the single stdout line `Plan resolver: invalid_arguments` identifies the legacy CLI fallback to canonical reads. Current command errors retain the workflow's blockers.
+
 ## AI Factory 2.18 Research Context
 
 Research is non-canonical supporting context in either artifact mode:

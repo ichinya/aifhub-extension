@@ -18,6 +18,9 @@ import {
 
 const COMPILER = 'aifhub.session_brief.compiler.v1';
 const CONFIG = '.ai-factory/config.yaml';
+const DEFAULT_RULES_ROOT = '.ai-factory/rules';
+const DEFAULT_RULES_FILE = '.ai-factory/RULES.md';
+const GENERATED_RULES_ROOT = '.ai-factory/rules/generated';
 const MAX_BYTES = 2 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 32 * 1024 * 1024;
 const MAX_FILES = 1024;
@@ -129,6 +132,14 @@ export async function assertSessionBriefBinding(changeId, digest, options = {}) 
   return status;
 }
 
+export function openSpecProjectRulePaths(config) {
+  return [
+    config.paths?.rules_file ?? DEFAULT_RULES_FILE,
+    config.rules?.base ?? `${config.paths?.rules ?? DEFAULT_RULES_ROOT}/base.md`,
+    config.rules?.skills
+  ];
+}
+
 async function buildSnapshot(options, explicitCompile) {
   const root = await realpath(path.resolve(options.rootDir ?? process.cwd()));
   if (options.changeId !== undefined && (typeof options.changeId !== 'string' || !options.changeId)) throw sddError('invalid-change-id');
@@ -226,7 +237,7 @@ async function buildSnapshot(options, explicitCompile) {
       if (!await add(safeReference(file), 'protected')) throw sddError('missing_context_reference');
     }
   }
-  const rulesRoot = safeReference(config.paths?.rules ?? '.ai-factory/rules');
+  const rulesRoot = safeReference(config.paths?.rules ?? DEFAULT_RULES_ROOT);
   const generatedFiles = [
     'openspec-base.md', `openspec-merged-${changeId}.md`, `openspec-change-${changeId}.md`,
     `openspec-rules-trace-${changeId}.json`
@@ -241,14 +252,25 @@ async function buildSnapshot(options, explicitCompile) {
   }
   // Generated OpenSpec outputs retain their fixed owner path even when the
   // configured project rules directory is elsewhere.
-  if (methodology === 'openspec') for (const file of generatedFiles) await add(`.ai-factory/rules/generated/${file}`, 'protected');
+  if (methodology === 'openspec') for (const file of generatedFiles) await add(`${GENERATED_RULES_ROOT}/${file}`, 'protected');
+  if (methodology === 'openspec') {
+    // The task helper consumes these rules independently of the directory walk.
+    for (const file of openSpecProjectRulePaths(config)) {
+      if (!file) continue;
+      const rulePath = safeReference(file);
+      const normalized = rulePath.toLowerCase();
+      if (normalized === GENERATED_RULES_ROOT || normalized.startsWith(`${GENERATED_RULES_ROOT}/`)) throw sddError('invalid_context_reference');
+      await add(rulePath, 'protected');
+    }
+  } else {
+    await add(safeReference(config.paths?.rules_file ?? DEFAULT_RULES_FILE), 'protected');
+  }
   const contextRefs = new Set([
     safeReference(config.paths?.architecture ?? '.ai-factory/ARCHITECTURE.md'),
     safeReference(config.paths?.context ?? 'CONTEXT.md'),
     safeReference(config.reviews?.policy_file ?? 'REVIEW.md'),
     'AGENTS.md', 'CLAUDE.md', ...policy.context_refs.map(safeReference)
   ]);
-  if (methodology === 'aifactory' || config.paths?.rules_file) await add(safeReference(config.paths?.rules_file ?? '.ai-factory/RULES.md'), 'protected');
   for (const file of [...contextRefs].sort()) {
     if (!file.endsWith('.md')) throw sddError('invalid_context_reference');
     const item = await add(file, 'protected');

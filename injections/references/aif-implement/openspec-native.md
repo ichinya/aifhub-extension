@@ -69,6 +69,14 @@ Hydrate runtime todo state from canonical OpenSpec tasks before editing implemen
 - Report missing todo-tool support as a capability fallback, not as an implementation failure.
 - Hydrating runtime todo state does not authorize broad task expansion; `/aif-implement` executes one task, one tightly coupled task group, or one explicit small same-shape batch validated under `skills/shared/TASK-COORDINATION.md`. Complete each item only after reconciling its expected change with the actual diff and evidence.
 
+After the applicable status, rules sync and SessionBrief preparation checks, and once a canonical task ID is selected, read its context before assignment:
+
+```bash
+ai-factory aifhub-plan-context task --change <change-id> --task <task-id> --json
+```
+
+Use a successful `aifhub.task_context.v1` response with the selected change and task IDs as a read-only context view. Preserve canonical source authority, the existing SessionBrief binding, and the execution admission below. For this exact, valid invocation with `task` first, only exit code `2` and a single stdout line `Plan resolver: invalid_arguments` allow the existing canonical reads as a compatibility fallback. Invalid JSON or other errors, including `stale` and `blocked`, retain existing blockers. Report the bounded diagnosis and applicable owner handoff before proceeding with any dependent work.
+
 #### Persistent execution and worker result acceptance
 
 For both configured OpenSpec and complete classic plans after marker-first classification, use the installed `ai-factory aifhub-execution <action> --json` helper with a JSON object on stdin. Read the installed extension's `docs/workflow-mechanics.md` for payload contracts and follow the durable execution section of `skills/shared/TASK-COORDINATION.md`. This supporting execution state is separate from SessionBrief context compilation and authoritative Handoff/QA gates. The helper selects effective paths/tools, requires a complete classic pair, and delegates valid ultra before writing state.

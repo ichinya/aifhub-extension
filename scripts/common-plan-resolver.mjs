@@ -13,6 +13,7 @@ import { selectSddProfile, validateSddInputs, validateSddPolicy } from './sdd-pr
 import { parseSimpleYaml } from './aif-artifact-sync.mjs';
 import { parseToolConfig } from './tool-config.mjs';
 import { discoverLegacyPlans } from './legacy-plan-migration.mjs';
+import { runTaskContextCommand } from './task-context.mjs';
 
 const ADAPTER_DIR = new URL('../adapters/', import.meta.url);
 
@@ -201,6 +202,9 @@ function computeSourceRevision(documents) {
 function sha256(value) { return createHash('sha256').update(value).digest('hex'); }
 
 export async function resolvePlanContextCommand(argv = process.argv.slice(2), options = {}) {
+  if (argv[0] === 'task') {
+    return runTaskContextCommand(argv.slice(1), options);
+  }
   let jsonOutput = false;
   let changeId;
   let methodology;
