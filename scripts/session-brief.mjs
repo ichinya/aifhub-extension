@@ -18,6 +18,7 @@ import {
 
 const COMPILER = 'aifhub.session_brief.compiler.v1';
 const CONFIG = '.ai-factory/config.yaml';
+const GENERATED_RULES_ROOT = '.ai-factory/rules/generated';
 const MAX_BYTES = 2 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 32 * 1024 * 1024;
 const MAX_FILES = 1024;
@@ -241,14 +242,26 @@ async function buildSnapshot(options, explicitCompile) {
   }
   // Generated OpenSpec outputs retain their fixed owner path even when the
   // configured project rules directory is elsewhere.
-  if (methodology === 'openspec') for (const file of generatedFiles) await add(`.ai-factory/rules/generated/${file}`, 'protected');
+  if (methodology === 'openspec') for (const file of generatedFiles) await add(`${GENERATED_RULES_ROOT}/${file}`, 'protected');
+  const rulesFile = config.paths?.rules_file ?? '.ai-factory/RULES.md';
+  if (methodology === 'openspec') {
+    // The task helper consumes these rules independently of the directory walk.
+    for (const file of [rulesFile, config.rules?.base, config.rules?.skills]) {
+      if (!file) continue;
+      const rulePath = safeReference(file);
+      const normalized = rulePath.toLowerCase();
+      if (normalized === GENERATED_RULES_ROOT || normalized.startsWith(`${GENERATED_RULES_ROOT}/`)) throw sddError('invalid_context_reference');
+      await add(rulePath, 'protected');
+    }
+  } else {
+    await add(safeReference(rulesFile), 'protected');
+  }
   const contextRefs = new Set([
     safeReference(config.paths?.architecture ?? '.ai-factory/ARCHITECTURE.md'),
     safeReference(config.paths?.context ?? 'CONTEXT.md'),
     safeReference(config.reviews?.policy_file ?? 'REVIEW.md'),
     'AGENTS.md', 'CLAUDE.md', ...policy.context_refs.map(safeReference)
   ]);
-  if (methodology === 'aifactory' || config.paths?.rules_file) await add(safeReference(config.paths?.rules_file ?? '.ai-factory/RULES.md'), 'protected');
   for (const file of [...contextRefs].sort()) {
     if (!file.endsWith('.md')) throw sddError('invalid_context_reference');
     const item = await add(file, 'protected');

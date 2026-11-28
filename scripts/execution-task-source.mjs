@@ -54,7 +54,7 @@ export function assertAuxiliaryPaths(paths) {
 
 // Preserve inline code in titles. Exclude examples without changing the shared
 // marker parser used by other workflow owners.
-export function parseExecutionTasks(content, { locations = false } = {}) {
+export function parseExecutionTasks(content, { locations = false, headingLines } = {}) {
   const lines = String(content).replace(/^\uFEFF/, '').split(/\r\n|\n|\r/);
   let frontmatter = lines[0] === '---', fence = null, comment = false, ordinal = 0;
   const tasks = [], seen = new Set();
@@ -88,6 +88,9 @@ export function parseExecutionTasks(content, { locations = false } = {}) {
     line = visible;
     const marker = line.match(/^\s*(`{3,}|~{3,})(.*)$/);
     if (marker) { fence = { char: marker[1][0], length: marker[1].length }; continue; }
+    if (headingLines && /^ {0,3}##(?:[ \t]|$)/.test(lines[index]) && /^ {0,3}##(?:[ \t]|$)/.test(line)) {
+      headingLines.push(index);
+    }
     const match = line.match(/^( *)-\s+\[([ xX])\]\s+(.+?)\s*$/);
     if (!match) { if (line.trim() && /^\S/.test(line)) parentIndent = null; continue; }
     const indent = match[1].length;

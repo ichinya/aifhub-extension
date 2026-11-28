@@ -6,6 +6,8 @@ import process from 'node:process';
 import { assertSessionBriefBinding, inspectSessionBrief, sessionBriefPaths } from './session-brief.mjs';
 import { buildCompositionBaseline, recordCompositionConsumption } from './instruction-composition.mjs';
 import { resolvePlanTarget, resolvePlanContext } from './common-plan-resolver.mjs';
+import { parseStrictJson } from './json-strict.mjs';
+import { readProviderFile, safeProviderPath } from './provider-files.mjs';
 
 import {
   ensureRuntimeLayout,
@@ -255,8 +257,10 @@ export async function collectGeneratedRules(changeId, options = {}) {
 
   const resolvedChangeId = normalized.changeId;
   const generatedDir = path.join(rootDir, GENERATED_DIR);
-  const fingerprints = await collectCurrentSpecFingerprints(rootDir, resolvedChangeId);
-  const trace = await readGeneratedRulesTrace(rootDir, generatedDir, resolvedChangeId);
+  const strictReader = options.strict ? (options.readSource ?? readProviderFile) : null;
+  const read = strictReader ? (root, file) => readBoundedRuleFile(root, file, strictReader) : readOptionalTextFile;
+  const fingerprints = await collectCurrentSpecFingerprints(rootDir, resolvedChangeId, strictReader ? read : null);
+  const trace = await readGeneratedRulesTrace(rootDir, generatedDir, resolvedChangeId, read, Boolean(strictReader));
   const expected = [
     {
       kind: 'merged',
@@ -286,13 +290,13 @@ export async function collectGeneratedRules(changeId, options = {}) {
 
   for (const expectedFile of expected) {
     const filePath = path.join(generatedDir, expectedFile.fileName);
-    const item = await readOptionalTextFile(rootDir, filePath);
+    const item = await read(rootDir, filePath);
     generatedMarkdownExists ||= item.exists;
     const traceStale = item.exists && trace.exists && trace.valid
       ? determineTraceStaleness(trace.inputs, expectedFile.expectedFingerprints, expectedFile.traceInputKinds)
       : null;
     const traceOutputStale = item.exists && trace.exists && trace.valid
-      ? determineTraceOutputStaleness(trace.outputs, item, expectedFile.traceOutputKind)
+      ? determineTraceOutputStaleness(trace.outputs, item, expectedFile.traceOutputKind, Boolean(strictReader))
       : null;
     const markdownStale = item.exists && !(trace.exists && trace.valid)
       ? determineStaleness(item.content, expectedFile.expectedFingerprints)
@@ -310,6 +314,7 @@ export async function collectGeneratedRules(changeId, options = {}) {
         ? traceOutputStale === null ? 'trace' : 'trace-output'
         : 'markdown',
       trace: summarizeGeneratedRulesTrace(trace, stale),
+      ...(strictReader ? { verified: traceStale === false && traceOutputStale === false, sha256: item.sha256 } : {}),
       content: item.content
     });
 
@@ -894,12 +899,13 @@ function createDefaultRunId(options = {}) {
   return `run-${date.toISOString().replace(/[:.]/g, '-')}`;
 }
 
-async function collectCurrentSpecFingerprints(rootDir, changeId) {
-  const baseFiles = await collectTextFiles(rootDir, path.join(rootDir, 'openspec', 'specs'), isSpecMarkdown);
+async function collectCurrentSpecFingerprints(rootDir, changeId, read = null) {
+  const baseFiles = await collectTextFiles(rootDir, path.join(rootDir, 'openspec', 'specs'), isSpecMarkdown, read);
   const deltaFiles = await collectTextFiles(
     rootDir,
     path.join(rootDir, 'openspec', 'changes', changeId, 'specs'),
-    isSpecMarkdown
+    isSpecMarkdown,
+    read
   );
 
   return {
@@ -949,9 +955,9 @@ function determineStaleness(content, expectedFingerprints) {
   return false;
 }
 
-async function readGeneratedRulesTrace(rootDir, generatedDir, changeId) {
+async function readGeneratedRulesTrace(rootDir, generatedDir, changeId, read = readOptionalTextFile, strict = false) {
   const filePath = path.join(generatedDir, `${TRACE_FILE_PREFIX}${changeId}.json`);
-  const item = await readOptionalTextFile(rootDir, filePath);
+  const item = await read(rootDir, filePath);
 
   if (!item.exists) {
     return {
@@ -967,7 +973,7 @@ async function readGeneratedRulesTrace(rootDir, generatedDir, changeId) {
   }
 
   try {
-    const parsed = JSON.parse(item.content);
+    const parsed = strict ? parseStrictJson(item.content) : JSON.parse(item.content);
     const rawInputs = parsed?.inputs;
     const inputs = Array.isArray(rawInputs)
       ? rawInputs.map(normalizeTraceInput).filter(Boolean)
@@ -984,6 +990,7 @@ async function readGeneratedRulesTrace(rootDir, generatedDir, changeId) {
       || !Array.isArray(rawInputs)
       || inputs.length !== rawInputs.length
       || rawOutputs !== undefined && (!Array.isArray(rawOutputs) || outputs.length !== rawOutputs.length)
+      || strict && (!uniqueCanonicalTracePaths(rawInputs) || !uniqueCanonicalTracePaths(rawOutputs ?? []))
     ) {
       return {
         path: item.path,
@@ -1019,6 +1026,13 @@ async function readGeneratedRulesTrace(rootDir, generatedDir, changeId) {
       error: err?.message ?? 'Invalid JSON.'
     };
   }
+}
+
+function uniqueCanonicalTracePaths(items) {
+  const paths = items.map(item => item.path);
+  return paths.every(value => !value.includes('\\') && !value.includes(':')
+    && value.split('/').every(part => part && part !== '.' && part !== '..'))
+    && new Set(paths).size === paths.length;
 }
 
 function normalizeTraceInput(input) {
@@ -1112,21 +1126,20 @@ function determineTraceStaleness(inputs, expectedFingerprints, traceInputKinds) 
   return false;
 }
 
-function determineTraceOutputStaleness(outputs, generatedRule, traceOutputKind) {
+function determineTraceOutputStaleness(outputs, generatedRule, traceOutputKind, strict = false) {
   if (!Array.isArray(outputs) || outputs.length === 0) {
     return null;
   }
 
-  const output = outputs.find((item) =>
-    item.path === generatedRule.path
-    || item.kind === traceOutputKind
-  );
+  const output = outputs.find(item => strict
+    ? item.path === generatedRule.path && item.kind === traceOutputKind
+    : item.path === generatedRule.path || item.kind === traceOutputKind);
 
   if (output === undefined) {
     return null;
   }
 
-  return output.sha256 !== createFingerprint(generatedRule.content);
+  return output.sha256 !== (generatedRule.sha256 ?? createFingerprint(generatedRule.content));
 }
 
 function summarizeGeneratedRulesTrace(trace, stale) {
@@ -1152,18 +1165,25 @@ function parseSourceFingerprints(content) {
   return fingerprints;
 }
 
-async function collectTextFiles(rootDir, directoryPath, predicate) {
-  if (!await isDirectory(directoryPath)) {
+async function collectTextFiles(rootDir, directoryPath, predicate, read = null) {
+  const guard = read ? async directory => (await safeProviderPath(rootDir, toPosix(path.relative(rootDir, directory)))).exists : null;
+  if (!(guard ? await guard(directoryPath) : await isDirectory(directoryPath))) {
     return [];
   }
 
   const filePaths = [];
-  await collectFilePaths(directoryPath, filePaths, predicate);
+  await collectFilePaths(directoryPath, filePaths, predicate, guard);
 
   const sorted = filePaths.sort((left, right) => toPosix(path.relative(rootDir, left)).localeCompare(toPosix(path.relative(rootDir, right))));
   const result = [];
 
   for (const filePath of sorted) {
+    if (read) {
+      const item = await read(rootDir, filePath);
+      if (!item.exists) throw new Error('sources_changed_during_read');
+      result.push(item);
+      continue;
+    }
     const content = await readFile(filePath, 'utf8');
     result.push({
       path: toPosix(path.relative(rootDir, filePath)),
@@ -1174,16 +1194,18 @@ async function collectTextFiles(rootDir, directoryPath, predicate) {
   return result;
 }
 
-async function collectFilePaths(directoryPath, filePaths, predicate) {
+async function collectFilePaths(directoryPath, filePaths, predicate, guard = null) {
+  if (guard && !await guard(directoryPath)) throw new Error('sources_changed_during_read');
   const entries = await readdir(directoryPath, { withFileTypes: true });
   const sortedEntries = entries.sort((left, right) => left.name.localeCompare(right.name));
 
   for (const entry of sortedEntries) {
     if (entry.name === '.gitignore') continue;
+    if (guard && entry.isSymbolicLink()) throw new Error('unsafe_path');
     const childPath = path.join(directoryPath, entry.name);
 
     if (entry.isDirectory()) {
-      await collectFilePaths(childPath, filePaths, predicate);
+      await collectFilePaths(childPath, filePaths, predicate, guard);
       continue;
     }
 
@@ -1191,6 +1213,17 @@ async function collectFilePaths(directoryPath, filePaths, predicate) {
       filePaths.push(childPath);
     }
   }
+}
+
+async function readBoundedRuleFile(rootDir, filePath, reader) {
+  const relativePath = toPosix(path.relative(rootDir, filePath));
+  const bytes = await reader(rootDir, relativePath, 4 * 1024 * 1024);
+  if (!bytes) return { path: relativePath, exists: false, content: '' };
+  return {
+    path: relativePath, exists: true,
+    content: new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes),
+    sha256: createFingerprint(bytes)
+  };
 }
 
 async function readOptionalTextFile(rootDir, filePath) {

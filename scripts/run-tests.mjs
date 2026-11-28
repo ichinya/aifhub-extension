@@ -16,12 +16,16 @@ const canonicalTemp = await realpath(os.tmpdir()).catch(() => null);
 if (canonicalTemp) { process.env.TEMP = canonicalTemp; process.env.TMP = canonicalTemp; process.env.TMPDIR = canonicalTemp; }
 
 const directory = fileURLToPath(new URL('./', import.meta.url));
-const mutating = ['superpowers-skill-eval.test.mjs'];
+const serial = ['superpowers-skill-eval.test.mjs'];
+if (process.platform === 'win32') {
+  // Keep the AI Tester fixture's CLI subprocesses out of the parallel Windows test wave.
+  serial.push('context-dedup-ai-tester-summary.test.mjs');
+}
 const names = readdirSync(directory).filter(name => name.endsWith('.test.mjs')).sort();
 let status = 0;
-for (const name of names.filter(name => mutating.includes(name)))
+for (const name of names.filter(name => serial.includes(name)))
   status |= spawnSync(process.execPath, ['--test', path.join(directory, name).replaceAll(path.sep, '/')], { stdio: 'inherit', windowsHide: true }).status ?? 1;
-const files = names.filter(name => !mutating.includes(name))
+const files = names.filter(name => !serial.includes(name))
   .map(name => path.join(directory, name).replaceAll(path.sep, '/'));
 status |= spawnSync(process.execPath, ['--test', ...files], { stdio: 'inherit', windowsHide: true }).status ?? 1;
 process.exitCode = status;

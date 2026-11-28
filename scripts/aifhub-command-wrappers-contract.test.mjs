@@ -288,7 +288,7 @@ async function copyInstalledCommandLayout(userProjectDir) {
   return extensionDir;
 }
 
-async function copyRealFinalizerLayout(userProjectDir) {
+async function copyRealWrapperLayout(userProjectDir, command) {
   const extensionDir = path.join(userProjectDir, '.ai-factory', 'extensions', 'aifhub-extension');
   await mkdir(path.join(extensionDir, 'commands'), { recursive: true });
   await copyFile(
@@ -296,14 +296,17 @@ async function copyRealFinalizerLayout(userProjectDir) {
     path.join(extensionDir, 'commands', 'run-installed-script.mjs')
   );
   await copyFile(
-    path.join(REPO_ROOT, 'commands', 'aifhub-done-finalizer.mjs'),
-    path.join(extensionDir, 'commands', 'aifhub-done-finalizer.mjs')
+    path.join(REPO_ROOT, 'commands', `${command}.mjs`),
+    path.join(extensionDir, 'commands', `${command}.mjs`)
   );
   await cp(
     path.join(REPO_ROOT, 'scripts'),
     path.join(extensionDir, 'scripts'),
     { recursive: true }
   );
+  if (command === 'aifhub-plan-context') {
+    await cp(path.join(REPO_ROOT, 'adapters'), path.join(extensionDir, 'adapters'), { recursive: true });
+  }
   return extensionDir;
 }
 
@@ -316,11 +319,11 @@ async function pathExists(targetPath) {
   }
 }
 
-async function runFinalizerWrapperHarness(userProjectDir, extensionDir) {
-  const harnessPath = path.join(tmpDir, 'run-finalizer-wrapper.mjs');
+async function runWrapperHarness(userProjectDir, extensionDir, command, args) {
+  const harnessPath = path.join(tmpDir, 'run-installed-wrapper.mjs');
   await writeFile(harnessPath, [
     "import { pathToFileURL } from 'node:url';",
-    'const wrapperPath = process.env.AIFHUB_FINALIZER_WRAPPER_PATH;',
+    'const wrapperPath = process.argv[2];',
     'const mod = await import(pathToFileURL(wrapperPath).href);',
     'let actionHandler = null;',
     'const chain = {',
@@ -331,21 +334,17 @@ async function runFinalizerWrapperHarness(userProjectDir, extensionDir) {
     '  action(handler) { actionHandler = handler; return this; }',
     '};',
     'mod.register({ command() { return chain; } });',
-    'await actionHandler(process.argv.slice(2));'
+    'await actionHandler(process.argv.slice(3));'
   ].join('\n'), 'utf8');
 
   try {
     const result = await execFileAsync(process.execPath, [
       harnessPath,
-      '--change',
-      'missing-change',
-      '--json'
+      path.join(extensionDir, 'commands', `${command}.mjs`),
+      ...args
     ], {
       cwd: userProjectDir,
-      env: {
-        ...process.env,
-        AIFHUB_FINALIZER_WRAPPER_PATH: path.join(extensionDir, 'commands', 'aifhub-done-finalizer.mjs')
-      },
+      env: { LOG_LEVEL: 'standard', ...(process.platform === 'win32' ? { SystemRoot: process.env.SystemRoot } : {}) },
       windowsHide: true
     });
     return { exitCode: 0, stdout: result.stdout, stderr: result.stderr };
@@ -472,7 +471,7 @@ describe('AIFHub installed command wrappers', () => {
   it('runs the real installed finalizer graph without project-root helper scripts', async () => {
     const userProjectDir = path.join(tmpDir, 'installed-finalizer-project');
     await mkdir(userProjectDir, { recursive: true });
-    const extensionDir = await copyRealFinalizerLayout(userProjectDir);
+    const extensionDir = await copyRealWrapperLayout(userProjectDir, 'aifhub-done-finalizer');
 
     assert.equal(
       await pathExists(path.join(userProjectDir, 'scripts', 'openspec-done-finalizer.mjs')),
@@ -480,7 +479,7 @@ describe('AIFHub installed command wrappers', () => {
       'consumer project must not need a root finalizer script'
     );
 
-    const command = await runFinalizerWrapperHarness(userProjectDir, extensionDir);
+    const command = await runWrapperHarness(userProjectDir, extensionDir, 'aifhub-done-finalizer', ['--change', 'missing-change', '--json']);
     const output = JSON.parse(command.stdout);
 
     assert.equal(command.exitCode, 2, 'unresolved explicit change should propagate command exit 2');
@@ -492,6 +491,40 @@ describe('AIFHub installed command wrappers', () => {
     assert.equal(output.archive.status, 'SKIPPED');
     assert.equal(output.errors[0].code, 'explicit-change-not-found');
     assert.equal(Object.hasOwn(output, 'context'), false);
+  });
+
+  it('runs task through the real installed resolver from a consumer root', async () => {
+    const root = path.join(tmpDir, 'installed-task-context-project');
+    const wrapper = 'aifhub-plan-context';
+    const extensionDir = await copyRealWrapperLayout(root, wrapper);
+    await cp(path.join(REPO_ROOT, 'test/fixtures/openspec-valid-change/openspec'), path.join(root, 'openspec'), { recursive: true });
+    await writeFile(path.join(root, '.ai-factory/config.yaml'), 'aifhub:\n  tools:\n    openspec: true\n');
+    assert.equal(await pathExists(path.join(root, 'scripts')), false);
+    const args = ['task', '--change', 'fixture-change', '--task', '1.1'];
+    const command = await runWrapperHarness(root, extensionDir, wrapper, [...args, '--json']);
+    assert.equal(command.exitCode, 0, command.stderr);
+    assert.equal(command.stderr, '');
+    const output = JSON.parse(command.stdout);
+    assert.equal(output.schema, 'aifhub.task_context.v1');
+    assert.equal(output.task_id, '1.1');
+    assert.deepEqual(output.task, { line: 3, checked: true });
+    assert.equal(output.section.markdown, await readFile(path.join(root, 'openspec/changes/fixture-change/tasks.md'), 'utf8'));
+    const invalid = await runWrapperHarness(root, extensionDir, wrapper, [...args, '--output', 'out.json', '--json']);
+    assert.equal(invalid.exitCode, 2);
+    assert.deepEqual(JSON.parse(invalid.stdout), { ok: false, error: 'invalid_task_arguments' });
+    assert.equal(await pathExists(path.join(root, 'out.json')), false);
+    assert.equal(await pathExists(path.join(root, '.ai-factory/state')), false);
+  });
+
+  it('task context guidance preserves admission and restricts fallback to the legacy response', async () => {
+    const instructions = await readFile(path.join(REPO_ROOT, 'injections/references/aif-implement/openspec-native.md'), 'utf8');
+    const prepare = instructions.indexOf('ai-factory aifhub-session-brief prepare --change');
+    const task = instructions.indexOf('ai-factory aifhub-plan-context task --change <change-id> --task <task-id> --json');
+    const dispatch = instructions.indexOf('#### Persistent execution and worker result acceptance');
+    assert.ok(prepare >= 0 && prepare < task && task < dispatch);
+    const guidance = instructions.slice(task, dispatch);
+    assert.match(guidance, /exit code `2`.*single stdout line `Plan resolver: invalid_arguments`/s);
+    assert.match(guidance, /Invalid JSON or other errors.*retain existing blockers/s);
   });
 
   it('runInstalledScript forwards process settings and reports child failures', async () => {
